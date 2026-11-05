@@ -12,6 +12,7 @@ final class KasirgaIstatistik {
     static int huniDortgen;
     static int huniSprite;
     static int altGirdapDortgen;
+    static int etekDortgen;
     static int tabanSprite;
     static int duvarSprite;
     static int gorselEnkaz;
@@ -34,6 +35,7 @@ final class KasirgaIstatistik {
         huniDortgen = 0;
         huniSprite = 0;
         altGirdapDortgen = 0;
+        etekDortgen = 0;
         tabanSprite = 0;
         duvarSprite = 0;
         gorselEnkaz = 0;
@@ -73,7 +75,8 @@ final class KasirgaIstatistik {
 
     static String sayilar() {
         return "huni_dortgen=" + huniDortgen + " huni_sprite=" + huniSprite + " alt_girdap_dortgen=" + altGirdapDortgen
-                + " taban_sprite=" + tabanSprite + " duvar_sprite=" + duvarSprite + " gorsel_enkaz=" + gorselEnkaz;
+                + " etek_dortgen=" + etekDortgen + " taban_sprite=" + tabanSprite + " duvar_sprite=" + duvarSprite
+                + " gorsel_enkaz=" + gorselEnkaz;
     }
 
     static String sureler() {

@@ -34,7 +34,7 @@ import net.minecraft.world.phys.Vec3;
  * /dogalafet spike kasirga dur
  * /dogalafet spike kasirga kalite &lt;kalite&gt;
  * /dogalafet spike kasirga hareket &lt;true|false&gt;
- * /dogalafet spike kasirga kamera &lt;mesafe&gt; [eğim]
+ * /dogalafet spike kasirga kamera &lt;mesafe&gt; [eğim] [yükseklik]
  * </pre>
  *
  * Komutlar sohbete yazı göndermez (N6); olan sunucu log'una yazılır.
@@ -56,9 +56,12 @@ public final class KasirgaSpikeKomutu {
                 .then(Commands.literal("hareket").then(Commands.argument("acik", BoolArgumentType.bool())
                         .executes(KasirgaSpikeKomutu::hareket)))
                 .then(Commands.literal("kamera").then(Commands.argument("mesafe", DoubleArgumentType.doubleArg(5, 400))
-                        .executes(b -> kamera(b, -12f))
+                        .executes(b -> kamera(b, -12f, 3))
                         .then(Commands.argument("egim", FloatArgumentType.floatArg(-90, 90))
-                                .executes(b -> kamera(b, FloatArgumentType.getFloat(b, "egim"))))))
+                                .executes(b -> kamera(b, FloatArgumentType.getFloat(b, "egim"), 3))
+                                .then(Commands.argument("yukseklik", DoubleArgumentType.doubleArg(0, 60))
+                                        .executes(b -> kamera(b, FloatArgumentType.getFloat(b, "egim"),
+                                                DoubleArgumentType.getDouble(b, "yukseklik")))))))
                 .then(Commands.argument("seviye", IntegerArgumentType.integer(1, 5))
                         .executes(b -> baslat(b, -1))
                         .then(Commands.literal("kalite").then(kaliteArgumani()
@@ -121,7 +124,12 @@ public final class KasirgaSpikeKomutu {
                 }
             }
         }
-        silinecek.forEach(Entity::discard);
+        silinecek.forEach(varlik -> {
+            if (varlik instanceof UcanBlokVarligi blok) {
+                blok.esyaOlarakDus();
+            }
+            varlik.discard();
+        });
         return silinecek.size();
     }
 
@@ -152,21 +160,22 @@ public final class KasirgaSpikeKomutu {
     }
 
     /**
-     * Oyuncuyu kasırganın ilerleme yönünde (kasırga kameraya doğru gelir) {@code mesafe} blok öteye, zeminin 3 blok
-     * üstüne koyar ve kasırgaya baktırır (vitrin: tasarım notu §3).
+     * Oyuncuyu kasırganın ilerleme yönünde (kasırga kameraya doğru gelir) {@code mesafe} blok öteye, zeminin
+     * {@code yukseklik} blok üstüne koyar ve kasırgaya baktırır (vitrin: tasarım notu §3).
      */
-    private static int kamera(CommandContext<CommandSourceStack> b, float egim) throws CommandSyntaxException {
+    private static int kamera(CommandContext<CommandSourceStack> b, float egim, double yukseklik)
+            throws CommandSyntaxException {
         ServerPlayer oyuncu = b.getSource().getPlayerOrException();
         ServerLevel seviye = oyuncu.serverLevel();
         KasirgaVarligi kasirga = kasirgalar(seviye).stream().findFirst().orElseThrow(KASIRGA_YOK::create);
         double mesafe = DoubleArgumentType.getDouble(b, "mesafe");
         double x = kasirga.getX() + Math.cos(kasirga.yon()) * mesafe;
         double z = kasirga.getZ() + Math.sin(kasirga.yon()) * mesafe;
-        double y = seviye.getHeight(Heightmap.Types.MOTION_BLOCKING, Mth.floor(x), Mth.floor(z)) + 3;
+        double y = seviye.getHeight(Heightmap.Types.MOTION_BLOCKING, Mth.floor(x), Mth.floor(z)) + yukseklik;
         float yaw = (float) (Mth.atan2(kasirga.getZ() - z, kasirga.getX() - x) * Mth.RAD_TO_DEG) - 90f;
         oyuncu.teleportTo(seviye, x, y, z, yaw, egim);
-        DogalAfetler.LOGGER.info("[spike-kasirga] kamera: mesafe={}, eğim={}, konum=({}, {}, {}), yaw={}", mesafe, egim,
-                String.format("%.1f", x), String.format("%.1f", y), String.format("%.1f", z),
+        DogalAfetler.LOGGER.info("[spike-kasirga] kamera: mesafe={}, eğim={}, yükseklik={}, konum=({}, {}, {}), yaw={}",
+                mesafe, egim, yukseklik, String.format("%.1f", x), String.format("%.1f", y), String.format("%.1f", z),
                 String.format("%.1f", yaw));
         return 1;
     }

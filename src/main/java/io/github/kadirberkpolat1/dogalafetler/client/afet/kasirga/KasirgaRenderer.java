@@ -2,6 +2,7 @@ package io.github.kadirberkpolat1.dogalafetler.client.afet.kasirga;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.EtekProfili;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.HuniProfili;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.KasirgaEvresi;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.KasirgaKaliteButcesi;
@@ -28,17 +29,17 @@ import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 /**
- * Kasırganın bütün istemci katmanları (tasarım notu §2): huni gövdesi, alt girdaplar, taban enkaz halkası, duvar bulutu
- * ve yalnız görsel enkaz kopyaları. Bulut katmanlarının hepsi tek atlas ve tek render tipiyle aynı tampona yazılır: kare
- * başına tek çizim çağrısı, yarı saydam dörtgenler kameraya göre birlikte sıralanır. Sprite'lar parçacık motoruna
- * değil bu tampona yazılır (16384 parçacık sınırına ve parçacık tick'ine takılmaz). Enkaz kopyaları vanilla blok
- * modelleriyle sabit blok tamponlarına gider. Dönüş siklonik: yukarıdan bakınca saat yönünün tersi.
+ * Kasırganın bütün istemci katmanları (tasarım notu §2): huni gövdesi, alt girdaplar, taban enkaz eteği ve toz halkası,
+ * duvar bulutu ve yalnız görsel enkaz kopyaları. Bulut katmanlarının hepsi tek atlas ve tek render tipiyle aynı tampona
+ * yazılır: kare başına tek çizim çağrısı, yarı saydam dörtgenler kameraya göre birlikte sıralanır. Sprite'lar parçacık
+ * motoruna değil bu tampona yazılır (16384 parçacık sınırına ve parçacık tick'ine takılmaz). Enkaz kopyaları vanilla
+ * blok modelleriyle sabit blok tamponlarına gider. Dönüş siklonik: yukarıdan bakınca saat yönünün tersi.
  */
 final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
-    private static final float[] TOZ = {0.50f, 0.43f, 0.35f};
-    private static final float YAPRAK_R = 0.30f;
-    private static final float YAPRAK_G = 0.48f;
-    private static final float YAPRAK_B = 0.22f;
+    private static final float[] TOZ = {0.52f, 0.42f, 0.31f};
+    private static final float[] ETEK_ALT = {0.40f, 0.31f, 0.22f};
+    private static final float[] ETEK_UST = {0.56f, 0.47f, 0.37f};
+    private static final float[][] YAPRAK = {{0.30f, 0.48f, 0.22f}, {0.42f, 0.58f, 0.24f}, {0.50f, 0.38f, 0.18f}};
     private static final float PIKSEL = 1f / KasirgaDokusu.BOYUT;
     private static final double TAM_TUR = Math.PI * 2;
 
@@ -89,11 +90,20 @@ final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
     @Override
     public void render(KasirgaVarligi k, float yaw, float kismi, PoseStack poz, MultiBufferSource tampon,
             int paketliIsik) {
+        // Burada yalnız opak enkaz kopyaları (derinlik yazar). Derinlik yazmayan bulut katmanları burada çizilseydi sonradan
+        // boşaltılan sabit blok tamponları huninin arkasındaki blokları öne bindirirdi; onları KasirgaBulutCizimi çizer.
+        if (KasirgaIstemciDurumu.acik(Katman.ENKAZ)) {
+            long bas = System.nanoTime();
+            KasirgaIstatistik.gorselEnkaz += enkaz(k, k.rankine(), poz, tampon, KasirgaIstemciDurumu.zaman(k, kismi),
+                    paketliIsik);
+            KasirgaIstatistik.sure(Katman.ENKAZ, System.nanoTime() - bas);
+        }
+    }
+
+    /** Yarı saydam bulut katmanları; {@code poz} kasırganın çizim konumuna taşınmış, tampon çağıran tarafından boşaltılır. */
+    void bulut(KasirgaVarligi k, double ex, double ey, double ez, float kismi, PoseStack poz,
+            MultiBufferSource tampon, int paketliIsik) {
         KasirgaDokusu.hazirla();
-        KasirgaIstatistik.kareBasi();
-        double ex = Mth.lerp(kismi, k.xOld, k.getX());
-        double ey = Mth.lerp(kismi, k.yOld, k.getY());
-        double ez = Mth.lerp(kismi, k.zOld, k.getZ());
         KasirgaIstatistik.konum(ex, ez);
         Vec3 kamera = entityRenderDispatcher.camera.getPosition();
         kamX = (float) (kamera.x - ex);
@@ -208,19 +218,25 @@ final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
         }
         if (KasirgaIstemciDurumu.acik(Katman.TABAN)) {
             long bas = System.nanoTime();
+            double hE = s.enkazYuksekligi();
+            double rEtek = s.enkazYaricapi() * (0.6 + 0.4 * tabanOrani);
+            double rEtekUst = HuniProfili.yaricap(rAlt, rUst, Math.max(0, (hE - alt) / (h - alt))) * 1.05;
+            // S1 seyrek bir toz girdabı, S5 huniyi saran kalın enkaz kılıfı.
+            float etekAlfa = (float) ((0.45 + 0.55 * a) * alfa * Math.min(1, tabanOrani * 1.25));
+            double etekOmega = rankine.acisalHiz(rEtek * 0.75);
+            int dilim = butce.huniDilim();
+            int halka = Math.max(4, butce.huniHalka() / 4);
+            KasirgaIstatistik.etekDortgen += etekAgi(t, dilim, halka, rEtek, rEtekUst, hE, etekOmega, 0, etekAlfa);
+            KasirgaIstatistik.etekDortgen += etekAgi(t, dilim, halka, rEtek * 0.82, rEtekUst * 0.9, hE * 0.85,
+                    etekOmega * 1.4, 0.5, etekAlfa * 0.7f);
             int adet = (int) (butce.tabanSpriteSayisi(s.seviye(), mesafe) * tabanOrani);
-            KasirgaIstatistik.tabanSprite += taban(k, s, rankine, adet, t, alfa);
+            KasirgaIstatistik.tabanSprite += taban(k, s, rankine, adet, t, alfa, rEtek, rEtekUst);
             KasirgaIstatistik.sure(Katman.TABAN, System.nanoTime() - bas);
         }
         if (KasirgaIstemciDurumu.acik(Katman.DUVAR)) {
             long bas = System.nanoTime();
             KasirgaIstatistik.duvarSprite += duvar(k, s, butce.duvarSprite(), t, alfa * Math.min(1, 0.4 + inis));
             KasirgaIstatistik.sure(Katman.DUVAR, System.nanoTime() - bas);
-        }
-        if (KasirgaIstemciDurumu.acik(Katman.ENKAZ)) {
-            long bas = System.nanoTime();
-            KasirgaIstatistik.gorselEnkaz += enkaz(k, rankine, poz, tampon, t);
-            KasirgaIstatistik.sure(Katman.ENKAZ, System.nanoTime() - bas);
         }
     }
 
@@ -273,6 +289,12 @@ final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
                 noktaNz[n] = sn;
             }
         }
+        agiYaz(dilim, halka);
+        return dilim * halka;
+    }
+
+    /** {@link #diziHazirla} dizilerindeki (dilim + 1) × (halka + 1) noktayı dörtgen ağı olarak tampona yazar. */
+    private void agiYaz(int dilim, int halka) {
         for (int j = 0; j < halka; j++) {
             for (int i = 0; i < dilim; i++) {
                 int a0 = j * (dilim + 1) + i;
@@ -285,7 +307,6 @@ final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
                 agKosesi(b0, j + 1);
             }
         }
-        return dilim * halka;
     }
 
     private void agKosesi(int n, int halka) {
@@ -320,10 +341,65 @@ final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
         return toplam;
     }
 
-    /** Taban enkaz halkası ve yere yayılan etek: Rankine profiliyle dönen, yükselip sönen toz sprite'ları. */
-    private int taban(KasirgaVarligi k, KasirgaSeviyesi s, RankineProfili rankine, int adet, double t, double alfa) {
+    /**
+     * Taban enkaz eteği (tasarım notu §2 katman 1): zeminde {@code rZemin}'den başlayıp {@code yukseklik}'te huniyle
+     * birleşen içbükey kılıf. Üst kenar açıya ve zamana göre dalgalanır, U dokusu Rankine hızıyla kayar (dönen toz);
+     * renk tabanda koyu kahverengi, üstte kahverengi-gri. Dörtgen sayısını döner.
+     */
+    private int etekAgi(double t, int dilim, int halka, double rZemin, double rUst, double yukseklik, double omega,
+            double faz, float alfa) {
+        diziHazirla((dilim + 1) * (halka + 1), halka + 1);
+        double uKay = t * omega / TAM_TUR * 2 + faz;
+        for (int j = 0; j <= halka; j++) {
+            double h = (double) j / halka;
+            double yaricapTemel = EtekProfili.yaricap(rZemin, rUst, h);
+            double dikeyAlfa = EtekProfili.alfa(h);
+            float ka = (float) h;
+            halkaR[j] = Mth.lerp(ka, ETEK_ALT[0], ETEK_UST[0]);
+            halkaG[j] = Mth.lerp(ka, ETEK_ALT[1], ETEK_UST[1]);
+            halkaB[j] = Mth.lerp(ka, ETEK_ALT[2], ETEK_UST[2]);
+            halkaV[j] = (float) (KasirgaDokusu.HUNI_B_V1 - h * (KasirgaDokusu.HUNI_B_V1 - KasirgaDokusu.HUNI_B_V0));
+            for (int i = 0; i <= dilim; i++) {
+                double teta = TAM_TUR * i / dilim;
+                float c = (float) Math.cos(teta);
+                float sn = (float) Math.sin(teta);
+                double dalga = 0.5 * Math.sin(3 * teta + omega * t * 0.6 + faz * 4)
+                        + 0.3 * Math.sin(7 * teta - t * 1.3 + faz);
+                double y = -1 + h * (yukseklik + 1) * (1 + 0.18 * dalga * h);
+                double yaricap = yaricapTemel * (1 + 0.05 * dalga);
+                int n = j * (dilim + 1) + i;
+                float x = (float) (c * yaricap);
+                float z = (float) (sn * yaricap);
+                noktaX[n] = x;
+                noktaY[n] = (float) y;
+                noktaZ[n] = z;
+                float dx = x - kamX;
+                float dy = (float) y - kamY;
+                float dz = z - kamZ;
+                float uzunluk = (float) Math.sqrt(dx * dx + dy * dy + dz * dz) + 1e-4f;
+                float fresnel = Math.abs(c * dx + sn * dz) / uzunluk;
+                noktaA[n] = (float) (alfa * dikeyAlfa * (0.7 + 0.3 * Math.sqrt(fresnel)));
+                noktaU[n] = (float) ((double) i / dilim * 2 + uKay);
+                noktaNx[n] = c;
+                noktaNz[n] = sn;
+            }
+        }
+        agiYaz(dilim, halka);
+        return dilim * halka;
+    }
+
+    /**
+     * Etek üstündeki dönen toz: üst kenarda içe kıvrılan toz rulosu (simit üzerinde yuvarlanan sprite'lar) ve Rankine
+     * profiliyle dönen toz halkası; S1-2'de havada takla atan yaprak ve çimen parçaları. Sprite sayısını döner.
+     */
+    private int taban(KasirgaVarligi k, KasirgaSeviyesi s, RankineProfili rankine, int adet, double t, double alfa,
+            double rEtek, double rEtekUst) {
         double rT = s.tabanYaricapi();
         double hE = s.enkazYuksekligi();
+        double rIc = rT * 0.45;
+        double rRulo = rEtekUst + 0.35 * (rEtek - rEtekUst);
+        double tup = 0.3 * hE;
+        boolean yaprakli = s.seviye() <= 2;
         int tohum = k.getId() * 7919;
         for (int i = 0; i < adet; i++) {
             double u1 = rastgele(i, 1, tohum);
@@ -332,42 +408,60 @@ final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
             double u4 = rastgele(i, 4, tohum);
             double u5 = rastgele(i, 5, tohum);
             double u6 = rastgele(i, 6, tohum);
-            boolean etek = (i & 3) == 0;
-            double r;
-            double y;
-            double boyut;
-            double a;
-            if (etek) {
-                r = rT * (0.9 + 1.3 * u1);
-                double fy = kesir(u2 + t * 0.05 * (0.5 + u3));
-                y = 0.2 + 1.8 * fy;
-                boyut = rT * (0.30 + 0.25 * u6) + 1;
-                a = 0.55 * Math.sqrt(Math.sin(Math.PI * fy));
-            } else {
-                r = rT * (0.45 + 1.35 * Math.pow(u1, 0.8));
-                double hMax = hE * (1.15 - 0.75 * (r / rT - 0.45) / 1.35);
-                double fy = kesir(u2 + t * (1.5 + 2.5 * u3) / hMax);
-                y = fy * hMax;
-                boyut = Mth.clamp(rT * (0.16 + 0.2 * u6), 0.7, 6) * (0.7 + 0.6 * fy);
-                a = 0.85 * Math.pow(Math.sin(Math.PI * fy), 0.7);
-            }
-            double aci = u4 * TAM_TUR - rankine.acisalHiz(r) * t * (0.85 + 0.3 * u5);
+            int tur = i % 5;
             float ton = (float) (0.75 + 0.35 * u5);
             float cr = TOZ[0] * ton;
             float cg = TOZ[1] * ton;
             float cb = TOZ[2] * ton;
-            if (s.seviye() <= 2 && !etek && u3 < 0.3) {
-                cr = YAPRAK_R;
-                cg = YAPRAK_G;
-                cb = YAPRAK_B;
-                boyut *= 0.5;
+            float u0 = tozKaresi(t, u2);
+            double r;
+            double y;
+            double boyut;
+            double a;
+            double aci;
+            double donus;
+            if (tur == 0) {
+                // Rulo: tüp açısı zamanla ilerler, toz dışta yükselip üstte içe kıvrılır.
+                double psi = u2 * TAM_TUR + t * (1.2 + 0.6 * u3);
+                r = rRulo + tup * Math.cos(psi);
+                y = 0.55 * hE + tup * Math.sin(psi);
+                boyut = tup * (0.6 + 0.5 * u6);
+                a = 0.6;
+                aci = u4 * TAM_TUR - rankine.acisalHiz(rRulo) * t;
+                donus = u1 * TAM_TUR + t * (u6 - 0.5);
+            } else if (yaprakli && tur >= 3) {
+                r = rT * (0.7 + 1.5 * u1);
+                double hMax = hE * (1.6 + 1.6 * u3);
+                double fy = kesir(u2 + t * (0.18 + 0.25 * u3));
+                y = fy * hMax;
+                boyut = 0.25 + 0.3 * u6;
+                a = Math.min(1, 4 * Math.sin(Math.PI * fy));
+                aci = u4 * TAM_TUR - rankine.acisalHiz(r) * t * (0.7 + 0.3 * u5);
+                donus = u1 * TAM_TUR + t * (3 + 5 * u6);
+                float[] renk = YAPRAK[(int) (u5 * YAPRAK.length)];
+                cr = renk[0];
+                cg = renk[1];
+                cb = renk[2];
+                u0 = KasirgaDokusu.YAPRAK_U0;
+            } else {
+                r = rIc + (rEtek - rIc) * Math.pow(u1, 0.8);
+                double hMax = hE * (1.15 - 0.75 * (r - rIc) / (rEtek - rIc));
+                double fy = kesir(u2 + t * (1.5 + 2.5 * u3) / hMax);
+                y = fy * hMax;
+                boyut = Mth.clamp(rT * (0.16 + 0.2 * u6), 0.7, 6) * (0.7 + 0.6 * fy);
+                a = 0.9 * Math.pow(Math.sin(Math.PI * fy), 0.6);
+                aci = u4 * TAM_TUR - rankine.acisalHiz(r) * t * (0.85 + 0.3 * u5);
+                donus = u1 * TAM_TUR + t * (u6 - 0.5) * 2;
             }
-            int kare = ((int) (t * 5 + u2 * 4)) & 3;
-            sprite((float) (Math.cos(aci) * r), (float) y, (float) (Math.sin(aci) * r), (float) boyut,
-                    (float) (u1 * TAM_TUR + t * (u6 - 0.5) * 2), kare * KasirgaDokusu.KARE, KasirgaDokusu.TOZ_V0, cr,
-                    cg, cb, (float) (a * alfa));
+            sprite((float) (Math.cos(aci) * r), (float) y, (float) (Math.sin(aci) * r), (float) boyut, (float) donus,
+                    u0, KasirgaDokusu.TOZ_V0, cr, cg, cb, (float) (a * alfa));
         }
         return adet;
+    }
+
+    /** Toz sprite'ı üç kare arasında döner (dördüncü kare yaprak). */
+    private static float tozKaresi(double t, double u) {
+        return ((int) (t * 5 + u * 3) % 3) * KasirgaDokusu.KARE;
     }
 
     /** Duvar bulutu: huni tepesinde yavaş dönen koyu disk; arkasında (hareketin tersi) açık renkli RFD yarığı. */
@@ -407,7 +501,8 @@ final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
     }
 
     /** Yalnız görsel enkaz kopyaları: sarmal yükseliş, tepede dışa savrulma ve düşüş; ömrü bitenler silinir. */
-    private int enkaz(KasirgaVarligi k, RankineProfili rankine, PoseStack poz, MultiBufferSource tampon, double t) {
+    private int enkaz(KasirgaVarligi k, RankineProfili rankine, PoseStack poz, MultiBufferSource tampon, double t,
+            int paketliIsik) {
         List<GorselEnkaz> liste = KasirgaIstemciDurumu.ENKAZ.get(k.getId());
         if (liste == null) {
             return 0;
@@ -441,7 +536,8 @@ final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
                     e.eksenY(), e.eksenZ()));
             poz.scale(e.olcek(), e.olcek(), e.olcek());
             poz.translate(-0.5, -0.5, -0.5);
-            bloklar.renderSingleBlock(e.durum(), poz, tampon, isik, OverlayTexture.NO_OVERLAY, ModelData.EMPTY, null);
+            bloklar.renderSingleBlock(e.durum(), poz, tampon, paketliIsik, OverlayTexture.NO_OVERLAY, ModelData.EMPTY,
+                    null);
             poz.popPose();
             cizilen++;
         }

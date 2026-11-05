@@ -50,18 +50,78 @@ class KasirgaSafMantikTest {
     }
 
     @Test
-    void besinciSeviyeKamaBirinciSeviyeIncedir() {
-        // Kama: taban yarıçapı tepe yarıçapının yarısından büyük (tasarım notu §2 katman 2).
-        assertTrue(KasirgaSeviyesi.icin(5).kamaMi());
+    void govdeTepeCapiTasarimTablosundandirVeGovdeYukariGenisler() {
+        // Tasarım notu §6 "Gövde tepe çapı" (2026-11-06): yoğuşma hunisi yukarı doğru genişler, taban tepeden geniş değil.
+        double[] tepeCapi = {10, 17, 27, 46, 55};
+        for (int s = 1; s <= 5; s++) {
+            KasirgaSeviyesi sv = KasirgaSeviyesi.icin(s);
+            assertEquals(tepeCapi[s - 1], sv.tepeCapi(), EPS);
+            assertEquals(tepeCapi[s - 1] / 2, sv.tepeYaricapi(), EPS);
+            assertTrue(sv.tepeYaricapi() > sv.tabanYaricapi(), "S" + s);
+        }
+    }
+
+    @Test
+    void dorduncuVeBesinciSeviyeKamaDigerleriIncedir() {
+        // Kama: orta yükseklikteki (h = 0,5) gövde genişliği yüksekliğin %40-50'si (tasarım notu §2 katman 2).
+        KasirgaSeviyesi s5 = KasirgaSeviyesi.icin(5);
+        assertEquals(2 * HuniProfili.yaricap(17, 27.5, 0.5), s5.ortaGenislik(), EPS);
+        double oran = s5.ortaGenislik() / s5.yukseklik();
+        assertTrue(oran >= 0.40 && oran <= 0.50, "S5 orta genişlik / yükseklik = " + oran);
+        assertTrue(s5.kamaMi());
         assertTrue(KasirgaSeviyesi.icin(4).kamaMi());
+        assertFalse(KasirgaSeviyesi.icin(3).kamaMi());
         assertFalse(KasirgaSeviyesi.icin(1).kamaMi());
         // S1 yere tam değmez; S3 ve üstü değer.
         assertTrue(KasirgaSeviyesi.icin(1).altBoslukOrani() > 0);
         assertEquals(0, KasirgaSeviyesi.icin(3).altBoslukOrani(), EPS);
-        // Enkaz halkası taban çapının 1,8 katı: yarıçapı tabanYarıçapı × 1,8.
-        assertEquals(17 * 1.8, KasirgaSeviyesi.icin(5).enkazYaricapi(), EPS);
-        assertEquals(6, KasirgaSeviyesi.icin(1).enkazYuksekligi(), EPS);
-        assertEquals(14, KasirgaSeviyesi.icin(5).enkazYuksekligi(), EPS);
+    }
+
+    @Test
+    void etekCapiTabaninBirSekizKatiYuksekligiAltidanOndorde() {
+        double[] tabloEtekCapi = {11, 18, 29, 43, 60};
+        for (int s = 1; s <= 5; s++) {
+            KasirgaSeviyesi sv = KasirgaSeviyesi.icin(s);
+            assertEquals(1.8 * sv.tabanCapi(), 2 * sv.enkazYaricapi(), EPS);
+            // Tablo yuvarlanmış değerleri verir (S5: 1,8 × 34 = 61,2 ≈ 60).
+            assertEquals(tabloEtekCapi[s - 1], 2 * sv.enkazYaricapi(), 1.3);
+            assertEquals(6 + 2 * (s - 1), sv.enkazYuksekligi(), EPS);
+        }
+        // S5'te etek gövde tepesinden de geniş: silüet tabanda genişler.
+        KasirgaSeviyesi s5 = KasirgaSeviyesi.icin(5);
+        assertTrue(2 * s5.enkazYaricapi() > s5.tepeCapi());
+    }
+
+    // --- Taban enkaz eteği: zeminde etek yarıçapı, üst kenarda huniyle birleşir ---
+
+    @Test
+    void etekProfiliZemindeGenisUstKenardaHuniyleBirlesir() {
+        assertEquals(30.6, EtekProfili.yaricap(30.6, 18, 0), EPS);
+        assertEquals(18, EtekProfili.yaricap(30.6, 18, 1), EPS);
+        // Zemine doğru açılan içbükey etek: ortada doğrusal ortalamanın altında.
+        assertTrue(EtekProfili.yaricap(30.6, 18, 0.5) < (30.6 + 18) / 2);
+        double onceki = Double.MAX_VALUE;
+        for (int i = 0; i <= 100; i++) {
+            double r = EtekProfili.yaricap(30.6, 18, i / 100.0);
+            assertTrue(r <= onceki);
+            onceki = r;
+        }
+        assertEquals(30.6, EtekProfili.yaricap(30.6, 18, -1), EPS);
+        assertEquals(18, EtekProfili.yaricap(30.6, 18, 2), EPS);
+    }
+
+    @Test
+    void etekAlfasiTabandaYuksekUstKenardaSoner() {
+        // Tasarım notu §2 katman 1: alfa 0,6-0,8, tabanda yüksek, üst kenarda sönen.
+        assertTrue(EtekProfili.alfa(0) >= 0.6 && EtekProfili.alfa(0) <= 0.8);
+        assertTrue(EtekProfili.alfa(0.3) >= 0.6);
+        assertEquals(0, EtekProfili.alfa(1), EPS);
+        double onceki = 1;
+        for (int i = 0; i <= 100; i++) {
+            double a = EtekProfili.alfa(i / 100.0);
+            assertTrue(a <= onceki && a >= 0);
+            onceki = a;
+        }
     }
 
     @Test

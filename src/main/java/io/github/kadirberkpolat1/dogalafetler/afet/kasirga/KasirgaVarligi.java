@@ -1,9 +1,11 @@
 package io.github.kadirberkpolat1.dogalafetler.afet.kasirga;
 
+import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
@@ -12,12 +14,15 @@ import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.TagKey;
 import net.minecraft.util.Mth;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 
@@ -41,6 +46,9 @@ public class KasirgaVarligi extends Entity {
 
     public static final int SENKRON_ARALIGI = 5;
     public static final int EN_COK_UCAN_BLOK = 40;
+    /** Kasırganın kaldıramadığı bloklar (tasarım notu §6, N12); veri paketiyle genişler. */
+    public static final TagKey<Block> DAYANIKLI = TagKey.create(Registries.BLOCK,
+            DogalAfetler.konum("kasirga_dayanikli"));
     /** Spike: kasırga ölçümler boyunca yüklü alanda kalsın diye doğduğu noktadan en çok bu kadar uzaklaşır. */
     private static final double EVDEN_EN_UZAK = 40;
     private static final float SAPMA = (float) Math.toRadians(35);
@@ -209,7 +217,9 @@ public class KasirgaVarligi extends Entity {
             int z = Mth.floor(getZ() + Math.sin(aci) * r);
             BlockPos konum = new BlockPos(x, sl.getHeight(Heightmap.Types.WORLD_SURFACE, x, z) - 1, z);
             BlockState durum = sl.getBlockState(konum);
-            if (durum.isAir() || !durum.getFluidState().isEmpty() || durum.hasBlockEntity()) {
+            // Çift bloklar (uzun ot, kapı) tek yarı taşınıp tek yarı konursa geçersiz yarım blok kalır.
+            if (durum.isAir() || !durum.getFluidState().isEmpty() || durum.hasBlockEntity() || durum.is(DAYANIKLI)
+                    || durum.hasProperty(BlockStateProperties.DOUBLE_BLOCK_HALF)) {
                 continue;
             }
             float sertlik = durum.getDestroySpeed(sl, konum);

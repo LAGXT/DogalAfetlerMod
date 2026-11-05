@@ -4,19 +4,19 @@ package io.github.kadirberkpolat1.dogalafetler.afet.kasirga;
  * Kasırga seviye tablosu (madde 10, tasarım notu §6) ve görsel türetilmiş boyutlar. Saf mantık: Minecraft sınıfına
  * dokunmaz. Uzunluklar blok, hız blok/sn.
  *
- * @param tepeCarpani    huni tepe yarıçapı / taban yarıçapı; 2'nin altı kama biçimidir
+ * @param tepeCapi       huni gövdesinin tepe çapı; yoğuşma hunisi yukarı doğru genişler (taban çapından büyük)
  * @param altBoslukOrani görünen huninin yerden başladığı yükseklik / huni yüksekliği (S1 yere tam değmez)
  */
 public record KasirgaSeviyesi(int seviye, double tabanCapi, double yukseklik, double hiz, int aktifSureSn,
-        double cekimYaricapi, int blokKaldirmaTick, double sertlikSiniri, double cekirdekHasari, double tepeCarpani,
+        double cekimYaricapi, int blokKaldirmaTick, double sertlikSiniri, double cekirdekHasari, double tepeCapi,
         double enkazYuksekligi, double altBoslukOrani) {
 
     private static final KasirgaSeviyesi[] TABLO = {
-            new KasirgaSeviyesi(1, 6, 50, 2.0, 60, 9, 2, 0.6, 1.0, 3.0, 6, 0.12),
-            new KasirgaSeviyesi(2, 10, 65, 2.6, 90, 15, 4, 2.0, 1.5, 2.6, 8, 0.06),
-            new KasirgaSeviyesi(3, 16, 80, 3.2, 120, 24, 8, 3.0, 2.0, 2.2, 10, 0),
-            new KasirgaSeviyesi(4, 24, 95, 3.8, 150, 36, 14, 4.0, 3.0, 1.95, 12, 0),
-            new KasirgaSeviyesi(5, 34, 110, 4.4, 180, 51, 20, 5.0, 4.0, 1.75, 14, 0),
+            new KasirgaSeviyesi(1, 6, 50, 2.0, 60, 9, 2, 0.6, 1.0, 10, 6, 0.12),
+            new KasirgaSeviyesi(2, 10, 65, 2.6, 90, 15, 4, 2.0, 1.5, 17, 8, 0.06),
+            new KasirgaSeviyesi(3, 16, 80, 3.2, 120, 24, 8, 3.0, 2.0, 27, 10, 0),
+            new KasirgaSeviyesi(4, 24, 95, 3.8, 150, 36, 14, 4.0, 3.0, 46, 12, 0),
+            new KasirgaSeviyesi(5, 34, 110, 4.4, 180, 51, 20, 5.0, 4.0, 55, 14, 0),
     };
 
     public static KasirgaSeviyesi icin(int seviye) {
@@ -31,12 +31,17 @@ public record KasirgaSeviyesi(int seviye, double tabanCapi, double yukseklik, do
     }
 
     public double tepeYaricapi() {
-        return tabanYaricapi() * tepeCarpani;
+        return tepeCapi / 2;
     }
 
-    /** Kama: taban yarıçapı tepe yarıçapının yarısından büyük. */
+    /** Gövdenin orta yükseklikteki ({@code h = 0,5}) genişliği. */
+    public double ortaGenislik() {
+        return 2 * HuniProfili.yaricap(tabanYaricapi(), tepeYaricapi(), 0.5);
+    }
+
+    /** Kama: orta yükseklikteki genişlik yüksekliğin en az %40'ı. */
     public boolean kamaMi() {
-        return tabanYaricapi() > tepeYaricapi() / 2;
+        return ortaGenislik() >= 0.4 * yukseklik;
     }
 
     /** Taban enkaz halkasının dış yarıçapı: çapı huni taban çapının 1,8 katı. */
