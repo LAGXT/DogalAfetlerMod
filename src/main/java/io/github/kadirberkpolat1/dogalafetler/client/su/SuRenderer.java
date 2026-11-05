@@ -11,6 +11,10 @@ import io.github.kadirberkpolat1.dogalafetler.su.DenizSeviyesiAlani;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSuDunyasi;
 import io.github.kadirberkpolat1.dogalafetler.su.SuAraliklari;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -18,6 +22,7 @@ import net.minecraft.client.renderer.BiomeColors;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.LightTexture;
+import net.minecraft.client.renderer.ShaderInstance;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
@@ -27,16 +32,20 @@ import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import org.joml.Matrix4f;
 
 /**
- * Sanal su yüzeyi (şader'siz). Her oyun tick'inde kameranın çevresi bir {@link VertexBuffer}'a kurulur, her karede
- * {@code AFTER_TRANSLUCENT_BLOCKS} aşamasında vanilla {@code rendertype_translucent} şaderi, su dokusu, biyom su rengi
- * ve ışık haritasıyla çizilir. Yakın: 1 blok hücre + dalgacık + yan yüzler + köpük; uzak (LOD): 4x4 blok düz hücre.
+ * Sanal su yüzeyi (şader'siz). İki {@link VertexBuffer}: yakın halka (kamera çevresi {@link #YAKIN} blok, 1 blok hücre,
+ * dalgacık, yan yüzler, köpük) her oyun tick'inde; uzak LOD ({@link #LOD}x{@link #LOD} blok düz hücre, görüş mesafesine
+ * kadar) {@link #UZAK_YENILEME} tick'te bir kurulur. Çizim {@code AFTER_TRANSLUCENT_BLOCKS} aşamasında vanilla
+ * {@code rendertype_translucent} şaderi, su dokusu, biyom su rengi ve ışık haritasıyla yapılır. Biyom rengi ve ışık
+ * sütun başına önbellektedir (vanilla renk önbelleği 256 chunk ile sınırlı; LOD onu taşırıyordu).
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class SuRenderer {
-    static final int YAKIN = 48;
+    static final int YAKIN = 40;
     static final int LOD = 4;
+    static final int UZAK_YENILEME = 10;
     private static final ResourceLocation SU = ResourceLocation.fromNamespaceAndPath("minecraft", "block/water_still");
     private static final int N = 2 * YAKIN + 1;
     private static final float[] UST = new float[N * N];
@@ -46,19 +55,37 @@ public final class SuRenderer {
     private static final SuAraliklari A = new SuAraliklari();
     private static final BufferBuilder BB = new BufferBuilder(1 << 21);
     private static final BlockPos.MutableBlockPos P = new BlockPos.MutableBlockPos();
-    private static VertexBuffer vb;
-    private static boolean bos = true;
+    private static final BlockPos.MutableBlockPos P2 = new BlockPos.MutableBlockPos();
+    private static final Map<Long, int[]> RENK = new HashMap<>();
+    /** [0..255] ışık, [256..511] ışığın okunduğu y, [512] okuma tick'i. */
+    private static final Map<Long, int[]> ISIK = new HashMap<>();
+    private static final int[] DI = {1, -1, 0, 0};
+    private static final int[] DJ = {0, 0, 1, -1};
+    private static ClientLevel sonSeviye;
+    private static VertexBuffer vbYakin;
+    private static VertexBuffer vbUzak;
+    private static boolean yakinBos = true;
+    private static boolean uzakBos = true;
     private static long kurulanTick = Long.MIN_VALUE;
-    private static int ox;
-    private static int oz;
+    private static long uzakTick = Long.MIN_VALUE;
+    private static int yakinOx;
+    private static int yakinOz;
+    private static int uzakOx;
+    private static int uzakOz;
     private static float u0;
     private static float u1;
     private static float v0;
     private static float v1;
     private static int dortgen;
-    private static long kurulumNs;
-    private static int kurulumSayisi;
-    private static int lodDortgen;
+    private static int yakinDortgen;
+    private static int uzakDortgen;
+    // Ölçüm (kare başına CPU maliyeti).
+    private static long olcYakinNs;
+    private static long olcUzakNs;
+    private static long olcCizimNs;
+    private static int olcKare;
+    private static int olcYakin;
+    private static int olcUzak;
     private static long sonKareNs;
     private static long pencereBitisNs;
     private static long pencereMaksNs;
@@ -76,6 +103,26 @@ public final class SuRenderer {
         pencereKare = 0;
     }
 
+    /** Maliyet sayacını sıfırlar. */
+    public static void olcumSifirla() {
+        olcYakinNs = 0;
+        olcUzakNs = 0;
+        olcCizimNs = 0;
+        olcKare = 0;
+        olcYakin = 0;
+        olcUzak = 0;
+    }
+
+    /** Son sıfırlamadan beri kare başına ortalama CPU maliyeti ve kurulum ortalamaları. */
+    public static String olcumOzeti() {
+        double kare = Math.max(1, olcKare);
+        return String.format(Locale.ROOT,
+                "kare=%d su_cpu_kare_basina=%.2fms (yakin_kurulum_ort=%.2fms x%d, uzak_kurulum_ort=%.2fms x%d, cizim_ort=%.3fms) dortgen yakin=%d uzak=%d",
+                olcKare, (olcYakinNs + olcUzakNs + olcCizimNs) / kare / 1e6, olcYakinNs / Math.max(1.0, olcYakin) / 1e6,
+                olcYakin, olcUzakNs / Math.max(1.0, olcUzak) / 1e6, olcUzak, olcCizimNs / kare / 1e6, yakinDortgen,
+                uzakDortgen);
+    }
+
     @SubscribeEvent
     public static void ciz(RenderLevelStageEvent e) {
         if (e.getStage() == RenderLevelStageEvent.Stage.AFTER_SKY) {
@@ -85,31 +132,52 @@ public final class SuRenderer {
         if (e.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) {
             return;
         }
+        olcKare++;
         Minecraft mc = Minecraft.getInstance();
         ClientLevel l = mc.level;
         SanalSuDunyasi d = SanalSu.dunya(l);
         if (d == null) {
+            yakinBos = true;
+            uzakBos = true;
             return;
+        }
+        if (l != sonSeviye) {
+            RENK.clear();
+            ISIK.clear();
+            sonSeviye = l;
+        }
+        if (RENK.size() > 4096) {
+            RENK.clear();
+        }
+        if (ISIK.size() > 4096) {
+            ISIK.clear();
         }
         long tick = l.getGameTime();
+        Vec3 cam = e.getCamera().getPosition();
         if (tick != kurulanTick) {
             kurulanTick = tick;
+            spriteGuncelle(mc);
             long t0 = System.nanoTime();
-            kur(mc, l, d, e.getCamera(), tick + 0.0);
-            kurulumNs += System.nanoTime() - t0;
-            if (++kurulumSayisi % 200 == 0) {
-                DogalAfetler.LOGGER.info("SPIKE-SU render kurulum ort={} ms dortgen={} (lod={})",
-                        String.format("%.2f", kurulumNs / 200 / 1e6), dortgen, lodDortgen);
-                kurulumNs = 0;
+            yakinKur(l, d, e.getCamera(), tick);
+            olcYakinNs += System.nanoTime() - t0;
+            olcYakin++;
+            int dx = (int) Math.floor(cam.x) - uzakOx;
+            int dz = (int) Math.floor(cam.z) - uzakOz;
+            if (tick - uzakTick >= UZAK_YENILEME || tick < uzakTick || dx * dx + dz * dz > 64) {
+                uzakTick = tick;
+                long t1 = System.nanoTime();
+                uzakKur(mc, l, d, e.getCamera(), tick);
+                olcUzakNs += System.nanoTime() - t1;
+                olcUzak++;
             }
         }
-        if (bos) {
+        if (yakinBos && uzakBos) {
             return;
         }
+        long t2 = System.nanoTime();
         PoseStack ps = e.getPoseStack();
-        Vec3 cam = e.getCamera().getPosition();
-        ps.pushPose();
-        ps.translate(ox - cam.x, -cam.y, oz - cam.z);
+        Matrix4f proj = e.getProjectionMatrix();
+        ShaderInstance sh = GameRenderer.getRendertypeTranslucentShader();
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.enableDepthTest();
@@ -117,12 +185,32 @@ public final class SuRenderer {
         RenderSystem.disableCull();
         RenderSystem.setShaderTexture(0, InventoryMenu.BLOCK_ATLAS);
         mc.gameRenderer.lightTexture().turnOnLightLayer();
-        vb.bind();
-        vb.drawWithShader(ps.last().pose(), e.getProjectionMatrix(), GameRenderer.getRendertypeTranslucentShader());
+        if (!uzakBos) {
+            ps.pushPose();
+            ps.translate(uzakOx - cam.x, -cam.y, uzakOz - cam.z);
+            vbUzak.bind();
+            vbUzak.drawWithShader(ps.last().pose(), proj, sh);
+            ps.popPose();
+        }
+        if (!yakinBos) {
+            ps.pushPose();
+            ps.translate(yakinOx - cam.x, -cam.y, yakinOz - cam.z);
+            vbYakin.bind();
+            vbYakin.drawWithShader(ps.last().pose(), proj, sh);
+            ps.popPose();
+        }
         VertexBuffer.unbind();
         mc.gameRenderer.lightTexture().turnOffLightLayer();
         RenderSystem.enableCull();
-        ps.popPose();
+        olcCizimNs += System.nanoTime() - t2;
+    }
+
+    private static void spriteGuncelle(Minecraft mc) {
+        TextureAtlasSprite sp = mc.getTextureAtlas(InventoryMenu.BLOCK_ATLAS).apply(SU);
+        u0 = sp.getU0();
+        u1 = sp.getU1();
+        v0 = sp.getV0();
+        v1 = sp.getV1();
     }
 
     private static void kareOlc() {
@@ -133,7 +221,7 @@ public final class SuRenderer {
                 pencereKare++;
             } else {
                 DogalAfetler.LOGGER.info("SPIKE-SU kare etiket={} kare={} en_uzun_kare={} ms", pencereEtiket, pencereKare,
-                        String.format("%.1f", pencereMaksNs / 1e6));
+                        String.format(Locale.ROOT, "%.1f", pencereMaksNs / 1e6));
                 pencereBitisNs = 0;
             }
         }
@@ -145,18 +233,53 @@ public final class SuRenderer {
                 + 0.03 * Math.sin(0.9 * (x + z) + 0.11 * t);
     }
 
-    private static void kur(Minecraft mc, ClientLevel l, SanalSuDunyasi d, Camera camera, double t) {
+    private static long chunkAnahtari(int x, int z) {
+        return ((long) (x >> 4) << 32) | ((z >> 4) & 0xffffffffL);
+    }
+
+    /** Sütunun biyom su rengi (vanilla karışımı, deniz seviyesinde); sütun başına bir kez hesaplanır. */
+    private static int renk(ClientLevel l, int x, int z) {
+        int[] c = RENK.computeIfAbsent(chunkAnahtari(x, z), a -> {
+            int[] n = new int[256];
+            Arrays.fill(n, -1);
+            return n;
+        });
+        int i = (x & 15) | ((z & 15) << 4);
+        int v = c[i];
+        if (v == -1) {
+            v = BiomeColors.getAverageWaterColor(l, P2.set(x, l.getSeaLevel(), z)) & 0xFFFFFF;
+            c[i] = v;
+        }
+        return v;
+    }
+
+    /** Yüzeyin ışığı; y değişince ya da 40 tick'te bir yeniden okunur. */
+    private static int isik(ClientLevel l, int x, int y, int z, long tick) {
+        int[] c = ISIK.computeIfAbsent(chunkAnahtari(x, z), a -> {
+            int[] n = new int[513];
+            Arrays.fill(n, 256, 512, Integer.MIN_VALUE);
+            n[512] = (int) tick;
+            return n;
+        });
+        if ((int) tick - c[512] > 40) {
+            Arrays.fill(c, 256, 512, Integer.MIN_VALUE);
+            c[512] = (int) tick;
+        }
+        int i = (x & 15) | ((z & 15) << 4);
+        if (c[256 + i] != y) {
+            c[i] = LevelRenderer.getLightColor(l, P.set(x, y, z));
+            c[256 + i] = y;
+        }
+        return c[i];
+    }
+
+    private static void yakinKur(ClientLevel l, SanalSuDunyasi d, Camera camera, long tick) {
         Vec3 cam = camera.getPosition();
         int cx = (int) Math.floor(cam.x);
         int cz = (int) Math.floor(cam.z);
-        ox = cx;
-        oz = cz;
-        TextureAtlasSprite sp = mc.getTextureAtlas(InventoryMenu.BLOCK_ATLAS).apply(SU);
-        u0 = sp.getU0();
-        u1 = sp.getU1();
-        v0 = sp.getV0();
-        v1 = sp.getV1();
+        double t = tick;
         DenizSeviyesiAlani alan = d.alan();
+        boolean var = false;
         for (int i = 0; i < N; i++) {
             for (int j = 0; j < N; j++) {
                 int x = cx - YAKIN + i;
@@ -168,6 +291,7 @@ public final class SuRenderer {
                     UST[k] = (float) A.ust(s);
                     ALT[k] = (float) A.alt(s);
                     TUR[k] = (byte) (A.sakin(s) ? 2 : 1);
+                    var = true;
                 } else if (alan.su(x, z)) {
                     UST[k] = alan.zemin(x, z);
                     ALT[k] = alan.taban(x, z);
@@ -177,21 +301,39 @@ public final class SuRenderer {
                 }
             }
         }
+        yakinDortgen = 0;
+        if (!var) {
+            yakinBos = true;
+            return;
+        }
+        yakinOx = cx;
+        yakinOz = cz;
         BB.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
         dortgen = 0;
         for (int i = 0; i < N; i++) {
             for (int j = 0; j < N; j++) {
-                int k = i * N + j;
-                if (TUR[k] != 0) {
-                    sutun(l, alan, cx - YAKIN + i, cz - YAKIN + j, i, j, t);
+                if (TUR[i * N + j] != 0) {
+                    sutun(l, alan, cx - YAKIN + i, cz - YAKIN + j, i, j, t, tick);
                 }
             }
         }
-        lodDortgen = 0;
+        yakinDortgen = dortgen;
+        yakinBos = !yukle(true);
+    }
+
+    private static void uzakKur(Minecraft mc, ClientLevel l, SanalSuDunyasi d, Camera camera, long tick) {
+        Vec3 cam = camera.getPosition();
+        int cx = (int) Math.floor(cam.x);
+        int cz = (int) Math.floor(cam.z);
+        uzakOx = cx;
+        uzakOz = cz;
         int r = Math.min(mc.options.getEffectiveRenderDistance(), 12) * 16;
         int gx0 = Math.floorDiv(cx - r, LOD) * LOD;
         int gz0 = Math.floorDiv(cz - r, LOD) * LOD;
         int ic = YAKIN - LOD;
+        BB.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
+        dortgen = 0;
+        int tamIsik = LightTexture.pack(0, 15);
         for (int gx = gx0; gx <= cx + r; gx += LOD) {
             for (int gz = gz0; gz <= cz + r; gz += LOD) {
                 int dx = gx + LOD / 2 - cx;
@@ -199,74 +341,80 @@ public final class SuRenderer {
                 if ((Math.abs(dx) < ic && Math.abs(dz) < ic) || dx * dx + dz * dz > r * r) {
                     continue;
                 }
-                d.araliklar(gx + LOD / 2, gz + LOD / 2, t, A);
+                d.araliklar(gx + LOD / 2, gz + LOD / 2, tick, A);
                 if (A.adet() == 0) {
                     continue;
                 }
                 float y = (float) A.ust(A.adet() - 1) - 0.16f;
-                int renk = BiomeColors.getAverageWaterColor(l, P.set(gx, (int) y, gz));
-                dortgenUst(gx - ox, gz - oz, LOD, y, y, y, y, renk, 0.72f, LightTexture.pack(0, 15));
-                lodDortgen++;
+                dortgenUst(gx - uzakOx, gz - uzakOz, LOD, y, y, y, y, renk(l, gx, gz), 0.72f, tamIsik);
             }
         }
-        if (dortgen + lodDortgen == 0) {
+        uzakDortgen = dortgen;
+        uzakBos = !yukle(false);
+    }
+
+    /** {@link #BB}'yi ilgili tampona yükler; boşsa {@code false}. */
+    private static boolean yukle(boolean yakin) {
+        if (dortgen == 0) {
             BB.end().release();
-            bos = true;
-            return;
+            return false;
         }
+        VertexBuffer vb = yakin ? vbYakin : vbUzak;
         if (vb == null) {
             vb = new VertexBuffer(VertexBuffer.Usage.DYNAMIC);
+            if (yakin) {
+                vbYakin = vb;
+            } else {
+                vbUzak = vb;
+            }
         }
         vb.bind();
         vb.upload(BB.end());
         VertexBuffer.unbind();
-        bos = false;
+        return true;
     }
 
     private static int komsu(int i, int j) {
         return i < 0 || j < 0 || i >= N || j >= N ? -1 : i * N + j;
     }
 
-    private static void sutun(ClientLevel l, DenizSeviyesiAlani alan, int x, int z, int i, int j, double t) {
+    private static void sutun(ClientLevel l, DenizSeviyesiAlani alan, int x, int z, int i, int j, double t, long tick) {
         int k = i * N + j;
         byte tur = TUR[k];
         float yu = UST[k] - 0.11f;
         float alt = ALT[k];
-        int[] di = {1, -1, 0, 0};
-        int[] dj = {0, 0, 1, -1};
-        int isik = LevelRenderer.getLightColor(l, P.set(x, (int) Math.floor(UST[k]), z));
-        int renk = BiomeColors.getAverageWaterColor(l, P);
+        int isik = isik(l, x, (int) Math.floor(UST[k]), z, tick);
+        int renk = renk(l, x, z);
         float egim = 0;
         for (int q = 0; q < 4; q++) {
-            int n = komsu(i + di[q], j + dj[q]);
+            int n = komsu(i + DI[q], j + DJ[q]);
             if (n >= 0 && TUR[n] != 0) {
                 egim = Math.max(egim, Math.abs(UST[k] - UST[n]));
             }
         }
         float kopuk = tur == 1 ? Math.max(0, Math.min(0.85f, (egim - 0.6f) / 2.5f)) : 0;
-        if (tur != 3) {
-            float derin = UST[k] - alt;
-            float a = Math.max(kopuk, Math.min(0.8f, 0.35f + 0.08f * derin));
-            int c = karistir(renk, 0xFFFFFF, kopuk);
-            float rx = x - ox;
-            float rz = z - oz;
-            if (tur == 1) {
-                dortgenUst(rx, rz, 1, yu + (float) dalgacik(x, z, t), yu + (float) dalgacik(x, z + 1, t),
-                        yu + (float) dalgacik(x + 1, z + 1, t), yu + (float) dalgacik(x + 1, z, t), c, a, isik);
-            } else {
-                dortgenUst(rx, rz, 1, yu, yu, yu, yu, c, a, isik);
-            }
+        float derin = UST[k] - alt;
+        float a = Math.max(kopuk, Math.min(0.8f, 0.35f + 0.08f * derin));
+        int c = karistir(renk, 0xFFFFFF, kopuk);
+        float rx = x - yakinOx;
+        float rz = z - yakinOz;
+        if (tur == 3) {
+            // Gerçek su: üstünü vanilla çizer; yalnız alçalmış sanal komşuya bakan "duvar" aşağıda çizilir.
+        } else if (tur == 1) {
+            dortgenUst(rx, rz, 1, yu + (float) dalgacik(x, z, t), yu + (float) dalgacik(x, z + 1, t),
+                    yu + (float) dalgacik(x + 1, z + 1, t), yu + (float) dalgacik(x + 1, z, t), c, a, isik);
+        } else {
+            dortgenUst(rx, rz, 1, yu, yu, yu, yu, c, a, isik);
         }
         for (int q = 0; q < 4; q++) {
-            int n = komsu(i + di[q], j + dj[q]);
+            int n = komsu(i + DI[q], j + DJ[q]);
             float taban;
             if (n >= 0 && TUR[n] != 0) {
                 taban = Math.max(UST[n] - 0.11f, alt);
+            } else if (tur == 3) {
+                continue;
             } else {
-                if (tur == 3) {
-                    continue;
-                }
-                int zn = alan.zemin(x + di[q], z + dj[q]);
+                int zn = alan.zemin(x + DI[q], z + DJ[q]);
                 if (zn != Integer.MIN_VALUE && zn >= UST[k]) {
                     continue;
                 }
@@ -276,29 +424,39 @@ public final class SuRenderer {
                 continue;
             }
             float golge = q < 2 ? 0.6f : 0.8f;
-            int c = karistir(carp(renk, golge), 0xFFFFFF, kopuk * 0.8f);
-            float a = Math.max(0.55f, kopuk);
+            int cy = karistir(carp(renk, golge), 0xFFFFFF, kopuk * 0.8f);
+            float ay = Math.max(0.55f, kopuk);
             float ex0;
             float ez0;
             float ex1;
             float ez1;
-            float rx = x - ox;
-            float rz = z - oz;
             switch (q) {
                 case 0 -> {
-                    ex0 = rx + 1; ez0 = rz; ex1 = rx + 1; ez1 = rz + 1;
+                    ex0 = rx + 1;
+                    ez0 = rz;
+                    ex1 = rx + 1;
+                    ez1 = rz + 1;
                 }
                 case 1 -> {
-                    ex0 = rx; ez0 = rz; ex1 = rx; ez1 = rz + 1;
+                    ex0 = rx;
+                    ez0 = rz;
+                    ex1 = rx;
+                    ez1 = rz + 1;
                 }
                 case 2 -> {
-                    ex0 = rx; ez0 = rz + 1; ex1 = rx + 1; ez1 = rz + 1;
+                    ex0 = rx;
+                    ez0 = rz + 1;
+                    ex1 = rx + 1;
+                    ez1 = rz + 1;
                 }
                 default -> {
-                    ex0 = rx; ez0 = rz; ex1 = rx + 1; ez1 = rz;
+                    ex0 = rx;
+                    ez0 = rz;
+                    ex1 = rx + 1;
+                    ez1 = rz;
                 }
             }
-            dikey(ex0, ez0, ex1, ez1, taban, yu, c, a, isik);
+            dikey(ex0, ez0, ex1, ez1, taban, yu, cy, ay, isik);
         }
     }
 

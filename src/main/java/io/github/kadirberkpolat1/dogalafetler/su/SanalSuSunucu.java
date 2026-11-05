@@ -6,8 +6,10 @@ import io.github.kadirberkpolat1.dogalafetler.network.AgKanali;
 import io.netty.buffer.Unpooled;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -15,6 +17,8 @@ import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingBreatheEvent;
@@ -33,6 +37,8 @@ public final class SanalSuSunucu {
     static boolean izle;
     /** Mağara cebi -> {x0, y0, z0, x1, y1, z1, önceki hash}. */
     static final Map<MagaraCebi, long[]> MAGARA_HASH = new HashMap<>();
+    private static int sonHesap;
+    private static int invalidSayisi;
 
     private SanalSuSunucu() {
     }
@@ -40,6 +46,10 @@ public final class SanalSuSunucu {
     public static void kaydet() {
         AgKanali.sunucudanIstemciye(SuPaketi.class, SuPaketi::yaz, SuPaketi::oku, SuPaketi::isle);
         KomutKaydi.ekle(SanalSuKomutu.olustur());
+    }
+
+    static String f(double v) {
+        return String.format(Locale.ROOT, "%.2f", v);
     }
 
     static void yayinla(ServerLevel l) {
@@ -80,10 +90,16 @@ public final class SanalSuSunucu {
                     alan.birak(k);
                 }
             }
+            long t0 = System.nanoTime();
             int okunan = alan.isle(SanalSu.okuyucu(l), 32);
             if (okunan > 0) {
-                DogalAfetler.LOGGER.info("SPIKE-SU alan(sunucu) okunan={} parca={} sutun={} bfs={} ms", okunan,
-                        alan.parcaSayisi(), alan.sonSutunSayisi(), String.format("%.2f", alan.sonHesapNs() / 1e6));
+                DogalAfetler.LOGGER.info("SPIKE-SU alan(sunucu) okunan={} okuma={} ms parca={} invalid_toplam={}", okunan,
+                        f((System.nanoTime() - t0) / 1e6), alan.parcaSayisi(), invalidSayisi);
+            }
+            if (alan.hesapSayisi() != sonHesap) {
+                sonHesap = alan.hesapSayisi();
+                DogalAfetler.LOGGER.info("SPIKE-SU alan(sunucu) BFS#{} sutun={} sure={} ms (arka plan)", sonHesap,
+                        alan.sonSutunSayisi(), f(alan.sonHesapNs() / 1e6));
             }
         }
         if (d.aktif()) {
@@ -107,21 +123,17 @@ public final class SanalSuSunucu {
         }
     }
 
-    private static String f(double v) {
-        return String.format("%.2f", v);
-    }
-
     private static void izleLog(ServerLevel l) {
         for (ServerPlayer p : l.players()) {
             DogalAfetler.LOGGER.info(
-                    "SPIKE-SU izle oyuncu pos=({},{},{}) hava={} can={} isInWater={} isUnderWater={} isSwimming={} batiklikOrani={} yol={}",
+                    "SPIKE-SU izle oyuncu pos=({} {} {}) hava={} can={} isInWater={} isUnderWater={} isSwimming={} poz={} batiklikOrani={} yol={}",
                     f(p.getX()), f(p.getY()), f(p.getZ()), p.getAirSupply(), f(p.getHealth()), p.isInWater(),
-                    p.isUnderWater(), p.isSwimming(), f(SanalSu.batiklikOrani(p)), SanalSu.yol);
+                    p.isUnderWater(), p.isSwimming(), p.getPose(), f(SanalSu.batiklikOrani(p)), SanalSu.yol);
             for (LivingEntity en : l.getEntitiesOfClass(LivingEntity.class, p.getBoundingBox().inflate(80),
                     x -> x.getTags().contains("spike"))) {
                 Vec3 v = en.getDeltaMovement();
                 DogalAfetler.LOGGER.info(
-                        "SPIKE-SU izle mob tur={} pos=({},{},{}) hiz=({},{},{}) hava={} can={} isInWater={} batiklikOrani={}",
+                        "SPIKE-SU izle mob tur={} pos=({} {} {}) hiz=({} {} {}) hava={} can={} isInWater={} batiklikOrani={}",
                         en.getType().toShortString(), f(en.getX()), f(en.getY()), f(en.getZ()), f(v.x), f(v.y), f(v.z),
                         en.getAirSupply(), f(en.getHealth()), en.isInWater(), f(SanalSu.batiklikOrani(en)));
             }
@@ -135,10 +147,17 @@ public final class SanalSuSunucu {
         }
     }
 
+    /** Yalnız yüzeye yakın değişiklik alanı etkiler (deniz altında büyüyen yosun, mağara blokları etkilemez). */
     @SubscribeEvent
     public static void blokDegisti(BlockEvent.NeighborNotifyEvent e) {
-        if (!e.getLevel().isClientSide() && SanalSu.SUNUCU.alanGerekli()) {
-            SanalSu.SUNUCU.alan().gecersizKil(e.getPos().getX() >> 4, e.getPos().getZ() >> 4);
+        LevelAccessor l = e.getLevel();
+        if (l.isClientSide() || !SanalSu.SUNUCU.alanGerekli()) {
+            return;
+        }
+        BlockPos p = e.getPos();
+        if (p.getY() >= l.getHeight(Heightmap.Types.MOTION_BLOCKING, p.getX(), p.getZ()) - 2) {
+            invalidSayisi++;
+            SanalSu.SUNUCU.alan().gecersizKil(p.getX() >> 4, p.getZ() >> 4);
         }
     }
 

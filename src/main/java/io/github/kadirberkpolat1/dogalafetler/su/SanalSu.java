@@ -1,5 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.su;
 
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import net.minecraft.core.BlockPos;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.FluidTags;
@@ -26,6 +28,20 @@ public final class SanalSu {
     public static volatile Yol yol = Yol.MIXIN;
     public static final SanalSuDunyasi SUNUCU = new SanalSuDunyasi(new DenizSeviyesiAlani(6, 96, 1));
     public static final SanalSuDunyasi ISTEMCI = new SanalSuDunyasi(new DenizSeviyesiAlani(6, 96, 1));
+
+    static {
+        SUNUCU.alan().yurutucu(yurutucu("dogalafetler-su-alan-sunucu"));
+        ISTEMCI.alan().yurutucu(yurutucu("dogalafetler-su-alan-istemci"));
+    }
+
+    private static Executor yurutucu(String ad) {
+        return Executors.newSingleThreadExecutor(r -> {
+            Thread t = new Thread(r, ad);
+            t.setDaemon(true);
+            t.setPriority(Thread.MIN_PRIORITY);
+            return t;
+        });
+    }
     /** Chunk derleme iş parçacıkları okur (gerçek suyu gizleme); yalnız değişmez kayıt atanır. */
     public static volatile Cekilme istemciCekilme;
 
@@ -127,15 +143,29 @@ public final class SanalSu {
 
     /** Kutudaki blok durumlarının FNV-1a özeti (harita bütünlüğü kanıtı). */
     public static long bolgeHash(Level l, int x0, int y0, int z0, int x1, int y1, int z1) {
-        long h = 0xcbf29ce484222325L;
+        return hash(bolgeKimlikleri(l, x0, y0, z0, x1, y1, z1));
+    }
+
+    /** Kutudaki blok durum kimlikleri; sıra x, z, y. */
+    public static int[] bolgeKimlikleri(Level l, int x0, int y0, int z0, int x1, int y1, int z1) {
+        int[] d = new int[(x1 - x0 + 1) * (z1 - z0 + 1) * (y1 - y0 + 1)];
         BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
+        int i = 0;
         for (int x = x0; x <= x1; x++) {
             for (int z = z0; z <= z1; z++) {
                 for (int y = y0; y <= y1; y++) {
-                    h ^= Block.getId(l.getBlockState(p.set(x, y, z)));
-                    h *= 0x100000001b3L;
+                    d[i++] = Block.getId(l.getBlockState(p.set(x, y, z)));
                 }
             }
+        }
+        return d;
+    }
+
+    public static long hash(int[] kimlikler) {
+        long h = 0xcbf29ce484222325L;
+        for (int v : kimlikler) {
+            h ^= v;
+            h *= 0x100000001b3L;
         }
         return h;
     }

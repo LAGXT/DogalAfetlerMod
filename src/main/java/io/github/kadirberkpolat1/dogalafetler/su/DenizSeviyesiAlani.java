@@ -1,9 +1,13 @@
 package io.github.kadirberkpolat1.dogalafetler.su;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Deniz seviyesi yükselmesinin alanı (bölüm H). Yalnız istenen (yüklü) chunk'ların sütun bilgisi önbellekte tutulur:
@@ -14,6 +18,10 @@ import java.util.Map;
  * <p>Kurallar: komşuya yayılma {@code zemin < kaynak + maksArtis} (su o bloğu aşamaz) ve
  * {@code zemin >= kaynak - tolerans} (gölün altına inen yamaçta su havada asılı kalmaz); en çok {@code maksMesafe} adım.
  * Aynı mesafede birden çok kaynak varsa yüksek yüzey kazanır; sonuç chunk okuma sırasından bağımsızdır.
+ *
+ * <p>İş parçacıkları: {@link #iste}, {@link #isle}, okuyucular sahibi iş parçacığında (sunucu ya da render) çağrılır.
+ * {@link #yurutucu(Executor)} verilirse BFS çağıranda alınan anlık görüntü üzerinde arka planda koşar ve sonuç dizileri
+ * tek atamayla yayınlanır; okuyucular o ana kadar eski sonucu görür.
  */
 public final class DenizSeviyesiAlani {
     /** Bir chunk'ın 256 sütununu ({@code indeks = lx + lz * 16}) doldurur; chunk yüklü değilse {@code false}. */
@@ -28,17 +36,27 @@ public final class DenizSeviyesiAlani {
         final int[] zemin = new int[256];
         final boolean[] su = new boolean[256];
         final int[] taban = new int[256];
-        final float[] kaynak = new float[256];
-        final int[] mesafe = new int[256];
+        volatile float[] kaynak = bosKaynak();
+        volatile int[] mesafe = bosMesafe();
         boolean okundu;
         boolean kuyrukta;
 
         Parca(int cx, int cz) {
             this.cx = cx;
             this.cz = cz;
-            Arrays.fill(kaynak, Float.NaN);
-            Arrays.fill(mesafe, -1);
         }
+    }
+
+    private static float[] bosKaynak() {
+        float[] k = new float[256];
+        Arrays.fill(k, Float.NaN);
+        return k;
+    }
+
+    private static int[] bosMesafe() {
+        int[] m = new int[256];
+        Arrays.fill(m, -1);
+        return m;
     }
 
     private final int maksArtis;
@@ -46,15 +64,32 @@ public final class DenizSeviyesiAlani {
     private final int tolerans;
     private final Map<Long, Parca> parcalar = new HashMap<>();
     private final ArrayDeque<Parca> kuyruk = new ArrayDeque<>();
+    private final AtomicBoolean hesapta = new AtomicBoolean();
+    private Executor yurutucu;
     private Parca onbellek;
     private boolean kirli;
-    private long sonHesapNs;
-    private int sonSutunSayisi;
+    private volatile long sonHesapNs;
+    private volatile int sonSutunSayisi;
+    private volatile int hesapSayisi;
 
     public DenizSeviyesiAlani(int maksArtis, int maksMesafe, int tolerans) {
         this.maksArtis = maksArtis;
         this.maksMesafe = maksMesafe;
         this.tolerans = tolerans;
+    }
+
+    /** BFS'in koşacağı yürütücü; {@code null} ise {@link #isle} içinde eşzamanlı. */
+    public void yurutucu(Executor y) {
+        this.yurutucu = y;
+    }
+
+    public boolean hesapSuruyor() {
+        return hesapta.get();
+    }
+
+    /** Tamamlanmış BFS sayısı (log ve test için). */
+    public int hesapSayisi() {
+        return hesapSayisi;
     }
 
     public static long anahtar(int cx, int cz) {
@@ -117,7 +152,10 @@ public final class DenizSeviyesiAlani {
         return sonSutunSayisi;
     }
 
-    /** En çok {@code butce} chunk okur; bir şey değiştiyse alanı yeniden hesaplar. Okunan chunk sayısını döner. */
+    /**
+     * En çok {@code butce} chunk okur; bir şey değiştiyse ve önceki hesap bitmişse BFS'i başlatır. Okunan chunk sayısını
+     * döner.
+     */
     public int isle(SutunOkuyucu okuyucu, int butce) {
         int okunan = 0;
         int deneme = kuyruk.size();
@@ -135,93 +173,132 @@ public final class DenizSeviyesiAlani {
                 kuyruk.add(p);
             }
         }
-        if (kirli) {
-            hesapla();
+        if (kirli && !hesapta.get()) {
+            kirli = false;
+            Runnable is = hesapIsi();
+            Executor y = yurutucu;
+            if (y == null) {
+                is.run();
+            } else {
+                hesapta.set(true);
+                y.execute(() -> {
+                    try {
+                        is.run();
+                    } finally {
+                        hesapta.set(false);
+                    }
+                });
+            }
         }
         return okunan;
     }
 
-    /** Bütün önbellek üzerinde çok kaynaklı BFS. */
+    /** Bütün önbellek üzerinde çok kaynaklı BFS (eşzamanlı). */
     public void hesapla() {
         kirli = false;
-        long t0 = System.nanoTime();
-        int toplam = 0;
-        for (Parca p : parcalar.values()) {
-            Arrays.fill(p.kaynak, Float.NaN);
-            Arrays.fill(p.mesafe, -1);
-            if (p.okundu) {
-                toplam += 256;
-            }
-        }
-        long[] sira = new long[toplam];
-        int[] kx = new int[toplam];
-        int[] kz = new int[toplam];
-        int n = 0;
-        for (Parca p : parcalar.values()) {
-            if (!p.okundu) {
-                continue;
-            }
-            for (int i = 0; i < 256; i++) {
-                if (!p.su[i]) {
-                    continue;
-                }
-                kx[n] = p.cx * 16 + (i & 15);
-                kz[n] = p.cz * 16 + (i >> 4);
-                // Yüksek yüzey önce: anahtarın üst yarısı (2048 - zemin) küçükten büyüğe sıralanır.
-                sira[n] = ((long) (2048 - p.zemin[i]) << 32) | n;
-                n++;
-            }
-        }
-        Arrays.sort(sira, 0, n);
-        long[] q = new long[Math.max(16, toplam)];
-        int bas = 0;
-        int son = 0;
-        for (int j = 0; j < n; j++) {
-            int idx = (int) sira[j];
-            int x = kx[idx];
-            int z = kz[idx];
-            Parca p = parca(x, z);
-            int i = (x & 15) + ((z & 15) << 4);
-            p.kaynak[i] = p.zemin[i];
-            p.mesafe[i] = 0;
-            q[son++] = paket(x, z);
-        }
-        while (bas < son) {
-            long v = q[bas++];
-            int x = (int) (v >> 32);
-            int z = (int) v;
-            Parca p = parca(x, z);
-            int i = (x & 15) + ((z & 15) << 4);
-            float k = p.kaynak[i];
-            int d = p.mesafe[i];
-            if (d >= maksMesafe) {
-                continue;
-            }
-            for (int yon = 0; yon < 4; yon++) {
-                int nx = x + (yon == 0 ? 1 : yon == 1 ? -1 : 0);
-                int nz = z + (yon == 2 ? 1 : yon == 3 ? -1 : 0);
-                Parca np = parca(nx, nz);
-                if (np == null || !np.okundu) {
-                    continue;
-                }
-                int ni = (nx & 15) + ((nz & 15) << 4);
-                if (np.mesafe[ni] >= 0) {
-                    continue;
-                }
-                int zn = np.zemin[ni];
-                if (zn < k + maksArtis && zn >= k - tolerans) {
-                    np.kaynak[ni] = k;
-                    np.mesafe[ni] = d + 1;
-                    q[son++] = paket(nx, nz);
-                }
-            }
-        }
-        sonSutunSayisi = toplam;
-        sonHesapNs = System.nanoTime() - t0;
+        hesapIsi().run();
     }
 
-    private static long paket(int x, int z) {
-        return ((long) x << 32) | (z & 0xffffffffL);
+    /** Anlık görüntüyü çağıranda alır; dönen iş herhangi bir iş parçacığında koşup sonucu yayınlar. */
+    private Runnable hesapIsi() {
+        List<Parca> liste = new ArrayList<>();
+        for (Parca p : parcalar.values()) {
+            if (p.okundu) {
+                liste.add(p);
+            }
+        }
+        int n = liste.size();
+        int[][] zeminK = new int[n][];
+        boolean[][] suK = new boolean[n][];
+        Map<Long, Integer> indeks = new HashMap<>(n * 2);
+        for (int i = 0; i < n; i++) {
+            Parca p = liste.get(i);
+            zeminK[i] = p.zemin.clone();
+            suK[i] = p.su.clone();
+            indeks.put(anahtar(p.cx, p.cz), i);
+        }
+        int[] pcx = new int[n];
+        int[] pcz = new int[n];
+        for (int i = 0; i < n; i++) {
+            pcx[i] = liste.get(i).cx;
+            pcz[i] = liste.get(i).cz;
+        }
+        return () -> {
+            long t0 = System.nanoTime();
+            float[][] kaynak = new float[n][256];
+            int[][] mesafe = new int[n][256];
+            for (int i = 0; i < n; i++) {
+                Arrays.fill(kaynak[i], Float.NaN);
+                Arrays.fill(mesafe[i], -1);
+            }
+            int toplam = n * 256;
+            long[] sira = new long[toplam];
+            int s = 0;
+            for (int i = 0; i < n; i++) {
+                for (int c = 0; c < 256; c++) {
+                    if (suK[i][c]) {
+                        // Yüksek yüzey önce: üst yarı (2048 - zemin) küçükten büyüğe; alt yarı parça*256 + sütun.
+                        sira[s++] = ((long) (2048 - zeminK[i][c]) << 32) | (i * 256L + c);
+                    }
+                }
+            }
+            Arrays.sort(sira, 0, s);
+            int[] q = new int[Math.max(16, toplam)];
+            int bas = 0;
+            int son = 0;
+            for (int j = 0; j < s; j++) {
+                int v = (int) sira[j];
+                int i = v >> 8;
+                int c = v & 255;
+                kaynak[i][c] = zeminK[i][c];
+                mesafe[i][c] = 0;
+                q[son++] = v;
+            }
+            while (bas < son) {
+                int v = q[bas++];
+                int i = v >> 8;
+                int c = v & 255;
+                float k = kaynak[i][c];
+                int d = mesafe[i][c];
+                if (d >= maksMesafe) {
+                    continue;
+                }
+                int x = pcx[i] * 16 + (c & 15);
+                int z = pcz[i] * 16 + (c >> 4);
+                for (int yon = 0; yon < 4; yon++) {
+                    int nx = x + (yon == 0 ? 1 : yon == 1 ? -1 : 0);
+                    int nz = z + (yon == 2 ? 1 : yon == 3 ? -1 : 0);
+                    int ni;
+                    if ((nx >> 4) == pcx[i] && (nz >> 4) == pcz[i]) {
+                        ni = i;
+                    } else {
+                        Integer o = indeks.get(anahtar(nx >> 4, nz >> 4));
+                        if (o == null) {
+                            continue;
+                        }
+                        ni = o;
+                    }
+                    int nc = (nx & 15) + ((nz & 15) << 4);
+                    if (mesafe[ni][nc] >= 0) {
+                        continue;
+                    }
+                    int zn = zeminK[ni][nc];
+                    if (zn < k + maksArtis && zn >= k - tolerans) {
+                        kaynak[ni][nc] = k;
+                        mesafe[ni][nc] = d + 1;
+                        q[son++] = ni * 256 + nc;
+                    }
+                }
+            }
+            for (int i = 0; i < n; i++) {
+                Parca p = liste.get(i);
+                p.mesafe = mesafe[i];
+                p.kaynak = kaynak[i];
+            }
+            sonSutunSayisi = toplam;
+            sonHesapNs = System.nanoTime() - t0;
+            hesapSayisi++;
+        };
     }
 
     private Parca parca(int x, int z) {

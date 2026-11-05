@@ -119,6 +119,33 @@ class DenizSeviyesiAlaniTest {
     }
 
     @Test
+    void arkaPlanYurutucusuAyniSonucuVerir() throws Exception {
+        var okuyucu = dunya((x, z) -> x < 8 ? 63 : 64 + (x + z) % 3, (x, z) -> x < 8 ? 1 : 0);
+        DenizSeviyesiAlani senkron = new DenizSeviyesiAlani(4, 96, 1);
+        DenizSeviyesiAlani asenkron = new DenizSeviyesiAlani(4, 96, 1);
+        java.util.concurrent.ExecutorService yurutucu = java.util.concurrent.Executors.newSingleThreadExecutor();
+        asenkron.yurutucu(yurutucu);
+        for (int cx = 0; cx <= 2; cx++) {
+            for (int cz = 0; cz <= 1; cz++) {
+                senkron.iste(cx, cz);
+                asenkron.iste(cx, cz);
+            }
+        }
+        senkron.isle(okuyucu, 100);
+        asenkron.isle(okuyucu, 100);
+        yurutucu.shutdown();
+        assertTrue(yurutucu.awaitTermination(10, java.util.concurrent.TimeUnit.SECONDS));
+        assertFalse(asenkron.hesapSuruyor());
+        assertEquals(1, asenkron.hesapSayisi());
+        for (int x = 0; x < 48; x++) {
+            for (int z = 0; z < 32; z++) {
+                assertEquals(senkron.kaynak(x, z), asenkron.kaynak(x, z), 0.0, "x=" + x + " z=" + z);
+                assertEquals(senkron.mesafe(x, z), asenkron.mesafe(x, z));
+            }
+        }
+    }
+
+    @Test
     void gecersizKilinanChunkYenidenHesaplanir() {
         int[] karaYuksekligi = {64};
         var okuyucu = dunya((x, z) -> x < 8 ? 63 : karaYuksekligi[0], (x, z) -> x < 8 ? 1 : 0);

@@ -8,6 +8,7 @@ import io.github.kadirberkpolat1.dogalafetler.su.MagaraZamani;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSuDunyasi;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Set;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
@@ -19,6 +20,7 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.ViewportEvent;
 import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.level.ChunkEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
@@ -27,6 +29,7 @@ import net.minecraftforge.fml.common.Mod;
 public final class SuIstemci {
     private static Cekilme sonCekilme;
     private static int sayac;
+    private static int sonHesap;
 
     private SuIstemci() {
     }
@@ -87,11 +90,25 @@ public final class SuIstemci {
                 alan.birak(k);
             }
         }
+        long t0 = System.nanoTime();
         int okunan = alan.isle(SanalSu.okuyucu(l), 64);
         if (okunan > 0) {
-            DogalAfetler.LOGGER.info("SPIKE-SU alan(istemci) okunan={} parca={} sutun={} bfs={} ms bekleyen={}", okunan,
-                    alan.parcaSayisi(), alan.sonSutunSayisi(), String.format("%.2f", alan.sonHesapNs() / 1e6),
+            DogalAfetler.LOGGER.info("SPIKE-SU alan(istemci) okunan={} okuma={} ms parca={} bekleyen={}", okunan,
+                    String.format(Locale.ROOT, "%.2f", (System.nanoTime() - t0) / 1e6), alan.parcaSayisi(),
                     alan.bekleyen());
+        }
+        if (alan.hesapSayisi() != sonHesap) {
+            sonHesap = alan.hesapSayisi();
+            DogalAfetler.LOGGER.info("SPIKE-SU alan(istemci) BFS#{} sutun={} sure={} ms (arka plan)", sonHesap,
+                    alan.sonSutunSayisi(), String.format(Locale.ROOT, "%.2f", alan.sonHesapNs() / 1e6));
+        }
+    }
+
+    /** İstemcide sunucu blok olayı yok; chunk (yeniden) yüklenince o chunk tekrar okunur. */
+    @SubscribeEvent
+    public static void chunkYuklendi(ChunkEvent.Load e) {
+        if (e.getLevel().isClientSide() && SanalSu.ISTEMCI.alanGerekli()) {
+            SanalSu.ISTEMCI.alan().gecersizKil(e.getChunk().getPos().x, e.getChunk().getPos().z);
         }
     }
 
@@ -107,7 +124,7 @@ public final class SuIstemci {
         mc.levelRenderer.setBlocksDirty(x0, 40, z0, x1, 70, z1);
         int bolum = ((x1 >> 4) - (x0 >> 4) + 3) * ((z1 >> 4) - (z0 >> 4) + 3) * ((70 >> 4) - (40 >> 4) + 3);
         DogalAfetler.LOGGER.info("SPIKE-SU cekilme yeniden derleme: bolum~{} isaretleme={} ms", bolum,
-                String.format("%.3f", (System.nanoTime() - t0) / 1e6));
+                String.format(Locale.ROOT, "%.3f", (System.nanoTime() - t0) / 1e6));
         SuRenderer.pencereBasla("cekilme_derleme", 3000);
     }
 
