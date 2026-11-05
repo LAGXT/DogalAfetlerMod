@@ -1,0 +1,187 @@
+plugins {
+    id 'eclipse'
+    id 'idea'
+    id 'maven-publish'
+    id 'net.minecraftforge.gradle' version '[6.0,6.2)'
+}
+
+version = mod_version
+group = mod_group_id
+
+base {
+    archivesName = mod_id
+}
+
+// Minecraft 1.20.1 Java 17 ister; JAVA_HOME'daki JDK 17 toolchain olarak bulunur.
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+println "Java: ${System.getProperty 'java.version'}, JVM: ${System.getProperty 'java.vm.version'} (${System.getProperty 'java.vendor'}), Arch: ${System.getProperty 'os.arch'}"
+
+// Uyumluluk modlari: -Puyum=e4mc | coldsweat | ikisi (varsayilan: yok).
+def uyum = (project.findProperty('uyum') ?: 'yok').toString()
+if (!(uyum in ['yok', 'e4mc', 'coldsweat', 'ikisi'])) {
+    throw new GradleException("Gecersiz -Puyum=${uyum}; gecerli degerler: yok, e4mc, coldsweat, ikisi")
+}
+
+minecraft {
+    mappings channel: mapping_channel, version: mapping_version
+
+    copyIdeResources = true
+
+    runs {
+        configureEach {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'info'
+
+            mods {
+                "${mod_id}" {
+                    source sourceSets.main
+                }
+            }
+        }
+
+        client {
+            property 'forge.enabledGameTestNamespaces', mod_id
+            // Quick Play: -PquickPlay=<run/saves altindaki dunya klasoru>, or. -PquickPlay=test
+            if (project.hasProperty('quickPlay')) {
+                args '--quickPlaySingleplayer', project.property('quickPlay').toString()
+            }
+        }
+
+        server {
+            workingDirectory project.file('run-server')
+            property 'forge.enabledGameTestNamespaces', mod_id
+            args '--nogui'
+        }
+
+        // Kayitli butun GameTest'leri kosar ve cikar; hic GameTest yoksa coker.
+        gameTestServer {
+            workingDirectory project.file('run-gametest')
+            property 'forge.enabledGameTestNamespaces', mod_id
+        }
+
+        data {
+            workingDirectory project.file('run-data')
+            args '--mod', mod_id, '--all', '--output', file('src/generated/resources/'), '--existing', file('src/main/resources/')
+        }
+    }
+}
+
+// runData ciktilari derlemeye dahil edilir.
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+
+repositories {
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = 'Modrinth'
+                url = 'https://api.modrinth.com/maven'
+            }
+        }
+        filter {
+            includeGroup 'maven.modrinth'
+        }
+    }
+}
+
+dependencies {
+    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+
+    if (uyum == 'e4mc' || uyum == 'ikisi') {
+        runtimeOnly fg.deobf("maven.modrinth:e4mc:${e4mc_surum}")
+    }
+    if (uyum == 'coldsweat' || uyum == 'ikisi') {
+        runtimeOnly fg.deobf("maven.modrinth:cold-sweat:${coldsweat_surum}")
+    }
+
+    testImplementation platform("org.junit:junit-bom:${junit_surum}")
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test', Test).configure {
+    useJUnitPlatform()
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+        exceptionFormat 'full'
+    }
+}
+
+// Calisma klasorleri git'te degil; yeni bir klon ya da worktree'de ilk acilista gereken dosyalar burada yazilir.
+tasks.matching { it.name == 'runServer' }.configureEach {
+    doFirst {
+        def klasor = project.file('run-server')
+        klasor.mkdirs()
+        def eula = new File(klasor, 'eula.txt')
+        if (!eula.exists()) {
+            eula.text = 'eula=true\n'
+        }
+        def ozellikler = new File(klasor, 'server.properties')
+        if (!ozellikler.exists()) {
+            ozellikler.text = "online-mode=false\nlevel-name=test\nlevel-seed=${test_dunyasi_seed}\n"
+        }
+    }
+}
+
+tasks.matching { it.name == 'runClient' }.configureEach {
+    doFirst {
+        def klasor = project.file('run')
+        klasor.mkdirs()
+        def secenekler = new File(klasor, 'options.txt')
+        if (!secenekler.exists()) {
+            secenekler.text = 'pauseOnLostFocus:false\n'
+        } else if (!secenekler.readLines().contains('pauseOnLostFocus:false')) {
+            def satirlar = secenekler.readLines().findAll { !it.startsWith('pauseOnLostFocus:') }
+            satirlar << 'pauseOnLostFocus:false'
+            secenekler.text = satirlar.join('\n') + '\n'
+        }
+    }
+}
+
+tasks.named('processResources', ProcessResources).configure {
+    var replaceProperties = [
+            minecraft_version: minecraft_version, minecraft_version_range: minecraft_version_range,
+            forge_version: forge_version, forge_version_range: forge_version_range,
+            loader_version_range: loader_version_range,
+            mod_id: mod_id, mod_name: mod_name, mod_license: mod_license, mod_version: mod_version,
+            mod_authors: mod_authors, mod_description: mod_description,
+    ]
+    inputs.properties replaceProperties
+
+    filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
+        expand replaceProperties + [project: project]
+    }
+}
+
+tasks.named('jar', Jar).configure {
+    manifest {
+        attributes([
+                'Specification-Title'     : mod_id,
+                'Specification-Vendor'    : mod_authors,
+                'Specification-Version'   : '1',
+                'Implementation-Title'    : project.name,
+                'Implementation-Version'  : project.jar.archiveVersion,
+                'Implementation-Vendor'   : mod_authors,
+                'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
+        ])
+    }
+    finalizedBy 'reobfJar'
+}
+
+publishing {
+    publications {
+        register('mavenJava', MavenPublication) {
+            artifact jar
+        }
+    }
+    repositories {
+        maven {
+            url "file://${project.projectDir}/mcmodsrepo"
+        }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}

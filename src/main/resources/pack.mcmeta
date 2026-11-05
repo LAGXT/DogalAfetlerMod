@@ -1,0 +1,8 @@
+{
+  "pack": {
+    "description": {
+      "text": "${mod_name} kaynakları"
+    },
+    "pack_format": 15
+  }
+}
