@@ -37,6 +37,10 @@ final class SirenSesi extends AbstractTickableSoundInstance {
         return zarf.tur();
     }
 
+    int gecenTick() {
+        return zarf.gecenTick();
+    }
+
     /** Zarf sessizden başlar; ses motoru düzeyi 0 olan sesi aksi halde hiç başlatmaz. */
     @Override
     public boolean canStartSilent() {
