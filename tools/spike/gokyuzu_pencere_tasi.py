@@ -10,8 +10,9 @@ Kullanım (runClient'tan hemen önce, ayrı bir süreç olarak; Minecraft kapan�
 3. Taşıma hypruse'un `movetoworkspacesilent` karşılığıyla yapılır (hypruse/hyprctl.py `_lua_movetoworkspacesilent`):
    Lua `hl.dsp.window.move{..., follow = false}`; bu Hyprland eski `movetoworkspacesilent` dizgesini kabul etmez.
    Yanıt `ok` değilse başarısız sayılır ve yeniden denenir.
-4. Taşımadan hemen sonra ve her 30 sn'de aktif pencere denetlenir; bizim Minecraft'ımızsa odak 1. adımdaki pencereye
-   geri verilir (hypruse `_lua_focuswindow` karşılığı) ve yazılır.
+4. Taşımadan hemen sonra ve her 5 sn'de (K0-21: en az 30 sn'de bir) aktif pencere denetlenir; bizim Minecraft'ımızsa odak
+   1. adımdaki pencereye geri verilir (hypruse `_lua_focuswindow` karşılığı), tutunduğu doğrulanır; tutunmazsa (ör. odak
+   tutmayan input-leap penceresi) görünür workspace'teki en son kullanılan başka pencere seçilir. Hepsi yazılır.
 """
 import json
 import os
@@ -60,6 +61,25 @@ bitis = time.time() + SURE
 tasindi = None
 goruldu = False
 son_denetim = 0.0
+def odagi_geri_ver(benim):
+    """Önce sahibin kaydedilen penceresi, tutunmazsa görünür workspace'teki en son kullanılan başka pencere denenir."""
+    gorunen = {m.get("activeWorkspace", {}).get("id") for m in hyprctl_json("monitors") or []}
+    adaylar = [sahibin] if sahibin and sahibin != benim else []
+    for k in sorted(hyprctl_json("clients") or [], key=lambda k: k.get("focusHistoryID", 999)):
+        if k["address"] != benim and k["address"] not in adaylar and k.get("workspace", {}).get("id") in gorunen:
+            adaylar.append(k["address"])
+    for aday in adaylar:
+        yanit = lua('hl.dsp.focus({ window = "address:%s" })' % aday)
+        time.sleep(0.3)
+        simdi = (hyprctl_json("activewindow") or {}).get("address")
+        if simdi != benim:
+            yaz(f"odak bizim Minecraft'taydı, geri verildi: {aday} ({yanit!r}); şimdi aktif {simdi}")
+            return
+        yaz(f"odak {aday} penceresinde tutunmadı ({yanit!r}), sıradaki aday")
+    yaz("UYARI: odak geri verilemedi; görünür workspace'te uygun pencere yok")
+
+
+son_kayit = 0.0
 while time.time() < bitis:
     c = benim_pencerem()
     if c is None:
@@ -80,12 +100,12 @@ while time.time() < bitis:
             yaz(f"TAŞIMA BAŞARISIZ (yanıt: {yanit!r}), yeniden denenecek")
             time.sleep(0.5)
             continue
-    if time.time() - son_denetim >= 30:
+    if time.time() - son_denetim >= 5:
         son_denetim = time.time()
         simdi = (hyprctl_json("activewindow") or {}).get("address")
-        if simdi == adres and sahibin and sahibin != adres:
-            yanit = lua('hl.dsp.focus({ window = "address:%s" })' % sahibin)
-            yaz(f"odak bizim Minecraft'taydı, sahibine geri verildi ({sahibin}): {yanit!r}")
-        else:
+        if simdi == adres:
+            odagi_geri_ver(adres)
+        elif time.time() - son_kayit >= 30:
+            son_kayit = time.time()
             yaz(f"odak denetimi: aktif {simdi} (bizim değil)")
     time.sleep(0.15)
