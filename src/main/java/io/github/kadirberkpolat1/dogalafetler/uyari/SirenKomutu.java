@@ -22,7 +22,7 @@ final class SirenKomutu {
         for (SirenTuru tur : SirenTuru.values()) {
             siren.then(Commands.literal(tur.kimlik())
                     .executes(baglam -> baslat(baglam, tur, varsayilanSure(tur)))
-                    .then(Commands.argument(SANIYE, IntegerArgumentType.integer(1, SirenPaketleri.EN_UZUN_TICK / SirenTuru.SANIYE))
+                    .then(Commands.argument(SANIYE, IntegerArgumentType.integer(1, SirenTuru.EN_UZUN_TICK / SirenTuru.SANIYE))
                             .executes(baglam -> baslat(baglam, tur,
                                     IntegerArgumentType.getInteger(baglam, SANIYE) * SirenTuru.SANIYE))));
         }

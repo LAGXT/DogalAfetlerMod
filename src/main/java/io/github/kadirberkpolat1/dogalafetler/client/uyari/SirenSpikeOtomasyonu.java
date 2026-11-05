@@ -10,10 +10,14 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.BooleanSupplier;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
-import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.OptionsList;
+import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.SoundOptionsScreen;
 import net.minecraft.sounds.SoundSource;
 import net.minecraftforge.api.distmarker.Dist;
@@ -23,8 +27,8 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 /**
- * Spike otomasyonu (K0-21): klavye/fare olmadan kanıt toplar. Yalnız {@code -Pspike=siren} ya da
- * {@code -Pspike=siren-kategori} ({@code -Ddogalafetler.spike}) ile çalışır; aksi halde hiçbir şey yapmaz. Her adım bir
+ * Spike otomasyonu (K0-21): klavye/fare olmadan kanıt toplar. Yalnız {@code -Pspike=siren}, {@code siren-kategori} ya da
+ * {@code siren-boyut} ({@code -Ddogalafetler.spike}) ile çalışır; aksi halde hiçbir şey yapmaz. Her adım bir
  * öncekinden {@code ms} sonra ve koşulu sağlanınca çalışır; ilk adım dünyaya girişten (oyuncu var, ekran kapalı) sayılır.
  * Koşullar siren durumuna bağlıdır, böylece yüklü makinede istemci yavaş dönse de sıra bozulmaz.
  */
@@ -36,7 +40,6 @@ public final class SirenSpikeOtomasyonu {
     private static long baslangic = -1;
     private static long oncekiAdimZamani = -1;
     private static int sonraki;
-    private static Screen bizimEkran;
     private static Boolean sonPencereEtkin;
 
     private record Adim(long ms, String ad, BooleanSupplier kosul, Runnable is) {
@@ -46,6 +49,7 @@ public final class SirenSpikeOtomasyonu {
         switch (SENARYO) {
             case "siren" -> secilenYolPlani();
             case "siren-kategori" -> gercekKategoriPlani();
+            case "siren-boyut" -> boyutPlani();
             default -> {
             }
         }
@@ -88,6 +92,34 @@ public final class SirenSpikeOtomasyonu {
         adim(500, "kapanış", SirenSpikeOtomasyonu::kapat);
     }
 
+    /**
+     * İnceleme B1: boyut değişimi ve {@code /stopsound} bütün sesleri keser; siren aynı zarfla yeniden başlamalı. B6:
+     * "Sirenler" kaydırıcısı %40'a çekilince çalan sirenin düzeyi ve {@code dogalafetler-client.toml} değişmeli.
+     */
+    private static void boyutPlani() {
+        adim(3000, "yaratıcı mod (Nether'de blok içinde boğulma hasarı olmasın)", () -> komut("gamemode creative @s"));
+        adim(500, "güneş sireni 60 sn", () -> komut("dogalafet spike siren gunes 60"));
+        adim(5000, "Nether'e geç (güneş sireni 100 tick çaldı)", () -> calan(SirenTuru.GUNES, 100),
+                () -> komut("execute in minecraft:the_nether run tp @s ~ ~ ~"));
+        bekle("siren Nether'de yeniden başladı", () -> yenidenBaslatma(1));
+        adim(5000, "Overworld'e dön", () -> komut("execute in minecraft:overworld run tp @s ~ ~ ~"));
+        bekle("siren Overworld'de yeniden başladı", () -> yenidenBaslatma(2));
+        adim(3000, "stopsound @s master", () -> komut("stopsound @s master"));
+        bekle("siren /stopsound sonrası yeniden başladı", () -> yenidenBaslatma(3));
+        adim(2000, "ses ayarları ekranı", SirenSpikeOtomasyonu::sesEkrani);
+        adim(1000, "Sirenler kaydırıcısını %40'a tıkla", () -> kaydiriciyaTikla(40));
+        adim(2500, "ekranı kapat (config kaydedilir)", () -> Minecraft.getInstance().setScreen(null));
+        adim(500, "config dosyası", SirenSpikeOtomasyonu::configSatiri);
+        adim(1500, "siren dur (fade-out)", () -> komut("dogalafet spike siren dur"));
+        bekle("güneş sireni durdu", () -> sustu(SirenTuru.GUNES));
+        adim(500, "sirenSes varsayılana (28) döner", () -> {
+            IstemciAyarlari.SIREN_SES.set(28);
+            IstemciAyarlari.SIREN_SES.save();
+            configSatiri();
+        });
+        adim(500, "kapanış", SirenSpikeOtomasyonu::kapat);
+    }
+
     @SubscribeEvent
     public static void tik(TickEvent.ClientTickEvent olay) {
         if (ADIMLAR.isEmpty() || olay.phase != TickEvent.Phase.END) {
@@ -108,10 +140,10 @@ public final class SirenSpikeOtomasyonu {
             DogalAfetler.LOGGER.info("[spike-siren] dünyaya girildi; senaryo={}, SoundSource.values()={}", SENARYO,
                     Arrays.toString(SoundSource.values()));
         }
-        // Pencereye ulaşan bir Escape duraklatma menüsü açarsa tek oyunculu oyun durur ve zaman çizelgesi bozulur.
-        // Otomasyon klavye beklemediği için kendi açmadığı ekranı kapatır; tuşun kaynağı {@link #tus} log'unda.
-        if (mc.screen != null && mc.screen != bizimEkran) {
-            DogalAfetler.LOGGER.warn("[spike-siren] otomasyonun açmadığı ekran kapatıldı: {}", mc.screen.getClass().getName());
+        // Pencereye ulaşan bir Escape duraklatma menüsü açarsa tek oyunculu oyun durur ve zaman çizelgesi bozulur;
+        // otomasyon klavye beklemediği için onu kapatır. Boyut değişimindeki yükleme ekranına dokunulmaz.
+        if (mc.screen instanceof PauseScreen) {
+            DogalAfetler.LOGGER.warn("[spike-siren] otomasyonun açmadığı duraklatma menüsü kapatıldı");
             mc.setScreen(null);
         }
         long simdi = System.currentTimeMillis();
@@ -172,6 +204,11 @@ public final class SirenSpikeOtomasyonu {
         return ses != null && ses.tur() == tur && ses.isStopped();
     }
 
+    private static boolean yenidenBaslatma(int enAz) {
+        SirenSesi ses = SirenCalar.ORNEK.etkin();
+        return SirenCalar.ORNEK.yenidenBaslatmaSayisi() >= enAz && ses != null && !ses.isStopped();
+    }
+
     private static void komut(String komut) {
         Minecraft.getInstance().player.connection.sendCommand(komut);
     }
@@ -188,11 +225,45 @@ public final class SirenSpikeOtomasyonu {
 
     private static void sesEkrani() {
         Minecraft mc = Minecraft.getInstance();
-        bizimEkran = new SoundOptionsScreen(null, mc.options);
-        mc.setScreen(bizimEkran);
+        mc.setScreen(new SoundOptionsScreen(null, mc.options));
         DogalAfetler.LOGGER.info("[spike-siren] ses ayarları açıldı; sirenSes={}, gerçek kategori={}",
                 IstemciAyarlari.SIREN_SES.get(),
                 SirenKategorisi.gercek().map(k -> k.getName() + " = " + mc.options.getSoundSourceVolume(k)).orElse("yok"));
+    }
+
+    /** Kaydırıcı düğmesine oyuncunun tıklayacağı yerden tıklar (düğme 4 piksel kenar bırakır; değer floor(100 · konum)). */
+    private static void kaydiriciyaTikla(int yuzde) {
+        Minecraft mc = Minecraft.getInstance();
+        AbstractWidget dugme = null;
+        if (mc.screen != null && SirenKaydiricisi.sonEklenen() != null) {
+            for (GuiEventListener oge : mc.screen.children()) {
+                if (oge instanceof OptionsList liste) {
+                    dugme = liste.findOption(SirenKaydiricisi.sonEklenen());
+                }
+            }
+        }
+        if (dugme == null) {
+            DogalAfetler.LOGGER.error("[spike-siren] Sirenler kaydırıcı düğmesi bulunamadı");
+            return;
+        }
+        int once = IstemciAyarlari.SIREN_SES.get();
+        double x = dugme.getX() + 4 + (yuzde + 0.5) / 100.0 * (dugme.getWidth() - 8);
+        dugme.onClick(x, dugme.getY() + dugme.getHeight() / 2.0);
+        DogalAfetler.LOGGER.info("[spike-siren] kaydırıcıya tıklandı (x={}): sirenSes {} -> {}, düğme \"{}\"",
+                String.format(Locale.ROOT, "%.1f", x), once, IstemciAyarlari.SIREN_SES.get(),
+                dugme.getMessage().getString());
+    }
+
+    private static void configSatiri() {
+        Minecraft mc = Minecraft.getInstance();
+        try {
+            Files.readAllLines(mc.gameDirectory.toPath().resolve("config/dogalafetler-client.toml"), StandardCharsets.UTF_8)
+                    .stream()
+                    .filter(satir -> satir.trim().startsWith("sirenSes"))
+                    .forEach(satir -> DogalAfetler.LOGGER.info("[spike-siren] dogalafetler-client.toml: {}", satir.trim()));
+        } catch (IOException hata) {
+            DogalAfetler.LOGGER.error("[spike-siren] dogalafetler-client.toml okunamadı", hata);
+        }
     }
 
     private static void secenekleriKaydet() {

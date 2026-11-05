@@ -34,4 +34,13 @@ class SirenTuruTest {
         assertEquals("siren_standart", SirenTuru.STANDART.sesAdi());
         assertEquals("siren_gunes", SirenTuru.GUNES.sesAdi());
     }
+
+    @Test
+    void pakettekiSureBirIleOnDakikaArasinaKirpilir() {
+        assertEquals(1, SirenTuru.sureyiKirp(0));
+        assertEquals(1, SirenTuru.sureyiKirp(-5));
+        assertEquals(200, SirenTuru.sureyiKirp(200));
+        assertEquals(SirenTuru.EN_UZUN_TICK, SirenTuru.sureyiKirp(Integer.MAX_VALUE));
+        assertEquals(600 * 20, SirenTuru.EN_UZUN_TICK);
+    }
 }

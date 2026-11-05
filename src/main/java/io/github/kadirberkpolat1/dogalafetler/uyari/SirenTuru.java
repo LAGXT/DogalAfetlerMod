@@ -21,6 +21,8 @@ public enum SirenTuru {
     public static final int STANDART_SURE_TICK = 10 * SANIYE;
     /** Güneş patlaması (tasarım notu) ve ay çarpması (K0-19) sireni 60 saniye. */
     public static final int UZUN_SURE_TICK = 60 * SANIYE;
+    /** Paketle gelen süre bu aralığa kırpılır; bozuk paket sonsuz siren çalmasın. */
+    public static final int EN_UZUN_TICK = 600 * SANIYE;
 
     private final String kimlik;
     private final String sesAdi;
@@ -77,6 +79,11 @@ public enum SirenTuru {
             case GUNES_PATLAMASI, AY_CARPMASI -> UZUN_SURE_TICK;
             default -> STANDART_SURE_TICK;
         };
+    }
+
+    /** Bağsız süreyi [1, {@link #EN_UZUN_TICK}] aralığına kırpar. */
+    public static int sureyiKirp(int sureTick) {
+        return Math.max(1, Math.min(EN_UZUN_TICK, sureTick));
     }
 
     public static Optional<SirenTuru> kimlikIle(String girdi) {

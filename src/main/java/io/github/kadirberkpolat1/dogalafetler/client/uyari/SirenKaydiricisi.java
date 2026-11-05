@@ -19,7 +19,14 @@ import net.minecraft.sounds.SoundSource;
  * listenin sonuna tam genişlikte eklenir.
  */
 final class SirenKaydiricisi {
+    private static OptionInstance<Integer> sonEklenen;
+
     private SirenKaydiricisi() {
+    }
+
+    /** Son açılan ses ekranına eklenen kaydırıcı (spike otomasyonu bunu fareyle oynatmadan sürür). */
+    static OptionInstance<Integer> sonEklenen() {
+        return sonEklenen;
     }
 
     static OptionInstance<Integer> olustur() {
@@ -37,6 +44,7 @@ final class SirenKaydiricisi {
     @SuppressWarnings({"rawtypes", "unchecked"})
     static String ekle(Options ayarlar, OptionsList liste) {
         OptionInstance<Integer> siren = olustur();
+        sonEklenen = siren;
         OptionInstance<Double> konusma = ayarlar.getSoundSourceOptionInstance(SoundSource.VOICE);
         AbstractWidget konusmaDugmesi = liste.findOption(konusma);
         // OptionsList.Entry protected olduğu için satırlar türü anılmadan yer değiştirir.

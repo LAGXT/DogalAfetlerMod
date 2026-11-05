@@ -3,7 +3,6 @@ package io.github.kadirberkpolat1.dogalafetler.uyari;
 import io.github.kadirberkpolat1.dogalafetler.network.AgKanali;
 import java.util.Objects;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.util.Mth;
 
 /**
  * Siren ağ paketleri. Sunucu sireni etkilenebilecek oyunculara gönderir (madde 5); istemci tarafı kendini
@@ -11,9 +10,6 @@ import net.minecraft.util.Mth;
  * yoktur ve bu paketler zaten yalnız istemciye gider.
  */
 public final class SirenPaketleri {
-    /** Paketle gelen süre bu aralığa kırpılır; bozuk paket sonsuz siren çalmasın. */
-    static final int EN_UZUN_TICK = 600 * SirenTuru.SANIYE;
-
     /** Sireni başlatır; aynı anda çalan siren varsa yenisi eskisini keser. */
     public record SirenPaketi(SirenTuru tur, int sureTick) {
         void yaz(FriendlyByteBuf tampon) {
@@ -22,7 +18,7 @@ public final class SirenPaketleri {
         }
 
         static SirenPaketi oku(FriendlyByteBuf tampon) {
-            return new SirenPaketi(tampon.readEnum(SirenTuru.class), Mth.clamp(tampon.readVarInt(), 1, EN_UZUN_TICK));
+            return new SirenPaketi(tampon.readEnum(SirenTuru.class), SirenTuru.sureyiKirp(tampon.readVarInt()));
         }
     }
 

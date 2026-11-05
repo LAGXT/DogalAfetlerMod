@@ -14,15 +14,23 @@ import net.minecraft.sounds.SoundSource;
 /**
  * Konumsuz, döngülü siren sesi. Dosya döngülüdür; süre, açılış ve fade-out {@link SirenZarfi} ile kodla yönetilir.
  * {@link SoundSource#MASTER} ile çalındığında düzey {@code sirenSes / 100} ile çarpılır (Ana Ses'i ses motoru uygular);
- * gerçek kategori deneyinde çarpanı ses motoru kategori kaydırıcısından alır.
+ * gerçek kategori deneyinde çarpanı ses motoru kategori kaydırıcısından alır. Zarf ses örneğinden ayrı yaşar: ses motoru
+ * örneği kendiliğinden keserse {@link #devam()} aynı zarfla yeni bir örnek verir.
  */
 final class SirenSesi extends AbstractTickableSoundInstance {
     private final SirenZarfi zarf;
-    private String bitisNedeni = "süre doldu";
+    private final SoundEvent olay;
+    private String bitisNedeni;
 
     SirenSesi(SirenTuru tur, int sureTick, SoundEvent olay, SoundSource kaynak) {
+        this(new SirenZarfi(tur, sureTick), olay, kaynak, "süre doldu");
+    }
+
+    private SirenSesi(SirenZarfi zarf, SoundEvent olay, SoundSource kaynak, String bitisNedeni) {
         super(olay, kaynak, SoundInstance.createUnseededRandom());
-        this.zarf = new SirenZarfi(tur, sureTick);
+        this.zarf = zarf;
+        this.olay = olay;
+        this.bitisNedeni = bitisNedeni;
         this.looping = true;
         this.delay = 0;
         this.attenuation = SoundInstance.Attenuation.NONE;
@@ -33,12 +41,21 @@ final class SirenSesi extends AbstractTickableSoundInstance {
         guncelle();
     }
 
+    /** Aynı zarfı (geçen tick, sönüm durumu, bitiş nedeni) sürdüren yeni örnek; açılış tekrarlanmaz. */
+    SirenSesi devam() {
+        return new SirenSesi(zarf, olay, source, bitisNedeni);
+    }
+
     SirenTuru tur() {
         return zarf.tur();
     }
 
     int gecenTick() {
         return zarf.gecenTick();
+    }
+
+    boolean zarfBitti() {
+        return zarf.bitti();
     }
 
     /** Zarf sessizden başlar; ses motoru düzeyi 0 olan sesi aksi halde hiç başlatmaz. */

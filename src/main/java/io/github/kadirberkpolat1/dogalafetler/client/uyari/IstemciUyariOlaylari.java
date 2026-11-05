@@ -15,10 +15,11 @@ import net.minecraftforge.client.event.sound.PlaySoundEvent;
 import net.minecraftforge.client.event.sound.PlaySoundSourceEvent;
 import net.minecraftforge.client.event.sound.PlayStreamingSourceEvent;
 import net.minecraftforge.client.event.sound.SoundEvent;
+import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
-/** İstemci olayları: ses ayarları ekranı, siren başlangıç kanıtları ve sunucudan çıkış. */
+/** İstemci olayları: ses ayarları ekranı, siren başlangıç kanıtları, kesilen sirenin yeniden çalınması ve sunucudan çıkış. */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class IstemciUyariOlaylari {
     private IstemciUyariOlaylari() {
@@ -70,6 +71,13 @@ public final class IstemciUyariOlaylari {
     @SubscribeEvent
     public static void akisKaynagiBasladi(PlayStreamingSourceEvent olay) {
         kaynakBasladi("PlayStreamingSourceEvent", olay);
+    }
+
+    @SubscribeEvent
+    public static void tik(TickEvent.ClientTickEvent olay) {
+        if (olay.phase == TickEvent.Phase.END) {
+            SirenCalar.ORNEK.denetle();
+        }
     }
 
     @SubscribeEvent

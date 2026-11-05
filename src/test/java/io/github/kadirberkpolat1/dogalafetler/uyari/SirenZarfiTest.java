@@ -124,6 +124,35 @@ class SirenZarfiTest {
         assertEquals(desibel(-3f / sure), zarf.duzey(), 1e-3f);
     }
 
+    /**
+     * İstemci, ses motorunun kestiği sireni (boyut değişimi, /stopsound) aynı zarfla yeni bir ses örneğinde sürdürür; yeni
+     * örneğin ilk düzeyi zarfın o anki düzeyidir. Okumak zarfı ilerletmediği için açılış yeniden başlamaz, düzey sıçramaz.
+     */
+    @Test
+    void zarfKorunarakYenidenBaslatmaAcilisiTekrarlamaz() {
+        SirenZarfi zarf = ilerlet(new SirenZarfi(SirenTuru.GUNES, 1200), 30);
+        float kesilmeOncesi = zarf.duzey();
+        assertTrue(kesilmeOncesi > 0.3f, "açılışın ortası");
+        assertEquals(kesilmeOncesi, zarf.duzey(), TOLERANS, "okuma durumu değiştirmez");
+        assertEquals(30, zarf.gecenTick(), "okuma zarfı ilerletmez");
+
+        float onceki = kesilmeOncesi;
+        float enBuyukAdim = 0f;
+        for (int i = 0; i < 300; i++) {
+            zarf.ilerle();
+            enBuyukAdim = Math.max(enBuyukAdim, Math.abs(zarf.duzey() - onceki));
+            onceki = zarf.duzey();
+        }
+        assertTrue(enBuyukAdim < 0.05f, "düzey sürekli, açılış tekrarı yok (en büyük adım " + enBuyukAdim + ")");
+
+        zarf.sondur();
+        ilerlet(zarf, 20);
+        float sonmeOrtasi = zarf.duzey();
+        zarf.ilerle();
+        assertTrue(zarf.duzey() < sonmeOrtasi && zarf.duzey() > sonmeOrtasi * 0.5f, "fade-out ortasında da sürekli");
+        assertTrue(zarf.perde() >= 0.5f);
+    }
+
     private static float desibel(float db) {
         return (float) Math.pow(10.0, db / 20.0);
     }
