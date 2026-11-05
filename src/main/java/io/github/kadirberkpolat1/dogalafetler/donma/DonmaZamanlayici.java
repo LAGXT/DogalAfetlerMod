@@ -32,9 +32,13 @@ import net.minecraftforge.event.server.ServerAboutToStartEvent;
  * <li>Her tick bekleyenler en yakın oyuncuya uzaklığa göre sıralı (20 tick'te bir yeniden) işlenir. Sıradaki chunk'ın
  * seviyesi hedefe en çok {@code seviyeAdimi} kadar yaklaşır: 256 sütun yeni seviyeye getirilir, bitince seviye
  * capability'ye yazılır. Geçiş tick'ler arasında bölünür; bir sütun 1, bir blok değişimi 8 birim tutar.</li>
- * <li>Bütçe TPS 18'in altında yarıya, 15'in altında çeyreğe iner; ayrıca bir tick'te en çok {@code tickMaksMs}.</li>
- * <li>Yalnız {@code BLOCK_TICKING} chunk'lar işlenir: daha düşük durumdaki chunk'ta {@code setBlock} istemcilere
- * gitmez ({@code Level.markAndNotifyBlock}, {@code ChunkHolder.blockChanged}).</li>
+ * <li>Bütçe TPS 18'in altında yarıya, 15'in altında çeyreğe iner; ayrıca bir tick'te en çok {@code tickMaksMs} (16 sütunda
+ * bir bakılır).</li>
+ * <li>Yalnız {@code ServerChunkCache.isPositionTicking} chunk'lar işlenir: ticking future'ı bitmiş chunk'ın 1 chunk
+ * çevresi FULL'dür. {@code getFullStatus()} yalnız ticket seviyesine bakar; komuşular henüz yüklenmemişken kenar
+ * sütundaki {@code setBlock}'un komşu şekil güncellemesi ({@code updateNeighbourShapes} → {@code Level.getBlockState})
+ * o chunk'ı ana thread'de senkron yükletir. Ticking olmayan chunk'ta değişim istemciye de gitmez
+ * ({@code ChunkHolder.blockChanged} → {@code getTickingChunk}).</li>
  * <li>{@code afetBlokHasari} kapalıyken kuyruk durur, seviyeler değişmez; açılınca kaldığı yerden sürer.</li>
  * </ul>
  */
@@ -69,6 +73,7 @@ public final class DonmaZamanlayici {
     private static long ozetNs;
     private static long ozetEnUzunNs;
     private static int ozetSureSiniri;
+    private static int ozetErken;
 
     private DonmaZamanlayici() {
     }
@@ -173,7 +178,10 @@ public final class DonmaZamanlayici {
     static boolean sogukBiyom(ServerLevel level, LevelChunk chunk) {
         ChunkPos p = chunk.getPos();
         int y = chunk.getHeight(Heightmap.Types.MOTION_BLOCKING, 8, 8);
-        Holder<Biome> biyom = level.getBiome(new BlockPos(p.getMiddleBlockX(), y, p.getMiddleBlockZ()));
+        return sogukBiyom(level.getBiome(new BlockPos(p.getMiddleBlockX(), y, p.getMiddleBlockZ())));
+    }
+
+    static boolean sogukBiyom(Holder<Biome> biyom) {
         return biyom.is(Tags.Biomes.IS_COLD_OVERWORLD) || biyom.value().getBaseTemperature() < 0.15f;
     }
 
@@ -253,8 +261,11 @@ public final class DonmaZamanlayici {
                 siraBasi++;
                 continue;
             }
-            FullChunkStatus durum = chunk.getFullStatus();
-            if (durum == null || !durum.isOrAfter(FullChunkStatus.BLOCK_TICKING)) {
+            if (!level.getChunkSource().isPositionTicking(anahtar)) {
+                FullChunkStatus durum = chunk.getFullStatus();
+                if (durum != null && durum.isOrAfter(FullChunkStatus.BLOCK_TICKING)) {
+                    ozetErken++;
+                }
                 siraBasi++;
                 continue;
             }
@@ -279,7 +290,7 @@ public final class DonmaZamanlayici {
             }
             int minX = chunk.getPos().getMinBlockX();
             int minZ = chunk.getPos().getMinBlockZ();
-            while (is.sutun < 256 && kalan > 0) {
+            while (is.sutun < 256 && kalan > 0 && ((is.sutun & 15) != 0 || System.nanoTime() < sinir)) {
                 int i = SUTUN_SIRASI[is.sutun++];
                 int degisen = DonmaIsleyici.sutunuIsle(level, chunk, minX + (i & 15), minZ + (i >> 4),
                         DonmaIsleyici.SINIRSIZ, is.bitis, is.cozulme, is.kiyi[i], tablo, e, konum);
@@ -326,19 +337,20 @@ public final class DonmaZamanlayici {
     }
 
     private static void ozet(ServerLevel level, MinecraftServer sunucu) {
-        if (ozetAdim == 0 && ozetSutun == 0) {
+        if (ozetAdim == 0 && ozetSutun == 0 && ozetErken == 0) {
             return;
         }
         DonmaVerisi veri = DonmaVerisi.al(sunucu);
         DogalAfetler.LOGGER.info("[donma] özet: G={} çözülme={} yüklü={} bekleyen={} süren={} | son 100 tick: {} adım, {} chunk"
-                        + " hedefte, {} blok, {} sütun, işçi ort {} ms/tick en çok {} ms, süre sınırı {} kez | bütçe {} blok/tick"
-                        + " (1/{}) TPS {} ({} ms/tick) | toplam {} adım, {} blok",
+                        + " hedefte, {} blok, {} sütun, işçi ort {} ms/tick en çok {} ms, süre sınırı {} kez, ticket'ı BLOCK_TICKING"
+                        + " ama ticking olmayan için atlama {} | bütçe {} blok/tick (1/{}) TPS {} ({} ms/tick) | toplam {} adım, {} blok",
                 veri.ilerleme(), veri.cozulme(), YUKLU.size(), BEKLEYEN.size(), ISLER.size(), ozetAdim, ozetUlasan,
                 ozetDegisen, ozetSutun, String.format("%.2f", ozetNs / 100.0 / 1e6), String.format("%.2f", ozetEnUzunNs / 1e6),
-                ozetSureSiniri, sonButce, sonBolen, String.format("%.1f", sonTps),
+                ozetSureSiniri, ozetErken, sonButce, sonBolen, String.format("%.1f", sonTps),
                 String.format("%.1f", sunucu.getAverageTickTime()), tamamlananAdim, toplamDegisen);
         ozetAdim = ozetUlasan = ozetDegisen = ozetSutun = ozetNs = ozetEnUzunNs = 0;
         ozetSureSiniri = 0;
+        ozetErken = 0;
     }
 
     private static int[] sutunSirasi() {

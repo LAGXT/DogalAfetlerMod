@@ -87,19 +87,22 @@ public final class DonmaKomutlari {
         KisMaskesi maske = DonmaZamanlayici.maske(level);
         double maskeAgirligi = maske.agirlik(p.x, p.z);
         double gurultu = maske.gurultu(p.getMiddleBlockX(), p.getMiddleBlockZ());
-        LevelChunk chunk = level.getChunk(p.x, p.z);
-        boolean soguk = DonmaZamanlayici.sogukBiyom(level, chunk);
-        int yuzeyY = chunk.getHeight(Heightmap.Types.MOTION_BLOCKING, konum.getX() & 15, konum.getZ() & 15);
+        // getChunk yüklü olmayan chunk'ı ana thread'de senkron üretir; komut chunk yüklememeli.
+        LevelChunk chunk = level.getChunkSource().getChunkNow(p.x, p.z);
+        int yuzeyY = chunk != null
+                ? chunk.getHeight(Heightmap.Types.MOTION_BLOCKING, konum.getX() & 15, konum.getZ() & 15)
+                : level.getSeaLevel();
         Holder<Biome> biyom = level.getBiome(new BlockPos(p.getMiddleBlockX(), yuzeyY, p.getMiddleBlockZ()));
+        boolean soguk = DonmaZamanlayici.sogukBiyom(biyom);
         double w = DonmaHedefi.kisAgirligi(maskeAgirligi, soguk);
         DonmaVerisi veri = DonmaVerisi.al(kaynak.getServer());
         yaz(b, String.format("Kış: chunk %s maske ağırlığı %.3f (gürültü %.4f, eşik %.4f) | biyom %s sıcaklık %.2f soğuk=%s"
-                        + " | yüzey Y=%d (Y>%d kalıcı kış=%s) | birleşik ağırlık %.3f → kış=%s | çözülmede hedef %d"
+                        + " | yüzey Y=%d%s (Y>%d kalıcı kış=%s) | birleşik ağırlık %.3f → kış=%s | çözülmede hedef %d"
                         + " (G=%d)",
                 p, maskeAgirligi, gurultu, maske.esik(), biyom.unwrapKey().map(k -> k.location().toString()).orElse("?"),
-                biyom.value().getBaseTemperature(), soguk, yuzeyY, DonmaAyarlari.kisYEsigi,
-                yuzeyY > DonmaAyarlari.kisYEsigi, w, w >= 0.5, DonmaHedefi.hedef(veri.ilerleme(), true, w),
-                veri.ilerleme()));
+                biyom.value().getBaseTemperature(), soguk, yuzeyY, chunk == null ? " (chunk yüklü değil, deniz seviyesi)" : "",
+                DonmaAyarlari.kisYEsigi, yuzeyY > DonmaAyarlari.kisYEsigi, w, w >= 0.5,
+                DonmaHedefi.hedef(veri.ilerleme(), true, w), veri.ilerleme()));
         return w >= 0.5 ? 1 : 0;
     }
 
