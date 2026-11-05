@@ -36,7 +36,10 @@ import org.joml.Vector3f;
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class SpikeOtomasyon {
     private static final boolean ACIK = "su".equals(System.getProperty("dogalafetler.spike"));
-    /** Koşulacak bölümler: hepsi ya da virgüllü liste (deniz, sualti, dalga, cekilme, hash, adil, magara). */
+    /**
+     * Koşulacak bölümler: hepsi ya da virgüllü liste (deniz, sualti, dalga, cekilme, adil, hash, magara); fpsdongu yalnız
+     * açıkça istenince koşar.
+     */
     private static final String BOLUM = System.getProperty("dogalafetler.spike.bolum", "hepsi");
 
     /** {@code bekle}: önceki adımdan sonra oyun tick'i; {@code kosul}: ayrıca doğru olana kadar bekle (null: yok). */
@@ -134,10 +137,19 @@ public final class SpikeOtomasyon {
         if (FPS.size() == 5) {
             List<Integer> ornek = FPS.subList(1, 5);
             double ort = ornek.stream().mapToInt(Integer::intValue).average().orElse(0);
-            DogalAfetler.LOGGER.info("SPIKE-SU FPS etiket={} ort={} min={} max={} ornek={} | {}", fpsEtiket,
+            DogalAfetler.LOGGER.info("SPIKE-SU FPS etiket={} ort={} min={} max={} ornek={} yuk={} | {}", fpsEtiket,
                     String.format(Locale.ROOT, "%.1f", ort), ornek.stream().mapToInt(Integer::intValue).min().orElse(0),
-                    ornek.stream().mapToInt(Integer::intValue).max().orElse(0), ornek, SuRenderer.olcumOzeti());
+                    ornek.stream().mapToInt(Integer::intValue).max().orElse(0), ornek, sistemYuku(), SuRenderer.olcumOzeti());
             fpsEtiket = null;
+        }
+    }
+
+    /** Makinenin 1 dakikalık yük ortalaması (FPS ölçümünü başka işlerden ayırmak için); okunamazsa "?". */
+    private static String sistemYuku() {
+        try {
+            return java.nio.file.Files.readString(java.nio.file.Path.of("/proc/loadavg")).split(" ")[0];
+        } catch (java.io.IOException | RuntimeException e) {
+            return "?";
         }
     }
 
@@ -356,6 +368,48 @@ public final class SpikeOtomasyon {
             s.add(komut(110, su + "dalga 10"));
             s.add(fps(80, "adil_dalga"));
             s.add(komut(110, su + "kapat"));
+        }
+        if (("," + BOLUM + ",").contains(",fpsdongu,")) {
+            // G: aynı kamerada dönüşümlü ölçüm (afetsiz / deniz +4 / afetsiz / dalga) x3; makine yükü koşudan koşuya oynadığı için
+            // oranlar yan yana ölçülen çiftlerden hesaplanır.
+            s.add(komut(10, su + "kapat"));
+            s.add(komut(2, "gamemode spectator"));
+            s.add(komut(2, su + "konum kiyi 0"));
+            s.add(komut(2, "tp @s ~ ~6 ~ ~ 22"));
+            s.add(chunkBekle(200, 600));
+            for (int i = 1; i <= 3; i++) {
+                s.add(fps(20, "dongu" + i + "_afetsiz"));
+                s.add(komut(110, su + "deniz 4 0"));
+                s.add(fps(60, "dongu" + i + "_deniz4"));
+                s.add(komut(110, su + "kapat"));
+                s.add(fps(60, "dongu" + i + "_afetsiz_b"));
+                s.add(komut(110, su + "dalga 10"));
+                s.add(fps(60, "dongu" + i + "_dalga"));
+                s.add(komut(110, su + "kapat"));
+            }
+        }
+        if (("," + BOLUM + ",").contains(",fpsdongu2,")) {
+            // H: aynı kamerada dönüşümlü ölçüm: afetsiz / çekilme (chunk yeniden derleme bitince) x3, afetsiz / mağara x3.
+            s.add(komut(10, su + "kapat"));
+            s.add(komut(2, "gamemode spectator"));
+            s.add(komut(2, su + "konum kiyi 0"));
+            s.add(komut(2, "tp @s ~ ~6 ~ ~ 30"));
+            s.add(chunkBekle(200, 600));
+            for (int i = 1; i <= 3; i++) {
+                s.add(fps(60, "cdongu" + i + "_afetsiz"));
+                s.add(komut(110, su + "cekilme 30 3"));
+                s.add(fps(160, "cdongu" + i + "_cekilme"));
+                s.add(komut(110, su + "kapat"));
+            }
+            s.add(komut(100, "effect give @s minecraft:night_vision 900 0 true"));
+            s.add(komut(2, su + "magara hazirla 14 17 -95"));
+            s.add(chunkBekle(200, 600));
+            for (int i = 1; i <= 3; i++) {
+                s.add(fps(20, "mdongu" + i + "_afetsiz"));
+                s.add(komut(110, su + "magara baslat 100000 0.05"));
+                s.add(fps(110, "mdongu" + i + "_magara"));
+                s.add(komut(110, su + "kapat"));
+            }
         }
         if (bolum("hash")) {
             s.add(komut(40, su + "konum kiyi -40"));
