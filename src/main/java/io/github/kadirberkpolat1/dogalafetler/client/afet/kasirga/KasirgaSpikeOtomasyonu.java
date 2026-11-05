@@ -61,12 +61,50 @@ public final class KasirgaSpikeOtomasyonu {
     }
 
     static {
-        if ("kasirga".equals(SENARYO)) {
-            plan();
+        switch (SENARYO) {
+            case "kasirga" -> plan();
+            case "kasirga-tablo" -> tabloPlani();
+            default -> {
+            }
         }
     }
 
     private KasirgaSpikeOtomasyonu() {
+    }
+
+    /**
+     * Yalnız FPS tablosu (soru 5): S1 ve S5 aynı vitrin karesinde (52 blok, eğim -12°), kasırga hareketsiz; her
+     * turda katmansız / Düşük / Yüksek / Ultra sırayla ölçülür (sistem yükündeki kayma her seçeneğe dağılır).
+     * Sonda kasırga durdurulup aynı noktada afetsiz ölçülür.
+     */
+    private static void tabloPlani() {
+        adim(1000, "hazırlık", KasirgaSpikeOtomasyonu::hazirlik);
+        adim(15000, "dünya yüklemesi bitti (sunucu ort tick < 15 ms)", () -> sunucuTickMs() < 15, () -> {
+        });
+        for (int seviye : new int[] {1, 5}) {
+            adim(500, "S" + seviye + " başlat", () -> komut("dogalafet spike kasirga " + seviye + " kalite yuksek"));
+            adim(8000, "S" + seviye + " olgun: hareketi durdur", KasirgaSpikeOtomasyonu::olgun,
+                    () -> komut("dogalafet spike kasirga hareket false"));
+            kamera(52, -12);
+            adim(3000, "vitrin noktasında", KasirgaSpikeOtomasyonu::isinlandi, () -> {
+            });
+            for (int tur = 1; tur <= 3; tur++) {
+                adim(300, "katmansız", () -> KasirgaIstemciDurumu.ACIK.clear());
+                olcum(700, "T-S" + seviye + "-katmansiz-" + tur, 4000);
+                adim(0, "katmanlar açık", () -> KasirgaIstemciDurumu.ACIK.addAll(EnumSet.allOf(Katman.class)));
+                for (String kalite : List.of("dusuk", "yuksek", "ultra")) {
+                    adim(300, "kalite " + kalite, () -> komut("dogalafet spike kasirga kalite " + kalite));
+                    olcum(1000, "T-S" + seviye + "-" + kalite + "-" + tur, 4000);
+                }
+            }
+            tps();
+            dur();
+            for (int tur = 1; tur <= 2; tur++) {
+                olcum(tur == 1 ? 3000 : 500, "T-S" + seviye + "-afetsiz-" + tur, 4000);
+            }
+            tps();
+        }
+        adim(1500, "kapanış", KasirgaSpikeOtomasyonu::kapat);
     }
 
     private static void plan() {
