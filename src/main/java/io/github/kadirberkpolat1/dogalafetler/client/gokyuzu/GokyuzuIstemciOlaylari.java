@@ -22,6 +22,7 @@ public final class GokyuzuIstemciOlaylari {
     /** Sis ve temizleme rengi (ufuk ve uzaktaki arazi). Kanca seçiminden bağımsız çalışır. */
     @SubscribeEvent
     public static void sisRengi(ViewportEvent.ComputeFogColor olay) {
+        GokyuzuOlcum.basla();
         ClientLevel level = Minecraft.getInstance().level;
         GokyuzuDurumu d = IstemciGokyuzu.durum();
         if (level == null || d.vanillaMi() || level.dimension() != Level.OVERWORLD
@@ -37,11 +38,14 @@ public final class GokyuzuIstemciOlaylari {
 
     @SubscribeEvent
     public static void asama(RenderLevelStageEvent olay) {
-        if (olay.getStage() == RenderLevelStageEvent.Stage.AFTER_SKY
-                && IstemciGokyuzu.kanca == IstemciGokyuzu.Kanca.AFTER_SKY) {
+        if (olay.getStage() != RenderLevelStageEvent.Stage.AFTER_SKY) {
+            return;
+        }
+        if (IstemciGokyuzu.kanca == IstemciGokyuzu.Kanca.AFTER_SKY) {
             GokyuzuCizici.afterSkyCiz(olay.getPoseStack(), olay.getProjectionMatrix(), olay.getPartialTick(),
                     olay.getCamera());
         }
+        GokyuzuOlcum.bitir();
     }
 
     @SubscribeEvent

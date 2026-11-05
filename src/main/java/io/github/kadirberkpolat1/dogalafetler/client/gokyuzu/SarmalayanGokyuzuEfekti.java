@@ -56,7 +56,7 @@ public final class SarmalayanGokyuzuEfekti extends DimensionSpecialEffects {
             case KIZIL_CUCE -> {
                 // Doğuş (ilerleme < 1): ufuktaki kızıl yay daha yoğun.
                 float dogus = 1f - d.ilerleme();
-                yield new float[] {1f, 0.28f + 0.1f * r[1], 0.12f, Math.min(1f, r[3] * (1.1f + 1.6f * dogus))};
+                yield new float[] {1f, 0.28f + 0.1f * r[1], 0.12f, Math.min(1f, r[3] * (1.1f + 0.5f * dogus))};
             }
             default -> r;
         };

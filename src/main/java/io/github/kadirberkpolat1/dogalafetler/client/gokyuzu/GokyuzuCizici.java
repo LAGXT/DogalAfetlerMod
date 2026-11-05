@@ -50,8 +50,11 @@ final class GokyuzuCizici {
     private static final ResourceLocation SN_HALKA = doku("supernova_halka");
     private static final ResourceLocation YILDIZ_ISIN = doku("yildiz_isin");
 
-    /** Vanilla güneş dokusunda diskin yarı boyu (100 birim uzaklıkta). Kendi dokumuzda disk yarıçapı 0,42. */
-    private static final float GUNES_DISK = 15f;
+    /**
+     * Vanilla güneş diskinin yarı boyu (100 birim uzaklıkta): {@code sun.png} 32 pikselin ortadaki 8'i parlak disk, kare 30
+     * birim yarı boylu → 7,5. Kendi dokumuzda disk yarıçapı dokunun 0,42'si.
+     */
+    private static final float GUNES_DISK = 7.5f;
     private static final float DOKU_DISK_ORANI = 0.42f;
 
     private static final Vector3f SAMANYOLU_N;
@@ -97,6 +100,8 @@ final class GokyuzuCizici {
     private static final ResourceLocation[] cisimDokulari = new ResourceLocation[5];
     private static ResourceLocation kalintiDokusu;
     private static boolean ilkCizimYazildi;
+    private static long cizimSuresiNs;
+    private static long cizimSayisi;
 
     private GokyuzuCizici() {
     }
@@ -314,6 +319,7 @@ final class GokyuzuCizici {
     /** Kanca (b) yolu: gökyüzünün tamamını biz çizeriz. */
     static void ciz(ClientLevel level, float pt, PoseStack poz, Camera kamera, Matrix4f izdusum, boolean sisli,
             Runnable sisKur) {
+        long bas = System.nanoTime();
         sisKur.run();
         if (sisli || gokGizli(kamera)) {
             return;
@@ -338,6 +344,8 @@ final class GokyuzuCizici {
         kubbe.bind();
         kubbe.drawWithShader(poz.last().pose(), izdusum, GameRenderer.getPositionShader());
         VertexBuffer.unbind();
+        // Kubbe rengi shader rengine yazıldı; sıfırlanmazsa gündüz (uzay katmanı atlanınca) güneş gök rengiyle çarpılır.
+        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         gunDogumu(level, poz, zaman, pt);
@@ -375,6 +383,16 @@ final class GokyuzuCizici {
         RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
         RenderSystem.depthMask(true);
         RenderSystem.enableCull();
+        cizimSuresiNs += System.nanoTime() - bas;
+        cizimSayisi++;
+    }
+
+    /** Kanca (b) çiziminin kare başına ortalama CPU süresini (µs) verir ve sayacı sıfırlar. GPU süresi dahil değil. */
+    static double ortalamaCizimMikrosaniye() {
+        double sonuc = cizimSayisi == 0 ? 0 : cizimSuresiNs / 1000.0 / cizimSayisi;
+        cizimSuresiNs = 0;
+        cizimSayisi = 0;
+        return sonuc;
     }
 
     /** Kanca (c) yolu: vanilla gökyüzü çizildikten sonra yalnız derin uzay eklenir; güneş ve ay gizlenemez. */
@@ -504,28 +522,33 @@ final class GokyuzuCizici {
                 float g = Mth.lerp(p, 0.97f, 0.60f);
                 float b = Mth.lerp(p, 0.88f, 0.235f);
                 float disk = GUNES_DISK * olcek;
-                kuad(m, HALE, tepe, disk * (3f + 3f * p), 0f, r, g * 0.95f, b * 0.8f, (0.35f + 0.45f * p) * yagmursuz);
-                kuad(m, GUNES, tepe, disk / DOKU_DISK_ORANI, sn * 2f, r, g, b, yagmursuz);
+                kuad(m, HALE, tepe, disk * (3f + 3f * p), 0f, r, g * 0.9f, b * 0.7f, (0.2f + 0.3f * p) * yagmursuz);
+                // Disk normal karışımla: parlak gökte toplamalı turuncu beyaza doyardı; turuncu kalsın.
+                kuadOrtu(m, GUNES, tepe, disk / DOKU_DISK_ORANI, sn * 2f, r, g, b, yagmursuz);
+                kuad(m, GUNES, tepe, disk / DOKU_DISK_ORANI, sn * 2f, r, g, b, 0.3f * yagmursuz);
             }
             case SUPERNOVA -> {
                 float f = GokyuzuRenkleri.flas(p);
                 float bp = GokyuzuRenkleri.parlaklik(p);
                 float halkaYari = 8f + 55f * (1f - (float) Math.exp(-p * 10f));
                 float sicak = GokyuzuRenkleri.yumusak(0.05f, 0.6f, p);
-                kuad(m, HALE, tepe, 60f + 90f * f, 0f, 0.85f, 0.92f, 1f, (0.45f * bp + 0.55f * f) * yagmursuz);
+                kuad(m, HALE, tepe, 40f + 50f * f, 0f, 0.8f, 0.88f, 1f, (0.3f * bp + 0.35f * f) * yagmursuz);
                 kuad(m, SN_HALKA, tepe, halkaYari, sn * 0.5f, Mth.lerp(sicak, 0.85f, 1f), Mth.lerp(sicak, 0.9f, 0.93f),
                         Mth.lerp(sicak, 1f, 0.78f), (0.35f + 0.65f * bp) * yagmursuz);
-                kuad(m, SN_ISIN, tepe, 25f + 60f * f + 15f * bp, sn * 1.5f, 0.9f, 0.95f, 1f,
-                        Math.min(1f, 0.15f + 0.6f * bp + 0.4f * f) * yagmursuz);
-                kuad(m, HALE, tepe, 4f + 6f * bp + 10f * f, 0f, 1f, 1f, 1f, yagmursuz);
+                kuad(m, SN_ISIN, tepe, 30f + 70f * f + 15f * bp, sn * 1.5f, 0.85f, 0.92f, 1f,
+                        Math.min(1f, 0.25f + 0.5f * bp + 0.4f * f) * yagmursuz);
+                kuad(m, HALE, tepe, 4f + 6f * bp + 8f * f, 0f, 1f, 1f, 1f, yagmursuz);
             }
             case GUNESSIZ -> {
             }
             case KIZIL_CUCE -> {
                 float disk = GUNES_DISK * 0.6f;
                 float dogus = 1f - p;
-                kuad(m, HALE, tepe, disk * (5f + 3f * dogus), 0f, 1f, 0.35f, 0.2f, (0.55f + 0.3f * dogus) * yagmursuz);
-                kuad(m, GUNES, tepe, disk / DOKU_DISK_ORANI, sn * 2f, 1f, 0.416f, 0.227f, yagmursuz);
+                kuad(m, HALE, tepe, disk * (5f + 3f * dogus), 0f, 1f, 0.3f, 0.15f, (0.4f + 0.3f * dogus) * yagmursuz);
+                kuadOrtu(m, GUNES, tepe, disk / DOKU_DISK_ORANI, sn * 2f, 1f, 0.416f, 0.227f, yagmursuz);
+                // Doğuşta ufuk yayı zaten kızıl; disk ancak daha parlak çekirdekle seçilir (ilerleme 1'de etkisiz).
+                kuad(m, GUNES, tepe, disk / DOKU_DISK_ORANI, sn * 2f, 1f, 0.416f, 0.227f, (0.25f + 0.6f * dogus) * yagmursuz);
+                kuad(m, HALE, tepe, disk * 1.8f, 0f, 1f, 0.5f, 0.28f, 0.5f * dogus * yagmursuz);
             }
         }
     }
@@ -569,6 +592,15 @@ final class GokyuzuCizici {
         bb.vertex(m, s, -100f, -s).uv(u0, v0).color(r, g, b, yagmursuz).endVertex();
         bb.vertex(m, -s, -100f, -s).uv(u1, v0).color(r, g, b, yagmursuz).endVertex();
         BufferUploader.drawWithShader(bb.end());
+    }
+
+    /** {@link #kuad} ama normal alfa karışımıyla (örten disk); sonra toplamalı karışıma döner. */
+    private static void kuadOrtu(Matrix4f m, ResourceLocation doku, Vector3f yon, float yari, float donus, float r,
+            float g, float b, float a) {
+        RenderSystem.defaultBlendFunc();
+        kuad(m, doku, yon, yari, donus, r, g, b, a);
+        RenderSystem.blendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE,
+                GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ZERO);
     }
 
     /** Gök küresine teğet dokulu kare: merkez {@code yon*100}, yarı boy {@code yari}, kendi ekseninde {@code donus}. */

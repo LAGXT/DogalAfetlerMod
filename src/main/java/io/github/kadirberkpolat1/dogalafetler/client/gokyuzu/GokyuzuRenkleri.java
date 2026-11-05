@@ -64,9 +64,12 @@ final class GokyuzuRenkleri {
     private static final float[] KC_GECE_GOK = hex(0x120A10);
     private static final float[] KC_GECE_SIS = hex(0x1A0E12);
 
-    /** Süpernovanın göğü aydınlatma oranı (gece güneş ufkun altında olduğu için zayıf). */
+    /**
+     * Süpernovanın göğü aydınlatma oranı (gece güneş ufkun altında olduğu için zayıf). Gök beyaza doymaz: ışınlar ve
+     * halka toplamalı çizildiği için arka plan orta tonda kalmalı.
+     */
     private static float supernovaAydinlatma(float p, float gun) {
-        return Mth.clamp(0.85f * parlaklik(p) * Math.max(gun, 0.3f) + 0.6f * flas(p), 0f, 1f);
+        return Mth.clamp(0.5f * parlaklik(p) * Math.max(gun, 0.3f) + 0.1f * flas(p), 0f, 1f);
     }
 
     static float[] gokRengi(GokyuzuDurumu d, float[] vanilla, float gun) {
@@ -100,9 +103,9 @@ final class GokyuzuRenkleri {
         float p = d.ilerleme();
         return switch (d.evre()) {
             case NORMAL, BUYUYEN -> d.ayVar() ? geceligi(zaman) * geceligi(zaman) * 0.5f : geceligi(zaman);
-            case SUPERNOVA -> Mth.clamp(1f - (0.9f * parlaklik(p) + 0.5f * flas(p)) * Math.max(gun, 0.25f), 0f, 1f);
+            case SUPERNOVA -> Mth.clamp(1f - 0.75f * parlaklik(p) * Math.max(gun, 0.25f), 0.15f, 1f);
             case GUNESSIZ -> 1f;
-            case KIZIL_CUCE -> Mth.lerp(gun, 1f, 0.25f);
+            case KIZIL_CUCE -> Mth.lerp(gun, 1f, 0.45f);
         };
     }
 
