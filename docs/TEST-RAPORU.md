@@ -27,3 +27,9 @@ sütununa yazılır; ekran görüntüleri ve ölçüm dosyaları `docs/kanit/` a
 Faz 0 (kurulum) iskeletin derlendiğini, JUnit ve GameTest altyapısının çalıştığını ve geliştirme sunucusunun açılıp
 kapandığını gösterdi; kanıtlar `.vibe/rapor/kurulum.md`'dedir. Matris satırları şartnamedeki özellikler için tanımlıdır ve
 özellikler yazılıp Faz 5'te koşturulana kadar `yapılmadı` kalır.
+
+## Faz 0 ön koşu
+
+#1 (derleme), #2 (birim testleri), #3 (GameTest) ve #4 (geliştirme sunucusu) satırları Faz 0 iskeleti üzerinde çalıştı
+(kanıt: `.vibe/rapor/dogrulama-kurulum.md`, bağımsız doğrulayıcı 9/9). Bunlar altyapının çalıştığını gösterir; satırların
+tam yeşili, özellikler yazıldıktan sonra Faz 5 koşusunu bekler.
