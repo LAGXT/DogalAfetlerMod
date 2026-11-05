@@ -47,6 +47,11 @@ minecraft {
             if (project.hasProperty('quickPlay')) {
                 args '--quickPlaySingleplayer', project.property('quickPlay').toString()
             }
+            // Spike otomasyonu (K0-21): -Pspike=<ad> istemcide senaryoyu koşar, ekran görüntüsü alır ve oyunu kapatır.
+            if (project.hasProperty('spike')) {
+                property 'dogalafetler.spike', project.property('spike').toString()
+                args '--width', '1280', '--height', '720'
+            }
         }
 
         server {
