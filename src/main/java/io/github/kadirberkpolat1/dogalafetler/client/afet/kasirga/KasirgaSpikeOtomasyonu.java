@@ -71,7 +71,10 @@ public final class KasirgaSpikeOtomasyonu {
 
     private static void plan() {
         adim(1000, "hazırlık: seyirci, öğlen, yağmur, HUD gizli, vsync kapalı", KasirgaSpikeOtomasyonu::hazirlik);
-        olcum(6000, "afetsiz-baslangic", 5000);
+        // Girişteki chunk yüklemesi FPS'i ve tick'i bastırır; temel ölçüm dünya oturunca alınır.
+        adim(15000, "dünya yüklemesi bitti (sunucu ort tick < 15 ms)", () -> sunucuTickMs() < 15, () -> {
+        });
+        olcum(0, "afetsiz-baslangic", 5000);
         tps();
 
         // S1: hareket ve enterpolasyon, yakın çekim.
@@ -95,12 +98,22 @@ public final class KasirgaSpikeOtomasyonu {
         kamera(52, -12);
         adim(3000, "çekim: S5 vitrin yüksek", KasirgaSpikeOtomasyonu::isinlandi, () -> cek("s5-vitrin-yuksek"));
         olcum(300, "S5-yuksek", 5000);
+        katmansizCekim("s5-vitrin-katmansiz");
         tps();
-        kamera(30, -25);
+        // Kamera taban halkasının (yarıçapı ~31 blok) dışında, yukarı bakar: bloklar 25-60 blok yukarıda döner.
+        kamera(48, -30);
         adim(2500, "çekim: kalkan bloklar", () -> isinlandi() && ucanBlokSayisi() >= 20, () -> cek("s5-kalkan-bloklar"));
+        adim(300, "yalnız huni ve bloklar (kanıt karesi)", () -> {
+            KasirgaIstemciDurumu.ACIK.remove(Katman.TABAN);
+            KasirgaIstemciDurumu.ACIK.remove(Katman.DUVAR);
+            KasirgaIstemciDurumu.ACIK.remove(Katman.ALT_GIRDAP);
+        });
+        adim(800, "çekim: kalkan bloklar (taban/duvar kapalı)", () -> cek("s5-kalkan-bloklar-yalniz"));
+        adim(300, "bütün katmanlar açık", () -> KasirgaIstemciDurumu.ACIK.addAll(EnumSet.allOf(Katman.class)));
         kamera(100, -14);
         adim(3000, "çekim: S5 100 blok yüksek", KasirgaSpikeOtomasyonu::isinlandi, () -> cek("s5-100blok-yuksek"));
         olcum(300, "S5-yuksek-100blok", 5000);
+        katmansizCekim("s5-100blok-katmansiz");
 
         // Soru 1: huni gövdesi teknikleri (ağ / sprite / karma), 52 ve 100 blok.
         for (HuniKipi kip : List.of(HuniKipi.SPRITE, HuniKipi.KARMA)) {
@@ -108,7 +121,6 @@ public final class KasirgaSpikeOtomasyonu {
             adim(300, "huni kipi " + ad, () -> KasirgaIstemciDurumu.huniKipi = kip);
             kamera(52, -12);
             adim(3000, "çekim: vitrin huni " + ad, KasirgaSpikeOtomasyonu::isinlandi, () -> cek("s5-vitrin-huni-" + ad));
-            olcum(300, "S5-yuksek-huni-" + ad, 4000);
             kamera(100, -14);
             adim(3000, "çekim: 100 blok huni " + ad, KasirgaSpikeOtomasyonu::isinlandi,
                     () -> cek("s5-100blok-huni-" + ad));
@@ -122,12 +134,6 @@ public final class KasirgaSpikeOtomasyonu {
         adim(3000, "çekim: S5 vitrin ultra", KasirgaSpikeOtomasyonu::isinlandi, () -> cek("s5-vitrin-ultra"));
         olcum(300, "S5-ultra", 5000);
         tps();
-        for (Katman katman : Katman.values()) {
-            String ad = katman.name().toLowerCase(java.util.Locale.ROOT);
-            adim(300, "katman kapalı: " + ad, () -> KasirgaIstemciDurumu.ACIK.remove(katman));
-            olcum(500, "S5-ultra-" + ad + "-kapali", 4000);
-            adim(0, "katman açık: " + ad, () -> KasirgaIstemciDurumu.ACIK.add(katman));
-        }
 
         // Soru 2: taban halkası kendi dörtgen listesiyle mi, vanilla parçacık motoruyla mı (700 / 1400).
         adim(300, "tüm katmanlar kapalı", () -> KasirgaIstemciDurumu.ACIK.clear());
@@ -154,13 +160,52 @@ public final class KasirgaSpikeOtomasyonu {
             KasirgaIstemciDurumu.ACIK.addAll(EnumSet.allOf(Katman.class));
         });
 
+        // FPS tablosu: aynı vitrin karesinde iç içe geçmiş turlar; sistem yükündeki kayma her seçeneğe dağılır,
+        // raporda tur ortancası kullanılır. "katmansız" = aynı kare, kasırga görseli yok (afetsiz karşılığı).
+        kamera(52, -12);
+        adim(2000, "vitrin noktasında", KasirgaSpikeOtomasyonu::isinlandi, () -> {
+        });
+        for (int tur = 1; tur <= 3; tur++) {
+            final int t = tur;
+            adim(300, "tablo turu " + t + ": katmansız", () -> KasirgaIstemciDurumu.ACIK.clear());
+            olcum(700, "tablo-katmansiz-" + t, 4000);
+            adim(0, "katmanlar açık", () -> KasirgaIstemciDurumu.ACIK.addAll(EnumSet.allOf(Katman.class)));
+            for (String kalite : List.of("dusuk", "yuksek", "ultra")) {
+                adim(300, "kalite " + kalite, () -> komut("dogalafet spike kasirga kalite " + kalite));
+                olcum(1000, "tablo-" + kalite + "-" + t, 4000);
+            }
+        }
+        // Soru 1: huni gövdesi teknikleri, Yüksek, iç içe iki tur.
+        adim(300, "kalite yüksek", () -> komut("dogalafet spike kasirga kalite yuksek"));
+        for (int tur = 1; tur <= 2; tur++) {
+            for (HuniKipi kip : HuniKipi.values()) {
+                String ad = kip.name().toLowerCase(java.util.Locale.ROOT);
+                adim(300, "huni kipi " + ad, () -> KasirgaIstemciDurumu.huniKipi = kip);
+                olcum(500, "huni-" + ad + "-" + tur, 3500);
+            }
+        }
+        adim(300, "huni kipi ağ", () -> KasirgaIstemciDurumu.huniKipi = HuniKipi.AG);
+        // Katman maliyetleri (Ultra), iç içe iki tur: her katman tek başına kapatılır.
+        adim(300, "kalite ultra", () -> komut("dogalafet spike kasirga kalite ultra"));
+        for (int tur = 1; tur <= 2; tur++) {
+            olcum(700, "katman-hepsi-acik-" + tur, 3500);
+            for (Katman katman : Katman.values()) {
+                String ad = katman.name().toLowerCase(java.util.Locale.ROOT);
+                adim(300, "katman kapalı: " + ad, () -> KasirgaIstemciDurumu.ACIK.remove(katman));
+                olcum(500, "katman-" + ad + "-kapali-" + tur, 3500);
+                adim(0, "katman açık: " + ad, () -> KasirgaIstemciDurumu.ACIK.add(katman));
+            }
+        }
+
         // S5 Düşük.
         adim(500, "kalite düşük", () -> komut("dogalafet spike kasirga kalite dusuk"));
         adim(1500, "çekim: S5 vitrin düşük", () -> cek("s5-vitrin-dusuk"));
         olcum(300, "S5-dusuk", 5000);
         tps();
         dur();
-        olcum(3000, "afetsiz-vitrin-noktasi", 5000);
+        for (int tur = 1; tur <= 2; tur++) {
+            olcum(tur == 1 ? 3000 : 500, "afetsiz-vitrin-noktasi-" + tur, 4000);
+        }
         tps();
         adim(1500, "kapanış", KasirgaSpikeOtomasyonu::kapat);
     }
@@ -189,6 +234,13 @@ public final class KasirgaSpikeOtomasyonu {
                 KasirgaIstemciDurumu.gorselEnkazSayisi()));
     }
 
+    /** Aynı kareden kasırgasız kontrol görüntüsü: fark analizi kasırganın kapladığı alanı gösterir. */
+    private static void katmansizCekim(String ad) {
+        adim(300, "bütün katmanlar kapalı (kontrol)", () -> KasirgaIstemciDurumu.ACIK.clear());
+        adim(800, "çekim: " + ad, () -> cek(ad));
+        adim(300, "bütün katmanlar açık", () -> KasirgaIstemciDurumu.ACIK.addAll(EnumSet.allOf(Katman.class)));
+    }
+
     private static void kamera(double mesafe, float egim) {
         adim(500, "kamera " + mesafe + " blok, eğim " + egim, () -> {
             KasirgaVarligi k = ilkKasirga();
@@ -212,6 +264,11 @@ public final class KasirgaSpikeOtomasyonu {
 
     private static KasirgaVarligi ilkKasirga() {
         return KasirgaIstemciDurumu.KASIRGALAR.values().stream().findFirst().orElse(null);
+    }
+
+    private static float sunucuTickMs() {
+        IntegratedServer sunucu = Minecraft.getInstance().getSingleplayerServer();
+        return sunucu == null ? 0 : sunucu.getAverageTickTime();
     }
 
     private static boolean olgun() {
@@ -339,7 +396,9 @@ public final class KasirgaSpikeOtomasyonu {
         komut("weather rain");
         komut("gamerule doDaylightCycle false");
         komut("gamerule doWeatherCycle false");
-        komut("tp @s ~ ~ ~ 0 -10");
+        // Sabit başlangıç: güneye bakar, kasırga 60 blok önde (20, ~66, 65) karada doğar (koşu 2'de rastgele doğuş
+        // noktasından bakılınca S1 suyun üstünde doğdu ve hiç blok kaldırmadı).
+        komut("tp @s 20 80 5 0 -10");
         DogalAfetler.LOGGER.info("{} ayarlar: renderDistance={}, simulationDistance={}, grafik={}, parçacık={}, pencere={}x{}",
                 ETIKET, mc.options.renderDistance().get(), mc.options.simulationDistance().get(),
                 mc.options.graphicsMode().get(), mc.options.particles().get(), mc.getWindow().getWidth(),

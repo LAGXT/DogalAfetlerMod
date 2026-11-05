@@ -162,6 +162,9 @@ final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
         float hr = Mth.lerp(a, 0.84f, 0.40f);
         float hg = Mth.lerp(a, 0.84f, 0.40f);
         float hb = Mth.lerp(a, 0.82f, 0.39f);
+        // S1 ince ve açık bir halat, S5 koyu ve yoğun bir kama: opaklık seviyeyle artar.
+        double disAlfa = 0.55 + 0.35 * a;
+        double icAlfa = 0.68 + 0.29 * a;
         int uTekrar = s.seviye() >= 3 ? 3 : 2;
         double kahve = 0.25 + 0.12 * s.seviye();
         double disOmega = rankine.acisalHiz(rAlt * 1.3);
@@ -174,12 +177,12 @@ final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
                 double karmaAlfa = kip == KasirgaIstemciDurumu.HuniKipi.KARMA ? 0.85 : 1;
                 KasirgaIstatistik.huniDortgen += huniAgi(t, 0, 0, butce.huniDilim(), butce.huniHalka(), alt, h, rAlt,
                         rUst, kivrim, 0, uKaymasi(t, disOmega, uTekrar), uTekrar, KasirgaDokusu.HUNI_A_V0,
-                        KasirgaDokusu.HUNI_A_V1, hr, hg, hb, (float) (0.62 * alfa * karmaAlfa), kahve);
+                        KasirgaDokusu.HUNI_A_V1, hr, hg, hb, (float) (disAlfa * alfa * karmaAlfa), kahve);
                 if (kip == KasirgaIstemciDurumu.HuniKipi.AG) {
                     KasirgaIstatistik.huniDortgen += huniAgi(t, 0, 0, butce.huniDilim(), butce.huniHalka(), alt, h,
                             rAlt * 0.8, rUst * 0.8, kivrim, 0, uKaymasi(t, icOmega, uTekrar) + 0.5, uTekrar,
                             KasirgaDokusu.HUNI_B_V0, KasirgaDokusu.HUNI_B_V1, hr * 0.78f, hg * 0.78f, hb * 0.80f,
-                            (float) (0.80 * alfa), kahve);
+                            (float) (icAlfa * alfa), kahve);
                 }
             }
             if (kip != KasirgaIstemciDurumu.HuniKipi.AG) {
@@ -264,7 +267,7 @@ final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
                 float dz = z - kamZ;
                 float uzunluk = (float) Math.sqrt(dx * dx + dy * dy + dz * dz) + 1e-4f;
                 float fresnel = Math.abs(c * dx + sn * dz) / uzunluk;
-                noktaA[n] = (float) (alfa * dikey * (0.15 + 0.85 * Math.pow(fresnel, 0.6)));
+                noktaA[n] = (float) (alfa * dikey * (0.35 + 0.65 * Math.pow(fresnel, 0.5)));
                 noktaU[n] = (float) ((double) i / dilim * uTekrar + uHalka);
                 noktaNx[n] = c;
                 noktaNz[n] = sn;

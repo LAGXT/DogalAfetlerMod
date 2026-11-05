@@ -49,11 +49,11 @@ final class KasirgaDokusu {
                 // Yatayda uzun, dikeyde sık: dönen huninin yatay yoğuşma şeritleri.
                 double a = fbm(u * 4, v * 7, 4, 5, 11);
                 double gri = 0.78 + 0.22 * a;
-                yaz(resim, x, y, gri, kirp(0.30 + 1.0 * (a - 0.35)));
+                yaz(resim, x, y, gri, kirp(0.58 + 0.9 * (a - 0.4)));
                 double b = fbm(u * 6, v * 12, 6, 5, 23);
                 double serit = 0.5 + 0.5 * Math.sin((v * 9 + b * 2.2) * Math.PI);
-                double ib = 0.6 * b + 0.4 * serit;
-                yaz(resim, x, y + 64, 0.62 + 0.38 * ib, kirp(0.45 + 0.8 * (ib - 0.4)));
+                double ib = 0.75 * b + 0.25 * serit;
+                yaz(resim, x, y + 64, 0.62 + 0.38 * ib, kirp(0.68 + 0.7 * (ib - 0.4)));
             }
         }
         for (int kare = 0; kare < 4; kare++) {

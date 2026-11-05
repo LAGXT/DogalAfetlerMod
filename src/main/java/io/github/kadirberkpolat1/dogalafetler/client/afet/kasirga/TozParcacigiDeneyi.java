@@ -26,10 +26,12 @@ final class TozParcacigiDeneyi {
 
     static void baslat(KasirgaVarligi kasirga, int adet) {
         Minecraft mc = Minecraft.getInstance();
-        var atlas = mc.getTextureAtlas(TextureAtlas.LOCATION_PARTICLES);
+        // Parçacık atlası ModelManager'ın atlas kümesinde yok (getTextureAtlas NPE verir); ParticleEngine onu
+        // TextureManager'a kaydeder.
+        TextureAtlas atlas = (TextureAtlas) mc.getTextureManager().getTexture(TextureAtlas.LOCATION_PARTICLES);
         for (int i = 0; i < adet; i++) {
             TozParcacigi p = new TozParcacigi(mc.level, kasirga, i);
-            p.dokuyuAyarla(atlas.apply(ResourceLocation.fromNamespaceAndPath("minecraft", "big_smoke_" + (i % 4 + 2))));
+            p.dokuyuAyarla(atlas.getSprite(ResourceLocation.fromNamespaceAndPath("minecraft", "big_smoke_" + (i % 4 + 2))));
             mc.particleEngine.add(p);
             PARCACIKLAR.add(p);
         }
