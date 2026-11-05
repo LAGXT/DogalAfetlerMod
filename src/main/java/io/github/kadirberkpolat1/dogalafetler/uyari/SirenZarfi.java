@@ -60,26 +60,27 @@ public final class SirenZarfi {
         }
     }
 
-    /** Türün fade-out süresiyle söndürmeye başlar. */
-    public void sondur() {
-        sondur(tur.sondurmeTick());
+    /** Türün fade-out süresiyle söndürmeye başlar; uygulandıysa {@code true}. */
+    public boolean sondur() {
+        return sondur(tur.sondurmeTick());
     }
 
     /**
      * {@code sure} tick'lik üstel söndürme başlatır. Zaten sönüyorsa yalnız daha erken bitecekse geçerlidir; düzey
-     * o anki değerden devam eder, sıçramaz.
+     * o anki değerden devam eder, sıçramaz. Uygulandıysa {@code true}, yok sayıldıysa {@code false}.
      */
-    public void sondur(int sure) {
+    public boolean sondur(int sure) {
         if (sure <= 0) {
             throw new IllegalArgumentException("Söndürme süresi pozitif olmalı: " + sure);
         }
         if (sonduruluyor() && tick + sure >= sondurmeBaslangici + sondurmeSuresi) {
-            return;
+            return false;
         }
         sondurmeOncesiDuzey = duzey();
         sondurmeOncesiPerde = perde();
         sondurmeBaslangici = tick;
         sondurmeSuresi = sure;
+        return true;
     }
 
     public boolean sonduruluyor() {

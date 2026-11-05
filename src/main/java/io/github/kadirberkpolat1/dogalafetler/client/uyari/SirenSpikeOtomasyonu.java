@@ -11,6 +11,7 @@ import java.util.Arrays;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.SoundOptionsScreen;
 import net.minecraft.sounds.SoundSource;
 import net.minecraftforge.api.distmarker.Dist;
@@ -29,6 +30,7 @@ public final class SirenSpikeOtomasyonu {
     private static final List<Adim> ADIMLAR = new ArrayList<>();
     private static long baslangic = -1;
     private static int sonraki;
+    private static Screen bizimEkran;
 
     private record Adim(long ms, String ad, Runnable is) {
     }
@@ -49,28 +51,31 @@ public final class SirenSpikeOtomasyonu {
     private static void secilenYolPlani() {
         adim(3000, "standart siren 10 sn", () -> komut("dogalafet spike siren standart 10"));
         adim(5000, "çekim: siren çalarken (altyazı kapalı)", () -> cek("siren-calarken-yazi-yok"));
-        adim(15500, "altyazı aç", () -> altyazi(true));
-        // Standart siren ~15,1 sn'de kendiliğinden biter (3 + 10 sn + 2 sn fade-out); güneş sireni onu kesmesin diye 16 sn.
-        adim(16000, "güneş sireni 20 sn", () -> komut("dogalafet spike siren gunes 20"));
-        adim(17500, "çekim: altyazı açıkken", () -> cek("siren-gunes-yalniz-altyazi"));
-        adim(18000, "altyazı kapat", () -> altyazi(false));
-        adim(21000, "siren dur (fade-out)", () -> komut("dogalafet spike siren dur"));
-        adim(26000, "ses ayarları ekranı", SirenSpikeOtomasyonu::sesEkrani);
-        adim(27500, "çekim: ses ayarları", () -> cek("ses-ayarlari-sirenler"));
-        adim(28000, "ekranı kapat", () -> Minecraft.getInstance().setScreen(null));
-        adim(28500, "kapanış", SirenSpikeOtomasyonu::kapat);
+        // Standart siren 240 tick (10 sn + 2 sn fade-out) sürer; yüklü makinede istemci ~16 tick/sn döndüğü için
+        // duvar saatinde 15 sn'yi bulur. Güneş sireni onu kesmesin diye 19. saniyede gelir.
+        adim(18500, "altyazı aç", () -> altyazi(true));
+        adim(19000, "güneş sireni 20 sn", () -> komut("dogalafet spike siren gunes 20"));
+        adim(20500, "çekim: altyazı açıkken", () -> cek("siren-gunes-yalniz-altyazi"));
+        adim(21000, "altyazı kapat", () -> altyazi(false));
+        adim(24000, "siren dur (fade-out)", () -> komut("dogalafet spike siren dur"));
+        adim(30000, "ses ayarları ekranı", SirenSpikeOtomasyonu::sesEkrani);
+        adim(31500, "çekim: ses ayarları", () -> cek("ses-ayarlari-sirenler"));
+        adim(32000, "ekranı kapat", () -> Minecraft.getInstance().setScreen(null));
+        adim(32500, "kapanış", SirenSpikeOtomasyonu::kapat);
     }
 
-    /** Reddedilen yol: mixin ile eklenen gerçek kategori; vanilla kaydırıcı, options.txt ve yeni sirenin eskisini kesmesi. */
+    /**
+     * Reddedilen yol: mixin ile eklenen gerçek kategori; vanilla kaydırıcı, options.txt, yeni sirenin çalan sireni
+     * tam düzeydeyken kesmesi ve standart sirenin kendiliğinden bitmesi.
+     */
     private static void gercekKategoriPlani() {
         adim(3000, "ses ayarları ekranı", SirenSpikeOtomasyonu::sesEkrani);
         adim(4500, "çekim: ses ayarları (gerçek kategori)", () -> cek("ses-ayarlari-gercek-kategori"));
         adim(5000, "ekranı kapat", () -> Minecraft.getInstance().setScreen(null));
-        adim(5500, "standart siren 10 sn", () -> komut("dogalafet spike siren standart 10"));
-        adim(7500, "güneş sireni standardı keser", () -> komut("dogalafet spike siren gunes 20"));
-        adim(9500, "siren dur (fade-out)", () -> komut("dogalafet spike siren dur"));
-        adim(14500, "options.txt kaydet", SirenSpikeOtomasyonu::secenekleriKaydet);
-        adim(15000, "kapanış", SirenSpikeOtomasyonu::kapat);
+        adim(5500, "güneş sireni 20 sn", () -> komut("dogalafet spike siren gunes 20"));
+        adim(9500, "standart siren güneşi keser", () -> komut("dogalafet spike siren standart 10"));
+        adim(26000, "options.txt kaydet", SirenSpikeOtomasyonu::secenekleriKaydet);
+        adim(26500, "kapanış", SirenSpikeOtomasyonu::kapat);
     }
 
     @SubscribeEvent
@@ -86,6 +91,12 @@ public final class SirenSpikeOtomasyonu {
             baslangic = System.currentTimeMillis();
             DogalAfetler.LOGGER.info("[spike-siren] dünyaya girildi; senaryo={}, SoundSource.values()={}", SENARYO,
                     Arrays.toString(SoundSource.values()));
+        }
+        // Pencere ilk belirdiğinde sahibinin masaüstünde kısa süre odak alabilir; oraya kaçan tuşlar duraklatma menüsü açarsa
+        // tek oyunculu oyun durur ve zaman çizelgesi bozulur. Otomasyon klavye beklemediği için kendi açmadığı ekranı kapatır.
+        if (mc.screen != null && mc.screen != bizimEkran) {
+            DogalAfetler.LOGGER.warn("[spike-siren] otomasyonun açmadığı ekran kapatıldı: {}", mc.screen.getClass().getName());
+            mc.setScreen(null);
         }
         long gecen = System.currentTimeMillis() - baslangic;
         while (sonraki < ADIMLAR.size() && ADIMLAR.get(sonraki).ms() <= gecen) {
@@ -115,7 +126,8 @@ public final class SirenSpikeOtomasyonu {
 
     private static void sesEkrani() {
         Minecraft mc = Minecraft.getInstance();
-        mc.setScreen(new SoundOptionsScreen(null, mc.options));
+        bizimEkran = new SoundOptionsScreen(null, mc.options);
+        mc.setScreen(bizimEkran);
         DogalAfetler.LOGGER.info("[spike-siren] ses ayarları açıldı; sirenSes={}, gerçek kategori={}",
                 IstemciAyarlari.SIREN_SES.get(),
                 SirenKategorisi.gercek().map(k -> k.getName() + " = " + mc.options.getSoundSourceVolume(k)).orElse("yok"));

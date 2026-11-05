@@ -88,16 +88,16 @@ class SirenZarfiTest {
     @Test
     void ikinciSondurmeYalnizDahaErkenBitiyorsaKisaltir() {
         SirenZarfi zarf = ilerlet(new SirenZarfi(SirenTuru.STANDART, 200), 50);
-        zarf.sondur();
+        assertTrue(zarf.sondur(), "ilk söndürme uygulanır");
         ilerlet(zarf, 10);
-        zarf.sondur();
+        assertFalse(zarf.sondur(), "daha geç bitecek ikinci söndürme yok sayılır");
         ilerlet(zarf, SirenTuru.STANDART.sondurmeTick() - 10);
         assertTrue(zarf.bitti(), "ikinci sondur() fade-out'u uzatmaz");
 
         SirenZarfi kesilen = ilerlet(new SirenZarfi(SirenTuru.STANDART, 200), 50);
         kesilen.sondur();
         ilerlet(kesilen, 5);
-        kesilen.sondur(SirenZarfi.KESME_TICK);
+        assertTrue(kesilen.sondur(SirenZarfi.KESME_TICK), "daha erken bitiren kesme uygulanır");
         ilerlet(kesilen, SirenZarfi.KESME_TICK);
         assertTrue(kesilen.bitti(), "yeni siren eskisini kısa fade ile keser");
     }

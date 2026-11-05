@@ -45,6 +45,10 @@ final class SirenSesi extends AbstractTickableSoundInstance {
 
     @Override
     public void tick() {
+        // Ses motoru durdurulan örneği kanal kapanana kadar bir iki tick daha çağırır.
+        if (isStopped()) {
+            return;
+        }
         zarf.ilerle();
         guncelle();
         if (zarf.sonduruluyor()) {
@@ -64,16 +68,16 @@ final class SirenSesi extends AbstractTickableSoundInstance {
 
     /** Türün fade-out'uyla söndürür. */
     void sondur(String neden) {
-        if (!zarf.sonduruluyor()) {
+        if (zarf.sondur()) {
             bitisNedeni = neden;
         }
-        zarf.sondur();
     }
 
-    /** Yeni siren eskisini kısa bir fade ile keser. */
+    /** Yeni siren eskisini kısa bir fade ile keser (zaten daha erken bitecekse dokunmaz). */
     void kes() {
-        bitisNedeni = "yeni siren kesti";
-        zarf.sondur(SirenZarfi.KESME_TICK);
+        if (zarf.sondur(SirenZarfi.KESME_TICK)) {
+            bitisNedeni = "yeni siren kesti";
+        }
     }
 
     private void guncelle() {
