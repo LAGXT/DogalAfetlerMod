@@ -1,0 +1,11 @@
+{
+  "replace": false,
+  "values": [
+    "#minecraft:dirt",
+    "#minecraft:leaves",
+    "#minecraft:sand",
+    "#minecraft:base_stone_overworld",
+    "minecraft:gravel",
+    "minecraft:clay"
+  ]
+}

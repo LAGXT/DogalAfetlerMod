@@ -1,0 +1,6 @@
+{
+  "donusumler": [
+    {"tur": "su_sutunu", "kaynak": "minecraft:water", "hedef": "minecraft:ice"},
+    {"tur": "yuzey", "kaynak": "minecraft:mud", "hedef": "minecraft:packed_mud", "esik": 60}
+  ]
+}
