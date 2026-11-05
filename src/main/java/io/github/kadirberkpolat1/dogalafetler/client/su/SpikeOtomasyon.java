@@ -2,19 +2,31 @@ package io.github.kadirberkpolat1.dogalafetler.client.su;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
+import io.github.kadirberkpolat1.dogalafetler.su.SanalSuDunyasi;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+import net.minecraft.client.Camera;
+import net.minecraft.client.GraphicsStatus;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
+import net.minecraft.client.gui.screens.PauseScreen;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.renderer.BiomeColors;
+import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.util.Mth;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import org.joml.Vector3f;
 
 /**
  * Klavyesiz görsel kanıt: yalnız {@code -Ddogalafetler.spike=su} (Gradle {@code -Pspike=su}) ile açılır. Girişten sonra
@@ -47,6 +59,7 @@ public final class SpikeOtomasyon {
     @SubscribeEvent
     public static void giris(ClientPlayerNetworkEvent.LoggingIn e) {
         if (ACIK && adimlar == null) {
+            ayarlariSabitle(Minecraft.getInstance());
             adimlar = senaryo();
             DogalAfetler.LOGGER.info("SPIKE-SU otomasyon basladi, adim={}", adimlar.size());
         }
@@ -59,6 +72,10 @@ public final class SpikeOtomasyon {
             return;
         }
         mc.options.hideGui = true;
+        if (mc.screen instanceof PauseScreen) {
+            DogalAfetler.LOGGER.info("SPIKE-SU otomasyon: disaridan acilan duraklatma ekrani kapatildi");
+            mc.setScreen(null);
+        }
         ekranBos = mc.screen == null ? ekranBos + 1 : 0;
         fpsOrnekle(mc);
         yuzmeTick(mc);
@@ -86,6 +103,22 @@ public final class SpikeOtomasyon {
         oncekiZaman = t;
         sira++;
         a.is().accept(mc);
+    }
+
+    /**
+     * FPS ölçümü ve LOD için sabit görüntü ayarları: options.txt dışarıdan değişse de (bir koşuda görüş mesafesi 3 ve
+     * dikey eşitleme açık bulundu) ölçümler aynı koşulda alınır.
+     */
+    private static void ayarlariSabitle(Minecraft mc) {
+        mc.options.renderDistance().set(12);
+        mc.options.simulationDistance().set(12);
+        mc.options.enableVsync().set(false);
+        mc.options.framerateLimit().set(260);
+        mc.options.graphicsMode().set(GraphicsStatus.FANCY);
+        mc.options.save();
+        DogalAfetler.LOGGER.info("SPIKE-SU ayarlar: gorus={} simulasyon={} vsync={} fpsSiniri={} grafik={}",
+                mc.options.renderDistance().get(), mc.options.simulationDistance().get(), mc.options.enableVsync().get(),
+                mc.options.framerateLimit().get(), mc.options.graphicsMode().get());
     }
 
     private static void fpsOrnekle(Minecraft mc) {
@@ -152,11 +185,52 @@ public final class SpikeOtomasyon {
     }
 
     private static Adim foto(int bekle, String ad) {
-        return is(bekle, mc -> Screenshot.grab(mc.gameDirectory, "spike_su_" + ad + ".png", mc.getMainRenderTarget(),
-                m -> DogalAfetler.LOGGER.info("SPIKE-SU foto {} fps={} poz=({} {} {}) -> {}", ad, mc.getFps(),
-                        String.format(Locale.ROOT, "%.1f", mc.player.getX()),
-                        String.format(Locale.ROOT, "%.1f", mc.player.getEyeY()),
-                        String.format(Locale.ROOT, "%.1f", mc.player.getZ()), m.getString())));
+        return is(bekle, mc -> {
+            DogalAfetler.LOGGER.info("SPIKE-SU nisan {} {}", ad, nisan(mc));
+            Screenshot.grab(mc.gameDirectory, "spike_su_" + ad + ".png", mc.getMainRenderTarget(),
+                    m -> DogalAfetler.LOGGER.info("SPIKE-SU foto {} fps={} poz=({} {} {}) -> {}", ad, mc.getFps(),
+                            String.format(Locale.ROOT, "%.1f", mc.player.getX()),
+                            String.format(Locale.ROOT, "%.1f", mc.player.getEyeY()),
+                            String.format(Locale.ROOT, "%.1f", mc.player.getZ()), m.getString()));
+        });
+    }
+
+    /**
+     * Ekran merkezinden giden ışında ilk sanal su ve ilk hava olmayan blok (24 bloğa kadar): görüntünün ortasında neyin
+     * olduğunun kanıtı. Sanal su için render'ın kullandığı renk (deniz seviyesindeki biyom) ve ışık da yazılır.
+     */
+    private static String nisan(Minecraft mc) {
+        Camera kamera = mc.gameRenderer.getMainCamera();
+        Vec3 p = kamera.getPosition();
+        Vector3f bak = kamera.getLookVector();
+        ClientLevel l = mc.level;
+        SanalSuDunyasi d = SanalSu.dunya(l);
+        long t = l.getGameTime();
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        String su = "yok";
+        String blok = "yok";
+        for (double s = 0; s <= 24 && ("yok".equals(su) || "yok".equals(blok)); s += 0.05) {
+            double x = p.x + bak.x() * s;
+            double y = p.y + bak.y() * s;
+            double z = p.z + bak.z() * s;
+            if ("yok".equals(su) && d != null) {
+                double ust = d.ustu(x, y, z, t);
+                if (!Double.isNaN(ust)) {
+                    int renk = BiomeColors.getAverageWaterColor(l, m.set(Mth.floor(x), l.getSeaLevel(), Mth.floor(z)));
+                    int isik = LevelRenderer.getLightColor(l, m.set(Mth.floor(x), Mth.floor(ust), Mth.floor(z)));
+                    su = String.format(Locale.ROOT, "%.2f (%.1f %.2f %.1f) yuzey=%.2f renk=%06x isik=%x", s, x, y, z, ust,
+                            renk & 0xFFFFFF, isik);
+                }
+            }
+            if ("yok".equals(blok)) {
+                BlockState b = l.getBlockState(m.set(Mth.floor(x), Mth.floor(y), Mth.floor(z)));
+                if (!b.isAir()) {
+                    blok = String.format(Locale.ROOT, "%.2f (%d %d %d) %s", s, m.getX(), m.getY(), m.getZ(), b);
+                }
+            }
+        }
+        return String.format(Locale.ROOT, "kamera=(%.2f %.2f %.2f) yaw=%.0f pitch=%.0f ilk_sanal_su=%s ilk_blok=%s", p.x, p.y,
+                p.z, kamera.getYRot(), kamera.getXRot(), su, blok);
     }
 
     /** 5 sn boyunca FPS örnekler (ilk saniye atılır) ve su render maliyetini yazar; sonraki adımlar eşzamanlı koşar. */
@@ -190,6 +264,9 @@ public final class SpikeOtomasyon {
         s.add(komut(2, "gamerule doMobSpawning false"));
         s.add(komut(2, "gamerule randomTickSpeed 0"));
         s.add(komut(2, "gamerule doFireTick false"));
+        // Hash kanıtı deterministik olsun: koyunların ot yemesi (çimen -> toprak) 2. koşuda kutuda 3 blok değiştirdi.
+        s.add(komut(2, "gamerule mobGriefing false"));
+        s.add(komut(2, "gamerule doImmediateRespawn true"));
         s.add(komut(2, "time set 6000"));
         s.add(komut(2, "weather clear"));
         s.add(komut(2, "gamemode spectator"));
@@ -228,7 +305,7 @@ public final class SpikeOtomasyon {
             s.add(yuz(5, 60));
             s.add(foto(30, "03b_sualti_yuzme"));
             s.add(komut(40, su + "konum kiyi -40"));
-            s.add(komut(400, "effect give @s minecraft:instant_health 1 3"));
+            s.add(komut(200, "effect give @s minecraft:instant_health 1 3"));
             s.add(komut(2, su + "yol olay"));
             s.add(yuz(20, 40));
             s.add(komut(100, su + "yol mixin"));
@@ -290,8 +367,8 @@ public final class SpikeOtomasyon {
             s.add(komut(2, su + "magara hazirla 60 22 33"));
             s.add(komut(10, su + "magara hazirla 14 17 -95"));
             s.add(chunkBekle(20, 400));
-            s.add(fps(20, "magara_once"));
-            s.add(foto(60, "07a_magara_once"));
+            s.add(fps(100, "magara_once"));
+            s.add(foto(100, "07a_magara_once"));
             s.add(komut(40, su + "magara baslat 100000 0.05"));
             s.add(foto(140, "07_magara"));
             s.add(fps(5, "magara"));

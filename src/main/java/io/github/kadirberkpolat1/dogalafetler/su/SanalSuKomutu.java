@@ -30,7 +30,8 @@ final class SanalSuKomutu {
     private static final Map<String, Anlik> ANLIKLAR = new HashMap<>();
     private static MagaraCebi hazirCep;
     private static final int HASH_YARICAP = 64;
-    private static final int HASH_UST_Y = 127;
+    /** Kıyı hash kutusunun deniz seviyesinden yüksekliği: deniz +6 ve 24 bloğluk dalga kutunun içinde kalmalı. */
+    private static final int HASH_DENIZ_USTU = 32;
 
     private SanalSuKomutu() {
     }
@@ -249,7 +250,7 @@ final class SanalSuKomutu {
         return bildir(c, fmt("magara ara: bulunamadi deneme=%d acik=%d kucuk=%d", deneme, acik, kucuk));
     }
 
-    /** Cebi hesaplar (su eklemez), kamerayı cebin kenarına, su yüzeyinin üstüne koyar. */
+    /** Cebi hesaplar (su eklemez), kamerayı en geniş açık su yüzeyinin 2,6 blok üstüne, aşağı bakacak şekilde koyar. */
     private static int hazirla(CommandContext<CommandSourceStack> c, int x, int y, int z) throws CommandSyntaxException {
         ServerPlayer p = c.getSource().getPlayerOrException();
         ServerLevel l = p.serverLevel();
@@ -266,36 +267,57 @@ final class SanalSuKomutu {
             return bildir(c, fmt("magara hazirla: cep bos (ilk kat hedefi asiyor) tohum=(%d,%d,%d) tam=%d acik=%b hedef=%d sure=%.1fms",
                     x, y, z, tam.hacim(), tam.acik(), hedef, sure));
         }
-        double ox = 0;
-        double oz = 0;
-        for (long k : cep.sutunAnahtarlari()) {
-            ox += (int) (k >> 32) + 0.5;
-            oz += (int) k + 0.5;
-        }
-        ox /= cep.sutunSayisi();
-        oz /= cep.sutunSayisi();
         int su = cep.ustY();
-        double enIyi = -1;
-        int kx = (int) Math.floor(ox);
-        int kz = (int) Math.floor(oz);
+        int enIyi = -1;
+        int kx = 0;
+        int kz = 0;
         for (long k : cep.sutunAnahtarlari()) {
             int sx = (int) (k >> 32);
             int sz = (int) k;
-            double d = Math.hypot(sx + 0.5 - ox, sz + 0.5 - oz);
-            if (d > enIyi && d <= 10 && h.bos(sx, su, sz) && h.bos(sx, su + 1, sz)) {
-                enIyi = d;
+            if (!h.bos(sx, su, sz) || !h.bos(sx, su + 1, sz) || !h.bos(sx, su + 2, sz) || !h.bos(sx, su + 3, sz)) {
+                continue;
+            }
+            int acikKomsu = acikYuzey(cep, h, sx, sz, su, 3);
+            if (acikKomsu > enIyi) {
+                enIyi = acikKomsu;
                 kx = sx;
                 kz = sz;
             }
         }
+        if (enIyi < 0) {
+            return bildir(c, fmt("magara hazirla: 3 blok bosluklu kamera sutunu yok tohum=(%d,%d,%d) cep=%d", x, y, z,
+                    cep.hacim()));
+        }
+        double yx = 0;
+        double yz = 0;
+        for (int dx = -6; dx <= 6; dx++) {
+            for (int dz = -6; dz <= 6; dz++) {
+                if (cep.icerir(kx + dx, su - 1, kz + dz) && h.bos(kx + dx, su, kz + dz)) {
+                    yx += dx;
+                    yz += dz;
+                }
+            }
+        }
         hazirCep = cep;
-        double goz = su + 1.3;
-        float yw = enIyi > 0.5 ? yaw(ox - (kx + 0.5), oz - (kz + 0.5)) : 0f;
-        float pitch = enIyi > 0.5 ? 35f : 70f;
-        p.teleportTo(l, kx + 0.5, goz - p.getEyeHeight(), kz + 0.5, yw, pitch);
-        return bildir(c, fmt("magara hazirla tohum=(%d,%d,%d) tam=%d acik=%b cep=%d sutun=%d minY=%d ustY=%d kamera=(%d,%.1f,%d) kenar=%.1f sure=%.1fms",
-                x, y, z, tam.hacim(), tam.acik(), cep.hacim(), cep.sutunSayisi(), cep.minY(), cep.ustY(), kx, goz, kz,
+        double goz = su + 2.6;
+        float yw = Math.abs(yx) + Math.abs(yz) < 1e-6 ? 0f : yaw(yx, yz);
+        p.teleportTo(l, kx + 0.5, goz - p.getEyeHeight(), kz + 0.5, yw, 70f);
+        return bildir(c, fmt("magara hazirla tohum=(%d,%d,%d) tam=%d acik=%b cep=%d sutun=%d minY=%d ustY=%d kamera=(%d,%.1f,%d) yaw=%.0f pitch=70 acik_yuzey_7x7=%d/49 sure=%.1fms",
+                x, y, z, tam.hacim(), tam.acik(), cep.hacim(), cep.sutunSayisi(), cep.minY(), cep.ustY(), kx, goz, kz, yw,
                 enIyi, sure));
+    }
+
+    /** Sütun çevresindeki ({@code 2r+1} kare) üstü açık su yüzeyi sayısı. */
+    private static int acikYuzey(MagaraCebi cep, MagaraDolumu.Hucre h, int x, int z, int su, int r) {
+        int n = 0;
+        for (int dx = -r; dx <= r; dx++) {
+            for (int dz = -r; dz <= r; dz++) {
+                if (cep.icerir(x + dx, su - 1, z + dz) && h.bos(x + dx, su, z + dz)) {
+                    n++;
+                }
+            }
+        }
+        return n;
     }
 
     private static int baslat(CommandContext<CommandSourceStack> c, int bekleme, double buhar) {
@@ -365,7 +387,7 @@ final class SanalSuKomutu {
     }
 
     /**
-     * {@code hash <etiket>}: kaynak konum çevresindeki kutunun (±64 x/z, dünya tabanından Y=127'ye) kimlik anlık
+     * {@code hash <etiket>}: kaynak konum çevresindeki kutunun (±64 x/z, dünya tabanından deniz seviyesi +32'ye) kimlik anlık
      * görüntüsünü saklar. {@code hash <etiket> <onceki>}: öncekinin kutusunu yeniden okur, iki hash'i ve farklı blokları yazar.
      */
     private static int hash(CommandContext<CommandSourceStack> c, String onceki) {
@@ -387,7 +409,8 @@ final class SanalSuKomutu {
             int x1 = m.getX() + HASH_YARICAP;
             int z1 = m.getZ() + HASH_YARICAP;
             int y0 = l.getMinBuildHeight();
-            a = new Anlik(x0, y0, z0, x1, HASH_UST_Y, z1, SanalSu.bolgeKimlikleri(l, x0, y0, z0, x1, HASH_UST_Y, z1));
+            int y1 = l.getSeaLevel() + HASH_DENIZ_USTU;
+            a = new Anlik(x0, y0, z0, x1, y1, z1, SanalSu.bolgeKimlikleri(l, x0, y0, z0, x1, y1, z1));
         }
         ANLIKLAR.put(etiket, a);
         long h = SanalSu.hash(a.kimlik);
