@@ -3,6 +3,7 @@ plugins {
     id 'idea'
     id 'maven-publish'
     id 'net.minecraftforge.gradle' version '[6.0,6.2)'
+    id 'org.spongepowered.mixin' version '0.7.+'
 }
 
 version = mod_version
@@ -33,6 +34,8 @@ minecraft {
             workingDirectory project.file('run')
             property 'forge.logging.markers', 'REGISTRIES'
             property 'forge.logging.console.level', 'info'
+            // Spike sanal su: gelistirme ortami resmi adlarla calisir; refmap (SRG) yalniz uretim jar'i icindir.
+            property 'mixin.env.disableRefMap', 'true'
 
             mods {
                 "${mod_id}" {
@@ -46,6 +49,11 @@ minecraft {
             // Quick Play: -PquickPlay=<run/saves altındaki dünya klasörü>, ör. -PquickPlay=test
             if (project.hasProperty('quickPlay')) {
                 args '--quickPlaySingleplayer', project.property('quickPlay').toString()
+            }
+            // Spike otomasyonu: -Pspike=su istemcide senaryolari sirayla kosar, ekran goruntusu alir ve oyunu kapatir.
+            if (project.hasProperty('spike')) {
+                property 'dogalafetler.spike', project.property('spike').toString()
+                args '--width', '1280', '--height', '720'
             }
         }
 
@@ -68,6 +76,13 @@ minecraft {
     }
 }
 
+// Spike sanal su: mixin yapılandırması (gerekçe .vibe/kararlar/spike-sanal-su.md).
+mixin {
+    add sourceSets.main, "${mod_id}.refmap.json"
+    config "${mod_id}.su.mixins.json"
+    config "${mod_id}.client.su.mixins.json"
+}
+
 // runData çıktıları derlemeye dahil edilir.
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
@@ -85,6 +100,7 @@ repositories {
 
 dependencies {
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 
     if (uyum == 'e4mc' || uyum == 'ikisi') {
         runtimeOnly fg.deobf("maven.modrinth:e4mc:${e4mc_surum}")

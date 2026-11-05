@@ -6,6 +6,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.CekirdekCevirileri;
 import io.github.kadirberkpolat1.dogalafetler.komut.DogalAfetKomutu;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import io.github.kadirberkpolat1.dogalafetler.network.AgKanali;
+import io.github.kadirberkpolat1.dogalafetler.su.SanalSuSunucu;
 import io.github.kadirberkpolat1.dogalafetler.veri.DataGenerators;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.eventbus.api.IEventBus;
@@ -28,6 +29,7 @@ public final class DogalAfetler {
 
         Ayarlar.kaydet(baglam);
         AgKanali.baslat();
+        SanalSuSunucu.kaydet();
         modBus.addListener(DogalAfetler::ortakKurulum);
 
         DataGenerators.ceviriEkle(CekirdekCevirileri::yaz);
