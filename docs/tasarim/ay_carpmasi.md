@@ -43,6 +43,13 @@ Kaynaklar:
 ## 4. Ses tasarımı
 
 - **Siren:** standart siren karakteri (`ses.md`), 60 sn boyunca döngü, çarpmada fade-out (bkz. Açık noktalar).
+
+### Spike sonrası güncelleme, 2026-11-06
+
+- **Siren kesinleşti (K0-19):** standart siren dosyası (`siren_standart.ogg`, 10 sn döngü birimi) 60 sn boyunca 6 tur çalar; çarpma anında sunucunun durdurma paketiyle 2 sn üstel fade-out (perde %20 iner). Güneş patlaması sireni kullanılmaz: o ses güneş patlamasına ayrılmış tanınır işarettir.
+- **Ses yolu (N5):** `MASTER` kaynağı × "Sirenler" kaydırıcısı (varsayılan %28); açılış spin-up'ı 140 Hz'den 280 Hz'e (perde 0,5 → 1, ses motoru perdeyi 0,5'te kırpar).
+- **Global siren:** paket bütün boyutlardaki oyunculara aynı anda gider (madde 3, N11). Siren sürerken Nether/End'e geçen oyuncuda siren boyut değişiminde aynı zarfla devam eder; `/stopsound` sireni susturmaz (K0-27). Siren sırasında giren oyuncu kalan süreyle sireni alır, böylece çarpma anı herkeste aynı kalan süreye denk gelir.
+- Yaklaşma uğultusu siren çalarken (40–60 sn) modun ortam sesi kuralına uyar: siren boyunca −3 dB.
 - **Yaklaşma (40–60 sn):** çok alçak, yükselen uğultu (sentez 18–45 Hz + 90 Hz harmonik, düşük düzey) — hissedilen ama konuşmayı bastırmayan; son 5 sn'de çatırtı katmanı (ayın parçalanması, uzak buz kırılması benzeri).
 - **Çarpma:** parlama anında tam sessizlik 1,5 sn (ışık sesten önce gelir), sonra derin, uzun güm ve 10 sn süren gerilen gürleme; ardından deprem katmanı (`deprem.md`).
 - **Meteorlar:** güneş patlaması meteoru ile aynı sesler, perde %10 yüksek (daha küçük, daha soluk parçalar).
@@ -72,5 +79,8 @@ Kaynaklar:
 | Sarsıntı | 12 sn, kamera 2,5°, blok düşüşü yoğunluğu %30 |
 | Enkaz halkası | 3 gün, açık (config) |
 
-- **Şartname gerilimi:** madde 5 "güneş patlaması hariç siren 10 sn" der, bölüm H ise çarpmanın siren başladıktan 60 sn sonra olup sirenin o anda fade-out ile durmasını ister. Öneri: 10 sn'lik siren örüntüsü 60 sn boyunca tekrarlanır (6 döngü) ve çarpmada fade-out olur; alternatif, 10 sn siren + 50 sn sessiz yaklaşma uğultusu. Karar KARARLAR'a.
+### Spike sonrası güncelleme, 2026-11-06
+
+- **Kapandı — siren süresi:** madde 5 ("güneş patlaması hariç 10 sn") ile bölüm H ("siren çaldıktan 60 sn sonra çarpma, siren o anda fade-out") arasında daha özel kural kazandı: ay çarpması sireni 60 sn, standart dosya döngüsü (K0-19; Berk değiştirebilir). "10 sn siren + 50 sn sessiz uğultu" alternatifi reddedildi.
+- Gökyüzü durumu için bool yetmez: `AyDurumu {VAR, YAKLASIYOR, YOK}` + ay olay tick'i (yaklaşma 0–60 sn, parçalanma, 3 günlük enkaz halkası sönümü istemcide bu tick'ten hesaplanır; `gokyuzu.md` §2).
 - Çarpma noktası görseldir; gerçek dünyada dev krater açılmaz (harita korunur, oyun devam eder).

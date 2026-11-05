@@ -28,7 +28,7 @@ Kaynaklar:
 | +20–40 sn | Taşkın duruklar, **geri çekilme** akıntısı denize doğru akar; S3+ ikinci, daha küçük dalga (%60 yükseklik) |
 | son | Mağaralara giren su kalır (`sanal_su.md` §mağara), yüzey suyu 30 sn'de çekilir |
 
-**Çekilme tekniği.** Gerçek su blokları değişmez; istemcide "su gizleme maskesi" (sütun başına gizlenen derinlik) gerçek suyun bu sütunlarda çizilmemesini sağlar, yerine indirilmiş seviyede sanal su yüzeyi çizilir. Bu, sıvı tesselatörüne kanca ister (bkz. Açık noktalar). Ay çarpmasından sonraki çarpan döneminde çekilme mesafesi ×1,5 (bölüm H: "daha belirgin").
+**Çekilme tekniği.** Gerçek su blokları değişmez; istemcide "su gizleme maskesi" (sütun başına gizlenen derinlik) gerçek suyun bu sütunlarda çizilmemesini sağlar, yerine indirilmiş seviyede sanal su yüzeyi çizilir. Kanca: `LiquidBlockRenderer.tesselate` mixin'i (aşağıdaki spike güncellemesi). Ay çarpmasından sonraki çarpan döneminde çekilme mesafesi ×1,5 (bölüm H: "daha belirgin").
 
 **Dalga gövdesi.** Dalga, ilerleme yönüne dik bir cephe boyunca yükseklik profili `h(s, t)` olan sanal su hacmidir (s = cepheye uzaklık):
 - Ön yüz: sığ suda diklik artınca tepe noktası ileri kaydırılır (Gerstner yatay yer değiştirme) ve **kırılan dudak** oluşur: tepenin önündeki 2–4 blokluk ters eğim (sarkıntı) ağın kendi üzerine katlanmasıyla çizilir.
@@ -46,6 +46,16 @@ Kaynaklar:
 **Kamera.** Cephe 24 blok içindeyken yerden gelen düşük frekanslı titreme (±0,3°·seviye); içine düşülünce kamera yuvarlanması ±8° salınım, ekran kenarında su perdesi.
 
 **Seviye 1 ile 5 farkı.** S1: dizden yüksek, köpüklü bir bore, plajı ve iskeleyi geçer, 30 blok içeri girer. S5: 20 blok yüksekliğinde, tepesi kırılarak katlanan turkuaz bir duvar, çekilmede 40 blok dip açığa çıkar, köyü ve ormanları yıkarak 220 blok içeri girer, ardından ikinci dalga gelir.
+
+### Spike sonrası güncelleme, 2026-11-06
+
+Kaynak: `.vibe/kararlar/spike-sanal-su.md` SU-01…SU-05, `docs/KARARLAR.md` K0-25.
+
+- **Çekilme (SU-05):** istemci mixin'i `client.su.mixin.LiquidBlockRendererMixin`, `tesselate` `HEAD`'de: çekilme bölgesinde ve üstündeki su katmanı gizlenen katmandan azsa gerçek su bloku çizilmez. Bölge başlarken ve biterken bir kez `LevelRenderer.setBlocksDirty` ile chunk'lar yeniden derlenir; düşüşü sanal yüzey gösterir, alçalmış yüzey ile gizlenmemiş gerçek su arasındaki dikey duvar sanal yan yüzle çizilir. Sunucu ve fizik gerçek suyu görmeye devam eder (kabul edildi). Ölçülen: ~210 chunk bölümünü işaretleme 1–15 ms, yeniden derleme süresince en uzun kare 36–286 ms (makine yüküne bağlı; çekilme başlangıcında bir kez), derleme bitince FPS afetsizle aynı bantta. Embeddium/Rubidium gibi sıvı render'ını değiştiren modlar yüklüyken yedek: sığ kıyı şeridinde (≤ 3 blok derin) gerçek suyun üstüne zemin renginde opak "ıslak dip" yüzeyi.
+- **Dalga verisi:** dalga 11 sayılık parametre kümesidir (köken, yön, başlangıç, hız, yükseklik, genişlik, uzunluk, taban, menzil), yüzey analitik `y(x, z, t)`; sütun aralığı sorgusu `[zemin, y)` döner. Kırılan dudak (sarkıntı) yalnız görsel ağdır; fizik sütun aralığıyla yetinir.
+- **Render:** `AFTER_TRANSLUCENT_BLOCKS`, vanilla `rendertype_translucent` şaderi ve `block/water_still` dokusu; dalga cephesinin yan yüzleri spike'ta çalıştı; köpük tepe şeridi Faz 2 kabul ölçütüdür (beyaz piksel oranı ölçülebilir). Bu nottaki renk tonları (`#1E5F6E` → `#5FB7B0`, karada `#6B5A3E`) köşe rengiyle biyom su renginin üstüne karıştırılır.
+- **Sürükleme ve yüzme:** `Entity` mixin'i (2 enjeksiyon) dalgaya giren oyuncu ve mob'a vanilla yüzme, hava kaybı ve boğulmayı verir; dalga itmesi batıklık × dalga ivmesi (`SanalSuDunyasi.itme`): oyuncuyu kendi istemcisi, diğer varlıkları sunucu iter, ikisi aynı deterministik değeri bulur. Çarpma hasarı ve "su gölgesi" sunucuda kalır.
+- Ölçülen FPS: dalga afetsizin %94–104'ü, çekilme (derleme sonrası) %96–115.
 
 ## 3. Vitrin anı
 
@@ -70,7 +80,7 @@ Kaynaklar:
 
 - LOD ve hücre ağı `sanal_su.md`'deki ortak kurallarla; dalga cephesi 48 blok içinde her zaman en ince ağla.
 - Sunucu: yıkım kuyruğu tick başına en çok 48 blok (S5), TPS kuralıyla kısılır; sürükleme yalnız dalgaya 4 blok yakın varlıklar için (AABB sorgusu cephe şeridinde).
-- Ağ: dalga parametreleri (başlangıç anı, yön, profil) bir kez gider; istemci aynı deterministik formülle dalgayı kendisi hesaplar, 2 Hz düzeltme paketi.
+- Ağ (spike sonrası güncelleme, 2026-11-06): dalga parametreleri (116 bayt) ve çekilme (76 bayt) tam durum paketiyle bir kez gider; istemci aynı deterministik formülle dalgayı oyun zamanından kendisi hesaplar. 2 Hz düzeltme paketi gerekmedi (SU-01).
 
 ## 6. Açık noktalar — önerilen varsayılanlar
 
@@ -82,5 +92,7 @@ Kaynaklar:
 | 4 | 14 | 7 | 150 | 200 | 30 | 0,10 | 2 | ≤3,5 |
 | 5 | 20 | 8 | 220 | 260 | 40 | 0,12 | 3 | ≤4,0 |
 
-- **Teknik risk (çekilme):** gerçek suyu bir bölgede görünmez yapmak için Forge 1.20.1'de genel bir olay bulunamadı; `LiquidBlockRenderer` ya da Forge sıvı render yoluna mixin gerekir [doğrulanmadı, spike 1]. Mixin kullanılamazsa yedek: çekilme yalnız sığ kıyı şeridinde (≤3 blok derin) gerçek suyun üstüne zemin renginde opak "ıslak dip" yüzeyi çizilerek gösterilir. Gizlenen bölgede sunucu hâlâ su görür; oyuncu orada yürürse yüzme fiziği sürer (kısa süreli, kabul edilebilir).
+### Spike sonrası güncelleme, 2026-11-06
+
+- **Kapandı — çekilme:** Forge 47.4.28 kaynaklarında sıvı tesselasyonunu atlatan ya da chunk geometrisine müdahale eden olay yok (`IClientFluidTypeExtensions` yalnız doku, renk, bindirme ve sis verir); `LiquidBlockRenderer.tesselate` `HEAD` mixin'i seçildi ve çalıştı (K0-25). Gerçek su için alfa 0 renk reddedildi (yine mixin ister, alfa 0 yüzey derinlik yazar ve dibi gizler). "Islak dip" yalnız sıvı render'ını değiştiren modlar için yedek. Gizlenen bölgede sunucu hâlâ su görür; oyuncu orada yürürse yüzme fiziği sürer (kısa süreli, kabul edildi).
 - Hedef oyuncunun 96 blok içinde en az 400 sütunluk deniz/okyanus suyu yoksa N14 uygulanır.

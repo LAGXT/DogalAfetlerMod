@@ -15,11 +15,23 @@ Kaynaklar:
 
 ## 2. Minecraft'ta gösterim (çalışma yolu)
 
-**Siren kategorisi (N5).** Siren `SoundSource.MASTER` ile çalınır (böylece Hava, Bloklar gibi vanilla kaydırıcıları etkilemez, yalnız Ana Ses etkiler) ve ses düzeyi `CLIENT config sirenSes / 100` ile çarpılır. "Müzik ve Sesler" ekranına `ScreenEvent.Init.Post` ile "Sirenler" kaydırıcısı eklenir, varsayılan **%28**. `SoundSource` enum'una gerçek kategori eklemek mixin/enum hack ister; Forge 1.20.1'de genişletilebilir enum olmadığı varsayılır [spike 4'te doğrulanmalı].
+**Siren kategorisi (N5).** Siren `SoundSource.MASTER` ile çalınır (böylece Hava, Bloklar gibi vanilla kaydırıcıları etkilemez, yalnız Ana Ses etkiler) ve ses düzeyi `CLIENT config sirenSes / 100` ile çarpılır. "Müzik ve Sesler" ekranına `ScreenEvent.Init.Post` ile "Sirenler" kaydırıcısı eklenir, varsayılan **%28**. `SoundSource` enum'una gerçek kategori eklemek mixin/enum hack ister (aşağıdaki spike güncellemesi: denendi, reddedildi).
 
-**Siren çalma.** Konumsuz (`SoundInstance.Attenuation.NONE`, `relative=true`), sunucunun gönderdiği siren paketiyle tüm etkilenebilecek oyuncularda aynı anda başlar. `AbstractTickableSoundInstance`: her tick ses düzeyi zarfı kodla yönetilir → afet aktif aşamaya geçince 2,0 sn'lik üstel fade-out (madde 5), dosya döngülüdür, böylece süre kodla kesin tutulur (10 sn ya da 60 sn).
+**Siren çalma.** Konumsuz (`SoundInstance.Attenuation.NONE`, `relative=true`), sunucunun gönderdiği siren paketiyle tüm etkilenebilecek oyuncularda aynı anda başlar. `AbstractTickableSoundInstance`: her tick ses düzeyi zarfı kodla yönetilir → afet aktif aşamaya geçince 2,0 sn'lik üstel fade-out (madde 5; güneş sireninde 4 sn), dosya döngülüdür, böylece süre kodla kesin tutulur (10 sn ya da 60 sn).
 
 **Sentez yolu.** `tools/assets/ses_uret.py` (KÖK/.venv, numpy): her ses deterministik seed'le 48 kHz `float32` olarak üretilir → normalize → `wav` → `ffmpeg -i x.wav -ac 1 -c:a libvorbis -q:a 5 x.ogg` (konumlu sesler mono olmalı, Minecraft stereo sesi uzaklıkla kısmaz; siren de mono). Kontrol: `ffmpeg -af ebur128` ile LUFS ve gerçek tepe, `showspectrumpic` ile spektrogram PNG (`docs/kanit/`). Döngülü dosyaların başı ve sonu sıfır geçişinde birleşir (50 ms çapraz geçiş).
+
+### Spike sonrası güncelleme, 2026-11-06
+
+Kaynak: `.vibe/kararlar/spike-siren.md` S-01…S-06, `docs/KARARLAR.md` K0-19, K0-23, K0-27.
+
+- **N5 yolu seçildi (S-01):** siren `SoundSource.MASTER` ile çalar, düzey `zarf × sirenSes / 100`; CLIENT config `ses.sirenSes` (0–100, varsayılan **28**, `dogalafetler-client.toml`). "Sirenler" kaydırıcısı "Müzik ve Sesler" ekranında Metin Okuyucu/Konuşma satırının boş sağına oturur (bulunamazsa listenin sonuna), değer bellekte anında değişir, ekran kapanırken bir kez kaydedilir; 0 = "KAPALI". Faz 2'de ikinci giriş noktası: "Modlar → Doğal Afetler → Ayarlar" (`ConfigScreenFactory`). Gerçek `SoundSource` kategorisi (enum mixin'i) denendi ve çalıştı, ama reddedildi: `SoundSource` Forge 47.4.28'de `IExtensibleEnum` değil, vanilla varsayılanı %100 olur, ses paketleri kategoriyi sıra numarasıyla taşır (başka modun sabitiyle sıra kayabilir), başka ses modları `values().length`'e güvenebilir.
+- **Spin-up 140 Hz (S-02):** `SoundEngine` perdeyi 0,5–2,0'a kırptığı ve dosya döngülü olduğu için spin-up dosyaya gömülmez; zarf perdeyi 0,5 → 1 çeker (280 Hz'in yarısı = 140 Hz). Zarf: standart açılış 24 tick, fade-out 40 tick (2 sn, perde %20 iner); güneş açılış 60 tick, süre boyunca +3 dB, fade-out 80 tick (4 sn). Güneş sireninin 1,5 → 2,5 kHz parlaması dosyaya gömülmedi (20 sn döngü 3 kez çalar); yerine kodda +3 dB.
+- **Ay çarpması sireni 60 sn (K0-19):** standart siren dosyası 60 sn döngüyle çalar, çarpma anında 2 sn fade-out; diğer altı afette 10 sn, güneş patlamasında 60 sn güneş sireni.
+- **Siren paketi** afet türünü değil siren türünü taşır (`SirenPaketi(tür, süreTick)`, `SirenDurdurPaketi`); paketi dinleyen değiştirilmiş istemci afet türünü öğrenemez (radar avantajı korunur). Faz 2'de sireni bitiren sunucunun durdurma paketidir; istemci süresi yalnız güvenlik tavanı (`süreTick + 3 sn`). Sonradan giren oyuncuya kalan süreyle siren paketi.
+- **Siren sürer (K0-27):** boyut değişimi, `/stopsound` ve kaynak yeniden yüklemesi `SoundManager.stop()` ile bütün sesleri keser; zarf ses örneğinden ayrı yaşadığı için siren aynı zarfla yeniden çalar (açılış tekrarlanmaz, düzey sıçramaz). **`/stopsound` sireni susturmaz** (uyarı sesi, kasıtlı); oyuncunun yolu "Sirenler" kaydırıcısıdır. Akışlı dosya baştan çalar (düzey sürekli). Sunucudan çıkışta siren fade beklemeden durur; ikinci siren gelirse eskisi 0,5 sn'de söner.
+- **Ölçülen dosyalar (S-03):** `siren_standart.ogg` −20,0 LUFS, gerçek tepe −12,9 dBTP, baskın 284→420→284 Hz, >2,5 kHz −45 dB, 68 553 bayt; `siren_gunes.ogg` −20,9 LUFS, −9,3 dBTP, 182→300→240→182 Hz, 123 565 bayt. Kanıt `docs/kanit/ses/`. Bayt determinizmi için ffmpeg `-serial_offset 20261105 -fflags +bitexact -flags:a +bitexact -map_metadata -1`; ara WAV 16 bit TPDF dither. Standart sirene +0,3 Hz, −10 dB ikinci osilatör eklendi (tonu canlandırır).
+- **Alt yazı:** iki siren olayının da `subtitle` = `subtitles.dogalafetler.siren` ("Siren çalıyor"). Açık nokta: konumsuz (`relative=true`, 0,0,0) seste vanilla alt yazı oku dünya başlangıcını gösterebilir; Faz 2'de kulakla/görüntüyle seçilecek.
 
 ## 3. Vitrin anı (ses)
 
@@ -29,7 +41,7 @@ Kaynaklar:
 
 **Standart siren (`siren_standart.ogg`, 10 sn döngü birimi) — "sakin ama fark edilir".**
 - Kaynak: iki osilatör; ana sinüs + 2. harmonik −12 dB + 3. harmonik −22 dB (mekanik sirenin yumuşak "üfleme" tonu, kare dalga sertliği yok) + −30 dB pembe gürültü "hava" katmanı.
-- Perde: **wail** örüntüsü, 280 Hz ↔ 420 Hz (yaklaşık C#4 ↔ G#4, tam beşli aralık), periyot 5 sn: 2,0 sn yükseliş, 0,5 sn tepe, 2,5 sn iniş (yavaş, nefes alan ritim). İlk 1,2 sn spin-up 120 Hz'den başlar.
+- Perde: **wail** örüntüsü, 280 Hz ↔ 420 Hz (yaklaşık C#4 ↔ G#4, tam beşli aralık), periyot 5 sn: 2,0 sn yükseliş, 0,5 sn tepe, 2,5 sn iniş (yavaş, nefes alan ritim). İlk 1,2 sn spin-up 140 Hz'den başlar (spike sonrası: kodda perde 0,5 → 1; §2 sonundaki güncelleme).
 - Filtre: 2,5 kHz üstü −12 dB/oktav alçak geçiren (tizlik yok), 8 kHz üstü pratikte boş.
 - Hedef: dosya içi entegre ses yüksekliği −20 LUFS, gerçek tepe ≤ −3 dBTP; varsayılan %28 kaydırıcıda oyuncunun duyduğu düzey vanilla yağmurdan biraz yüksek, kılıç vuruşu sesinden düşük. Baskın frekans 280–420 Hz (spektrogramda tek, yumuşak kayan çizgi).
 
@@ -90,5 +102,4 @@ Kaynaklar:
 | `donma_ruzgar.ogg`, `buz_sarkisi.ogg`, `kiyi_yalama.ogg` | 12 döngü / 1 / 6 döngü | sentez |
 
 - Varsayılan siren düzeyi %28 (şartname %25–30 aralığının ortası).
-- Siren `MASTER` üzerinden çalındığı için oyuncu vanilla bir kaydırıcıyla değil, yalnız "Sirenler" ve Ana Ses ile kısar; bu N5'in "kendi kategorisi" isteğine yakın en güvenli yol olarak KARARLAR'a yazılmalı.
-- Ay çarpması sireninin 10 sn mi 60 sn mi olduğu şartnamede çelişkili (`ay_carpmasi.md` §6).
+- Spike sonrası güncelleme, 2026-11-06: siren `MASTER` + "Sirenler" kaydırıcısı yolu kesinleşti (K0-23); oyuncu sireni vanilla kategori kaydırıcılarıyla değil, yalnız "Sirenler" ve Ana Ses ile kısar. Ay çarpması sireni 60 sn (K0-19, `ay_carpmasi.md` §6).

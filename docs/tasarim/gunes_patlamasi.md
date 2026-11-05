@@ -43,7 +43,7 @@ Kaynaklar:
 
 **Aşama 3 – Güneşsiz dönem.** Gündüz de gece de karanlık gökyüzü: Samanyolu bandı, 2 uzak galaksi, kalıntı nebulası. Donma `donma.md`'ye göre ilerler; kar yağışı kendi renderer'ımızla (yıldız ışığında mavi-gri tonlu kar). Dünya ışık motoru değişmediği için Minecraft "gündüzü" hâlâ aydınlıktır; görsel karanlık sis ve gökyüzü rengiyle verilir (madde 16, bkz. Açık noktalar).
 
-**Aşama 4 – Kızıl cüce doğuşu.** İlk şafakta (gün zamanı 23 000) ufukta 60 sn boyunca soluk kızıl ışık yayı belirir, güneş normal yörüngede yükselir; boyutu eski güneşin %60'ı, renk `#FF6A3A`, yumuşak kızıl hale. Gündüz gökyüzü `#B07A68`'e, sis `#C08870`'e kayar; yıldızlar ve nebula gündüz %25 alfa ile görünmeye devam eder.
+**Aşama 4 – Kızıl cüce doğuşu.** İlk şafakta (gün zamanı 23 000) ufukta 60 sn boyunca soluk kızıl ışık yayı belirir, güneş normal yörüngede yükselir; boyutu eski güneşin %60'ı, renk `#FF6A3A`, yumuşak kızıl hale. Gündüz gökyüzü `#B07A68`'e, sis `#C08870`'e kayar; yıldızlar ve nebula gündüz %45 alfa ile görünmeye devam eder (spike sonrası güncelleme, 2026-11-06: %25 parlak kızıl gökte görünmüyordu; `gokyuzu.md` §2).
 
 **Afet sonrası iz.** Kraterler, yanmış alanlar, kurumuş göl yatakları (sonra yeniden dolup donar), kızıl cüce döneminde kalıcı kış bölgeleri.
 
@@ -55,7 +55,7 @@ Kaynaklar:
 
 ## 4. Ses tasarımı
 
-- **Siren:** uzun/ürkütücü varyant, 60 sn, sona doğru fade-out (bkz. `ses.md`).
+- **Siren:** uzun/ürkütücü varyant, 60 sn, meteorlar başlayınca 4 sn üstel fade-out (spike sonrası güncelleme, 2026-11-06; bkz. `ses.md`).
 - **Meteor:** yaklaşırken yükselen ıslık + yanma hışırtısı (Doppler: perde 1,2→0,8), çarpmada derin güm (sentez 30–80 Hz + çakıl dağılması), 64 blok ötede yalnız boğuk güm.
 - **Kavrulma ortamı:** düşük düzey sıcak rüzgâr (kahverengi gürültü, 0,2 Hz dalgalanma), uzak yangın uğultusu.
 - **Süpernova:** çökme sırasında bütün ortam sesleri 3 sn'de susturulur (sessizlik vurgusu), parlamada tek, uzun, alçak "basınç" sesi (sentez: 25 Hz'den 60 Hz'e çıkan sinüs + yavaşça açılan gürültü, 8 sn), sonra 20 sn süren uzak kristal uğultu.
