@@ -1,7 +1,9 @@
 package io.github.kadirberkpolat1.dogalafetler.network;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -16,11 +18,21 @@ import net.minecraftforge.network.PacketDistributor;
 import net.minecraftforge.network.simple.SimpleChannel;
 
 /**
- * Modun tek ağ kanalı. Sunucu otoritelidir: afet durumu sunucuda tutulur, istemciye yalnız senkron paketleri gider
- * (madde 2, 3). Protokol değiştiğinde {@link #PROTOKOL_SURUMU} artırılır; farklı sürümler bağlanamaz.
+ * Modun tek ağ kanalı (K0-07). Sunucu otoritelidir: afet durumu sunucuda tutulur, istemciye yalnız senkron paketleri gider
+ * (madde 2, 3). Paket kimlikleri kayıt sırasıyla verildiği için kayıt her çalışmada aynı sıradadır: alt sistemler mod
+ * kurucusunda {@link #kaydet} ile katkı ekler, çekirdek ortak kurulumda ({@code enqueueWork}) önce kendi paketlerini, sonra
+ * katkıları eklendikleri sırayla kaydeder:
+ *
+ * <pre>{@code
+ * AgKanali.kaydet(k -> {
+ *     k.sunucudanIstemciye(SirenPaketi.class, SirenPaketi::yaz, SirenPaketi::oku, SirenPaketi::isle);
+ * });
+ * }</pre>
+ *
+ * Protokol değiştiğinde {@link #PROTOKOL_SURUMU} artırılır; farklı sürümler bağlanamaz.
  */
 public final class AgKanali {
-    public static final String PROTOKOL_SURUMU = "1";
+    public static final String PROTOKOL_SURUMU = "2";
 
     public static final SimpleChannel KANAL = NetworkRegistry.newSimpleChannel(
             DogalAfetler.konum("ana"),
@@ -28,7 +40,24 @@ public final class AgKanali {
             PROTOKOL_SURUMU::equals,
             PROTOKOL_SURUMU::equals);
 
-    private static final AtomicInteger SONRAKI_KIMLIK = new AtomicInteger();
+    /** Paket tiplerini kanala kaydeden araç; işleyiciler alıcının ana thread'inde çalışır. */
+    public interface Kaydedici {
+        <M> void sunucudanIstemciye(Class<M> tur, BiConsumer<M, FriendlyByteBuf> yazici,
+                Function<FriendlyByteBuf, M> okuyucu, BiConsumer<M, Supplier<NetworkEvent.Context>> isleyici);
+
+        <M> void istemcidenSunucuya(Class<M> tur, BiConsumer<M, FriendlyByteBuf> yazici,
+                Function<FriendlyByteBuf, M> okuyucu, BiConsumer<M, Supplier<NetworkEvent.Context>> isleyici);
+    }
+
+    /** Bir alt sistemin paket kayıtları. */
+    @FunctionalInterface
+    public interface PaketKatkisi {
+        void kaydet(Kaydedici kaydedici);
+    }
+
+    private static final List<PaketKatkisi> KATKILAR = new CopyOnWriteArrayList<>();
+    private static boolean kaydedildi;
+    private static int sonrakiKimlik;
 
     private AgKanali() {
     }
@@ -38,21 +67,45 @@ public final class AgKanali {
         DogalAfetler.LOGGER.debug("Ağ kanalı {} hazır, protokol sürümü {}", KANAL, PROTOKOL_SURUMU);
     }
 
-    /** Sunucudan istemciye giden bir paket tipini kaydeder; işleyici istemcinin ana thread'inde çalışır. */
-    public static <M> void sunucudanIstemciye(Class<M> tur, BiConsumer<M, FriendlyByteBuf> yazici,
-            Function<FriendlyByteBuf, M> okuyucu, BiConsumer<M, Supplier<NetworkEvent.Context>> isleyici) {
-        kaydet(tur, NetworkDirection.PLAY_TO_CLIENT, yazici, okuyucu, isleyici);
+    /** Bir alt sistemin paketlerini kayıt sırasına ekler; mod kurucusunda çağrılır. */
+    public static synchronized void kaydet(PaketKatkisi katki) {
+        if (kaydedildi) {
+            throw new IllegalStateException("Paketler ortak kurulumda kaydedildi; katkı mod kurucusunda eklenmeli");
+        }
+        KATKILAR.add(Objects.requireNonNull(katki, "katki"));
     }
 
-    /** İstemciden sunucuya giden bir paket tipini kaydeder; işleyici sunucunun ana thread'inde çalışır. */
-    public static <M> void istemcidenSunucuya(Class<M> tur, BiConsumer<M, FriendlyByteBuf> yazici,
-            Function<FriendlyByteBuf, M> okuyucu, BiConsumer<M, Supplier<NetworkEvent.Context>> isleyici) {
-        kaydet(tur, NetworkDirection.PLAY_TO_SERVER, yazici, okuyucu, isleyici);
+    /** Ortak kurulumda (ana thread) bir kez: önce çekirdek paketleri, sonra katkılar eklendikleri sırayla. */
+    public static synchronized void paketleriKaydet() {
+        if (kaydedildi) {
+            return;
+        }
+        kaydedildi = true;
+        Kaydedici kaydedici = new Kaydedici() {
+            @Override
+            public <M> void sunucudanIstemciye(Class<M> tur, BiConsumer<M, FriendlyByteBuf> yazici,
+                    Function<FriendlyByteBuf, M> okuyucu, BiConsumer<M, Supplier<NetworkEvent.Context>> isleyici) {
+                ekle(tur, NetworkDirection.PLAY_TO_CLIENT, yazici, okuyucu, isleyici);
+            }
+
+            @Override
+            public <M> void istemcidenSunucuya(Class<M> tur, BiConsumer<M, FriendlyByteBuf> yazici,
+                    Function<FriendlyByteBuf, M> okuyucu, BiConsumer<M, Supplier<NetworkEvent.Context>> isleyici) {
+                ekle(tur, NetworkDirection.PLAY_TO_SERVER, yazici, okuyucu, isleyici);
+            }
+        };
+        kaydedici.sunucudanIstemciye(DonemPaketi.class, DonemPaketi::yaz, DonemPaketi::oku, DonemPaketi::isle);
+        kaydedici.sunucudanIstemciye(AfetDurumPaketi.class, AfetDurumPaketi::yaz, AfetDurumPaketi::oku,
+                AfetDurumPaketi::isle);
+        for (PaketKatkisi katki : KATKILAR) {
+            katki.kaydet(kaydedici);
+        }
+        DogalAfetler.LOGGER.info("{} ağ paketi kaydedildi (protokol {})", sonrakiKimlik, PROTOKOL_SURUMU);
     }
 
-    private static <M> void kaydet(Class<M> tur, NetworkDirection yon, BiConsumer<M, FriendlyByteBuf> yazici,
+    private static <M> void ekle(Class<M> tur, NetworkDirection yon, BiConsumer<M, FriendlyByteBuf> yazici,
             Function<FriendlyByteBuf, M> okuyucu, BiConsumer<M, Supplier<NetworkEvent.Context>> isleyici) {
-        KANAL.messageBuilder(tur, SONRAKI_KIMLIK.getAndIncrement(), yon)
+        KANAL.messageBuilder(tur, sonrakiKimlik++, yon)
                 .encoder(yazici)
                 .decoder(okuyucu)
                 .consumerMainThread(isleyici)

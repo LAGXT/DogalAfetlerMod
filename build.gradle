@@ -52,6 +52,10 @@ minecraft {
         server {
             workingDirectory project.file('run-server')
             property 'forge.enabledGameTestNamespaces', mod_id
+            // Yaşam döngüsünü gerçek afet olmadan sınamak için: -PoyunTestiAfeti=deprem,sinkhole (core.OyunTestiAfeti).
+            if (project.hasProperty('oyunTestiAfeti')) {
+                property 'dogalafetler.oyunTestiAfeti', project.property('oyunTestiAfeti').toString()
+            }
             args '--nogui'
         }
 
