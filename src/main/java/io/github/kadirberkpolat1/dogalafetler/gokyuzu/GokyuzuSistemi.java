@@ -18,6 +18,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 
 /**
  * Spike: gökyüzü durumunun sunucu tarafı. Durum SavedData'da, değişince herkese, girişte oyuncuya paketle gider.
@@ -31,9 +32,8 @@ public final class GokyuzuSistemi {
     private GokyuzuSistemi() {
     }
 
-    /** Mod inşasında çağrılır: paket ve komut kaydı. */
+    /** Mod inşasında çağrılır: komut kaydı (paket {@link ModOlaylari} ile ortak kurulumda). */
     public static void kaydet() {
-        AgKanali.sunucudanIstemciye(GokyuzuPaketi.class, GokyuzuPaketi::yaz, GokyuzuPaketi::oku, GokyuzuPaketi::isle);
         KomutKaydi.ekle(Commands.literal("spike").then(Commands.literal("gokyuzu")
                 .then(Commands.literal("durum").executes(GokyuzuSistemi::durumYaz))
                 .then(Commands.argument("ay", StringArgumentType.word())
@@ -90,6 +90,19 @@ public final class GokyuzuSistemi {
             GokyuzuDurumu d = GokyuzuVerisi.al(oyuncu.server).durum();
             AgKanali.oyuncuyaGonder(oyuncu, new GokyuzuPaketi(d));
             DogalAfetler.LOGGER.info("[gokyuzu] girişte {} oyuncusuna gönderildi: {}", oyuncu.getGameProfile().getName(), d);
+        }
+    }
+
+    /** K0-07: paket kaydı ortak kurulumda; modun kendi dinleyicileri tek thread'de sırayla çalıştığı için kimlik sırası sabit. */
+    @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD)
+    public static final class ModOlaylari {
+        private ModOlaylari() {
+        }
+
+        @SubscribeEvent
+        public static void ortakKurulum(FMLCommonSetupEvent olay) {
+            AgKanali.sunucudanIstemciye(GokyuzuPaketi.class, GokyuzuPaketi::yaz, GokyuzuPaketi::oku, GokyuzuPaketi::isle);
+            DogalAfetler.LOGGER.info("[gokyuzu] paket ortak kurulumda kaydedildi");
         }
     }
 }

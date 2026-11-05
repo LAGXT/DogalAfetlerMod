@@ -11,6 +11,9 @@ public final class IstemciGokyuzu {
         AFTER_SKY
     }
 
+    /** Spike deneyi seçimi ({@code -Pspike=...} → {@code -Ddogalafetler.spike}); boşsa normal çalışma. */
+    static final String SPIKE = System.getProperty("dogalafetler.spike", "");
+
     private static volatile GokyuzuDurumu durum = GokyuzuDurumu.VARSAYILAN;
     static volatile Kanca kanca = Kanca.SARMALAYICI;
     /** AFTER_SKY kancasında vanilla ayın üstüne gökyüzü renginde örtü çizilsin mi (ay gizleme denemesi). */

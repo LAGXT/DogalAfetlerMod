@@ -5,17 +5,19 @@ import io.github.kadirberkpolat1.dogalafetler.gokyuzu.GokyuzuDurumu;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.GunesEvresi;
 import javax.annotation.Nullable;
 import net.minecraft.client.Camera;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.DimensionSpecialEffects;
 import net.minecraft.client.renderer.LightTexture;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
 /**
- * Kanca (b): kayıt anında {@code minecraft:overworld} için kayıtlı olan efekt nesnesini (vanilla ya da bizden önce
- * yüklenen başka bir mod) sarar. Durum vanilla iken (ay var + normal güneş) her çağrı iç nesneye gider; başka
- * durumda gökyüzünü {@link GokyuzuCizici} çizer.
+ * Kanca (b): {@code minecraft:overworld} efekt kimliğine kayıtlı nesneyi (vanilla ya da başka bir modun efekti) sarar.
+ * Gökyüzünü yalnız Overworld boyutunda ve durum vanilla değilken {@link GokyuzuCizici} çizer; diğer her durumda ve
+ * aynı efekt kimliğini kullanan mod boyutlarında her çağrı iç nesneye gider (N11: başka boyutun göğü değişmez).
  */
 public final class SarmalayanGokyuzuEfekti extends DimensionSpecialEffects {
     private final DimensionSpecialEffects ic;
@@ -29,8 +31,19 @@ public final class SarmalayanGokyuzuEfekti extends DimensionSpecialEffects {
         return ic;
     }
 
-    private static boolean bizCiziyoruz(GokyuzuDurumu d) {
-        return IstemciGokyuzu.kanca == IstemciGokyuzu.Kanca.SARMALAYICI && !d.vanillaMi();
+    private static boolean overworldMu(@Nullable ClientLevel level) {
+        return level != null && level.dimension() == Level.OVERWORLD;
+    }
+
+    /**
+     * Normal güneş + ay yok iken tam gündüzde (yıldızlar görünmezken, ay ufkun en az ~22° altında) gök vanilla ile
+     * aynıdır; çizim iç nesneye bırakılır ki başka modun ya da şader paketinin gündüz göğü korunsun.
+     */
+    private static boolean bizCiziyoruz(@Nullable ClientLevel level, float zaman, GokyuzuDurumu d) {
+        if (IstemciGokyuzu.kanca != IstemciGokyuzu.Kanca.SARMALAYICI || !overworldMu(level) || d.vanillaMi()) {
+            return false;
+        }
+        return !(d.evre() == GunesEvresi.NORMAL && GokyuzuRenkleri.geceligi(zaman) <= 0f);
     }
 
     @Override
@@ -48,7 +61,7 @@ public final class SarmalayanGokyuzuEfekti extends DimensionSpecialEffects {
     public float[] getSunriseColor(float zaman, float pt) {
         float[] r = ic.getSunriseColor(zaman, pt);
         GokyuzuDurumu d = IstemciGokyuzu.durum();
-        if (r == null || !bizCiziyoruz(d)) {
+        if (r == null || !bizCiziyoruz(Minecraft.getInstance().level, zaman, d)) {
             return r;
         }
         return switch (d.evre()) {
@@ -90,7 +103,7 @@ public final class SarmalayanGokyuzuEfekti extends DimensionSpecialEffects {
     @Override
     public boolean renderSky(ClientLevel level, int ticks, float pt, PoseStack poz, Camera kamera, Matrix4f izdusum,
             boolean sisli, Runnable sisKur) {
-        if (bizCiziyoruz(IstemciGokyuzu.durum())) {
+        if (bizCiziyoruz(level, level.getTimeOfDay(pt), IstemciGokyuzu.durum())) {
             GokyuzuCizici.ciz(level, pt, poz, kamera, izdusum, sisli, sisKur);
             return true;
         }
@@ -100,8 +113,8 @@ public final class SarmalayanGokyuzuEfekti extends DimensionSpecialEffects {
     @Override
     public boolean renderClouds(ClientLevel level, int ticks, float pt, PoseStack poz, double x, double y, double z,
             Matrix4f izdusum) {
-        GokyuzuDurumu d = IstemciGokyuzu.durum();
-        if (d.evre() == GunesEvresi.GUNESSIZ) {
+        if (bizCiziyoruz(level, level.getTimeOfDay(pt), IstemciGokyuzu.durum())
+                && IstemciGokyuzu.durum().evre() == GunesEvresi.GUNESSIZ) {
             // Karanlık uzay göğünde parlak beyaz bulut tutarsız (tasarım notu §2 Bulutlar).
             return true;
         }
@@ -124,7 +137,7 @@ public final class SarmalayanGokyuzuEfekti extends DimensionSpecialEffects {
             float gokIsigi, int pikselX, int pikselY, Vector3f renk) {
         ic.adjustLightmapColors(level, pt, gokKararmasi, blokKirmizi, gokIsigi, pikselX, pikselY, renk);
         GokyuzuDurumu d = IstemciGokyuzu.durum();
-        if (!d.vanillaMi()) {
+        if (overworldMu(level) && !d.vanillaMi()) {
             GokyuzuRenkleri.isikHaritasi(d, gokKararmasi, gokIsigi, renk);
         }
     }

@@ -33,6 +33,8 @@ public final class GokyuzuOtomasyonu {
     private static boolean basladi;
     private static int bekleme;
     private static boolean bakisKilitli;
+    /** İlk bekleme bitti mi; ondan sonra açık kalan her ekran kapatılır. */
+    private static boolean hazir;
     private static float hedefSapma = -90f;
     private static float hedefEgim = -70f;
 
@@ -54,6 +56,8 @@ public final class GokyuzuOtomasyonu {
         switch (MOD) {
             case "gokyuzu-kalicilik" -> kalicilikPlani();
             case "gokyuzu-ozel" -> ozelPlani();
+            case "gokyuzu-ezilme" -> ezilmePlani("ezilme_");
+            case "gokyuzu-ezilme-yansimasiz" -> ezilmePlani("ezilme_yansimasiz_");
             default -> matrisPlani();
         }
         DogalAfetler.LOGGER.info("[gokyuzu-oto] başladı: mod={}, adım={}", MOD, KUYRUK.size());
@@ -66,6 +70,12 @@ public final class GokyuzuOtomasyonu {
             return;
         }
         mc.options.hideGui = true;
+        if (hazir && mc.screen != null) {
+            // K0-21 rev.: otomasyon hiç ekran açmaz; açılan ekran (başkasının tuşu, PauseScreen) kapatılır.
+            DogalAfetler.LOGGER.warn("[gokyuzu-oto] otomasyonun açmadığı ekran kapatıldı: {}",
+                    mc.screen.getClass().getSimpleName());
+            mc.setScreen(null);
+        }
         if (mc.mouseHandler.isMouseGrabbed()) {
             mc.mouseHandler.releaseMouse();
         }
@@ -76,6 +86,7 @@ public final class GokyuzuOtomasyonu {
             bekleme--;
             return;
         }
+        hazir = true;
         while (!KUYRUK.isEmpty()) {
             if (!KUYRUK.peek().calis(mc)) {
                 return;
@@ -367,6 +378,30 @@ public final class GokyuzuOtomasyonu {
         bakis(-90f, -70f);
         durum("off", "kizilcuce", 1f);
         zamanVeCek(6000, "kalicilik_1_once");
+        bekle(40);
+        durdur();
+    }
+
+    /**
+     * Ezilme senaryosu ({@code -Pspike=gokyuzu-ezilme} ve {@code gokyuzu-ezilme-yansimasiz}): sahte ikinci gökyüzü modu
+     * etkinken normal durumda onun çizimi, aysız+güneşsiz durumda ay ve güneşin yokluğu, normal güneş + ay yok iken
+     * gündüz iç nesneye devir ve gece bizim çizim.
+     */
+    private static void ezilmePlani(String onek) {
+        hazirlik();
+        komut("execute positioned over motion_blocking_no_leaves run tp @s ~ ~6 ~ -90 -70");
+        bakis(-90f, -70f);
+        bekle(100);
+        durum("on", "normal", 0f);
+        zamanVeCek(6000, onek + "normal");
+        zamanVeCek(18000, onek + "normal_gece");
+        durum("off", "gunessiz", 0.5f);
+        zamanVeCek(18000, onek + "ay-off_gunessiz_gece");
+        zamanVeCek(6000, onek + "ay-off_gunessiz_gunduz");
+        durum("off", "normal", 0f);
+        zamanVeCek(6000, onek + "ay-off_normal_gunduz");
+        zamanVeCek(18000, onek + "ay-off_normal_gece");
+        durum("on", "normal", 0f);
         bekle(40);
         durdur();
     }
