@@ -17,10 +17,10 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
 println "Java: ${System.getProperty 'java.version'}, JVM: ${System.getProperty 'java.vm.version'} (${System.getProperty 'java.vendor'}), Arch: ${System.getProperty 'os.arch'}"
 
-// Uyumluluk modlari: -Puyum=e4mc | coldsweat | ikisi (varsayilan: yok).
+// Uyumluluk modları: -Puyum=e4mc | coldsweat | ikisi (varsayılan: yok).
 def uyum = (project.findProperty('uyum') ?: 'yok').toString()
 if (!(uyum in ['yok', 'e4mc', 'coldsweat', 'ikisi'])) {
-    throw new GradleException("Gecersiz -Puyum=${uyum}; gecerli degerler: yok, e4mc, coldsweat, ikisi")
+    throw new GradleException("Geçersiz -Puyum=${uyum}; geçerli değerler: yok, e4mc, coldsweat, ikisi")
 }
 
 minecraft {
@@ -43,7 +43,7 @@ minecraft {
 
         client {
             property 'forge.enabledGameTestNamespaces', mod_id
-            // Quick Play: -PquickPlay=<run/saves altindaki dunya klasoru>, or. -PquickPlay=test
+            // Quick Play: -PquickPlay=<run/saves altındaki dünya klasörü>, ör. -PquickPlay=test
             if (project.hasProperty('quickPlay')) {
                 args '--quickPlaySingleplayer', project.property('quickPlay').toString()
             }
@@ -55,7 +55,7 @@ minecraft {
             args '--nogui'
         }
 
-        // Kayitli butun GameTest'leri kosar ve cikar; hic GameTest yoksa coker.
+        // Kayıtlı bütün GameTest'leri koşar ve çıkar; hiç GameTest yoksa çöker.
         gameTestServer {
             workingDirectory project.file('run-gametest')
             property 'forge.enabledGameTestNamespaces', mod_id
@@ -68,18 +68,16 @@ minecraft {
     }
 }
 
-// runData ciktilari derlemeye dahil edilir.
+// runData çıktıları derlemeye dahil edilir.
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
 repositories {
-    exclusiveContent {
-        forRepository {
-            maven {
-                name = 'Modrinth'
-                url = 'https://api.modrinth.com/maven'
-            }
-        }
-        filter {
+    // Modrinth deposu yalnız maven.modrinth grubunu sunar. exclusiveContent kullanılmaz: fg.deobf aynı gruptaki
+    // *_mapped_official yapıtını ForgeGradle'ın kendi deobf deposundan verir ve exclusiveContent bunu engeller.
+    maven {
+        name = 'Modrinth'
+        url = 'https://api.modrinth.com/maven'
+        content {
             includeGroup 'maven.modrinth'
         }
     }
@@ -108,8 +106,10 @@ tasks.named('test', Test).configure {
     }
 }
 
-// Calisma klasorleri git'te degil; yeni bir klon ya da worktree'de ilk acilista gereken dosyalar burada yazilir.
+// Çalışma klasörleri git'te değil; yeni bir klon ya da worktree'de ilk açılışta gereken dosyalar burada yazılır.
 tasks.matching { it.name == 'runServer' }.configureEach {
+    // Sunucu konsolu: Gradle'ın stdin'i sunucuya iletilir, böylece `stop` ve diğer komutlar yazılabilir.
+    standardInput = System.in
     doFirst {
         def klasor = project.file('run-server')
         klasor.mkdirs()
@@ -120,6 +120,17 @@ tasks.matching { it.name == 'runServer' }.configureEach {
         def ozellikler = new File(klasor, 'server.properties')
         if (!ozellikler.exists()) {
             ozellikler.text = "online-mode=false\nlevel-name=test\nlevel-seed=${test_dunyasi_seed}\n"
+        }
+    }
+}
+
+tasks.matching { it.name == 'runGameTestServer' }.configureEach {
+    doFirst {
+        // GameTest sunucusu server.properties'i okumaya çalışır; yoksa log'a zararsız ama yanıltıcı bir ERROR düşer.
+        def ozellikler = project.file('run-gametest/server.properties')
+        ozellikler.parentFile.mkdirs()
+        if (!ozellikler.exists()) {
+            ozellikler.text = ''
         }
     }
 }
