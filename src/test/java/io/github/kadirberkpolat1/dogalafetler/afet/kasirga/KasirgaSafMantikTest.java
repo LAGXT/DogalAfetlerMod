@@ -98,8 +98,10 @@ class KasirgaSafMantikTest {
     void etekProfiliZemindeGenisUstKenardaHuniyleBirlesir() {
         assertEquals(30.6, EtekProfili.yaricap(30.6, 18, 0), EPS);
         assertEquals(18, EtekProfili.yaricap(30.6, 18, 1), EPS);
-        // Zemine doğru açılan içbükey etek: ortada doğrusal ortalamanın altında.
-        assertTrue(EtekProfili.yaricap(30.6, 18, 0.5) < (30.6 + 18) / 2);
+        // Dışa şişkin toz bulutu kubbesi: alt yarısı neredeyse etek genişliğinde kalır (arazi tabanı örtse de silüet
+        // geniş görünür), üst kenarda huniye kıvrılır.
+        assertTrue(EtekProfili.yaricap(30.6, 18, 0.5) > (30.6 + 18) / 2);
+        assertTrue(EtekProfili.yaricap(30.6, 18, 0.4) >= 18 + 0.8 * (30.6 - 18));
         double onceki = Double.MAX_VALUE;
         for (int i = 0; i <= 100; i++) {
             double r = EtekProfili.yaricap(30.6, 18, i / 100.0);
@@ -114,7 +116,7 @@ class KasirgaSafMantikTest {
     void etekAlfasiTabandaYuksekUstKenardaSoner() {
         // Tasarım notu §2 katman 1: alfa 0,6-0,8, tabanda yüksek, üst kenarda sönen.
         assertTrue(EtekProfili.alfa(0) >= 0.6 && EtekProfili.alfa(0) <= 0.8);
-        assertTrue(EtekProfili.alfa(0.3) >= 0.6);
+        assertTrue(EtekProfili.alfa(0.5) >= 0.6);
         assertEquals(0, EtekProfili.alfa(1), EPS);
         double onceki = 1;
         for (int i = 0; i <= 100; i++) {

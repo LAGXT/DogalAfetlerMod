@@ -110,8 +110,8 @@ public final class KasirgaSpikeOtomasyonu {
 
     /**
      * Vitrin düzeltmesi (inceleme B2) ve ölçüm kapsamı (B9): S1 yakın ve S5 vitrin (52 blok, zemin +10, eğim -8°)
-     * yeni etekle, her karenin katmansız kontrolüyle; S5'te 52 blokta iki iç içe tur, sonra etek halkasının içinde (20
-     * blok) ve huni çekirdeğinde (5 blok); kasırga durdurulunca aynı vitrin noktasında afetsiz.
+     * yeni etekle, her karenin katmansız kontrolüyle; S5'te 52 blokta iki iç içe tur ve hemen ardından aynı noktada
+     * afetsiz; sonra yeni bir S5'le etek halkasının içinde (20 blok) ve huni çekirdeğinde (5 blok).
      */
     private static void v2Plani() {
         adim(1000, "hazırlık", KasirgaSpikeOtomasyonu::hazirlik);
@@ -153,6 +153,15 @@ public final class KasirgaSpikeOtomasyonu {
             }
         }
         tps();
+        // Afetsiz, aynı noktada ve turların hemen ardından (makine yükü dakikalar içinde değişiyor).
+        dur();
+        for (int tur = 1; tur <= 2; tur++) {
+            olcum(tur == 1 ? 3000 : 500, "V2-afetsiz-" + tur, 4000);
+        }
+        tps();
+        adim(500, "S5 yüksek yeniden (yakın noktalar)", () -> komut("dogalafet spike kasirga 5 kalite yuksek"));
+        adim(8000, "S5 olgun: hareketi durdur", KasirgaSpikeOtomasyonu::olgun,
+                () -> komut("dogalafet spike kasirga hareket false"));
         for (int mesafe : new int[] {20, 5}) {
             kamera(mesafe, -8, 10);
             adim(3000, mesafe + " blokta", KasirgaSpikeOtomasyonu::isinlandi, () -> {
@@ -168,16 +177,7 @@ public final class KasirgaSpikeOtomasyonu {
             }
         }
         tps();
-        kamera(52, -8, 10);
-        adim(3000, "vitrin noktasında", KasirgaSpikeOtomasyonu::isinlandi, () -> {
-        });
-        adim(300, "kalite yüksek", () -> komut("dogalafet spike kasirga kalite yuksek"));
-        olcum(1000, "V2-S5-yuksek-son", 4000);
         dur();
-        for (int tur = 1; tur <= 2; tur++) {
-            olcum(tur == 1 ? 3000 : 500, "V2-afetsiz-" + tur, 4000);
-        }
-        tps();
         adim(1500, "kapanış", KasirgaSpikeOtomasyonu::kapat);
     }
 

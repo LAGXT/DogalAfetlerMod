@@ -389,16 +389,16 @@ final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
     }
 
     /**
-     * Etek üstündeki dönen toz: üst kenarda içe kıvrılan toz rulosu (simit üzerinde yuvarlanan sprite'lar) ve Rankine
-     * profiliyle dönen toz halkası; S1-2'de havada takla atan yaprak ve çimen parçaları. Sprite sayısını döner.
+     * Etek üstündeki dönen toz: kubbenin omzunda içe kıvrılan toz rulosu (simit üzerinde yuvarlanan sprite'lar) ve
+     * Rankine profiliyle dönen toz halkası; S1-2'de havada takla atan yaprak ve çimen parçaları. Sprite sayısını döner.
      */
     private int taban(KasirgaVarligi k, KasirgaSeviyesi s, RankineProfili rankine, int adet, double t, double alfa,
             double rEtek, double rEtekUst) {
         double rT = s.tabanYaricapi();
         double hE = s.enkazYuksekligi();
         double rIc = rT * 0.45;
-        double rRulo = rEtekUst + 0.35 * (rEtek - rEtekUst);
-        double tup = 0.3 * hE;
+        double rRulo = rEtekUst + 0.6 * (rEtek - rEtekUst);
+        double tup = 0.25 * hE;
         boolean yaprakli = s.seviye() <= 2;
         int tohum = k.getId() * 7919;
         for (int i = 0; i < adet; i++) {
@@ -424,7 +424,7 @@ final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
                 // Rulo: tüp açısı zamanla ilerler, toz dışta yükselip üstte içe kıvrılır.
                 double psi = u2 * TAM_TUR + t * (1.2 + 0.6 * u3);
                 r = rRulo + tup * Math.cos(psi);
-                y = 0.55 * hE + tup * Math.sin(psi);
+                y = 0.7 * hE + tup * Math.sin(psi);
                 boyut = tup * (0.6 + 0.5 * u6);
                 a = 0.6;
                 aci = u4 * TAM_TUR - rankine.acisalHiz(rRulo) * t;
@@ -445,7 +445,7 @@ final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
                 u0 = KasirgaDokusu.YAPRAK_U0;
             } else {
                 r = rIc + (rEtek - rIc) * Math.pow(u1, 0.8);
-                double hMax = hE * (1.15 - 0.75 * (r - rIc) / (rEtek - rIc));
+                double hMax = hE * (1.15 - 0.45 * (r - rIc) / (rEtek - rIc));
                 double fy = kesir(u2 + t * (1.5 + 2.5 * u3) / hMax);
                 y = fy * hMax;
                 boyut = Mth.clamp(rT * (0.16 + 0.2 * u6), 0.7, 6) * (0.7 + 0.6 * fy);
