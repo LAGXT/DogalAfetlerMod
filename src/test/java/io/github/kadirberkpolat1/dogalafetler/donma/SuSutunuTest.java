@@ -1,0 +1,69 @@
+package io.github.kadirberkpolat1.dogalafetler.donma;
+
+import static io.github.kadirberkpolat1.dogalafetler.donma.SuSutunu.Tur.BUZ;
+import static io.github.kadirberkpolat1.dogalafetler.donma.SuSutunu.Tur.DIGER;
+import static io.github.kadirberkpolat1.dogalafetler.donma.SuSutunu.Tur.SU;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+
+import io.github.kadirberkpolat1.dogalafetler.donma.SuSutunu.Tur;
+import java.util.Random;
+import org.junit.jupiter.api.Test;
+
+class SuSutunuTest {
+    @Test
+    void enAlttakiSuDonmaz() {
+        assertArrayEquals(new Tur[] {BUZ, BUZ, SU, DIGER}, SuSutunu.planla(new Tur[] {SU, SU, SU, DIGER}, 4));
+    }
+
+    @Test
+    void derinSudaKalinlikSinirinaKadarDonar() {
+        assertArrayEquals(new Tur[] {BUZ, BUZ, BUZ, BUZ, SU}, SuSutunu.planla(new Tur[] {SU, SU, SU, SU, SU}, 4));
+        assertArrayEquals(new Tur[] {BUZ, SU, SU, SU, SU}, SuSutunu.planla(new Tur[] {SU, SU, SU, SU, SU}, 1));
+    }
+
+    @Test
+    void dondurSonraCozBaslangicSutununuVerir() {
+        Tur[] baslangic = {SU, SU, SU, DIGER};
+        assertArrayEquals(baslangic, SuSutunu.planla(SuSutunu.planla(baslangic, 4), 0));
+    }
+
+    @Test
+    void altiSuOlmayanBuzaDokunulmaz() {
+        Tur[] oyuncuBuzu = {BUZ, BUZ, DIGER};
+        assertArrayEquals(oyuncuBuzu, SuSutunu.planla(oyuncuBuzu, 0));
+        Tur[] buzSutunu = {BUZ, BUZ, BUZ, BUZ, BUZ};
+        assertArrayEquals(buzSutunu, SuSutunu.planla(buzSutunu, 0));
+    }
+
+    @Test
+    void tekBlokSuBirikintisiDonmaz() {
+        Tur[] birikinti = {SU, DIGER};
+        assertArrayEquals(birikinti, SuSutunu.planla(birikinti, 4));
+    }
+
+    @Test
+    void suOlmayanSutunaDokunulmaz() {
+        Tur[] kara = {DIGER, DIGER};
+        assertArrayEquals(kara, SuSutunu.planla(kara, 4));
+    }
+
+    @Test
+    void sonDurumYalnizSonKalinligaBaglidir() {
+        Random r = new Random(3);
+        for (int deneme = 0; deneme < 500; deneme++) {
+            int uzunluk = 1 + r.nextInt(5);
+            Tur[] baslangic = new Tur[uzunluk];
+            for (int i = 0; i < uzunluk; i++) {
+                baslangic[i] = r.nextInt(4) == 0 ? DIGER : SU;
+            }
+            Tur[] mevcut = baslangic;
+            int son = 0;
+            for (int i = 0; i < 1 + r.nextInt(6); i++) {
+                son = r.nextInt(5);
+                mevcut = SuSutunu.planla(mevcut, son);
+            }
+            assertArrayEquals(SuSutunu.planla(baslangic, son), mevcut);
+            assertArrayEquals(baslangic, SuSutunu.planla(mevcut, 0));
+        }
+    }
+}
