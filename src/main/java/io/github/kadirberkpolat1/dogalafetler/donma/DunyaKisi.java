@@ -10,10 +10,11 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraftforge.common.Tags;
 
 /**
- * {@link KisAlani} için dünya biyom örneği: chunk ortasının gürültü yüzey yüksekliği ({@code ChunkGenerator.getBaseHeight},
- * {@code WORLD_SURFACE_WG}) ve oradaki gürültü biyomu ({@code getUncachedNoiseBiome}). İkisi de chunk yüklemez ve
- * yalnız seed'e bağlıdır: aynı chunk yüklü olsun olmasın aynı sonucu verir. Soğuk = karlı biyom
- * ({@code Tags.Biomes.IS_SNOWY} ya da taban sıcaklık &lt; 0,15). Ana thread'de kullanılır.
+ * {@link KisAlani} için dünya biyom örneği: chunk ortasında deniz seviyesinin bir üstündeki gürültü biyomu
+ * ({@code getUncachedNoiseBiome}). Chunk yüklemez ve yalnız seed'e bağlıdır: chunk yüklü olsun olmasın aynı sonucu verir.
+ * Gürültü yüzeyi ({@code getBaseHeight}) bütün bir gürültü sütunu hesapladığı için kullanılmaz (ölçümde chunk başına
+ * onlarca ms); dağlarda bu yükseklikte mağara biyomu çıkabilir, ama orada yükseklik bileşeni zaten tam kıştır. Soğuk =
+ * karlı biyom ({@code Tags.Biomes.IS_SNOWY} ya da taban sıcaklık &lt; 0,15). Ana thread'de kullanılır.
  */
 final class DunyaKisi implements KisAlani.ChunkOrnegi {
     private record Ornek(boolean soguk, float sicaklik) {
@@ -57,7 +58,7 @@ final class DunyaKisi implements KisAlani.ChunkOrnegi {
         if (o == null) {
             int x = cx * 16 + 8;
             int z = cz * 16 + 8;
-            int y = tabanYuksekligi(level, x, z);
+            int y = level.getSeaLevel() + 1;
             Holder<Biome> biyom = level.getUncachedNoiseBiome(x >> 2, y >> 2, z >> 2);
             float sicaklik = biyom.value().getBaseTemperature();
             o = new Ornek(biyom.is(Tags.Biomes.IS_SNOWY) || sicaklik < 0.15f, sicaklik);
