@@ -1,0 +1,23 @@
+Dosya: src/main/resources/assets/dogalafetler/sounds/siren_standart.ogg (68567 bayt, 10.0 sn, mono, 48000 Hz, Vorbis q5)
+Hedef: -20.0 LUFS, tepe <= -3.0 dBTP
+Ölçülen (ogg): I = -20.0 LUFS, gerçek tepe = -12.9 dBTP
+Baskın frekanslar (20 Hz kümeleri, güçlüden zayıfa): 420 Hz, 400 Hz, 380 Hz
+Döngü dikişi: |ilk - son| / en büyük iç adım = 0.506 (<= 1 ise süreksizlik yok); ilk örnek = +0.00501
+
+ffmpeg -i siren_standart.ogg -af ebur128=peak=true -f null -
+Summary:
+
+  Integrated loudness:
+    I:         -20.0 LUFS
+    Threshold: -30.0 LUFS
+
+  Loudness range:
+    LRA:         1.2 LU
+    Threshold: -39.8 LUFS
+    LRA low:   -20.5 LUFS
+    LRA high:  -19.3 LUFS
+
+  True peak:
+    Peak:      -12.9 dBFS
+[out#0/null @ 0x5567dbd853c0] video:0KiB audio:938KiB subtitle:0KiB other streams:0KiB global headers:0KiB muxing overhead: unknown
+size=N/A time=00:00:10.00 bitrate=N/A speed= 233x elapsed=0:00:00.04
