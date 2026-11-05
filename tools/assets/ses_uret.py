@@ -5,6 +5,8 @@ Her ses deterministik seed'le 48 kHz'te numpy ile üretilir, 16 bit WAV'a yazıl
 (`-c:a libvorbis -q:a 5`) çevrilir. Döngülü dosyalar matematiksel olarak periyodiktir: osilatörler döngü boyunca tam
 sayı tur atar, pembe gürültü FFT'de üretilir, alçak geçiren filtre ve yankı FFT alanında dairesel uygulanır; sonra
 sinyal yükselen bir sıfır geçişinden başlayacak şekilde döndürülür. Böylece dosyanın sonu başına dikişsiz bağlanır.
+Çıktılar bayt düzeyinde tekrarlanır: Ogg akış seri numarası sabit (`-serial_offset`, `+bitexact`), etiket yok
+(`-map_metadata -1`); ölçüm metnine ffmpeg'in süreç adresi ve hız satırları girmez.
 
 Kullanım (KÖK'ten):
     .venv/bin/python tools/assets/ses_uret.py                # iki siren, ölçüm ve spektrogram
@@ -31,6 +33,8 @@ from typing import Callable
 import numpy as np
 
 ORNEKLEME = 48_000
+# Ogg akış seri numarası (sabit: aynı girdi → aynı bayt). Tek akışlı dosyalarda değerin kendisi önemsizdir.
+OGG_SERI_NUMARASI = 20261105
 KOK = Path(__file__).resolve().parents[2]
 SES_KLASORU = KOK / "src/main/resources/assets/dogalafetler/sounds"
 KANIT_KLASORU = KOK / "docs/kanit/ses"
@@ -179,10 +183,11 @@ def ffmpeg(*argumanlar: str) -> str:
 def ebur128(yol: Path) -> tuple[float, float, str]:
     """(entegre LUFS, gerçek tepe dBTP, ffmpeg özet metni)."""
     cikti = ffmpeg("-i", str(yol), "-af", "ebur128=peak=true", "-f", "null", "-")
-    ozet = cikti[cikti.rfind("Summary:"):]
+    # Özetin ardındaki `[out#0/null @ 0x...]` ve `speed=... elapsed=...` satırları her çalıştırmada değişir; alınmaz.
+    ozet = re.search(r"Summary:.*?True peak:\s+Peak:\s+\S+ dBFS", cikti, re.S).group(0)
     lufs = float(re.search(r"I:\s+(-?[\d.]+) LUFS", ozet).group(1))
     tepe = float(re.search(r"True peak:\s+Peak:\s+(-?[\d.]+|-inf) dBFS", ozet).group(1))
-    return lufs, tepe, ozet.strip()
+    return lufs, tepe, ozet
 
 
 def baskin_frekanslar(sinyal: np.ndarray, adet: int = 3) -> list[float]:
@@ -209,7 +214,9 @@ def uret(ad: str, tanim: SesTanimi, gecici: Path) -> None:
     wav_yaz(wav, sinyal, uretec)
 
     ogg = SES_KLASORU / f"{ad}.ogg"
-    ffmpeg("-y", "-i", str(wav), "-ac", "1", "-c:a", "libvorbis", "-q:a", "5", str(ogg))
+    # Ogg muxer seri numarasını aksi halde rastgele seçer ve sayfa CRC'leri de ona göre değişir.
+    ffmpeg("-y", "-i", str(wav), "-map_metadata", "-1", "-ac", "1", "-c:a", "libvorbis", "-q:a", "5",
+           "-fflags", "+bitexact", "-flags:a", "+bitexact", "-serial_offset", str(OGG_SERI_NUMARASI), str(ogg))
 
     lufs, tepe, ozet = ebur128(ogg)
     sure = sinyal.size / ORNEKLEME
