@@ -10,44 +10,36 @@ import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.SnowLayerBlock;
-import net.minecraft.world.level.block.SnowyDirtBlock;
 import net.minecraft.world.level.block.SpreadingSnowyDirtBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
 
 /**
- * Donma tablosunu dünyaya uygular. Sütunun hedef durumu kök blokların ve etkin seviyenin fonksiyonudur; geçiş yönlüdür:
- * seviye artarken buz, kar ve zincir yalnız ileri, azalırken yalnız geri gider ({@link DonmaHedefi#yonlu}). Böylece donma
- * başlarken soğuk biyomların doğal karı ve buzu kaldırılmaz, çöz(0) yine kök duruma döner; yarım kalan geçiş aynı
- * yönde yeniden uygulanınca düzelir.
+ * Donma tablosunu dünyaya uygular. Sütunun hedefi {@link DonmaHedefi#sutunHedefi} ile (G, dönem, sütunun kış ağırlığı,
+ * ılık ofset) hesaplanır; yön eski ve yeni hedefin farkından gelir. Donarken donma eşikleri, çözülürken çözülme eşikleri
+ * kullanılır ve değer yalnız o yönde değişir ({@link DonmaHedefi#yonlu}).
  *
  * <p>Sütun kuralları (en üst hareket engelleyen blok, {@code MOTION_BLOCKING}, üzerinden):
  * <ul>
- * <li>Üst blok su kaynağı ya da buzsa {@link SuSutunu} planı: yukarıdan aşağı buz, kıyıda önce ve kalın.</li>
- * <li>Üst blok yüzey tablosundaysa kökünden seviyedeki durumuna çevrilir.</li>
- * <li>Kök {@code #dogalafetler:donma/kar_zemini} etiketindeyse ve üstü hava ya da kar katmanıysa kar katmanı sayısı
- * ayarlanır; {@code snowy} özelliği olan zeminde kırağı ({@code snowy=true}).</li>
- * <li>Tanınmayan bloğa ve üstünde bitki olan zemine dokunulmaz.</li>
+ * <li>Üst blok su kaynağı ya da buzsa {@link SuSutunu} planı. Buz biti işaretli olmayan sütunun buzuna (doğal ya da
+ * oyuncunun) dokunulmaz.</li>
+ * <li>Zeminin üstü hava ya da bizim karımız değilse (bitki, oyuncunun karı, başka blok) sütuna dokunulmaz.</li>
+ * <li>Üst blok yüzey tablosundaysa zincirde yönlü ilerler; aynı adlı blok durumu özellikleri korunur.</li>
+ * <li>Kök {@code #dogalafetler:donma/kar_zemini} etiketindeyse kar katmanı ayarlanır ve kar biti tutulur. Zeminin
+ * {@code snowy} özelliğini vanilla şekil güncellemesi ayarlar.</li>
  * </ul>
- * Bloklar {@link Block#UPDATE_CLIENTS} ile konur: komşu fizik güncellemesi yok, şekil güncellemesi var (çimen karı
- * vanilla kuralıyla görür).
+ * Bloklar {@link Block#UPDATE_CLIENTS} ile konur: komşu fizik güncellemesi yok, şekil güncellemesi var.
  */
 public final class DonmaIsleyici {
     public static final TagKey<Block> KAR_ZEMINI = BlockTags.create(DogalAfetler.konum("donma/kar_zemini"));
     private static final int BAYRAK = Block.UPDATE_CLIENTS;
+    /** Sınırsız üst Y: yüzey doğrudan {@code MOTION_BLOCKING} heightmap'inden okunur (dünya işleyicisi). */
+    static final int SINIRSIZ = Integer.MAX_VALUE;
 
     private DonmaIsleyici() {
     }
-
-    /** Sütunun etkin seviyesi: chunk seviyesi + sabit titreşim; çözülme döneminde Y eşiğinin üstü daima 100. */
-    static int etkinSeviye(long seed, int x, int z, int yuzeyY, int seviye, boolean cozulme, DonmaEsikleri e) {
-        int taban = cozulme && yuzeyY > DonmaAyarlari.kisYEsigi ? 100 : seviye;
-        return taban + DonmaEsikleri.titresim(seed, x, z, e.titresimGenligi());
-    }
-
-    /** Sınırsız üst Y: yüzey doğrudan {@code MOTION_BLOCKING} heightmap'inden okunur (dünya işleyicisi). */
-    static final int SINIRSIZ = Integer.MAX_VALUE;
 
     /**
      * {@code ustY}'nin altındaki en üst {@code MOTION_BLOCKING} bloğu. GameTest şablonları normal arazili dünyada yer
@@ -68,16 +60,16 @@ public final class DonmaIsleyici {
     }
 
     /**
-     * Bölgedeki her sütunu tek seferde {@code onceki}'den {@code seviye}'ye getirir (GameTest ve deney komutları); yüzey
-     * {@code ustY}'nin altında aranır. {@code afetBlokHasari} kapalıyken hiçbir blok değişmez. Bölgenin chunk'ları yüklü olmalı.
+     * Bölgedeki her sütunu tek seferde ({@code oncekiG}, {@code oncekiCozulme}) durumundan ({@code g}, {@code cozulme})
+     * durumuna getirir (GameTest ve deney yolu); yüzey {@code ustY}'nin altında aranır. {@code afetBlokHasari} kapalıyken
+     * hiçbir blok değişmez. Bölgenin chunk'ları yüklü olmalı.
      */
-    public static int bolgeyiIsle(ServerLevel level, int minX, int minZ, int maxX, int maxZ, int ustY, int onceki,
-            int seviye) {
+    public static int bolgeyiIsle(ServerLevel level, int minX, int minZ, int maxX, int maxZ, int ustY, int oncekiG,
+            boolean oncekiCozulme, int g, boolean cozulme, KisKaynagi kis, DonmaEsikleri e) {
         if (!Kurallar.blokHasariAcik(level.getGameRules())) {
             return 0;
         }
         Tablo tablo = DonmaTablosuYukleyici.etkin();
-        DonmaEsikleri e = DonmaAyarlari.esikler;
         int genislik = maxX - minX + 1;
         int derinlik = maxZ - minZ + 1;
         int[] kiyi = kiyiUzakliklari(level, minX, minZ, genislik, derinlik, ustY, tablo, e);
@@ -88,11 +80,28 @@ public final class DonmaIsleyici {
                 int x = minX + dx;
                 int z = minZ + dz;
                 LevelChunk chunk = level.getChunk(x >> 4, z >> 4);
-                degisen += sutunuIsle(level, chunk, x, z, ustY, onceki, seviye, false, kiyi[dz * genislik + dx], tablo, e,
-                        konum);
+                degisen += sutunuIsle(level, chunk, durumu(chunk), x, z, ustY, oncekiG, oncekiCozulme, g, cozulme, kis,
+                        kiyi[dz * genislik + dx], tablo, e, konum);
             }
         }
         return degisen;
+    }
+
+    /** Bölgenin "bizim koyduğumuz" kar ve buz bitlerini siler (GameTest sahnesi kurulurken). */
+    public static void bitleriTemizle(ServerLevel level, int minX, int minZ, int maxX, int maxZ) {
+        for (int z = minZ; z <= maxZ; z++) {
+            for (int x = minX; x <= maxX; x++) {
+                ChunkDonmaSeviyesi c = durumu(level.getChunk(x >> 4, z >> 4));
+                int i = ChunkDonmaSeviyesi.indeks(x, z);
+                c.kar(i, false);
+                c.buz(i, false);
+            }
+        }
+    }
+
+    private static ChunkDonmaSeviyesi durumu(LevelChunk chunk) {
+        ChunkDonmaSeviyesi c = ChunkDonmaSeviyesi.al(chunk);
+        return c != null ? c : new ChunkDonmaSeviyesi();
     }
 
     /** Bölge ve 1 blokluk halkasının yüzey türlerinden kıyı uzaklıkları; yüklü olmayan komşu chunk bilinmiyor sayılır. */
@@ -126,68 +135,68 @@ public final class DonmaIsleyici {
         return durum.is(tablo.suKaynak()) && durum.getFluidState().isSource();
     }
 
-    /** Bir sütunu chunk seviyesi {@code onceki}'den {@code seviye}'ye götürür; değişen blok sayısını döndürür. */
-    static int sutunuIsle(ServerLevel level, LevelChunk chunk, int x, int z, int ustY, int onceki, int seviye,
-            boolean cozulme, int kiyi, Tablo tablo, DonmaEsikleri e, BlockPos.MutableBlockPos konum) {
+    /** Sütunu ({@code oncekiG}, {@code oncekiCozulme}) hedefinden ({@code g}, {@code cozulme}) hedefine götürür. */
+    static int sutunuIsle(ServerLevel level, LevelChunk chunk, ChunkDonmaSeviyesi durum, int x, int z, int ustY,
+            int oncekiG, boolean oncekiCozulme, int g, boolean cozulme, KisKaynagi kis, int kiyi, Tablo tablo,
+            DonmaEsikleri e, BlockPos.MutableBlockPos konum) {
         int y = yuzey(chunk, x, z, ustY, konum);
         if (y < level.getMinBuildHeight() || y + 1 >= level.getMaxBuildHeight()) {
             return 0;
         }
-        long seed = level.getSeed();
-        int etkin = etkinSeviye(seed, x, z, y, seviye, cozulme, e);
-        int yon = Integer.signum(etkin - etkinSeviye(seed, x, z, y, onceki, cozulme, e));
+        double w = kis.agirlik(x, z, y);
+        double ofset = kis.ofset(x, z);
+        int eski = DonmaHedefi.sutunHedefi(oncekiG, oncekiCozulme, w, ofset);
+        int yeni = DonmaHedefi.sutunHedefi(g, cozulme, w, ofset);
+        int yon = Integer.signum(yeni - eski);
         if (yon == 0) {
             return 0;
         }
+        int etkin = yeni + DonmaEsikleri.titresim(level.getSeed(), x, z, e.titresimGenligi());
+        int i = ChunkDonmaSeviyesi.indeks(x, z);
         BlockState ust = chunk.getBlockState(konum.set(x, y, z));
         if (tablo.suKaynak() != null && (suMu(ust, tablo) || ust.is(tablo.suHedef()))) {
-            return suSutunu(level, chunk, x, y, z, etkin, yon, kiyi, tablo, e, konum);
+            return suSutunu(level, chunk, durum, i, x, y, z, etkin, yon, kiyi, tablo, e, konum);
+        }
+        BlockPos yukari = new BlockPos(x, y + 1, z);
+        BlockState ustundeki = chunk.getBlockState(yukari);
+        boolean bizimKar = ustundeki.is(Blocks.SNOW) && durum.kar(i);
+        if (!ustundeki.isAir() && !bizimKar) {
+            return 0;
         }
         int degisen = 0;
         Block kok = tablo.yuzey().kok(ust.getBlock());
-        if (kok != ust.getBlock() || tablo.yuzey().taniyor(kok)) {
+        if (tablo.yuzey().taniyor(ust.getBlock())) {
             Block istenen = tablo.yuzey().durum(ust.getBlock(), etkin, yon);
             if (istenen != ust.getBlock()) {
-                ust = istenen.defaultBlockState();
-                level.setBlock(konum.set(x, y, z), ust, BAYRAK);
+                level.setBlock(konum.set(x, y, z), ozellikleriKopyala(ust, istenen), BAYRAK);
                 degisen++;
             }
         }
         if (!kok.defaultBlockState().is(KAR_ZEMINI)) {
             return degisen;
         }
-        BlockPos yukari = new BlockPos(x, y + 1, z);
-        BlockState ustundeki = chunk.getBlockState(yukari);
-        if (!ustundeki.isAir() && !ustundeki.is(Blocks.SNOW)) {
-            return degisen;
-        }
-        int mevcutKatman = ustundeki.is(Blocks.SNOW) ? ustundeki.getValue(SnowLayerBlock.LAYERS) : 0;
-        int katman = DonmaHedefi.yonlu(mevcutKatman, e.karKatmani(etkin, kok instanceof SpreadingSnowyDirtBlock), yon);
-        if (katman != mevcutKatman) {
-            BlockState istenenUst = katman == 0 ? Blocks.AIR.defaultBlockState()
+        int mevcut = bizimKar ? ustundeki.getValue(SnowLayerBlock.LAYERS) : 0;
+        boolean tekKat = kok instanceof SpreadingSnowyDirtBlock;
+        int istenenKatman = yon > 0 ? e.karKatmani(etkin, tekKat) : e.karKatmaniCozulme(etkin, tekKat);
+        int katman = DonmaHedefi.yonlu(mevcut, istenenKatman, yon);
+        if (katman != mevcut) {
+            BlockState yeniUst = katman == 0 ? Blocks.AIR.defaultBlockState()
                     : Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, katman);
-            if (katman == 0 || istenenUst.canSurvive(level, yukari)) {
-                level.setBlock(yukari, istenenUst, BAYRAK);
-                degisen++;
-            } else {
-                katman = mevcutKatman;
-            }
-        }
-        BlockState zemin = chunk.getBlockState(konum.set(x, y, z));
-        if (zemin.hasProperty(SnowyDirtBlock.SNOWY)) {
-            boolean mevcutKarli = zemin.getValue(SnowyDirtBlock.SNOWY);
-            boolean istenenKarli = katman > 0 || e.kiragi(etkin);
-            boolean karli = yon > 0 ? mevcutKarli || istenenKarli : mevcutKarli && istenenKarli;
-            if (mevcutKarli != karli) {
-                level.setBlock(konum, zemin.setValue(SnowyDirtBlock.SNOWY, karli), BAYRAK);
+            if (katman == 0 || yeniUst.canSurvive(level, yukari)) {
+                level.setBlock(yukari, yeniUst, BAYRAK);
+                durum.kar(i, katman > 0);
                 degisen++;
             }
         }
         return degisen;
     }
 
-    private static int suSutunu(ServerLevel level, LevelChunk chunk, int x, int y, int z, int etkin, int yon, int kiyi,
-            Tablo tablo, DonmaEsikleri e, BlockPos.MutableBlockPos konum) {
+    private static int suSutunu(ServerLevel level, LevelChunk chunk, ChunkDonmaSeviyesi durum, int i, int x, int y, int z,
+            int etkin, int yon, int kiyi, Tablo tablo, DonmaEsikleri e, BlockPos.MutableBlockPos konum) {
+        boolean bizim = durum.buz(i);
+        if (!bizim && (yon < 0 || chunk.getBlockState(konum.set(x, y, z)).is(tablo.suHedef()))) {
+            return 0;
+        }
         SuSutunu.Tur[] sutun = new SuSutunu.Tur[e.maksBuzKalinligi() + 1];
         for (int d = 0; d < sutun.length; d++) {
             int yy = y - d;
@@ -195,11 +204,11 @@ public final class DonmaIsleyici {
                 sutun[d] = SuSutunu.Tur.DIGER;
                 continue;
             }
-            BlockState durum = chunk.getBlockState(konum.set(x, yy, z));
-            sutun[d] = suMu(durum, tablo) ? SuSutunu.Tur.SU
-                    : durum.is(tablo.suHedef()) ? SuSutunu.Tur.BUZ : SuSutunu.Tur.DIGER;
+            BlockState s = chunk.getBlockState(konum.set(x, yy, z));
+            sutun[d] = suMu(s, tablo) ? SuSutunu.Tur.SU : s.is(tablo.suHedef()) ? SuSutunu.Tur.BUZ : SuSutunu.Tur.DIGER;
         }
-        SuSutunu.Tur[] plan = SuSutunu.planla(sutun, e.buzKalinligi(etkin, kiyi), yon);
+        int kalinlik = yon > 0 ? e.buzKalinligi(etkin, kiyi) : e.buzKalinligiCozulme(etkin, kiyi);
+        SuSutunu.Tur[] plan = SuSutunu.planla(sutun, kalinlik, yon);
         int degisen = 0;
         for (int d = 0; d < sutun.length; d++) {
             if (plan[d] != sutun[d]) {
@@ -209,6 +218,22 @@ public final class DonmaIsleyici {
                 degisen++;
             }
         }
+        durum.buz(i, plan[0] == SuSutunu.Tur.BUZ);
         return degisen;
+    }
+
+    /** Hedef bloka kaynak durumun aynı adlı özelliklerini taşır (ör. {@code snowy}); diğerleri varsayılan. */
+    static BlockState ozellikleriKopyala(BlockState kaynak, Block hedef) {
+        BlockState s = hedef.defaultBlockState();
+        for (Property<?> p : kaynak.getProperties()) {
+            if (s.hasProperty(p)) {
+                s = kopyala(s, kaynak, p);
+            }
+        }
+        return s;
+    }
+
+    private static <T extends Comparable<T>> BlockState kopyala(BlockState hedef, BlockState kaynak, Property<T> p) {
+        return hedef.setValue(p, kaynak.getValue(p));
     }
 }

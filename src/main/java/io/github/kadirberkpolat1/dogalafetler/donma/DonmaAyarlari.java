@@ -7,7 +7,7 @@ package io.github.kadirberkpolat1.dogalafetler.donma;
 public final class DonmaAyarlari {
     /** Tick başına en çok blok değişimi (TPS kısmasından önce). */
     public static volatile int temelButce = 256;
-    /** Bir chunk geçişinde seviyenin en çok değiştiği miktar. */
+    /** Bir chunk geçişinde global ilerlemenin (G) en çok ilerlediği miktar. */
     public static volatile int seviyeAdimi = 5;
     public static volatile double tpsEsigi = 18.0;
     public static volatile double tpsKritikEsigi = 15.0;
@@ -18,7 +18,8 @@ public final class DonmaAyarlari {
     public static volatile double kisOrani = KisMaskesi.VARSAYILAN_ORAN;
     public static volatile double kisDalgaBoyu = KisMaskesi.VARSAYILAN_DALGA_BOYU;
     public static volatile double kisBant = KisMaskesi.VARSAYILAN_BANT;
-    public static volatile int kisYEsigi = 120;
+    /** Y geçişi ({@code kisYGecisAlt/Ust}) ve ılık ofseti. */
+    public static volatile KisAlani.Ayar kisAyar = KisAlani.Ayar.VARSAYILAN;
     public static volatile DonmaEsikleri esikler = DonmaEsikleri.VARSAYILAN;
 
     private DonmaAyarlari() {

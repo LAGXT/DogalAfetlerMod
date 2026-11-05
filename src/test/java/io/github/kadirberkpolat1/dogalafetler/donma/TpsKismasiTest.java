@@ -36,4 +36,13 @@ class TpsKismasiTest {
         assertEquals(2, TpsKismasi.bolen(16.0, 18.0, 15.0));
         assertEquals(4, TpsKismasi.bolen(12.0, 18.0, 15.0));
     }
+
+    @Test
+    void bosTickGirdileriOrtalamayaGirmez() {
+        long[] t = new long[100];
+        Arrays.fill(t, 50, 100, 100_000_000L);
+        assertEquals(100.0, TpsKismasi.ortalamaMs(t), 1e-9);
+        assertEquals(10.0, TpsKismasi.tps(t), 1e-9, "yazılmamış 0 girdileri TPS'i yüksek göstermemeli");
+        assertEquals(0.0, TpsKismasi.ortalamaMs(new long[100]), 0.0);
+    }
 }

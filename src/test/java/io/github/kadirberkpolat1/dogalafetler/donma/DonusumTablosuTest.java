@@ -120,4 +120,23 @@ class DonusumTablosuTest {
             }
         }
     }
+
+    @Test
+    void cozulmeEsigiDonmaEsigindenYuksekHisterezis() {
+        DonusumTablosu<String> t = new DonusumTablosu<>();
+        t.ekle("cimen", "kiragili", 10, 50);
+        assertEquals("kiragili", t.durum("cimen", 30, 1));
+        assertEquals("kiragili", t.durum("kiragili", 55, -1), "çözülme eşiğinin üstünde kalır");
+        assertEquals("cimen", t.durum("kiragili", 45, -1), "çözülmede 50'nin altında kalkar");
+        assertEquals("cimen", t.durum("cimen", 45, -1));
+        assertEquals("cimen", t.durum("kiragili", 0, -1));
+    }
+
+    @Test
+    void cozulmeEsigiDonmaEsigindenKucukReddedilir() {
+        DonusumTablosu<String> t = new DonusumTablosu<>();
+        assertThrows(IllegalArgumentException.class, () -> t.ekle("a", "b", 50, 40));
+        t.ekle("a", "b", 20, 60);
+        assertThrows(IllegalArgumentException.class, () -> t.ekle("b", "c", 30, 50), "zincirde çözülme eşiği de artmalı");
+    }
 }

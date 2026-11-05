@@ -50,8 +50,12 @@ public final class KisMaskesi {
 
     /** Chunk merkezindeki kış ağırlığı: 0 = ılık, 1 = kalıcı kış, arası = sınır kuşağı. */
     public double agirlik(int chunkX, int chunkZ) {
-        double n = gurultu(chunkX * 16 + 8, chunkZ * 16 + 8);
-        return yumusakBasamak(esik - bant, esik + bant, n);
+        return agirlikNoktada(chunkX * 16 + 8, chunkZ * 16 + 8);
+    }
+
+    /** Blok noktasındaki kış ağırlığı (sütun düzeyindeki çift doğrusal ara değerin köşeleri). */
+    public double agirlikNoktada(int blokX, int blokZ) {
+        return yumusakBasamak(esik - bant, esik + bant, gurultu(blokX, blokZ));
     }
 
     public boolean kisMi(int chunkX, int chunkZ) {

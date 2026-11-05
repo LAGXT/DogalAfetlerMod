@@ -12,6 +12,7 @@ public final class DonmaSpike {
     }
 
     public static void kaydet(IEventBus modBus) {
+        DonmaBloklari.BLOKLAR.register(modBus);
         modBus.addListener(ChunkDonmaSeviyesi::kaydet);
         IEventBus forge = MinecraftForge.EVENT_BUS;
         forge.addGenericListener(LevelChunk.class, ChunkDonmaSeviyesi::ekle);

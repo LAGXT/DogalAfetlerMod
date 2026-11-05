@@ -6,7 +6,9 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.ResourceManager;
@@ -14,6 +16,9 @@ import net.minecraft.server.packs.resources.SimpleJsonResourceReloadListener;
 import net.minecraft.util.GsonHelper;
 import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraftforge.registries.ForgeRegistries;
 
 /**
@@ -23,12 +28,17 @@ import net.minecraftforge.registries.ForgeRegistries;
  * <pre>{@code
  * {"donusumler": [
  *   {"tur": "su_sutunu", "kaynak": "minecraft:water", "hedef": "minecraft:ice"},
- *   {"tur": "yuzey", "kaynak": "minecraft:mud", "hedef": "minecraft:packed_mud", "esik": 60}
+ *   {"tur": "yuzey", "kaynak": "minecraft:grass_block", "hedef": "dogalafetler:kiragili_cimen",
+ *    "esik": 10, "cozulmeEsigi": 50}
  * ]}
  * }</pre>
  *
- * Kayıtlı olmayan blok (yüklü olmayan mod) sessizce atlanır; tersinirliği bozan satır ({@link DonusumTablosu#ekle})
- * hata olarak log'a düşer ve atlanır.
+ * Yüzey satırı kuralları: hedef yalnız donmayla oluşan blok olabilir, yani {@code dogalafetler} ad alanında; başka bir
+ * hedef (doğada ya da oyuncu elinde de bulunan) çözülmede oyuncunun bloğunu köke çevirirdi, bu yüzden ancak
+ * {@code "yabanciHedefOnayi": true} ile kabul edilir. Kaynak ve hedefin blok durumu özellik adları aynı olmalı (özellikler
+ * kopyalanır); çift bloklar (kapı, uzun bitki, yatak) reddedilir; eşikler titreşimden büyük olmalı. {@code cozulmeEsigi}
+ * verilmezse {@code esik}. Kayıtlı olmayan blok (yüklü olmayan mod) sessizce atlanır; kurala ya da tersinirliğe aykırı satır
+ * log'a düşer ve atlanır.
  */
 public final class DonmaTablosuYukleyici extends SimpleJsonResourceReloadListener {
     public static final String KLASOR = "donma_tablosu";
@@ -81,12 +91,20 @@ public final class DonmaTablosuYukleyici extends SimpleJsonResourceReloadListene
                                 if (kaynak == suKaynak || kaynak == suHedef || hedef == suKaynak || hedef == suHedef) {
                                     throw new IllegalArgumentException("yüzey satırı su sütunu bloklarını kullanıyor");
                                 }
-                                yuzey.ekle(kaynak, hedef, GsonHelper.getAsInt(satir, "esik"));
+                                yuzeySatiriniDenetle(kaynak, hedef, GsonHelper.getAsBoolean(satir, "yabanciHedefOnayi", false));
+                                int esik = GsonHelper.getAsInt(satir, "esik");
+                                int cozulme = GsonHelper.getAsInt(satir, "cozulmeEsigi", esik);
+                                int titresim = DonmaAyarlari.esikler.titresimGenligi();
+                                if (esik <= titresim) {
+                                    throw new IllegalArgumentException("eşik (" + esik + ") titreşimden (" + titresim
+                                            + ") büyük olmalı; yoksa seviye 0'da donuk kalır");
+                                }
+                                yuzey.ekle(kaynak, hedef, esik, cozulme);
                             }
                             default -> throw new IllegalArgumentException("bilinmeyen tür: " + tur);
                         }
                     } catch (IllegalArgumentException hata) {
-                        DogalAfetler.LOGGER.error("[donma] {}: satır reddedildi ({}): {}", dosya.getKey(), hata.getMessage(),
+                        DogalAfetler.LOGGER.warn("[donma] {}: satır reddedildi ({}): {}", dosya.getKey(), hata.getMessage(),
                                 satir);
                     }
                 }
@@ -97,6 +115,33 @@ public final class DonmaTablosuYukleyici extends SimpleJsonResourceReloadListene
         etkin = new Tablo(yuzey, suKaynak, suHedef);
         DogalAfetler.LOGGER.info("[donma] Donma tablosu yüklendi: {} dosya, {} yüzey dönüşümü, su sütunu {} ↔ {}",
                 dosyalar.size(), yuzey.boyut(), ad(suKaynak), ad(suHedef));
+    }
+
+    static void yuzeySatiriniDenetle(Block kaynak, Block hedef, boolean yabanciHedefOnayi) {
+        ResourceLocation hedefAdi = ForgeRegistries.BLOCKS.getKey(hedef);
+        if (!yabanciHedefOnayi && (hedefAdi == null || !DogalAfetler.MOD_ID.equals(hedefAdi.getNamespace()))) {
+            throw new IllegalArgumentException("hedef " + hedefAdi + " donmayla oluşan kendi bloğumuz değil; çözülmede "
+                    + "oyuncunun bloğu da köke döner (gerekirse \"yabanciHedefOnayi\": true)");
+        }
+        BlockState k = kaynak.defaultBlockState();
+        BlockState h = hedef.defaultBlockState();
+        if (ciftBlok(k) || ciftBlok(h)) {
+            throw new IllegalArgumentException("çift blok (kapı, uzun bitki, yatak) tabloya alınamaz");
+        }
+        Set<String> ka = adlar(k);
+        Set<String> ha = adlar(h);
+        if (!ka.equals(ha)) {
+            throw new IllegalArgumentException("blok durumu özellikleri farklı: " + ka + " ≠ " + ha
+                    + " (geri dönüşte özellik kaybolur)");
+        }
+    }
+
+    private static boolean ciftBlok(BlockState s) {
+        return s.hasProperty(BlockStateProperties.DOUBLE_BLOCK_HALF) || s.hasProperty(BlockStateProperties.BED_PART);
+    }
+
+    private static Set<String> adlar(BlockState s) {
+        return s.getProperties().stream().map(Property::getName).collect(Collectors.toSet());
     }
 
     @Nullable

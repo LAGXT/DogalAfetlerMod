@@ -7,22 +7,30 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * İki yönlü dönüşüm tablosu (madde 9): her dönüşüm {@code kaynak → hedef}, eşik seviyesinde uygulanır. Bir blok
- * en çok bir dönüşümün kaynağı ve en çok birinin hedefi olabilir; böylece her durumun tek bir kökü (orijinal bloğu)
- * vardır ve çözülme orijinal kayıt tutmadan tersine yürüyüp bulunur. Durum yalnız kök ve seviyenin fonksiyonudur.
+ * İki yönlü dönüşüm tablosu (madde 9): her dönüşüm {@code kaynak → hedef}; donarken {@code esik}'te uygulanır, çözülürken
+ * {@code cozulmeEsik}'in altında geri alınır ({@code cozulmeEsik ≥ esik}: histerezis). Bir blok en çok bir dönüşümün kaynağı
+ * ve en çok birinin hedefi olabilir; böylece her durumun tek bir kökü (orijinal bloğu) vardır ve çözülme orijinal kayıt
+ * tutmadan tersine yürüyüp bulunur.
  */
 public final class DonusumTablosu<T> {
-    public record Donusum<T>(T kaynak, T hedef, int esik) {
+    public record Donusum<T>(T kaynak, T hedef, int esik, int cozulmeEsik) {
     }
 
     private final Map<T, Donusum<T>> kaynaktan = new LinkedHashMap<>();
     private final Map<T, Donusum<T>> hedeften = new LinkedHashMap<>();
 
     public void ekle(T kaynak, T hedef, int esik) {
+        ekle(kaynak, hedef, esik, esik);
+    }
+
+    public void ekle(T kaynak, T hedef, int esik, int cozulmeEsik) {
         Objects.requireNonNull(kaynak, "kaynak");
         Objects.requireNonNull(hedef, "hedef");
         if (kaynak.equals(hedef)) {
             throw new IllegalArgumentException("blok kendine dönüşemez: " + kaynak);
+        }
+        if (cozulmeEsik < esik) {
+            throw new IllegalArgumentException("çözülme eşiği (" + cozulmeEsik + ") donma eşiğinden (" + esik + ") küçük");
         }
         if (kaynaktan.containsKey(kaynak)) {
             throw new IllegalArgumentException("aynı kaynak iki dönüşümde: " + kaynak);
@@ -38,14 +46,14 @@ public final class DonusumTablosu<T> {
             t = sonraki == null ? null : sonraki.hedef();
         }
         Donusum<T> onceki = hedeften.get(kaynak);
-        if (onceki != null && onceki.esik() >= esik) {
-            throw new IllegalArgumentException("zincirde eşik artmalı: " + onceki + " sonra " + kaynak + " → " + hedef);
+        if (onceki != null && (onceki.esik() >= esik || onceki.cozulmeEsik() > cozulmeEsik)) {
+            throw new IllegalArgumentException("zincirde eşikler artmalı: " + onceki + " sonra " + kaynak + " → " + hedef);
         }
         Donusum<T> sonraki = kaynaktan.get(hedef);
-        if (sonraki != null && sonraki.esik() <= esik) {
-            throw new IllegalArgumentException("zincirde eşik artmalı: " + kaynak + " → " + hedef + " sonra " + sonraki);
+        if (sonraki != null && (sonraki.esik() <= esik || sonraki.cozulmeEsik() < cozulmeEsik)) {
+            throw new IllegalArgumentException("zincirde eşikler artmalı: " + kaynak + " → " + hedef + " sonra " + sonraki);
         }
-        Donusum<T> donusum = new Donusum<>(kaynak, hedef, esik);
+        Donusum<T> donusum = new Donusum<>(kaynak, hedef, esik, cozulmeEsik);
         kaynaktan.put(kaynak, donusum);
         hedeften.put(hedef, donusum);
     }
@@ -64,11 +72,14 @@ public final class DonusumTablosu<T> {
         return k;
     }
 
-    /** Seviyedeki durum: kökten başlayıp eşiği aşılan dönüşümler uygulanır. */
+    /** Donma yönünde seviyedeki durum: kökten başlayıp donma eşiği aşılan dönüşümler uygulanır. */
     public T durum(T mevcut, int seviye) {
-        T s = kok(mevcut);
+        return yuru(kok(mevcut), seviye, false);
+    }
+
+    private T yuru(T s, int seviye, boolean cozulme) {
         Donusum<T> d;
-        while ((d = kaynaktan.get(s)) != null && d.esik() <= seviye) {
+        while ((d = kaynaktan.get(s)) != null && (cozulme ? d.cozulmeEsik() : d.esik()) <= seviye) {
             s = d.hedef();
         }
         return s;
@@ -87,14 +98,14 @@ public final class DonusumTablosu<T> {
     }
 
     /**
-     * Yönlü durum: donarken ({@code yon > 0}) zincirde yalnız ileri, çözülürken ({@code yon < 0}) yalnız geri gidilir;
-     * {@code yon == 0} dokunmaz. Böylece donma başlarken doğal hedef bloklar (ör. soğuk biyomun buzu) eritilmez.
+     * Yönlü durum: donarken ({@code yon > 0}) donma eşikleriyle yalnız ileri, çözülürken ({@code yon < 0}) çözülme
+     * eşikleriyle yalnız geri gidilir; {@code yon == 0} dokunmaz.
      */
     public T durum(T mevcut, int seviye, int yon) {
         if (yon == 0) {
             return mevcut;
         }
-        T istenen = durum(mevcut, seviye);
+        T istenen = yuru(kok(mevcut), seviye, yon < 0);
         int fark = adim(istenen) - adim(mevcut);
         return (yon > 0 ? fark > 0 : fark < 0) ? istenen : mevcut;
     }

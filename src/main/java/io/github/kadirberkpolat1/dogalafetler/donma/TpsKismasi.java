@@ -1,26 +1,30 @@
 package io.github.kadirberkpolat1.dogalafetler.donma;
 
 /**
- * TPS ölçümü ve blok bütçesi kısması (madde 3, madde 9 ÖNCELİK). TPS, sunucunun son 100 tick süresinin ortalamasından
- * hesaplanır ({@code MinecraftServer.tickTimes}, nanosaniye); {@code /forge tps} ile aynı formül: {@code min(20, 1000 / mspt)}.
+ * TPS ölçümü ve blok bütçesi kısması (madde 3, madde 9 ÖNCELİK). Tek kaynak: {@code MinecraftServer.tickTimes} (son 100 tick,
+ * nanosaniye); ms/tick ve TPS aynı ortalamadan gelir. Henüz yazılmamış (0) girdiler ortalamaya girmez, yoksa sunucu
+ * açılışından sonraki ilk 100 tick'te TPS olduğundan yüksek görünür.
  */
 public final class TpsKismasi {
     private TpsKismasi() {
     }
 
-    public static double tps(long[] tickNanosaniye) {
-        if (tickNanosaniye.length == 0) {
-            return 20.0;
-        }
+    /** Dolu girdilerin ortalama tick süresi (ms); hiç ölçüm yoksa 0. */
+    public static double ortalamaMs(long[] tickNanosaniye) {
         long toplam = 0;
+        int adet = 0;
         for (long t : tickNanosaniye) {
-            toplam += t;
+            if (t > 0) {
+                toplam += t;
+                adet++;
+            }
         }
-        double ortalama = toplam / (double) tickNanosaniye.length;
-        if (ortalama <= 0.0) {
-            return 20.0;
-        }
-        return Math.min(20.0, 1000.0 / (ortalama / 1_000_000.0));
+        return adet == 0 ? 0.0 : toplam / (double) adet / 1_000_000.0;
+    }
+
+    public static double tps(long[] tickNanosaniye) {
+        double ms = ortalamaMs(tickNanosaniye);
+        return ms <= 0.0 ? 20.0 : Math.min(20.0, 1000.0 / ms);
     }
 
     /** 1 = tam bütçe, 2 = yarı ({@code tps < esik}), 4 = çeyrek ({@code tps < kritikEsik}). */

@@ -93,15 +93,24 @@ def main():
         adim[0] = ad
         yaz_log(f"### {ad}")
 
+    def sonlandir(_isaret, _cerceve):
+        raise SystemExit(143)
+
+    # SIGTERM (ör. `timeout`) Python'da varsayılan olarak finally'yi atlar; SystemExit'e çevrilince stop ve geri yazma çalışır.
+    signal.signal(signal.SIGTERM, sonlandir)
     senaryo_dunyasini_sil()
     ozgun_ozellikler = ozellikleri_senaryoya_cevir()
     yaz_log(f"senaryo dünyası run-server/{SENARYO_DUNYASI} silindi; server.properties geçici: {SENARYO_OZELLIKLERI}")
 
     ortam = dict(os.environ, JAVA_HOME=JAVA_HOME)
-    surec = subprocess.Popen(
-        ["./gradlew", "runServer", "--console=plain"], cwd=KOK, env=ortam, stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", bufsize=1,
-        start_new_session=True)
+    try:
+        surec = subprocess.Popen(
+            ["./gradlew", "runServer", "--console=plain"], cwd=KOK, env=ortam, stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace", bufsize=1,
+            start_new_session=True)
+    except BaseException:
+        ozellikleri_geri_al(ozgun_ozellikler)
+        raise
 
     def okuyucu():
         for satir in surec.stdout:
@@ -215,6 +224,9 @@ def main():
     try:
         adima_gec("sunucu açılışı")
         bekle(r"Done \(", 900)
+        # server.properties yalnız açılışta okunur; hemen geri yazılır, böylece betik nasıl biterse bitsin dosya bozuk kalmaz.
+        ozellikleri_geri_al(ozgun_ozellikler)
+        yaz_log("server.properties özgün haline döndürüldü (sunucu açıldı)")
 
         adima_gec("0. başlangıç durumunu zorla")
         i = indeks()
@@ -299,6 +311,27 @@ def main():
         komut("dogalafet spike donma cozulme true")
         komut("dogalafet spike donma 40")
         bekle(r"global ilerleme 80 → 40;", 60, i)
+
+        adima_gec("5b. dağ chunk'ı: çözülme döneminde ilk kez yüklenir, Y üst sınırındaki sütunların hedefi 100")
+        i = indeks()
+        komut("dogalafet spike donma dagbul 0 0 140")
+        j = bekle(r"\[donma\] dağ bulundu: -?\d+ -?\d+ -?\d+", 120, i)
+        dx, dy, dz = map(int, re.search(r"dağ bulundu: (-?\d+) (-?\d+) (-?\d+)", satir(j)).groups())
+        cx, cz = dx // 16, dz // 16
+        komut(f"execute positioned {dx} 64 {dz} run dogalafet spike donma izle")
+        i = indeks()
+        forceload_ekle(dx, dz, i)
+        bekle(rf"izlenen chunk \[{cx}, {cz}\] yüklendi \(yeni=true\): kayıtlı seviye 0", 180, i)
+        bekle(rf"izlenen chunk \[{cx}, {cz}\] seviye \d+ → 40 \(hedef 40\)", 300, i)
+        i = indeks()
+        komut(f"execute positioned {dx} {dy} {dz} run dogalafet spike donma ornek")
+        j = bekle(r"\[donma\] w_sütun özeti", 60, i)
+        esik, ust, tam = map(int, re.search(r"Y≥(\d+): (\d+) sütun, hedefi 100: (\d+)", satir(j)).groups())
+        if ust == 0 or ust != tam:
+            raise SenaryoHatasi(f"dağ chunk'ında Y≥{esik} {ust} sütunun yalnız {tam} tanesinin hedefi 100")
+        yaz_log(f"--- denetim: dağ chunk'ı [{cx}, {cz}] Y≥{esik} {ust} sütunun hepsinin hedefi 100")
+        komut(f"execute positioned {dx} {dy} {dz} run dogalafet spike donma kis")
+        komut(f"forceload remove {dx} {dz}")
         for kx, kz in [(0, 0), (x, z), (-3000, 1500), (4000, -2500), (8000, 8000)]:
             komut(f"execute positioned {kx} 64 {kz} run dogalafet spike donma kis")
         time.sleep(10)
@@ -318,7 +351,12 @@ def main():
             except subprocess.TimeoutExpired:
                 yaz_log("!!! stop sonrası kapanmadı, SIGTERM")
                 os.killpg(surec.pid, signal.SIGTERM)
-                surec.wait(timeout=60)
+                try:
+                    surec.wait(timeout=60)
+                except subprocess.TimeoutExpired:
+                    yaz_log("!!! SIGTERM sonrası da kapanmadı, SIGKILL")
+                    os.killpg(surec.pid, signal.SIGKILL)
+                    surec.wait()
         time.sleep(1)
         ozellikleri_geri_al(ozgun_ozellikler)
         yaz_log("server.properties özgün haline döndürüldü")
