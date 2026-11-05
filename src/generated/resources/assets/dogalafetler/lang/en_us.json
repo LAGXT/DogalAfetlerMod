@@ -34,5 +34,9 @@
   "gamerule.sinkholeAfeti.description": "Allows sinkholes to be chosen.",
   "gamerule.tsunamiAfeti": "Tsunamis",
   "gamerule.tsunamiAfeti.description": "Allows tsunamis to be chosen.",
-  "mod.dogalafetler.ad": "Natural Disasters"
+  "mod.dogalafetler.ad": "Natural Disasters",
+  "options.dogalafetler.sirenler": "Sirens",
+  "options.dogalafetler.sirenler.aciklama": "Disaster siren volume, on top of Master Volume. Same setting as sirenSes in dogalafetler-client.toml.",
+  "soundCategory.dogalafetler_siren": "Sirens (category)",
+  "subtitles.dogalafetler.siren": "Siren wails"
 }

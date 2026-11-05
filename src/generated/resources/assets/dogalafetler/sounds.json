@@ -1,0 +1,17 @@
+{
+  "siren_gunes": {
+    "sounds": [
+      {
+        "name": "dogalafetler:siren_gunes",
+        "stream": true
+      }
+    ],
+    "subtitle": "subtitles.dogalafetler.siren"
+  },
+  "siren_standart": {
+    "sounds": [
+      "dogalafetler:siren_standart"
+    ],
+    "subtitle": "subtitles.dogalafetler.siren"
+  }
+}
