@@ -7,17 +7,22 @@ import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LevelAccessor;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 
 /**
  * Sanal su sisteminin dış API'si (spike). Sunucu ve istemci ayrı {@link SanalSuDunyasi} kopyası tutar; tek oyunculuda
- * ikisi aynı JVM'de olduğu için seviyenin tarafına göre seçilir. Sıcaklık sistemi ıslaklık için yalnız
- * {@link #icindeMi(Entity)} ve {@link #batiklikOrani(Entity)} okur.
+ * ikisi aynı JVM'de olduğu için seviyenin tarafına göre seçilir.
+ *
+ * <p><b>İş parçacığı:</b> sorgular paylaşılan geçici nesneler kullandığı için yalnız seviyenin sahibi iş parçacığından
+ * (sunucu thread'i / istemcinin render thread'i) çağrılabilir; başka thread'den çağrı sessizce yanlış sonuç verir.
  */
 public final class SanalSu {
     /** Fizik yolu: vanilla sıvı durumuna mixin kancası ya da yalnız Forge olayları (karşılaştırma için). */
@@ -57,7 +62,12 @@ public final class SanalSu {
         return d.aktif() ? d : null;
     }
 
-    public static double batiklikOrani(Entity e) {
+    /**
+     * Varlığın kutusunun yalnız <b>sanal</b> suda kalan payı (0..1); gerçek suyu saymaz. Isı sistemi ıslaklığı vanilla
+     * alanlarından ({@code isInWater()}, {@code getFluidHeight(WATER)}) okumalıdır: mixin yolunda onlar gerçek + sanal suyu
+     * birlikte kapsar. Bu değer sanal suya özgü davranış (sürükleme, tanılama) içindir. Sahibi thread'den çağrılır.
+     */
+    public static double sanalBatiklik(Entity e) {
         SanalSuDunyasi d = dunya(e.level());
         if (d == null) {
             return 0;
@@ -66,8 +76,55 @@ public final class SanalSu {
         return d.batiklik(e.getX(), e.getZ(), b.minY, b.maxY, e.level().getGameTime());
     }
 
-    public static boolean icindeMi(Entity e) {
-        return batiklikOrani(e) > 0;
+    /** Varlık sanal suya değiyor mu ({@link #sanalBatiklik} &gt; 0); gerçek suyu saymaz. Sahibi thread'den çağrılır. */
+    public static boolean sanalSudaMi(Entity e) {
+        return sanalBatiklik(e) > 0;
+    }
+
+    /**
+     * Dış sistemlerin (donma: su↔buz, yıkım, yapı yerleşimi) blok değiştirdiğini bildirdiği tek giriş: chunk deniz alanında
+     * yeniden okunur. Blok olayları bayrak-2 ({@code UPDATE_CLIENTS}) değişikliklerini görmez. Sunucu thread'inden çağrılır;
+     * istemci tarafı kendi periyodik tazelemesiyle yetişir.
+     */
+    public static void chunkDegisti(LevelAccessor l, int cx, int cz) {
+        if (!l.isClientSide() && l instanceof Level seviye && seviye.dimension() == Level.OVERWORLD) {
+            SUNUCU.alan().gecersizKil(cx, cz);
+        }
+    }
+
+    /**
+     * Bloğun mağara suyu için özü: hava; geçirgen (çarpışmasız: meşale, ot, liken, ray, çiçek; ya da vanilla'da su
+     * tutabilen {@code WATERLOGGED}: sarkıt, fener, zincir) ya da katı. Gerçek sıvı içeren hücre katı sayılır (su zaten
+     * orada; sanal su onun üstüne çıkar).
+     */
+    public static MagaraDolumu.BlokOzu blokOzu(BlockGetter g, BlockPos p, BlockState s) {
+        if (s.isAir()) {
+            return MagaraDolumu.BlokOzu.HAVA;
+        }
+        if (!s.getFluidState().isEmpty()) {
+            return MagaraDolumu.BlokOzu.KATI;
+        }
+        if (s.getCollisionShape(g, p).isEmpty() || s.hasProperty(BlockStateProperties.WATERLOGGED)) {
+            return MagaraDolumu.BlokOzu.GECIRGEN;
+        }
+        return MagaraDolumu.BlokOzu.KATI;
+    }
+
+    /**
+     * Mağara dolumu için gerçek dünya hücresi: yüklü olmayan chunk ve sütunun yaprak hariç yüzeyinin
+     * ({@code MOTION_BLOCKING_NO_LEAVES}) hizası ve üstü açık, altı kapalı (bkz. {@link MagaraDolumu#sinifla}).
+     */
+    public static MagaraDolumu.Hucre magaraHucresi(Level l) {
+        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+        return (x, y, z) -> {
+            m.set(x, y, z);
+            if (!l.isLoaded(m)) {
+                return MagaraDolumu.Tur.ACIK;
+            }
+            BlockState s = l.getBlockState(m);
+            return MagaraDolumu.sinifla(true, blokOzu(l, m, s), y,
+                    l.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z));
+        };
     }
 
     /** Mixin yolu: ayaktan su yüzeyine yükseklik; olay yolundayken 0. */

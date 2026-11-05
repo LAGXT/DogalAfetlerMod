@@ -12,16 +12,48 @@ import java.util.Set;
 /**
  * Kapalı boşluğa sanal su doldurma (bölüm B, mağaralar). İki adım:
  * <ol>
- * <li>Keşif: tohumdan "önce en alçak" öncelikli taşkın (su aşağı akar), en çok {@code maksZiyaret} hücre. Sınıra
- * takılırsa bekleyen en alçak hücre sızıntı seviyesidir; su onu aşamaz (yoksa dışarı akardı).</li>
+ * <li>Keşif: tohumdan "önce en alçak" öncelikli taşkın (su aşağı akar), en çok {@code maksZiyaret} hücre. Keşif bir
+ * {@link Tur#ACIK} hücreye (gökyüzünü gören hava, yüklü olmayan chunk) değerse o hücrenin y'si ağız eşiğidir: su mağara
+ * ağzından dışarı akacağı için eşiği aşamaz. Sınıra takılırsa bekleyen en alçak hücre de sızıntı seviyesidir.</li>
  * <li>Dolum: en alçak hücreden başlayıp düz yüzeyle kat kat yükselir; bir kat {@code maksHacim}'i aşacaksa durur.</li>
  * </ol>
  */
 public final class MagaraDolumu {
-    /** {@code true}: hücre boş (hava), su girebilir. */
+    /** Hücrenin su açısından durumu. */
+    public enum Tur {
+        /** Su tutabilir (hava ya da geçirgen blok); bloğa dokunulmaz, hücre su içinde çizilir ve suda sayılır. */
+        BOS,
+        /** Suyu geçirmez (dolu blok, gerçek sıvı). */
+        KATI,
+        /** Mağaranın dışı (gökyüzünü gören hava, yüklü olmayan chunk): su buraya gelirse akar gider. */
+        ACIK
+    }
+
+    /** Bloğun kendisinin özü; Minecraft'a bağlı karar {@code SanalSu.blokOzu}'nda, burası saf mantık. */
+    public enum BlokOzu {
+        HAVA,
+        /** Çarpışmasız ya da vanilla'da su tutabilen blok (meşale, ot, liken, sarkıt, ray ...). */
+        GECIRGEN,
+        KATI
+    }
+
     @FunctionalInterface
     public interface Hucre {
-        boolean bos(int x, int y, int z);
+        Tur tur(int x, int y, int z);
+    }
+
+    /**
+     * Hücre sınıfı. {@code acikYuzeyY}: sütunun yaprak hariç hareket engelleyen yüzeyi ({@code MOTION_BLOCKING_NO_LEAVES});
+     * onun hizası ve üstü gökyüzünü görür. Gök ışığı yerine yükseklik kullanılır: yaprak ışığı 1 azaltır, taç altı da açıktır.
+     */
+    public static Tur sinifla(boolean yuklu, BlokOzu ozu, int y, int acikYuzeyY) {
+        if (!yuklu) {
+            return Tur.ACIK;
+        }
+        if (ozu == BlokOzu.KATI) {
+            return Tur.KATI;
+        }
+        return y >= acikYuzeyY ? Tur.ACIK : Tur.BOS;
     }
 
     private static final int KAYMA = 1 << 20;
@@ -52,7 +84,7 @@ public final class MagaraDolumu {
         if (maksZiyaret >= KAYMA) {
             throw new IllegalArgumentException("maksZiyaret çok büyük: " + maksZiyaret);
         }
-        if (!hucre.bos(x0, y0, z0)) {
+        if (hucre.tur(x0, y0, z0) != Tur.BOS) {
             return MagaraCebi.BOS;
         }
         PriorityQueue<Long> yigin = new PriorityQueue<>();
@@ -62,6 +94,7 @@ public final class MagaraDolumu {
         yigin.add(tohum);
         gorulen.add(tohum);
         List<Long> kesif = new ArrayList<>();
+        int agiz = Integer.MAX_VALUE;
         while (!yigin.isEmpty() && kesif.size() < maksZiyaret) {
             long k = yigin.poll();
             kesif.add(k);
@@ -79,11 +112,15 @@ public final class MagaraDolumu {
                 if (gorulen.contains(nk) || kati.contains(nk)) {
                     continue;
                 }
-                if (hucre.bos(x0 + nx, y0 + ny, z0 + nz)) {
+                Tur tur = hucre.tur(x0 + nx, y0 + ny, z0 + nz);
+                if (tur == Tur.BOS) {
                     gorulen.add(nk);
                     yigin.add(nk);
                 } else {
                     kati.add(nk);
+                    if (tur == Tur.ACIK) {
+                        agiz = Math.min(agiz, ny);
+                    }
                 }
             }
         }
@@ -100,10 +137,11 @@ public final class MagaraDolumu {
             }
             maxY = Math.max(maxY, y);
         }
-        int ustSinir = maxY + 1;
+        int ustSinir = Math.min(maxY + 1, agiz);
         if (acik) {
             ustSinir = Math.min(ustSinir, dy(yigin.peek()));
         }
+        int agizY = agiz == Integer.MAX_VALUE ? Integer.MAX_VALUE : y0 + agiz;
         // Kat kat dolum: her hücre eklendiği seviyeyle işaretlenir; hacmi aşan kat geri alınmaz, dolum orada durur.
         Map<Long, Integer> eklenme = new HashMap<>();
         ArrayDeque<Long> is = new ArrayDeque<>();
@@ -163,7 +201,7 @@ public final class MagaraDolumu {
             dolMinY = Math.min(dolMinY, y);
         }
         if (hacim == 0) {
-            return new MagaraCebi(new HashMap<>(), 0, 0, 0, kesif.size(), acik);
+            return new MagaraCebi(new HashMap<>(), 0, 0, 0, kesif.size(), acik, agizY);
         }
         Map<Long, int[]> sutunlar = new HashMap<>();
         for (Map.Entry<Long, List<Integer>> e : sutunY.entrySet()) {
@@ -189,6 +227,6 @@ public final class MagaraDolumu {
             }
             sutunlar.put(e.getKey(), dizi);
         }
-        return new MagaraCebi(sutunlar, hacim, dolMinY, y0 + seviye, kesif.size(), acik);
+        return new MagaraCebi(sutunlar, hacim, dolMinY, y0 + seviye, kesif.size(), acik, agizY);
     }
 }

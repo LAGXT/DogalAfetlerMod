@@ -71,6 +71,10 @@ public final class DenizSeviyesiAlani {
     private volatile long sonHesapNs;
     private volatile int sonSutunSayisi;
     private volatile int hesapSayisi;
+    private int degisenOkuma;
+    private final int[] okuZemin = new int[256];
+    private final boolean[] okuSu = new boolean[256];
+    private final int[] okuTaban = new int[256];
 
     public DenizSeviyesiAlani(int maksArtis, int maksMesafe, int tolerans) {
         this.maksArtis = maksArtis;
@@ -90,6 +94,11 @@ public final class DenizSeviyesiAlani {
     /** Tamamlanmış BFS sayısı (log ve test için). */
     public int hesapSayisi() {
         return hesapSayisi;
+    }
+
+    /** İlk okuma ya da verisi değişmiş yeniden okuma sayısı (BFS'i yalnız bunlar tetikler). */
+    public int degisenOkumaSayisi() {
+        return degisenOkuma;
     }
 
     public static long anahtar(int cx, int cz) {
@@ -127,7 +136,10 @@ public final class DenizSeviyesiAlani {
         return sonuc;
     }
 
-    /** Blok değişimi: chunk yeniden okunur; yeni veri gelene kadar eski değerler kullanılır. */
+    /**
+     * Chunk yeniden okunmak üzere sıraya girer (blok değişimi ya da periyodik tazeleme); yeni veri gelene kadar eski
+     * değerler kullanılır. Okunan veri öncekiyle aynıysa BFS yeniden koşmaz, bu yüzden gereksiz çağrı ucuzdur.
+     */
     public void gecersizKil(int cx, int cz) {
         Parca p = parcalar.get(anahtar(cx, cz));
         if (p != null && !p.kuyrukta) {
@@ -153,8 +165,8 @@ public final class DenizSeviyesiAlani {
     }
 
     /**
-     * En çok {@code butce} chunk okur; bir şey değiştiyse ve önceki hesap bitmişse BFS'i başlatır. Okunan chunk sayısını
-     * döner.
+     * En çok {@code butce} chunk okur; verisi değişen chunk varsa ve önceki hesap bitmişse BFS'i başlatır. Okunan chunk
+     * sayısını döner.
      */
     public int isle(SutunOkuyucu okuyucu, int butce) {
         int okunan = 0;
@@ -164,11 +176,19 @@ public final class DenizSeviyesiAlani {
             if (parcalar.get(anahtar(p.cx, p.cz)) != p) {
                 continue;
             }
-            if (okuyucu.oku(p.cx, p.cz, p.zemin, p.su, p.taban)) {
+            if (okuyucu.oku(p.cx, p.cz, okuZemin, okuSu, okuTaban)) {
+                boolean degisti = !p.okundu || !Arrays.equals(okuZemin, p.zemin) || !Arrays.equals(okuSu, p.su)
+                        || !Arrays.equals(okuTaban, p.taban);
+                if (degisti) {
+                    System.arraycopy(okuZemin, 0, p.zemin, 0, 256);
+                    System.arraycopy(okuSu, 0, p.su, 0, 256);
+                    System.arraycopy(okuTaban, 0, p.taban, 0, 256);
+                    degisenOkuma++;
+                    kirli = true;
+                }
                 p.okundu = true;
                 p.kuyrukta = false;
                 okunan++;
-                kirli = true;
             } else {
                 kuyruk.add(p);
             }

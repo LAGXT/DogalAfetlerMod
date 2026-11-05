@@ -166,9 +166,9 @@ public final class SpikeOtomasyon {
             boolean gercekSu = !mc.level.getFluidState(p.blockPosition()).isEmpty()
                     || !mc.level.getFluidState(net.minecraft.core.BlockPos.containing(p.getEyePosition())).isEmpty();
             DogalAfetler.LOGGER.info(
-                    "SPIKE-SU yuzme(istemci) y={} isSprinting={} isSwimming={} poz={} isInWater={} isUnderWater={} batiklikOrani={} gercekSuTemasi={}",
+                    "SPIKE-SU yuzme(istemci) y={} isSprinting={} isSwimming={} poz={} isInWater={} isUnderWater={} sanalBatiklik={} gercekSuTemasi={}",
                     String.format(Locale.ROOT, "%.2f", p.getY()), p.isSprinting(), p.isSwimming(), p.getPose(),
-                    p.isInWater(), p.isUnderWater(), String.format(Locale.ROOT, "%.2f", SanalSu.batiklikOrani(p)),
+                    p.isInWater(), p.isUnderWater(), String.format(Locale.ROOT, "%.2f", SanalSu.sanalBatiklik(p)),
                     gercekSu);
         }
     }

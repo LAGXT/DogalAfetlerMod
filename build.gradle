@@ -149,6 +149,15 @@ tasks.matching { it.name == 'runGameTestServer' }.configureEach {
         if (!ozellikler.exists()) {
             ozellikler.text = ''
         }
+        // Spike sanal su: Forge GameTest sunucusu dünyayı server.properties'ten kurar (varsayılan normal arazi) ve testleri
+        // y=-60'a koyar; normal dünyada testler yer altında kalır, gökyüzü/yükseklik haritası testleri anlamsızlaşır. Düz dünya
+        // (yapısız), eski dünyaya dokunmamak için ayrı klasörde.
+        def anahtarlar = ['level-type=', 'level-name=', 'generator-settings=']
+        def satirlar = ozellikler.readLines().findAll { satir -> !anahtarlar.any { satir.startsWith(it) } }
+        satirlar << 'level-type=minecraft\\:flat' << 'level-name=oyuntesti-duz'
+        satirlar << 'generator-settings={"layers":[{"block":"minecraft:bedrock","height":1},{"block":"minecraft:dirt","height":2},' +
+                '{"block":"minecraft:grass_block","height":1}],"biome":"minecraft:plains","structure_overrides":[]}'
+        ozellikler.text = satirlar.join('\n') + '\n'
     }
 }
 

@@ -45,8 +45,8 @@ class SanalSuDunyasiTest {
     @Test
     void magaraCebindekiVarlikBatiklikOraniVerir() {
         SanalSuDunyasi dunya = new SanalSuDunyasi(duzKiyi());
-        MagaraCebi cep = MagaraDolumu.doldur((x, y, z) -> x >= 0 && x < 5 && z >= 0 && z < 5 && y >= 10 && y < 14,
-                2, 10, 2, 1000, 10_000);
+        MagaraCebi cep = MagaraDolumu.doldur((x, y, z) -> x >= 0 && x < 5 && z >= 0 && z < 5 && y >= 10 && y < 14
+                ? MagaraDolumu.Tur.BOS : MagaraDolumu.Tur.KATI, 2, 10, 2, 1000, 10_000);
         dunya.magaraEkle(cep, new MagaraZamani(0, cep.minY(), cep.ustY(), 1, 1000, 1));
         assertEquals(1.0, dunya.batiklik(2.5, 2.5, 10, 11.8, 500), 1e-9);
         assertEquals(0.0, dunya.batiklik(2.5, 2.5, 14, 15.8, 500), 1e-9);

@@ -2,6 +2,7 @@ package io.github.kadirberkpolat1.dogalafetler.client.su;
 
 import io.github.kadirberkpolat1.dogalafetler.su.Cekilme;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
+import java.util.concurrent.atomic.AtomicLong;
 import net.minecraft.core.BlockPos;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.world.level.BlockAndTintGetter;
@@ -9,7 +10,14 @@ import net.minecraft.world.level.material.FluidState;
 
 /** Çekilme: gerçek suyun üst katmanlarını tesselatörde atlatır (chunk derleme iş parçacıklarında çağrılır). */
 public final class SuGizleme {
+    private static final AtomicLong GIZLENEN = new AtomicLong();
+
     private SuGizleme() {
+    }
+
+    /** Şimdiye kadar tesselatörde atlatılan sıvı bloğu sayısı (kanca çalışıyor mu tanısı). */
+    public static long gizlenenSayisi() {
+        return GIZLENEN.get();
     }
 
     public static boolean gizli(BlockAndTintGetter g, BlockPos pos, FluidState fs) {
@@ -30,6 +38,10 @@ public final class SuGizleme {
             }
             ustteSu++;
         }
-        return ustteSu < k;
+        if (ustteSu < k) {
+            GIZLENEN.incrementAndGet();
+            return true;
+        }
+        return false;
     }
 }

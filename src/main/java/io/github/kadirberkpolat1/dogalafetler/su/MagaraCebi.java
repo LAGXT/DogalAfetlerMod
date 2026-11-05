@@ -17,18 +17,24 @@ public final class MagaraCebi {
     private final int ustY;
     private final int ziyaret;
     private final boolean acik;
+    private final int agizY;
     private final int minX;
     private final int maxX;
     private final int minZ;
     private final int maxZ;
 
     public MagaraCebi(Map<Long, int[]> sutunlar, int hacim, int minY, int ustY, int ziyaret, boolean acik) {
+        this(sutunlar, hacim, minY, ustY, ziyaret, acik, Integer.MAX_VALUE);
+    }
+
+    public MagaraCebi(Map<Long, int[]> sutunlar, int hacim, int minY, int ustY, int ziyaret, boolean acik, int agizY) {
         this.sutunlar = sutunlar;
         this.hacim = hacim;
         this.minY = minY;
         this.ustY = ustY;
         this.ziyaret = ziyaret;
         this.acik = acik;
+        this.agizY = agizY;
         int x0 = Integer.MAX_VALUE;
         int x1 = Integer.MIN_VALUE;
         int z0 = Integer.MAX_VALUE;
@@ -74,6 +80,11 @@ public final class MagaraCebi {
     /** Keşif sınırına takıldı (boşluk daha büyük ya da açık); su seviyesi en alçak sızıntı noktasıyla sınırlandı. */
     public boolean acik() {
         return acik;
+    }
+
+    /** Keşifte değilen en alçak açık hücrenin (mağara ağzı) y'si; su bunun altında kalır. Ağız yoksa {@code MAX_VALUE}. */
+    public int agizY() {
+        return agizY;
     }
 
     public int sutunSayisi() {

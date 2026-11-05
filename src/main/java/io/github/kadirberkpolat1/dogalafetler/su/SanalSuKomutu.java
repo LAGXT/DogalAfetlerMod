@@ -197,19 +197,54 @@ final class SanalSuKomutu {
         return bildir(c, "kiyi " + bx + " " + (deniz + 1) + " " + bz + " yaw=" + yw);
     }
 
-    private static MagaraDolumu.Hucre hucre(ServerLevel l) {
-        BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
-        return (x, y, z) -> {
-            m.set(x, y, z);
-            return l.isLoaded(m) && l.getBlockState(m).isAir() && !l.canSeeSky(m);
-        };
+    private static boolean bos(MagaraDolumu.Hucre h, int x, int y, int z) {
+        return h.tur(x, y, z) == MagaraDolumu.Tur.BOS;
     }
 
-    /** Kapalı bir boşluğu süre bütçesiyle arar (en çok 1,5 sn); bulursa {@link #hazirla} ile hazırlar. */
+    /**
+     * Tsunami suyunun tohumdan dolduracağı cep: ağızlı (ya da keşif sınırına takılan) mağarada eşiğe kadar, kapalı
+     * boşlukta hacmin %60'ı; en çok 4 000 hücre. Su eklemez, bloğa dokunmaz. Boş cep: tohum boş değil ya da eşiğin üstünde.
+     */
+    static MagaraCebi cepHesapla(ServerLevel l, int x, int y, int z) {
+        MagaraDolumu.Hucre h = SanalSu.magaraHucresi(l);
+        MagaraCebi tam = MagaraDolumu.doldur(h, x, y, z, 20_000, 20_000);
+        if (tam.bos()) {
+            return tam;
+        }
+        boolean sinirli = tam.acik() || tam.agizY() != Integer.MAX_VALUE;
+        int hedef = sinirli ? 4000 : Math.min(4000, (int) (tam.hacim() * 0.6));
+        return MagaraDolumu.doldur(h, x, y, z, hedef, 20_000);
+    }
+
+    /**
+     * Cebi {@code d}'ye ekler (dolma 2 blok/sn, {@code bekleme} tick, buharlaşma {@code buhar} blok/tick) ve cebin kutusunu
+     * (+2 blok) hash'ler. Döner: {@code {x0, y0, z0, x1, y1, z1, hash}}.
+     */
+    static long[] magaraBaslat(SanalSuDunyasi d, ServerLevel l, MagaraCebi cep, int bekleme, double buhar) {
+        int x0 = Integer.MAX_VALUE;
+        int x1 = Integer.MIN_VALUE;
+        int z0 = Integer.MAX_VALUE;
+        int z1 = Integer.MIN_VALUE;
+        for (long k : cep.sutunAnahtarlari()) {
+            int x = (int) (k >> 32);
+            int z = (int) k;
+            x0 = Math.min(x0, x);
+            x1 = Math.max(x1, x);
+            z0 = Math.min(z0, z);
+            z1 = Math.max(z1, z);
+        }
+        long[] kutu = {x0 - 2, cep.minY() - 2, z0 - 2, x1 + 2, cep.ustY() + 3, z1 + 2, 0};
+        kutu[6] = SanalSu.bolgeHash(l, (int) kutu[0], (int) kutu[1], (int) kutu[2], (int) kutu[3], (int) kutu[4],
+                (int) kutu[5]);
+        d.magaraEkle(cep, new MagaraZamani(l.getGameTime(), cep.minY(), cep.ustY(), 0.1, bekleme, buhar));
+        return kutu;
+    }
+
+    /** Mağara boşluğunu süre bütçesiyle arar (en çok 1,5 sn); bulursa {@link #hazirla} ile hazırlar. */
     private static int magaraAra(CommandContext<CommandSourceStack> c) throws CommandSyntaxException {
         ServerPlayer p = c.getSource().getPlayerOrException();
         ServerLevel l = p.serverLevel();
-        MagaraDolumu.Hucre h = hucre(l);
+        MagaraDolumu.Hucre h = SanalSu.magaraHucresi(l);
         BlockPos o = p.blockPosition();
         long t0 = System.nanoTime();
         long butce = 1_500_000_000L;
@@ -228,7 +263,7 @@ final class SanalSuKomutu {
                         if (System.nanoTime() - t0 > butce) {
                             return bildir(c, fmt("magara ara: butce doldu deneme=%d acik=%d kucuk=%d", deneme, acik, kucuk));
                         }
-                        if (!h.bos(x, y, z) || h.bos(x, y - 1, z) || !h.bos(x, y + 1, z)) {
+                        if (!bos(h, x, y, z) || bos(h, x, y - 1, z) || !bos(h, x, y + 1, z)) {
                             continue;
                         }
                         deneme++;
@@ -254,18 +289,13 @@ final class SanalSuKomutu {
     private static int hazirla(CommandContext<CommandSourceStack> c, int x, int y, int z) throws CommandSyntaxException {
         ServerPlayer p = c.getSource().getPlayerOrException();
         ServerLevel l = p.serverLevel();
-        MagaraDolumu.Hucre h = hucre(l);
+        MagaraDolumu.Hucre h = SanalSu.magaraHucresi(l);
         long t0 = System.nanoTime();
-        MagaraCebi tam = MagaraDolumu.doldur(h, x, y, z, 20_000, 20_000);
-        if (tam.bos()) {
-            return bildir(c, "magara hazirla: tohum bos degil");
-        }
-        int hedef = tam.acik() ? 4000 : Math.min(4000, (int) (tam.hacim() * 0.6));
-        MagaraCebi cep = MagaraDolumu.doldur(h, x, y, z, hedef, 20_000);
+        MagaraCebi cep = cepHesapla(l, x, y, z);
         double sure = (System.nanoTime() - t0) / 1e6;
         if (cep.bos()) {
-            return bildir(c, fmt("magara hazirla: cep bos (ilk kat hedefi asiyor) tohum=(%d,%d,%d) tam=%d acik=%b hedef=%d sure=%.1fms",
-                    x, y, z, tam.hacim(), tam.acik(), hedef, sure));
+            return bildir(c, fmt("magara hazirla: cep bos (tohum bos degil ya da esigin ustunde) tohum=(%d,%d,%d) tur=%s agizY=%d sure=%.1fms",
+                    x, y, z, h.tur(x, y, z), cep.agizY(), sure));
         }
         int su = cep.ustY();
         int enIyi = -1;
@@ -274,7 +304,7 @@ final class SanalSuKomutu {
         for (long k : cep.sutunAnahtarlari()) {
             int sx = (int) (k >> 32);
             int sz = (int) k;
-            if (!h.bos(sx, su, sz) || !h.bos(sx, su + 1, sz) || !h.bos(sx, su + 2, sz) || !h.bos(sx, su + 3, sz)) {
+            if (!bos(h, sx, su, sz) || !bos(h, sx, su + 1, sz) || !bos(h, sx, su + 2, sz) || !bos(h, sx, su + 3, sz)) {
                 continue;
             }
             int acikKomsu = acikYuzey(cep, h, sx, sz, su, 3);
@@ -292,7 +322,7 @@ final class SanalSuKomutu {
         double yz = 0;
         for (int dx = -6; dx <= 6; dx++) {
             for (int dz = -6; dz <= 6; dz++) {
-                if (cep.icerir(kx + dx, su - 1, kz + dz) && h.bos(kx + dx, su, kz + dz)) {
+                if (cep.icerir(kx + dx, su - 1, kz + dz) && bos(h, kx + dx, su, kz + dz)) {
                     yx += dx;
                     yz += dz;
                 }
@@ -302,8 +332,8 @@ final class SanalSuKomutu {
         double goz = su + 2.6;
         float yw = Math.abs(yx) + Math.abs(yz) < 1e-6 ? 0f : yaw(yx, yz);
         p.teleportTo(l, kx + 0.5, goz - p.getEyeHeight(), kz + 0.5, yw, 70f);
-        return bildir(c, fmt("magara hazirla tohum=(%d,%d,%d) tam=%d acik=%b cep=%d sutun=%d minY=%d ustY=%d kamera=(%d,%.1f,%d) yaw=%.0f pitch=70 acik_yuzey_7x7=%d/49 sure=%.1fms",
-                x, y, z, tam.hacim(), tam.acik(), cep.hacim(), cep.sutunSayisi(), cep.minY(), cep.ustY(), kx, goz, kz, yw,
+        return bildir(c, fmt("magara hazirla tohum=(%d,%d,%d) cep=%d sutun=%d minY=%d ustY=%d agizY=%d acik=%b kamera=(%d,%.1f,%d) yaw=%.0f pitch=70 acik_yuzey_7x7=%d/49 sure=%.1fms",
+                x, y, z, cep.hacim(), cep.sutunSayisi(), cep.minY(), cep.ustY(), cep.agizY(), cep.acik(), kx, goz, kz, yw,
                 enIyi, sure));
     }
 
@@ -312,7 +342,7 @@ final class SanalSuKomutu {
         int n = 0;
         for (int dx = -r; dx <= r; dx++) {
             for (int dz = -r; dz <= r; dz++) {
-                if (cep.icerir(x + dx, su - 1, z + dz) && h.bos(x + dx, su, z + dz)) {
+                if (cep.icerir(x + dx, su - 1, z + dz) && bos(h, x + dx, su, z + dz)) {
                     n++;
                 }
             }
@@ -326,23 +356,7 @@ final class SanalSuKomutu {
             return bildir(c, "magara baslat: hazir cep yok");
         }
         ServerLevel l = c.getSource().getLevel();
-        int x0 = Integer.MAX_VALUE;
-        int x1 = Integer.MIN_VALUE;
-        int z0 = Integer.MAX_VALUE;
-        int z1 = Integer.MIN_VALUE;
-        for (long k : cep.sutunAnahtarlari()) {
-            int x = (int) (k >> 32);
-            int z = (int) k;
-            x0 = Math.min(x0, x);
-            x1 = Math.max(x1, x);
-            z0 = Math.min(z0, z);
-            z1 = Math.max(z1, z);
-        }
-        long[] kutu = {x0 - 2, cep.minY() - 2, z0 - 2, x1 + 2, cep.ustY() + 3, z1 + 2, 0};
-        kutu[6] = SanalSu.bolgeHash(l, (int) kutu[0], (int) kutu[1], (int) kutu[2], (int) kutu[3], (int) kutu[4],
-                (int) kutu[5]);
-        MagaraZamani z = new MagaraZamani(l.getGameTime(), cep.minY(), cep.ustY(), 0.1, bekleme, buhar);
-        SanalSu.SUNUCU.magaraEkle(cep, z);
+        long[] kutu = magaraBaslat(SanalSu.SUNUCU, l, cep, bekleme, buhar);
         SanalSuSunucu.MAGARA_HASH.put(cep, kutu);
         SanalSuSunucu.yayinla(l);
         return bildir(c, fmt("magara baslat hacim=%d hashOnce=%s kutu=[%d,%d,%d..%d,%d,%d] bekleme=%d buhar=%.3f",

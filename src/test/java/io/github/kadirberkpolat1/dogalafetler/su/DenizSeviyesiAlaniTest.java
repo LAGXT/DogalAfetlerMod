@@ -160,4 +160,30 @@ class DenizSeviyesiAlaniTest {
         assertEquals(0, aralik(alan, 12, 0, 4).adet());
         assertFalse(alan.bekleyen() > 0);
     }
+
+    @Test
+    void degismeyenYenidenOkumaHesabiTetiklemez() {
+        int[] karaYuksekligi = {64};
+        var okuyucu = dunya((x, z) -> x < 8 ? 63 : karaYuksekligi[0], (x, z) -> x < 8 ? 1 : 0);
+        DenizSeviyesiAlani alan = new DenizSeviyesiAlani(4, 96, 1);
+        alan.iste(0, 0);
+        alan.iste(1, 0);
+        alan.isle(okuyucu, 10);
+        assertEquals(1, alan.hesapSayisi());
+        assertEquals(2, alan.degisenOkumaSayisi());
+
+        alan.gecersizKil(0, 0);
+        alan.gecersizKil(1, 0);
+        assertEquals(2, alan.isle(okuyucu, 10), "iki chunk yeniden okundu");
+        assertEquals(1, alan.hesapSayisi(), "değişmeyen okuma BFS başlatmaz");
+        assertEquals(2, alan.degisenOkumaSayisi());
+
+        karaYuksekligi[0] = 80;
+        alan.gecersizKil(0, 0);
+        alan.gecersizKil(1, 0);
+        alan.isle(okuyucu, 10);
+        assertEquals(2, alan.hesapSayisi());
+        assertEquals(4, alan.degisenOkumaSayisi());
+        assertEquals(0, aralik(alan, 12, 0, 4).adet());
+    }
 }
