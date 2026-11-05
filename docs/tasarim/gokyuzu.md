@@ -6,7 +6,7 @@ Tek renderer, tek sunucu durumu: `ayVar` (bool) × `gunesEvresi` (`NORMAL`, `BUY
 
 - **Yıldız renkleri:** çıplak gözle yıldızların çoğu beyaz görünür; parlakların bir kısmı belirgin mavi-beyaz (O/B/A türü) ya da turuncu-kırmızı (K/M türü). Parlaklık dağılımı üsteldir: sönükler çok, parlaklar az. Ufka yakın yıldızlar atmosfer yüzünden sönük ve titrektir.
 - **Samanyolu:** karanlık gökyüzünde gökyüzünü boydan boya kesen, ortasında koyu toz şeritleri (Great Rift) olan, merkezine doğru (Yay takımyıldızı) kalınlaşan süt beyazı bant.
-- **Galaksiler:** çıplak gözle Andromeda soluk, uzun bir oval leke; fotoyrafta parlak çekirdek, mavimsi sarmal kollar.
+- **Galaksiler:** çıplak gözle Andromeda soluk, uzun bir oval leke; fotoğrafta parlak çekirdek, mavimsi sarmal kollar.
 - **Emisyon nebulaları ve süpernova kalıntısı:** hidrojen-alfa kırmızı/pembe, oksijen-III mavi-yeşil; Yengeç Nebulası'nda dışta kırmızı-turuncu iplikler, içte mavi-beyaz yaygın ışıma.
 - **Süpernova:** gündüz görülebilen nokta ışık (SN 1006, ~−7,5 kadir).
 - **Kızıl cüce:** ~3000 K, turuncu-kırmızı disk; gökyüzü daha sıcak ve loş tonlu.
@@ -19,7 +19,7 @@ Kaynaklar:
 
 ## 2. Minecraft'ta gösterim
 
-**Kanca.** `RegisterDimensionSpecialEffectsEvent` ile `minecraft:overworld` efekt kimliği için vanilla `OverworldEffects`'i saran bir `DogalAfetGokyuzu` kaydedilir; içindeki vanilla nesneye delege eder. `renderSky` yalnız durum `NORMAL + ayVar` değilse `true` döner ve kendi çizimimizi yapar; normal durumda `false` döner, vanilla ya da başka bir modın gökyüzü aynen kalır (en az çakışma). Sis rengi `ViewportEvent.ComputeFogColor`, gündüz gökyüzü rengi kendi kubbe çizimimizde. Işık motoru, `getSkyDarken`, gün/gece döngüsü ve spawn kurallarına dokunulmaz.
+**Kanca.** `RegisterDimensionSpecialEffectsEvent` ile `minecraft:overworld` efekt kimliği için vanilla `OverworldEffects`'i saran bir `DogalAfetGokyuzu` kaydedilir; içindeki vanilla nesneye delege eder. `renderSky` yalnız durum `NORMAL + ayVar` değilse `true` döner ve kendi çizimimizi yapar; normal durumda `false` döner, vanilla ya da başka bir modun gökyüzü aynen kalır (en az çakışma). Sis rengi `ViewportEvent.ComputeFogColor`, gündüz gökyüzü rengi kendi kubbe çizimimizde. Işık motoru, `getSkyDarken`, gün/gece döngüsü ve spawn kurallarına dokunulmaz.
 
 **Çizim sırası (kendi `renderSky`'imiz).**
 1. Gökyüzü kubbesi: vanilla'daki üst disk + ufuk gün doğumu/batımı yelpazesi, renkleri evre tablosundan.
@@ -31,9 +31,9 @@ Kaynaklar:
 
 **Yıldızlar.** Açılışta tek seferlik `VertexBuffer` (vanilla 1500 yıldız yerine Yüksek'te 6000). Yön: birim kürede düzgün rastgele, %35'i Samanyolu düzlemine ±12° içinde yoğunlaştırılmış. Parlaklık: `m = -ln(U)` ile üstel dağılım, boyut 0,08–0,45 (en parlak %1'i 4 kollu küçük ışın dokusu). Renk: %70 beyaz `#F4F6FF`, %12 mavi-beyaz `#AFC8FF`, %10 sarı `#FFE7B0`, %8 turuncu-kırmızı `#FFB08A`. Titreme: yıldızlar 4 gruba bölünür, her grubun alfası farklı fazlı 1,1–2,3 Hz sinüsle ±%15 değişir (VBO yeniden yazılmaz, grup başına tek uniform renk); ufka yakın 15°'de alfa yarıya iner.
 
-**Samanyolu.** Gökyüzü küresinde 30° eğik bir büyük çember boyunca 64 dilimli şerit, 24° geniş; doku 2048×256 (`tools/assets/` Pillow betiyi: çok ölçekli gürültü + ortada koyu toz damarları + merkez şişkinliği, sarımsı merkez → mavimsi beyaz uçlar). Alfa 0,55.
+**Samanyolu.** Gökyüzü küresinde 30° eğik bir büyük çember boyunca 64 dilimli şerit, 24° geniş; doku 2048×256 (`tools/assets/` Pillow betiği: çok ölçekli gürültü + ortada koyu toz damarları + merkez şişkinliği, sarımsı merkez → mavimsi beyaz uçlar). Alfa 0,55.
 
-**Galaksiler.** 2 sprite: eğik sarmal (Andromeda benzeri, 256², 9° açısal boyut) ve küçük karşıdan sarmal (128², 4°); prosedurel: logaritmik sarmal kollar + sarı çekirdek + mavi kol düğümleri.
+**Galaksiler.** 2 sprite: eğik sarmal (Andromeda benzeri, 256², 9° açısal boyut) ve küçük karşıdan sarmal (128², 4°); prosedürel: logaritmik sarmal kollar + sarı çekirdek + mavi kol düğümleri.
 
 **Nebulalar.** Gece nebula seti (aysız normal gecede): 3 emisyon nebulası (kırmızı-pembe Orion benzeri 6°, mavi-yeşil 4°, karışık 5°). Süpernova kalıntısı (yalnız güneş yokken): eski güneşin yörünge yerinde, 40° açısal boyut, 1024² doku; dışta kırmızı-turuncu iplik ağı (yönlü gürültüden ince çizgiler), içte mavi-beyaz yaygın ışıma, ortada soluk mavi pulsar noktası (0,5 Hz hafif yanıp sönme). Kalıntı çok yavaş genişler (günde %1, tavan %130) — zaman geçtiği hissedilir.
 

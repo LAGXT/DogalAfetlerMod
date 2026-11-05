@@ -5,7 +5,7 @@
 - **Yüzey kırığı.** 6 Şubat 2023 Kahramanmaraş depremlerinde (Mw 7,8 ve 7,5) yüzey kırığı toplam ~460 km boyunca izlendi; sol yanal doğrultu atımlı fayın tipik izleri: **kademeli (en échelon) çatlaklar** — ana hatta çapraz, birbirine paralel, kısa yarıklar; **basmış sırtlar (mole track)** — fay üzerinde kabarmış, parçalanmış toprak şeridi; **ayrılma havzaları (pull-apart)** — fayın sıçradığı yerde çökmüş çukurlar; yolları, çitleri, ağaç sıralarını metrelerce yana kaydıran atım; yer yer dikey **fay basamağı (scarp)**.
 - Kırık bir noktadan başlayıp fay boyunca saniyede kilometrelerce **ilerler**; yarık bir anda değil, bir yöne yayılarak açılır.
 - **Ses:** büyük depremlerden önce/sırasında derin bir gürleme ve güm sesi duyulur; P dalgası sarsıntıdan kısa süre önce gelir, çoğu enerji insan duyma sınırının altındadır.
-- **Hasar deseni:** ahşap çatılar, bacalar, gevşek dış kaplamalar ve ağaç dalları önce düşer; yamalarda heyelan, su kenarlarında sıvılaşma (kum kaynaması); sarsıntı sonrası havada aslı toz bulutu.
+- **Hasar deseni:** ahşap çatılar, bacalar, gevşek dış kaplamalar ve ağaç dalları önce düşer; yamalarda heyelan, su kenarlarında sıvılaşma (kum kaynaması); sarsıntı sonrası havada asılı toz bulutu.
 
 Kaynaklar:
 - https://www.usgs.gov/media/images/preliminary-observations-surface-rupture-2023-turkey-earthquake-sequence

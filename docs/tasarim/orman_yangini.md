@@ -4,7 +4,7 @@ Yangın mantığı ortak `yangin` yöneticisindedir (meteor ateşleri de aynı s
 
 ## 1. Gerçek olay
 
-- **Yangın türleri:** yüzey yangını (çimen, çalı, ölü örtü; alçak, hızlı ilerleyen alev şeridi), **taaç (crown) yangını** (alevler ağaç tepelerine sıçrar, tepeden tepeye koşar; en yüksek ve en görünür alevler), **kıvılcım sıçraması (spotting)**: yanan parçalar rüzgârla cephenin önüne taşınıp yeni odağlar açar.
+- **Yangın türleri:** yüzey yangını (çimen, çalı, ölü örtü; alçak, hızlı ilerleyen alev şeridi), **taç (crown) yangını** (alevler ağaç tepelerine sıçrar, tepeden tepeye koşar; en yüksek ve en görünür alevler), **kıvılcım sıçraması (spotting)**: yanan parçalar rüzgârla cephenin önüne taşınıp yeni odaklar açar.
 - **Cephe biçimi:** rüzgâr yönünde uzamış elips; baş (head) hızlı ve yoğun, kanatlar yavaş, sırt (heel) zayıf.
 - **Duman sütunu:** duraysal olmayan havada dikey yükselen sütun; tepesinde beyaz, karnabahar biçimli **pirokümülüs** bulutu (yoğuşma). Duraysal havada duman yatay yayılır ve vadilerde birikir. Duman rüzgâr altında güneşi turuncuya boyar.
 - **Sonrası:** siyah kül, kömürleşmiş düz gövdeler, beyaz kül lekeleri, saatlerce tüten kütükler.
@@ -20,22 +20,22 @@ Kaynaklar:
 
 **Alev katmanları (istemci, yanan hücre başına).**
 1. Vanilla ateş bloğu.
-2. **Büyük alev dilleri:** yaprak ve kütük yanarken hücre üstünde 1,5–3 blok yüksekliğinde, 8 karelik animasyonlu alev sprite'ı (kendi dokumuz, turuncu-sarı çekirdek, kızıl uç, additive karışım); taaç yangınında ağacın üstünde birleşik 4–6 blokluk alev perdesi. Alevler rüzgâr yönüne 15–30° yatık.
-3. **Kıvılcımlar:** yukarı sarmal çizerek yükselen parlak turuncu noktalar (`LAVA` benzeri ama küçük, 2–4 sn ömür); rüzgâr altı yönde 3–12 blok uzağa taşınan "ateş kırıntıları" (spotting) — bunların bir kısmı sunucuda gerçek yeni odağ olur, istemci aynı yörüngeyi çizer.
+2. **Büyük alev dilleri:** yaprak ve kütük yanarken hücre üstünde 1,5–3 blok yüksekliğinde, 8 karelik animasyonlu alev sprite'ı (kendi dokumuz, turuncu-sarı çekirdek, kızıl uç, additive karışım); taç yangınında ağacın üstünde birleşik 4–6 blokluk alev perdesi. Alevler rüzgâr yönüne 15–30° yatık.
+3. **Kıvılcımlar:** yukarı sarmal çizerek yükselen parlak turuncu noktalar (`LAVA` benzeri ama küçük, 2–4 sn ömür); rüzgâr altı yönde 3–12 blok uzağa taşınan "ateş kırıntıları" (spotting) — bunların bir kısmı sunucuda gerçek yeni odak olur, istemci aynı yörüngeyi çizer.
 4. **Duman:** hücre başına `CAMPFIRE_SIGNAL_SMOKE` benzeri koyu gri duman, yangın kenarında daha açık (taze yanma), merkezde koyu.
 5. **Duman sütunu + pirokümülüs (afet başına tek):** yangın alanının ağırlık merkezinde, 40–90 blok yükselen, tepeye doğru genişleyen sütun (büyük yarı saydam duman sprite'ları yığını, alttan turuncu aydınlatılmış); tepesinde beyaz, karnabahar biçimli bulut kapağı (S3+). Sütun rüzgâr yönüne 10° eğilir; kilometrelerce uzaktan yangının yerini gösterir.
 
 **Ortam.** Yangına 48 blok içinde sis rengi turuncu-kahverengi (`#7A5236`), görüş %55; güneş diski turuncuya boyanır (gokyuzu renderer'ına "duman örtüsü" parametresi). 24 blok içinde ekranda hafif ısı dalgalanması (şader yok: kamera yaw/pitch'ine 0,05°'lik 3 Hz sinus + alt kenarda yukarı kayan yarı saydam ısı dokusu). Ortam sıcaklığı yanan hücre sayısı ve uzaklıkla artar (madde 7).
 
-**Afet koreografisi.** Başlangıç: hedef oyuncunun 40–90 blok uzağında orman/çayır biyomunda bir yazım alanı (S'ye göre yarıçap). Rüzgâr yönü afet başında seçilir ve tüm afet boyunca sabit kalır (±20° sapma); yayılma olasılığı rüzgâr yönünde ×2,5, karşı yönde ×0,3 → elips cephe kendiliğinden oluşur. Yağmur yağınca yayılma durur, hücreler 10–30 sn içinde söner (yoğun buhar + `block.fire.extinguish`).
+**Afet koreografisi.** Başlangıç: hedef oyuncunun 40–90 blok uzağında orman/çayır biyomunda bir başlangıç alanı (S'ye göre yarıçap). Rüzgâr yönü afet başında seçilir ve tüm afet boyunca sabit kalır (±20° sapma); yayılma olasılığı rüzgâr yönünde ×2,5, karşı yönde ×0,3 → elips cephe kendiliğinden oluşur. Yağmur yağınca yayılma durur, hücreler 10–30 sn içinde söner (yoğun buhar + `block.fire.extinguish`).
 
-**Afet sonrası iz.** Yanan kütüklerın %30'u yok olur, kalanları vanilla "soyulmuş koyu meşe"/"soyulmuş mangrov" gibi en koyu soyulmuş kütüğe (kömürleşme görünümü) döner; çimen → kaba toprak, çiçek/çimen kaybolur; yer yer kül izi için `ASH` ve `WHITE_ASH` parçacıkları 3 dk boyunca süzülür; 60 sn boyunca bazı kütüklerden tüten ince duman. Yanmış alan uzaktan kahverengi-siyah bir yara olarak okunur.
+**Afet sonrası iz.** Yanan kütüklerin %30'u yok olur, kalanları vanilla "soyulmuş koyu meşe"/"soyulmuş mangrov" gibi en koyu soyulmuş kütüğe (kömürleşme görünümü) döner; çimen → kaba toprak, çiçek/çimen kaybolur; yer yer kül izi için `ASH` ve `WHITE_ASH` parçacıkları 3 dk boyunca süzülür; 60 sn boyunca bazı kütüklerden tüten ince duman. Yanmış alan uzaktan kahverengi-siyah bir yara olarak okunur.
 
-**Seviye 1 ile 5 farkı.** S1: birkaç ağaç ve çimenlikte yerel, alçak alevli yüzey yangını, ince gri duman. S5: 24 blok yarıçapla başlayan, rüzgâr altı yönde 12 blok kıvılcım sıçratan taaç yangını; ağaç tepelerinde birleşik alev perdeleri, 90 blok yükselen duman sütunu ve tepesinde beyaz pirokümülüs, turuncuya boyanmış gökyüzü.
+**Seviye 1 ile 5 farkı.** S1: birkaç ağaç ve çimenlikte yerel, alçak alevli yüzey yangını, ince gri duman. S5: 24 blok yarıçapla başlayan, rüzgâr altı yönde 12 blok kıvılcım sıçratan taç yangını; ağaç tepelerinde birleşik alev perdeleri, 90 blok yükselen duman sütunu ve tepesinde beyaz pirokümülüs, turuncuya boyanmış gökyüzü.
 
 ## 3. Vitrin anı
 
-**Taaç yangınının bir tepeden diğerine sıçradığı 8 saniye, alacakaranlıkta.** Kamera yangın cephesinin rüzgâr üstü yanında, bir tepede, 30–50 blok uzakta, cepheyi yandan görerek (pitch −5°). Görüntüde: ön planda kararmış gövdeler ve kül, ortada ağaç tepelerinde yatık turuncu alev perdeleri, havada rüzgârla taşınan kıvılcım yayları, sağda yeni tutuşan bir ağaç, arka planda alttan turuncu aydınlanmış dev duman sütunu ve tepesinde beyaz pirokümülüs; gökyüzü kahverengi-turuncu. Gece çekimi alevlerin ışığını (vanilla ateş ışığı 15) en iyi gösterir.
+**Taç yangınının bir tepeden diğerine sıçradığı 8 saniye, alacakaranlıkta.** Kamera yangın cephesinin rüzgâr üstü yanında, bir tepede, 30–50 blok uzakta, cepheyi yandan görerek (pitch −5°). Görüntüde: ön planda kararmış gövdeler ve kül, ortada ağaç tepelerinde yatık turuncu alev perdeleri, havada rüzgârla taşınan kıvılcım yayları, sağda yeni tutuşan bir ağaç, arka planda alttan turuncu aydınlanmış dev duman sütunu ve tepesinde beyaz pirokümülüs; gökyüzü kahverengi-turuncu. Gece çekimi alevlerin ışığını (vanilla ateş ışığı 15) en iyi gösterir.
 
 ## 4. Ses tasarımı
 
@@ -60,7 +60,7 @@ Kaynaklar:
 
 ## 6. Açık noktalar — önerilen varsayılanlar
 
-| Seviye | Başlangıç yarıçapı | Yayılma çarpanı | Süre | Kıvılcım sıçraması | Taaç yangını | Ortam sıcaklığı artışı (merkez) |
+| Seviye | Başlangıç yarıçapı | Yayılma çarpanı | Süre | Kıvılcım sıçraması | Taç yangını | Ortam sıcaklığı artışı (merkez) |
 |---|---|---|---|---|---|---|
 | 1 | 3 | ×0,5 | 2 dk | yok | yok | +4 birim |
 | 2 | 6 | ×0,75 | 3 dk | 3 blok | yok | +6 |

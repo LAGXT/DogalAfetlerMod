@@ -21,7 +21,7 @@ Kaynaklar:
 | −10–0 sn | Siren | — |
 | 0–4 sn | **Titreme ve çatlama** | Merkezden dışa 3 eş merkezli halka (r = 0,35R, 0,7R, 1,05R) üzerinde çatlak örtüsü (`destroyBlockProgress` aşama 0→6), halkaları radyal çatlaklar birleştirir; hafif kamera titremesi; çimen üzerinde toz fışkırması |
 | 4–7 sn | **Sarkma** | Merkez çapın %40'ı 1 blok oturur (üst blok bir altına taşınır), ağaçlar ve çit direkleri merkeze doğru 10–20° eğilir (`BlockDisplay` benzeri eğik görsel kopya, aşağıda), su varsa merkezde çıkar |
-| 7–10 sn | **Çekirdek çöküşü** | İç halka (r < 0,5R) tek parça hâlinde düşer: sütunlar 0,6 sn içinde aşağı kayan blok blokları olarak görünür, üstündeki ağaç, çit, hayvan, oyuncuyla birlikte; boşluğtan yukarı toz patlaması |
+| 7–10 sn | **Çekirdek çöküşü** | İç halka (r < 0,5R) tek parça hâlinde düşer: sütunlar 0,6 sn içinde aşağı kayan blok kütleleri olarak görünür, üstündeki ağaç, çit, hayvan, oyuncuyla birlikte; boşluktan yukarı toz patlaması |
 | 10–16 sn | **Basamaklı geri çekilme** | Dış halkalar sırayla (0,7R sonra R) 1,5 sn arayla köşelenir: halkanın üst katmanı içe devrilir, çukura kayan bloklar dibe yığılır; her halka bir basamak bırakır |
 | 16–30 sn | **Durulma** | Kenarlardan tek tek düşen bloklar ve çakıl sızması, dipten yükselen toz, kenarda asılı kalan çimen saçakları (kökleri olan çimen blokları bilerek 1 blok içe taşan bırakılır) |
 
@@ -39,7 +39,7 @@ Kaynaklar:
 
 ## 3. Vitrin anı
 
-**Çekirdek çöküşü ve ilk halka (8 saniye).** Kamera çukurun dış kenarından 6–10 blok geride, Y+10'da, merkeze 35–45° aşağı bakar. Görüntüde: çukurun tam ortası tek parça hâlinde aşağı kayıyor, üstündeki ağaç dik hâlde birlikte iniyor, bir inek havada, dış halka içe devrilmeye başlamış; ön planda zeminde kameraya kadar uzanan eş merkezli çatlaklar; boşluğtan yukarı toprak renginde toz patlıyor. Küçük resim için: tam yukarıdan (pitch −80°) çekilmiş ikinci kare — kusursuz dairesel karanlık çukur, çevresinde çatlak halkaları.
+**Çekirdek çöküşü ve ilk halka (8 saniye).** Kamera çukurun dış kenarından 6–10 blok geride, Y+10'da, merkeze 35–45° aşağı bakar. Görüntüde: çukurun tam ortası tek parça hâlinde aşağı kayıyor, üstündeki ağaç dik hâlde birlikte iniyor, bir inek havada, dış halka içe devrilmeye başlamış; ön planda zeminde kameraya kadar uzanan eş merkezli çatlaklar; boşluktan yukarı toprak renginde toz patlıyor. Küçük resim için: tam yukarıdan (pitch −80°) çekilmiş ikinci kare — kusursuz dairesel karanlık çukur, çevresinde çatlak halkaları.
 
 ## 4. Ses tasarımı
 

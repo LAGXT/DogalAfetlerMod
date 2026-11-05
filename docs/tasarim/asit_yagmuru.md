@@ -3,8 +3,8 @@
 ## 1. Gerçek olay
 
 - Asit yağmuru (kükürt ve azot oksitlerinden oluşan sülfürik/nitrik asit) görsel olarak normal yağmurdan ayırt edilemez; izleri **etkilerinde** görülür. Oyunda okunabilirlik için rengi abartıyoruz (şartname: yeşilimsi/sarımsı).
-- **Taş üzerinde (USGS):** mermer ve kireçtaşında kalsit çözünür; açıkta kalan yüzeyler **pürüzlenir, keskin kenarlar ve oymalar yuvarlanır**, malzeme kaybolur. Yağmur görmeyen korunaklı yüzeylerde **kara alçıtaşı kabuğu** (gypsum) oluşur, kabarcuk yapıp dökülür, altında ufalanan taş kalır.
-- **Bitki örtüsü (USGS, EPA):** iğne yapraklı ağaçlar iğnelerini kaybeder; Kara Orman'da yeşil iğneler dökülüp yalnız kara gövde ve dallar kalmıştır. Toprağa alüminyum salınır, bitkiler sararar.
+- **Taş üzerinde (USGS):** mermer ve kireçtaşında kalsit çözünür; açıkta kalan yüzeyler **pürüzlenir, keskin kenarlar ve oymalar yuvarlanır**, malzeme kaybolur. Yağmur görmeyen korunaklı yüzeylerde **kara alçıtaşı kabuğu** (gypsum) oluşur, kabarcık yapıp dökülür, altında ufalanan taş kalır.
+- **Bitki örtüsü (USGS, EPA):** iğne yapraklı ağaçlar iğnelerini kaybeder; Kara Orman'da yeşil iğneler dökülüp yalnız kara gövde ve dallar kalmıştır. Toprağa alüminyum salınır, bitkiler sararır.
 - **Metal:** bakır ve bronzda hızlanan yeşil patina.
 
 Kaynaklar:
@@ -45,7 +45,7 @@ Cam asit dayanıklıdır; bu, "çatı altında korun" fikrini cam serayla da mü
 
 ## 3. Vitrin anı
 
-**Bir ormanın yapraklarını kaybettiği 8 saniye.** Kamera orman kenarında, cam bir sera ya da taş sundurmanın altında (çerçeve için), dışa ve hafif yukarı bakar (pitch −8°). Görüntüde: sarı-yeşil sis ve eğik sarımsı yağmur çizgileri, ağaçların tepesinden yükselen beyaz cızlama dumanları, çatlak örtüsü taşıyan ve tek tek kaybolan yapraklar, ön planda kaba toprağa dönen çimen ve ölü çalılar, camın üstünde süzsülen yeşil damlalar. Küçük resim için: yarısı yeşil, yarısı kara gövdeye dönmüş orman, üstünde zeytin rengi bulut tavanı.
+**Bir ormanın yapraklarını kaybettiği 8 saniye.** Kamera orman kenarında, cam bir sera ya da taş sundurmanın altında (çerçeve için), dışa ve hafif yukarı bakar (pitch −8°). Görüntüde: sarı-yeşil sis ve eğik sarımsı yağmur çizgileri, ağaçların tepesinden yükselen beyaz cızlama dumanları, çatlak örtüsü taşıyan ve tek tek kaybolan yapraklar, ön planda kaba toprağa dönen çimen ve ölü çalılar, camın üstünde süzülen yeşil damlalar. Küçük resim için: yarısı yeşil, yarısı kara gövdeye dönmüş orman, üstünde zeytin rengi bulut tavanı.
 
 ## 4. Ses tasarımı
 
