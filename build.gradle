@@ -130,12 +130,24 @@ tasks.matching { it.name == 'runServer' }.configureEach {
 
 tasks.matching { it.name == 'runGameTestServer' }.configureEach {
     doFirst {
-        // GameTest sunucusu server.properties'i okumaya çalışır; yoksa log'a zararsız ama yanıltıcı bir ERROR düşer.
+        // Forge'un GameTest sunucusu dünyayı server.properties'ten kurar (yoksa log'a yanıltıcı bir ERROR düşer). Normal
+        // arazi testlerin sahnesini örter (K0-31): yapısız düz dünya, eski dünyaya dokunmamak için ayrı klasörde. Yönetilen
+        // anahtarlar her koşuda yeniden yazılır; dosyadaki diğer satırlar korunur. Oyun kuralları kural.OyunTestiDunyasi'nda.
         def ozellikler = project.file('run-gametest/server.properties')
         ozellikler.parentFile.mkdirs()
-        if (!ozellikler.exists()) {
-            ozellikler.text = ''
-        }
+        def yonetilen = [
+                'level-type'        : 'flat',
+                'level-name'        : 'oyuntesti-duz',
+                'generate-structures': 'false',
+                'generator-settings': '{"layers":[{"block":"minecraft:bedrock","height":1},' +
+                        '{"block":"minecraft:dirt","height":2},{"block":"minecraft:grass_block","height":1}],' +
+                        '"biome":"minecraft:plains","structure_overrides":[]}',
+        ]
+        def eski = ozellikler.exists() ? ozellikler.readLines() : []
+        def satirlar = eski.findAll { satir -> !yonetilen.keySet().any { satir.startsWith(it + '=') } }
+        yonetilen.each { anahtar, deger -> satirlar << "${anahtar}=${deger}".toString() }
+        ozellikler.text = satirlar.join('\n') + '\n'
+        yonetilen.each { anahtar, deger -> logger.lifecycle("run-gametest/server.properties: ${anahtar}=${deger}") }
     }
 }
 
