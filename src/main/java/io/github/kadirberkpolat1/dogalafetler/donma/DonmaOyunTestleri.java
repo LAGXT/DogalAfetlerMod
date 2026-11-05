@@ -88,12 +88,12 @@ public final class DonmaOyunTestleri {
         y.assertTrue(f.isEmpty(), ne + ": " + f.size() + " blok farklı, ilki " + (f.isEmpty() ? "" : f.get(0)));
     }
 
-    private static int isle(GameTestHelper y, int seviye) {
+    private static int isle(GameTestHelper y, int onceki, int seviye) {
         BlockPos a = y.absolutePos(BlockPos.ZERO);
         BlockPos b = y.absolutePos(new BlockPos(EN - 1, 0, EN - 1));
         int ustY = y.absolutePos(p(0, BOY - 1, 0)).getY();
         return DonmaIsleyici.bolgeyiIsle(y.getLevel(), Math.min(a.getX(), b.getX()), Math.min(a.getZ(), b.getZ()),
-                Math.max(a.getX(), b.getX()), Math.max(a.getZ(), b.getZ()), ustY, seviye);
+                Math.max(a.getX(), b.getX()), Math.max(a.getZ(), b.getZ()), ustY, onceki, seviye);
     }
 
     /** Hata mesajı için sütunun göreli y=0..5 blokları ve MOTION_BLOCKING yüksekliği. */
@@ -120,7 +120,7 @@ public final class DonmaOyunTestleri {
         sahneKur(y);
         BlockState[] baslangic = anlik(y);
 
-        int donan = isle(y, 100);
+        int donan = isle(y, 0, 100);
         y.assertTrue(donan > 0, "dondur(100) hiç blok değiştirmedi; " + genelTani(y));
         y.assertTrue(y.getBlockState(p(4, 3, 4)).is(Blocks.ICE), "göl yüzeyi buz olmalı; " + sutunTani(y, 4, 4)
                 + " | " + sutunTani(y, 2, 4));
@@ -140,11 +140,11 @@ public final class DonmaOyunTestleri {
                 && !y.getBlockState(p(0, 3, 8)).getValue(SnowyDirtBlock.SNOWY), "bitkili zemine dokunulmamalı");
         BlockState[] donuk = anlik(y);
 
-        isle(y, 30);
-        isle(y, 100);
+        isle(y, 100, 30);
+        isle(y, 30, 100);
         ayniMi(y, donuk, "100 → 30 → 100 doğrudan 100 ile aynı olmalı");
 
-        int cozulen = isle(y, 0);
+        int cozulen = isle(y, 100, 0);
         y.assertTrue(cozulen > 0, "çöz(0) hiç blok değiştirmedi");
         ayniMi(y, baslangic, "dondur(100) → çöz(0) başlangıcı vermeli");
         y.runAfterDelay(20, () -> {
@@ -158,15 +158,47 @@ public final class DonmaOyunTestleri {
         sahneKur(y);
         BlockState[] baslangic = anlik(y);
         for (int seviye = 5; seviye <= 60; seviye += 5) {
-            isle(y, seviye);
+            isle(y, seviye - 5, seviye);
         }
         y.assertTrue(y.getBlockState(p(2, 3, 4)).is(Blocks.ICE), "60'ta kıyı sütunu donmuş olmalı; " + sutunTani(y, 2, 4));
         y.assertTrue(y.getBlockState(p(1, 4, 1)).is(Blocks.SNOW), "60'ta çimende kar olmalı");
         for (int seviye = 55; seviye >= 0; seviye -= 5) {
-            isle(y, seviye);
+            isle(y, seviye + 5, seviye);
         }
         ayniMi(y, baslangic, "5'lik adımlarla 60'a çıkıp 0'a inmek başlangıcı vermeli");
         y.succeed();
+    }
+
+    /** Soğuk biyom benzeri sahne: gölün üstü doğal buz, çimende doğal kar. Donma başlarken ve taban %40'a çözülürken kalırlar. */
+    @GameTest(template = "donma_alan")
+    public static void donmaBaslarkenDogalKarVeBuzKorunur(GameTestHelper y) {
+        sahneKur(y);
+        for (int x = 2; x <= 6; x++) {
+            for (int z = 2; z <= 6; z++) {
+                y.setBlock(p(x, 3, z), Blocks.ICE);
+            }
+        }
+        y.setBlock(p(1, 4, 1), Blocks.SNOW);
+        int onceki = 0;
+        for (int seviye = 5; seviye <= 20; seviye += 5) {
+            isle(y, onceki, seviye);
+            onceki = seviye;
+        }
+        dogalKorundu(y, "donma başında 0 → 20");
+        isle(y, 20, 100);
+        isle(y, 100, 40);
+        dogalKorundu(y, "100 → 40 çözülmesinde");
+        y.succeed();
+    }
+
+    private static void dogalKorundu(GameTestHelper y, String ne) {
+        for (int x = 2; x <= 6; x++) {
+            for (int z = 2; z <= 6; z++) {
+                y.assertTrue(y.getBlockState(p(x, 3, z)).is(Blocks.ICE), ne + ": doğal göl buzu eridi; " + sutunTani(y, x, z));
+            }
+        }
+        y.assertTrue(y.getBlockState(p(1, 4, 1)).is(Blocks.SNOW), ne + ": doğal kar kalktı; " + sutunTani(y, 1, 1));
+        y.assertTrue(y.getBlockState(p(1, 3, 1)).getValue(SnowyDirtBlock.SNOWY), ne + ": karlı çimen karasız kaldı");
     }
 
     @GameTest(template = "donma_alan")
@@ -179,7 +211,7 @@ public final class DonmaOyunTestleri {
         int degisen;
         try {
             kural.set(false, level.getServer());
-            degisen = isle(y, 100);
+            degisen = isle(y, 0, 100);
         } finally {
             kural.set(eski, level.getServer());
         }

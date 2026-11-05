@@ -74,6 +74,31 @@ public final class DonusumTablosu<T> {
         return s;
     }
 
+    /** Kökten {@code blok}'a kadar zincirdeki adım sayısı (kök 0). */
+    public int adim(T blok) {
+        int n = 0;
+        T k = blok;
+        Donusum<T> d;
+        while ((d = hedeften.get(k)) != null) {
+            k = d.kaynak();
+            n++;
+        }
+        return n;
+    }
+
+    /**
+     * Yönlü durum: donarken ({@code yon > 0}) zincirde yalnız ileri, çözülürken ({@code yon < 0}) yalnız geri gidilir;
+     * {@code yon == 0} dokunmaz. Böylece donma başlarken doğal hedef bloklar (ör. soğuk biyomun buzu) eritilmez.
+     */
+    public T durum(T mevcut, int seviye, int yon) {
+        if (yon == 0) {
+            return mevcut;
+        }
+        T istenen = durum(mevcut, seviye);
+        int fark = adim(istenen) - adim(mevcut);
+        return (yon > 0 ? fark > 0 : fark < 0) ? istenen : mevcut;
+    }
+
     public Collection<Donusum<T>> donusumler() {
         return Collections.unmodifiableCollection(kaynaktan.values());
     }

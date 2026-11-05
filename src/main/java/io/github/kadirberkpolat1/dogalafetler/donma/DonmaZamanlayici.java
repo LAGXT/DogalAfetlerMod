@@ -143,10 +143,12 @@ public final class DonmaZamanlayici {
         }
     }
 
-    /** Global ilerleme ya da dönem değişti: bütün yüklü chunk'lar yeniden hedefe bakılır. */
+    /**
+     * Global ilerleme ya da dönem değişti: bütün yüklü chunk'lar yeniden hedefe bakılır. Süren adımlar bitirilir; yarım
+     * bırakılan adımda chunk seviyesi eski kalır ve dokunulmuş sütunlar, hedef eski seviyeye eşitse ileride kalırdı.
+     */
     static void hepsiniKuyrugaAl() {
         BEKLEYEN.addAll(YUKLU);
-        ISLER.clear();
         siraKirli = true;
     }
 
@@ -293,7 +295,7 @@ public final class DonmaZamanlayici {
             while (is.sutun < 256 && kalan > 0 && ((is.sutun & 15) != 0 || System.nanoTime() < sinir)) {
                 int i = SUTUN_SIRASI[is.sutun++];
                 int degisen = DonmaIsleyici.sutunuIsle(level, chunk, minX + (i & 15), minZ + (i >> 4),
-                        DonmaIsleyici.SINIRSIZ, is.bitis, is.cozulme, is.kiyi[i], tablo, e, konum);
+                        DonmaIsleyici.SINIRSIZ, is.baslangic, is.bitis, is.cozulme, is.kiyi[i], tablo, e, konum);
                 is.degisen += degisen;
                 kalan -= 1 + degisen * DonmaAyarlari.BLOK_MALIYETI;
                 bakilan++;

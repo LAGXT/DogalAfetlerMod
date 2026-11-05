@@ -39,4 +39,13 @@ class DonmaHedefiTest {
         assertEquals(40, DonmaHedefi.siradakiSeviye(42, 40, 5));
         assertEquals(60, DonmaHedefi.siradakiSeviye(60, 60, 5));
     }
+
+    @Test
+    void yonluDegerDonarkenAzalmazCozulurkenArtmaz() {
+        assertEquals(3, DonmaHedefi.yonlu(1, 3, 1));
+        assertEquals(3, DonmaHedefi.yonlu(3, 1, 1));
+        assertEquals(1, DonmaHedefi.yonlu(3, 1, -1));
+        assertEquals(1, DonmaHedefi.yonlu(1, 3, -1));
+        assertEquals(2, DonmaHedefi.yonlu(2, 5, 0));
+    }
 }

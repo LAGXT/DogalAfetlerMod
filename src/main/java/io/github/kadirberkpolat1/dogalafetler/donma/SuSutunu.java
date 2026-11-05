@@ -20,7 +20,29 @@ public final class SuSutunu {
     }
 
     public static Tur[] planla(Tur[] sutun, int kalinlik) {
-        Tur[] sonuc = sutun.clone();
+        int n = parca(sutun);
+        return n < 0 ? sutun.clone() : doldur(sutun, n, kalinlik);
+    }
+
+    /**
+     * Yönlü plan: donarken ({@code yon > 0}) buz yalnız kalınlaşır, çözülürken ({@code yon < 0}) yalnız incelir,
+     * {@code yon == 0} dokunmaz. Donma başlarken doğal buz (donmuş nehir, okyanus) eritilmez.
+     */
+    public static Tur[] planla(Tur[] sutun, int kalinlik, int yon) {
+        int n = parca(sutun);
+        if (n < 0 || yon == 0) {
+            return sutun.clone();
+        }
+        int mevcut = 0;
+        while (mevcut < n && sutun[mevcut] == Tur.BUZ) {
+            mevcut++;
+        }
+        int hedef = Math.max(0, Math.min(kalinlik, n - 1));
+        return doldur(sutun, n, yon > 0 ? Math.max(hedef, mevcut) : Math.min(hedef, mevcut));
+    }
+
+    /** Üstteki su/buz parçasının uzunluğu; parça kurallara uymuyorsa -1. */
+    private static int parca(Tur[] sutun) {
         int n = 0;
         boolean suVar = false;
         while (n < sutun.length && sutun[n] != Tur.DIGER) {
@@ -30,11 +52,16 @@ public final class SuSutunu {
             n++;
         }
         if (n < 2 || !suVar) {
-            return sonuc;
+            return -1;
         }
         if (n < sutun.length && sutun[n - 1] != Tur.SU) {
-            return sonuc;
+            return -1;
         }
+        return n;
+    }
+
+    private static Tur[] doldur(Tur[] sutun, int n, int kalinlik) {
+        Tur[] sonuc = sutun.clone();
         int buz = Math.max(0, Math.min(kalinlik, n - 1));
         for (int d = 0; d < n; d++) {
             sonuc[d] = d < buz ? Tur.BUZ : Tur.SU;

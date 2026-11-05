@@ -33,4 +33,15 @@ public final class DonmaHedefi {
         }
         return mevcut;
     }
+
+    /** Yönlü değer: donarken ({@code yon > 0}) azalmaz, çözülürken ({@code yon < 0}) artmaz, {@code yon == 0} değişmez. */
+    public static int yonlu(int mevcut, int istenen, int yon) {
+        if (yon > 0) {
+            return Math.max(mevcut, istenen);
+        }
+        if (yon < 0) {
+            return Math.min(mevcut, istenen);
+        }
+        return mevcut;
+    }
 }

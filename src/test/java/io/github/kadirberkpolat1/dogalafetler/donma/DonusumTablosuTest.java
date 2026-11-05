@@ -90,4 +90,34 @@ class DonusumTablosuTest {
         assertThrows(IllegalArgumentException.class, () -> t.ekle("b", "c", 40));
         assertThrows(IllegalArgumentException.class, () -> t.ekle("z", "a", 60));
     }
+
+    @Test
+    void donarkenGeriCozmezCozulurkenIleriDondurmez() {
+        DonusumTablosu<String> t = tablo();
+        assertEquals("buz", t.durum("buz", 0, 1), "donma yönünde doğal buz korunur");
+        assertEquals("sikisik_buz", t.durum("su", 95, 1));
+        assertEquals("su", t.durum("su", 50, -1), "çözülme yönünde yeni donma olmaz");
+        assertEquals("buz", t.durum("sikisik_buz", 50, -1));
+        assertEquals("su", t.durum("sikisik_buz", 0, -1));
+        assertEquals("buz", t.durum("buz", 95, 0), "yön 0 dokunmaz");
+        assertEquals("tas", t.durum("tas", 100, 1));
+    }
+
+    @Test
+    void yonluYoldaSifiraCozmekKokuVerir() {
+        DonusumTablosu<String> t = tablo();
+        Random r = new Random(17);
+        for (String kok : new String[] {"su", "camur", "tas"}) {
+            for (int deneme = 0; deneme < 200; deneme++) {
+                String mevcut = kok;
+                int onceki = 0;
+                for (int i = 0; i < 1 + r.nextInt(8); i++) {
+                    int yeni = r.nextInt(101);
+                    mevcut = t.durum(mevcut, yeni, Integer.signum(yeni - onceki));
+                    onceki = yeni;
+                }
+                assertEquals(kok, t.durum(mevcut, 0, -1), kok);
+            }
+        }
+    }
 }

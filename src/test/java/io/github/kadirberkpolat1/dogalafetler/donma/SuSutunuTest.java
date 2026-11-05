@@ -66,4 +66,25 @@ class SuSutunuTest {
             assertArrayEquals(baslangic, SuSutunu.planla(mevcut, 0));
         }
     }
+
+    @Test
+    void donarkenDogalBuzErimez() {
+        Tur[] dogal = {BUZ, SU, SU, DIGER};
+        assertArrayEquals(dogal, SuSutunu.planla(dogal, 0, 1));
+        assertArrayEquals(new Tur[] {BUZ, BUZ, SU, DIGER}, SuSutunu.planla(dogal, 2, 1));
+    }
+
+    @Test
+    void cozulurkenYeniBuzOlusmaz() {
+        Tur[] su = {SU, SU, SU, DIGER};
+        assertArrayEquals(su, SuSutunu.planla(su, 2, -1));
+        assertArrayEquals(new Tur[] {BUZ, SU, SU, DIGER}, SuSutunu.planla(new Tur[] {BUZ, BUZ, SU, DIGER}, 1, -1));
+        assertArrayEquals(su, SuSutunu.planla(new Tur[] {BUZ, BUZ, SU, DIGER}, 0, -1));
+    }
+
+    @Test
+    void yonSifirDokunmaz() {
+        Tur[] s = {BUZ, SU, SU, DIGER};
+        assertArrayEquals(s, SuSutunu.planla(s, 3, 0));
+    }
 }

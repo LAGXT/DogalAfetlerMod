@@ -17,8 +17,10 @@ import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
 
 /**
- * Donma tablosunu dünyaya uygular. Her sütunun durumu yalnız kök blokların ve etkin seviyenin fonksiyonudur; bu yüzden
- * yarım kalan geçiş, çökme ya da ters yöne dönme aynı seviyeyi yeniden uygulayınca kendiliğinden düzelir.
+ * Donma tablosunu dünyaya uygular. Sütunun hedef durumu kök blokların ve etkin seviyenin fonksiyonudur; geçiş yönlüdür:
+ * seviye artarken buz, kar ve zincir yalnız ileri, azalırken yalnız geri gider ({@link DonmaHedefi#yonlu}). Böylece donma
+ * başlarken soğuk biyomların doğal karı ve buzu kaldırılmaz, çöz(0) yine kök duruma döner; yarım kalan geçiş aynı
+ * yönde yeniden uygulanınca düzelir.
  *
  * <p>Sütun kuralları (en üst hareket engelleyen blok, {@code MOTION_BLOCKING}, üzerinden):
  * <ul>
@@ -66,10 +68,11 @@ public final class DonmaIsleyici {
     }
 
     /**
-     * Bölgedeki her sütunu tek seferde {@code seviye}'ye getirir (GameTest ve deney komutları); yüzey {@code ustY}'nin
-     * altında aranır. {@code afetBlokHasari} kapalıyken hiçbir blok değişmez. Bölgenin chunk'ları yüklü olmalı.
+     * Bölgedeki her sütunu tek seferde {@code onceki}'den {@code seviye}'ye getirir (GameTest ve deney komutları); yüzey
+     * {@code ustY}'nin altında aranır. {@code afetBlokHasari} kapalıyken hiçbir blok değişmez. Bölgenin chunk'ları yüklü olmalı.
      */
-    public static int bolgeyiIsle(ServerLevel level, int minX, int minZ, int maxX, int maxZ, int ustY, int seviye) {
+    public static int bolgeyiIsle(ServerLevel level, int minX, int minZ, int maxX, int maxZ, int ustY, int onceki,
+            int seviye) {
         if (!Kurallar.blokHasariAcik(level.getGameRules())) {
             return 0;
         }
@@ -85,7 +88,8 @@ public final class DonmaIsleyici {
                 int x = minX + dx;
                 int z = minZ + dz;
                 LevelChunk chunk = level.getChunk(x >> 4, z >> 4);
-                degisen += sutunuIsle(level, chunk, x, z, ustY, seviye, false, kiyi[dz * genislik + dx], tablo, e, konum);
+                degisen += sutunuIsle(level, chunk, x, z, ustY, onceki, seviye, false, kiyi[dz * genislik + dx], tablo, e,
+                        konum);
             }
         }
         return degisen;
@@ -122,22 +126,27 @@ public final class DonmaIsleyici {
         return durum.is(tablo.suKaynak()) && durum.getFluidState().isSource();
     }
 
-    /** Bir sütunu chunk seviyesine getirir; değişen blok sayısını döndürür. */
-    static int sutunuIsle(ServerLevel level, LevelChunk chunk, int x, int z, int ustY, int seviye, boolean cozulme, int kiyi,
-            Tablo tablo, DonmaEsikleri e, BlockPos.MutableBlockPos konum) {
+    /** Bir sütunu chunk seviyesi {@code onceki}'den {@code seviye}'ye götürür; değişen blok sayısını döndürür. */
+    static int sutunuIsle(ServerLevel level, LevelChunk chunk, int x, int z, int ustY, int onceki, int seviye,
+            boolean cozulme, int kiyi, Tablo tablo, DonmaEsikleri e, BlockPos.MutableBlockPos konum) {
         int y = yuzey(chunk, x, z, ustY, konum);
         if (y < level.getMinBuildHeight() || y + 1 >= level.getMaxBuildHeight()) {
             return 0;
         }
-        int etkin = etkinSeviye(level.getSeed(), x, z, y, seviye, cozulme, e);
+        long seed = level.getSeed();
+        int etkin = etkinSeviye(seed, x, z, y, seviye, cozulme, e);
+        int yon = Integer.signum(etkin - etkinSeviye(seed, x, z, y, onceki, cozulme, e));
+        if (yon == 0) {
+            return 0;
+        }
         BlockState ust = chunk.getBlockState(konum.set(x, y, z));
         if (tablo.suKaynak() != null && (suMu(ust, tablo) || ust.is(tablo.suHedef()))) {
-            return suSutunu(level, chunk, x, y, z, etkin, kiyi, tablo, e, konum);
+            return suSutunu(level, chunk, x, y, z, etkin, yon, kiyi, tablo, e, konum);
         }
         int degisen = 0;
         Block kok = tablo.yuzey().kok(ust.getBlock());
         if (kok != ust.getBlock() || tablo.yuzey().taniyor(kok)) {
-            Block istenen = tablo.yuzey().durum(ust.getBlock(), etkin);
+            Block istenen = tablo.yuzey().durum(ust.getBlock(), etkin, yon);
             if (istenen != ust.getBlock()) {
                 ust = istenen.defaultBlockState();
                 level.setBlock(konum.set(x, y, z), ust, BAYRAK);
@@ -152,19 +161,24 @@ public final class DonmaIsleyici {
         if (!ustundeki.isAir() && !ustundeki.is(Blocks.SNOW)) {
             return degisen;
         }
-        int katman = e.karKatmani(etkin, kok instanceof SpreadingSnowyDirtBlock);
-        BlockState istenenUst = katman == 0 ? Blocks.AIR.defaultBlockState()
-                : Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, katman);
-        if (ustundeki != istenenUst && (katman == 0 || istenenUst.canSurvive(level, yukari))) {
-            level.setBlock(yukari, istenenUst, BAYRAK);
-            degisen++;
-        } else if (katman > 0 && ustundeki != istenenUst) {
-            katman = ustundeki.is(Blocks.SNOW) ? ustundeki.getValue(SnowLayerBlock.LAYERS) : 0;
+        int mevcutKatman = ustundeki.is(Blocks.SNOW) ? ustundeki.getValue(SnowLayerBlock.LAYERS) : 0;
+        int katman = DonmaHedefi.yonlu(mevcutKatman, e.karKatmani(etkin, kok instanceof SpreadingSnowyDirtBlock), yon);
+        if (katman != mevcutKatman) {
+            BlockState istenenUst = katman == 0 ? Blocks.AIR.defaultBlockState()
+                    : Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, katman);
+            if (katman == 0 || istenenUst.canSurvive(level, yukari)) {
+                level.setBlock(yukari, istenenUst, BAYRAK);
+                degisen++;
+            } else {
+                katman = mevcutKatman;
+            }
         }
         BlockState zemin = chunk.getBlockState(konum.set(x, y, z));
         if (zemin.hasProperty(SnowyDirtBlock.SNOWY)) {
-            boolean karli = katman > 0 || e.kiragi(etkin);
-            if (zemin.getValue(SnowyDirtBlock.SNOWY) != karli) {
+            boolean mevcutKarli = zemin.getValue(SnowyDirtBlock.SNOWY);
+            boolean istenenKarli = katman > 0 || e.kiragi(etkin);
+            boolean karli = yon > 0 ? mevcutKarli || istenenKarli : mevcutKarli && istenenKarli;
+            if (mevcutKarli != karli) {
                 level.setBlock(konum, zemin.setValue(SnowyDirtBlock.SNOWY, karli), BAYRAK);
                 degisen++;
             }
@@ -172,8 +186,8 @@ public final class DonmaIsleyici {
         return degisen;
     }
 
-    private static int suSutunu(ServerLevel level, LevelChunk chunk, int x, int y, int z, int etkin, int kiyi, Tablo tablo,
-            DonmaEsikleri e, BlockPos.MutableBlockPos konum) {
+    private static int suSutunu(ServerLevel level, LevelChunk chunk, int x, int y, int z, int etkin, int yon, int kiyi,
+            Tablo tablo, DonmaEsikleri e, BlockPos.MutableBlockPos konum) {
         SuSutunu.Tur[] sutun = new SuSutunu.Tur[e.maksBuzKalinligi() + 1];
         for (int d = 0; d < sutun.length; d++) {
             int yy = y - d;
@@ -185,7 +199,7 @@ public final class DonmaIsleyici {
             sutun[d] = suMu(durum, tablo) ? SuSutunu.Tur.SU
                     : durum.is(tablo.suHedef()) ? SuSutunu.Tur.BUZ : SuSutunu.Tur.DIGER;
         }
-        SuSutunu.Tur[] plan = SuSutunu.planla(sutun, e.buzKalinligi(etkin, kiyi));
+        SuSutunu.Tur[] plan = SuSutunu.planla(sutun, e.buzKalinligi(etkin, kiyi), yon);
         int degisen = 0;
         for (int d = 0; d < sutun.length; d++) {
             if (plan[d] != sutun[d]) {
