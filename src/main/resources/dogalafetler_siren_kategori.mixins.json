@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "io.github.kadirberkpolat1.dogalafetler.uyari.kategori",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
+    "SoundSourceErisimci",
+    "SoundSourceKarisimi"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
