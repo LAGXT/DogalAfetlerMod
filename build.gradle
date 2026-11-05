@@ -47,6 +47,10 @@ minecraft {
             if (project.hasProperty('quickPlay')) {
                 args '--quickPlaySingleplayer', project.property('quickPlay').toString()
             }
+            // Spike otomasyonu: -Pspike=gokyuzu | gokyuzu-kalicilik (istemci kendi kendine kanıt toplar ve kapanır)
+            if (project.hasProperty('spike')) {
+                property 'dogalafetler.spike', project.property('spike').toString()
+            }
         }
 
         server {

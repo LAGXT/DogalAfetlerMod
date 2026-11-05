@@ -3,6 +3,7 @@ package io.github.kadirberkpolat1.dogalafetler;
 import com.mojang.logging.LogUtils;
 import io.github.kadirberkpolat1.dogalafetler.config.Ayarlar;
 import io.github.kadirberkpolat1.dogalafetler.core.CekirdekCevirileri;
+import io.github.kadirberkpolat1.dogalafetler.gokyuzu.GokyuzuSistemi;
 import io.github.kadirberkpolat1.dogalafetler.komut.DogalAfetKomutu;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import io.github.kadirberkpolat1.dogalafetler.network.AgKanali;
@@ -29,6 +30,7 @@ public final class DogalAfetler {
         Ayarlar.kaydet(baglam);
         AgKanali.baslat();
         modBus.addListener(DogalAfetler::ortakKurulum);
+        GokyuzuSistemi.kaydet();
 
         DataGenerators.ceviriEkle(CekirdekCevirileri::yaz);
         DataGenerators.ceviriEkle(Kurallar::cevirileriYaz);
