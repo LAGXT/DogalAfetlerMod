@@ -69,9 +69,13 @@ public final class SuRenderer {
     private static long kurulanTick = Long.MIN_VALUE;
     private static long uzakTick = Long.MIN_VALUE;
     private static int yakinOx;
+    private static int yakinOy;
     private static int yakinOz;
     private static int uzakOx;
+    private static int uzakOy;
     private static int uzakOz;
+    /** Kurulmakta olan tamponun Y kökeni; köşe Y'si buna göre göreli yazılır. */
+    private static int oyAktif;
     private static float u0;
     private static float u1;
     private static float v0;
@@ -185,24 +189,30 @@ public final class SuRenderer {
         RenderSystem.disableCull();
         RenderSystem.setShaderTexture(0, InventoryMenu.BLOCK_ATLAS);
         mc.gameRenderer.lightTexture().turnOnLightLayer();
+        // Vanilla chunk çizimi gibi: model-görünüm yalnız kamera dönüşü, öteleme CHUNK_OFFSET'te. Aksi hâlde şaderin
+        // silindirik sis mesafesi mutlak Y ile hesaplanır ve su kamera yüksekliği kadar sisli görünür.
+        Matrix4f mv = ps.last().pose();
         if (!uzakBos) {
-            ps.pushPose();
-            ps.translate(uzakOx - cam.x, -cam.y, uzakOz - cam.z);
+            ofset(sh, uzakOx - cam.x, uzakOy - cam.y, uzakOz - cam.z);
             vbUzak.bind();
-            vbUzak.drawWithShader(ps.last().pose(), proj, sh);
-            ps.popPose();
+            vbUzak.drawWithShader(mv, proj, sh);
         }
         if (!yakinBos) {
-            ps.pushPose();
-            ps.translate(yakinOx - cam.x, -cam.y, yakinOz - cam.z);
+            ofset(sh, yakinOx - cam.x, yakinOy - cam.y, yakinOz - cam.z);
             vbYakin.bind();
-            vbYakin.drawWithShader(ps.last().pose(), proj, sh);
-            ps.popPose();
+            vbYakin.drawWithShader(mv, proj, sh);
         }
+        ofset(sh, 0, 0, 0);
         VertexBuffer.unbind();
         mc.gameRenderer.lightTexture().turnOffLightLayer();
         RenderSystem.enableCull();
         olcCizimNs += System.nanoTime() - t2;
+    }
+
+    private static void ofset(ShaderInstance sh, double x, double y, double z) {
+        if (sh.CHUNK_OFFSET != null) {
+            sh.CHUNK_OFFSET.set((float) x, (float) y, (float) z);
+        }
     }
 
     private static void spriteGuncelle(Minecraft mc) {
@@ -307,7 +317,9 @@ public final class SuRenderer {
             return;
         }
         yakinOx = cx;
+        yakinOy = (int) Math.floor(cam.y);
         yakinOz = cz;
+        oyAktif = yakinOy;
         BB.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
         dortgen = 0;
         for (int i = 0; i < N; i++) {
@@ -326,11 +338,12 @@ public final class SuRenderer {
         int cx = (int) Math.floor(cam.x);
         int cz = (int) Math.floor(cam.z);
         uzakOx = cx;
+        uzakOy = (int) Math.floor(cam.y);
         uzakOz = cz;
+        oyAktif = uzakOy;
         int r = Math.min(mc.options.getEffectiveRenderDistance(), 12) * 16;
         int gx0 = Math.floorDiv(cx - r, LOD) * LOD;
         int gz0 = Math.floorDiv(cz - r, LOD) * LOD;
-        int ic = YAKIN - LOD;
         BB.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
         dortgen = 0;
         int tamIsik = LightTexture.pack(0, 15);
@@ -338,7 +351,9 @@ public final class SuRenderer {
             for (int gz = gz0; gz <= cz + r; gz += LOD) {
                 int dx = gx + LOD / 2 - cx;
                 int dz = gz + LOD / 2 - cz;
-                if ((Math.abs(dx) < ic && Math.abs(dz) < ic) || dx * dx + dz * dz > r * r) {
+                boolean yakinda = gx >= cx - YAKIN && gx + LOD <= cx + YAKIN + 1 && gz >= cz - YAKIN
+                        && gz + LOD <= cz + YAKIN + 1;
+                if (yakinda || dx * dx + dz * dz > r * r) {
                     continue;
                 }
                 d.araliklar(gx + LOD / 2, gz + LOD / 2, tick, A);
@@ -472,7 +487,7 @@ public final class SuRenderer {
     }
 
     private static void kose(float x, float y, float z, int c, float a, float u, float v, int isik, float ny) {
-        BB.vertex(x, y, z).color((c >> 16 & 255) / 255f, (c >> 8 & 255) / 255f, (c & 255) / 255f, a).uv(u, v).uv2(isik)
+        BB.vertex(x, y - oyAktif, z).color((c >> 16 & 255) / 255f, (c >> 8 & 255) / 255f, (c & 255) / 255f, a).uv(u, v).uv2(isik)
                 .normal(0, ny, 0).endVertex();
     }
 

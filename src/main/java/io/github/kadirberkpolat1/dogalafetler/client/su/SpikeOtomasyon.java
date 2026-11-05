@@ -24,6 +24,8 @@ import net.minecraftforge.fml.common.Mod;
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class SpikeOtomasyon {
     private static final boolean ACIK = "su".equals(System.getProperty("dogalafetler.spike"));
+    /** Koşulacak bölümler: hepsi ya da virgüllü liste (deniz, sualti, dalga, cekilme, hash, adil, magara). */
+    private static final String BOLUM = System.getProperty("dogalafetler.spike.bolum", "hepsi");
 
     /** {@code bekle}: önceki adımdan sonra oyun tick'i; {@code kosul}: ayrıca doğru olana kadar bekle (null: yok). */
     private record Adim(int bekle, Predicate<Minecraft> kosul, int kosulSiniri, Consumer<Minecraft> is) {
@@ -175,6 +177,10 @@ public final class SpikeOtomasyon {
         });
     }
 
+    private static boolean bolum(String ad) {
+        return "hepsi".equals(BOLUM) || ("," + BOLUM + ",").contains("," + ad + ",");
+    }
+
     private static List<Adim> senaryo() {
         String su = "dogalafet spike su ";
         List<Adim> s = new ArrayList<>();
@@ -190,80 +196,110 @@ public final class SpikeOtomasyon {
         s.add(komut(2, su + "izle ac"));
         s.add(komut(2, su + "konum kiyi -40"));
         s.add(komut(5, su + "hash kiyi_once"));
-        // A: açık hava, deniz +4 (aynı kamera önce/sonra).
-        s.add(komut(5, "tp @s ~ ~5 ~ ~ 22"));
-        s.add(chunkBekle(20, 600));
-        s.add(fps(40, "afetsiz_kiyi"));
-        s.add(foto(60, "01_kiyi_afetsiz"));
-        s.add(komut(50, "tp @s ~ ~35 ~ ~ 38"));
-        s.add(chunkBekle(20, 600));
-        s.add(fps(40, "afetsiz_yuksek"));
-        s.add(foto(60, "05a_lod_afetsiz"));
-        s.add(komut(50, su + "deniz 4 100"));
-        s.add(foto(200, "05_lod_deniz4"));
-        s.add(fps(5, "deniz4_yuksek_lod"));
-        s.add(komut(110, "tp @s ~ ~-35 ~ ~ 22"));
-        s.add(chunkBekle(20, 600));
-        s.add(fps(40, "deniz4_kiyi"));
-        s.add(foto(60, "02_kiyi_deniz4"));
-        // B: sualtı, boğulma, mob, yüzme pozu, olay yolu karşılaştırması.
-        s.add(komut(60, "gamemode survival"));
-        s.add(komut(2, su + "konum kiyi -40"));
-        s.add(komut(2, "tp @s ~ ~ ~ ~ -15"));
-        s.add(komut(2, "summon pig ~1.5 ~ ~1.5 {NoAI:1b,Tags:[\"spike\"]}"));
-        s.add(foto(60, "03_sualti"));
-        s.add(fps(5, "sualti"));
-        s.add(komut(110, su + "konum kiyi 180"));
-        s.add(yuz(5, 60));
-        s.add(foto(30, "03b_sualti_yuzme"));
-        s.add(komut(200, "effect give @s minecraft:instant_health 1 3"));
-        s.add(komut(2, su + "konum kiyi -40"));
-        s.add(komut(2, su + "yol olay"));
-        s.add(yuz(20, 40));
-        s.add(komut(100, su + "yol mixin"));
-        s.add(komut(2, "effect give @s minecraft:instant_health 1 3"));
-        s.add(komut(2, "kill @e[tag=spike]"));
-        s.add(komut(2, su + "kapat"));
-        // C: dalga, mob sürüklenmesi (kamera yanda ve yüksekte).
-        s.add(komut(10, "gamemode spectator"));
-        s.add(komut(2, su + "konum kiyi 0"));
-        s.add(komut(2, "execute positioned ~ ~ ~ run summon zombie ^2 ^ ^8 {Tags:[\"spike\"],PersistenceRequired:1b}"));
-        s.add(komut(2, "execute positioned ~ ~ ~ run summon pig ^-2 ^ ^6 {Tags:[\"spike\"]}"));
-        s.add(komut(2, "tp @s ~ ~9 ~ ~ 18"));
-        s.add(chunkBekle(10, 400));
-        s.add(fps(20, "dalga_once"));
-        s.add(foto(60, "04a_dalga_once"));
-        s.add(komut(40, su + "dalga 10"));
-        s.add(fps(60, "dalga"));
-        s.add(foto(40, "04_dalga_yaklasiyor"));
-        s.add(foto(40, "04b_dalga_yakin"));
-        s.add(komut(160, su + "kapat"));
-        s.add(komut(2, "kill @e[tag=spike]"));
-        // D: çekilme.
-        s.add(komut(10, su + "konum kiyi 0"));
-        s.add(komut(2, "tp @s ~ ~6 ~ ~ 30"));
-        s.add(chunkBekle(10, 400));
-        s.add(fps(20, "cekilme_once"));
-        s.add(foto(60, "06a_cekilme_once"));
-        s.add(komut(40, su + "cekilme 30 3"));
-        s.add(fps(120, "cekilme"));
-        s.add(foto(60, "06_cekilme"));
-        s.add(komut(40, su + "kapat"));
-        s.add(komut(40, su + "konum kiyi -40"));
-        s.add(komut(10, su + "hash kiyi_sonra kiyi_once"));
-        // E: mağara (çevrimdışı analizle bulunan kapalı cep; tohum en alçak hücre).
-        s.add(komut(10, "effect give @s minecraft:night_vision 600 0 true"));
-        s.add(komut(2, su + "magara hazirla 30 32 58"));
-        s.add(chunkBekle(20, 400));
-        s.add(fps(20, "magara_once"));
-        s.add(foto(60, "07a_magara_once"));
-        s.add(komut(40, su + "magara baslat 100000 0.05"));
-        s.add(foto(140, "07_magara"));
-        s.add(fps(5, "magara"));
-        s.add(komut(110, su + "magara kurut 0.04"));
-        s.add(foto(60, "08_magara_buhar"));
-        s.add(foto(300, "09_magara_kurudu"));
-        s.add(komut(20, su + "kapat"));
+        if (bolum("deniz")) {
+            // A: açık hava, deniz +4 (aynı kamera önce/sonra).
+            s.add(komut(5, "tp @s ~ ~5 ~ ~ 22"));
+            s.add(chunkBekle(20, 600));
+            s.add(fps(40, "afetsiz_kiyi"));
+            s.add(foto(60, "01_kiyi_afetsiz"));
+            s.add(komut(50, "tp @s ~ ~35 ~ ~ 38"));
+            s.add(chunkBekle(20, 600));
+            s.add(fps(40, "afetsiz_yuksek"));
+            s.add(foto(60, "05a_lod_afetsiz"));
+            s.add(komut(50, su + "deniz 4 100"));
+            s.add(foto(200, "05_lod_deniz4"));
+            s.add(fps(5, "deniz4_yuksek_lod"));
+            s.add(komut(110, "tp @s ~ ~-35 ~ ~ 22"));
+            s.add(chunkBekle(20, 600));
+            s.add(fps(40, "deniz4_kiyi"));
+            s.add(foto(60, "02_kiyi_deniz4"));
+            s.add(komut(60, su + "kapat"));
+        }
+        if (bolum("sualti")) {
+            // B: sualtı, boğulma, mob, yüzme pozu, olay yolu karşılaştırması.
+            s.add(komut(10, su + "deniz 4 0"));
+            s.add(komut(2, "gamemode survival"));
+            s.add(komut(2, su + "konum kiyi -40"));
+            s.add(komut(2, "tp @s ~ ~ ~ ~ -15"));
+            s.add(komut(2, "summon pig ~1.5 ~ ~1.5 {NoAI:1b,Tags:[\"spike\"]}"));
+            s.add(foto(60, "03_sualti"));
+            s.add(fps(5, "sualti"));
+            s.add(komut(110, su + "konum kiyi 180"));
+            s.add(yuz(5, 60));
+            s.add(foto(30, "03b_sualti_yuzme"));
+            s.add(komut(40, su + "konum kiyi -40"));
+            s.add(komut(400, "effect give @s minecraft:instant_health 1 3"));
+            s.add(komut(2, su + "yol olay"));
+            s.add(yuz(20, 40));
+            s.add(komut(100, su + "yol mixin"));
+            s.add(komut(2, "effect give @s minecraft:instant_health 1 3"));
+            s.add(komut(2, "kill @e[tag=spike]"));
+            s.add(komut(2, su + "kapat"));
+            s.add(komut(10, "gamemode spectator"));
+        }
+        if (bolum("dalga")) {
+            // C: dalga, mob sürüklenmesi (kamera yanda ve yüksekte).
+            s.add(komut(10, su + "konum kiyi 0"));
+            s.add(komut(2, "execute positioned ~ ~ ~ run summon zombie ^2 ^ ^8 {Tags:[\"spike\"],PersistenceRequired:1b}"));
+            s.add(komut(2, "execute positioned ~ ~ ~ run summon pig ^-2 ^ ^6 {Tags:[\"spike\"]}"));
+            s.add(komut(2, "tp @s ~ ~2 ~ ~ -4"));
+            s.add(chunkBekle(10, 400));
+            s.add(fps(20, "dalga_once"));
+            s.add(foto(60, "04a_dalga_once"));
+            s.add(komut(40, su + "dalga 10"));
+            s.add(fps(60, "dalga"));
+            s.add(foto(40, "04_dalga_yaklasiyor"));
+            s.add(foto(40, "04b_dalga_yakin"));
+            s.add(komut(160, su + "kapat"));
+            s.add(komut(2, "kill @e[tag=spike]"));
+        }
+        if (bolum("cekilme")) {
+            // D: çekilme.
+            s.add(komut(10, su + "konum kiyi 0"));
+            s.add(komut(2, "tp @s ~ ~6 ~ ~ 30"));
+            s.add(chunkBekle(10, 400));
+            s.add(fps(20, "cekilme_once"));
+            s.add(foto(60, "06a_cekilme_once"));
+            s.add(komut(40, su + "cekilme 30 3"));
+            s.add(fps(120, "cekilme"));
+            s.add(foto(60, "06_cekilme"));
+            s.add(komut(40, su + "kapat"));
+        }
+        if (bolum("adil")) {
+            // F: aynı kamera, oturmuş dünya: afetsiz / deniz +4 / dalga FPS'i.
+            s.add(komut(10, su + "konum kiyi 0"));
+            s.add(komut(2, "tp @s ~ ~6 ~ ~ 22"));
+            s.add(chunkBekle(200, 600));
+            s.add(fps(0, "adil_afetsiz"));
+            s.add(komut(110, su + "deniz 4 0"));
+            s.add(fps(60, "adil_deniz4"));
+            s.add(foto(60, "10_adil_deniz4"));
+            s.add(komut(60, su + "kapat"));
+            s.add(fps(60, "adil_afetsiz_2"));
+            s.add(komut(110, su + "dalga 10"));
+            s.add(fps(80, "adil_dalga"));
+            s.add(komut(110, su + "kapat"));
+        }
+        if (bolum("hash")) {
+            s.add(komut(40, su + "konum kiyi -40"));
+            s.add(komut(10, su + "hash kiyi_sonra kiyi_once"));
+        }
+        if (bolum("magara")) {
+            // E: mağara (çevrimdışı analizle bulunan kapalı cepler; tohum en alçak hücre; son başarılı olan kalır).
+            s.add(komut(10, "effect give @s minecraft:night_vision 900 0 true"));
+            s.add(komut(2, su + "magara hazirla 60 22 33"));
+            s.add(komut(10, su + "magara hazirla 14 17 -95"));
+            s.add(chunkBekle(20, 400));
+            s.add(fps(20, "magara_once"));
+            s.add(foto(60, "07a_magara_once"));
+            s.add(komut(40, su + "magara baslat 100000 0.05"));
+            s.add(foto(140, "07_magara"));
+            s.add(fps(5, "magara"));
+            s.add(komut(110, su + "magara kurut 0.04"));
+            s.add(foto(60, "08_magara_buhar"));
+            s.add(foto(300, "09_magara_kurudu"));
+            s.add(komut(20, su + "kapat"));
+        }
         s.add(is(40, mc -> {
             DogalAfetler.LOGGER.info("SPIKE-SU otomasyon bitti, oyun kapatiliyor");
             mc.stop();

@@ -53,6 +53,7 @@ minecraft {
             // Spike otomasyonu: -Pspike=su istemcide senaryolari sirayla kosar, ekran goruntusu alir ve oyunu kapatir.
             if (project.hasProperty('spike')) {
                 property 'dogalafetler.spike', project.property('spike').toString()
+                property 'dogalafetler.spike.bolum', (project.findProperty('spikeBolum') ?: 'hepsi').toString()
                 args '--width', '1280', '--height', '720'
             }
         }

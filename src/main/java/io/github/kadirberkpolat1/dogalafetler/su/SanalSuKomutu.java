@@ -262,6 +262,10 @@ final class SanalSuKomutu {
         int hedef = tam.acik() ? 4000 : Math.min(4000, (int) (tam.hacim() * 0.6));
         MagaraCebi cep = MagaraDolumu.doldur(h, x, y, z, hedef, 20_000);
         double sure = (System.nanoTime() - t0) / 1e6;
+        if (cep.bos()) {
+            return bildir(c, fmt("magara hazirla: cep bos (ilk kat hedefi asiyor) tohum=(%d,%d,%d) tam=%d acik=%b hedef=%d sure=%.1fms",
+                    x, y, z, tam.hacim(), tam.acik(), hedef, sure));
+        }
         double ox = 0;
         double oz = 0;
         for (long k : cep.sutunAnahtarlari()) {
@@ -296,8 +300,8 @@ final class SanalSuKomutu {
 
     private static int baslat(CommandContext<CommandSourceStack> c, int bekleme, double buhar) {
         MagaraCebi cep = hazirCep;
-        if (cep == null) {
-            return bildir(c, "magara baslat: once hazirla");
+        if (cep == null || cep.bos()) {
+            return bildir(c, "magara baslat: hazir cep yok");
         }
         ServerLevel l = c.getSource().getLevel();
         int x0 = Integer.MAX_VALUE;
