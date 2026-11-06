@@ -1,0 +1,8 @@
+{
+  "type": "dogalafetler:zirh_eki",
+  "category": "equipment",
+  "ek": "termostatli",
+  "malzeme": {
+    "item": "dogalafetler:termostat_plakasi"
+  }
+}

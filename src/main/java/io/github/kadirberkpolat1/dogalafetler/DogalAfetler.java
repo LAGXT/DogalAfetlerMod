@@ -12,6 +12,7 @@ import io.github.kadirberkpolat1.dogalafetler.esya.EsyaKayitlari;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.GokyuzuSistemi;
 import io.github.kadirberkpolat1.dogalafetler.komut.CekirdekKomutlari;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
+import io.github.kadirberkpolat1.dogalafetler.meteor.Meteor;
 import io.github.kadirberkpolat1.dogalafetler.network.AgKanali;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.Sicaklik;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
@@ -56,6 +57,7 @@ public final class DogalAfetler {
         DonmaSistemi.kaydet(modBus);
         Yiyecek.kaydet(modBus);
         EsyaKayitlari.kaydet(modBus);
+        Meteor.kaydet(modBus);
         Kancalar.bagla();
 
         DataGenerators.ceviriEkle(CekirdekCevirileri::yaz);
