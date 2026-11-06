@@ -87,10 +87,14 @@ minecraft {
             args '--nogui'
         }
 
-        // Kayıtlı bütün GameTest'leri koşar ve çıkar; hiç GameTest yoksa çöker.
+        // Kayıtlı bütün GameTest'leri koşar ve çıkar; hiç GameTest yoksa çöker. -Ptest_filtre=<regex> yalnız sınıf, batch ya da
+        // test adı uyan testleri (ve yerleşim bekçisini) koşar (K-E20); kabul ve entegrasyon filtresiz koşar.
         gameTestServer {
             workingDirectory project.file('run-gametest')
             property 'forge.enabledGameTestNamespaces', mod_id
+            if (project.hasProperty('test_filtre')) {
+                property 'dogalafetler.gametest.filtre', project.property('test_filtre').toString()
+            }
         }
 
         data {
