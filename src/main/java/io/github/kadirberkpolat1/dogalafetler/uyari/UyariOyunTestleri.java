@@ -7,6 +7,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.AfetKaydi;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
 import io.github.kadirberkpolat1.dogalafetler.core.CekirdekOyunTestleri;
+import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
 import io.github.kadirberkpolat1.dogalafetler.core.OyunTestiAfeti;
 import io.github.kadirberkpolat1.dogalafetler.core.SirenTuru;
 import io.github.kadirberkpolat1.dogalafetler.network.AgKanali;
@@ -29,6 +30,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
@@ -37,9 +39,10 @@ import net.minecraftforge.network.NetworkDirection;
 
 /**
  * Uyarı alt sisteminin oyun içi testleri: çekirdeğin siren olayları sahte oyuncunun istemcisine {@code uyari/siren} ve
- * {@code uyari/siren_durdur} olarak gider; siren sırasında gelen kalan süreyle alır; alan dışındaki almaz (K-C30); ortam
- * katmanı gider ve afet bitince söner. Paketler sahte oyuncunun gömülü kanalından okunur (çekirdek §13). Tek afet
- * yuvasını kullandıkları için her biri kendi {@code batch}'indedir.
+ * {@code uyari/siren_durdur} olarak gider (standart, güneş ve ay sireni); siren sırasında gelen kalan süreyle alır;
+ * alan dışındaki almaz (K-C30); ortam katmanı gider, sonradan girene ve başka boyutta yeniden doğana sürer, afet
+ * bitince söner. Paketler sahte oyuncunun gömülü kanalından okunur (çekirdek §13). Tek afet yuvasını kullandıkları
+ * için her biri kendi {@code batch}'indedir; temizlik zaman aşımına bağlı değildir (sabit gecikmeli kontrol).
  */
 @GameTestHolder(DogalAfetler.MOD_ID)
 @PrefixGameTestTemplate(false)
@@ -85,16 +88,22 @@ public final class UyariOyunTestleri {
         return coz(ham, new SirenDurdurPaketi(0L, 1), SirenDurdurPaketi::oku);
     }
 
-    /** Ortak sahne: yuva boş, test afeti DEPREM için geçici kayıtlı, oyuncu alanın ortasında. */
-    private record Sahne(GameTestHelper yardimci, MinecraftServer server, AfetYoneticisi yonetici, BlockPos merkez,
-            AfetKaydi.GeciciKayit kayit, List<ServerPlayer> oyuncular) {
+    /** Ortak sahne: yuva boş, test afeti {@code tur} için geçici kayıtlı, oyuncular alanın ortasında. */
+    private record Sahne(GameTestHelper yardimci, MinecraftServer server, AfetYoneticisi yonetici, AfetTuru tur,
+            BlockPos merkez, AfetKaydi.GeciciKayit kayit, List<ServerPlayer> oyuncular) {
         static Sahne kur(GameTestHelper yardimci) {
+            return kur(yardimci, AfetTuru.DEPREM);
+        }
+
+        static Sahne kur(GameTestHelper yardimci, AfetTuru tur) {
             ServerLevel level = yardimci.getLevel();
             AfetYoneticisi yonetici = AfetYoneticisi.al(level.getServer());
             yonetici.durdur();
-            AfetKaydi.GeciciKayit kayit = AfetKaydi.geciciKaydet(AfetTuru.DEPREM,
-                    () -> new OyunTestiAfeti(AfetTuru.DEPREM, 16, 100));
-            return new Sahne(yardimci, level.getServer(), yonetici, yardimci.absolutePos(BlockPos.ZERO), kayit,
+            if (tur == AfetTuru.GUNES_PATLAMASI) {
+                yonetici.donem().gunesEvresiAyarla(GunesEvresi.NORMAL);
+            }
+            AfetKaydi.GeciciKayit kayit = AfetKaydi.geciciKaydet(tur, () -> new OyunTestiAfeti(tur, 16, 100));
+            return new Sahne(yardimci, level.getServer(), yonetici, tur, yardimci.absolutePos(BlockPos.ZERO), kayit,
                     new ArrayList<>());
         }
 
@@ -106,13 +115,16 @@ public final class UyariOyunTestleri {
         }
 
         Afet baslat(ServerPlayer hedef) {
-            yardimci.assertTrue(yonetici.elleBaslat(AfetTuru.DEPREM, 1, hedef, yardimci.getLevel(), merkez)
-                    == AfetYoneticisi.BaslatmaSonucu.BASLADI, "afet başlamadı");
+            yardimci.assertTrue(yonetici.elleBaslat(tur, tur.seviyeli() ? 1 : null, hedef, yardimci.getLevel(), merkez)
+                    == AfetYoneticisi.BaslatmaSonucu.BASLADI, "afet başlamadı: " + tur.kimlik());
             return yonetici.aktifAfet().orElseThrow();
         }
 
         void temizle() {
             yonetici.durdur();
+            if (tur == AfetTuru.GUNES_PATLAMASI) {
+                yonetici.donem().gunesEvresiAyarla(GunesEvresi.NORMAL);
+            }
             kayit.close();
             oyuncular.forEach(o -> server.getPlayerList().remove(o));
         }
@@ -153,6 +165,45 @@ public final class UyariOyunTestleri {
         yardimci.succeed();
     }
 
+    /**
+     * Sunucu geneli sirenler (V7): güneş patlaması kendi sireni, ay çarpması standart siren; ikisi de 1200 tick (K0-19),
+     * AKTIF'te türün fade-out'uyla durdurma (güneş 80, standart 40).
+     */
+    private static void uzunSiren(GameTestHelper yardimci, AfetTuru afetTuru, SirenTuru beklenen) {
+        Sahne sahne = Sahne.kur(yardimci, afetTuru);
+        sahne.koru(() -> {
+            ServerPlayer oyuncu = sahne.oyuncu(0, 0);
+            Afet afet = sahne.baslat(oyuncu);
+            long afetNo = afet.baglam().baslangicSaati();
+            gelenler(oyuncu);
+            yardimci.assertTrue(sahne.yonetici().asamaIleri() && afet.asama() == AfetAsamasi.SIREN, "SIREN'e geçmedi");
+            List<SirenPaketi> siren = sirenler(gelenler(oyuncu));
+            yardimci.assertTrue(siren.size() == 1, "SIREN başlarken tek siren paketi beklendi: " + siren.size());
+            SirenPaketi paket = siren.get(0);
+            yardimci.assertTrue(paket.tur() == beklenen && paket.afet() == afetTuru && paket.afetNo() == afetNo
+                    && paket.toplamTick() == SirenTuru.UZUN_SURE_TICK && paket.kalanTick() == SirenTuru.UZUN_SURE_TICK,
+                    "uzun siren paketi içeriği: " + paket);
+            yardimci.assertTrue(sahne.yonetici().asamaIleri() && afet.asama() == AfetAsamasi.AKTIF, "AKTIF'e geçmedi");
+            List<SirenDurdurPaketi> durdur = durdurmalar(gelenler(oyuncu));
+            int fade = beklenen == SirenTuru.GUNES ? 80 : 40;
+            yardimci.assertTrue(durdur.size() == 1 && durdur.get(0).afetNo() == afetNo
+                    && durdur.get(0).fadeTick() == fade && UyariAyarlari.fadeOutTick(beklenen) == fade,
+                    "AKTIF'e geçişte " + fade + " tick'lik durdurma beklendi: " + durdur);
+        });
+        sahne.temizle();
+        yardimci.succeed();
+    }
+
+    @GameTest(template = "bos", batch = "uyari_gunes", timeoutTicks = 100)
+    public static void gunesPatlamasiKendiSireniniUzunCalarDortSaniyedeSoner(GameTestHelper yardimci) {
+        uzunSiren(yardimci, AfetTuru.GUNES_PATLAMASI, SirenTuru.GUNES);
+    }
+
+    @GameTest(template = "bos", batch = "uyari_ay", timeoutTicks = 100)
+    public static void ayCarpmasiStandartSireniAltmisSaniyeCalarIkiSaniyedeSoner(GameTestHelper yardimci) {
+        uzunSiren(yardimci, AfetTuru.AY_CARPMASI, SirenTuru.STANDART);
+    }
+
     @GameTest(template = "bos", batch = "uyari_gec_gelen", timeoutTicks = 200)
     public static void sirenSirasindaGelenOyuncuKalanSureyleAlir(GameTestHelper yardimci) {
         Sahne sahne = Sahne.kur(yardimci);
@@ -164,15 +215,16 @@ public final class UyariOyunTestleri {
         });
         List<SirenPaketi> alinan = new ArrayList<>();
         yardimci.runAfterDelay(10, () -> sahne.koru(() -> ikinci[0] = sahne.oyuncu(3, 3)));
-        yardimci.succeedWhen(() -> {
-            yardimci.assertTrue(ikinci[0] != null, "ikinci oyuncu henüz girmedi");
+        // Çekirdek geç gelene 1 Hz'de gönderir; 50. tick'te kesin gitmiştir. Temizlik zaman aşımına kalmaz.
+        yardimci.runAfterDelay(50, () -> sahne.koru(() -> {
             alinan.addAll(sirenler(gelenler(ikinci[0])));
-            yardimci.assertTrue(!alinan.isEmpty(), "sonradan gelene siren henüz gitmedi");
+            yardimci.assertTrue(!alinan.isEmpty(), "sonradan gelene siren gitmedi");
             SirenPaketi paket = alinan.get(0);
             yardimci.assertTrue(paket.kalanTick() < paket.toplamTick() && paket.kalanTick() > 0
                     && paket.toplamTick() == SirenTuru.STANDART_SURE_TICK, "kalan süre < toplam olmalı: " + paket);
             sahne.temizle();
-        });
+            yardimci.succeed();
+        }));
     }
 
     @GameTest(template = "bos", batch = "uyari_alan", timeoutTicks = 100)
@@ -227,8 +279,43 @@ public final class UyariOyunTestleri {
         }));
     }
 
+    /**
+     * V3: ölüm ve End çıkışı {@code PlayerList.respawn} yolundan geçer ({@code PlayerChangedDimensionEvent} gelmez). Nether'de
+     * iken Overworld'de başlayan konumlu katmanı alamayan oyuncu, Overworld'de yeniden doğunca alır.
+     */
+    @GameTest(template = "bos", batch = "uyari_dogus", timeoutTicks = 100)
+    public static void baskaBoyuttaYenidenDoganOyuncuKatmaniAlir(GameTestHelper yardimci) {
+        Sahne sahne = Sahne.kur(yardimci);
+        String kimlik = "uyari/ortam_dogus";
+        MinecraftServer server = sahne.server();
+        sahne.koru(() -> {
+            ServerLevel nether = server.getLevel(Level.NETHER);
+            yardimci.assertTrue(nether != null, "Nether boyutu yok");
+            ServerPlayer oyuncu = sahne.oyuncu(0, 0);
+            oyuncu.teleportTo(nether, 0.5, 70, 0.5, 0f, 0f);
+            yardimci.assertTrue(oyuncu.level() == nether, "oyuncu Nether'e geçmedi");
+            gelenler(oyuncu);
+            OrtamSesi.baslat(server, kimlik, OrtamSesi.AFETSIZ, UyariSesleri.ORTAM_TEST, SoundSource.AMBIENT,
+                    OrtamSesi.Yer.nokta(yardimci.getLevel().dimension(), Vec3.atCenterOf(sahne.merkez()), 32f),
+                    HacimEgrisi.sabit(1f));
+            yardimci.assertTrue(coz(gelenler(oyuncu), ornekOrtam(), OrtamPaketi::oku).isEmpty(),
+                    "Nether'deki oyuncu Overworld katmanını almamalı");
+            ServerPlayer dogan = server.getPlayerList().respawn(oyuncu, true);
+            sahne.oyuncular().remove(oyuncu);
+            sahne.oyuncular().add(dogan);
+            yardimci.assertTrue(dogan.level().dimension() == Level.OVERWORLD,
+                    "oyuncu Overworld'de doğmalı: " + dogan.level().dimension().location());
+            List<OrtamPaketi> alinan = coz(gelenler(dogan), ornekOrtam(), OrtamPaketi::oku);
+            yardimci.assertTrue(alinan.stream().anyMatch(p -> p.kimlik().equals(kimlik)),
+                    "yeniden doğan oyuncuya katman gitmeli: " + alinan);
+        });
+        OrtamSesi.durdur(server, kimlik, 1);
+        sahne.temizle();
+        yardimci.succeed();
+    }
+
     private static OrtamPaketi ornekOrtam() {
-        return new OrtamPaketi("uyari/ornek", 0L, UyariSesleri.ORTAM_TEST, SoundSource.AMBIENT, null, 0, 0, 0, 0f,
+        return new OrtamPaketi("uyari/ornek", 0L, 0L, UyariSesleri.ORTAM_TEST, SoundSource.AMBIENT, null, 0, 0, 0, 0f,
                 HacimEgrisi.sabit(1f), 0);
     }
 }

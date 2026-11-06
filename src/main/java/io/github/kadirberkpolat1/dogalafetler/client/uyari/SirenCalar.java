@@ -11,6 +11,7 @@ import io.github.kadirberkpolat1.dogalafetler.uyari.UyariPaketleri.SirenPaketi;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.sounds.SoundManager;
+import net.minecraft.sounds.SoundSource;
 
 /**
  * İstemcide aynı anda en çok bir siren çalar (S-02). Aynı afetin tekrar isteği yok sayılır; başka afetin sireni gelirse
@@ -42,8 +43,7 @@ final class SirenCalar {
                     etkin.afetNo());
         }
         SirenProfili profil = SirenProfili.icin(paket.tur());
-        etkin = new SirenSesi(new SirenZarfi(profil, paket.toplamTick(), paket.kalanTick()), paket.afet(),
-                paket.afetNo());
+        etkin = new SirenSesi(new SirenZarfi(profil, paket.toplamTick(), paket.kalanTick()), paket.afetNo());
         nobet = new SirenNobeti();
         Minecraft mc = Minecraft.getInstance();
         calinanDunya = mc.level;
@@ -73,7 +73,8 @@ final class SirenCalar {
             return;
         }
         SoundManager sesler = mc.getSoundManager();
-        if (!nobet.yenidenCalinmali(etkin.isStopped(), etkin.zarf().bitti(), sesler.isActive(etkin))) {
+        boolean anaSesKapali = mc.options.getSoundSourceVolume(SoundSource.MASTER) <= 0f;
+        if (!nobet.yenidenCalinmali(etkin.isStopped(), etkin.zarf().bitti(), sesler.isActive(etkin), anaSesKapali)) {
             return;
         }
         String neden = mc.level != calinanDunya ? "boyut değişimi" : "ses motoru durdurdu, ör. /stopsound";

@@ -21,6 +21,7 @@ import net.minecraft.client.resources.sounds.AbstractTickableSoundInstance;
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.sounds.SoundManager;
 import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -103,8 +104,7 @@ final class IstemciOrtam {
 
     void paket(OrtamPaketi paket) {
         Katman eski = katmanlar.get(paket.kimlik());
-        boolean ayni = eski != null && !eski.sonuyor() && eski.paket.ses().equals(paket.ses())
-                && eski.paket.afetNo() == paket.afetNo() && paket.gecenTick() + 20 >= eski.gecen;
+        boolean ayni = eski != null && !eski.sonuyor() && eski.paket.baslangic() == paket.baslangic();
         if (ayni) {
             eski.paket = paket;
             return;
@@ -140,6 +140,7 @@ final class IstemciOrtam {
         int tavan = UyariAyarlari.ortamTavan();
         List<OrtamKarisimi.Aday> adaylar = new ArrayList<>();
         SoundManager sesler = mc.getSoundManager();
+        boolean anaSesKapali = mc.options.getSoundSourceVolume(SoundSource.MASTER) <= 0f;
         for (Iterator<Katman> it = katmanlar.values().iterator(); it.hasNext(); ) {
             Katman k = it.next();
             k.gecen++;
@@ -164,7 +165,7 @@ final class IstemciOrtam {
             } else if (k.ornek == null) {
                 k.ornek = new Ornek(k);
                 sesler.play(k.ornek);
-            } else if (k.nobet.yenidenCalinmali(k.ornek.isStopped(), false, sesler.isActive(k.ornek))) {
+            } else if (k.nobet.yenidenCalinmali(k.ornek.isStopped(), false, sesler.isActive(k.ornek), anaSesKapali)) {
                 k.ornek = new Ornek(k);
                 sesler.play(k.ornek);
                 DogalAfetler.LOGGER.info("[ortam] katman yeniden çalındı (ses motoru kesti): {}", k.paket.kimlik());

@@ -11,7 +11,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.regex.Pattern;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
@@ -41,7 +40,8 @@ import net.minecraftforge.server.ServerLifecycleHooks;
  * }</pre>
  *
  * Afet bitince ({@link AfetBittiEvent}) o afetin ({@code afetNo}) unutulan katmanları {@value #VARSAYILAN_FADE_TICK} tick'te
- * kendiliğinden söner. Sonradan giren ya da boyut değiştiren oyuncuya süren katmanlar geçen süreyle gider.
+ * kendiliğinden söner. Sonradan giren, boyut değiştiren ya da (ölüm, End çıkışı) yeniden doğan oyuncuya süren katmanlar
+ * geçen süreyle gider.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID)
 public final class OrtamSesi {
@@ -49,7 +49,6 @@ public final class OrtamSesi {
     /** Hiçbir afete bağlı olmayan katman (sahibi kendisi durdurur). */
     public static final long AFETSIZ = -1L;
 
-    private static final Pattern KIMLIK = Pattern.compile("[a-z0-9_]+/[a-z0-9_./-]{1,48}");
     private static final Map<String, Katman> KATMANLAR = new LinkedHashMap<>();
 
     /** Katmanın yeri: konumsuz (her boyutta aynı düzey) ya da bir boyutta bir nokta ve menzil (doğrusal sönüm). */
@@ -74,8 +73,9 @@ public final class OrtamSesi {
             HacimEgrisi egri, long baslangic) {
         OrtamPaketi paket(MinecraftServer server) {
             int gecen = (int) Math.max(0, Math.min(Integer.MAX_VALUE, server.getTickCount() - baslangic));
-            return new OrtamPaketi(kimlik, afetNo, ses, kategori, yer.globalMi() ? null : yer.boyut().location(),
-                    yer.nokta().x, yer.nokta().y, yer.nokta().z, yer.menzil(), egri, gecen);
+            return new OrtamPaketi(kimlik, afetNo, baslangic, ses, kategori,
+                    yer.globalMi() ? null : yer.boyut().location(), yer.nokta().x, yer.nokta().y, yer.nokta().z,
+                    yer.menzil(), egri, gecen);
         }
 
         boolean duyar(ServerPlayer oyuncu) {
@@ -89,16 +89,14 @@ public final class OrtamSesi {
     /**
      * Katmanı başlatır; aynı kimlikte süren katman varsa yerine geçer (istemcide zaman çizelgesi sıfırdan başlar).
      *
-     * @param kimlik {@code <alt sistem>/<katman>} (küçük ASCII), aynı anda benzersiz
+     * @param kimlik {@code <alt sistem ≤ 15>/<katman ≤ 48>} (küçük ASCII, {@link OrtamKimligi}), aynı anda benzersiz
      * @param afetNo bağlı afetin başlangıç saati ({@code afet.baglam().baslangicSaati()}) ya da {@link #AFETSIZ}
      * @param ses ses olayı (modun kendi döngülü dosyası ya da vanilla ses)
      * @param kategori vanilla kaydırıcısı (ses.md §4 kural 6: WEATHER, BLOCKS, AMBIENT)
      */
     public static void baslat(MinecraftServer server, String kimlik, long afetNo, ResourceLocation ses,
             SoundSource kategori, Yer yer, HacimEgrisi egri) {
-        if (kimlik == null || !KIMLIK.matcher(kimlik).matches()) {
-            throw new IllegalArgumentException("Ortam katmanı kimliği <alt sistem>/<katman> olmalı: " + kimlik);
-        }
+        OrtamKimligi.dogrula(kimlik);
         Katman katman = new Katman(kimlik, afetNo, Objects.requireNonNull(ses, "ses"),
                 Objects.requireNonNull(kategori, "kategori"), Objects.requireNonNull(yer, "yer"),
                 Objects.requireNonNull(egri, "egri"), server.getTickCount());
@@ -182,6 +180,14 @@ public final class OrtamSesi {
 
     @SubscribeEvent
     public static void boyutDegisti(PlayerEvent.PlayerChangedDimensionEvent olay) {
+        if (olay.getEntity() instanceof ServerPlayer oyuncu) {
+            oyuncuyaSurenleri(oyuncu);
+        }
+    }
+
+    /** Ölüm ve End çıkışı {@code PlayerList.respawn} yolundan geçer; {@code PlayerChangedDimensionEvent} gelmez. */
+    @SubscribeEvent
+    public static void yenidenDogdu(PlayerEvent.PlayerRespawnEvent olay) {
         if (olay.getEntity() instanceof ServerPlayer oyuncu) {
             oyuncuyaSurenleri(oyuncu);
         }

@@ -20,7 +20,7 @@ import net.minecraftforge.network.NetworkEvent;
  * çekirdeğin yoluyla alınır ({@code DistExecutor.safeCallWhenOn}, K-C14); ortak kod istemci sınıfı yüklemez (N15).
  */
 public final class UyariPaketleri {
-    private static final int KIMLIK_SINIRI = 64;
+    private static final int KIMLIK_SINIRI = OrtamKimligi.EN_UZUN;
 
     private UyariPaketleri() {
     }
@@ -84,15 +84,17 @@ public final class UyariPaketleri {
     }
 
     /**
-     * Bir ortam katmanının tam durumu (başlatma ve konum güncellemesi aynı paket). {@code boyut} null ise katman
+     * Bir ortam katmanının tam durumu (başlatma ve konum güncellemesi aynı paket). {@code baslangic} katmanın sunucudaki
+     * başlangıç tick'i: aynı kimlikle yeniden başlatılan katmanı istemci bununla ayırır. {@code boyut} null ise katman
      * konumsuzdur (her boyutta, sönümsüz); değilse {@code menzil} blokta doğrusal söner. {@code gecenTick} katmanın
      * başlangıcından beri geçen gerçek tick (sonradan giren eğriyi doğru yerden alır).
      */
-    public record OrtamPaketi(String kimlik, long afetNo, ResourceLocation ses, SoundSource kategori,
+    public record OrtamPaketi(String kimlik, long afetNo, long baslangic, ResourceLocation ses, SoundSource kategori,
             ResourceLocation boyut, double x, double y, double z, float menzil, HacimEgrisi egri, int gecenTick) {
         void yaz(FriendlyByteBuf t) {
             t.writeUtf(kimlik, KIMLIK_SINIRI);
             t.writeLong(afetNo);
+            t.writeVarLong(baslangic);
             t.writeResourceLocation(ses);
             t.writeUtf(kategori.getName(), 32);
             t.writeBoolean(boyut != null);
@@ -114,6 +116,7 @@ public final class UyariPaketleri {
         static OrtamPaketi oku(FriendlyByteBuf t) {
             String kimlik = t.readUtf(KIMLIK_SINIRI);
             long afetNo = t.readLong();
+            long baslangic = t.readVarLong();
             ResourceLocation ses = t.readResourceLocation();
             SoundSource kategori = kategori(t.readUtf(32));
             ResourceLocation boyut = null;
@@ -136,8 +139,8 @@ public final class UyariPaketleri {
             for (int i = 0; i < adet; i++) {
                 noktalar.add(new HacimEgrisi.Nokta(t.readVarInt(), t.readFloat()));
             }
-            return new OrtamPaketi(kimlik, afetNo, ses, kategori, boyut, x, y, z, menzil, new HacimEgrisi(noktalar),
-                    Math.max(0, t.readVarInt()));
+            return new OrtamPaketi(kimlik, afetNo, baslangic, ses, kategori, boyut, x, y, z, menzil,
+                    new HacimEgrisi(noktalar), Math.max(0, t.readVarInt()));
         }
 
         static void isle(OrtamPaketi paket, Supplier<NetworkEvent.Context> baglam) {

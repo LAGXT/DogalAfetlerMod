@@ -11,7 +11,8 @@ pencereler kullanılır (perdesi 1 olmayan açılış/fade pencereleri ve 5 sn'l
 - siren kazanç düzeyleri (ör. "Sirenler" %28 ve %40) ve farkları (beklenen 20·log10(40/28) = +3,10 dB);
 - ortam katmanının siren yokken ve siren çalarken düzeyi (beklenen −3 dB bastırma);
 - dosyanın baştan çalındığı anlar (gecikme sıfıra döner: ses motoru sireni kesti, siren yeniden çalındı);
-- ses içindeki sessizlik boşlukları (boyut değişimi yükleme ekranı vb.);
+- ses içindeki sessizlik boşlukları (boyut değişimi yükleme ekranı vb.) ve her boşluğun 4 sn öncesi / 6 sn sonrasındaki
+  eşleşik siren düzeyi (boyut değişiminden sonra siren aynı düzeyle sürüyor mu, K0-27);
 - sirenin son düşüşü (200–1000 Hz bant zarfı, 100 ms): süre, toplam düşüş, eğim.
 
 Kullanım: .venv/bin/python tools/senaryo/uyari_kayit_olc.py <kayıt.wav> <çıktı klasörü>
@@ -244,6 +245,17 @@ def main():
     bos = bosluklar(zaman, sesli)
     satirlar.append(f"Ses içindeki sessiz boşluklar (bantlar < {SESSIZ_DBFS:.0f} dBFS, ≥ 0,2 sn): "
                     + (", ".join(f"{a:.2f}–{b:.2f} sn ({b - a:.2f} sn)" for a, b in bos) or "yok"))
+    for a, b in bos:
+        once = gecerli_s[(gecerli_s[:, 0] >= a - 4.0) & (gecerli_s[:, 0] < a)]
+        sonra = gecerli_s[(gecerli_s[:, 0] > b) & (gecerli_s[:, 0] <= b + 6.0)]
+        if len(once) and len(sonra):
+            d_once, d_sonra = float(np.median(db(once[:, 1]))), float(np.median(db(sonra[:, 1])))
+            satirlar.append(f"  boşluk {a:.2f}–{b:.2f} sn: siren öncesi {d_once:.2f} dB ({len(once)} pencere), sonrası "
+                            f"{d_sonra:.2f} dB ({len(sonra)} pencere, {sonra[0, 0]:.2f}–{sonra[-1, 0]:.2f} sn); "
+                            f"fark {d_sonra - d_once:+.2f} dB")
+        else:
+            satirlar.append(f"  boşluk {a:.2f}–{b:.2f} sn: öncesinde {len(once)}, sonrasında {len(sonra)} geçerli siren "
+                            f"penceresi (karşılaştırılamadı)")
 
     tavan_s = float(np.percentile(siren_db[siren_db > siren_esigi], 90)) if (siren_db > siren_esigi).any() else 0.0
     for bas, son in kosular(siren_db > siren_esigi, zaman):

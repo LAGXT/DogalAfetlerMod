@@ -1,7 +1,6 @@
 package io.github.kadirberkpolat1.dogalafetler.client.uyari;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
-import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.uyari.SesDuzeyi;
 import io.github.kadirberkpolat1.dogalafetler.uyari.SirenZarfi;
 import io.github.kadirberkpolat1.dogalafetler.uyari.UyariAyarlari;
@@ -24,21 +23,19 @@ import net.minecraft.world.phys.Vec3;
  */
 final class SirenSesi extends AbstractTickableSoundInstance {
     private final SirenZarfi zarf;
-    private final AfetTuru afet;
     private final long afetNo;
     private final boolean devamOrnegi;
     private String bitisNedeni;
     private boolean ilkTick = true;
 
-    SirenSesi(SirenZarfi zarf, AfetTuru afet, long afetNo) {
-        this(zarf, afet, afetNo, "güvenlik tavanı (durdurma paketi gelmedi)", false);
+    SirenSesi(SirenZarfi zarf, long afetNo) {
+        this(zarf, afetNo, "güvenlik tavanı (durdurma paketi gelmedi)", false);
     }
 
-    private SirenSesi(SirenZarfi zarf, AfetTuru afet, long afetNo, String bitisNedeni, boolean devamOrnegi) {
+    private SirenSesi(SirenZarfi zarf, long afetNo, String bitisNedeni, boolean devamOrnegi) {
         super(SoundEvent.createVariableRangeEvent(DogalAfetler.konum(zarf.profil().sesAdi())), SoundSource.MASTER,
                 SoundInstance.createUnseededRandom());
         this.zarf = zarf;
-        this.afet = afet;
         this.afetNo = afetNo;
         this.bitisNedeni = bitisNedeni;
         this.devamOrnegi = devamOrnegi;
@@ -56,15 +53,11 @@ final class SirenSesi extends AbstractTickableSoundInstance {
 
     /** Aynı zarfı (geçen tick, sönüm durumu, bitiş nedeni) sürdüren yeni örnek; açılış tekrarlanmaz. */
     SirenSesi devam() {
-        return new SirenSesi(zarf, afet, afetNo, bitisNedeni, true);
+        return new SirenSesi(zarf, afetNo, bitisNedeni, true);
     }
 
     SirenZarfi zarf() {
         return zarf;
-    }
-
-    AfetTuru afet() {
-        return afet;
     }
 
     long afetNo() {

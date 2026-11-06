@@ -18,6 +18,7 @@ import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.OptionsList;
 import net.minecraft.client.gui.components.events.GuiEventListener;
+import net.minecraft.client.gui.screens.OptionsSubScreen;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.SoundOptionsScreen;
 import net.minecraft.resources.ResourceKey;
@@ -28,6 +29,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.InputEvent;
+import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -40,9 +42,11 @@ import org.lwjgl.openal.ALC11;
  * çalışır (S-05). Komutlar entegre sunucuda çıktısı bastırılmış kaynakla verilir: sohbete yazı düşmez, ekran
  * görüntüsünde yalnız oyun kalır (N6). Her girdi olayı kurulumdan kapanışa log'a yazılır ve sayılır.
  *
- * <p>Ses: oyun Ana Ses %0 ile açılır; açık OpenAL aygıtı "Wave File Writer" (karışımı dosyaya yazan, hoparlörsüz aygıt)
- * değilse otomasyon Ana Ses'e dokunmadan oyunu kapatır. Aygıt doğruysa Ana Ses %100 olur: vanilla Ana Ses 0 iken hiçbir
- * sesi başlatmaz, siren ölçülemezdi.
+ * <p>Ses (U-15, U-17): otomasyon dosyaya güvenmez. İlk istemci tick'inde Ana Ses'i kendisi 0 yapar; açık OpenAL aygıtı
+ * "Wave File Writer" (karışımı dosyaya yazan, hoparlörsüz aygıt) değilse Ana Ses'i 0 kaydedip oyunu kapatır. Aygıt
+ * doğruysa Ana Ses %100 olur (vanilla Ana Ses 0 iken hiçbir sesi başlatmaz, siren ölçülemezdi). Seçenek ekranı
+ * kapanırken ({@code OptionsSubScreen.removed()} → {@code options.save()}) Ana Ses o an 0'dır, sonraki tick'te geri açılır;
+ * kapanışta 0 yazılıp kaydedilir. Böylece {@code options.txt}'e Ana Ses 1.0 hiç yazılmaz.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class UyariOtomasyonu {
@@ -60,6 +64,10 @@ public final class UyariOtomasyonu {
     private static int fareSayisi;
     private static int tekerlekSayisi;
     private static int stopsoundOncesi;
+    private static long tickSayaci;
+    private static boolean anaSesSifirlandi;
+    private static boolean aygitDogrulandi;
+    private static boolean anaSesGeriAcilacak;
 
     private record Adim(long ms, String ad, BooleanSupplier kosul, Runnable is) {
     }
@@ -85,7 +93,7 @@ public final class UyariOtomasyonu {
             cek("uyari-siren-calarken-yazi-yok");
             ortamLog("siren sırasında (-3 dB bekleniyor)");
         });
-        adim(0, "Nether'e geç (80 tick)", () -> calan(80),
+        adim(0, "Nether'e geç (45 tick; tam düzey geçişten önce ve sonra kayda girsin)", () -> calan(45),
                 () -> komut("execute in minecraft:the_nether run tp @s ~ ~ ~"));
         bekle("siren Nether'de yeniden başladı", () -> SirenCalar.ORNEK.yenidenBaslatmaSayisi() >= 1);
         bekle("siren durdu (AKTIF aşama, fade-out)", UyariOtomasyonu::sustu);
@@ -131,7 +139,7 @@ public final class UyariOtomasyonu {
             komut("dogalafet stop");
             log("girdi sayacı: tuş={} fare={} tekerlek={}", tusSayisi, fareSayisi, tekerlekSayisi);
         });
-        adim(1000, "çıkış", () -> Minecraft.getInstance().stop());
+        adim(1000, "çıkış", UyariOtomasyonu::cikis);
     }
 
     /** Dedicated server'a bağlı istemci: komut vermez, sunucu konsolunun başlattığı sireni bekler (ses kayda gider). */
@@ -141,21 +149,22 @@ public final class UyariOtomasyonu {
         bekle("siren durdu (sunucunun durdurma paketi, fade-out)", UyariOtomasyonu::sustu);
         adim(1000, "çıkış", () -> {
             log("girdi sayacı: tuş={} fare={} tekerlek={}", tusSayisi, fareSayisi, tekerlekSayisi);
-            Minecraft.getInstance().stop();
+            cikis();
         });
     }
 
-    /** Kayıt aygıtı doğruysa Ana Ses'i açar; değilse Ana Ses'e dokunmadan oyunu kapatır. */
+    /** Kayıt aygıtı doğruysa Ana Ses'i açar; değilse Ana Ses'i 0 kaydedip oyunu kapatır. */
     private static boolean sesiAc() {
         Minecraft mc = Minecraft.getInstance();
         String aygit = sesAygiti();
         if (!aygit.contains(KAYIT_AYGITI)) {
-            DogalAfetler.LOGGER.error("[uyari-otomasyon] ses aygıtı '{}' kayıt aygıtı değil; Ana Ses %0 kalıyor, kapanış", aygit);
+            DogalAfetler.LOGGER.error("[uyari-otomasyon] ses aygıtı '{}' kayıt aygıtı değil; Ana Ses %0, kapanış", aygit);
             sonraki = ADIMLAR.size();
-            mc.stop();
+            cikis();
             return false;
         }
-        mc.options.getSoundSourceOptionInstance(SoundSource.MASTER).set(1.0);
+        aygitDogrulandi = true;
+        anaSes(1.0);
         log("ses: aygıt='{}' MASTER={} WEATHER={} AMBIENT={} altyazı={} sirenSes={} ortamTavan={}", aygit,
                 mc.options.getSoundSourceVolume(SoundSource.MASTER), mc.options.getSoundSourceVolume(SoundSource.WEATHER),
                 mc.options.getSoundSourceVolume(SoundSource.AMBIENT), mc.options.showSubtitles().get(),
@@ -163,12 +172,48 @@ public final class UyariOtomasyonu {
         return true;
     }
 
+    private static void anaSes(double deger) {
+        Minecraft.getInstance().options.getSoundSourceOptionInstance(SoundSource.MASTER).set(deger);
+    }
+
+    /** Ana Ses 0 kaydedilir ve oyun kapanır (options.txt'e Ana Ses 1.0 kalmaz). */
+    private static void cikis() {
+        Minecraft mc = Minecraft.getInstance();
+        anaSes(0.0);
+        mc.options.save();
+        log("Ana Ses %0 options.txt'e yazıldı; kapanış");
+        mc.stop();
+    }
+
+    /** Seçenek ekranının {@code removed()}'ı seçenekleri kaydeder; Ana Ses o an 0, sonraki tick'te geri açılır. */
+    @SubscribeEvent
+    public static void ekranKapaniyor(ScreenEvent.Closing olay) {
+        if (ETKIN && olay.getScreen() instanceof OptionsSubScreen) {
+            anaSes(0.0);
+            anaSesGeriAcilacak = aygitDogrulandi;
+            log("seçenek ekranı kapanıyor: Ana Ses kayıt için %0");
+        }
+    }
+
     @SubscribeEvent
     public static void tik(TickEvent.ClientTickEvent olay) {
-        if (!ETKIN || olay.phase != TickEvent.Phase.END) {
+        if (!ETKIN) {
             return;
         }
         Minecraft mc = Minecraft.getInstance();
+        if (!anaSesSifirlandi) {
+            anaSesSifirlandi = true;
+            anaSes(0.0);
+            log("ilk tick: Ana Ses %0 (aygıt doğrulanana dek)");
+        }
+        if (olay.phase != TickEvent.Phase.END) {
+            return;
+        }
+        tickSayaci++;
+        if (anaSesGeriAcilacak) {
+            anaSesGeriAcilacak = false;
+            anaSes(1.0);
+        }
         if (baslangic < 0) {
             boolean hazir = mc.player != null && mc.level != null
                     && (SENARYO.equals("uyari-sunucu") || mc.screen == null && mc.getSingleplayerServer() != null);
@@ -182,6 +227,7 @@ public final class UyariOtomasyonu {
             }
             baslangic = System.currentTimeMillis();
             oncekiAdimZamani = baslangic;
+            tickSayaci = 0;
             log("dünyaya girildi; {} adım", ADIMLAR.size());
         }
         if (mc.screen instanceof PauseScreen) {
@@ -204,7 +250,8 @@ public final class UyariOtomasyonu {
             }
             sonraki++;
             oncekiAdimZamani = simdi;
-            log("t={} ms (fps={}): {}", simdi - baslangic, mc.getFps(), adim.ad());
+            log("t={} ms (fps={}, tick/sn={}): {}", simdi - baslangic, mc.getFps(), simdi > baslangic
+                    ? String.format(Locale.ROOT, "%.1f", tickSayaci * 1000.0 / (simdi - baslangic)) : "-", adim.ad());
             adim.is().run();
         }
     }

@@ -14,10 +14,15 @@ açar ve karışımı /tmp/uyari-ses-cikis.wav'a yazar (ölçüm dosyadan, `tool
 iken hiçbir sesi başlatmaz), değilse oyunu kapatır. Bu betik de log'daki "OpenAL initialized on device" satırını denetler,
 başka aygıtta süreci öldürür. Kategoriler: WEATHER %100 (örnek ortam katmanı; açık havada başka WEATHER sesi yok), diğerleri
 0 (kayıtta yalnız siren ve ortam katmanı kalır).
+(f) U-17: worktree'nin `run/options.txt`'i koşudan önce bayt bayt saklanır, sonunda (hata olsa da) geri yazılır; önce/sonra
+    sha256 log'a girer. Java kapısı (`UyariOtomasyonu`) da dosyaya güvenmez: ilk tick'te Ana Ses 0, seçenek ekranı kapanırken
+    ve kapanışta 0 kaydeder.
+(g) Senaryo son adımına ("çıkış") ulaşmadıysa koşu "tamamlanmadı" sayılır (protokol temiz olsa da).
 
 Kullanım (worktree kökünden): python3 tools/senaryo/uyari_istemci.py <kanıt klasörü>
 Çıkış: 0 geçerli koşu, 1 geçersiz/iptal.
 """
+import hashlib
 import json
 import os
 import re
@@ -117,7 +122,8 @@ def secenekleri_hazirla():
 
 
 def kos(kanit, otomasyon="uyari", gradle_ek=("-PquickPlay=test", "-PoyunTestiAfeti=deprem"), wav=WAV):
-    """İstemciyi protokolle açar, kapanışına kadar bekler, kanıtları `kanit`'a kopyalar; koşu geçerliyse True."""
+    """İstemciyi protokolle açar, kapanışına kadar bekler, kanıtları `kanit`'a kopyalar; koşu geçerli ve senaryo
+    tamamlandıysa True. `run/options.txt` koşudan önce saklanır ve sonunda bayt bayt geri yazılır (U-17)."""
     kanit = Path(kanit).resolve()
     kanit.mkdir(parents=True, exist_ok=True)
     log = Gunluk(kanit / "pencere-uyari.log")
@@ -131,6 +137,32 @@ def kos(kanit, otomasyon="uyari", gradle_ek=("-PquickPlay=test", "-PoyunTestiAfe
         log("kapı 10 dk'da açılmadı; koşu iptal")
         return False
 
+    secenekler = RUN / "options.txt"
+    ozgun = secenekler.read_bytes() if secenekler.exists() else None
+    log(f"(f) options.txt önce: sha256={sha256(ozgun)}")
+    gecerli = False
+    try:
+        gecerli = _kos(kanit, log, otomasyon, gradle_ek, wav)
+    finally:
+        acik = istemci_jvm()
+        if acik is not None:
+            oldur(log, acik, "betik bitti, istemci açık (options.txt geri yazılmadan önce)")
+            time.sleep(2)
+        if ozgun is None:
+            secenekler.unlink(missing_ok=True)
+        else:
+            secenekler.write_bytes(ozgun)
+        sonra = secenekler.read_bytes() if secenekler.exists() else None
+        log(f"(f) options.txt geri yazıldı: sha256={sha256(sonra)} "
+            f"({'öncekiyle AYNI' if sonra == ozgun else 'FARKLI'})")
+    return gecerli
+
+
+def sha256(veri):
+    return "yok" if veri is None else hashlib.sha256(veri).hexdigest()
+
+
+def _kos(kanit, log, otomasyon, gradle_ek, wav):
     secenekleri_hazirla()
     for eski in (RUN / "uyari-kanit").glob("*") if (RUN / "uyari-kanit").exists() else []:
         eski.unlink()
@@ -237,8 +269,10 @@ def kos(kanit, otomasyon="uyari", gradle_ek=("-PquickPlay=test", "-PoyunTestiAfe
     for dosya in sorted((RUN / "uyari-kanit").glob("*")):
         shutil.copy2(dosya, kanit / dosya.name)
         log(f"kanıt: {dosya.name}")
-    log(f"koşu {'GEÇERLİ' if gecerli else 'GEÇERSİZ'}")
-    return gecerli
+    tamam = re.search(r"\[uyari-otomasyon\] t=\d+ ms .*: çıkış", metin) is not None
+    log(f"(g) senaryo son adıma ulaştı: {'evet' if tamam else 'hayır (tamamlanmadı)'}")
+    log(f"koşu {'GEÇERLİ' if gecerli else 'GEÇERSİZ'}" + ("" if tamam else ", senaryo tamamlanmadı"))
+    return gecerli and tamam
 
 
 def main():
