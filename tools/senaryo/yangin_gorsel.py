@@ -42,6 +42,18 @@ def log(*a):
     GUNLUK.flush()
 
 
+def hyprland_imzasi():
+    """Ajan kabuğu Hyprland ortamını devralmayabilir: tek canlı örneğin imzası soket klasöründen alınır."""
+    if os.environ.get("HYPRLAND_INSTANCE_SIGNATURE"):
+        return os.environ["HYPRLAND_INSTANCE_SIGNATURE"]
+    kok = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")) / "hypr"
+    adaylar = [p.name for p in kok.glob("*") if (p / ".socket.sock").exists()]
+    if len(adaylar) != 1:
+        raise SystemExit(f"Hyprland örneği belirsiz ({kok}): {adaylar}")
+    os.environ["HYPRLAND_INSTANCE_SIGNATURE"] = adaylar[0]
+    return adaylar[0]
+
+
 def hypr(*a):
     r = subprocess.run(["hyprctl", *a], capture_output=True, text=True, timeout=10)
     return r.stdout.strip()
@@ -205,6 +217,7 @@ def kareleri_tasi():
 def main():
     var = [int(p.stem.rsplit("-", 1)[1]) for p in KANIT.glob("runClient-*.log") if p.stem.rsplit("-", 1)[1].isdigit()]
     no = max(var, default=0) + 1
+    log("Hyprland imzası:", hyprland_imzasi())
     (W / "run/screenshots").mkdir(parents=True, exist_ok=True)
     for eski in (W / "run/screenshots").glob("yangin_*.png"):
         eski.unlink()
