@@ -1,5 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.yangin.mantik;
 
+import io.github.kadirberkpolat1.dogalafetler.core.BitisNedeni;
+
 /**
  * Ortak yangının Minecraft'a dokunmayan hesapları (madde 6, bölüm G): tick bütçesi ve TPS kısması, aktif tavan, yayılma
  * olasılığı (vanilla yanıcılık × rüzgâr × eğim × nem), yanma süresi, yağmurda sönme ve işleme önceliği.
@@ -119,6 +121,15 @@ public final class YanginMantigi {
             return YagisDurumu.ACIK;
         }
         return yagmurluBiyom && ortu <= KORUNAKLI_ORTU ? YagisDurumu.KORUNAKLI : YagisDurumu.YOK;
+    }
+
+    /**
+     * Afet bitiş nedeninden yangın kipi (Y-27): {@code /dogalafet stop}, {@code sifirla} ({@link BitisNedeni#KOMUT}) ve
+     * ön-uyarıda iptal ateşi hemen söndürür; doğal bitiş, gamerule ve hata ateşi yanıp bitmeye bırakır. Çekirdeğin
+     * {@code Afet.durdur(level, temiz)} bayrağıyla aynı anlamda değildir (çekirdekte doğal bitiş {@code true}).
+     */
+    public static boolean temizBitis(BitisNedeni neden) {
+        return neden == BitisNedeni.KOMUT || neden == BitisNedeni.IPTAL;
     }
 
     /** {@code alanTutustur}'un tick başına okuma bütçesi: hücre bütçesiyle (config × TPS kısması) orantılı. */

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Yangın parçacık dokularını üretir (madde 6, tasarım notu §5): 4 kare alev (16x16), 4 kare duman (32x32; sütun ve pirokümülüs de kullanır) ve 2 kare kıvılcım (8x8).
+"""Yangın parçacık dokularını üretir (madde 6, tasarım notu §5): 4 kare alev (16x16), 4 kare hücre dumani (32x32),
+4 kare sütun/pirokümülüs (64x64) ve 2 kare kıvılcım (8x8).
 
 Kullanım: python3 tools/assets/yangin_dokulari.py  (kökten). Aynı tohumla aynı PNG'leri yazar.
 """
@@ -48,10 +49,9 @@ def alev(kare, rng):
             r = 255
             g = int(90 + 165 * sicak ** 1.5)
             b = int(30 + 170 * max(0.0, sicak - 0.7) / 0.3) if sicak > 0.7 else 30
-            # kenar satır ve sütunlarda alfa düşer: sprite kenarı sert kesilmesin
-            alt = min(1.0, (boy - 1 - y + 0.5) / 2.5, (y + 0.5) / 2.5)
-            yan = min(1.0, (min(x, boy - 1 - x) + 0.5) / 1.5)
-            a = int(255 * min(1.0, kenar * 9) * alt * yan)
+            # tam parlak çizilir ve parçacık gölgelendiricisi yalnız alfa < 0,1'i atar: dış iki halka 0, üçüncü yarım
+            halka = min(x, y, boy - 1 - x, boy - 1 - y)
+            a = int(255 * min(1.0, kenar * 9) * (0.0 if halka <= 1 else 0.5 if halka == 2 else 1.0))
             img.putpixel((x, y), (r, min(255, g), min(255, b), a))
     return img
 
@@ -68,6 +68,24 @@ def duman(kare, rng):
                 continue
             ton = int(150 + 70 * n(y, x))
             img.putpixel((x, y), (ton, ton, ton, int(255 * min(1.0, yogun) ** 1.2)))
+    return img
+
+
+def kume(kare, rng):
+    """64x64 sütun ve pirokümülüs dumani: 14 bloğa varan quad'da piksel ~0,2 blok kalır, alfa geniş bir halkada sıfıra iner."""
+    boy = 64
+    img = Image.new("RGBA", (boy, boy))
+    kaba = gurultu(rng, boy, 5)
+    ince = gurultu(rng, boy, 13)
+    for y in range(boy):
+        for x in range(boy):
+            d = math.hypot(x + 0.5 - boy / 2, y + 0.5 - boy / 2) / (boy / 2)
+            yogun = ((1 - d) * 1.2 + (kaba(x, y) - 0.5) * 0.7 + (ince(x, y) - 0.5) * 0.35 - kare * 0.06) \
+                * kenar_sonumu(d, 0.45)
+            if yogun <= 0:
+                continue
+            ton = int(165 + 60 * kaba(y, x))
+            img.putpixel((x, y), (ton, ton, ton, int(255 * min(1.0, yogun) ** 1.4)))
     return img
 
 
@@ -91,9 +109,10 @@ def main():
     for kare in range(4):
         alev(kare, random.Random(100 + kare)).save(HEDEF / f"yangin_alevi_{kare}.png")
         duman(kare, random.Random(200 + kare)).save(HEDEF / f"yangin_dumani_{kare}.png")
+        kume(kare, random.Random(300 + kare)).save(HEDEF / f"yangin_kumesi_{kare}.png")
     for kare in range(2):
         kivilcim(kare).save(HEDEF / f"yangin_kivilcimi_{kare}.png")
-    print(f"10 doku yazıldı: {HEDEF}")
+    print(f"14 doku yazıldı: {HEDEF}")
 
 
 if __name__ == "__main__":

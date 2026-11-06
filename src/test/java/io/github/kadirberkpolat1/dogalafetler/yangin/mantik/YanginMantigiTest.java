@@ -2,8 +2,10 @@ package io.github.kadirberkpolat1.dogalafetler.yangin.mantik;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.github.kadirberkpolat1.dogalafetler.core.BitisNedeni;
 import org.junit.jupiter.api.Test;
 
 class YanginMantigiTest {
@@ -204,5 +206,14 @@ class YanginMantigiTest {
         KureTarayici tarayici = new KureTarayici(3);
         assertEquals(7, tarayici.ilerle(5, (dx, dy, dz) -> 7), "bir konum 7 okuma harcadı, bütçe 5: tek konumda durur");
         assertTrue(!tarayici.bitti());
+    }
+
+    @Test
+    void afetBitisNedeniYanginKipiniBelirler() {
+        assertTrue(YanginMantigi.temizBitis(BitisNedeni.KOMUT), "stop ve sifirla ateşi söndürür");
+        assertTrue(YanginMantigi.temizBitis(BitisNedeni.IPTAL), "ön-uyarıda iptal edilen afetin ateşi kalmaz");
+        assertFalse(YanginMantigi.temizBitis(BitisNedeni.DOGAL), "doğal bitişte ateş yanıp biter");
+        assertFalse(YanginMantigi.temizBitis(BitisNedeni.KURAL), "gamerule kapanınca ateş yanıp biter");
+        assertFalse(YanginMantigi.temizBitis(BitisNedeni.HATA), "hata bitişinde ateş yanıp biter");
     }
 }

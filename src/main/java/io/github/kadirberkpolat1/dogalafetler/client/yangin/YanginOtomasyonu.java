@@ -140,7 +140,7 @@ public final class YanginOtomasyonu {
             }
             case 1 -> {
                 if (sayac == 70) {
-                    server.execute(() -> kameraSec(server, "vitrin", VITRIN_ADAYLARI, VITRIN_KAPLAMA));
+                    server.execute(() -> kameraSec(server, "vitrin", VITRIN_ADAYLARI, VITRIN_KAPLAMA, false));
                 } else if (sayac == KARE_ARALIGI) {
                     komut(server, "forge tps");
                     komut(server, "dogalafet yangin bilgi");
@@ -158,7 +158,7 @@ public final class YanginOtomasyonu {
             }
             case 2 -> {
                 if (sayac == 1) {
-                    server.execute(() -> kameraSec(server, "yagmur", YAGMUR_ADAYLARI, YAGMUR_KAPLAMA));
+                    server.execute(() -> kameraSec(server, "yagmur", YAGMUR_ADAYLARI, YAGMUR_KAPLAMA, true));
                 } else if (sayac == 40) {
                     server.execute(() -> {
                         server.overworld().setWeatherParameters(0, 6000, true, false);
@@ -243,11 +243,19 @@ public final class YanginOtomasyonu {
      * Sunucu thread'inde: kamerayı cephenin yanına koyar. Cephe çizgisi rüzgâra diktir (p); kamera çizginin -p ucundan
      * {@code aday} blok dışarıda, 4 blok rüzgâr üstünde, taçların 3+ blok üstündedir ve cephenin yakın kısmına bakar;
      * yangın kadrajda soldan sağa (rüzgâr altına) ilerler. Kaplama tahmini hedefi geçen en uzak aday seçilir.
+     * {@code yalnizYagmurlu}: yalnız yağışı {@code RAIN} olan biyomdaki ateş sayılır (yağışsız savanada yağmur yangını
+     * söndürmez, Y-08; yağmur karesi sönmeyi göstermeli).
      */
-    private static void kameraSec(IntegratedServer server, String ad, int[] adaylar, double hedefKaplama) {
+    private static void kameraSec(IntegratedServer server, String ad, int[] adaylar, double hedefKaplama,
+            boolean yalnizYagmurlu) {
         ServerLevel level = server.overworld();
         ServerPlayer oyuncu = server.getPlayerList().getPlayers().get(0);
         List<BlockPos> atesler = atesBloklari(level);
+        if (yalnizYagmurlu) {
+            int toplam = atesler.size();
+            atesler.removeIf(a -> level.getBiome(a).value().getPrecipitationAt(a) != Biome.Precipitation.RAIN);
+            DogalAfetler.LOGGER.info(ON + "kamera {}: {} ateş bloğunun {}'i yağmurlu biyomda", ad, toplam, atesler.size());
+        }
         if (atesler.isEmpty()) {
             DogalAfetler.LOGGER.warn(ON + "kamera {}: ateş bloğu yok, kamera değişmedi", ad);
             return;

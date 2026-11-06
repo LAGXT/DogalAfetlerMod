@@ -1,17 +1,23 @@
 package io.github.kadirberkpolat1.dogalafetler.yangin;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.core.AfetKaydi;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
+import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
+import io.github.kadirberkpolat1.dogalafetler.core.CekirdekOyunTestleri;
+import io.github.kadirberkpolat1.dogalafetler.core.OyunTestiAfeti;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import io.github.kadirberkpolat1.dogalafetler.yangin.mantik.YanginMantigi;
 import java.util.function.BiPredicate;
 import java.util.function.DoubleSupplier;
+import java.util.function.IntSupplier;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.gametest.framework.GameTestServer;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.block.Block;
@@ -39,6 +45,8 @@ public final class YanginOyunTestleri {
     private static final String SAHNE = "yangin_sahne";
     /** Sıçrama eşiğinin altında (kıvılcım komşu test alanlarına düşmez); yerel yayılma sürer. */
     private static final double DUSUK = 0.1;
+    /** Testte {@code kaynakBitti(temiz=false)} sönüm penceresi (tick); meşe kütüğü 444 tick yanar. */
+    private static final int SONUM_TESTI = 80;
 
     private YanginOyunTestleri() {
     }
@@ -314,8 +322,8 @@ public final class YanginOyunTestleri {
 
     /**
      * Y-19: ateş bloğu yüklü olmayan chunk'tayken hücre sönerse blok bekleyen silmeye girer; chunk yüklenince
-     * ({@code ChunkEvent.Load}) kalkar. "Yüklü değil" sahnenin alanı için test kancasıyla taklit edilir; gerçek boşalt/yükle
-     * yolu runServer senaryosunda (forceload).
+     * ({@code ChunkEvent.Load}) kalkar. "Yüklü değil" sahnenin alanı için test kancasıyla taklit edilir; 1 Hz denetim kapalıdır,
+     * yani bloğu yalnız olay yolu kaldırabilir. Gerçek boşalt/yükle yolu runServer senaryosunda (forceload).
      */
     @GameTest(template = SAHNE, batch = "yangin_bekleyen", timeoutTicks = 100)
     public static void yukluOlmayanAtesChunkYuklenincekalkar(GameTestHelper y) {
@@ -326,6 +334,8 @@ public final class YanginOyunTestleri {
                 "yaprak tutuşmalı");
         BlockPos ates = y.absolutePos(yaprak.above());
         AABB bolge = alan(y);
+        YanginYoneticisi.bekleyenDenetimiAyarla(false);
+        y.runAfterDelay(95, () -> YanginYoneticisi.bekleyenDenetimiAyarla(true));
         BiPredicate<ServerLevel, BlockPos> onceki = YanginYoneticisi.yukluKaynagiAyarla(
                 (l, p) -> !bolge.contains(Vec3.atCenterOf(p)) && l.isLoaded(p));
         try {
@@ -343,6 +353,7 @@ public final class YanginOyunTestleri {
             y.assertBlockPresent(Blocks.OAK_LEAVES, yaprak);
             y.assertTrue(!YanginYoneticisi.veri(level).bekleyenSilmeler.contains(ates.asLong()),
                     "bekleyen silme boşalmalı");
+            YanginYoneticisi.bekleyenDenetimiAyarla(true);
         });
     }
 
@@ -368,21 +379,98 @@ public final class YanginOyunTestleri {
         y.succeed();
     }
 
-    /** {@code kaynakBitti(temiz=false)}: yayılma durur, hücre sönüm süresi içinde yanıp biter (yakıt havaya döner). */
-    @GameTest(template = SAHNE, batch = "yangin_genel", timeoutTicks = 300)
+    /**
+     * {@code kaynakBitti(temiz=false)}: yayılma durur ve bitiş sönüm penceresine kısalır. Pencere testte 80 tick, yakıt meşe
+     * kütüğü (yanma süresi 444 tick): kütük kaynakBitti olmadan 80 tick'te yanmazdı.
+     */
+    @GameTest(template = SAHNE, batch = "yangin_genel", timeoutTicks = 160)
     public static void kaynakBittiYanarakBiter(GameTestHelper y) {
         ServerLevel level = y.getLevel();
+        BlockPos kutuk = new BlockPos(4, 1, 4);
+        y.setBlock(kutuk, Blocks.OAK_LOG);
+        YanginKaynagi kaynak = YanginKaynagi.afet(AfetTuru.GUNES_PATLAMASI, 9002L);
+        y.assertTrue(YanginYoneticisi.tutustur(level, y.absolutePos(kutuk), kaynak, DUSUK) == 1, "tutuşmalı");
+        YanginHucresi h = YanginYoneticisi.veri(level).hucreler.get(y.absolutePos(kutuk).asLong());
+        long simdi = level.getGameTime();
+        long ilkBitis = h.bitis;
+        IntSupplier onceki = YanginYoneticisi.sonumKaynagiAyarla(() -> SONUM_TESTI);
+        try {
+            YanginYoneticisi.kaynakBitti(level.getServer(), kaynak, false);
+        } finally {
+            YanginYoneticisi.sonumKaynagiAyarla(onceki);
+        }
+        y.assertTrue(!h.yayilabilir, "hücre yayılmamalı");
+        y.assertTrue(ilkBitis > simdi + SONUM_TESTI && h.bitis <= simdi + SONUM_TESTI,
+                "bitiş sönüm penceresine kısalmalı: " + (ilkBitis - simdi) + " -> " + (h.bitis - simdi));
+        y.succeedWhen(() -> {
+            y.assertBlockPresent(Blocks.AIR, kutuk);
+            y.assertTrue(aktif(y) == 0 && atesSayisi(y) == 0, "yanıp bitmeli");
+        });
+    }
+
+    /** Y-27: {@code /dogalafet stop} ({@code KOMUT}) olayıyla afetin ateşi hemen söner, yakıt korunur. */
+    @GameTest(template = SAHNE, batch = "yangin_afet_stop")
+    public static void afetDurunceAtesiSoner(GameTestHelper y) {
+        ServerLevel level = y.getLevel();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(level.getServer());
+        yonetici.durdur();
         BlockPos yaprak = new BlockPos(4, 1, 4);
         y.setBlock(yaprak, kaliciYaprak());
-        YanginKaynagi kaynak = YanginKaynagi.afet(AfetTuru.GUNES_PATLAMASI, 9002L);
-        y.assertTrue(YanginYoneticisi.tutustur(level, y.absolutePos(yaprak), kaynak, DUSUK) == 1, "tutuşmalı");
-        long simdi = level.getGameTime();
-        YanginYoneticisi.kaynakBitti(level.getServer(), kaynak, false);
-        YanginHucresi h = YanginYoneticisi.veri(level).hucreler.get(y.absolutePos(yaprak).asLong());
-        y.assertTrue(h != null && !h.yayilabilir, "hücre kalmalı ama yayılmamalı");
-        y.assertTrue(h.bitis <= simdi + YanginAyarlari.afetSonrasiSonumSaniye() * 20L, "bitiş sönüm süresi içinde");
+        BlockPos merkez = y.absolutePos(BlockPos.ZERO);
+        ServerPlayer oyuncu = CekirdekOyunTestleri.sahteOyuncu(y, merkez.getX() + 0.5, merkez.getY() + 1, merkez.getZ() + 0.5);
+        try (AfetKaydi.GeciciKayit kayit = AfetKaydi.geciciKaydet(AfetTuru.DEPREM,
+                () -> new OyunTestiAfeti(AfetTuru.DEPREM, 16, 100))) {
+            y.assertTrue(yonetici.elleBaslat(AfetTuru.DEPREM, 1, oyuncu, level, merkez)
+                    == AfetYoneticisi.BaslatmaSonucu.BASLADI, "afet başlamadı");
+            YanginKaynagi kaynak = YanginKaynagi.afet(AfetTuru.DEPREM,
+                    yonetici.aktifAfet().orElseThrow().baglam().baslangicSaati());
+            y.assertTrue(YanginYoneticisi.tutustur(level, y.absolutePos(yaprak), kaynak, DUSUK) == 1, "tutuşmalı");
+            y.assertTrue(yonetici.durdur(), "afet durmalı");
+        } finally {
+            yonetici.durdur();
+            level.getServer().getPlayerList().remove(oyuncu);
+        }
+        y.assertTrue(aktif(y) == 0 && atesSayisi(y) == 0, "stop ateşi hemen söndürmeli");
+        y.assertBlockPresent(Blocks.OAK_LEAVES, yaprak);
+        y.succeed();
+    }
+
+    /** Y-27: doğal bitiş ({@code DOGAL}) olayıyla ateş yayılmayı bırakır ve sönüm penceresinde yanıp biter. */
+    @GameTest(template = SAHNE, batch = "yangin_afet_dogal", timeoutTicks = 160)
+    public static void afetDogalBitinceAtesYanipBiter(GameTestHelper y) {
+        ServerLevel level = y.getLevel();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(level.getServer());
+        yonetici.durdur();
+        BlockPos kutuk = new BlockPos(4, 1, 4);
+        y.setBlock(kutuk, Blocks.OAK_LOG);
+        BlockPos merkez = y.absolutePos(BlockPos.ZERO);
+        ServerPlayer oyuncu = CekirdekOyunTestleri.sahteOyuncu(y, merkez.getX() + 0.5, merkez.getY() + 1, merkez.getZ() + 0.5);
+        long simdi;
+        YanginHucresi h;
+        IntSupplier onceki = YanginYoneticisi.sonumKaynagiAyarla(() -> SONUM_TESTI);
+        try (AfetKaydi.GeciciKayit kayit = AfetKaydi.geciciKaydet(AfetTuru.DEPREM,
+                () -> new OyunTestiAfeti(AfetTuru.DEPREM, 16, 100))) {
+            y.assertTrue(yonetici.elleBaslat(AfetTuru.DEPREM, 1, oyuncu, level, merkez)
+                    == AfetYoneticisi.BaslatmaSonucu.BASLADI, "afet başlamadı");
+            YanginKaynagi kaynak = YanginKaynagi.afet(AfetTuru.DEPREM,
+                    yonetici.aktifAfet().orElseThrow().baglam().baslangicSaati());
+            y.assertTrue(YanginYoneticisi.tutustur(level, y.absolutePos(kutuk), kaynak, DUSUK) == 1, "tutuşmalı");
+            h = YanginYoneticisi.veri(level).hucreler.get(y.absolutePos(kutuk).asLong());
+            simdi = level.getGameTime();
+            for (int i = 0; i < 8 && yonetici.aktifAfet().isPresent(); i++) {
+                yonetici.asamaIleri();
+            }
+            y.assertTrue(yonetici.aktifAfet().isEmpty(), "afet doğal bitmeli");
+        } finally {
+            YanginYoneticisi.sonumKaynagiAyarla(onceki);
+            yonetici.durdur();
+            level.getServer().getPlayerList().remove(oyuncu);
+        }
+        y.assertTrue(h != null && !h.yayilabilir && h.bitis <= simdi + SONUM_TESTI,
+                "doğal bitişte hücre yayılmamalı ve sönüm penceresinde bitmeli");
+        y.assertTrue(aktif(y) == 1, "doğal bitiş ateşi hemen söndürmemeli");
         y.succeedWhen(() -> {
-            y.assertBlockPresent(Blocks.AIR, yaprak);
+            y.assertBlockPresent(Blocks.AIR, kutuk);
             y.assertTrue(aktif(y) == 0 && atesSayisi(y) == 0, "yanıp bitmeli");
         });
     }

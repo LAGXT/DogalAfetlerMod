@@ -2,6 +2,7 @@ package io.github.kadirberkpolat1.dogalafetler.yangin;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.core.TpsOlcer;
+import io.github.kadirberkpolat1.dogalafetler.core.olay.AfetBittiEvent;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import io.github.kadirberkpolat1.dogalafetler.network.AgKanali;
 import io.github.kadirberkpolat1.dogalafetler.yangin.mantik.KureTarayici;
@@ -20,6 +21,7 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiPredicate;
 import java.util.function.DoubleSupplier;
+import java.util.function.IntSupplier;
 import java.util.function.Predicate;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -73,6 +75,8 @@ public final class YanginYoneticisi {
     private static final Map<ResourceKey<Level>, YanginVerisi> VERILER = new ConcurrentHashMap<>();
     private static volatile DoubleSupplier kismaKaynagi = TpsOlcer::kismaCarpani;
     private static volatile BiPredicate<ServerLevel, BlockPos> yukluKaynagi = (level, konum) -> level.isLoaded(konum);
+    private static volatile IntSupplier sonumKaynagi = () -> YanginAyarlari.afetSonrasiSonumSaniye() * 20;
+    private static volatile boolean bekleyenDenetimi = true;
 
     private YanginYoneticisi() {
     }
@@ -147,11 +151,11 @@ public final class YanginYoneticisi {
     }
 
     /**
-     * Afet bitti; o kaynağın süren alan tutuşturmaları durur ve yeni tutuşma olmaz (Y-05). {@code temiz=true}
-     * ({@code /dogalafet stop}, {@code sifirla}, gamerule): ateşler hemen söndürülür, ateş blokları kalkar, yanıcı bloklar
-     * korunur. {@code temiz=false} (doğal bitiş, hata): kalan hücreler yayılmaz ve en geç {@code afetSonrasiSonumSaniye}
-     * içinde yanıp biter (yakıt vanilla'daki gibi havaya döner; {@code afetBlokHasari=false} iken blok değişmez).
-     * Vanilla ateşe devredilmez.
+     * Afet bitti; o kaynağın süren alan tutuşturmaları durur ve yeni tutuşma olmaz (Y-05). {@code temiz=true}: ateşler
+     * hemen söndürülür, ateş blokları kalkar, yanıcı bloklar korunur. {@code temiz=false}: kalan hücreler yayılmaz ve en
+     * geç {@code afetSonrasiSonumSaniye} içinde yanıp biter (yakıt vanilla'daki gibi havaya döner; {@code afetBlokHasari=false}
+     * iken blok değişmez). Vanilla ateşe devredilmez. Afet kaynakları için yönetici bunu {@link AfetBittiEvent}'ten kendisi
+     * çağırır (Y-27); elle çağrmak idempotenttir.
      */
     public static void kaynakBitti(YanginKaynagi kaynak, boolean temiz) {
         MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
@@ -162,7 +166,7 @@ public final class YanginYoneticisi {
 
     public static void kaynakBitti(MinecraftServer server, YanginKaynagi kaynak, boolean temiz) {
         Objects.requireNonNull(kaynak, "kaynak");
-        int sonum = Math.max(1, YanginAyarlari.afetSonrasiSonumSaniye() * 20);
+        int sonum = Math.max(1, sonumKaynagi.getAsInt());
         for (ServerLevel level : server.getAllLevels()) {
             YanginVerisi veri = VERILER.get(level.dimension());
             if (veri == null) {
@@ -180,7 +184,7 @@ public final class YanginYoneticisi {
             long simdi = level.getGameTime();
             int sayi = 0;
             for (YanginHucresi h : veri.hucreler.values()) {
-                if (h.kaynak.equals(kaynak)) {
+                if (h.kaynak.equals(kaynak) && h.yayilabilir) {
                     h.yayilabilir = false;
                     h.bitis = Math.min(h.bitis, simdi + sonum / 2 + veri.rastgele.nextInt(sonum / 2 + 1));
                     sayi++;
@@ -230,6 +234,18 @@ public final class YanginYoneticisi {
         return onceki;
     }
 
+    /** Testte {@code kaynakBitti(temiz=false)} sönüm penceresini (tick) zorlar; önceki kaynağı döndürür. */
+    static IntSupplier sonumKaynagiAyarla(IntSupplier kaynak) {
+        IntSupplier onceki = sonumKaynagi;
+        sonumKaynagi = Objects.requireNonNull(kaynak, "kaynak");
+        return onceki;
+    }
+
+    /** Testte bekleyen silmenin 1 Hz denetimini açıp kapatır; {@code ChunkEvent.Load} yolu her zaman çalışır. */
+    static void bekleyenDenetimiAyarla(boolean acik) {
+        bekleyenDenetimi = acik;
+    }
+
     static int sonButce(ServerLevel level) {
         return veri(level).sonButce;
     }
@@ -260,6 +276,18 @@ public final class YanginYoneticisi {
         VERILER.clear();
     }
 
+    /**
+     * Afet bittiğinde o afetin ateşleri (kaynak = tür + {@code afetNo} = başlangıç saati) {@link YanginMantigi#temizBitis}
+     * eşlemesiyle söndürülür ya da yanıp bitmeye bırakılır (Y-27). Faz 4 afetlerinin {@code kaynakBitti} çağırması gerekmez.
+     */
+    @SubscribeEvent
+    public static void afetBitti(AfetBittiEvent olay) {
+        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+        if (server != null) {
+            kaynakBitti(server, YanginKaynagi.afet(olay.tur(), olay.baslangicSaati()), YanginMantigi.temizBitis(olay.neden()));
+        }
+    }
+
     /** Chunk yüklendi: bekleyen ateş silmeleri bir sonraki tick'te denetlenir (olay işçi thread'inden de gelebilir). */
     @SubscribeEvent
     public static void chunkYuklendi(ChunkEvent.Load olay) {
@@ -286,7 +314,8 @@ public final class YanginYoneticisi {
             veri.yanmislar.values().removeIf(bitis -> bitis <= simdi);
         }
         boolean calisti = false;
-        if (!veri.bekleyenSilmeler.isEmpty() && (veri.chunkYuklendi || simdi % BEKLEYEN_ARALIGI == 0)) {
+        if (!veri.bekleyenSilmeler.isEmpty()
+                && (veri.chunkYuklendi || (bekleyenDenetimi && simdi % BEKLEYEN_ARALIGI == 0))) {
             veri.chunkYuklendi = false;
             bekleyenleriIsle(level, veri);
             calisti = true;
