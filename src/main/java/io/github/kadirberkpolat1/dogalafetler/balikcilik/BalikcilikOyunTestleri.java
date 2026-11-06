@@ -50,6 +50,8 @@ import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.gametest.framework.AfterBatch;
+import net.minecraft.gametest.framework.BeforeBatch;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraftforge.common.ForgeHooks;
@@ -66,7 +68,8 @@ import net.minecraftforge.registries.ForgeRegistries;
  * Buz altı balıkçılığın oyun testleri (madde 15, GOREV \u00a76 #3 "buz deliği açılır ve yeniden donar"). Düz GameTest
  * dünyasında sahne testin içinde kurulur: 3x3 havuz (y 2–3 su, y 4 buz) taş duvarla çevrili, 5x5 (x, z 0..4); deliğin
  * yeri ortadaki (2, 4, 2). Global donma ilerlemesini değiştiren testler kendi batch'lerindedir; eşik altı ve chunk
- * sınırı testleri ayrı batch'te tek başınadır. Her test kendi sahnesini sonda havaya çevirir.
+ * sınırı testleri ayrı batch'te tek başınadır. Her test kendi sahnesini sonda havaya çevirir; global dönemi her batch
+ * sonunda batch başındaki değerine geri koyar (K-E22).
  */
 @GameTestHolder(DogalAfetler.MOD_ID)
 @PrefixGameTestTemplate(false)
@@ -88,6 +91,96 @@ public final class BalikcilikOyunTestleri {
         }
         d.cozulmeDonemiAyarla(false);
         d.donmaIlerlemesiAyarla(g);
+    }
+
+    /**
+     * Global dönem (donma, çözülme, güneş evresi) batch başında saklanır, sonunda geri konur (K-E15 b, K-E22): sonraki
+     * batch'lerin sahnesine kar yağmasın. Aynı batch'in testleri eşzamanlı koşar ve donmayı değiştirir; test başına geri
+     * koymak henüz süren kardeş testin donmasını erken sıfırlardı. Batch'ler sırayla koşar: tek kayıt yeter.
+     */
+    private static Runnable donemGeriKoyucu;
+
+    private static void donemiSakla(ServerLevel level) {
+        DunyaDonemi d = DunyaDonemi.al(level);
+        float donma = d.donmaIlerlemesi();
+        boolean cozulme = d.cozulmeDonemi();
+        GunesEvresi evre = d.gunesEvresi();
+        float evreIlerlemesi = d.evreIlerlemesi();
+        donemGeriKoyucu = () -> {
+            if (d.gunesEvresi() != evre) {
+                d.gunesEvresiAyarla(evre);
+            }
+            d.evreIlerlemesiAyarla(evreIlerlemesi);
+            d.cozulmeDonemiAyarla(cozulme);
+            d.donmaIlerlemesiAyarla(donma);
+        };
+    }
+
+    private static void donemiGeriKoy(ServerLevel level) {
+        if (donemGeriKoyucu != null) {
+            donemGeriKoyucu.run();
+            donemGeriKoyucu = null;
+        }
+    }
+
+    @BeforeBatch(batch = BATCH)
+    public static void balikcilikOncesi(ServerLevel level) {
+        donemiSakla(level);
+    }
+
+    @AfterBatch(batch = BATCH)
+    public static void balikcilikSonrasi(ServerLevel level) {
+        donemiGeriKoy(level);
+    }
+
+    @BeforeBatch(batch = BATCH_2)
+    public static void balikcilik2Oncesi(ServerLevel level) {
+        donemiSakla(level);
+    }
+
+    @AfterBatch(batch = BATCH_2)
+    public static void balikcilik2Sonrasi(ServerLevel level) {
+        donemiGeriKoy(level);
+    }
+
+    @BeforeBatch(batch = "balikcilik_esik_alti")
+    public static void esikAltiOncesi(ServerLevel level) {
+        donemiSakla(level);
+    }
+
+    @AfterBatch(batch = "balikcilik_esik_alti")
+    public static void esikAltiSonrasi(ServerLevel level) {
+        donemiGeriKoy(level);
+    }
+
+    @BeforeBatch(batch = "balikcilik_sinir")
+    public static void sinirOncesi(ServerLevel level) {
+        donemiSakla(level);
+    }
+
+    @AfterBatch(batch = "balikcilik_sinir")
+    public static void sinirSonrasi(ServerLevel level) {
+        donemiGeriKoy(level);
+    }
+
+    @BeforeBatch(batch = "balikcilik_sifir")
+    public static void sifirOncesi(ServerLevel level) {
+        donemiSakla(level);
+    }
+
+    @AfterBatch(batch = "balikcilik_sifir")
+    public static void sifirSonrasi(ServerLevel level) {
+        donemiGeriKoy(level);
+    }
+
+    @BeforeBatch(batch = "balikcilik_acik_su")
+    public static void acikSuOncesi(ServerLevel level) {
+        donemiSakla(level);
+    }
+
+    @AfterBatch(batch = "balikcilik_acik_su")
+    public static void acikSuSonrasi(ServerLevel level) {
+        donemiGeriKoy(level);
     }
 
     private static void havuzKur(GameTestHelper y) {

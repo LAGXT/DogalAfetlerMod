@@ -50,6 +50,8 @@ public final class DogalAfetler {
         CekirdekAyarlari.kaydet();
         SunucuAyarlari.kaydet();
         IstemciAyarlari.kaydet();
+        // Afet kayıtları (Faz 4: AfetKaydi.kaydet yapan satırlar) buraya, ozelliktenKaydet'in üstüne: test afeti gerçek
+        // afeti kayıtlı türü atlar; tersi sırada gerçek kayıt "zaten kayıtlı" ile modu düşürür (K-E22).
         OyunTestiAfeti.ozelliktenKaydet();
         SuAyarlari.kaydet();
         SanalSu.kaydet();
