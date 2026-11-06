@@ -119,7 +119,8 @@ public final class SuKomutlari {
         double boy = Math.hypot(bak.x, bak.z);
         double fx = boy < 1e-3 ? 1 : bak.x / boy;
         double fz = boy < 1e-3 ? 0 : bak.z / boy;
-        double taban = Math.min(l.getSeaLevel() - 1, p.getBlockY());
+        // Taban gerçek su yüzeyinin altında kalırsa dalga gerçek suyun içinde görünmez: sütunun su/kara yüzeyi ile sınırla.
+        double taban = Math.min(l.getSeaLevel(), l.getHeight(Heightmap.Types.MOTION_BLOCKING, p.getBlockX(), p.getBlockZ())) - 1;
         int id = SanalSu.dalgaBaslat(l, new Dalga(p.getX() + fx * 70, p.getZ() + fz * 70, -fx, -fz, SanalSu.sunucuSaati, 0.3,
                 yukseklik, 120, 40, taban, 140));
         yaz(k, Component.translatable(DALGA, id, yukseklik));
@@ -163,7 +164,7 @@ public final class SuKomutlari {
 
     /**
      * Vitrin için yüklü chunk'larda en iyi kumsalı bulur (deniz seviyesindeki kara, denize doğru en az 6 su sütunu, karaya
-     * doğru deniz + 1..5 arası en az 8 alçak sütun; puan = ikisinin toplamı) ve oyuncuyu izleyici olarak 16 blok açığa,
+     * doğru deniz + 1..5 arası en az 8 alçak sütun; puan = ikisinin toplamı, batıya bakan kıyıya +8) ve oyuncuyu izleyici olarak 16 blok açığa,
      * deniz + 7 yükseklikte kıyıya bakacak şekilde taşır (+4 yükselmeden sonra da kamera 3 blok suyun üstünde).
      */
     private static int kiyi(CommandContext<CommandSourceStack> k) throws CommandSyntaxException {
@@ -181,7 +182,11 @@ public final class SuKomutlari {
                     continue;
                 }
                 for (int[] d : yonler) {
+                    // Batıya bakan kıyı öncelikli: gün batımında kamera güneşe ve yansımasına bakar (vitrin anı).
                     int puan = kumsalPuani(l, x, z, d, deniz);
+                    if (puan > 0 && d[0] < 0) {
+                        puan += 8;
+                    }
                     if (puan > enPuan) {
                         enPuan = puan;
                         en = new int[] {x, z, d[0], d[1]};

@@ -97,6 +97,14 @@ public final class SuRenderer {
     private static double saat;
     /** Dalgacık bileşeni (kalite: 1..4); 1 iken eğim köpüğü yok. */
     private static int bilesen = 3;
+    /** Güneş yönü (gökyüzü çiziminin dönüşüyle: (-sin θ, cos θ, 0)), yansıma gücü ve rengi; kamera konumu. */
+    private static double gunesX;
+    private static double gunesY;
+    private static float parlamaSoluk;
+    private static int gunesRengi = 0xFFFFFF;
+    private static double kamX;
+    private static double kamY;
+    private static double kamZ;
 
     private SuRenderer() {
     }
@@ -155,6 +163,7 @@ public final class SuRenderer {
             case ULTRA -> 4;
         };
         Vec3 cam = e.getCamera().getPosition();
+        gunesHazirla(l, e.getPartialTick(), cam);
         if (tick != kurulanTick) {
             kurulanTick = tick;
             spriteGuncelle(mc);
@@ -362,7 +371,16 @@ public final class SuRenderer {
                     continue;
                 }
                 float y = (float) A.ust(A.adet() - 1) - 0.16f;
-                dortgenUst(gx - uzakOx, gz - uzakOz, LOD, y, y, y, y, renk(l, gx, gz), 0.72f, tamIsik);
+                int c = renk(l, gx, gz);
+                float alfa = 0.72f;
+                int isik = tamIsik;
+                float p = A.sakin(A.adet() - 1) ? 0 : parlama(gx + LOD / 2.0, y, gz + LOD / 2.0, saat, 2.5);
+                if (p > 0.02f) {
+                    c = karistir(c, gunesRengi, Math.min(1f, p));
+                    alfa = Math.max(alfa, Math.min(0.95f, p));
+                    isik = parlakIsik(isik, p);
+                }
+                dortgenUst(gx - uzakOx, gz - uzakOz, LOD, y, y, y, y, c, alfa, isik);
             }
         }
         uzakDortgen = dortgen;
@@ -401,6 +419,48 @@ public final class SuRenderer {
         return false;
     }
 
+    /** Güneş yönü, ufka yakınlıkla sönen yansıma gücü (yağmurda yok) ve gün batımında turuncuya kayan renk. */
+    private static void gunesHazirla(ClientLevel l, float kismi, Vec3 cam) {
+        double aci = l.getSunAngle(kismi);
+        gunesX = -Math.sin(aci);
+        gunesY = Math.cos(aci);
+        parlamaSoluk = (float) (Math.max(0, Math.min(1, (gunesY + 0.08) / 0.2)) * (1 - l.getRainLevel(kismi)));
+        float ufuk = (float) Math.max(0, Math.min(1, gunesY * 2.5));
+        gunesRengi = (255 << 16) | ((int) (150 + 105 * ufuk) << 8) | (int) (70 + 185 * ufuk);
+        kamX = cam.x;
+        kamY = cam.y;
+        kamZ = cam.z;
+    }
+
+    /**
+     * Sahte güneş yansıması (tasarım notu "parlama"): dalgacık normali ile göz-güneş yarım vektörünün açısı, ^48; 0..1.
+     * {@code egim} normal sapmasını büyütür (düz LOD karolarında yansıma şeridi dağılsın).
+     */
+    private static float parlama(double x, double y, double z, double t, double egim) {
+        if (parlamaSoluk <= 0) {
+            return 0;
+        }
+        double nx = -(dalgacik(x + 0.5, z, t) - dalgacik(x - 0.5, z, t)) * egim;
+        double nz = -(dalgacik(x, z + 0.5, t) - dalgacik(x, z - 0.5, t)) * egim;
+        double vx = kamX - x;
+        double vy = kamY - y;
+        double vz = kamZ - z;
+        double vl = Math.sqrt(vx * vx + vy * vy + vz * vz);
+        if (vl < 1e-6) {
+            return 0;
+        }
+        double hx = vx / vl + gunesX;
+        double hy = vy / vl + gunesY;
+        double hz = vz / vl;
+        double d = (nx * hx + hy + nz * hz) / (Math.sqrt(nx * nx + 1 + nz * nz) * Math.sqrt(hx * hx + hy * hy + hz * hz));
+        return d <= 0 ? 0 : (float) (Math.pow(d, 48) * parlamaSoluk);
+    }
+
+    /** Yansıyan sütunun ışığı: blok ışığı yansıma gücüyle yükselir (gün batımında da parlak kalsın). */
+    private static int parlakIsik(int isik, float p) {
+        return LightTexture.pack(Math.max(LightTexture.block(isik), Math.round(15 * Math.min(1f, p))), LightTexture.sky(isik));
+    }
+
     private static int komsu(int i, int j) {
         return i < 0 || j < 0 || i >= N || j >= N ? -1 : i * N + j;
     }
@@ -428,13 +488,22 @@ public final class SuRenderer {
         }
         float a = Math.max(kopuk, derin < 1 ? 0.25f + 0.15f * derin : Math.min(0.85f, 0.4f + 0.06f * derin));
         int c = karistir(renk, 0xFFFFFF, kopuk);
+        int ustIsik = isik;
+        if (tur == 1) {
+            float p = parlama(x + 0.5, UST[k], z + 0.5, t, 1);
+            if (p > 0.02f) {
+                c = karistir(c, gunesRengi, Math.min(1f, p));
+                a = Math.max(a, Math.min(0.95f, p));
+                ustIsik = parlakIsik(isik, p);
+            }
+        }
         float rx = x - yakinOx;
         float rz = z - yakinOz;
         if (tur == 3) {
             // Gerçek su: üstünü vanilla çizer; yalnız alçalmış sanal komşuya bakan "duvar" aşağıda çizilir.
         } else if (tur == 1) {
             dortgenUst(rx, rz, 1, yu + (float) dalgacik(x, z, t), yu + (float) dalgacik(x, z + 1, t),
-                    yu + (float) dalgacik(x + 1, z + 1, t), yu + (float) dalgacik(x + 1, z, t), c, a, isik);
+                    yu + (float) dalgacik(x + 1, z + 1, t), yu + (float) dalgacik(x + 1, z, t), c, a, ustIsik);
         } else {
             dortgenUst(rx, rz, 1, yu, yu, yu, yu, c, a, isik);
         }

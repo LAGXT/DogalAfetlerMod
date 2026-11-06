@@ -14,6 +14,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.animal.Pig;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
@@ -186,7 +187,8 @@ public final class SuOyunTestleri {
 
     /**
      * Kapalı oda tavana kadar dolar; içindeki sahte oyuncu (yaşam tick'i elle, bağlantısı tick'lenmediği için) suyun
-     * altında sayılır, ıslaktır ({@link SanalSu#icindeMi}), havası azalır ve hava bitince boğulma hasarı alır.
+     * altında sayılır, ıslaktır ({@link SanalSu#icindeMi}), koşarken yüzme pozuna geçer, havası azalır ve hava bitince
+     * boğulma hasarı alır.
      */
     @GameTest(template = "su_alani", batch = "su_oyuncu", timeoutTicks = 400)
     public static void sahteOyuncuSanalSudaHavaKaybederBogulur(GameTestHelper h) {
@@ -195,6 +197,7 @@ public final class SuOyunTestleri {
         BlockPos ayak = m(h, 6, 2, 6);
         ServerPlayer oyuncu = CekirdekOyunTestleri.sahteOyuncu(h, ayak.getX() + 0.5, ayak.getY(), ayak.getZ() + 0.5);
         oyuncu.setGameMode(GameType.SURVIVAL);
+        oyuncu.setSprinting(true);
         int id = SanalSu.magaraDoldur(l, m(h, 4, 2, 4), 4000, 6000);
         h.assertTrue(id > 0, "oda dolmadı");
         float can = oyuncu.getHealth();
@@ -204,6 +207,8 @@ public final class SuOyunTestleri {
                     h.assertTrue(SanalSu.icindeMi(oyuncu), "oyuncu ıslak değil");
                     h.assertTrue(oyuncu.isInWater() && oyuncu.isUnderWater(), "oyuncu suyun altında sayılmadı");
                     h.assertTrue(oyuncu.getAirSupply() < oyuncu.getMaxAirSupply(), "hava azalmadı: " + oyuncu.getAirSupply());
+                    h.assertTrue(oyuncu.isSwimming() && oyuncu.getPose() == Pose.SWIMMING,
+                            "koşan oyuncu yüzmüyor: swimming=" + oyuncu.isSwimming() + " poz=" + oyuncu.getPose());
                     oyuncu.setAirSupply(0);
                 })
                 .thenWaitUntil(() -> h.assertTrue(oyuncu.getHealth() < can, "boğulma hasarı yok"))

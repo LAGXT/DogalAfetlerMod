@@ -90,13 +90,16 @@ public final class SuOtomasyon {
         List<String> a = new ArrayList<>(List.of("k:gamerule doDaylightCycle false", "k:weather clear 100000",
                 "k:dogalafet denizseviyesi 0", "k:dogalafet su kiyi", "b:300"));
         if (hepsi || BOLUM.contains("deniz")) {
-            a.addAll(List.of("k:time set 11900", "b:200", "f:deniz-afetsiz", "s:sanal-su-deniz-once", "k:dogalafet denizseviyesi 4",
-                    "b:300", "f:deniz-afet", "s:sanal-su-deniz-vitrin", "k:time set 12500", "b:40",
-                    "s:sanal-su-deniz-gunbatimi", "k:time set 6000", "k:gamemode survival", "b:80", "o:suya-dustu", "b:120",
-                    "o:batik", "k:effect give @s minecraft:water_breathing 60 0 true",
-                    "k:effect give @s minecraft:resistance 60 4 true", "k:execute as @s at @s run tp @s ~ ~ ~ ~180 0", "b:10", "o:bas",
-                    "k:dogalafet su dalga 6", "b:300", "o:dalga-sonrasi", "k:dogalafet su temizle", "k:gamemode spectator",
-                    "k:dogalafet denizseviyesi 0", "k:dogalafet su kiyi", "b:60"));
+            a.addAll(List.of("k:time set 11900", "b:300", "f:deniz-afetsiz", "s:sanal-su-deniz-once",
+                    "k:dogalafet denizseviyesi 4", "b:300", "f:deniz-afet", "s:sanal-su-deniz-vitrin",
+                    "k:dogalafet denizseviyesi 0", "b:100", "f:deniz-afetsiz-2", "k:dogalafet denizseviyesi 4",
+                    "k:time set 12500", "b:100", "s:sanal-su-deniz-gunbatimi", "k:time set 6000",
+                    "k:execute as @s at @s rotated ~ 0 run tp @s ^ ^ ^16", "k:gamemode survival", "b:100", "o:kumsal",
+                    "b:100", "o:batik", "s:sanal-su-sualti", "k:effect give @s minecraft:water_breathing 90 0 true",
+                    "k:effect give @s minecraft:resistance 90 4 true", "k:execute as @s at @s run tp @s ~ ~ ~ ~180 0", "b:10",
+                    "o:bas", "k:dogalafet su dalga 6", "b:250", "o:dalga-icinde", "b:60", "o:dalga-sonrasi",
+                    "k:dogalafet su temizle", "k:gamemode spectator", "k:dogalafet denizseviyesi 0", "k:dogalafet su kiyi",
+                    "b:60"));
         }
         if (hepsi || BOLUM.contains("dalga")) {
             a.addAll(List.of("k:time set 5000", "k:execute as @s at @s run tp @s ^ ^3 ^28 ~180 4", "b:200", "f:dalga-afetsiz",
