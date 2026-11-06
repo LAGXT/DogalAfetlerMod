@@ -58,6 +58,8 @@ public final class GokyuzuKomutlari {
     static final String GUN = ON + "gun";
     static final String VAR = ON + "var";
     static final String YOK = ON + "yok";
+    static final String EVET = ON + "evet";
+    static final String HAYIR = ON + "hayir";
     static final String ASAMA_EVRE = "commands.dogalafetler.gokyuzu.asama";
     static final String ASAMA_DOGUS_TAMAM = "commands.dogalafetler.gokyuzu.dogus_tamam";
 
@@ -130,7 +132,7 @@ public final class GokyuzuKomutlari {
         satirlar.add(Component.translatable(SUREC, surecDurumu(yonetici, ust)));
         satirlar.add(kalan(donem, ust));
         satirlar.add(Component.translatable(DONMA, yuzde(donem.donmaIlerlemesi()),
-                Component.translatable(donem.cozulmeDonemi() ? VAR : YOK)));
+                Component.translatable(donem.cozulmeDonemi() ? EVET : HAYIR)));
         if (KATKILAR.isEmpty()) {
             satirlar.add(Component.translatable(KIS_YOK));
         }
@@ -240,6 +242,8 @@ public final class GokyuzuKomutlari {
         y.ekle(GUN, "%s days", "%s gün");
         y.ekle(VAR, "present", "var");
         y.ekle(YOK, "gone", "yok");
+        y.ekle(EVET, "yes", "evet");
+        y.ekle(HAYIR, "no", "hayır");
         y.ekle(ASAMA_EVRE, "%s: %s", "%s: %s");
         y.ekle(ASAMA_DOGUS_TAMAM, "%s: red dwarf dawn completed", "%s: kızıl cüce doğuşu tamamlandı");
     }

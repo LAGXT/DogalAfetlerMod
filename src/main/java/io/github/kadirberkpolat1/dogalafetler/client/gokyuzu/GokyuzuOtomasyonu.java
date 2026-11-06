@@ -100,6 +100,8 @@ public final class GokyuzuOtomasyonu {
         bekleme = 200;
         if (MOD.startsWith("ezilme")) {
             ezilmePlani();
+        } else if (MOD.equals("samanyolu")) {
+            samanyoluPlani();
         } else {
             plan();
         }
@@ -310,6 +312,18 @@ public final class GokyuzuOtomasyonu {
         ay(true);
         an(18000, -70f, 40, "11-normal-gece-ayli");
         fps("normal-gece-ayli", 6);
+    }
+
+    /** Samanyolu bandının gündüz görünümü (görsel değerlendirme P2): güneşsiz ve kızıl cüce gündüzü, karşılaştırma gecesi. */
+    private static void samanyoluPlani() {
+        hazirlik();
+        evre("gunessiz", 0.5f);
+        an(6000, -70f, 22 * 20, "s1-gunessiz-ogle-tepe");
+        an(3000, -35f, 40, "s2-gunessiz-sabah-ufuk");
+        ay(false);
+        an(18000, -70f, 40, "s3-gunessiz-gece-aysiz");
+        evre("kizil_cuce", 1f);
+        an(6000, -70f, 22 * 20, "s4-kizilcuce-ogle-tepe");
     }
 
     /** K0-26 ezilme denemesi: normal durumda kazananın göğü, aysız + güneşsiz durumda bizim göğümüz. */
