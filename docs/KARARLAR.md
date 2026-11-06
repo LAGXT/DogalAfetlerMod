@@ -1067,7 +1067,8 @@ future'ı protected olduğu için kullanılmadı; future tamamlanmadan yapılan 
 alır. Öncelik en yakın oyuncuya uzaklıkla devam eder (dış halka sona kalır). GameTest `simulasyonDisiGorunenChunkDonar`
 (tur 3, D2-3): oyuncunun görüş bileti gibi yalnız yükleme bileti (`DistanceManager.addTicket`, seviye 31; ticking izleyicisine
 girmez) 40 chunk ötedeki chunk'ı yükler; `isPositionTicking` false iken kuyruk onu G 60'a (konulan çimen kırağılanır) ve 0'a
-(çimen geri gelir) yetiştirir.
+(çimen geri gelir) yetiştirir. Test tarifi (K-E21): bilet + hedefle 8 komşusunun eşzamanlı `level.getChunk` ile üretimi;
+üretim tick zaman aşımına girmez.
 
 **K-D27 Vitrin karesinde sohbet yok (D6).** Otomasyon kurulumda `hideGui` açar ve sohbeti yalnız istemcide
 `chatVisibility = HIDDEN` yapar (sunucuya bildirilmez: komut çıktıları yine gelir ve log'a düşer, çizilmez); çıkışta FULL.
@@ -2252,7 +2253,8 @@ bloke oldu. Taklit magma hücresini dışarıda bırakır. (b) yiyecek `guvecSic
 dalında 66–72): dönem global; iki batch önce `balikcilik_sinir` donmayı %60'ta bırakıyordu. Mutlak ortam ölçen test nötr
 dönemi (donma 0, güneş normal) kendisi kurar, sonda eskisini geri koyar. (c) donma `simulasyonDisiGorunenChunkDonar` ("hedef chunk
 simülasyon dışında olmalı"): hedef köke göre 40 chunk doğudaydı ve ızgara oraya uzanıyordu; hedef z = −40 chunk, ileti hedefi
-yazar. Beklentiler ve üretim kodu değişmedi (`9389461`).
+yazar. Beklentiler ve üretim kodu değişmedi (`9389461`). Aynı testin "aşama 0" düşmesi için (c) yanlış teşhisti; ayrı kök
+neden: z = −40 hedefi her koşuda üretilir, üretim duvar saatiyle, zaman aşımı tick'le (bkz. K-E21).
 
 **K-E16 GameTest yerleşimi tek satırda; her koşu boş dünyayla başlar.** Başarım birleşince 156 testle iki test her koşuda düştü
 (`gametest-5..7.log`): su `denizYukselmesiBolgeyiDegistirmezSifirIzBirakmaz` ("0 aralık", deniz +4) ve yangın
@@ -2887,6 +2889,8 @@ geçirir; `tools/senaryo/gradle_kapisi.sh` `TEST_FILTRE` ortam değişkenini `-P
 - **Gf4 (birleştirmede):** `gradle_kapisi.sh` log'un ilk satırına `FILTRE=<regex> (kabul için geçersiz koşu)` ya da
   `FILTRE=yok` yazar; dışa aktarılı kalmış `TEST_FILTRE` kabul koşusunu sessizce süzemez. Doğrulayıcılar kabul loglarında
   `FILTRE=yok` arar (GOREV §6).
+- **Aralıklı düşme (gametest-filtre AÇIK):** filtresiz ilk koşudaki `simulasyonDisiGorunenChunkDonar` "aşama 0" düşmesi
+  K-E21 ile kapandı.
 - **Açık (Gf3):** filtresiz yol da `f_177587_` yansımasıyla batch listesini okur (yalnız toplamı loglamak için); kabul
   koşuları gereksiz yere SRG adına bağlı. Şef kararıyla dokunulmadı.
 - **Reddedilen:** `RegisterGameTestsEvent`'te süzmek (Forge metotları olaydan sonra ekler); `GameTestRegistry.TEST_FUNCTIONS`'ı
@@ -2894,6 +2898,26 @@ geçirir; `tools/senaryo/gradle_kapisi.sh` `TEST_FILTRE` ortam değişkenini `-P
 
 İşçi kullanımı: `TEST_FILTRE='Meteor|meteor_' tools/senaryo/gradle_kapisi.sh <log> runGameTestServer` ya da
 `JAVA_HOME=/home/lagxt/.jdks/jdk-17.0.21+9 ./gradlew runGameTestServer --offline -Ptest_filtre='Meteor|meteor_'`.
+
+**K-E21 `simulasyonDisiGorunenChunkDonar` hedef chunk'ı ve 8 komşusunu eşzamanlı üretir; dünya üretimi tick sayacının dışında
+kalır (şef kararı, dal `is/donma-aralikli` `0bf06bb`).** Belirti: "simülasyon dışı chunk 60'a ve geri 0'a yetişmedi (aşama 0)"
+(`gametest-filtre/gametest-tam.log`:790); aşama 0 = hedef hiç `DonmaZamanlayici.islenebilir` olmadı. **Kök neden:** aşama 0,
+z = −40'taki hedefin ve 8 komşusunun arka plan iş parçacıklarında üretilmesini (duvar saati) bekler; `timeoutTicks = 3000` oyun
+tick'i sayar ve GameTest sunucusu tick'leri uyumadan koşturur (`GameTestServer.waitUntilNextTick` yalnız `runAllTasks`; vanilla
+50 ms bekler). Aynı 1–4 sn'lik üretim yüke göre 80 ile 3000+ tick arası tutar; düşen koşuda 3000 tick ~2,5 sn'de doldu.
+**İstatistik (83 kayıtlı koşu):** 68'i ≤ 60 tick (saklanan dünyada bölge diskte kalıyordu); uzunlar bölgenin ilk üretildiği
+koşular (`entegrasyon-3/gametest-2` 1600, `radar-sismograf/gametest-4` 2400, `donma/gametest-9` 600). K-E16'dan sonra her koşu
+üretim: 260 / 80 / 120 / 300 / 660 / 600 ve bir kez 3000+ (düştü); tick hızı 160–1540 tick/sn. K-E15 (c) kendi iletisi için
+doğruydu, "aşama 0" için yanlış teşhisti. **Düzeltme (yalnız test):** `addTicket(GORUS_BILETI, hedef, 31, hedef)`'ten sonra
+hedef ve 8 komşusu `ServerLevel.getChunk(x, z)` ile yüklenir (ana iş parçacığında `managedBlock`; üretim tick ilerlemeden
+biter). `getChunk`'ın geçici `TicketType.UNKNOWN` bileti (seviye 33, ömrü **2 tick**: zaman aşımı 1, `purgeStaleTickets` ikinci
+temizlikte siler) ticking izleyicisine girmez; senaryo, `isPositionTicking` denetimleri, `timeoutTicks` ve G eşikleri aynı. Tanı
+satırı `[donma] test sahnesi: chunk x,z ve 8 komşusu eşzamanlı üretildi (N ms)`. Kanıt (`.vibe/kanit/donma-aralikli/`): JUnit
+469, GameTest 157/157 ×3, üretim 255 / 278 / 372 ms (doğrulama 189–235 ms), `donma_zamanlayici_7` ≤ 1 ilerleme satırı (≤ 20 tick).
+Faz 4 kuralı (GOREV §6): uzak chunk `level.getChunk` ile eşzamanlı üretilir; duvar saatine bağlı arka plan işi tick zaman
+aşımıyla beklenmez. **Reddedilen:** `timeoutTicks`'i büyütmek (oran yine yüke bağlı); hedefi yüklü bölgeye yaklaştırmak (K-D26
+sahnesi bozulur); GameTest sunucusuna tick sınırı mixin'i (üretim jar'ına test yaması, bütün koşular yavaşlar); üretim kodunu
+değiştirmek (bekleme vanilla üretimde); yeniden koşup geçeni kabul etmek (olasılık yükle artar).
 
 ### Yiyecek
 
