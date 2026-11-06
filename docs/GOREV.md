@@ -47,7 +47,9 @@ Bu görev hangi bilgisayarda çalışacağını bilmez. Faz 0'ın ilk işi makin
 
 ### Ağır süreç kuralı (RAM)
 
-Ağır süreç = bir `./gradlew` çağrısı (Gradle JVM'i ve başlattığı Minecraft JVM'i birlikte tek sayılır) ya da Gradle'sız çalışan bir Minecraft sunucusu. Aynı anda en fazla iki ağır süreç çalışır. İşçi ağır süreç başlatmadan önce `free -g` ve `pgrep -fc GradleWrapperMain` bakar; boş RAM 4 GB'ın altındaysa ya da zaten iki `gradlew` çalışıyorsa bekler (en çok 10 dk), sonra şefe raporlar. İstisna çok oyunculu test (§6 #7): sunucu §6 #5'teki üretim kurulumundan Gradle'sız (`run.sh`) çalışır, istemciler `runClient` ile açılır; başka ağır süreç yokken ve boş RAM `docs/MAKINE.md`'ye göre yetiyorsa (her `runClient` yaklaşık 5–6 GB: Gradle JVM'i + oyun) şef bu testi diğer işçiler derleme yapmazken başlatır. İşçi turunu bitirmeden başlattığı her Minecraft sürecini kapatır.
+Ağır süreç = bir `./gradlew` çağrısı (Gradle JVM'i ve başlattığı Minecraft JVM'i birlikte tek sayılır) ya da Gradle'sız çalışan bir Minecraft sunucusu. Aynı anda en fazla iki ağır süreç çalışır. İşçi ağır süreç başlatmadan önce `free -g` ve `pgrep -fc GradleWrapperMain` bakar; boş RAM 4 GB'ın altındaysa ya da zaten iki `gradlew` çalışıyorsa bekler (en çok 10 dk), sonra şefe raporlar. Tavan ölçüme bağlıdır (K-E19 a): kullanılabilir RAM sürekli ≥ 12 GB ise üç `./gradlew`, değilse iki; 2026-11-06 ölçümü 11,8 GB / 8 iş parçacığı → **iki** (`docs/MAKINE.md`). İstisna çok oyunculu test (§6 #7): sunucu §6 #5'teki üretim kurulumundan Gradle'sız (`run.sh`) çalışır, istemciler `runClient` ile açılır; başka ağır süreç yokken ve boş RAM `docs/MAKINE.md`'ye göre yetiyorsa (her `runClient` yaklaşık 5–6 GB: Gradle JVM'i + oyun) şef bu testi diğer işçiler derleme yapmazken başlatır. İşçi turunu bitirmeden başlattığı her Minecraft sürecini kapatır.
+
+**Yoklama yok (K-E19 e):** işçi, doğrulayıcı ve entegratör bir arka plan işini `sleep N` döngüsüyle ya da log kuyruğunu tekrar tekrar okuyarak beklemez; işi arka planda başlatır, beklemek zorundaysa bloklayan `wait` aracını kullanır, beklerken başka işi sürdürür. Her yoklama turu kota ve bağlam harcar.
 
 ### Kota ve hız sınırı
 
@@ -77,7 +79,8 @@ Ağır süreç = bir `./gradlew` çağrısı (Gradle JVM'i ve başlattığı Min
 - **Yazan:** kendi worktree'sinde yazar, kendi parçasının hedefli testini koşar, kendi dalına commit atar, `git diff main...is/<parça>`'yı `KÖK/.vibe/diff/<parça>.patch`'e yazar.
 - **İnceleyici** (`good`, o kodu yazmamış, `requesting-code-review` skill'i): patch'i şartnameye, `docs/KARARLAR.md`'ye ve kabul ölçütüne karşı okur; bulguları `KÖK/.vibe/rapor/inceleme-<parça>.md`'ye yazar: `P0` çalışmıyor ya da dünya verisi bozuluyor, `P1` şartnameye ya da sözleşmeye aykırı, `P2` iyileştirme. Dosya `## Özet` ile başlar: sayılar ve her `P0`/`P1` için tek satır `dosya:satır — sorun`.
 - **Doğrulayıcı** (`fast`, ikisinden de bağımsız): yazanın worktree'sinde kaynak dosyalara dokunmadan kabul komutlarını baştan koşar; her kabul maddesi için `komut → sonuç` satırı yazar, ham çıktı `KÖK/.vibe/kanit/<parça>.txt`'de.
-- Bulgu ya da başarısız kanıt yazana döner; düzeltmeden sonra yalnız etkilenen kanıtlar yeniden koşar. `P0` ve `P1` kalmayınca parça kabul edilir ve `DURUM.md`'ye işlenir.
+- `P0`/`P1` bulgusu ya da başarısız kanıt yazana döner; düzeltmeden sonra yalnız etkilenen kanıtlar yeniden koşar. **İnceleme `P0` = `P1` = 0 ise parça kabul edilir** ve `DURUM.md`'ye işlenir (K-E19 d). `P2`'ler için ayrı işçi turu açılmaz: inceleyici raporuna "Entegratöre devredilen P2'ler" bölümünü yazar (her biri `dosya:satır` + tek satır düzeltme); entegratör birleştirmede uygular ya da `docs/KARARLAR.md`'de açık noktaya yazar. Gerekçe: Faz 3'te P2 turları parça başına 3–4 tura (yazan + inceleme + doğrulama tekrarları) çıktı ve kabulü günlerce geciktirdi; P2'ler kabulü değiştirmeyen iyileştirmelerdir.
+- Doğrulama iki kuyrukta (Faz 4+): `dogrulayici` (dedicated portları 25611–25620) ve `dogrulayici-2` (25631–25640); işçinin kendi dedicated portu 25640 + (workspace − 90).
 - Kabul ölçütünü sen yazarsın; işçinin "bitti"si iddiadır. Görsel işi ekran görüntülerini kendin açıp tasarım notu ve şartnameyle karşılaştırmadan kabul etme.
 - Bir işçinin turu 10 dakikadır yeni araç çağrısı olmadan sürüyorsa `vibe_list` ile son etkinliğine bak; bekleyen bir süreçte takıldıysa süreci kapatmasını söyle, yanıt vermiyorsa `vibe_kill` ile kapatıp işi aynı görev metniyle yeni oturuma ver.
 
@@ -197,6 +200,8 @@ Entegratör bütün dalları `main`'e birleştirir, `.vibe/kararlar/*.md`'yi `do
 | 14 | Gamerule'lar | her kural `/gamerule <ad>` ile okunur ve değiştirilir | tab tamamlama çalışır; kapalı afet seçilmez, başlamış afet güvenle biter; ulaşılmış dönemler geri alınmaz |
 | 15 | Sanal su | tsunami, mağara suyu ve deniz yükselmesi öncesi ve sonrası etkilenen bölgedeki blokların sayımı ya da hash'i; GameTest ve istemcide sanal suya giren oyuncu ve mob | bloklar birebir aynı (harita bozulmadı; mağara suyu kuruduktan sonra iz yok); oyuncu sanal suda yüzer, havası azalır ve boğulur, sürüklenir, ıslanır (sıcaklık); mob'lar da etkilenir |
 | 16 | Başarımlar | 27 başarımın her biri komut ve senaryolarla tetiklenir | her biri doğru oyuncuda açılır; toast ve sohbet duyurusu; ödüller verilir; gizli olanlar açılana kadar görünmez |
+
+**Doğrulama turları (K-E19 c):** ilk doğrulama kabul komutlarının hepsini koşar. Tur 2 ve sonrası yalnız değişen yolu koşar (değişen dosyaların testleri, etkilenen matris satırları, gerekiyorsa tam derleme); değişmeyen kanıt önceki rapordan satırıyla atıfla aktarılır ("değişmedi, `dogrulama-<parça>.md` madde N"). GameTest varsayılan **2** ardışık koşudur; aralıklı düşme şüphesinde (bir koşuda düşüp diğerinde geçen test, zamanlamaya bağlı ileti) 3.
 
 ## 7. Teslimat
 

@@ -92,6 +92,31 @@ Sahibinin uygulamaları ~8 GiB tuttuğu için kullanılabilir RAM 6–8 GiB aras
 Swap 27 GiB olduğu için RAM aşımı çökme yerine ciddi yavaşlama olarak görünür; FPS/TPS ölçümleri (§6 #10) başka ağır
 süreç yokken yapılmalıdır.
 
+## Faz 4 öncesi ölçüm (2026-11-06, K-E19)
+
+| Öğe | Değer | Nasıl ölçüldü |
+|---|---|---|
+| İş parçacığı | 8 (4 çekirdek) | `nproc` |
+| RAM (boş Gradle yokken) | toplam 15 727 MiB, kullanılabilir **12 093 MiB** (11,8 GiB), boş 6 695 MiB, swap 1,8 / 27 GiB dolu | `free -m`, `free -g` (19:4x, bir başka işçinin Gradle'ı henüz başlamamışken) |
+| RAM (bir Gradle + GameTest çalışırken) | kullanılabilir 8 979 MiB | `free -m` (19:5x) |
+
+**Karar (K-E19 a):** kullanılabilir RAM 12 GB eşiğinin altında (11,8 GiB; sahibinin uygulamaları ~3,6 GiB kullanıyor ve
+değişken). Bir `runGameTestServer` (Gradle `-Xmx3G` + sunucu JVM'i) kullanılabilir RAM'i ~3 GiB düşürüyor; üç eş zamanlı ağır
+süreç ~9 GiB ister ve 4 GiB payı korunamaz. Tavan **iki** `./gradlew` kalır (GOREV §2). Kullanılabilir RAM sürekli ≥ 12 GB
+ölçülürse (sahibi uygulamalarını kapatınca) şef üçe çıkarabilir.
+
+**Gradle daemon ölçümü (K-E19 b):** `cleanTest test --offline` (472 JUnit), ikişer ardışık koşu, log'lar
+`.vibe/kanit/faz3-kapanis/zaman-*.log`.
+
+| Düzen | Koşu 1 | Koşu 2 | Fork |
+|---|---|---|---|
+| A: bugünkü (`org.gradle.daemon=false`, `jvmargs=-Xmx3G`) | 48 sn | 53 sn | her çağrıda "single-use Daemon" |
+| B: A + `GRADLE_OPTS=-Xmx3G` | 37 sn | 33 sn | yine "single-use Daemon" |
+| C: `--daemon` | 38 sn | 13 sn | ilki daemon açar, ikincisi sıcak daemon'u kullanır |
+
+Kazanç yalnız sıcak daemon'la (C koşu 2). Daemon boşta 3 saat yaşar, `-Xmx3G`'ye kadar büyür ve ağır süreç kapısının sayacına
+girmez; iki Gradle tavanlı bu makinede RAM payını yer. Daemon kapalı kalır, `gradle.properties` değişmedi.
+
 ## Pratik notlar
 
 - **Gradle sayacı:** `pgrep -fc GradleWrapperMain`, komut satırında aynı kelimeyi taşıyan çağıran kabuğu da sayar

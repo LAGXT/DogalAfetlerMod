@@ -2282,9 +2282,9 @@ azalan verim alır. (b) K-E12'nin eşya sürümü: `DataGenerators.vanillaEsyaEt
 bir paket). (e) Başarım: balık sayımı tek kaynak `BalikTutulduEvent` (başarım §E.3; `ItemFishedEvent` kanca yolu, `DELIK_YUKARI`,
 `BasarimKimlikleri.BUZ_DELIGI` silindi; `balikSayisi()` yalnız `#cig_kutup_baligi` sayar, A-15 ile aynı sonuç). `YiyecekYendiEvent`
 dinlenmez: başarımın `Start`/`Finish` + taze ısınma etkisi yolu aynı yemeyi tanır (§E.4), ikinci abonelik aynı yemeğe ikinci
-kaynak olurdu. Zincir GameTest `corbaGercekYiyecekZinciriyleAcilir`: gerçek Ateşli Güveç `YiyecekAPI`'den yenir, yiyecek olayı bir kez
+kaynak olurdu (abonelik eklenmemesi şef kabul, 2026-11-06). Zincir GameTest `corbaGercekYiyecekZinciriyleAcilir`: gerçek Ateşli Güveç `YiyecekAPI`'den yenir, yiyecek olayı bir kez
 ve `oncekiKademe() == DONUYOR` gelir (yiyecek §A3 = A-29), #19 nötrde açılır. `MeteorCarptiEvent` istatistik ve afet koreografisi
-içindir (meteor §A.2); #7 ve #22 eşya alımından, başarım dinlemez. `yayinciKaydet` Faz 3'te gerekmez: dört ipucu Faz 4
+içindir (meteor §A.2); #7 ve #22 eşya alımından, başarım dinlemez (şef kabul, 2026-11-06). `yayinciKaydet` Faz 3'te gerekmez: dört ipucu Faz 4
 afetlerinindir (§A.3). (f) `runData`: #7, #15, #16, #19, #22 ikonları mod eşyaları, `rewards/hedef` Sıcak Salep (A-06, A-07).
 (g) `DogalAfetler` kaydı `DonmaSistemi.kaydet`'ten sonra: `Yiyecek`, `EsyaKayitlari`, `Meteor`, `Balikcilik`, `Basarim`, sonra
 `Kancalar.bagla()` (`68577b1`, `1e70a46`).
@@ -2827,6 +2827,39 @@ yeniden kuyruğa alır; `zamanlayiciHazirla` ve `simulasyonDisiGorunenChunkDonar
 Kanıt: birleşik koşu 2'de `chunk 4,4 yarım işi atıldı (G 10 -> 5, 6/256 sütun)` (eski iş gerçekten vardı), üç koşu 131/131.
 Reddedilen: testte bekleme/yeniden deneme (kök nedeni gizler); `kapsamAyarla`'da tüm işleri atmak (kapsam dışı chunk'ların
 geçerli işini de silerdi).
+
+**K-E18 `/dogalafet odul meteor` (KOM.13; şef kararı, sahibi entegratör).** Şartname KOMUTLAR: "/dogalafet odul meteor (test için
+Meteorit Parçası / Kozmik Çekirdek verme)". Biçim `/dogalafet odul meteor [parca|cekirdek|hepsi] [adet 1–64] [oyuncu]`: argümansız
+komutu veren oyuncuya birer Meteorit Parçası ve Kozmik Çekirdek (şartnamedeki "Parçası / Çekirdek" ikisini birden karşılar);
+`parca`/`cekirdek` yalnız o eşyadan, `hepsi` ikisinden `adet`'er; oyuncu verilmezse komutu veren (konsolda oyuncu şart). Alt
+komut meteor paketinde (`MeteorKomutlari.odulKomutu`, `KomutKaydi` ile `odul` kökü; yetki 2, diğer `dogalafet` alt komutlarıyla
+aynı). Verme `MeteorAPI.odulVer(oyuncu, parca, cekirdek)` (meteor §A): eşyalar soğuk (sıcaklık etiketi yok; yanma krater
+ödülüne özgü), envantere girer, sığmayan oyuncunun önüne düşer. Tür ayrıştırma saf `meteor.mantik.OdulIstegi` (büyük/küçük harf
+duyarsız; bilinmeyen tür hata iletisi `commands.dogalafetler.odul.meteor_tur`, verme yok). Lang datagen (`MeteorCevirileri`).
+Madde 13c "ödüller yalnız meteordan" oynanış kuralıdır; OP test komutu şartnamenin kendi istisnasıdır. Kanıt: JUnit
+`OdulIstegiTest` (3), GameTest `odulKomutuMeteorEsyalariniVerir` (batch `meteor_odul_komut`: argümansız 1 + 1, `cekirdek 3 <oyuncu>`,
+bilinmeyen tür 0, ödüller soğuk, OP olmayan reddedilir), `meteor_sunucu.py` adımı (konsolda `odul meteor cekirdek 1 Kimse` → "No
+player was found": komut kayıtlı ve ayrıştırılıyor).
+
+**K-E19 Faz 4 hızlandırma (şef kararı, 2026-11-06).** (a) **Ağır süreç tavanı ölçüme bağlı:** kullanılabilir RAM sürekli
+≥ 12 GB ise üç `./gradlew`, değilse iki. Ölçüm `nproc` 8, `free -m` kullanılabilir 12 093 MiB (11,8 GiB; bir GameTest
+çalışırken 8 979 MiB) → **iki** kalır (`docs/MAKINE.md` "Faz 4 öncesi ölçüm", GOREV §2). (b) **Gradle daemon değişmez:** `org.gradle.daemon=false` + `org.gradle.jvmargs=-Xmx3G`
+ile istemci JVM'i (`-Xmx64m`) uyuşmadığından her çağrı tek kullanımlık daemon forklar ("single-use Daemon"). Ölçüm `cleanTest
+test --offline` (472 JUnit), ikişer koşu (`.vibe/kanit/faz3-kapanis/zaman-*.log`): A bugünkü düzen 48 / 53 sn; B
+`GRADLE_OPTS=-Xmx3G` (jvmargs'ı istemciyle eşleme denemesi) 37 / 33 sn ama fork sürdü (log'da yine "single-use"; A'dan kısa
+oluşu forkla ilgili değil); C `--daemon` 38 sn (daemon açılışı) / 13 sn (sıcak daemon). Kazanç yalnız aynı daemon'u yeniden
+kullanan ardışık koşularda (~35 sn). Bedeli: boşta 3 saat yaşayan, `-Xmx3G`'ye kadar büyüyen ve ağır süreç kapısının
+`GradleWrapperMain` sayacına girmeyen JVM'ler; paralel worktree'lerdeki eş zamanlı her derleme ayrı daemon açar ve iki tavanlı,
+11,8 GiB'lık makinede 4 GB payını yer. Daemon kapalı kalır (GOREV §2 "her derleme bitince RAM boşalır"), `gradle.properties`'e
+dokunulmadı. (c) **Doğrulama
+turları** (GOREV §6 sonu): tur 2+ yalnız değişen yolu koşar, değişmeyen kanıt önceki rapordan atıfla aktarılır; GameTest
+varsayılan 2 koşu, aralıklı şüphesinde 3. (d) **Kabul kuralı** (GOREV §3 "Denetim zinciri"): inceleme P0 = P1 = 0 ise parça
+kabul; P2 için ayrı işçi turu açılmaz, inceleyici "Entegratöre devredilen P2'ler" bölümü yazar (dosya:satır + tek satır
+düzeltme), entegratör birleştirmede uygular ya da açık noktaya yazar. Gerekçe: Faz 3'te P2 turları parça başına 3–4 tura
+çıktı (meteor 4, başarım 3, balıkçılık 3, radar 2 tur). Doğrulama iki kuyrukta: `dogrulayici` (portlar 25611–25620),
+`dogrulayici-2` (25631–25640); işçi dedicated portu 25640 + (workspace − 90). (e) **Yoklama yok** (GOREV §2): işçi,
+doğrulayıcı ve entegratör `sleep N` döngüsüyle yoklamaz; arka plan işini bloklayan `wait` ile bekler. Faz 4 görev taslakları
+`.vibe/gorev/4-<parça>.md` bu kuralları ve GameTest filtresini (`-Ptest_filtre=<regex>`, K-E20, dal `is/gametest-filtre`) taşır.
 
 ### Yiyecek
 
