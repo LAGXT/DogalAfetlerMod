@@ -114,6 +114,12 @@ public final class SuRenderer {
     private static int gRenk;
     private static float gAlfa;
     private static int gIsik;
+    /** Gölgeleme ışık kipi: açık havada güneş ve ufuk, mağarada tavandan blok ışığı ve sıcak, koyu yansıma. */
+    private static double glX;
+    private static double glY;
+    private static float glGuc;
+    private static int glRenk;
+    private static int yansimaRengi;
     private static float esX;
     private static float esZ;
     private static final int[] QC = new int[4];
@@ -421,28 +427,46 @@ public final class SuRenderer {
         vz /= vl;
         boolean alttan = vy < 0;
         double f = alttan ? 0 : 0.02 + 0.98 * Math.pow(1 - Math.max(0, nx * vx + ny * vy + nz * vz), 5);
-        double dif = 0.86 + 0.32 * Math.max(0, nx * gunesX + ny * gunesY) * Math.max(0.3, parlamaSoluk);
+        double dif = 0.86 + 0.32 * Math.max(0, nx * glX + ny * glY) * Math.max(0.3, glGuc);
         int c = parlat(taban, (float) dif);
         if (alttan) {
             c = karistir(c, 0x0E3A4A, 0.35f);
         }
-        c = karistir(c, ufukRengi, (float) Math.min(0.8, f));
+        c = karistir(c, yansimaRengi, (float) Math.min(0.8, f));
         float spec = 0;
-        if (parlamaSoluk > 0 && !alttan) {
-            double hx = vx + gunesX;
-            double hy = vy + gunesY;
+        if (glGuc > 0 && !alttan) {
+            double hx = vx + glX;
+            double hy = vy + glY;
             double hz = vz;
             double d = (nx * hx + ny * hy + nz * hz) / Math.sqrt(hx * hx + hy * hy + hz * hz);
             if (d > 0) {
-                spec = (float) (Math.pow(d, 64) * parlamaSoluk * 1.6);
+                spec = (float) (Math.pow(d, 64) * glGuc * 1.6);
             }
         }
         if (spec > 0.02f) {
-            c = karistir(c, gunesRengi, Math.min(1f, spec));
+            c = karistir(c, glRenk, Math.min(1f, spec));
         }
         gRenk = c;
         gAlfa = (float) Math.min(0.95, Math.max(alfa + (0.92 - alfa) * f, Math.min(0.95f, spec)));
         gIsik = spec > 0.02f ? parlakIsik(isik, spec) : isik;
+    }
+
+    private static void gunesKipi() {
+        glX = gunesX;
+        glY = gunesY;
+        glGuc = parlamaSoluk;
+        glRenk = gunesRengi;
+        yansimaRengi = ufukRengi;
+    }
+
+    /** Mağara suyu: gök yansıması yok; tavandaki ışık kaynaklarının sıcak parıltısı, gücü blok ışığıyla. */
+    private static void magaraKipi(int isik) {
+        float b = LightTexture.block(isik) / 15f;
+        glX = 0.25;
+        glY = 0.97;
+        glGuc = 0.9f * b;
+        glRenk = 0xFFE2B0;
+        yansimaRengi = karistir(0x23272B, 0xFFCF8E, 0.45f * b);
     }
 
     private static long chunkAnahtari(int x, int z) {
@@ -678,8 +702,21 @@ public final class SuRenderer {
                 } else {
                     egim(mx, mz, saat, 2.5);
                 }
+                gunesKipi();
                 golgele(renk(l, gx, gz), 0.72f, mx, y, mz, esX, esZ, tamIsik);
-                dortgenUst(gx - uzakOx, gz - uzakOz, LOD, y, y, y, y, gRenk, gAlfa, gIsik);
+                int lodRenk = gRenk;
+                float lodAlfa = gAlfa;
+                for (Dalga w : d.dalgaDizisi()) {
+                    // Uzakta da dalga tepesi okunsun: cepheye 0..5 blok karolar beyaz köpük, gövde turkuaz.
+                    double h = w.yuzey(mx, mz, saat);
+                    if (!Double.isNaN(h) && h - w.taban() > 1) {
+                        double s = w.cepheyeUzaklik(mx, mz, saat);
+                        float kp = s < 5 ? (float) Math.max(0, 0.9 * (1 - Math.abs(s - 2.5) / 2.5)) : 0;
+                        lodRenk = karistir(karistir(lodRenk, 0x3E8F94, (float) Math.min(0.6, (h - w.taban()) / 8)), 0xFFFFFF, kp);
+                        lodAlfa = Math.max(lodAlfa, 0.6f + 0.35f * kp);
+                    }
+                }
+                dortgenUst(gx - uzakOx, gz - uzakOz, LOD, y, y, y, y, lodRenk, lodAlfa, gIsik);
             }
         }
         uzakDortgen = dortgen;
@@ -795,6 +832,11 @@ public final class SuRenderer {
         }
         float a = Math.max(kopuk * 0.6f, derin < 1 ? 0.25f + 0.15f * derin : Math.min(0.85f, 0.4f + 0.06f * derin));
         int tabanRenk = karistir(renk, 0xFFFFFF, kopuk * 0.5f);
+        if (tur == 2) {
+            magaraKipi(isik);
+        } else {
+            gunesKipi();
+        }
         if (tur == 1) {
             int v00 = i * (N + 1) + j;
             int v01 = v00 + 1;
@@ -822,8 +864,20 @@ public final class SuRenderer {
                 dudak(dalga, rx, rz, dalga.taban() + dalgaH, dalgaH, isik);
             }
         } else if (tur == 2) {
-            golgele(tabanRenk, a, x + 0.5, yu, z + 0.5, 0, 0, isik);
-            dortgenUst(rx, rz, 1, yu, yu, yu, yu, gRenk, gAlfa, isik);
+            // Mağara suyu sakin ama cımsız değil: dalgacığın %30'u yükseklikte, eğimin %60'ı ışıkta (SU-28).
+            int v00 = i * (N + 1) + j;
+            int v01 = v00 + 1;
+            int v10 = v00 + N + 1;
+            int v11 = v10 + 1;
+            float y00 = yu + 0.3f * VH[v00];
+            float y01 = yu + 0.3f * VH[v01];
+            float y11 = yu + 0.3f * VH[v11];
+            float y10 = yu + 0.3f * VH[v10];
+            kosegolgeOlcekli(0, tabanRenk, a, x, y00, z, v00, isik);
+            kosegolgeOlcekli(1, tabanRenk, a, x, y01, z + 1, v01, isik);
+            kosegolgeOlcekli(2, tabanRenk, a, x + 1, y11, z + 1, v11, isik);
+            kosegolgeOlcekli(3, tabanRenk, a, x + 1, y10, z, v10, isik);
+            dortgenSerbest(rx, y00, rz, rx, y01, rz + 1, rx + 1, y11, rz + 1, rx + 1, y10, rz, false, x, z);
         }
         for (int q = 0; q < 4; q++) {
             int n = komsu(i + DI[q], j + DJ[q]);
@@ -877,6 +931,13 @@ public final class SuRenderer {
             }
             dikey(ex0, ez0, ex1, ez1, taban, yu, cy, ay, isik);
         }
+    }
+
+    private static void kosegolgeOlcekli(int q, int taban, float alfa, double x, double y, double z, int v, int isik) {
+        golgele(taban, alfa, x, y, z, VSX[v] * 0.6, VSZ[v] * 0.6, isik);
+        QC[q] = gRenk;
+        QA[q] = gAlfa;
+        QI[q] = gIsik;
     }
 
     private static void kosegolge(int q, int taban, float alfa, double x, double y, double z, int v, int isik) {

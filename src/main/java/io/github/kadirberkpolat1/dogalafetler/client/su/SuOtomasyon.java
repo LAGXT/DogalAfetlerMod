@@ -93,12 +93,12 @@ public final class SuOtomasyon {
             // Vitrin (tasarım notu §3): gün batımı, ay yok, iskelenin ucundan kıyı köyü; sonra +4 denizin altından.
             a.addAll(List.of("k:time set 12500", "k:dogalafet su ay yok", "b:200", "f:deniz-afetsiz", "s:sanal-su-deniz-once",
                     "k:dogalafet denizseviyesi 4", "b:300", "f:deniz-afet", "s:sanal-su-deniz-vitrin",
-                    "k:dogalafet su vitrin kamera sualti", "b:80", "s:sanal-su-sualti", "k:dogalafet denizseviyesi 0",
+                    "k:time set 6000", "k:dogalafet su vitrin kamera sualti", "b:100", "s:sanal-su-sualti", "k:dogalafet denizseviyesi 0",
                     "b:40"));
         }
         if (hepsi || BOLUM.contains("dalga")) {
             a.addAll(List.of("k:time set 10500", "k:dogalafet su vitrin kamera tepe", "b:200", "f:dalga-afetsiz",
-                    "s:sanal-su-dalga-once", "k:dogalafet su vitrin dalga 14", "b:50", "f:dalga-afet", "s:sanal-su-dalga",
+                    "s:sanal-su-dalga-once", "k:dogalafet su vitrin dalga 14", "b:110", "f:dalga-afet", "s:sanal-su-dalga",
                     "k:dogalafet su temizle", "b:40"));
         }
         if (hepsi || BOLUM.contains("magara")) {

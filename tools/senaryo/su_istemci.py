@@ -136,6 +136,7 @@ def main():
                      f"-PquickPlay=test -Potomasyon=su -PotomasyonBolum={bolum} > '{oyun_log}' 2>&1\n"
                      f"echo \"cikis=$?\" >> '{oyun_log}'\n")
     ifade = f'hl.dsp.exec_cmd("{KURAL} sh {betik}")'
+    duvar_baslangic = time.time()
     log(f"exec kuralıyla başlatılıyor: {ifade} -> {sh(['hyprctl', 'dispatch', ifade])}")
     baslangic = time.monotonic()
 
@@ -215,7 +216,7 @@ def main():
     for satir in re.findall(r".*SU-OTOMASYON (?:FPS|FOTO|OYUNCU).*", metin):
         log("  " + satir.split("SU-OTOMASYON ", 1)[1])
     for png in (RUN / "screenshots").glob("sanal-su-*.png"):
-        if png.stat().st_mtime > time.time() - 3600:
+        if png.stat().st_mtime > duvar_baslangic:
             shutil.copy2(png, kanit / png.name)
             log(f"kopyalandı: {png.name}")
     if alarm or girdi:
