@@ -20,9 +20,10 @@ Her eşya işçisi bu dosyaya kendi bölümünü ekler.
   mesafe (m), "Varış m:ss" (ON_UYARI/SIREN) ya da "Kalan m:ss" (AKTIF). Afet yoksa "Gökyüzü sakin · Menzil 300 m".
 - **Gökyüzü anomalisi (N7):** güneş patlaması/ay çarpması yalnız sirenden sonra; kap mora döner, içinde nabız gibi
   parlayan bir dolgu ve dışa yayılan halka, "Gökyüzü anomalisi · <afet> · Başlamasına m:ss". Yön ve mesafe yoktur.
-- **Gelişmiş radar:** çerçeve mor, üst kenarda mavi ışık çizgisi; alt bölümde seviye adı (Hafif…Felaket, seviye
-  rengiyle), hareket oku + hız (hareketli afette) ya da "Durağan", "Son afetler" başlığı ve 5 satır geçmiş (ad · seviye ·
-  "12 dk önce").
+- **Gelişmiş radar:** çerçeve mor, üst kenarda mavi ışık çizgisi; üst bölüm normal radarla aynı boyda. Altında 9 px'lik kısa
+  satırlar: seviye adı (Hafif…Felaket, seviye rengiyle) ile hareket oku + hız (hareketli afette) ya da "Durağan" aynı satırda,
+  "Son afetler" ve tek sütunda 5 kısa geçmiş satırı (`Kasırga S2 3dk`). Panel en çok 108 GUI px yüksekliğindedir: GUI
+  ölçeği 2'de ekranın %30'unu geçmez.
 - **Sismograf:** eşya hotbar'da/yan eldeyken öncü sarsıntıda her darbede kısık bir zemin gürlemesi (2,4 sn, 25–110 Hz,
   −27 LUFS, oyunda 0,08–0,30 hacım) ve 2 sn süren, en çok 0,3°'lik kamera titremesi; action bar'da (yalnız taşıyan)
   altun "Öncü sarsıntı algılandı · %45 · KD 240 m" (Hassas'ta "· Seviye: Şiddetli" kırmızı). AKTIF'te "Ana sarsıntı".
