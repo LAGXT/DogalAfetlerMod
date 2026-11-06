@@ -8,6 +8,7 @@ import io.github.kadirberkpolat1.dogalafetler.config.SunucuAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.CekirdekCevirileri;
 import io.github.kadirberkpolat1.dogalafetler.core.OyunTestiAfeti;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.GokyuzuSistemi;
+import io.github.kadirberkpolat1.dogalafetler.donma.DonmaSistemi;
 import io.github.kadirberkpolat1.dogalafetler.komut.CekirdekKomutlari;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import io.github.kadirberkpolat1.dogalafetler.network.AgKanali;
@@ -46,6 +47,7 @@ public final class DogalAfetler {
         Uyari.kaydet(modBus);
         GokyuzuSistemi.kaydet();
         YanginSistemi.kaydet(modBus);
+        DonmaSistemi.kaydet(modBus);
 
         DataGenerators.ceviriEkle(CekirdekCevirileri::yaz);
         DataGenerators.ceviriEkle(Kurallar::cevirileriYaz);
