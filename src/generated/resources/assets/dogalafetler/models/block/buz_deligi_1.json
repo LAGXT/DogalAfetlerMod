@@ -1,0 +1,175 @@
+{
+  "parent": "minecraft:block/block",
+  "elements": [
+    {
+      "faces": {
+        "down": {
+          "cullface": "down",
+          "texture": "#kenar"
+        },
+        "east": {
+          "cullface": "east",
+          "texture": "#kenar"
+        },
+        "north": {
+          "cullface": "north",
+          "texture": "#kenar"
+        },
+        "south": {
+          "texture": "#kenar"
+        },
+        "up": {
+          "cullface": "up",
+          "texture": "#kenar"
+        },
+        "west": {
+          "cullface": "west",
+          "texture": "#kenar"
+        }
+      },
+      "from": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        16,
+        16,
+        3
+      ]
+    },
+    {
+      "faces": {
+        "down": {
+          "cullface": "down",
+          "texture": "#kenar"
+        },
+        "east": {
+          "cullface": "east",
+          "texture": "#kenar"
+        },
+        "north": {
+          "texture": "#kenar"
+        },
+        "south": {
+          "cullface": "south",
+          "texture": "#kenar"
+        },
+        "up": {
+          "cullface": "up",
+          "texture": "#kenar"
+        },
+        "west": {
+          "cullface": "west",
+          "texture": "#kenar"
+        }
+      },
+      "from": [
+        0,
+        0,
+        13
+      ],
+      "to": [
+        16,
+        16,
+        16
+      ]
+    },
+    {
+      "faces": {
+        "down": {
+          "cullface": "down",
+          "texture": "#kenar"
+        },
+        "east": {
+          "texture": "#kenar"
+        },
+        "north": {
+          "texture": "#kenar"
+        },
+        "south": {
+          "texture": "#kenar"
+        },
+        "up": {
+          "cullface": "up",
+          "texture": "#kenar"
+        },
+        "west": {
+          "cullface": "west",
+          "texture": "#kenar"
+        }
+      },
+      "from": [
+        0,
+        0,
+        3
+      ],
+      "to": [
+        3,
+        16,
+        13
+      ]
+    },
+    {
+      "faces": {
+        "down": {
+          "cullface": "down",
+          "texture": "#kenar"
+        },
+        "east": {
+          "cullface": "east",
+          "texture": "#kenar"
+        },
+        "north": {
+          "texture": "#kenar"
+        },
+        "south": {
+          "texture": "#kenar"
+        },
+        "up": {
+          "cullface": "up",
+          "texture": "#kenar"
+        },
+        "west": {
+          "texture": "#kenar"
+        }
+      },
+      "from": [
+        13,
+        0,
+        3
+      ],
+      "to": [
+        16,
+        16,
+        13
+      ]
+    },
+    {
+      "faces": {
+        "down": {
+          "texture": "#zar"
+        },
+        "up": {
+          "texture": "#zar"
+        }
+      },
+      "from": [
+        3,
+        14.6,
+        3
+      ],
+      "to": [
+        13,
+        14.6,
+        13
+      ]
+    }
+  ],
+  "render_type": "minecraft:translucent",
+  "textures": {
+    "kenar": "dogalafetler:block/buz_deligi_kenar",
+    "particle": "dogalafetler:block/buz_deligi_kenar",
+    "zar": "dogalafetler:block/buz_deligi_buzlanma_1"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_buz_alabaligi": {
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "dogalafetler:buz_alabaligi"
+            ]
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    },
+    "has_the_recipe": {
+      "conditions": {
+        "recipe": "dogalafetler:pismis_buz_alabaligi_tutsuleme"
+      },
+      "trigger": "minecraft:recipe_unlocked"
+    }
+  },
+  "requirements": [
+    [
+      "has_buz_alabaligi",
+      "has_the_recipe"
+    ]
+  ],
+  "rewards": {
+    "recipes": [
+      "dogalafetler:pismis_buz_alabaligi_tutsuleme"
+    ]
+  },
+  "sends_telemetry_event": false
+}

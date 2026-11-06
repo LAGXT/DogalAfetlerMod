@@ -1,0 +1,35 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_derin_soguk_somonu": {
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "dogalafetler:derin_soguk_somonu"
+            ]
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    },
+    "has_the_recipe": {
+      "conditions": {
+        "recipe": "dogalafetler:pismis_derin_soguk_somonu_tutsuleme"
+      },
+      "trigger": "minecraft:recipe_unlocked"
+    }
+  },
+  "requirements": [
+    [
+      "has_derin_soguk_somonu",
+      "has_the_recipe"
+    ]
+  ],
+  "rewards": {
+    "recipes": [
+      "dogalafetler:pismis_derin_soguk_somonu_tutsuleme"
+    ]
+  },
+  "sends_telemetry_event": false
+}

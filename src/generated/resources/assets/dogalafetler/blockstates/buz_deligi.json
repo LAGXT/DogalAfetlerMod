@@ -1,0 +1,52 @@
+{
+  "variants": {
+    "asama=0,donma=false,ince=false": {
+      "model": "dogalafetler:block/buz_deligi_0"
+    },
+    "asama=0,donma=false,ince=true": {
+      "model": "dogalafetler:block/buz_deligi_0"
+    },
+    "asama=0,donma=true,ince=false": {
+      "model": "dogalafetler:block/buz_deligi_0"
+    },
+    "asama=0,donma=true,ince=true": {
+      "model": "dogalafetler:block/buz_deligi_0"
+    },
+    "asama=1,donma=false,ince=false": {
+      "model": "dogalafetler:block/buz_deligi_1"
+    },
+    "asama=1,donma=false,ince=true": {
+      "model": "dogalafetler:block/buz_deligi_1"
+    },
+    "asama=1,donma=true,ince=false": {
+      "model": "dogalafetler:block/buz_deligi_1"
+    },
+    "asama=1,donma=true,ince=true": {
+      "model": "dogalafetler:block/buz_deligi_1"
+    },
+    "asama=2,donma=false,ince=false": {
+      "model": "dogalafetler:block/buz_deligi_2"
+    },
+    "asama=2,donma=false,ince=true": {
+      "model": "dogalafetler:block/buz_deligi_2"
+    },
+    "asama=2,donma=true,ince=false": {
+      "model": "dogalafetler:block/buz_deligi_2"
+    },
+    "asama=2,donma=true,ince=true": {
+      "model": "dogalafetler:block/buz_deligi_2"
+    },
+    "asama=3,donma=false,ince=false": {
+      "model": "dogalafetler:block/buz_deligi_3"
+    },
+    "asama=3,donma=false,ince=true": {
+      "model": "dogalafetler:block/buz_deligi_3"
+    },
+    "asama=3,donma=true,ince=false": {
+      "model": "dogalafetler:block/buz_deligi_3"
+    },
+    "asama=3,donma=true,ince=true": {
+      "model": "dogalafetler:block/buz_deligi_3"
+    }
+  }
+}

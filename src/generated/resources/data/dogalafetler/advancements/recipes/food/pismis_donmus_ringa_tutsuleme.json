@@ -1,0 +1,35 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_donmus_ringa": {
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "dogalafetler:donmus_ringa"
+            ]
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    },
+    "has_the_recipe": {
+      "conditions": {
+        "recipe": "dogalafetler:pismis_donmus_ringa_tutsuleme"
+      },
+      "trigger": "minecraft:recipe_unlocked"
+    }
+  },
+  "requirements": [
+    [
+      "has_donmus_ringa",
+      "has_the_recipe"
+    ]
+  ],
+  "rewards": {
+    "recipes": [
+      "dogalafetler:pismis_donmus_ringa_tutsuleme"
+    ]
+  },
+  "sends_telemetry_event": false
+}

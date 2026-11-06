@@ -1,0 +1,35 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_kutup_morinasi": {
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "dogalafetler:kutup_morinasi"
+            ]
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    },
+    "has_the_recipe": {
+      "conditions": {
+        "recipe": "dogalafetler:pismis_kutup_morinasi_tutsuleme"
+      },
+      "trigger": "minecraft:recipe_unlocked"
+    }
+  },
+  "requirements": [
+    [
+      "has_kutup_morinasi",
+      "has_the_recipe"
+    ]
+  ],
+  "rewards": {
+    "recipes": [
+      "dogalafetler:pismis_kutup_morinasi_tutsuleme"
+    ]
+  },
+  "sends_telemetry_event": false
+}

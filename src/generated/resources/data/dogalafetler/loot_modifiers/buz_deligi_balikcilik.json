@@ -1,0 +1,10 @@
+{
+  "type": "dogalafetler:buz_deligi_balikcilik",
+  "conditions": [
+    {
+      "condition": "forge:loot_table_id",
+      "loot_table_id": "minecraft:gameplay/fishing"
+    }
+  ],
+  "tablo": "dogalafetler:gameplay/buz_deligi_balikcilik"
+}
