@@ -35,7 +35,8 @@ import net.minecraftforge.fml.common.Mod;
 
 /**
  * Asit yağmurunun istemci durumu ve tick efektleri (tasarım notu §2, §4, §5). Durum çekirdeğin {@code AfetDurumPaketi}'nden
- * okunur (merkez, yarıçap, aşama; {@code ozel.y} yoğunluk, {@code ozel.a} aşınan bloklar) ve 1 Hz paket arasında yumuşatılır.
+ * okunur (merkez, yarıçap, aşama, seviye; {@code ozel.y} yoğunluk, {@code ozel.a} aşınan bloklar) ve 1 Hz paket arasında
+ * yumuşatılır; görünen yoğunluk seviyeyle ölçeklenir (S1 seyrek çise, S5 sağanak).
  * SIREN'de bulut tavanı ve sis toplanır, AKTIF'te yağmur ({@link AsitYagmuruCizici}), sıçrama, cızlama dumancığı, yüzey
  * buharı ve vanilla yağmur sesi gelir. Parçacıklar vanilla'nın 32 blok kesimini atlayarak ({@code force}) eklenir; sayıyı
  * efekt kalitesi ve vanilla parçacık ayarı sınırlar.
@@ -165,10 +166,12 @@ public final class IstemciAsitYagmuru {
         x += (hedefX - x) * 0.05;
         z += (hedefZ - z) * 0.05;
         yaricap = p.yaricap();
-        double hedefYogunluk = p.asama() == AfetAsamasi.AKTIF ? p.ozel().getFloat("y") : 0;
+        double carpan = AsitKurallari.gorselCarpan(p.seviye());
+        double hedefYogunluk = p.asama() == AfetAsamasi.AKTIF ? p.ozel().getFloat("y") * carpan : 0;
         double sirenIlerleme = p.asama() == AfetAsamasi.SIREN && p.kalanTick() >= 0
                 ? 1.0 - Math.min(1.0, p.kalanTick() / (double) SIREN_TICK) : 1.0;
-        double hedefBulut = p.asama() == AfetAsamasi.SIREN ? 0.7 * sirenIlerleme : Math.max(0.7, hedefYogunluk);
+        double hedefBulut = p.asama() == AfetAsamasi.SIREN ? 0.7 * carpan * sirenIlerleme
+                : Math.max(0.7 * carpan, hedefYogunluk);
         yogunluk += Mth.clamp(hedefYogunluk - yogunluk, -0.02, 0.02);
         bulut += Mth.clamp(hedefBulut - bulut, -0.01, 0.01);
         asinan = p.ozel().getLongArray("a");

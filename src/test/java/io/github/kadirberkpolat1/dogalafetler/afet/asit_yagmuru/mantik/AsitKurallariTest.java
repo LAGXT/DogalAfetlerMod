@@ -131,6 +131,16 @@ class AsitKurallariTest {
     }
 
     @Test
+    void gorselYogunlukSeviyeyleArtar() {
+        assertEquals(0.4, AsitKurallari.gorselCarpan(1), 1e-9, "S1 seyrek çise");
+        assertEquals(1.0, AsitKurallari.gorselCarpan(5), 1e-9, "S5 tam sağanak");
+        assertEquals(1.0, AsitKurallari.gorselCarpan(8), 1e-9);
+        for (int s = 2; s <= 5; s++) {
+            assertTrue(AsitKurallari.gorselCarpan(s) > AsitKurallari.gorselCarpan(s - 1));
+        }
+    }
+
+    @Test
     void ignedenOnceYapraklilarDahaYavas() {
         assertEquals(1.0, AsitKurallari.kabulOlasiligi(Sinif.IGNE_YAPRAK));
         assertTrue(AsitKurallari.kabulOlasiligi(Sinif.YAPRAK) < 1.0);

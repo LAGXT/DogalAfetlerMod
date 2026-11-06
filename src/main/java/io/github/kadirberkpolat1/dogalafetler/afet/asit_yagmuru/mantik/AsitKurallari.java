@@ -85,6 +85,11 @@ public final class AsitKurallari {
         return Math.min(giris, cikis);
     }
 
+    /** Seviyenin görsel yoğunluk çarpanı (tasarım §2: S1 seyrek çise, S5 yoğun sağanak): 0,4 / 0,55 / 0,7 / 0,85 / 1. */
+    public static double gorselCarpan(int seviye) {
+        return 0.4 + 0.15 * (Math.max(1, Math.min(5, seviye)) - 1);
+    }
+
     /** Öldürmeme garantisi: hasar canı {@code enAzCan}'ın altına indirmez; 0 dönerse hasar verilmez. */
     public static float hasarMiktari(float can, float hasar, float enAzCan) {
         return Math.max(0f, Math.min(hasar, can - enAzCan));
