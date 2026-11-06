@@ -31,17 +31,23 @@ import net.minecraftforge.client.event.InputEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import org.lwjgl.openal.ALC10;
 
 /**
  * İstemci otomasyonu (K0-21 rev. 2): klavye/fare olmadan uyarı kanıtı toplar. Yalnız {@code -Potomasyon=uyari}
  * ({@code -Ddogalafetler.otomasyon=uyari}) ile çalışır. Adımlar bir öncekinden {@code ms} sonra <b>ve</b> koşulu sağlanınca
  * çalışır (S-05). Komutlar entegre sunucuda çıktısı bastırılmış kaynakla verilir: sohbete yazı düşmez, ekran
  * görüntüsünde yalnız oyun kalır (N6). Her girdi olayı kurulumdan kapanışa log'a yazılır ve sayılır.
+ *
+ * <p>Ses: oyun Ana Ses %0 ile açılır; açık OpenAL aygıtı "Wave File Writer" (karışımı dosyaya yazan, hoparlörsüz aygıt)
+ * değilse otomasyon Ana Ses'e dokunmadan oyunu kapatır. Aygıt doğruysa Ana Ses %100 olur: vanilla Ana Ses 0 iken hiçbir
+ * sesi başlatmaz, siren ölçülemezdi.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class UyariOtomasyonu {
     private static final boolean ETKIN = "uyari".equals(System.getProperty("dogalafetler.otomasyon", ""));
     private static final String KATMAN = "uyari/ortam_test";
+    private static final String KAYIT_AYGITI = "Wave File Writer";
     private static final long KOSUL_ZAMAN_ASIMI_MS = 40_000;
     private static final List<Adim> ADIMLAR = new ArrayList<>();
     private static long baslangic = -1;
@@ -50,6 +56,7 @@ public final class UyariOtomasyonu {
     private static int tusSayisi;
     private static int fareSayisi;
     private static int tekerlekSayisi;
+    private static int stopsoundOncesi;
 
     private record Adim(long ms, String ad, BooleanSupplier kosul, Runnable is) {
     }
@@ -58,13 +65,24 @@ public final class UyariOtomasyonu {
     }
 
     private static void plan() {
-        adim(3000, "yaratıcı mod, gün, açık hava", () -> {
+        adim(3000, "ses aygıtı denetimi, yaratıcı mod, gün, açık hava", () -> {
+            Minecraft mc = Minecraft.getInstance();
+            String aygit = sesAygiti();
+            if (!aygit.contains(KAYIT_AYGITI)) {
+                DogalAfetler.LOGGER.error("[uyari-otomasyon] ses aygıtı '{}' kayıt aygıtı değil; Ana Ses %0 kalıyor, kapanış",
+                        aygit);
+                sonraki = ADIMLAR.size();
+                mc.stop();
+                return;
+            }
+            mc.options.getSoundSourceOptionInstance(SoundSource.MASTER).set(1.0);
             komut("gamemode creative @s");
             komut("time set day");
             komut("weather clear");
-            Minecraft mc = Minecraft.getInstance();
-            log("ses: MASTER={} altyazı={} sirenSes={} ortamTavan={}", mc.options.getSoundSourceVolume(SoundSource.MASTER),
-                    mc.options.showSubtitles().get(), UyariAyarlari.sirenSes().get(), UyariAyarlari.ortamTavan());
+            log("ses: aygıt='{}' MASTER={} WEATHER={} AMBIENT={} altyazı={} sirenSes={} ortamTavan={}", aygit,
+                    mc.options.getSoundSourceVolume(SoundSource.MASTER), mc.options.getSoundSourceVolume(SoundSource.WEATHER),
+                    mc.options.getSoundSourceVolume(SoundSource.AMBIENT), mc.options.showSubtitles().get(),
+                    UyariAyarlari.sirenSes().get(), UyariAyarlari.ortamTavan());
         });
         adim(1000, "ortam test katmanı (20 blok doğuda, menzil 64)", UyariOtomasyonu::ortamBaslat);
         bekle("ortam katmanı çalıyor", () -> IstemciOrtam.ORNEK.caliyor(KATMAN) && IstemciOrtam.ORNEK.duzey(KATMAN) > 0.1f);
@@ -88,9 +106,16 @@ public final class UyariOtomasyonu {
         adim(500, "siren aşamasına geç", () -> komut("dogalafet asama ileri"));
         adim(0, "çekim: alt yazı açıkken (20 tick)", () -> calan(20), () -> cek("uyari-siren-altyazi-acik"));
         adim(300, "altyazı kapat", () -> Minecraft.getInstance().options.showSubtitles().set(false));
-        adim(0, "stopsound @s master (50 tick)", () -> calan(50), () -> komut("stopsound @s master"));
-        bekle("siren /stopsound sonrası yeniden başladı", () -> SirenCalar.ORNEK.yenidenBaslatmaSayisi() >= 2);
-        adim(300, "ses ayarları ekranı", UyariOtomasyonu::sesEkrani);
+        adim(0, "stopsound @s master (50 tick)", () -> calan(50), () -> {
+            stopsoundOncesi = SirenCalar.ORNEK.yenidenBaslatmaSayisi();
+            komut("stopsound @s master");
+        });
+        bekle("siren /stopsound sonrası yeniden başladı",
+                () -> SirenCalar.ORNEK.yenidenBaslatmaSayisi() > stopsoundOncesi && calan(0));
+        adim(300, "ses ayarları ekranı", () -> {
+            configKopyala("once");
+            sesEkrani();
+        });
         adim(1500, "çekim: ses ayarları", () -> cek("uyari-ses-ayarlari-sirenler"));
         adim(300, "Sirenler kaydırıcısını %40'a tıkla", () -> kaydiriciyaTikla(40));
         adim(1000, "ekranı kapat (config kaydedilir)", () -> Minecraft.getInstance().setScreen(null));
@@ -225,12 +250,23 @@ public final class UyariOtomasyonu {
         });
     }
 
+    /** Ölçüm için WEATHER (açık havada başka WEATHER sesi yok; AMBIENT'teki mağara/Nether sesleri kayda karışmasın). */
     private static void ortamBaslat() {
         Minecraft mc = Minecraft.getInstance();
         Vec3 konum = mc.player.position().add(20, 0, 0);
         ResourceKey<Level> boyut = mc.player.level().dimension();
         sunucuda(server -> OrtamSesi.baslat(server, KATMAN, OrtamSesi.AFETSIZ, UyariSesleri.ORTAM_TEST,
-                SoundSource.AMBIENT, OrtamSesi.Yer.nokta(boyut, konum, 64f), HacimEgrisi.giris(40, 1f)));
+                SoundSource.WEATHER, OrtamSesi.Yer.nokta(boyut, konum, 64f), HacimEgrisi.giris(40, 1f)));
+    }
+
+    /** Açık OpenAL aygıtının adı (bağlam yoksa boş). */
+    private static String sesAygiti() {
+        long baglam = ALC10.alcGetCurrentContext();
+        if (baglam == 0L) {
+            return "";
+        }
+        String ad = ALC10.alcGetString(ALC10.alcGetContextsDevice(baglam), ALC10.ALC_DEVICE_SPECIFIER);
+        return ad == null ? "" : ad;
     }
 
     private static void ortamLog(String an) {

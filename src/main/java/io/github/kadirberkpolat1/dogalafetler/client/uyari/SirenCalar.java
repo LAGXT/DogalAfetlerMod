@@ -31,7 +31,8 @@ final class SirenCalar {
 
     void istek(SirenPaketi paket) {
         boolean caliyor = caliyor();
-        SirenKarari karar = SirenKarari.istek(caliyor, caliyor ? etkin.afetNo() : 0L, paket.afetNo());
+        SirenKarari karar = SirenKarari.istek(caliyor, caliyor && etkin.zarf().sonduruluyor(),
+                caliyor ? etkin.afetNo() : 0L, paket.afetNo());
         if (karar == SirenKarari.YOK_SAY) {
             DogalAfetler.LOGGER.info("[siren] istek yok sayıldı: afetNo {} zaten çalıyor", paket.afetNo());
             return;

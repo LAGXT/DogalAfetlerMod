@@ -8,7 +8,12 @@
 (d) Bekçi: açılıştan önce sahibin etkin penceresi kaydedilir; 5 sn'de bir `activewindow`. Etkin pencere bizim pid'imizse
     ALARM: süreç öldürülür, odak kaydedilen pencereye verilir, koşu geçersiz.
 (e) Oyun içi girdi olayları log'dan sayılır; sıfırdan farklıysa koşu geçersiz.
-Ses: options.txt'te MASTER %0 ile başlar (sahibin hoparlöründen ses çıkmaz); ölçüm dosyadan (tools/assets/ses_uret.py).
+Ses: sahibin hoparlörüne hiç ses gitmez. Oyunun OpenAL Soft'u `ALSOFT_DRIVERS=wave` ile yalnız "Wave File Writer" aygıtını
+açar ve karışımı /tmp/uyari-ses-cikis.wav'a yazar (ölçüm dosyadan, `tools/senaryo/uyari_kayit_olc.py`). Oyun Ana Ses
+%0 ile açılır; otomasyon açık aygıtın adını OpenAL'dan okur, "Wave File Writer" ise Ana Ses'i %100 yapar (vanilla Ana Ses 0
+iken hiçbir sesi başlatmaz), değilse oyunu kapatır. Bu betik de log'daki "OpenAL initialized on device" satırını denetler,
+başka aygıtta süreci öldürür. Kategoriler: WEATHER %100 (örnek ortam katmanı; açık havada başka WEATHER sesi yok), diğerleri
+0 (kayıtta yalnız siren ve ortam katmanı kalır).
 
 Kullanım (worktree kökünden): python3 tools/senaryo/uyari_istemci.py <kanıt klasörü>
 Çıkış: 0 geçerli koşu, 1 geçersiz/iptal.
@@ -29,6 +34,9 @@ WORKSPACE = 94
 JAVA_HOME = "/home/lagxt/.jdks/jdk-17.0.21+9"
 BASLATMA_BETIGI = Path("/tmp/uyari-ses-kosu.sh")
 TOPLAM_SURE = 20 * 60
+WAV = Path("/tmp/uyari-ses-cikis.wav")
+ALSOFT_CONF = Path("/tmp/uyari-alsoft.conf")
+CIHAZ = "Wave File Writer"
 
 
 def ortam():
@@ -99,7 +107,11 @@ def oldur(log, java_pid, neden):
 def secenekleri_hazirla():
     yol = RUN / "options.txt"
     satirlar = yol.read_text(encoding="utf-8").splitlines() if yol.exists() else []
-    ayar = {"pauseOnLostFocus": "false", "soundCategory_master": "0.0", "showSubtitles": "false"}
+    ayar = {"pauseOnLostFocus": "false", "showSubtitles": "false", "tutorialStep": "none",
+            "onboardAccessibility": "false", "narrator": "0", "soundDevice": '""',
+            "soundCategory_master": "0.0", "soundCategory_weather": "1.0"}
+    for kategori in ("music", "record", "ambient", "block", "hostile", "neutral", "player", "voice"):
+        ayar[f"soundCategory_{kategori}"] = "0.0"
     satirlar = [s for s in satirlar if s.split(":", 1)[0] not in ayar] + [f"{k}:{v}" for k, v in ayar.items()]
     yol.write_text("\n".join(satirlar) + "\n", encoding="utf-8")
 
@@ -110,7 +122,7 @@ def main():
     log = Gunluk(kanit / "pencere-uyari.log")
 
     for _ in range(10):
-        if gradle_sayisi() < 2 and bos_ram_gib() >= 7 and not baska_istemci():
+        if gradle_sayisi() < 2 and bos_ram_gib() >= 6 and not baska_istemci():
             break
         log(f"ağır süreç kapısı: gradle={gradle_sayisi()} boş={bos_ram_gib():.1f} GiB istemci={baska_istemci()}; 60 sn")
         time.sleep(60)
@@ -125,8 +137,12 @@ def main():
     for eski in (RUN / "screenshots").glob("uyari-*.png") if (RUN / "screenshots").exists() else []:
         eski.unlink()
     istemci_log = kanit / "runClient-uyari.log"
+    WAV.unlink(missing_ok=True)
+    ALSOFT_CONF.write_text(f"[general]\ndrivers = wave\nfrequency = 48000\nchannels = stereo\nsample-type = int16\n"
+                           f"[wave]\nfile = {WAV}\n", encoding="utf-8")
     BASLATMA_BETIGI.write_text(
-        f"#!/bin/sh\ncd '{KOK}' || exit 1\nexport JAVA_HOME='{JAVA_HOME}' DISPLAY=:0\n"
+        f"#!/bin/sh\ncd '{KOK}' || exit 1\nexport JAVA_HOME='{JAVA_HOME}' DISPLAY=:0 ALSOFT_DRIVERS=wave "
+        f"ALSOFT_CONF='{ALSOFT_CONF}'\n"
         f"exec timeout {TOPLAM_SURE} ./gradlew runClient --no-daemon --offline --console=plain -PquickPlay=test "
         f"-Potomasyon=uyari -PoyunTestiAfeti=deprem > '{istemci_log}' 2>&1\n", encoding="utf-8")
 
@@ -178,6 +194,7 @@ def main():
 
     gecerli = True
     yoklama = 0
+    cihaz = None
     while istemci_jvm() is not None:
         if time.monotonic() - basla > TOPLAM_SURE:
             oldur(log, java_pid, "toplam süre aşıldı")
@@ -190,9 +207,21 @@ def main():
             log(f"(d) odak geri: {hyprctl('dispatch', f'hl.dsp.focus({{ window = "address:{sahip_adres}" }})')}")
             gecerli = False
             break
+        if cihaz is None and istemci_log.exists():
+            bulunan = re.search(r"OpenAL initialized on device (.+)", istemci_log.read_text(encoding="utf-8",
+                                                                                            errors="replace"))
+            if bulunan:
+                cihaz = bulunan.group(1).strip()
+                log(f"ses aygıtı: {cihaz!r} (beklenen {CIHAZ!r})")
+                if CIHAZ not in cihaz:
+                    oldur(log, java_pid, "ses aygıtı wave yazıcı değil (hoparlöre ses gidebilir)")
+                    gecerli = False
+                    break
         if yoklama % 6 == 1:
             log(f"(d) denetim {yoklama}: etkin={etkin.get('address')} {etkin.get('class')}; gradle={gradle_sayisi()}")
         time.sleep(5)
+    if WAV.exists():
+        log(f"ses kaydı: {WAV} ({WAV.stat().st_size} bayt)")
     time.sleep(3)
     log(f"istemci kapandı; süre={time.monotonic() - basla:.0f} sn; yoklama={yoklama}; ALARM={0 if gecerli else 1}")
 

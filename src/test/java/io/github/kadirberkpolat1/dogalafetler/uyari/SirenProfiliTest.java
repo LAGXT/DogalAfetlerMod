@@ -45,10 +45,13 @@ class SirenProfiliTest {
     /** S-02 / 1 Hz geç gelen istek: aynı afet zaten çalıyorsa yok sayılır, çalmıyorsa kalan süreyle başlar. */
     @Test
     void tekrarlananIstekAyniAfetCalarkenYokSayilir() {
-        assertEquals(SirenKarari.BASLAT, SirenKarari.istek(false, 0L, 1234L));
-        assertEquals(SirenKarari.YOK_SAY, SirenKarari.istek(true, 1234L, 1234L));
-        assertEquals(SirenKarari.KES_VE_BASLAT, SirenKarari.istek(true, 1000L, 1234L));
-        assertEquals(SirenKarari.BASLAT, SirenKarari.istek(false, 1234L, 1234L), "bitmiş siren yeniden başlar");
+        assertEquals(SirenKarari.BASLAT, SirenKarari.istek(false, false, 0L, 1234L));
+        assertEquals(SirenKarari.YOK_SAY, SirenKarari.istek(true, false, 1234L, 1234L));
+        assertEquals(SirenKarari.KES_VE_BASLAT, SirenKarari.istek(true, false, 1000L, 1234L));
+        assertEquals(SirenKarari.BASLAT, SirenKarari.istek(false, false, 1234L, 1234L), "bitmiş siren yeniden başlar");
+        assertEquals(SirenKarari.BASLAT, SirenKarari.istek(true, true, 1234L, 1234L),
+                "sönen siren aynı saatte başlamış yeni afetin sirenini engellemez");
+        assertEquals(SirenKarari.BASLAT, SirenKarari.istek(true, true, 1000L, 1234L), "söneni kesmeye gerek yok");
     }
 
     @Test
