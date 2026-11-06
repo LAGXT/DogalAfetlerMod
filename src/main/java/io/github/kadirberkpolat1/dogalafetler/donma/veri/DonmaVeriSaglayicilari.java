@@ -21,7 +21,12 @@ import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.SnowyDirtBlock;
+import net.minecraft.world.level.storage.loot.LootPool;
+import net.minecraft.world.level.storage.loot.LootTable;
+import net.minecraft.world.level.storage.loot.entries.AlternativesEntry;
+import net.minecraft.world.level.storage.loot.entries.LootItem;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets;
+import net.minecraft.world.level.storage.loot.providers.number.ConstantValue;
 import net.minecraftforge.client.model.generators.BlockStateProvider;
 import net.minecraftforge.client.model.generators.ModelFile;
 import net.minecraftforge.common.data.BlockTagsProvider;
@@ -87,6 +92,13 @@ public final class DonmaVeriSaglayicilari {
         protected void addTags(HolderLookup.Provider arama) {
             tag(DonmaIsleyici.KAR_ZEMINI).addTag(BlockTags.DIRT).addTag(BlockTags.LEAVES).addTag(BlockTags.SAND)
                     .addTag(BlockTags.BASE_STONE_OVERWORLD).add(Blocks.GRAVEL, Blocks.CLAY);
+            // Üstü düz yaygın yapı blokları (tam bloklar; basamak ve merdiven yok): kar kalın buz aşamasında gelir (D8).
+            tag(DonmaIsleyici.YAPI_KAR_ZEMINI).addTag(BlockTags.PLANKS).addTag(BlockTags.LOGS).addTag(BlockTags.STONE_BRICKS)
+                    .add(Blocks.COBBLESTONE, Blocks.MOSSY_COBBLESTONE, Blocks.BRICKS, Blocks.MUD_BRICKS, Blocks.SMOOTH_STONE,
+                            Blocks.POLISHED_ANDESITE, Blocks.POLISHED_DIORITE, Blocks.POLISHED_GRANITE, Blocks.COBBLED_DEEPSLATE,
+                            Blocks.POLISHED_DEEPSLATE, Blocks.DEEPSLATE_BRICKS, Blocks.DEEPSLATE_TILES, Blocks.SANDSTONE,
+                            Blocks.SMOOTH_SANDSTONE, Blocks.CUT_SANDSTONE, Blocks.RED_SANDSTONE, Blocks.SMOOTH_RED_SANDSTONE,
+                            Blocks.CUT_RED_SANDSTONE, Blocks.QUARTZ_BLOCK, Blocks.SMOOTH_QUARTZ, Blocks.TERRACOTTA);
             Block kiragili = DonmaBloklari.KIRAGILI_CIMEN.get();
             Block ince = DonmaBloklari.INCE_BUZ.get();
             tag(BlockTags.DIRT).add(kiragili);
@@ -104,7 +116,11 @@ public final class DonmaVeriSaglayicilari {
 
         @Override
         protected void generate() {
-            add(DonmaBloklari.KIRAGILI_CIMEN.get(), b -> createSingleItemTableWithSilkTouch(b, Blocks.DIRT));
+            // İpek dokunuş kırağılı çimeni değil çimeni verir: blok oyuncunun eline geçmez (K0-24 hedef kuralı, D9).
+            add(DonmaBloklari.KIRAGILI_CIMEN.get(), b -> LootTable.lootTable().withPool(LootPool.lootPool()
+                    .setRolls(ConstantValue.exactly(1.0F))
+                    .add(AlternativesEntry.alternatives(LootItem.lootTableItem(Blocks.GRASS_BLOCK).when(HAS_SILK_TOUCH),
+                            applyExplosionCondition(b, LootItem.lootTableItem(Blocks.DIRT))))));
             dropWhenSilkTouch(DonmaBloklari.INCE_BUZ.get());
         }
 

@@ -11,8 +11,8 @@ class DonmaEsikleriTest {
 
     @Test
     void karKatmaniIlerlemeyleArtarCimendeTekKattaKalir() {
-        assertEquals(0, e.karKatmani(24, false));
-        assertEquals(1, e.karKatmani(25, false));
+        assertEquals(0, e.karKatmani(14, false));
+        assertEquals(1, e.karKatmani(15, false));
         assertEquals(5, e.karKatmani(100, false));
         assertEquals(1, e.karKatmani(100, true));
         int onceki = 0;
@@ -95,6 +95,43 @@ class DonmaEsikleriTest {
             assertEquals(t, DonmaEsikleri.titresim(99L, i * 31 - 9000, i * 17 + 4000, 8));
         }
         assertEquals(0, e.titresimsiz().titresimGenligi());
+    }
+
+    /** D2: varsayılan sıra madde 9 (kırağı 10 < ilk kar 15 < kıyı buzu 20 < kalın buz 40). */
+    @Test
+    void varsayilanSiraKiragiKarKiyiBuzuKalinBuz() {
+        assertEquals(0, e.karKatmani(14, false));
+        assertEquals(0, e.buzSeviyesi(19, 0), "kıyı buzu ilk kardan sonra");
+        assertEquals(1, e.karKatmani(19, false), "19'da kar var, buz yok");
+        assertTrue(e.buzSeviyesi(20, 0) > 0);
+        assertEquals(e.yapiKarEsigi(), 40, "yapı karı kalın buz aşamasında (ilk buz + kalınlık adımı)");
+        assertTrue(e.buzKalinligi(40, 0) >= 2, "40'ta kıyıda kalın buz");
+    }
+
+    @Test
+    void bozukSiraIlkKarIlkBuzdanOnceyeCekilir() {
+        int[] kar = {25, 55, 70, 85, 95};
+        int[] sirali = DonmaEsikleri.siraliKarEsikleri(kar, 20, 8);
+        assertEquals(19, sirali[0]);
+        assertEquals(55, sirali[1]);
+        assertEquals(25, kar[0], "girdi değişmez");
+        int[] dogru = {15, 55, 70, 85, 95};
+        assertTrue(DonmaEsikleri.siraliKarEsikleri(dogru, 20, 8) == dogru, "sıra doğruysa aynı dizi");
+        assertEquals(9, DonmaEsikleri.siraliKarEsikleri(new int[] {12, 55}, 9, 8)[0], "titreşimin üstünde kalır");
+    }
+
+    /** D8: yapı karı doğal zeminden geç gelir, önce kalkar (kıyı buzu 45'ten önce). */
+    @Test
+    void yapiKariGecGelirOnceKalkar() {
+        assertEquals(0, e.yapiKarKatmani(39, 1));
+        assertEquals(1, e.yapiKarKatmani(40, 1));
+        assertEquals(5, e.yapiKarKatmani(100, 1));
+        assertEquals(0, e.yapiKarKatmani(54, -1));
+        assertTrue(e.yapiKarKatmani(54, -1) == 0 && e.buzSeviyesiCozulme(54, 0) > 0, "çatı karı kıyı buzundan önce kalkar");
+        DonmaEsikleri ozel = e.yapiKari(60, 70);
+        assertEquals(0, ozel.yapiKarKatmani(59, 1));
+        assertEquals(0, ozel.titresimsiz().yapiKarKatmani(69, -1), "titreşimsiz kopya yapı eşiklerini taşır");
+        assertThrows(IllegalArgumentException.class, () -> e.yapiKari(50, 40));
     }
 
     @Test

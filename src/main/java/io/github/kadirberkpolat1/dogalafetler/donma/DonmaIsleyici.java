@@ -45,6 +45,8 @@ import net.minecraft.world.level.levelgen.Heightmap;
  */
 public final class DonmaIsleyici {
     public static final TagKey<Block> KAR_ZEMINI = BlockTags.create(DogalAfetler.konum("donma/kar_zemini"));
+    /** Yapı blokları (çatı, duvar üstü): kar daha geç gelir ({@code yapiKarEsigi}, D8). */
+    public static final TagKey<Block> YAPI_KAR_ZEMINI = BlockTags.create(DogalAfetler.konum("donma/yapi_kar_zemini"));
     private static final int BAYRAK = Block.UPDATE_CLIENTS;
     private static final int SU_BAYRAGI = Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE;
     /** Sınırsız üst Y: yüzey doğrudan {@code MOTION_BLOCKING} heightmap'inden okunur. */
@@ -195,6 +197,23 @@ public final class DonmaIsleyici {
         return durum.is(tablo.suHedef()) || durum.is(tablo.suInce());
     }
 
+    /**
+     * Kış ağırlığının yükseklik bileşeni için zemin: yaprak sayılmadan en üst hareket engelleyen blok (D7; ağaç tepesi
+     * yanındaki zeminden "daha kışlı" olmasın). Uzun süren sınırsız yolda heightmap, GameTest yolunda {@code ustY}'den tarama.
+     */
+    static int zeminY(LevelChunk chunk, int x, int z, int ustY, BlockPos.MutableBlockPos konum) {
+        int h = chunk.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x & 15, z & 15);
+        if (ustY >= h) {
+            return h;
+        }
+        for (int y = ustY; y >= chunk.getMinBuildHeight(); y--) {
+            if (Heightmap.Types.MOTION_BLOCKING_NO_LEAVES.isOpaque().test(chunk.getBlockState(konum.set(x, y, z)))) {
+                return y;
+            }
+        }
+        return chunk.getMinBuildHeight() - 1;
+    }
+
     /** Sütunu geçirir: önce buharlaşma, sonra donma (N10 sırası). */
     static void sutunuIsle(ServerLevel level, LevelChunk chunk, ChunkDonmaVerisi durum, int x, int z, int ustY, Gecis gecis,
             KisKaynagi kis, Kiyi kiyi, Tablo tablo, DonmaEsikleri e, EsikKumesi esikler, BlockPos.MutableBlockPos konum,
@@ -211,7 +230,7 @@ public final class DonmaIsleyici {
         if (!gecis.donmaVar()) {
             return;
         }
-        double w = kis.agirlik(x, z, y);
+        double w = kis.agirlik(x, z, zeminY(chunk, x, z, ustY, konum));
         double ofset = kis.ofset(x, z);
         int eski = DonmaHedefi.sutunHedefi(gecis.eskiG(), gecis.eskiCozulme(), w, ofset);
         int yeni = DonmaHedefi.sutunHedefi(gecis.yeniG(), gecis.yeniCozulme(), w, ofset);
@@ -246,12 +265,14 @@ public final class DonmaIsleyici {
                 sayac.degisen++;
             }
         }
-        if (!kok.defaultBlockState().is(KAR_ZEMINI)) {
+        boolean yapi = !kok.defaultBlockState().is(KAR_ZEMINI);
+        if (yapi && !kok.defaultBlockState().is(YAPI_KAR_ZEMINI)) {
             return;
         }
         int mevcut = bizimKar ? ustundeki.getValue(SnowLayerBlock.LAYERS) : 0;
         boolean tekKat = kok instanceof SpreadingSnowyDirtBlock;
-        int istenenKatman = yon > 0 ? e.karKatmani(etkin, tekKat) : e.karKatmaniCozulme(etkin, tekKat);
+        int istenenKatman = yapi ? e.yapiKarKatmani(etkin, yon)
+                : yon > 0 ? e.karKatmani(etkin, tekKat) : e.karKatmaniCozulme(etkin, tekKat);
         int katman = DonmaHedefi.yonlu(mevcut, istenenKatman, yon);
         if (katman != mevcut) {
             BlockState yeniUst = katman == 0 ? Blocks.AIR.defaultBlockState()
@@ -283,7 +304,7 @@ public final class DonmaIsleyici {
         }
         int c = kiyi.uzaklik(x, z);
         int seviye = yon > 0 ? e.buzSeviyesi(etkin, c) : e.buzSeviyesiCozulme(etkin, c);
-        SuSutunu.Tur[] plan = SuSutunu.planlaSeviye(sutun, seviye, yon);
+        SuSutunu.Tur[] plan = SuSutunu.planlaSeviye(sutun, seviye, yon, bizim);
         for (int d = 0; d < sutun.length; d++) {
             if (plan[d] != sutun[d]) {
                 Block yeni = switch (plan[d]) {
@@ -301,8 +322,9 @@ public final class DonmaIsleyici {
 
     /**
      * Sütunun buharlaşma kaydını {@code hedef} derinliğe getirir (N9): kayıt yoksa ve üst blok üstü açık su kaynağıysa
-     * yüzeyden aşağı kurur; kayıt varsa eksik kalanı kurutur ya da derinlik düşünce suyu alttan yukarı geri koyar
-     * (ara konum hava ya da akıcı su değilse — oyuncu doldurduysa — kayıt bırakılır). Blok değişti mi döner.
+     * yüzeyden aşağı kurur; kayıt varsa eksik kalanı kurutur ya da derinlik düşünce suyu alttan yukarı geri koyar. Geri
+     * dolmada kaynak su "zaten dolu" sayılır (komşu sütundan akan ve vanilla'nın kaynağa çevirdiği su, D3), akıcı su kaynakla
+     * değiştirilir; yalnız katı bir blokta (oyuncu doldurdu) durulur ve kayıt bırakılır. Blok değişti mi döner.
      */
     static boolean buharla(ServerLevel level, LevelChunk chunk, ChunkDonmaVerisi durum, int i, int x, int y, int z,
             int hedef, Tablo tablo, BlockPos.MutableBlockPos konum, Sayac sayac) {
@@ -342,7 +364,10 @@ public final class DonmaIsleyici {
         } else {
             for (int j = kaldirilan - 1; j >= k; j--) {
                 BlockState s = chunk.getBlockState(konum.set(x, ust - j, z));
-                if (!s.isAir() && !(s.is(tablo.suKaynak()) && !s.getFluidState().isSource())) {
+                if (s.is(tablo.suKaynak()) && s.getFluidState().isSource()) {
+                    continue;
+                }
+                if (!s.isAir() && !s.is(tablo.suKaynak())) {
                     k = 0;
                     break;
                 }

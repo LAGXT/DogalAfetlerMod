@@ -25,8 +25,10 @@ public final class EsikKumesi {
         boolean[] donma = new boolean[UST - ALT + 1];
         boolean[] cozulme = new boolean[UST - ALT + 1];
         for (int l = ALT + 1; l <= UST; l++) {
-            boolean d = e.karKatmani(l - 1, false) != e.karKatmani(l, false);
-            boolean c = e.karKatmaniCozulme(l - 1, false) != e.karKatmaniCozulme(l, false);
+            boolean d = e.karKatmani(l - 1, false) != e.karKatmani(l, false)
+                    || e.yapiKarKatmani(l - 1, 1) != e.yapiKarKatmani(l, 1);
+            boolean c = e.karKatmaniCozulme(l - 1, false) != e.karKatmaniCozulme(l, false)
+                    || e.yapiKarKatmani(l - 1, -1) != e.yapiKarKatmani(l, -1);
             for (int u = 0; u <= e.kiyiUzaklikSiniri() && !(d && c); u++) {
                 d |= e.buzSeviyesi(l - 1, u) != e.buzSeviyesi(l, u);
                 c |= e.buzSeviyesiCozulme(l - 1, u) != e.buzSeviyesiCozulme(l, u);

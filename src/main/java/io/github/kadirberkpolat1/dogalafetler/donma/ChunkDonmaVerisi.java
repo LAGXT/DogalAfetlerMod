@@ -99,9 +99,16 @@ public final class ChunkDonmaVerisi {
     }
 
     /**
-     * {@code /dogalafet sifirla} sonrası ilk görülüş: bloklar çözülmeden yalnız veri sıfırlanır. Chunk yeni dönemin
- * ilerlemesini benimser; bitler ve buharlaşma kayıtları silinir (kalan kar/buz artık yabancıdır).
+     * {@code /dogalafet sifirla} sonrası ilk görülüş (D4): chunk yeni döngüyü kaydeder, son işlenen ilerlemesini ve bitlerini
+     * korur; kuyruk onu normal adımlarla yeni döngünün hedefine (0) çözer. Son adımın yönü bilinmez sayılır (eşik
+     * atlaması ilk adımda kapalı).
      */
+    public void donguyeAktar(long yeniDongu) {
+        dongu = yeniDongu;
+        sonYon = 0;
+    }
+
+    /** Chunk verisini yeni döngüde {@code g}'ye ayarlar ve bitleri siler (GameTest sahnesi kurulumu). */
     public void donguyeGec(long yeniDongu, int g, boolean cozulmeDonemi) {
         dongu = yeniDongu;
         durum(g, cozulmeDonemi);

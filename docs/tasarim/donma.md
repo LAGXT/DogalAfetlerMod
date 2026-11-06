@@ -127,11 +127,17 @@ Uygulama `is/donma` dalında; kararlar `.vibe/kararlar/donma.md` (K-D6…K-D21),
   alttan yukarı geri gelir; aynı chunk işinde önce geri dolma sonra donma (N10).
 - **Kıyı uzaklığı chunk'tan bağımsız:** BFS chunk'ın çevresinde 15 blok hale okur; göl chunk sınırını kesse de halka
   kıyıyı izler (spike'taki 1 blokluk halede chunk kenarındaki sütunlar fazla uzaklık alıp geç donuyordu).
-- **Vitrin yüzdesi:** §2 eşiklerine göre kıyıdan 15 blok içerisi 50'de buzlanır; %55'te yarıçapı ≤ 15 blok gölün
-  çoğu buzdur, orta yalnız titreşimle ince buz ve açık su beneklidir. Kıyıdan içeri ilerleyen halka %35–45'te en
-  belirgin; görsel tur %35, %45 ve %55 karelerini birlikte alır (§3'teki "%55'te gölün yarısı buz" eşik tablosuyla
-  çelişiyor, şef kararına bırakıldı).
-- **`sifirla`:** veri döngüsü; bloklar çözülmez, kalan kar/buz yabancı sayılır.
+- **Sıra ve vitrin yüzdesi (şef kararı, §2 tablosunun yerine geçer):** madde 9 ve K0-24 sırası kazanır: kırağı 10 →
+  ince kar **15** (§2'deki 25'in yerine) → kenardan buz 20 (15 blok içeride 50) → kalın buz ve yapı karı 40 → kar
+  katmanları 55–95. §2'deki "kırağı → kıyı buzu → kar" satırı da böylece "kırağı → ince kar → kıyı buzu" olur. Vitrin
+  yüzdesi "buz kıyıdan içeri başlıyor" bandına (20–50) çekildi: **vitrin %35** (§3'teki %55 yerine); görsel tur %25 ve
+  %35'i yandan, %35'i üstten alır.
+- **1 blok derin su donar:** kıyı rafları ve sığ bataklık tamamen buz olur (yürünebilir); 2+ derin suyun en alt bloğu
+  balıkçılık için su kalır. %100'de kıyıda açık su şeridi kalmaz.
+- **Yapı karı:** üstü düz yapı blokları (tahta, taş/tuğla tam bloklar; basamak yok) kalın buz aşamasında (40) kar alır,
+  ince karla (55'in altında) kalkar; etiket `#dogalafetler:donma/yapi_kar_zemini`.
+- **`sifirla`:** test aracı; bizim kar, buz ve kırağımız kuyrukla 0'a çözülür, kurumuş su geri dolar; oyuncunun ve
+  doğanın karı/buzu kalır.
 - **Bu turda yapılmayanlar (açık):** vanilla çimen/yaprak biyom rengi tonlaması, kayrağı örtüsü ve sarkit çizimi, rüzgâr ve
   buz şarkısı sesleri. Blok düzeyindeki adımlar (kırağı, kar katmanları, kıyıdan içeri ince buz → buz → kalınlaşma,
   çözülme sırası) ve yukarıdaki parçacıklar vitrini taşır.

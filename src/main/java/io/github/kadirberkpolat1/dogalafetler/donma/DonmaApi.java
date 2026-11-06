@@ -138,9 +138,10 @@ public final class DonmaApi {
         return null;
     }
 
+    /** Kış ağırlığının zemini: yapraksız en üst hareket engelleyen blok (D7); chunk yüklü değilse {@code konum}. */
     static int yuzeyY(ServerLevel level, BlockPos konum) {
         LevelChunk chunk = level.getChunkSource().getChunkNow(konum.getX() >> 4, konum.getZ() >> 4);
         return chunk == null ? konum.getY()
-                : chunk.getHeight(Heightmap.Types.MOTION_BLOCKING, konum.getX() & 15, konum.getZ() & 15);
+                : chunk.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, konum.getX() & 15, konum.getZ() & 15);
     }
 }

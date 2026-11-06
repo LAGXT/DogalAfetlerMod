@@ -25,7 +25,7 @@ import net.minecraftforge.server.ServerLifecycleHooks;
  * dönem süreçleri ({@code donma}, {@code buharlasma}), komutlar ve datagen katkıları. Dünya dönemi olaylarını dinler:
  * kızıl cüce doğunca çözülme dönemi açılır ve kış parametreleri dünyaya sabitlenir; süpernova yeni donma döngüsünü
  * başlatır; güneş büyümesi bitince buharlaşma derinliği 0'a iner (sular geri gelir, N9); {@code sifirla} yeni bir veri
- * döngüsü açar (bloklar çözülmez). Yalnız {@code DogalAfetler} kurucusundan çağrılır.
+ * döngüsü açar ve bizim kar/buzumuz kuyrukla 0'a çözülür (D4). Yalnız {@code DogalAfetler} kurucusundan çağrılır.
  */
 public final class DonmaSistemi {
     private static DonmaSureci donmaSureci;
@@ -92,7 +92,7 @@ public final class DonmaSistemi {
                 d.ekVeri(KisBolgesi.ALT_SISTEM).putLong("dongu", System.currentTimeMillis());
                 d.ekVeriDegisti(KisBolgesi.ALT_SISTEM);
                 KisBolgesi.sifirla();
-                DogalAfetler.LOGGER.info("[donma] dünya dönemi sıfırlandı: yeni veri döngüsü, bloklar çözülmeden kalır");
+                DogalAfetler.LOGGER.info("[donma] dünya dönemi sıfırlandı: yeni veri döngüsü, bizim kar ve buz kuyrukla 0'a çözülür");
             }
             default -> {
             }

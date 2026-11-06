@@ -6,6 +6,8 @@ import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
 import io.github.kadirberkpolat1.dogalafetler.donma.DonmaApi;
 import io.github.kadirberkpolat1.dogalafetler.donma.DonmaZamanlayici;
+import io.github.kadirberkpolat1.dogalafetler.donma.KisBolgesi;
+import io.github.kadirberkpolat1.dogalafetler.donma.mantik.KisAlani;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -16,6 +18,7 @@ import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.entity.player.ChatVisiblity;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -28,11 +31,12 @@ import net.minecraftforge.fml.common.Mod;
 /**
  * Donma görsel kanıt otomasyonu (K0-21 rev. 2). Yalnız {@code -Ddogalafetler.otomasyon=donma} ile, tek oyunculu Quick Play
  * dünyasında çalışır; üretimde etkisizdir. Yakındaki bir gölü (yoksa nehir/kıyıyı) bulur, kıyısındaki tepeden ona bakar
- * ve sırayla: vitrin (güneşsiz evre, G 30'dan gerçek donma süreciyle {@code hiz 20} altında %55'e, kar yağışı; kıyıdan
- * içeri donan göl %35, %45 ve %55'te, %47'de üstten), %100 donmuş manzara, büyüyen güneşte buharlaşmış göl yatağı ve
- * süpernovada geri dolması, kızıl cücede bir kalıcı kış sınırında çözülme (G=40). Güneş evresi entegre sunucuda doğrudan
- * ayarlanır (evre komutu gökyüzü dalında). Aralarda {@code /forge tps} ve {@code /dogalafet donma bilgi} çıktıları log'a
- * düşer. Karelerde arayüz gizlidir. Klavye, fare ve tekerlek girdileri kapanışa kadar sayılır; kendi açmadığı duraklatma
+ * ve sırayla: vitrin (güneşsiz evre, G 15'ten gerçek donma süreciyle {@code hiz 20} altında %35'e, kar yağışı; kıyıdan
+ * içeri donan göl %25 ve %35'te, %35'te üstten), %100 donmuş göl (yan, üst), manzara, tahta çatılı evde yapı karı,
+ * büyüyen güneşte buharlaşmış göl yatağı (kıyıdan dik, üstten) ve süpernovada geri dolması, kızıl cücede bir kalıcı
+ * kış sınırı boyunca geniş planda çözülme (G=40). Güneş evresi entegre sunucuda doğrudan ayarlanır (evre komutu
+ * gökyüzü dalında). Aralarda {@code /forge tps} ve {@code /dogalafet donma bilgi} çıktıları log'a düşer. Arayüz ve sohbet
+ * baştan gizlidir. Klavye, fare ve tekerlek girdileri kapanışa kadar sayılır; kendi açmadığı duraklatma
  * ekranını kapatır; adımlar durum koşuluyla ilerler.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
@@ -53,6 +57,8 @@ public final class DonmaOtomasyonu {
     private static int bosTick;
     private static int[] gol;
     private static BlockPos sinir;
+    private static double[] sinirYonu = {1, 0};
+    private static int[] ev;
 
     private DonmaOtomasyonu() {
     }
@@ -154,47 +160,44 @@ public final class DonmaOtomasyonu {
 
     private static void plan(Minecraft mc) {
         ekle("kurulum", () -> {
+            // Sohbet yalnız istemcide gizlenir (sunucuya bildirilmez): komut çıktıları log'a düşer, karelere girmez.
+            mc.options.chatVisibility().set(ChatVisiblity.HIDDEN);
+            mc.options.hideGui = true;
             for (String k : new String[] {"gamemode spectator", "gamerule doDaylightCycle false", "time set 6000",
                     "weather clear 100000", "gamerule doWeatherCycle false", "dogalafet donma 0 donma",
                     "dogalafet buharlasma 0"}) {
                 komut(mc, k);
             }
         }, yetisti(100), 2400);
-        ekle("göl ara", () -> {
+        ekle("göl ara, ev kur", () -> {
             gol = golBul(mc.level, mc.player.blockPosition(), 112);
             DogalAfetler.LOGGER.info(ON + "göl: {}", gol == null ? "bulunamadı"
                     : String.format(Locale.ROOT, "merkez (%d, %d) yüzey Y=%d alan %d yarıçap %d", gol[0], gol[1], gol[2],
                             gol[3], gol[4]));
+            evKur(mc);
             yanBak(mc);
         }, bekle(120), 200);
-        ekle("G 30, güneşsiz", () -> {
+        // Madde 9 sırası: kırağı 10, ince kar 15, kıyı buzu 20 (15 blok içeride 50). "Buz kıyıdan içeri" bandı 20–50:
+        // vitrin %35, gerçek donma süreciyle hiz 20 altında (72 tick'te 1 puan) 15'ten.
+        ekle("G 15, güneşsiz", () -> {
             evre(mc, GunesEvresi.GUNESSIZ);
-            komut(mc, "dogalafet donma 30 donma");
+            komut(mc, "dogalafet donma 15 donma");
             komut(mc, "weather rain 100000");
         }, yetisti(60), 3000);
-        // Gerçek donma süreci hiz 20 altında (72 tick'te 1 puan); kıyıdan içeri halka 35 ve 45'te, 55'te gölün çoğu buz.
-        ekle("hiz 20 ile 35'e", () -> komut(mc, "dogalafet hiz 20"), gEnAz(35f), 1200);
-        ekle("vitrin %35", () -> kare(mc, "vitrin_35"), gEnAz(45f), 1200);
-        ekle("vitrin %45", () -> {
-            kare(mc, "vitrin_45");
-            ustBak(mc);
-        }, gEnAz(47f), 400);
-        ekle("vitrin %47 üstten", () -> {
-            kare(mc, "vitrin_47_ust");
-            yanBak(mc);
-        }, gEnAz(55f), 1200);
-        ekle("vitrin %55 yetişme sırasında", () -> {
-            kare(mc, "vitrin_55_yetisirken");
+        ekle("hiz 20 ile 25'e", () -> komut(mc, "dogalafet hiz 20"), gEnAz(25f), 1200);
+        ekle("vitrin %25", () -> kare(mc, "vitrin_25"), gEnAz(35f), 1200);
+        ekle("vitrin %35 yetişme sırasında", () -> {
+            kare(mc, "vitrin_35_yetisirken");
             komut(mc, "dogalafet stop");
             komut(mc, "dogalafet hiz 1");
         }, bekle(1), 2);
-        ekle("vitrin %55", () -> { }, yetisti(20), 2400);
+        ekle("vitrin %35", () -> { }, yetisti(20), 2400);
         ekle("vitrin kare", () -> {
-            kare(mc, "vitrin_55");
+            kare(mc, "vitrin_35");
             bilgi(mc);
         }, bekle(40), 60);
         ekle("üstten", () -> ustBak(mc), bekle(100), 120);
-        ekle("üstten kare", () -> kare(mc, "vitrin_55_ust"), bekle(20), 30);
+        ekle("üstten kare", () -> kare(mc, "vitrin_35_ust"), bekle(20), 30);
         ekle("G 100", () -> {
             yanBak(mc);
             komut(mc, "dogalafet donma 100");
@@ -202,9 +205,17 @@ public final class DonmaOtomasyonu {
         ekle("%100 kare", () -> {
             kare(mc, "donmus_100");
             bilgi(mc);
-        }, bekle(40), 60);
-        ekle("manzara", () -> uzakBak(mc), bekle(120), 140);
-        ekle("manzara kare", () -> kare(mc, "donmus_100_manzara"), bekle(20), 30);
+            ustBak(mc);
+        }, bekle(100), 120);
+        ekle("%100 üstten", () -> {
+            kare(mc, "donmus_100_ust");
+            uzakBak(mc);
+        }, bekle(120), 140);
+        ekle("manzara kare", () -> {
+            kare(mc, "donmus_100_manzara");
+            evBak(mc);
+        }, bekle(100), 120);
+        ekle("yapı karı kare", () -> kare(mc, "yapi_cati_kari_100"), bekle(20), 30);
         ekle("çöz 0", () -> {
             yanBak(mc);
             komut(mc, "weather clear 100000");
@@ -213,18 +224,29 @@ public final class DonmaOtomasyonu {
         ekle("buharlaşma 6", () -> {
             evre(mc, GunesEvresi.BUYUYEN);
             komut(mc, "dogalafet buharlasma 6");
+            yatakBak(mc);
         }, yetisti(60), 3000);
         ekle("buharlaşma kare", () -> {
             kare(mc, "buharlasma_gol_yatagi");
             bilgi(mc);
-        }, bekle(40), 60);
-        ekle("süpernova: geri dol", () -> evre(mc, GunesEvresi.SUPERNOVA), yetisti(60), 3000);
+            ustBak(mc);
+        }, bekle(100), 120);
+        ekle("buharlaşma üstten", () -> kare(mc, "buharlasma_gol_yatagi_ust"), bekle(20), 30);
+        ekle("süpernova: geri dol", () -> {
+            evre(mc, GunesEvresi.SUPERNOVA);
+            yatakBak(mc);
+        }, yetisti(60), 3000);
         ekle("geri dolmuş kare", () -> kare(mc, "buharlasma_geri_dolmus"), bekle(20), 30);
         ekle("kış sınırı ara", () -> {
             MinecraftServer server = mc.getSingleplayerServer();
             BlockPos o = mc.player.blockPosition();
             sinir = server.submit(() -> DonmaApi.kisSiniriBul(server.overworld(), o.getX(), o.getZ(), 4000)).join();
-            DogalAfetler.LOGGER.info(ON + "kış sınırı: {}", sinir);
+            if (sinir != null) {
+                int sx = sinir.getX();
+                int sz = sinir.getZ();
+                sinirYonu = server.submit(() -> sinirTeget(KisBolgesi.alan(server.overworld()), sx, sz)).join();
+            }
+            DogalAfetler.LOGGER.info(ON + "kış sınırı: {} teğet {}", sinir, java.util.Arrays.toString(sinirYonu));
             evre(mc, GunesEvresi.GUNESSIZ);
             komut(mc, "dogalafet donma 100 donma");
             if (sinir != null) {
@@ -246,9 +268,50 @@ public final class DonmaOtomasyonu {
             DogalAfetler.LOGGER.info(ON + "bitti; FPS {}", mc.getFps());
         }, bekle(100), 120);
         ekle("çıkış", () -> {
+            mc.options.chatVisibility().set(ChatVisiblity.FULL);
             DogalAfetler.LOGGER.info(ON + "kapanıyor; girdi sayıları: tuş={} fare={} tekerlek={}", tus, fare, teker);
             mc.stop();
         }, bekle(1), 2);
+    }
+
+    /** Kamera tarafında, gölün dışında tahta çatılı küçük taş ev (yapı karı karesi, D8). */
+    private static void evKur(Minecraft mc) {
+        if (gol == null) {
+            return;
+        }
+        double m = gol[4] + 24;
+        ev = new int[] {(int) Math.round(gol[0] - m * 0.7071), 0, (int) Math.round(gol[1] + m * 0.7071)};
+        ev[1] = mc.level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, ev[0], ev[2]);
+        int x = ev[0];
+        int y = ev[1];
+        int z = ev[2];
+        komut(mc, String.format(Locale.ROOT, "fill %d %d %d %d %d %d air", x - 5, y, z - 5, x + 5, y + 12, z + 5));
+        komut(mc, String.format(Locale.ROOT, "fill %d %d %d %d %d %d cobblestone", x - 3, y - 1, z - 3, x + 3, y - 1, z + 3));
+        komut(mc, String.format(Locale.ROOT, "fill %d %d %d %d %d %d cobblestone hollow", x - 3, y, z - 3, x + 3, y + 2, z + 3));
+        komut(mc, String.format(Locale.ROOT, "fill %d %d %d %d %d %d oak_planks", x - 3, y + 3, z - 3, x + 3, y + 3, z + 3));
+        DogalAfetler.LOGGER.info(ON + "ev: ({}, {}, {})", x, y, z);
+    }
+
+    private static void evBak(Minecraft mc) {
+        if (ev != null) {
+            tpBak(mc, ev[0] - 9, ev[1] + 9, ev[2] + 9, ev[0], ev[1] + 3, ev[2]);
+        }
+    }
+
+    /** Kurumuş göl yatağı: kıyının hemen üstünden dik açıyla (taban ve kuru duvarlar okunur). */
+    private static void yatakBak(Minecraft mc) {
+        if (gol != null) {
+            double m = gol[4] * 0.6 + 2;
+            tpBak(mc, gol[0] - m * 0.7071, gol[2] + 10, gol[1] + m * 0.7071, gol[0] + 0.5, gol[2] - 3, gol[1] + 0.5);
+        }
+    }
+
+    /** Maske sınırının teğet yönü (gradyana dik, birim): kamera sınır boyunca bakar, ekranın bir yanı kış, öbürü ılık. */
+    static double[] sinirTeget(KisAlani alan, int x, int z) {
+        double gx = alan.maskeNoktada(x + 16, z) - alan.maskeNoktada(x - 16, z);
+        double gz = alan.maskeNoktada(x, z + 16) - alan.maskeNoktada(x, z - 16);
+        double n = Math.hypot(gx, gz);
+        return n < 1e-9 ? new double[] {1, 0} : new double[] {-gz / n, gx / n};
     }
 
     private static void bilgi(Minecraft mc) {
@@ -297,12 +360,15 @@ public final class DonmaOtomasyonu {
         }
     }
 
+    /** Geniş plan: sınır boyunca, 70 blok geriden ve 45 blok yukarıdan, 50 blok ileriye bakış. */
     private static void sinirBak(Minecraft mc) {
         if (sinir == null) {
             return;
         }
+        double tx = sinirYonu[0];
+        double tz = sinirYonu[1];
         int y = mc.level.getHeight(Heightmap.Types.MOTION_BLOCKING, sinir.getX(), sinir.getZ());
-        tpBak(mc, sinir.getX() - 60, y + 50, sinir.getZ() - 60, sinir.getX(), y, sinir.getZ());
+        tpBak(mc, sinir.getX() - tx * 70, y + 45, sinir.getZ() - tz * 70, sinir.getX() + tx * 50, y, sinir.getZ() + tz * 50);
     }
 
     private static void tpBak(Minecraft mc, double x, double y, double z, double hx, double hy, double hz) {

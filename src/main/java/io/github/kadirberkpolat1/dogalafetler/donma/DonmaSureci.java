@@ -80,6 +80,10 @@ final class DonmaSureci implements DonemSureci {
                 y.donemSureciBasladi(this);
             }
         }
+        if (d.gunesEvresi() == GunesEvresi.KIZIL_CUCE && !d.cozulmeDonemi() && !DonmaAyarlari.kalici()) {
+            // kalici doğuştan sonra kapatıldıysa çözülme dönemi doğuş olayını beklemeden açılır.
+            d.cozulmeDonemiAyarla(true);
+        }
         if (!aktifMi(server.overworld()) || y.surecDurdu(this)) {
             return;
         }

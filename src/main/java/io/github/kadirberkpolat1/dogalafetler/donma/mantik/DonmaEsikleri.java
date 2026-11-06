@@ -4,14 +4,15 @@ import java.util.Arrays;
 
 /**
  * Donma adımlarının eşikleri, yönlü (histerezisli). Donarken bir öğe donma eşiğinde gelir, çözülürken çözülme eşiğinin
- * altında kalkar; çözülme eşikleri madde 9 ÇÖZÜLME sırasını verir: önce kar (55–95), sonra kırağı (tablo, 50), sonra
- * buz kıyıdan içeri ({@code max(enAz, taban − k·uzaklık)}: kıyıda 45, ortada 10).
+ * altında kalkar. Varsayılan donma sırası madde 9 ve K0-24: kırağı (tablo, 10) → ince kar (15) → kenardan buz (20) → kalın
+ * buz ve yapı karı (40); çözülme eşikleri çözülme sırasını verir: önce kar (55–95), sonra kırağı (tablo, 50), sonra buz
+ * kıyıdan içeri ({@code max(enAz, taban − k·uzaklık)}: kıyıda 45, ortada 10).
  *
  * <p>Seviye sütunun etkin seviyesidir (sütun hedefi + sabit titreşim, ±{@code titresimGenligi}). Titreşim bütün eşiklerden
  * küçük olmalı; yoksa seviye 0'da bazı sütunlar donuk kalır ve çöz(0) başlangıca dönmez.
  */
 public final class DonmaEsikleri {
-    public static final DonmaEsikleri VARSAYILAN = new DonmaEsikleri(new int[] {25, 55, 70, 85, 95},
+    public static final DonmaEsikleri VARSAYILAN = new DonmaEsikleri(new int[] {15, 55, 70, 85, 95},
             new int[] {55, 65, 75, 85, 95}, 20, 20, 2, 15, 4, 45, 3, 10, 10, 8, 6);
 
     private final int[] karEsikleri;
@@ -27,6 +28,8 @@ public final class DonmaEsikleri {
     private final int buzCozulmeAdimi;
     private final int titresimGenligi;
     private final int inceBuzPayi;
+    private final int yapiKarEsigi;
+    private final int yapiKarCozulmeEsigi;
 
     public DonmaEsikleri(int[] karEsikleri, int[] karCozulmeEsikleri, int ilkBuzEsigi, int buzKalinlikAdimi,
             int kiyiKatsayisi, int kiyiUzaklikSiniri, int maksBuzKalinligi, int buzCozulmeTabani,
@@ -79,13 +82,56 @@ public final class DonmaEsikleri {
         this.buzCozulmeAdimi = buzCozulmeAdimi;
         this.titresimGenligi = titresimGenligi;
         this.inceBuzPayi = inceBuzPayi;
+        this.yapiKarEsigi = ilkBuzEsigi + buzKalinlikAdimi;
+        this.yapiKarCozulmeEsigi = Math.max(yapiKarEsigi, karCozulmeEsikleri[0]);
+    }
+
+    private DonmaEsikleri(DonmaEsikleri o, int titresimGenligi, int yapiKarEsigi, int yapiKarCozulmeEsigi) {
+        this.karEsikleri = o.karEsikleri;
+        this.karCozulmeEsikleri = o.karCozulmeEsikleri;
+        this.ilkBuzEsigi = o.ilkBuzEsigi;
+        this.buzKalinlikAdimi = o.buzKalinlikAdimi;
+        this.kiyiKatsayisi = o.kiyiKatsayisi;
+        this.kiyiUzaklikSiniri = o.kiyiUzaklikSiniri;
+        this.maksBuzKalinligi = o.maksBuzKalinligi;
+        this.buzCozulmeTabani = o.buzCozulmeTabani;
+        this.buzCozulmeKiyiKatsayisi = o.buzCozulmeKiyiKatsayisi;
+        this.buzCozulmeEnAz = o.buzCozulmeEnAz;
+        this.buzCozulmeAdimi = o.buzCozulmeAdimi;
+        this.titresimGenligi = titresimGenligi;
+        this.inceBuzPayi = o.inceBuzPayi;
+        if (yapiKarEsigi <= titresimGenligi || yapiKarCozulmeEsigi < yapiKarEsigi) {
+            throw new IllegalArgumentException("yapı karı eşikleri geçersiz: " + yapiKarEsigi + " / " + yapiKarCozulmeEsigi);
+        }
+        this.yapiKarEsigi = yapiKarEsigi;
+        this.yapiKarCozulmeEsigi = yapiKarCozulmeEsigi;
     }
 
     /** Aynı eşikler, titreşimsiz (deterministik GameTest sahneleri için). */
     public DonmaEsikleri titresimsiz() {
-        return new DonmaEsikleri(karEsikleri, karCozulmeEsikleri, ilkBuzEsigi, buzKalinlikAdimi, kiyiKatsayisi,
-                kiyiUzaklikSiniri, maksBuzKalinligi, buzCozulmeTabani, buzCozulmeKiyiKatsayisi, buzCozulmeEnAz,
-                buzCozulmeAdimi, 0, inceBuzPayi);
+        return new DonmaEsikleri(this, 0, yapiKarEsigi, yapiKarCozulmeEsigi);
+    }
+
+    /**
+     * Aynı eşikler, yapı karı eşikleriyle (D8): çatı ve duvar üstü gibi yapı bloklarına kar {@code donma}'da gelir,
+     * {@code cozulme}'nin altında kalkar (varsayılan kalın buz aşaması = ilk buz + kalınlık adımı; çözülme ilk karın
+     * çözülme eşiği).
+     */
+    public DonmaEsikleri yapiKari(int donma, int cozulme) {
+        return new DonmaEsikleri(this, titresimGenligi, donma, cozulme);
+    }
+
+    /**
+     * Madde 9 sırası (D2): ilk kar kıyı buzundan önce gelmeli. İlk kar eşiği {@code ilkBuzEsigi}'ne eşit ya da büyükse
+     * {@code ilkBuzEsigi − 1}'e (titreşimin üstünde) çekilmiş kopyayı döner; sıra doğruysa aynı diziyi döner.
+     */
+    public static int[] siraliKarEsikleri(int[] karEsikleri, int ilkBuzEsigi, int titresimGenligi) {
+        if (karEsikleri.length == 0 || karEsikleri[0] < ilkBuzEsigi) {
+            return karEsikleri;
+        }
+        int[] k = karEsikleri.clone();
+        k[0] = Math.max(titresimGenligi + 1, ilkBuzEsigi - 1);
+        return k;
     }
 
     /**
@@ -99,6 +145,25 @@ public final class DonmaEsikleri {
     /** Çözülme yönünde kalan kar katmanı sayısı. */
     public int karKatmaniCozulme(int seviye, boolean tekKat) {
         return katman(karCozulmeEsikleri, seviye, tekKat);
+    }
+
+    /**
+     * Yapı bloğunun (çatı, duvar üstü) üstündeki kar katmanı: donarken {@code yapiKarEsigi}'nin, çözülürken
+     * {@code yapiKarCozulmeEsigi}'nin altında hiç yok; üstünde doğal zeminle aynı katman eşikleri.
+     */
+    public int yapiKarKatmani(int seviye, int yon) {
+        if (yon > 0) {
+            return seviye >= yapiKarEsigi ? karKatmani(seviye, false) : 0;
+        }
+        return seviye >= yapiKarCozulmeEsigi ? karKatmaniCozulme(seviye, false) : 0;
+    }
+
+    public int yapiKarEsigi() {
+        return yapiKarEsigi;
+    }
+
+    public int yapiKarCozulmeEsigi() {
+        return yapiKarCozulmeEsigi;
     }
 
     private static int katman(int[] esikler, int seviye, boolean tekKat) {

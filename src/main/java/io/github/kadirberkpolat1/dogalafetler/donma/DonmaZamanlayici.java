@@ -22,6 +22,8 @@ import java.util.Random;
 import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.FullChunkStatus;
+import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
@@ -43,9 +45,10 @@ import net.minecraftforge.event.server.ServerAboutToStartEvent;
  * geçilmez. Bekleyenler en yakın oyuncuya uzaklığa göre sıralı (20 tick'te bir yeniden).</li>
  * <li>Bütçe {@link YetismeButcesi}: tick başına en çok {@code tickBasinaMaksBlok · TpsOlcer.kismaCarpani()} blok, bir
  * sütun ancak en kötü durumunu karşılayan birim kaldıysa işlenir; ayrıca süre tavanı (aşım sonraki tick'ten düşülür).</li>
- * <li>Yalnız {@code ServerChunkCache.isPositionTicking} chunk'lar işlenir (komşu chunk senkron yüklenmesin, değişim
- * istemciye gitsin). {@code afetBlokHasari} kapalıyken kuyruk durur; açılınca kaldığı yerden sürer.</li>
- * <li>{@code /dogalafet sifirla} sonrası (yeni döngü) chunk blokları çözmeden yeni ilerlemeyi benimser.</li>
+ * <li>Yalnız bilet seviyesi en az {@code BLOCK_TICKING} olan ve 8 komşusu yüklü chunk'lar işlenir ({@link #islenebilir}):
+ * kenar sütunundaki şekil güncellemesi komşuyu senkron yüklemez; simülasyon mesafesi dışında ama görüş mesafesindeki
+ * chunk'lar da donar (D5). {@code afetBlokHasari} kapalıyken kuyruk durur; açılınca kaldığı yerden sürer.</li>
+ * <li>{@code /dogalafet sifirla} sonrası (yeni döngü) chunk bitlerini korur ve bizim kar/buzumuzu 0'a çözer (D4).</li>
  * </ul>
  */
 public final class DonmaZamanlayici {
@@ -212,6 +215,28 @@ public final class DonmaZamanlayici {
         }
     }
 
+    /**
+     * Chunk işlenebilir mi: bilet seviyesi blok tick'i (oyuncunun görüş mesafesi ya da spawn) ve 8 komşusu tam yüklü.
+     * {@code isPositionTicking} simülasyon mesafesini de istediği için görünen dış halkayı hiç işlemiyordu; ChunkHolder'ın
+     * ticking future'ı erişilemez (protected). Future tamamlanmadan yapılan değişiklik istemciye giden ilk chunk paketinde
+     * yer alır.
+     */
+    static boolean islenebilir(ServerLevel level, LevelChunk chunk, int cx, int cz) {
+        FullChunkStatus durum = chunk.getFullStatus();
+        if (durum == null || !durum.isOrAfter(FullChunkStatus.BLOCK_TICKING)) {
+            return false;
+        }
+        ServerChunkCache kaynak = level.getChunkSource();
+        for (int dz = -1; dz <= 1; dz++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                if ((dx != 0 || dz != 0) && kaynak.getChunkNow(cx + dx, cz + dz) == null) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     static int hedefG(DunyaDonemi donem) {
         return Math.max(0, Math.min(100, (int) Math.floor(donem.donmaIlerlemesi() + 1e-4)));
     }
@@ -271,14 +296,14 @@ public final class DonmaZamanlayici {
                 siraBasi++;
                 continue;
             }
-            if (!level.getChunkSource().isPositionTicking(anahtar)) {
+            if (!islenebilir(level, chunk, cx, cz)) {
                 siraBasi++;
                 continue;
             }
             ChunkIsi is = ISLER.get(anahtar);
             if (is == null) {
                 if (durum.dongu() != dongu) {
-                    durum.donguyeGec(dongu, g, cozulme);
+                    durum.donguyeAktar(dongu);
                     chunk.setUnsaved(true);
                 }
                 if (durum.sonG() == g && durum.cozulme() == cozulme && durum.sonBuhar() == buhar && !durum.yarimVar()) {

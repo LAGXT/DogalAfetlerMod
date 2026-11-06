@@ -92,7 +92,7 @@ public final class DonmaOyunTestleri {
             }
         }
         y.setBlock(p(0, 3, 0), Blocks.PACKED_MUD);
-        y.setBlock(p(8, 3, 0), Blocks.COBBLESTONE);
+        y.setBlock(p(8, 3, 0), Blocks.IRON_BLOCK);
         y.setBlock(p(8, 4, 8), Blocks.OAK_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true));
         y.setBlock(p(0, 4, 8), Blocks.GRASS);
         bitleriTemizle(y);
@@ -184,7 +184,7 @@ public final class DonmaOyunTestleri {
         BlockState cimen = y.getBlockState(p(1, 3, 1));
         y.assertTrue(cimen.is(kiragili()) && cimen.getValue(SnowyDirtBlock.SNOWY), "çimen kırağılı ve karlı: " + cimen);
         y.assertTrue(is(y, 0, 3, 0, Blocks.PACKED_MUD) && y.getBlockState(p(0, 4, 0)).isAir(), "kuru çamura dokunulmamalı");
-        y.assertTrue(is(y, 8, 3, 0, Blocks.COBBLESTONE) && y.getBlockState(p(8, 4, 0)).isAir(), "tanınmayan bloğa dokunulmamalı");
+        y.assertTrue(is(y, 8, 3, 0, Blocks.IRON_BLOCK) && y.getBlockState(p(8, 4, 0)).isAir(), "tanınmayan bloğa dokunulmamalı");
         y.assertTrue(kar(y, 8, 5, 8) >= 4, "yaprağın üstünde kalın kar; " + sutunTani(y, 8, 8));
         y.assertTrue(is(y, 0, 4, 8, Blocks.GRASS) && is(y, 0, 3, 8, Blocks.GRASS_BLOCK), "bitkili zemine dokunulmamalı");
         BlockState[] donuk = anlik(y);
@@ -415,6 +415,71 @@ public final class DonmaOyunTestleri {
         y.succeed();
     }
 
+    /**
+     * D1: eğimli kıyılı göl (dış halka 1, iç halka 2, orta 3 derin). %100'de 1 derin kıyı tamamen buz (yürünebilir, açık
+     * su şeridi yok), daha derinde en alt su kalır; 40'ta kıyı açılır; 0'da sahne başlangıçla aynı.
+     */
+    @GameTest(template = ALAN)
+    public static void sigKiyiTamamenDonarVeCozulur(GameTestHelper y) {
+        for (int x = 0; x < EN; x++) {
+            for (int z = 0; z < EN; z++) {
+                int halka = Math.min(Math.min(x - 2, 6 - x), Math.min(z - 2, 6 - z));
+                int derinlik = halka < 0 ? 0 : Math.min(3, halka + 1);
+                y.setBlock(p(x, 0, z), Blocks.STONE);
+                for (int yy = 1; yy <= 3; yy++) {
+                    boolean su = yy > 3 - derinlik;
+                    y.setBlock(p(x, yy, z), su ? Blocks.WATER : yy == 3 ? Blocks.GRASS_BLOCK : Blocks.DIRT);
+                }
+            }
+        }
+        bitleriTemizle(y);
+        BlockState[] baslangic = anlik(y);
+        DonmaEsikleri e = DonmaEsikleri.VARSAYILAN.titresimsiz();
+        isle(y, gecis(0, false, 100, false), KisKaynagi.YOK, e);
+        for (int z = 2; z <= 6; z++) {
+            y.assertTrue(is(y, 2, 3, z, Blocks.ICE) && is(y, 6, 3, z, Blocks.ICE), "1 derin kıyı tamamen buz olmalı; "
+                    + sutunTani(y, 2, z));
+        }
+        y.assertTrue(is(y, 3, 3, 4, Blocks.ICE) && is(y, 3, 2, 4, Blocks.WATER), "2 derinde üst buz, alt su; "
+                + sutunTani(y, 3, 4));
+        y.assertTrue(is(y, 4, 3, 4, Blocks.ICE) && is(y, 4, 2, 4, Blocks.ICE) && is(y, 4, 1, 4, Blocks.WATER),
+                "3 derinde 2 buz, alt su; " + sutunTani(y, 4, 4));
+        isle(y, gecis(100, false, 40, false), KisKaynagi.YOK, e);
+        y.assertTrue(is(y, 2, 3, 4, Blocks.WATER), "40'ta 1 derin kıyı açılmalı (bizim buz); " + sutunTani(y, 2, 4));
+        isle(y, gecis(40, false, 0, false), KisKaynagi.YOK, e);
+        ayniMi(y, baslangic, "sığ kıyılı göl dondur → çöz başlangıcı vermeli");
+        y.succeed();
+    }
+
+    /**
+     * D8: yapı çatısına (tahta) kar kalın buz aşamasında (40) gelir, doğal zemine 15'te; oyuncunun çatıdaki karı değişmez;
+     * 0'da sahne başlangıçla aynı.
+     */
+    @GameTest(template = ALAN)
+    public static void yapiCatisinaKarGecGelirVeKalkar(GameTestHelper y) {
+        for (int x = 0; x < EN; x++) {
+            for (int z = 0; z < EN; z++) {
+                y.setBlock(p(x, 0, z), Blocks.STONE);
+                for (int yy = 1; yy <= 3; yy++) {
+                    y.setBlock(p(x, yy, z), x < 4 ? (yy == 1 ? Blocks.DIRT : Blocks.AIR) : Blocks.OAK_PLANKS);
+                }
+            }
+        }
+        y.setBlock(p(8, 4, 8), Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 2));
+        bitleriTemizle(y);
+        BlockState[] baslangic = anlik(y);
+        DonmaEsikleri e = DonmaEsikleri.VARSAYILAN.titresimsiz();
+        isle(y, gecis(0, false, 30, false), KisKaynagi.YOK, e);
+        y.assertTrue(kar(y, 1, 2, 1) == 1, "30'da doğal zeminde kar; " + sutunTani(y, 1, 1));
+        y.assertTrue(kar(y, 6, 4, 1) == 0, "30'da çatıda kar yok; " + sutunTani(y, 6, 1));
+        isle(y, gecis(30, false, 100, false), KisKaynagi.YOK, e);
+        y.assertTrue(kar(y, 6, 4, 1) == 5, "100'de çatıda kalın kar; " + sutunTani(y, 6, 1));
+        y.assertTrue(kar(y, 8, 4, 8) == 2, "oyuncunun çatı karı değişmemeli");
+        isle(y, gecis(100, false, 0, false), KisKaynagi.YOK, e);
+        ayniMi(y, baslangic, "çatı karı çözülünce sahne başlangıçla aynı");
+        y.succeed();
+    }
+
     @GameTest(template = "bos")
     public static void tabloVeriPaketindenYuklenir(GameTestHelper y) {
         DonmaTablosuYukleyici.Tablo tablo = DonmaTablosuYukleyici.etkin();
@@ -640,29 +705,89 @@ public final class DonmaOyunTestleri {
         });
     }
 
-    /** {@code /dogalafet sifirla} veriyi sıfırlar, blokları çözmez: chunk yeni döngüde G=0'ı benimser, kalan buz yabancıdır. */
-    @GameTest(template = ALAN, batch = "donma_zamanlayici_4", timeoutTicks = 2000)
-    public static void sifirlaBloklariCozmezVeriyiSifirlar(GameTestHelper y) {
+    /**
+     * D4: {@code /dogalafet sifirla} test aracıdır ve dünyayı ilk haline döndürür: bizim kar/buz/kırağımız kuyrukla 0'a
+     * çözülür, oyuncunun karı (bit yok) kalır. {@code donma 100} → {@code sifirla} → bekle → sahne başlangıçla aynı.
+     */
+    @GameTest(template = ALAN, batch = "donma_zamanlayici_4", timeoutTicks = 3000)
+    public static void sifirlaBizimKarVeBuzuCozer(GameTestHelper y) {
         sahneKur(y);
+        y.setBlock(p(1, 4, 7), Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, 3));
+        BlockState[] baslangic = anlik(y);
         LongOpenHashSet chunklar = zamanlayiciHazirla(y);
         MinecraftServer server = y.getLevel().getServer();
-        DunyaDonemi.al(server).donmaIlerlemesiAyarla(30f);
-        BlockState[][] donuk = {null};
+        komut(y, "dogalafet donma 100 donma");
+        boolean[] sifirlandi = {false};
+        y.onEachTick(() -> {
+            if (!sifirlandi[0] && hepsi(y, chunklar, 100)) {
+                y.assertTrue(is(y, 4, 3, 4, Blocks.ICE) && kar(y, 1, 4, 1) == 1, "100'de sahne donmuş olmalı");
+                sifirlandi[0] = true;
+                AfetYoneticisi.al(server).sifirla();
+            }
+        });
+        y.succeedWhen(() -> {
+            y.assertTrue(sifirlandi[0] && hepsi(y, chunklar, 0), "sıfırlama sonrası chunk'lar 0'a çözülmedi");
+            ayniMi(y, baslangic, "sifirla bizim kar ve buzu çözmeli, oyuncunun karı kalmalı");
+            zamanlayiciBitir(y);
+        });
+    }
+
+    /**
+     * D3 (N9): buharlaşmanın geri dolması çok tick'e ve chunk'lara yayılır; erken dolan sütundan akan su sonraki sütunları
+     * durdurmaz. Chunk sınırını kesen göl 6 blok kurur, sonra 0'a geri dolar; sahne başlangıçla aynı (akıcı su kalmaz).
+     */
+    @GameTest(template = GOL, batch = "donma_zamanlayici_6", timeoutTicks = 3000)
+    public static void buharlasmaCokTickliGeriDolmaBaslangicVerir(GameTestHelper y) {
+        golSahnesi(y);
+        BlockState[] baslangic = anlik(y, GOL_EN, GOL_BOY);
+        LongOpenHashSet chunklar = zamanlayiciHazirla(y, GOL_EN);
+        DunyaDonemi d = DunyaDonemi.al(y.getLevel().getServer());
+        d.buharlasmaDerinligiAyarla(6f);
+        int[] asama = {0};
         int[] bekle = {0};
         y.onEachTick(() -> {
-            if (donuk[0] == null && hepsi(y, chunklar, 30)) {
-                donuk[0] = anlik(y);
-                AfetYoneticisi.al(server).sifirla();
-            } else if (donuk[0] != null) {
+            if (asama[0] == 0 && buharHepsi(y, chunklar, 6)) {
+                y.assertTrue(y.getBlockState(p(15, 1, 15)).isAir(), "6 blokta 3 derin göl tamamen kurumalı");
+                asama[0] = 1;
+                d.buharlasmaDerinligiAyarla(0f);
+            } else if (asama[0] == 1 && buharHepsi(y, chunklar, 0)) {
+                asama[0] = 2;
+            } else if (asama[0] == 2) {
                 bekle[0]++;
             }
         });
         y.succeedWhen(() -> {
-            y.assertTrue(donuk[0] != null && bekle[0] >= 40, "30'a donma ve sıfırlama sonrası bekleme");
-            y.assertTrue(hepsi(y, chunklar, 0), "chunk'lar yeni döngüde G=0 olmalı");
-            ayniMi(y, donuk[0], "sifirla blokları çözmemeli");
+            y.assertTrue(asama[0] == 2 && bekle[0] >= 40, "kuruma, geri dolma ve 40 tick bekleme bitmedi");
+            ayniMi(y, baslangic, "çok tick'li geri dolma başlangıcı vermeli", GOL_EN, GOL_BOY);
             zamanlayiciBitir(y);
         });
+    }
+
+    private static boolean buharHepsi(GameTestHelper y, LongOpenHashSet chunklar, int buhar) {
+        for (long c : chunklar) {
+            ChunkDonmaVerisi v = ChunkDonmaVerisi.al(y.getLevel().getChunk(ChunkPos.getX(c), ChunkPos.getZ(c)));
+            if (v.sonBuhar() != buhar || v.yarimVar()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** 32x32 sahne: taş zemin, toprak, çimen; ortada chunk sınırını kesen yarıçap 12, 3 derin göl. */
+    private static void golSahnesi(GameTestHelper y) {
+        for (int x = 0; x < GOL_EN; x++) {
+            for (int z = 0; z < GOL_EN; z++) {
+                double dx = x - 15.5;
+                double dz = z - 15.5;
+                boolean gol = dx * dx + dz * dz <= 144;
+                y.setBlock(p(x, 0, z), Blocks.STONE);
+                y.setBlock(p(x, 1, z), gol ? Blocks.WATER : Blocks.DIRT);
+                y.setBlock(p(x, 2, z), gol ? Blocks.WATER : Blocks.DIRT);
+                y.setBlock(p(x, 3, z), gol ? Blocks.WATER : Blocks.GRASS_BLOCK);
+            }
+        }
+        int[] k = kutu(y, GOL_EN);
+        DonmaIsleyici.bitleriTemizle(y.getLevel(), k[0], k[1], k[2], k[3]);
     }
 
     /**

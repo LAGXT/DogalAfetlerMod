@@ -104,22 +104,32 @@ public final class DonmaAyarlari {
         return istemci.get().parcacikYogunlugu.get();
     }
 
-    /** Adım eşikleri (config değişince yeniden kurulur; geçersizse varsayılan). */
+    /**
+     * Adım eşikleri (config değişince yeniden kurulur; geçersizse varsayılan). Madde 9 sırası (D2): ilk kar kıyı buzundan
+     * önce gelmeli; bozuksa ilk kar eşiği {@code ilkBuzEsigi − 1}'e çekilir ve WARN yazılır.
+     */
     public static DonmaEsikleri esikler() {
         Sunucu c = s();
         List<?> anahtar = List.of(c.karEsikleri.get(), c.karCozulmeEsikleri.get(), c.ilkBuzEsigi.get(),
                 c.buzKalinlikAdimi.get(), c.kiyiKatsayisi.get(), c.kiyiUzaklikSiniri.get(), c.maksBuzKalinligi.get(),
                 c.buzCozulmeTabani.get(), c.buzCozulmeKiyiKatsayisi.get(), c.buzCozulmeEnAz.get(), c.buzCozulmeAdimi.get(),
-                c.titresimGenligi.get(), c.inceBuzPayi.get());
+                c.titresimGenligi.get(), c.inceBuzPayi.get(), c.yapiKarEsigi.get(), c.yapiKarCozulmeEsigi.get());
         DonmaEsikleri e = onbellekEsikler;
         if (e != null && anahtar.equals(onbellekAnahtar)) {
             return e;
         }
         try {
-            e = new DonmaEsikleri(dizi(c.karEsikleri.get()), dizi(c.karCozulmeEsikleri.get()), c.ilkBuzEsigi.get(),
+            int[] kar = dizi(c.karEsikleri.get());
+            int[] sirali = DonmaEsikleri.siraliKarEsikleri(kar, c.ilkBuzEsigi.get(), c.titresimGenligi.get());
+            if (sirali != kar) {
+                DogalAfetler.LOGGER.warn("[donma] ilk kar eşiği ({}) kıyı buzundan ({}) önce olmalı (madde 9 sırası); {} kullanılıyor",
+                        kar[0], c.ilkBuzEsigi.get(), sirali[0]);
+            }
+            e = new DonmaEsikleri(sirali, dizi(c.karCozulmeEsikleri.get()), c.ilkBuzEsigi.get(),
                     c.buzKalinlikAdimi.get(), c.kiyiKatsayisi.get(), c.kiyiUzaklikSiniri.get(), c.maksBuzKalinligi.get(),
                     c.buzCozulmeTabani.get(), c.buzCozulmeKiyiKatsayisi.get(), c.buzCozulmeEnAz.get(),
-                    c.buzCozulmeAdimi.get(), c.titresimGenligi.get(), c.inceBuzPayi.get());
+                    c.buzCozulmeAdimi.get(), c.titresimGenligi.get(), c.inceBuzPayi.get())
+                    .yapiKari(c.yapiKarEsigi.get(), c.yapiKarCozulmeEsigi.get());
         } catch (IllegalArgumentException hata) {
             DogalAfetler.LOGGER.error("[donma] config eşikleri geçersiz ({}); varsayılan eşikler kullanılıyor", hata.getMessage());
             e = DonmaEsikleri.VARSAYILAN;
@@ -156,6 +166,8 @@ public final class DonmaAyarlari {
         final ForgeConfigSpec.IntValue titresimGenligi;
         final ForgeConfigSpec.IntValue inceBuzPayi;
         final ForgeConfigSpec.IntValue karYagisiEsigi;
+        final ForgeConfigSpec.IntValue yapiKarEsigi;
+        final ForgeConfigSpec.IntValue yapiKarCozulmeEsigi;
         final ForgeConfigSpec.DoubleValue kisOrani;
         final ForgeConfigSpec.DoubleValue kisDalgaBoyu;
         final ForgeConfigSpec.DoubleValue kisGecisBandi;
@@ -184,9 +196,11 @@ public final class DonmaAyarlari {
                     .defineInRange("tickBasinaMaksMs", 4, 1, 40);
             seviyeAdimi = k.comment("Bir chunk geçişinde ilerlemenin en çok ilerlediği puan (yetişme adımı).")
                     .defineInRange("seviyeAdimi", 5, 1, 100);
-            k.comment("Adım eşikleri (sütunun etkin seviyesi, %). Donarken donma, çözülürken çözülme eşikleri.").push("esikler");
-            karEsikleri = k.comment("Kar katmanı 1..n'nin geldiği seviyeler (artan).")
-                    .defineList("karEsikleri", List.of(25, 55, 70, 85, 95), o -> o instanceof Integer);
+            k.comment("Adım eşikleri (sütunun etkin seviyesi, %). Donarken donma, çözülürken çözülme eşikleri. Donma sırası"
+                    + " (madde 9): kırağı (tablo, 10) < ilk kar < ilkBuzEsigi < kalın buz; bozulursa ilk kar ilkBuzEsigi-1'e"
+                    + " çekilir.").push("esikler");
+            karEsikleri = k.comment("Kar katmanı 1..n'nin geldiği seviyeler (artan; ilki ilkBuzEsigi'nden küçük).")
+                    .defineList("karEsikleri", List.of(15, 55, 70, 85, 95), o -> o instanceof Integer);
             karCozulmeEsikleri = k.comment("Kar katmanı 1..n'nin kalktığı seviyeler (her biri donma eşiğinden küçük değil).")
                     .defineList("karCozulmeEsikleri", List.of(55, 65, 75, 85, 95), o -> o instanceof Integer);
             ilkBuzEsigi = k.comment("Kıyıdaki su sütununda ilk buzun geldiği seviye.").defineInRange("ilkBuzEsigi", 20, 0, 100);
@@ -209,6 +223,11 @@ public final class DonmaAyarlari {
                     .defineInRange("inceBuzPayi", 6, 0, 50);
             karYagisiEsigi = k.comment("Yağmurun istemcide kar olarak göründüğü ilerleme (%).")
                     .defineInRange("karYagisiEsigi", 40, 0, 101);
+            yapiKarEsigi = k.comment("Yapı bloklarına (#dogalafetler:donma/yapi_kar_zemini: tahta, taş/tuğla tam bloklar) karın"
+                    + " geldiği seviye; kalın buz aşaması (madde 9 'ilerleyen aşamalarda yapılar').")
+                    .defineInRange("yapiKarEsigi", 40, 9, 100);
+            yapiKarCozulmeEsigi = k.comment("Yapı karının kalktığı seviye (yapiKarEsigi'nden küçük olamaz).")
+                    .defineInRange("yapiKarCozulmeEsigi", 55, 9, 100);
             k.pop();
             k.comment("Kalıcı kış bölgeleri (kızıl cüce çözülmesi). Çözülme başlarken dünyaya yazılır; sonradan değişmez.").push("kis");
             kisOrani = k.comment("Seed'li gürültü maskesiyle seçilen kara oranı (madde 9 'yaklaşık %25').")

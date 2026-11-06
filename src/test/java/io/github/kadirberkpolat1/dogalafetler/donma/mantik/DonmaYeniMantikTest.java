@@ -138,8 +138,10 @@ class DonmaYeniMantikTest {
             for (int b = a + 1; b <= Math.min(110, a + 12); b++) {
                 for (int c = 0; c <= 16; c++) {
                     boolean donmaFarki = e.karKatmani(a, false) != e.karKatmani(b, false)
+                            || e.yapiKarKatmani(a, 1) != e.yapiKarKatmani(b, 1)
                             || e.buzSeviyesi(a, c) != e.buzSeviyesi(b, c);
                     boolean cozulmeFarki = e.karKatmaniCozulme(a, false) != e.karKatmaniCozulme(b, false)
+                            || e.yapiKarKatmani(a, -1) != e.yapiKarKatmani(b, -1)
                             || e.buzSeviyesiCozulme(a, c) != e.buzSeviyesiCozulme(b, c);
                     if (donmaFarki) {
                         assertTrue(k.degisimVar(a, b, false), "donma " + a + ".." + b + " c=" + c);

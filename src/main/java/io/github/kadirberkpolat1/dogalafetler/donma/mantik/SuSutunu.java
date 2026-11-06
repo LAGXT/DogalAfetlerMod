@@ -6,8 +6,11 @@ package io.github.kadirberkpolat1.dogalafetler.donma.mantik;
  * <ul>
  * <li>Üstteki kesintisiz su/buz parçası en az bir su içermeli; parça tarama içinde bitiyorsa en altı su olmalı. Böylece
  * altında su olmayan buz (oyuncunun buz zemini, buz sütunu) su sayılmaz ve hiç eritilmez.</li>
- * <li>Parçanın en alt bloğu hiç donmaz (kalınlık en çok uzunluk−1). Bu, yukarıdaki kuralın donmuş sütunda da tutmasını
- * sağlar ve buz altı balıkçılık için su bırakır (madde 15).</li>
+ * <li>Parça en az 2 blok derinse en alt bloğu hiç donmaz (kalınlık en çok uzunluk−1): buz altı balıkçılık için su kalır
+ * (madde 15) ve yukarıdaki kural donmuş sütunda da tutar.</li>
+ * <li>1 blok derin su (altı tarama içinde katı) tamamen donar: kıyı rafları ve sığ bataklık da yürünebilir buz olur
+ * (madde 9). Donmuş 1 derin sütunda su kalmadığı için çözülürken yalnız buzu bizim koyduğumuz biliniyorsa
+ * ({@code bizim}) su sayılır.</li>
  * <li>Buz seviyesi: 0 yok, 1 üst blok ince buz ({@link Tur#INCE}), {@code k + 1} üstte {@code k} blok buz. İnce buz
  * donmanın ilk, çözülmenin son evresidir.</li>
  * </ul>
@@ -21,23 +24,30 @@ public final class SuSutunu {
     private SuSutunu() {
     }
 
-    /** Yönsüz plan, {@code kalinlik} blok buz. */
+    /** Yönsüz plan, {@code kalinlik} blok buz; sütundaki buz bizimdir (saf testler). */
     public static Tur[] planla(Tur[] sutun, int kalinlik) {
-        int n = parca(sutun);
+        int n = parca(sutun, true);
         return n < 0 ? sutun.clone() : doldur(sutun, n, kalinlikSeviyesi(kalinlik));
     }
 
-    /** Yönlü plan, {@code kalinlik} blok buz (ince evre yok). */
+    /** Yönlü plan, {@code kalinlik} blok buz (ince evre yok); sütundaki buz bizimdir. */
     public static Tur[] planla(Tur[] sutun, int kalinlik, int yon) {
-        return planlaSeviye(sutun, kalinlikSeviyesi(kalinlik), yon);
+        return planlaSeviye(sutun, kalinlikSeviyesi(kalinlik), yon, true);
+    }
+
+    /** {@link #planlaSeviye(Tur[], int, int, boolean)}, buzun bizim olduğu bilinmeden. */
+    public static Tur[] planlaSeviye(Tur[] sutun, int seviye, int yon) {
+        return planlaSeviye(sutun, seviye, yon, false);
     }
 
     /**
      * Yönlü plan, buz seviyesiyle: donarken ({@code yon > 0}) buz yalnız ilerler (su → ince → kalın), çözülürken
      * ({@code yon < 0}) yalnız geriler, {@code yon == 0} dokunmaz. Donma başlarken doğal buz eritilmez.
+     *
+     * @param bizim sütunun buzunu donma koydu (chunk verisindeki buz biti); tamamen donmuş 1 derin sütun ancak böyle çözülür
      */
-    public static Tur[] planlaSeviye(Tur[] sutun, int seviye, int yon) {
-        int n = parca(sutun);
+    public static Tur[] planlaSeviye(Tur[] sutun, int seviye, int yon, boolean bizim) {
+        int n = parca(sutun, bizim);
         if (n < 0 || yon == 0) {
             return sutun.clone();
         }
@@ -62,16 +72,21 @@ public final class SuSutunu {
         return kalinlik <= 0 ? 0 : kalinlik + 1;
     }
 
-    /** Seviyeyi parça uzunluğuna sığdırır: en çok {@code n − 1} blok buz. */
+    /** Parçada en çok buz: 1 derin sütun tamamen, daha derini en alt bloğu dışında. */
+    private static int enCokBuz(int n) {
+        return n == 1 ? 1 : n - 1;
+    }
+
+    /** Seviyeyi parça uzunluğuna sığdırır. */
     private static int sinirla(int seviye, int n) {
         if (seviye <= 1) {
             return Math.max(0, seviye);
         }
-        return Math.min(seviye - 1, n - 1) + 1;
+        return Math.min(seviye - 1, enCokBuz(n)) + 1;
     }
 
     /** Üstteki su/buz parçasının uzunluğu; parça kurallara uymuyorsa -1. */
-    private static int parca(Tur[] sutun) {
+    private static int parca(Tur[] sutun, boolean bizim) {
         int n = 0;
         boolean suVar = false;
         while (n < sutun.length && sutun[n] != Tur.DIGER) {
@@ -79,6 +94,10 @@ public final class SuSutunu {
                 suVar = true;
             }
             n++;
+        }
+        if (n == 1) {
+            // Tek blok: altı tarama içinde katı olmalı; su ya da bizim donmuş suyumuz.
+            return n < sutun.length && (suVar || bizim) ? 1 : -1;
         }
         if (n < 2 || !suVar) {
             return -1;

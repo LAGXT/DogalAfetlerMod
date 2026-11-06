@@ -2,6 +2,7 @@ package io.github.kadirberkpolat1.dogalafetler.donma.mantik;
 
 import static io.github.kadirberkpolat1.dogalafetler.donma.mantik.SuSutunu.Tur.BUZ;
 import static io.github.kadirberkpolat1.dogalafetler.donma.mantik.SuSutunu.Tur.DIGER;
+import static io.github.kadirberkpolat1.dogalafetler.donma.mantik.SuSutunu.Tur.INCE;
 import static io.github.kadirberkpolat1.dogalafetler.donma.mantik.SuSutunu.Tur.SU;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
@@ -35,10 +36,26 @@ class SuSutunuTest {
         assertArrayEquals(buzSutunu, SuSutunu.planla(buzSutunu, 0));
     }
 
+    /** D1: 1 derin su tamamen donar (yürünebilir kıyı); çözülme yalnız buz bizimse geri verir. */
     @Test
-    void tekBlokSuBirikintisiDonmaz() {
-        Tur[] birikinti = {SU, DIGER};
-        assertArrayEquals(birikinti, SuSutunu.planla(birikinti, 4));
+    void birDerinSuTamamenDonarBizimseCozulur() {
+        Tur[] sig = {SU, DIGER};
+        assertArrayEquals(new Tur[] {INCE, DIGER}, SuSutunu.planlaSeviye(sig, 1, 1));
+        assertArrayEquals(new Tur[] {BUZ, DIGER}, SuSutunu.planlaSeviye(sig, 5, 1));
+        assertArrayEquals(new Tur[] {INCE, DIGER}, SuSutunu.planlaSeviye(new Tur[] {BUZ, DIGER}, 1, -1, true));
+        assertArrayEquals(sig, SuSutunu.planlaSeviye(new Tur[] {BUZ, DIGER}, 0, -1, true));
+        assertArrayEquals(new Tur[] {BUZ, DIGER}, SuSutunu.planlaSeviye(new Tur[] {BUZ, DIGER}, 0, -1, false),
+                "bizim olmayan tek buz (oyuncunun) çözülmez");
+        assertArrayEquals(new Tur[] {SU}, SuSutunu.planlaSeviye(new Tur[] {SU}, 5, 1), "altı bilinmeyen tek blok donmaz");
+    }
+
+    @Test
+    void ikiVeDortDerinSudaEnAltSuKalir() {
+        assertArrayEquals(new Tur[] {BUZ, SU, DIGER}, SuSutunu.planlaSeviye(new Tur[] {SU, SU, DIGER}, 5, 1));
+        assertArrayEquals(new Tur[] {BUZ, BUZ, BUZ, SU, DIGER},
+                SuSutunu.planlaSeviye(new Tur[] {SU, SU, SU, SU, DIGER}, 9, 1));
+        assertArrayEquals(new Tur[] {SU, SU, SU, SU, DIGER},
+                SuSutunu.planlaSeviye(new Tur[] {BUZ, BUZ, BUZ, SU, DIGER}, 0, -1, true));
     }
 
     @Test

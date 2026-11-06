@@ -151,8 +151,12 @@ def main():
         s2.komut("forge tps")
         if s2.bekle(r"Overall: .*TPS", 30):
             log("tps:", s2.bekle(r"Overall: .*", 1).group(0))
-        s2.komut("dogalafet donma 0")
+        # D4: sifirla bizim kar ve buzu kuyrukla 0'a çözer (blokları bırakmaz).
+        s2.komut("dogalafet sifirla")
         yetis(s2, 400)
+        s2.komut("dogalafet donma bilgi")
+        cozuldu = s2.bekle(r"Chunk \[0, 0\]: last processed 0 ", 30, sonra=0)
+        log("sıfırlama sonrası chunk:", cozuldu.group(0) if cozuldu else "yok")
     finally:
         s2.durdur()
     ikinci = s2.metin()
@@ -160,8 +164,9 @@ def main():
         log(f"{ad}: invalid dist={metin.count('invalid dist')} Exception={metin.count('Exception')} "
             f"ERROR={len(re.findall(r'/ERROR\]', metin))}")
     korundu = bool(re.search(r"Freeze: 60\.00%", ikinci))
-    log("ilerleme yeniden başlatmada korundu:", korundu)
-    return 0 if korundu else 1
+    sifirlandi = bool(re.search(r"Chunk \[0, 0\]: last processed 0 ", ikinci))
+    log("ilerleme yeniden başlatmada korundu:", korundu, "| sifirla sonrası chunk 0'a çözüldü:", sifirlandi)
+    return 0 if korundu and sifirlandi else 1
 
 
 if __name__ == "__main__":
