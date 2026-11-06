@@ -19,13 +19,18 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.gametest.framework.GameTestRegistry;
+import net.minecraft.gametest.framework.TestFunction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.network.Connection;
@@ -72,6 +77,21 @@ public final class CekirdekOyunTestleri {
         level.getServer().getPlayerList().placeNewPlayer(baglanti, oyuncu);
         oyuncu.moveTo(x, y, z);
         return oyuncu;
+    }
+
+    /**
+     * K-E16: vanilla GameTest yerleşimi bir batch'in 8. testinde satır kırar ve yeni satırın derinliğini yalnız o batch'in
+     * şablonlarından hesaplar; aynı satırdaki daha derin sahneler (ör. 32x32 donma gölü) yeni satırın alan temizliğiyle kesilir ve
+     * suyu komşu sahnelere akar. Batch başına en çok 7 test: bütün sahneler tek satırda kalır.
+     */
+    @GameTest(template = "bos", batch = "cekirdek_yerlesim")
+    public static void hicBirBatchSatirKirmaz(GameTestHelper yardimci) {
+        Map<String, Long> sayim = GameTestRegistry.getAllTestFunctions().stream()
+                .collect(Collectors.groupingBy(TestFunction::getBatchName, TreeMap::new, Collectors.counting()));
+        List<String> buyuk = sayim.entrySet().stream().filter(e -> e.getValue() >= 8)
+                .map(e -> e.getKey() + "=" + e.getValue()).toList();
+        yardimci.assertTrue(buyuk.isEmpty(), "8 ve üstü testli batch satır kırar (K-E16): " + buyuk);
+        yardimci.succeed();
     }
 
     @GameTest(template = "bos")

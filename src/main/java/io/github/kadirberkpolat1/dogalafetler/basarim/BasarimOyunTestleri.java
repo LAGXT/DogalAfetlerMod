@@ -397,7 +397,7 @@ public final class BasarimOyunTestleri {
         y.succeed();
     }
 
-    @GameTest(template = "bos")
+    @GameTest(template = "bos", batch = "basarim_genel")
     public static void besTuyKatmanliGiyimOyuncuBasina(GameTestHelper y) {
         ServerPlayer a = oyuncu(y, "tuy-a", 0);
         ServerPlayer b = oyuncu(y, "tuy-b", 2);
@@ -423,7 +423,7 @@ public final class BasarimOyunTestleri {
         y.succeed();
     }
 
-    @GameTest(template = "bos")
+    @GameTest(template = "bos", batch = "basarim_genel")
     public static void dortYunluParcaYunluKahraman(GameTestHelper y) {
         ServerPlayer a = oyuncu(y, "yun-a", 0);
         try {
@@ -472,7 +472,7 @@ public final class BasarimOyunTestleri {
         }
     }
 
-    @GameTest(template = "bos")
+    @GameTest(template = "bos", batch = "basarim_genel")
     public static void meteorEsyalariToplanincaGoktenGelenMisafirVeKozmikSans(GameTestHelper y) {
         ServerPlayer a = oyuncu(y, "meteor-a", 0);
         ServerPlayer b = oyuncu(y, "meteor-b", 2);
@@ -494,7 +494,7 @@ public final class BasarimOyunTestleri {
         y.succeed();
     }
 
-    @GameTest(template = "bos")
+    @GameTest(template = "bos", batch = "basarim_genel")
     public static void radarUretimiRadarAltinda(GameTestHelper y) {
         ServerPlayer a = oyuncu(y, "radar-a", 0);
         ServerPlayer b = oyuncu(y, "radar-b", 2);
@@ -515,7 +515,7 @@ public final class BasarimOyunTestleri {
         y.succeed();
     }
 
-    @GameTest(template = "bos")
+    @GameTest(template = "bos", batch = "basarim_genel")
     public static void buzDeligiBaliklariBirikirKutupUstasiOyuncuBasina(GameTestHelper y) {
         ServerPlayer a = oyuncu(y, "balik-a", 0);
         ServerPlayer b = oyuncu(y, "balik-b", 2);
@@ -546,7 +546,7 @@ public final class BasarimOyunTestleri {
                 no + 1, neden));
     }
 
-    @GameTest(template = "bos")
+    @GameTest(template = "bos", batch = "basarim_genel_2")
     public static void sekizTurdenSagCikanHepsiniAtlattim(GameTestHelper y) {
         ServerPlayer a = oyuncu(y, "hepsi-a", 0);
         try {
@@ -577,7 +577,7 @@ public final class BasarimOyunTestleri {
     }
 
     /** Olayı hiç gelmeyen (sentetik) afette yedek tahmin sayılır; hasar tahmini Çatı Altı'nı bozar (A-10, A-31). */
-    @GameTest(template = "bos")
+    @GameTest(template = "bos", batch = "basarim_genel_2")
     public static void olaysizAfetteYedekTahminSayilir(GameTestHelper y) {
         ServerPlayer hasarli = oyuncu(y, "asit-a", 0);
         ServerPlayer kosullu = oyuncu(y, "iz-b", 2);
@@ -623,7 +623,7 @@ public final class BasarimOyunTestleri {
                 komut);
     }
 
-    @GameTest(template = "bos")
+    @GameTest(template = "bos", batch = "basarim_genel_2")
     public static void unvanKomutuVerirKaldirir(GameTestHelper y) {
         ServerPlayer a = oyuncu(y, "komut-a", 0);
         MinecraftServer server = y.getLevel().getServer();
@@ -908,7 +908,7 @@ public final class BasarimOyunTestleri {
     }
 
     /** Kardeş dallar birleşip {@code runData} unutulursa kırmızıya döner (inceleme A5; A-06, A-07). */
-    @GameTest(template = "bos")
+    @GameTest(template = "bos", batch = "basarim_genel_2")
     public static void ikonlarKayitliEsyalarlaGuncel(GameTestHelper y) {
         for (Basarimlar b : Basarimlar.values()) {
             if (b.ikonYedegi() == null) {

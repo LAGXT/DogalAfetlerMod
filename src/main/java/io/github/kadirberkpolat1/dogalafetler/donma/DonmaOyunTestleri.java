@@ -183,7 +183,7 @@ public final class DonmaOyunTestleri {
 
     // ---------------------------------------------------------------- doğrudan yol
 
-    @GameTest(template = ALAN)
+    @GameTest(template = ALAN, batch = "donma_alan")
     public static void dondurSonraCozBaslangicDurumunuVerir(GameTestHelper y) {
         sahneKur(y);
         BlockState[] baslangic = anlik(y);
@@ -209,7 +209,7 @@ public final class DonmaOyunTestleri {
         });
     }
 
-    @GameTest(template = ALAN)
+    @GameTest(template = ALAN, batch = "donma_alan")
     public static void araSeviyedenCozBaslangicDurumunuVerir(GameTestHelper y) {
         sahneKur(y);
         BlockState[] baslangic = anlik(y);
@@ -226,7 +226,7 @@ public final class DonmaOyunTestleri {
     }
 
     /** Tasarım notu §2: su → ince buz → buz; çözülürken buz → ince buz → su. Kıyı satırı x=2 (uzaklık 0). */
-    @GameTest(template = ALAN)
+    @GameTest(template = ALAN, batch = "donma_alan")
     public static void inceBuzIlkVeSonEvredir(GameTestHelper y) {
         sahneKur(y);
         DonmaEsikleri e = DonmaEsikleri.VARSAYILAN.titresimsiz();
@@ -245,7 +245,7 @@ public final class DonmaOyunTestleri {
     }
 
     /** Madde 9 ÇÖZÜLME: 100'den taban 40'a inince kar ve kırağı kalkmış, buz kıyıdan açılmış, ortada kalmış olmalı. */
-    @GameTest(template = ALAN)
+    @GameTest(template = ALAN, batch = "donma_alan")
     public static void cozulmeKarVeKiragiOnceBuzKiyidanIceriAcilir(GameTestHelper y) {
         sahneKur(y);
         DonmaEsikleri e = DonmaEsikleri.VARSAYILAN.titresimsiz();
@@ -263,7 +263,7 @@ public final class DonmaOyunTestleri {
     }
 
     /** K0-24: çözülme döneminde Y üst sınırındaki sütun %100'e, alt sınırdaki G'ye gelir (sütun düzeyi kış ağırlığı). */
-    @GameTest(template = ALAN)
+    @GameTest(template = ALAN, batch = "donma_alan")
     public static void cozulmeDonemindeYuksekSutunYuzdeYuzeAlcakSutunGyeGelir(GameTestHelper y) {
         for (int x = 0; x < EN; x++) {
             for (int z = 0; z < EN; z++) {
@@ -301,7 +301,7 @@ public final class DonmaOyunTestleri {
     }
 
     /** K0-24: oyuncunun kuru çamuru, 3 katlı karı ve su üstündeki buzu 0 → 100 → 40 → 0 boyunca değişmez. */
-    @GameTest(template = ALAN)
+    @GameTest(template = ALAN, batch = "donma_alan_2")
     public static void oyuncuBloklariDegismez(GameTestHelper y) {
         for (int x = 0; x < EN; x++) {
             for (int z = 0; z < EN; z++) {
@@ -333,7 +333,7 @@ public final class DonmaOyunTestleri {
     }
 
     /** Doğal buz ve kar (soğuk biyom benzeri) donma başlarken ve taban %40'a çözülürken kalır. */
-    @GameTest(template = ALAN)
+    @GameTest(template = ALAN, batch = "donma_alan_2")
     public static void donmaBaslarkenDogalKarVeBuzKorunur(GameTestHelper y) {
         sahneKur(y);
         for (int x = 2; x <= 6; x++) {
@@ -363,7 +363,7 @@ public final class DonmaOyunTestleri {
         y.assertTrue(cimen.is(Blocks.GRASS_BLOCK) && cimen.getValue(SnowyDirtBlock.SNOWY), ne + ": karlı çimen değişti");
     }
 
-    @GameTest(template = ALAN)
+    @GameTest(template = ALAN, batch = "donma_alan_2")
     public static void blokHasariKapaliykenBlokDegismez(GameTestHelper y) {
         sahneKur(y);
         BlockState[] baslangic = anlik(y);
@@ -383,7 +383,7 @@ public final class DonmaOyunTestleri {
     }
 
     /** N9: su yüzeyden aşağı derinlik kadar kurur, sığ göl tamamen kurur, derinlik 0'a inince aynı su geri gelir. */
-    @GameTest(template = ALAN)
+    @GameTest(template = ALAN, batch = "donma_alan_2")
     public static void buharlasmaDerinlikKadarKururVeGeriDolar(GameTestHelper y) {
         sahneKur(y);
         BlockState[] baslangic = anlik(y);
@@ -403,7 +403,7 @@ public final class DonmaOyunTestleri {
     }
 
     /** N10: aynı geçişte önce geri dolma, sonra donma; kurumuş göl süpernovadan sonra yüzeyinden donar. */
-    @GameTest(template = ALAN)
+    @GameTest(template = ALAN, batch = "donma_alan_2")
     public static void buharlasmaSonrasiOnceGeriDolarSonraDonar(GameTestHelper y) {
         sahneKur(y);
         buharla(y, 6);
@@ -419,7 +419,7 @@ public final class DonmaOyunTestleri {
      * kıyı sütunu hâlâ kuru. Kurumuş yatağa konan kaynak ve akıcı su aynı derinlikte yeniden kurur; derinlik 0'da sahne
      * başlangıçla aynı.
      */
-    @GameTest(template = ALAN)
+    @GameTest(template = ALAN, batch = "donma_alan_3")
     public static void komsuSiviTikiKurumusSutunuDoldurmaz(GameTestHelper y) {
         sahneKur(y);
         y.setBlock(p(1, 4, 4), Blocks.STONE);
@@ -450,7 +450,7 @@ public final class DonmaOyunTestleri {
         });
     }
 
-    @GameTest(template = ALAN)
+    @GameTest(template = ALAN, batch = "donma_alan_3")
     public static void buzYuzeyiSorgusu(GameTestHelper y) {
         sahneKur(y);
         isle(y, 0, 100);
@@ -466,7 +466,7 @@ public final class DonmaOyunTestleri {
      * D1: eğimli kıyılı göl (dış halka 1, iç halka 2, orta 3 derin). %100'de 1 derin kıyı tamamen buz (yürünebilir, açık
      * su şeridi yok), daha derinde en alt su kalır; 40'ta kıyı açılır; 0'da sahne başlangıçla aynı.
      */
-    @GameTest(template = ALAN)
+    @GameTest(template = ALAN, batch = "donma_alan_3")
     public static void sigKiyiTamamenDonarVeCozulur(GameTestHelper y) {
         for (int x = 0; x < EN; x++) {
             for (int z = 0; z < EN; z++) {
@@ -502,7 +502,7 @@ public final class DonmaOyunTestleri {
      * D8: yapı çatısına (tahta) kar kalın buz aşamasında (40) gelir, doğal zemine 15'te; oyuncunun çatıdaki karı değişmez;
      * 0'da sahne başlangıçla aynı.
      */
-    @GameTest(template = ALAN)
+    @GameTest(template = ALAN, batch = "donma_alan_3")
     public static void yapiCatisinaKarGecGelirVeKalkar(GameTestHelper y) {
         for (int x = 0; x < EN; x++) {
             for (int z = 0; z < EN; z++) {
@@ -532,7 +532,7 @@ public final class DonmaOyunTestleri {
      * dikilir ({@code MOTION_BLOCKING} 120'nin üstünde = yükseklik bandında tam kış olurdu); yaprak sütununun zemini yanındaki
      * çıplak çimenle aynı, kış ağırlıkları farkı ≤ 0,05 (K0-24 komşu sınırı).
      */
-    @GameTest(template = ALAN)
+    @GameTest(template = ALAN, batch = "donma_alan_3")
     public static void kisAgirligiYaprakSayilmadanZemindenOkunur(GameTestHelper y) {
         sahneKur(y);
         ServerLevel level = y.getLevel();

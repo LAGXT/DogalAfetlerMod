@@ -182,18 +182,22 @@ public final class YanginOyunTestleri {
         dosemeKur(y, 1, Blocks.OAK_PLANKS.defaultBlockState());
         dosemeKur(y, 2, kaliciYaprak());
         int ilk = ozet(y);
+        BlockState[] ilkDurum = durumlar(y, 0, 8);
         int tutusan = YanginYoneticisi.alanTutustur(level, y.absolutePos(new BlockPos(4, 2, 4)), 3,
                 YanginKaynagi.KOMUT, 1.0);
         y.runAfterDelay(20, () -> {
             int aktif = aktif(y);
             int ozet = ozet(y);
+            String yirmide = farklar(y, ilkDurum);
             y.runAfterDelay(300, () -> {
                 kural.set(onceki, level.getServer());
                 int son = ozet(y);
+                String sonda = farklar(y, ilkDurum);
                 YanginYoneticisi.sondur(level, genisAlan(y));
                 y.assertTrue(tutusan > 0 && aktif > 0, "blok hasarı kapalıyken de yangın (veri/görsel) sürmeli: "
                         + tutusan + "/" + aktif);
-                y.assertTrue(ozet == ilk && son == ilk, "blok hasarı kapalıyken blok hash'i değişmemeli");
+                y.assertTrue(ozet == ilk && son == ilk, "blok hasarı kapalıyken blok hash'i değişmemeli; 20. tick " + yirmide
+                        + ", sonda " + sonda + ", köşe " + y.absolutePos(BlockPos.ZERO).toShortString());
                 y.succeed();
             });
         });
@@ -533,7 +537,7 @@ public final class YanginOyunTestleri {
     }
 
     /** Y-22: afet ateşi vanilla {@code minecraft:fire} etiketinde (su iksiri söndürür, yol bulucu kaçınır). */
-    @GameTest(template = SAHNE, batch = "yangin_genel")
+    @GameTest(template = SAHNE, batch = "yangin_genel_2")
     public static void afetAtesiAtesEtiketinde(GameTestHelper y) {
         y.assertTrue(YanginKayitlari.AFET_ATESI.get().defaultBlockState().is(BlockTags.FIRE),
                 "dogalafetler:afet_atesi minecraft:fire etiketinde olmalı");
@@ -605,6 +609,20 @@ public final class YanginOyunTestleri {
             sonuc[i++] = y.getBlockState(p);
         }
         return sonuc;
+    }
+
+    /** {@link #durumlar}{@code (y, 0, 8)} anından bu yana değişen bloklar (göreli konum: önce -> şimdi), en çok 6. */
+    private static String farklar(GameTestHelper y, BlockState[] once) {
+        StringBuilder sb = new StringBuilder();
+        int i = 0;
+        int sayi = 0;
+        for (BlockPos p : BlockPos.betweenClosed(BlockPos.ZERO, new BlockPos(8, 7, 8))) {
+            BlockState simdi = y.getBlockState(p);
+            if (simdi != once[i++] && sayi++ < 6) {
+                sb.append(p.toShortString()).append(": ").append(once[i - 1]).append(" -> ").append(simdi).append("; ");
+            }
+        }
+        return sayi + " fark [" + sb + "]";
     }
 
     private static int farkSayisi(BlockState[] a, BlockState[] b) {

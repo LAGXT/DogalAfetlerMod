@@ -121,7 +121,16 @@ public final class SuOyunTestleri {
         h.startSequence()
                 .thenWaitUntil(() -> {
                     SuAraliklari k = araliklar(h, 10, 8);
-                    h.assertTrue(k.adet() == 1 && k.alt(0) == y4 && k.ust(0) == y7, "kara sütunu henüz [y4, y7) değil");
+                    if (k.adet() != 1 || k.alt(0) != y4 || k.ust(0) != y7) {
+                        h.fail("kara sütunu henüz [" + y4 + ", " + y7 + ") değil: " + k.adet() + " aralık"
+                                + (k.adet() > 0 ? " [" + k.alt(0) + ", " + k.ust(0) + ")" : "") + ", köşe "
+                                + m(h, 0, 0, 0).toShortString() + ", deniz "
+                                + DunyaDonemi.al(h.getLevel().getServer()).deniz().mevcutArtis() + ", alan kuyruğu "
+                                + SanalSu.boyut(h.getLevel()).dunya.alan().bekleyen() + "/"
+                                + SanalSu.boyut(h.getLevel()).dunya.alan().parcaSayisi() + ", son hesap "
+                                + SanalSu.boyut(h.getLevel()).dunya.alan().sonHesapNs() / 1_000_000 + " ms, oyuncu "
+                                + h.getLevel().players().size());
+                    }
                 })
                 .thenExecute(() -> {
                     h.assertTrue(araliklar(h, 13, 13).adet() == 0, "yüksek sütün ıslak");

@@ -186,6 +186,10 @@ tasks.matching { it.name == 'runGameTestServer' }.configureEach {
         yonetilen.each { anahtar, deger -> satirlar << "${anahtar}=${deger}".toString() }
         ozellikler.text = satirlar.join('\n') + '\n'
         yonetilen.each { anahtar, deger -> logger.lifecycle("run-gametest/server.properties: ${anahtar}=${deger}") }
+        // Her koşu boş dünyayla başlar (K-E16): sahnelerin yeri test sayısıyla değişir ve saklanan dünyada eski yerleşimin
+        // kutuları dışında kalan bloklar (ör. donma gölü) yeni sahnelere akıyordu.
+        project.delete(project.file('run-gametest/oyuntesti-duz'))
+        logger.lifecycle('run-gametest/oyuntesti-duz silindi: GameTest boş dünyayla başlar')
     }
 }
 

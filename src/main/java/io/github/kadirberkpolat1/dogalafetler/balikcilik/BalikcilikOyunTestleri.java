@@ -71,7 +71,9 @@ import net.minecraftforge.registries.ForgeRegistries;
 @GameTestHolder(DogalAfetler.MOD_ID)
 @PrefixGameTestTemplate(false)
 public final class BalikcilikOyunTestleri {
+    /** Batch başına en çok 7 test (K-E16). */
     private static final String BATCH = "balikcilik";
+    private static final String BATCH_2 = BATCH + "_2";
     private static final BlockPos DELIK = new BlockPos(2, 4, 2);
     private static final Field ISIRMA = ObfuscationReflectionHelper.findField(FishingHook.class, "f_37089_");
 
@@ -691,7 +693,7 @@ public final class BalikcilikOyunTestleri {
     }
 
     /** Madde 14/15: çiğ buz balığı küçük serinlik, pişmiş orta ısınma, pişmiş Donmuş Ringa büyük ısınma (B-19). */
-    @GameTest(template = "bos", batch = BATCH)
+    @GameTest(template = "bos", batch = BATCH_2)
     public static void cigBalikSogutururPismisIsitir(GameTestHelper y) {
         ServerLevel level = y.getLevel();
         y.assertTrue(SicaklikKapisi.acikMi(level.getServer()), "sıcaklık sistemi açık olmalı (test önkoşulu)");
@@ -717,7 +719,7 @@ public final class BalikcilikOyunTestleri {
     }
 
     /** Madde 15 risk/denge: delikte oltası olan, buz üstünde hareketsiz oyuncunun ortamı giderek soğur. */
-    @GameTest(template = "bos", batch = BATCH, timeoutTicks = 300)
+    @GameTest(template = "bos", batch = BATCH_2, timeoutTicks = 300)
     public static void buzdaHareketsizBalikciDahaHizliSogur(GameTestHelper y) {
         ServerLevel level = y.getLevel();
         donma(y, 50f);
