@@ -376,6 +376,10 @@ yükselmeyi tüketir) durdurmayla bozulmamalı. Çekirdek sözleşmesi §3a'ya i
 **K-C50 Güneş evresi ilerlemesini evrenin sahibi yazar (sıcaklık §A.8).** Sıcaklık `evreIlerlemesi()`'ni okur, yazmaz: evrenin
 sahibi (güneş patlaması afeti ya da gökyüzü dönem süreci) `BUYUYEN` boyunca 0→1'i 5 MC gününde (ölçekli afet saatiyle) doğrusal,
 `SUPERNOVA` boyunca 0→1'i evre süresinde yazar; yazılmazsa güneş patlaması sıcaklığı 0 kalır ve süpernova artığı sönmez.
+**Faz 4 notu (güneş GP1, entegrasyon 4):** `BUYUYEN` eğrisi güneş patlamasında iki parçalıdır: sirende 0 → 0,273 karesel
+(`0,273·τ²`, gökyüzü ölçeği 1 → 1,6), AKTIF'in 5 MC gününde 0,273 → 1 doğrusal (sıcaklık artışı siren sonunda %27, 1. gün
+%42, 5. gün %100). Çekirdek §6 ve sıcaklık §A.8 sözleşme metinleri buna göre değişti; okuyucu kod (sıcaklık, gökyüzü) değişmedi
+(çarpan `evreIlerlemesi` olarak kaldı; inceleme-gunes-patlamasi-kizil-cuce doğruladı).
 Çekirdek sözleşmesi §6 tablosunun evre ilerlemesi satırına işlendi.
 
 ### Reddedilen yollar
@@ -2291,6 +2295,141 @@ afetlerinindir (§A.3). (f) `runData`: #7, #15, #16, #19, #22 ikonları mod eşy
 (g) `DogalAfetler` kaydı `DonmaSistemi.kaydet`'ten sonra: `Yiyecek`, `EsyaKayitlari`, `Meteor`, `Balikcilik`, `Basarim`, sonra
 `Kancalar.bagla()` (`68577b1`, `1e70a46`).
 
+## Faz 4 — Güneş patlaması ve kızıl cüce
+
+Parça `gunes-patlamasi-kizil-cuce` (dal `is/gunes-patlamasi-kizil-cuce`, son commit `84b2faf`; `main`'e birleştirme `ded08d7`, entegrasyon 4
+1/6). Kaynak `.vibe/kararlar/gunes-patlamasi-kizil-cuce.md` §B/§C/§D; diğer işçilerin kullandığı arayüz sözleşmeleri (§A) ve
+entegratöre notlar (§E) o dosyada kalır. Şef kararları (§E b, c; GP17 FPS) "Şef kararları (Faz 4)" bölümündedir; N17 satırları
+sondaki tablodadır. Rapor `.vibe/rapor/gunes-patlamasi-kizil-cuce.md`, inceleme `.vibe/rapor/inceleme-gunes-patlamasi-kizil-cuce.md`
+(kabul, P0/P1 = 0, P2 = 5), birleştirme `.vibe/rapor/entegrasyon-4.md`.
+
+**GP1 Evre ilerlemesi: siren karesel 0 → 0,273, AKTIF doğrusal 0,273 → 1 (sıcaklık §A.8 sapması).** Gökyüzü güneşi
+`1 + 2,2·p` ölçekle çizer (gokyuzu §2). Şartname "siren başladıktan sonra güneş yavaş yavaş büyüsün"; tasarım §2 siren
+60 sn'de 1,0 → 1,6 kat (`1 + 0,6·τ²`). 5 günlük doğrusal 0 → 1 sirende yalnız 1,02 kat verirdi (görünmez). Bu yüzden siren
+boyunca `p = (0,6/2,2)·τ²`, AKTIF'te `p = 0,273 + 0,727·t` (güneş 1,6 → 3,2 kat, sıçramasız). Sıcaklık aynı `p`'yi okur:
+`gunesPatlamasiArtisi` = 18 ise siren sonu +4,9, 1. gün sonu +7,6, 5. gün +18; tasarımın "1. gün +6 → 5. gün +18" eğrisiyle
+uyumlu. Sıcaklık §A.8'in "BÜYÜYEN boyunca 0 → 1 doğrusal" cümlesi buna göre güncellenmeli (§E). JUnit: monoton, sona doğru
+hızlanan siren, siren sonu = AKTIF başı, 1,6 ve 3,2 kat; GameTest `sirendeGunesBuyurMeteorlarAktifteBaslarStopNormaleDondurur`.
+
+**GP2 BÜYÜYEN'e geçiş SIREN başında.** Ön-uyarıda gök değişseydi eşyası olmayan oyuncu afeti önceden görürdü (madde 4,
+N7: radarda bile görünmez). Buharlaşma (BÜYÜYEN'de başlar) bu yüzden meteorlardan 60 sn önce başlar; 5 günlük sürecin
+%0,8'i, derinlik farkı ihmal edilir. Çekirdeğin taklidi BÜYÜYEN'i AKTIF'te yapıyordu; gerçek afet bundan ayrılır (taklit yalnız
+yaşam döngüsü içindir).
+
+**GP3 Meteor yoğunluğu dakikalık ardışık yağmurlarla; gerçek tick.** `MeteorAPI.yagmur` tek bir yoğunluk alır; eğri (1/40 sn →
+1/12 sn, oyuncu başına) afetin (meteor §A.1). Her 1200 oyun tick'inde (gerçek tick, afet `asamaTick` sayısı) 1200 tick'lik
+yeni bir yağmur o anın yoğunluğuyla başlar; yağmur dengeli dağıtımı ve giren/çıkan oyuncuyu kendisi yürütür (`oyuncular`
+boş). `/dogalafet hiz` 5 günü sıkıştırır ama meteor yoğunluğu gerçek zamanda kalır (test aracı meteor yağdırmayı 1000 katına
+çıkarmasın). Büyük meteor %5 (tasarım: "büyük %5, Kozmik Çekirdek yalnız burada"); API'de orta boy yok, tasarımın %25 "orta"sı
+küçük sayılır. Yağmur kaydedilmez (M-05): kayıttan dönüşte `yuklendi` ilk tick'te yenisini başlatır.
+
+**GP4 Alt aşama = gün; `asama ileri` bir gün atlar.** N18 "güneş patlamasının 5 gününü beklemeden". Gün gün atlamak
+sıcaklık, kavrulma ve meteor yoğunluğunun her gününün ayrı sınanmasını sağlar; 5. günde (son alt aşama) `asama ileri` BITIS'e
+geçer = doğal bitiş (süpernova, "Güneşi Atlattım"). Siren + 5 gün + bitiş = 7 komut; sonrası zincirin `asama ileri`'si.
+
+**GP5 Başlama kapısı `yerUygunMu`'da.** Çekirdeğin tek seferlik kapısı (K-C6) rastgele seçimi korur, `/dogalafet start` korumaz.
+Süpernova/güneşsiz/doğuş sürerken başlayan afet evreyi BÜYÜYEN yapıp zinciri ve donmayı bozardı; `yerUygunMu` false →
+"uygun yer bulunamadı" (N14 yolu, ek çekirdek kodu yok). Tamamlanmış kızıl cücede elle başlar (test aracı; rastgele seçim
+`gunesPatlamasiTekrarlanabilir`'e bağlı).
+
+**GP6 Kavrulma: güneşe açık çimen → kaba toprak, 3. günden.** Tasarım §2 "çimenler 3. günden sonra rastgele kaba toprağa
+dönüşür (yangın sistemi dışı, `afetBlokHasari` ile)". Her tick oyuncu başına bir deneme, olasılık 3. gün 0 → 5. gün 0,5 ×
+TPS kısması, 64 blok yarıçap; 2 günde 128×128 alanın ~%50'si (yamalı). "Güneşe açık" = sütunun `MOTION_BLOCKING` yüksekliğinin
+hemen altı (yaprak ve çatı gölgeler; yükseklik haritası eşzamanlı, gök ışığı gecikebilir). Her değişimde
+`SanalSu.chunkDegisti`. GameTest `kavrulmaCimeniKabaToprakYaparBlokHasariKapaliykenDokunmaz`. Kalıcı izdir (krater gibi);
+`stop` geri almaz.
+
+**GP7 Taklitle çakışma (K-E22 ile değişti).** Tur 1'de gerçek kayıt `ozelliktenKaydet`'ten sonraydı ve taklit kayıtlıysa gerçek afet
+atlanıyordu. K-E22 (şef kararı) sırayı çevirdi: gerçek kayıt önce, taklit kayıtlı türü atlar ve güneş türü atlanınca
+`OyunTestiSureci` de kaydedilmez, `GunesZinciriSureci` her zaman kayıtlıdır. Bu daldaki atlama dalı ölü kod olduğu için kaldırıldı;
+senaryonun alt sınıfı (`GercekAfetSunucusu`) da kalktı, betik ortak `Sunucu`'yu kullanır. Sonuç: `-PoyunTestiAfeti=...,gunes_patlamasi`
+taşıyan eski senaryolar artık gerçek afeti koşar (§E'de kırılan adımlar).
+
+**GP8 Kalıcılık.** NBT `aktifSure` (başlarken config'ten sabitlenir; süreç ortasında config değişse de aynı kalır), `aktifGecen`.
+Evre ve ilerleme `DunyaDonemi`'nde. GameTest `kayitOkumaGunuVeKalaniKorurZincirDisindaBaslamaz`; senaryo koşu 2 "Aktif afet geri
+yüklendi: gunes_patlamasi ... aktif" + büyüyen güneş + yağmurun yeniden başlaması; koşu 3 kızıl cüce kalıcı.
+
+**GP9 GameTest hijyeni (K-E15, K-E16).** Beş test, beş batch (her biri 1 test). Global dönemi değiştirenler başta ve sonda
+`sifirla` ("eski değer" = boş dünyanın ilk hâli; her koşu boş dünyayla başlar, gokyuzu testleriyle aynı desen); değiştirilen
+gamerule (`afetBlokHasari`) eski değerine döner. Meteor yağdıran test `afetBlokHasari=false` ile koşar ve afeti aynı testte
+`stop` ile temizce bitirir (uçan meteor ve yağmur 0 doğrulanır). Sahte oyuncu test sonunda listeden çıkarılır.
+
+**GP10 İstemci ve ses kapsamı (tur 2'de güncellendi).** Güneş diski, süpernova, nebula, kızıl cüce (gokyuzu), meteor izi/çarpma
+(meteor), siren (uyarı), donma ve buhar (donma) ortak çizicilerdedir. Afete özel ekler `client.gunes_patlamasi`'ndadır (GP11–GP14);
+tek durum kaynağı çekirdeğin `DonemPaketi`'si (evre, ilerleme, evre başlangıcı): yeni paket, yeni mixin ve gokyuzu dosyasına yazım yok.
+Yapılmayanlar: çarpma anının beyaz örtüsü (meteor parçasının çarpma parlaması var), süpernova çökmesinde öteki ortam seslerinin
+susturulması (vanilla kategorilerine dokunmak gerekir), kavrulmada uzak yangın uğultusunun ayrı katmanı (rüzgâr dosyasının içinde).
+
+**GP11 Aurora perdesi `AFTER_SKY`'da.** Tasarım §2 aşama 0: "gece ufuktan yükselen kızıl-yeşil aurora" (Carrington 1859). Forge
+`RenderLevelStageEvent.Stage.AFTER_SKY`'da `position_color`, toplamalı, derinlik yazımı yok: kuzey göğünde ±100°'lik yay, 7–13°'den
+22–36° yukarı üç bant (alt kenar yeşil `#3CFF8A`, üst kenar kızıl `#FF3C5A`, uçlar saydam), U yönünde kayan ışın deseni
+(`GunesGorselEgrileri.isin`) ve dalgalanan yükseklik/yarıçap. Güç `aurora(p, gece, yağmur)`: BUYUYEN'in bütün gecelerinde (siren ve
+5 gün), sirende %35'ten tama açılır, gündüz ve yağmurda söner. Arazi sonra çizildiği için perdenin önünde kalır. Kalite (N13,
+mevcut `gorsel.efektKalitesi`): katman 1/2/3/3, dilim 48/64/96/128 (Düşük/Orta/Yüksek/Ultra); en çok 1 152 dörtgen, kare başına
+ayırma yok (statik sütun dizileri, yalnız render thread'i).
+
+**GP12 Ekran örtüleri görünüm uzayında (`AFTER_WEATHER`), arayüz katmanı değil.** F1 (`hideGui`) bütün arayüz katmanlarını gizler;
+süpernova parlaması ve ısı dalgalanması arayüz değil dünyanın parlaklığıdır (vitrin kareleri de F1'le alınır). Model-görünüm birim
+matrise alınır, z = −1'de projeksiyondan hesaplanan ekranın 1,2 katı dörtgenler çizilir, sonra geri yüklenir. (a) Süpernova: beyaz
+%85 × `GokyuzuEgrileri.supernovaFlas(evre saniyesi)` (gökyüzünün parlama eğrisiyle aynı an), çatı altında %35. (b) Isı
+dalgalanması: ekranın alt %55'inde yana kayan, titreşen sıcak şeritler (kalite 10/16/24/32 şerit), yalnız gündüz ve göğü gören
+konumda, AKTIF ilerledikçe %25'ten tama (şadersiz serap; vücut sıcaklığının sıcak vinyeti sıcaklığın kendi katmanıdır). (c) Kızıl
+cüce şafak tonu: doğuş boyunca `#FF6A3A`, tepe %14 (doğuşun ortası), doğuş tamam olunca 0; gündüz gök/sis tonu ve ışık haritası
+gokyuzu'nundur (G11, G14).
+
+**GP13 Yaprak/çimen kuruması blok renk işleyicisiyle.** Tasarım §2 "yapraklar kahverengiye döner (biyom rengi istemcide
+karıştırılır), blok değişmez". `RegisterColorHandlersEvent.Block`'ta çimen (`grass_block`, `grass`, `fern`, `potted_fern`,
+`tall_grass`, `large_fern`) ve yapraklar (meşe, orman, akasya, kara meşe, mangrov, sarmaşık, ladin, huş) için vanilla'nın
+`BlockColors.createDefault` hesabının aynısı + kuruluk karışımı (çimen `#B59A55`, yaprak `#8A6A2E`). Kuruluk 2. günün sonundan (p =
+0,564) sürecin sonuna yumuşak geçiş, tavan %72; 8 basamak, basamak değişince bir kez `levelRenderer.allChanged()` (5 günde en
+çok 8 + dönüş). Kuruluk 0'da renk vanilla ile bire bir; eşya simgesi (`level == null`) değişmez. Bilinen sınır: aynı blokları
+renk işleyicisiyle kaydeden başka bir mod varsa mod yükleme sırası kazananı belirler (önceki işleyici Forge API'sinde okunamaz).
+
+**GP14 Sesler.** `tools/assets/gunes_sesleri.py` (ses_uret yardımcıları, deterministik), ölçüm `docs/kanit/ses/gunes_*_ebur128.txt` +
+spektrogram: kavurucu rüzgâr (20 sn döngü, −26,1 LUFS, −9,0 dBTP, baskın 40 Hz), süpernova basıncı (8 sn, 25 → 60 Hz, −25,0 LUFS,
+−9,3 dBTP), kristal uğultu (20 sn, −29,9 LUFS, −18,2 dBTP, 340–660 Hz), kızıl cüce akoru (4,5 sn, −27,0 LUFS, −14,5 dBTP); dördü
+de "UYGUN". Rüzgâr sunucunun `OrtamSesi` katmanıdır (`gunes/kavrulma`, global, WEATHER; AKTIF'te %30 → %100, afet bitince söner,
+kayıttan dönüşte yeniden). Süpernova ve akor eşitlenmiş evre saniyesinden istemcide bir kez çalar (AMBIENT, konumsuz): basınç
+çökme bitince (8. sn), kristal 6 sn sonra, akor doğuşun ilk 6 sn'sinde; sonradan giren oyuncu yalnız pencere içindeyse duyar.
+Siren uyarınındır (K0-19). `sounds.json` ve altyazılar datagen (`GunesPatlamasiSesleri`).
+
+**GP15 Kavrulma ölçekli saate bağlı (tur 1'den değişti).** Tur 1'de her gerçek tick'te oyuncu başına bir deneme vardı;
+`/dogalafet hiz` 5 günü sıkıştırırken kavrulmayı sıkıştırmıyordu (hızlı testte çimen hiç kurumuyordu). Şimdi ölçekli tick başına
+bir deneme (`adim` kadar, oyuncu başına tick'te en çok 32; TPS kısması olasılığı çarpar). Hız 1'de davranış aynıdır.
+
+**GP16 Görsel otomasyon.** `client.gunes_patlamasi.GunesPatlamasiOtomasyonu` (`-Potomasyon=gunes_patlamasi`) + `tools/senaryo/
+gunes_patlamasi_gorsel.py` (ws 96, `runclient_kilit.py kos`, K0-21 rev. 2 (a)–(e), kare eksik/bayatsa bir tekrar). Kamera en yakın
+ormanın 40 blok batısında uçan yaratıcı oyuncudur: izleyici meteor yağmurunun hedefi değildir (meteor §A.1). Gerçek afet komutlarla
+yürütülür; tek vitrin eki 4. günde afetin kendi kaynağıyla kısa, yoğun bir yağmurdur (oyuncu başına dakikada 40, %15 büyük,
+düşme 0,6 yavaş çekim) — tasarım vitrini "4–6 meteor izi" ister, afetin 4. gün yoğunluğu (dakikada 4,3) tek karede bunu vermez.
+Kavrulma karesi hız 60 × 300 tick (4. günün %75'i) sonrasıdır. Her kare: koşul + FPS ≥ 15 (en çok 60 tick) + en az iki yeni
+çizilmiş kare; satırı FPS, TPS, mspt, evre, ilerleme, evre saniyesi, uçan meteor, parçacık ve kuruluk basamağını yazar.
+Toast'lar (F1'de de çizilir) her istemci tick'inde temizlenir; süpernova çökmesi ve parlaması `hiz 0.25` ile ağır çekimde alınır.
+
+**GP17 Gizli workspace'te FPS 1: tekrar yok, ölçüm Faz 5'e.** Koşu 1'de 13 karenin hepsi FPS 1 (15 FPS kapısı her karede 60 tick'te
+zaman aşımına düştü); kareler yine en az iki yeni çizilmiş karenin sonunda alındı, 13 farklı md5 ve piksel ölçümleri evrelerle
+uyumlu (`gorsel/kare-olcum-1.tsv`: aurora karesinde üst yarı yeşil %8,4 / kızıl %4,3, kızıl cücede kızıl %72). Şefin tekrar koşulu
+"kare boş çıkarsa" sağlanmadığı için ikinci runClient açılmadı. FPS 1 compositor kısmasıdır, modün maliyeti değildir: emsal
+yangın ("İstemci FPS ve Ultra karesi bilinen sınır: gizli workspace ~1 FPS çizer, ölçüm Faz 5'te görünür pencerede", şef
+kararı), spike-gokyuzu Faz 2 notu, K0-21 rev. 2 (j). Sunucu tarafı ölçüldü: TPS her karede 20,0, meteor vitrini tepesinde mspt
+6,7–7,1 (10 uçan meteor, 4 482 parçacık). Gerçek FPS ve Düşük/Yüksek/Ultra karşılaştırması görünür pencere ya da başsız
+kalibrasyon ister (§E).
+
+**GP18 Başarısız GameTest de batch sonunda temizlenir (entegrasyon 4, inceleme P2).** `succeedWhen` kullanan iki test
+(`sirendeGunesBuyur...`, `zincirKizilCuceye...`) başarısız bitince kendi temizliğini çalıştırmıyordu (`try/finally` asıl
+kontrolü geçtiği için işlemez: koşul zaman aşımına kadar yeniden denenir). Batch'leri `@AfterBatch` ile afeti durdurur, dönemi ve
+hızı `sifirla` ile sıfırlar, siren testinin kapattığı `afetBlokHasari`'nı eski değerine döndürür (K-E15; balıkçılık K-E22 c ile aynı
+desen). Başarılı yol değişmedi.
+
+### Reddedilen yollar
+
+- **BÜYÜYEN'i AKTIF'te açmak (taklit gibi):** sirende güneş büyümezdi (bölüm D).
+- **Siren büyümesini gökyüzü çizicisinde ayrı alanla vermek:** gokyuzu paketine yazmak (sahiplik dışı) ve yeni dönem alanı/paket
+  (çekirdek); aynı sonuç evre ilerlemesiyle alınır (GP1).
+- **Tek uzun yağmur:** yoğunluk eğrisi uygulanamazdı (GP3).
+- **Kavrulmada `canSeeSky`:** gök ışığı blok değişiminden sonra gecikir; yükseklik haritası eşzamanlı (GP6).
+- **Başlama kapısını komutta denetlemek:** `CekirdekKomutlari` çekirdeğindir; `yerUygunMu` aynı işi kendi sınıfında görür (GP5).
+
 ## Şef kararları (Faz 0–1)
 
 **K0-19 Ay çarpması siren süresi: 60 sn.** Madde 5 "Güneş Patlaması hariç 10 sn" der; bölüm H "siren çaldıktan 60 saniye
@@ -3098,6 +3237,24 @@ düşüşün, 30 yedek yangın saniyesinin ve zombi hasarının sayılmadığın
   verdiği GameTest'lerde sınanır (`dogalBitenKasirga…`, `seviyeUc…`, `seviyeBes…`). Tasarım notu "Vitrin anı" sıranın oyunda garanti
   olmadığını yazar.
 
+## Şef kararları (Faz 4)
+
+Faz 4 parçalarında şefin verdiği ya da kabul ettiği kararlar (kaynak `.vibe/kararlar/<parça>.md` §B/§E; parça bölümlerinde aynı
+kimliklerle atıf vardır). Faz 4 öncesi entegrasyon kararları (K-E18…K-E24) "Şef kararları (Faz 3)" bölümünün Entegrasyon alt
+başlığındadır.
+
+### Güneş patlaması ve kızıl cüce
+
+- **GP1 sözleşme cümleleri (§E a):** başkasının karar dosyasına işçi yazmaz; entegratör işledi (`.vibe/kararlar/cekirdek.md` §6
+  evre ilerlemesi satırı, `.vibe/kararlar/sicaklik.md` §A.8, K-C50 notu).
+- **K-C26 ve tekrarlanabilir güneş patlaması (§E b): sözleşmeye uygun, değişmez.** `gunesPatlamasiTekrarlanabilir=true` iken kızıl
+  cücede başlayıp sirende/AKTIF'te `stop` ile duran afetin BÜYÜYEN'i çekirdekçe `NORMAL`'e döner (K-C26 metni). Varsayılan
+  config'te (tekrarlanamaz) bu yol yoktur.
+- **B-20 açık kalır (§E c):** kızıl cüce tabanında yeniden donan buz deliği donma/balıkçılık kodudur, bu parçanın kapsamı dışı
+  ("Açık noktalar (Faz 3)").
+- **GP17 FPS ölçümü Faz 5'e:** gizli workspace 1 FPS çizer; kareler boş değilken ikinci runClient açılmaz (yangındaki şef
+  kararıyla aynı). Gerçek FPS ve Düşük/Yüksek/Ultra karşılaştırması "Açık noktalar (Faz 4)".
+
 ## Açık noktalar (Faz 2b)
 
 Entegratöre bırakılan notlardan işlenenler: kancalar (K-E1), protokol (K-C47), `asama ileri [süreç]` (K-C48), sanal su §3a istisnası
@@ -3145,6 +3302,24 @@ birleşmiş beş worktree kaldırıldı (`.vibe/diff/<parça>.patch` kalır). A�
   senaryolar `cekirdek_sunucu.argumanlar` / `agir_surec_kapisi` ile `--port` / `--kanit` alır (K-E13); tsunami, sinkhole, orman
   yangını ve asit yağmuru mod kurucusunda `BasarimIpucuEvent.yayinciKaydet`, koşulda `BasarimIpucuEvent` yayınlar (başarım §A.3,
   A-30, A-31; Faz 4 log'unda "yayıncı olarak kayıtlı değil" satırı 0); kodla blok değiştiren afet `SanalSu.chunkDegisti` çağırır.
+
+## Açık noktalar (Faz 4)
+
+Birleşen parçalardan kalanlar (her birleştirmede güncellenir; plan `.vibe/rapor/entegrasyon-4.md`):
+
+- **Güneş — FPS (GP17):** gerçek FPS ve Düşük/Yüksek/Ultra karşılaştırması Faz 5'te görünür pencere ya da başsız kalibrasyonla
+  (K0-21 rev. 2 (j)); hazır yol `gunes_patlamasi_gorsel.py` (kare başına FPS/TPS/mspt), kalite için
+  `gorsel.efektKalitesi` değiştirilip üç koşu.
+- **Güneş — vitrin kareleri zayıf (inceleme P2):** kavrulma için aynı açıdan 1. gün / 4. gün sonu kare çifti (ağaçlık ve çimen
+  çerçevede) yok; süpernova kabuğu karesi gökyüzü sahibinin kabuk kalibrasyonuyla yeniden alınmalı
+  (`client/gunes_patlamasi/GunesPatlamasiOtomasyonu`). Faz 5 görünür koşu.
+- **Güneş — şeker kamışı kurumuyor (inceleme P2):** `client/gunes_patlamasi/KavrulmaRengi.java:38-42` renk işleyicisi
+  listesinde `Blocks.SUGAR_CANE` yok; nilüfer ve saplar da dışarıda (GP13 bilinen sınırına eklenmeli). Faz 5.
+- **Güneş — GP10 yapılmayanlar:** çarpma anının ayrı beyaz örtüsü, süpernova çökmesinde öteki ortam seslerinin susturulması,
+  kavrulmada ayrı uzak yangın katmanı.
+- **Betikler (K-E22/K-E23):** `-PoyunTestiAfeti` taşıyan betikler birleştirme turlarında `!tür`'e geçer ya da gerçek afete
+  uyarlanır (`entegrasyon-4.md` §3.6). Güneş birleştiğinde `uyari_sunucu.py` ve `radar_gorsel.py` güneş adımları gerçek afetle
+  aynı çıktıyı verir (güneş §E); `basarim_sunucu.py`'de güneş adımı yok.
 
 ## N17 — Sayısal varsayılanlar
 
@@ -3394,6 +3569,18 @@ birleşmiş beş worktree kaldırıldı (`.vibe/diff/<parça>.patch` kalır). A�
 | başarım (kod) | yangın yakınlığı | 8 | blok | ipucu gelmezse "yangın alanında": yangın ısısının etkili olduğu yakınlık (yangın 6 + √n) |
 | başarım (kod) | çorba aday penceresi | 60 | tick | yedikten sonra ısınmanın görülmesi için 3 sn |
 | başarım (kod) | çorba varsayılan etki süresi | 180 | sn | madde 14'ün en uzun sıcak yiyeceği |
+| güneş patlaması | `gunes_patlamasi.aktifSureGun` | 5,0 | MC günü (1–10) | bölüm D "5 Minecraft günü" |
+| güneş patlaması | `gunes_patlamasi.meteorBaslangicDakikaBasina` | 1,5 | meteor/dk/oyuncu (0–30) | tasarım: oyuncu başına 1/40 sn |
+| güneş patlaması | `gunes_patlamasi.meteorSonDakikaBasina` | 5,0 | meteor/dk/oyuncu (0–30) | tasarım: 5. gün 1/12 sn; arası doğrusal |
+| güneş patlaması | `gunes_patlamasi.buyukMeteorOrani` | 0,05 | oran (0–1) | tasarım: büyük %5 (Kozmik Çekirdek yalnız büyükte) |
+| güneş patlaması | `gunes_patlamasi.kavrulmaBaslangicGun` | 3,0 | gün (0–10) | tasarım §2 "3. günden sonra" |
+| güneş patlaması | `gunes_patlamasi.kavrulmaOlasiligi` | 0,5 | olasılık (0–1) | 2 günde çevrenin ~yarısı: yamalı, çöl değil |
+| güneş patlaması | `gunes_patlamasi.kavrulmaYaricap` | 64 | blok (8–160) | 4 chunk: oyuncunun gördüğü çevre, yüklü alan |
+| güneş patlaması | sabit: yağmur dilimi | 1200 | tick | yoğunluk dakikada bir güncellenir (GP3) |
+| güneş patlaması | sabit: siren sonu güneş | 1,6 | kat | tasarım §2 aşama 0 (GP1) |
+| güneş patlaması | sabit: kavrulma denemesi tavanı | 32 | deneme/oyuncu/tick | `hiz` yüksekken TPS korunur (GP15) |
+| güneş patlaması | sabit: yaprak/çimen kuruluğu | p 0,564 → 1, tavan %72, 8 basamak | — | tasarım "yapraklar kahverengiye"; basamak = yeniden örme (GP13) |
+| güneş patlaması | `gorsel.efektKalitesi` (mevcut, CLIENT) | Yüksek | Düşük/Orta/Yüksek/Ultra | aurora katmanı 1/2/3/3, dilim 48–128; ısı şeridi 10–32 (N13, tasarım §5) |
 
 Config dışı sabitler (oynanış değeri değil, sınır/biçim): siren 200/1200 tick (şartname, K0-19); son afet geçmişi 5
 (madde 13a); tek çarpan ≤ 100, toplam ≤ 1000 (K-C22); hız 0,1–1000; TPS ölçüm aralığı 20 tick; dönem kaydı sınırları
