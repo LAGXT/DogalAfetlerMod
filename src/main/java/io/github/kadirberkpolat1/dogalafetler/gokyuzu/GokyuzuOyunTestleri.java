@@ -128,10 +128,10 @@ public final class GokyuzuOyunTestleri {
                 }
                 safakVerildi[0] = true;
                 ust.setDayTime(Math.floorDiv(ust.getDayTime(), 24_000L) * 24_000L + 24_000L);
-                yardimci.fail("kapı açık; uykudaki gibi sabaha atılandı, şafak geçildi");
+                yardimci.fail("kapı açık; uykudaki gibi sabaha atlandı, şafak geçildi");
             }
             yardimci.assertTrue(donem.gunesEvresi() == GunesEvresi.KIZIL_CUCE,
-                    "uyku şafağı atlayınca da kızıl cüe doğmalı: " + donem.ozet());
+                    "uyku şafağı atlayınca da kızıl cüce doğmalı: " + donem.ozet());
             temizle.run();
         });
     }

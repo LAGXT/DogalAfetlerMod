@@ -6,6 +6,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
 import io.github.kadirberkpolat1.dogalafetler.core.DonemSureci;
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
+import io.github.kadirberkpolat1.dogalafetler.core.OyunTestiSureci;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.GunesZinciri;
 import java.util.Optional;
 import net.minecraft.nbt.CompoundTag;
@@ -40,8 +41,18 @@ public final class GunesZinciriSureci implements DonemSureci {
     private GunesZinciriSureci() {
     }
 
+    /**
+     * {@code OyunTestiAfeti.ozelliktenKaydet()}'ten sonra çağrılmalı: çekirdeğin taklidi ({@value OyunTestiSureci#KIMLIK},
+     * yalnız {@code -PoyunTestiAfeti=...,gunes_patlamasi}) kayıtlıysa zincir dönem süreci olarak kaydedilmez; iki süreç aynı
+     * evreyi sürer ve taklit kızıl cüceyi donma kapısı olmadan doğururdu. Komutlar yine çalışır.
+     */
     static void kaydet() {
         ornek = new GunesZinciriSureci();
+        if (AfetYoneticisi.donemSurecleri().stream().anyMatch(s -> s.kimlik().equals(OyunTestiSureci.KIMLIK))) {
+            DogalAfetler.LOGGER.warn("Oyun testi dönem süreci {} kayıtlı; güneş zinciri süreci kaydedilmedi",
+                    OyunTestiSureci.KIMLIK);
+            return;
+        }
         AfetYoneticisi.donemSureciKaydet(ornek);
         MinecraftForge.EVENT_BUS.addListener(EventPriority.NORMAL, false, TickEvent.ServerTickEvent.class, ornek::tick);
     }
