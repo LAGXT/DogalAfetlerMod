@@ -2,7 +2,9 @@ package io.github.kadirberkpolat1.dogalafetler;
 
 import com.mojang.logging.LogUtils;
 import io.github.kadirberkpolat1.dogalafetler.afet.ay_carpmasi.AyCarpmasiSistemi;
+import io.github.kadirberkpolat1.dogalafetler.afet.deprem.DepremSistemi;
 import io.github.kadirberkpolat1.dogalafetler.afet.gunes_patlamasi.GunesPatlamasiSistemi;
+import io.github.kadirberkpolat1.dogalafetler.afet.sinkhole.SinkholeSistemi;
 import io.github.kadirberkpolat1.dogalafetler.balikcilik.Balikcilik;
 import io.github.kadirberkpolat1.dogalafetler.basarim.Basarim;
 import io.github.kadirberkpolat1.dogalafetler.config.AyarKaydi;
@@ -55,6 +57,8 @@ public final class DogalAfetler {
         // afeti kayıtlı türü atlar; tersi sırada gerçek kayıt "zaten kayıtlı" ile modu düşürür (K-E22).
         GunesPatlamasiSistemi.kaydet(modBus);
         AyCarpmasiSistemi.kaydet(modBus);
+        DepremSistemi.kaydet(modBus);
+        SinkholeSistemi.kaydet();
         OyunTestiAfeti.ozelliktenKaydet();
         SuAyarlari.kaydet();
         SanalSu.kaydet();

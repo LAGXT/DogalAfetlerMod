@@ -1,0 +1,24 @@
+Dosya: src/main/resources/assets/dogalafetler/sounds/sinkhole_cokus.ogg (42789 bayt, 6.0 sn, mono, 48000 Hz, Vorbis q5)
+Hedef (docs/tasarim/ses.md §4): -22.0 LUFS ±1, gerçek tepe <= -6.0 dBTP, baskın frekans 18–60 Hz, 2500 Hz üstü <= -30 dB
+Ölçülen (ogg): I = -22.0 LUFS, gerçek tepe = -7.4 dBTP
+Baskın frekanslar (20 Hz kümeleri, güçlüden zayıfa): 20 Hz, 60 Hz, 80 Hz
+Perde izi (0,5 sn pencerelerde en güçlü frekans, ilk 20): 30, 26, 24, 22, 22, 22, 22, 58, 22, 42, 44, 44 Hz
+Bant enerjisi / toplam: 18–60 Hz -0.6 dB; 300–3400 Hz (konuşma) -16.4 dB; >2500 Hz -76.4 dB; >8000 Hz -87.1 dB
+Döngü dikişi: |ilk - son| / en büyük iç adım = 0.084 (<= 1 ise süreksizlik yok); ilk örnek = +0.00180
+Hedefle karşılaştırma: UYGUN
+
+ffmpeg -i sinkhole_cokus.ogg -af ebur128=peak=true -f null -
+Summary:
+
+  Integrated loudness:
+    I:         -22.0 LUFS
+    Threshold: -33.4 LUFS
+
+  Loudness range:
+    LRA:        10.0 LU
+    Threshold: -44.6 LUFS
+    LRA low:   -31.1 LUFS
+    LRA high:  -21.1 LUFS
+
+  True peak:
+    Peak:       -7.4 dBFS
