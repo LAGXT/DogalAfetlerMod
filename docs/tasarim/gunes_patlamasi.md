@@ -87,3 +87,15 @@ Kaynaklar:
 | Buharlaşma derinliği | 0 → 6 blok, 5 gün boyunca doğrusal |
 
 - **Teknik risk:** "gündüz de karanlık" yalnız görsel olmalı (madde 16). Işık motoru değişmediğinden blok ışığı gündüz aydınlık kalır; karanlık hissi sis rengi + gökyüzü + `adjustLightmapColors` ile ışık haritası renk tonlaması verilebilir. `adjustLightmapColors` yalnız renk çıktısını değiştirir, ışık değerlerini, mob spawn'u ve vanilla mantığını değiştirmez; bu yorum KARARLAR'a yazılmalı.
+
+## 7. Uygulama notları (Faz 4, 2026-11-06; kararlar `.vibe/kararlar/gunes-patlamasi-kizil-cuce.md` §B)
+
+- **Siren büyümesi evre ilerlemesiyle (GP1):** güneş SIREN başında BÜYÜYEN olur; ilerleme siren boyunca `0,273·τ²`
+  (gökyüzü ölçeği `1 + 2,2·p` → 1,0 → 1,6 kat), AKTIF'in 5 gününde 0,273 → 1 doğrusal (1,6 → 3,2 kat). Sıcaklık aynı
+  ilerlemeyi okur: artış 18 iken 1. gün sonu +7,6, 5. gün +18 (§6'daki "1. gün +6 → 5. gün +18"e yakın).
+- **Meteor boyu (GP3):** meteor API'sinde iki boy var; %5 büyük, kalanı küçük (§6'daki "orta" küçük sayılır). Yoğunluk
+  dakikalık ardışık yağmurlarla 1/40 sn → 1/12 sn.
+- **Kavrulma (GP6):** güneşe açık (yaprak/çatı altı değil) çimen 3. günden sonra kaba toprağa döner; yaprak rengi
+  (istemci `ColorResolver`) yapılmadı.
+- **Yapılmayan istemci ekleri (GP10):** aurora perdesi, ısı dalgalanması, çarpma beyaz örtüsü, süpernova/kavrulma/kızıl cüce
+  sesleri ve vitrin kareleri bu turda yok; görüntü ortak gökyüzü, meteor, donma ve uyarı çizicilerindendir.
