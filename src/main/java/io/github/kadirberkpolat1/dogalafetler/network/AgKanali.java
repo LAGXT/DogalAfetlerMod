@@ -39,7 +39,7 @@ import net.minecraftforge.network.simple.SimpleChannel;
  * {@link #PROTOKOL_SURUMU}'nu bir kez artırır (K-C47).
  */
 public final class AgKanali {
-    public static final String PROTOKOL_SURUMU = "5";
+    public static final String PROTOKOL_SURUMU = "6";
 
     public static final SimpleChannel KANAL = NetworkRegistry.newSimpleChannel(
             DogalAfetler.konum("ana"),

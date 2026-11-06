@@ -358,7 +358,10 @@ değişince istemci ve sunucu sürümü uyuşmalıdır (K0-07, K-C33). Birden ç
 birleştirmede çakışırdı (sıcaklık S-19, uyarı, yangın §E). Kural (çekirdek sözleşmesi §9): paket ekleyen dal
 `PROTOKOL_SURUMU`'nu artırmaz; entegratör birleştirmede bir kez artırır. Faz 2b'de "3" → "4" (`d62d796`): `sicaklik/durum`,
 `su/durum`, `uyari/ortam`, `uyari/ortam_durdur`, `uyari/siren`, `uyari/siren_durdur`, `yangin/ates_durumu` eklendi; log
-`9 ağ paketi kaydedildi (protokol 4)` (`.vibe/kanit/entegrasyon-2b/gametest-4.log` ve yedi dedicated senaryo).
+`9 ağ paketi kaydedildi (protokol 4)` (`.vibe/kanit/entegrasyon-2b/gametest-4.log` ve yedi dedicated senaryo). Faz 3: "5" (K-E17 d).
+**Faz 4 notu (ay, entegrasyon 4 2/6):** "5" → "6", Faz 4'te tek sefer: paket kümesi aynı (12 paket), ama ay `DonemPaketi`'nin tel
+biçimine `long ayOlaySaati` ekledi (+8 bayt, sonda); eski istemci yeni paketi okuyamaz. Diğer beş Faz 4 dalı paket eklemedi,
+artırmaz.
 
 **K-C48 `/dogalafet asama ileri [süreç]`.** Donma K-D31: donma ve buharlaşma süreçlerinin ayrık aşaması yok; argümansız
 `asama ileri` ilk dolu çıktıyı veren süreci ilerlettiği için, birden çok süreç sürerken (güneş zinciri, donma, buharlaşma, deniz)
