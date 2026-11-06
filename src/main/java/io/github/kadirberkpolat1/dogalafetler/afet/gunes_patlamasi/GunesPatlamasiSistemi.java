@@ -1,6 +1,5 @@
 package io.github.kadirberkpolat1.dogalafetler.afet.gunes_patlamasi;
 
-import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetKaydi;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import net.minecraftforge.eventbus.api.IEventBus;
@@ -11,17 +10,13 @@ public final class GunesPatlamasiSistemi {
     }
 
     /**
-     * {@code OyunTestiAfeti.ozelliktenKaydet()}'ten sonra çağrılmalı: çekirdeğin yaşam döngüsü taklidi
-     * ({@code -PoyunTestiAfeti=...,gunes_patlamasi}, yalnız senaryo) türü almışsa gerçek afet kaydedilmez (iki kayıt hatadır;
-     * gökyüzü G15 ile aynı yol). Config bölümü ve sesler her durumda kaydedilir.
+     * Config bölümü, sesler ve afet kaydı. {@code OyunTestiAfeti.ozelliktenKaydet()}'ten önce çağrılır (K-E22): çekirdeğin
+     * yaşam döngüsü taklidi ({@code -PoyunTestiAfeti=...,gunes_patlamasi}) bu türü artık uyarıyla atlar ve onunla birlikte
+     * {@code OyunTestiSureci} de kaydedilmez; güneş zinciri her zaman gerçek afetten başlar.
      */
     public static void kaydet(IEventBus modBus) {
         GunesPatlamasiAyarlari.kaydet();
         GunesPatlamasiSesleri.kaydet(modBus);
-        if (AfetKaydi.kayitliMi(AfetTuru.GUNES_PATLAMASI)) {
-            DogalAfetler.LOGGER.warn("Güneş patlaması türü zaten kayıtlı (oyun testi taklidi); gerçek afet kaydedilmedi");
-            return;
-        }
         AfetKaydi.kaydet(AfetTuru.GUNES_PATLAMASI, GunesPatlamasi::new);
     }
 }
