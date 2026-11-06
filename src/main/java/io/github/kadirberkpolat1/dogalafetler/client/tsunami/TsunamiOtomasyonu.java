@@ -102,16 +102,18 @@ public final class TsunamiOtomasyonu {
 
     /**
      * FPS kabulü (TS-12, K0-33 ölçüsü): aynı vitrin kamerasından, verilen efekt kalitesiyle önce afetsiz taban, sonra S5'in
-     * karadaki penceresi (AKTİF'in 620. tick'i, normal koşudaki "karada" penceresiyle aynı). {@code ayar} adımları (blok hasarı
-     * kapalı, yağmur kapalı) kök neden ayrıştırması içindir; afetten önce uygulanır, sonra geri alınır.
+     * karadaki penceresi (AKTİF'in 620. tick'i, normal koşudaki "karada" penceresiyle aynı), sonra {@code stop}'tan 200 tick
+     * sonra afetsiz "sonra" tabanı: yıkılan köy kameranın görüş hattını açar ve vanilla daha çok bölüm çizer (ölçüm 7'de
+     * görünür bölüm 456 → 1343); bu taban afetin çalışma maliyetini dünyanın değişen geometrisinden ayırır. {@code ayar}
+     * adımları (blok hasarı kapalı, yağmur kapalı) kök neden ayrıştırması içindir; afetten önce uygulanır, sonra geri alınır.
      */
     private static List<String> olcum(String ad, EfektKalitesi kalite, List<String> ayar, List<String> geri) {
         List<String> a = new ArrayList<>(List.of("q:" + kalite.name(), "k:dogalafet su vitrin", "b:300", "k:time set 10500",
                 "k:dogalafet su vitrin kamera tepe", "b:200", "f:" + ad + "-afetsiz"));
         a.addAll(ayar);
         a.addAll(List.of("k:dogalafet start tsunami 5", "b:20", "k:dogalafet asama ileri", "b:20",
-                "k:dogalafet asama ileri", "b:620", "f:" + ad + "-karada", "s:" + ad + "-karada", "k:dogalafet stop", "b:60",
-                "k:dogalafet su temizle", "b:40"));
+                "k:dogalafet asama ileri", "b:620", "f:" + ad + "-karada", "s:" + ad + "-karada", "k:dogalafet stop", "b:200",
+                "f:" + ad + "-sonra", "k:dogalafet su temizle", "b:40"));
         a.addAll(geri);
         return a;
     }
@@ -173,13 +175,10 @@ public final class TsunamiOtomasyonu {
             a.add("q:YUKSEK");
         }
         if (BOLUM.contains("tekrar")) {
-            // K0-33 ölçüsü Yüksek: her sahne yeni kumsal olduğu için tek ölçüm gürültülü; bölüm bütçesi 2 ve 1 dönüşümlü ikişer kez.
+            // K0-33 ölçüsü Yüksek: her sahne yeni kumsal olduğu için tek ölçüm gürültülü; varsayılan ayarlarla üç kez.
             a.addAll(List.of("k:dogalafet su vitrin", "b:300", "k:dogalafet su vitrin kamera tepe", "b:600"));
-            for (int i = 1; i <= 2; i++) {
-                for (int b : new int[] {2, 1}) {
-                    a.addAll(olcum("tsunami-olc-yuksek-bolum" + b + "-" + i, EfektKalitesi.YUKSEK,
-                            List.of("c:tsunami.yikimBolumTick=" + b), List.of("c:tsunami.yikimBolumTick=2")));
-                }
+            for (int i = 1; i <= 3; i++) {
+                a.addAll(olcum("tsunami-olc-yuksek-" + i, EfektKalitesi.YUKSEK, List.of(), List.of()));
             }
         }
         if (hepsi || BOLUM.contains("avci")) {
