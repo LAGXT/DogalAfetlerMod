@@ -34,9 +34,9 @@ import net.minecraftforge.fml.util.ObfuscationReflectionHelper;
  * üç konum (gizliler ortada tam görünür). Sahne komutları entegre sunucunun konsol kaynağından çıktısız verilir:
  * sohbete komut satırı (başarı ya da hata) düşmez; sohbet kareden önce temizlenir (A-33). Toast üreten komuttan önce
  * istemci en az {@value #AKICI_FPS} FPS çizmeli ve toast karesi ancak toast'ın kayma süresi boyunca gerçekten kare
- * çizildikten sonra alınır: görünmeyen workspace'te FPS 1'e düşünce framebuffer bayat kalıyordu (koşu 2). Sekme
- * açılmadan istemcinin iç imleç konumu pencerenin köşesine alınır (ipucu kutusu sekmeyi karartmasın). Klavye, fare
- * ve tekerlek girdileri kapanışa kadar sayılır; kendi açmadığı duraklatma ekranını kapatır.
+ * çizildikten sonra alınır: görünmeyen workspace'te FPS 1'e düşünce framebuffer bayat kalıyordu (A-34). Sekme
+ * açıldıktan sonra istemcinin iç imleç konumu pencerenin köşesine alınır (ipucu kutusu sekmeyi karartmasın). Klavye,
+ * fare ve tekerlek girdileri kapanışa kadar sayılır; kendi açmadığı duraklatma ekranını kapatır.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class BasarimOtomasyonu {
@@ -56,9 +56,10 @@ public final class BasarimOtomasyonu {
     private static int sayac;
     private static int adim = -1;
     private static int adimTick;
-    /** Çizilen kare sayısı ({@code RenderTickEvent}) ve adımın başındaki değeri. */
+    /** Çizilen kare sayısı ({@code RenderTickEvent}), adımın başındaki değeri ve biten adımda çizilen kare. */
     private static int kareSayaci;
     private static int adimKaresi;
+    private static int oncekiAdimKaresi;
 
     private BasarimOtomasyonu() {
     }
@@ -136,6 +137,7 @@ public final class BasarimOtomasyonu {
             }
             adim++;
             adimTick = 0;
+            oncekiAdimKaresi = kareSayaci - adimKaresi;
             adimKaresi = kareSayaci;
             if (adim < ADIMLAR.size()) {
                 ADIMLAR.get(adim).is().run();
@@ -295,9 +297,9 @@ public final class BasarimOtomasyonu {
     }
 
     private static void sekmeyiAc(Minecraft mc) {
-        imleciKenaraAl(mc);
         ClientAdvancements liste = mc.player.connection.getAdvancements();
         mc.setScreen(new AdvancementsScreen(liste));
+        imleciKenaraAl(mc);
         Advancement kok = liste.getAdvancements().get(KOK);
         if (kok != null) {
             liste.setSelectedTab(kok, true);
@@ -307,8 +309,9 @@ public final class BasarimOtomasyonu {
 
     /**
      * İstemcinin iç imleç konumunu pencerenin sol üst köşesine alır: sabit imleç bir widget'ın üstünde kalırsa vanilla
-     * ipucu kutusu çıkar ve sekmeyi karartır. Gerçek imlece ve sahibin oturumuna dokunmaz (yalnız {@code MouseHandler}
-     * alanı; SRG adları {@code build/createSrgToMcp/output.srg}).
+     * ipucu kutusu çıkar ve sekmeyi karartır. Ekran açıldıktan sonra çağrılır: {@code setScreen} →
+     * {@code releaseMouse} konumu pencere ortasına geri alır. Gerçek imlece ve sahibin oturumuna dokunmaz (yalnız
+     * {@code MouseHandler} alanı; SRG adları {@code build/createSrgToMcp/output.srg}).
      */
     private static void imleciKenaraAl(Minecraft mc) {
         ObfuscationReflectionHelper.setPrivateValue(MouseHandler.class, mc.mouseHandler, 0.0, "f_91507_");
@@ -326,7 +329,7 @@ public final class BasarimOtomasyonu {
     private static void kare(Minecraft mc, String ad) {
         String dosya = "basarim_" + ad + ".png";
         Screenshot.grab(mc.gameDirectory, dosya, mc.getMainRenderTarget(), mesaj -> { });
-        DogalAfetler.LOGGER.info(ON + "kare {} (FPS {}, adımda çizilen kare {}, ekran {})", dosya, mc.getFps(),
-                kareSayaci - adimKaresi, mc.screen == null ? "yok" : mc.screen.getClass().getSimpleName());
+        DogalAfetler.LOGGER.info(ON + "kare {} (FPS {}, önceki adımda çizilen kare {}, ekran {})", dosya, mc.getFps(),
+                oncekiAdimKaresi, mc.screen == null ? "yok" : mc.screen.getClass().getSimpleName());
     }
 }
