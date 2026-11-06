@@ -223,6 +223,7 @@
   "commands.dogalafetler.yok": "yok",
   "death.attack.dogalafetler.asiri_isinma": "%1$s sıcak çarpmasından öldü",
   "death.attack.dogalafetler.asiri_isinma.player": "%1$s, %2$s ile savaşırken sıcak çarpmasından öldü",
+  "death.attack.dogalafetler.asit": "%1$s asit yağmurunda eridi",
   "death.attack.dogalafetler.donma": "%1$s donarak öldü",
   "death.attack.dogalafetler.donma.player": "%1$s, %2$s ile savaşırken donarak öldü",
   "donem_sureci.dogalafetler.buharlasma": "Buharlaşma",
