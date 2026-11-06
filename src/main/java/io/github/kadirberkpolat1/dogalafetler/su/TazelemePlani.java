@@ -17,7 +17,7 @@ public final class TazelemePlani {
 
     private final int yakinYaricap;
     private final int periyot;
-    private final int uzakButce;
+    private int uzakButce;
     private long sonTick = Long.MIN_VALUE;
     private int imlec;
 
@@ -25,6 +25,11 @@ public final class TazelemePlani {
         this.yakinYaricap = yakinYaricap;
         this.periyot = periyot;
         this.uzakButce = uzakButce;
+    }
+
+    /** Uzak chunk bütçesini değiştirir (config). */
+    public void uzakButce(int butce) {
+        uzakButce = Math.max(0, butce);
     }
 
     /**

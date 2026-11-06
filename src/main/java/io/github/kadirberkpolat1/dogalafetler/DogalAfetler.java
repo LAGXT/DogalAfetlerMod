@@ -10,6 +10,8 @@ import io.github.kadirberkpolat1.dogalafetler.core.OyunTestiAfeti;
 import io.github.kadirberkpolat1.dogalafetler.komut.CekirdekKomutlari;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import io.github.kadirberkpolat1.dogalafetler.network.AgKanali;
+import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
+import io.github.kadirberkpolat1.dogalafetler.su.SuAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.veri.DataGenerators;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.eventbus.api.IEventBus;
@@ -38,6 +40,8 @@ public final class DogalAfetler {
         SunucuAyarlari.kaydet();
         IstemciAyarlari.kaydet();
         OyunTestiAfeti.ozelliktenKaydet();
+        SuAyarlari.kaydet();
+        SanalSu.kaydet();
 
         DataGenerators.ceviriEkle(CekirdekCevirileri::yaz);
         DataGenerators.ceviriEkle(Kurallar::cevirileriYaz);
