@@ -75,6 +75,7 @@ public final class SuRenderer {
     private static final float[] VSX = new float[(N + 1) * (N + 1)];
     private static final float[] VSZ = new float[(N + 1) * (N + 1)];
     private static final SuAraliklari A = new SuAraliklari();
+    private static final SuAraliklari A_KOMSU = new SuAraliklari();
     private static final BufferBuilder BB = new BufferBuilder(1 << 21);
     /** Yakın halkanın kendi kurucusu: yapım birkaç tick'e yayılırken uzak LOD kurulumu araya girebilir. */
     private static final BufferBuilder BB_YAKIN = new BufferBuilder(1 << 21);
@@ -745,6 +746,7 @@ public final class SuRenderer {
                 golgele(renk(l, gx, gz), 0.72f, mx, y, mz, esX, esZ, tamIsik);
                 int lodRenk = gRenk;
                 float lodAlfa = gAlfa;
+                double dalgaH = 0;
                 for (Dalga w : d.dalgaDizisi()) {
                     // Uzakta da dalga tepesi okunsun: cepheye 0..5 blok karolar beyaz köpük, gövde turkuaz.
                     double h = w.yuzey(mx, mz, saat);
@@ -753,13 +755,46 @@ public final class SuRenderer {
                         float kp = s < 5 ? (float) Math.max(0, 0.9 * (1 - Math.abs(s - 2.5) / 2.5)) : 0;
                         lodRenk = karistir(karistir(lodRenk, 0x3E8F94, (float) Math.min(0.6, (h - w.taban()) / 8)), 0xFFFFFF, kp);
                         lodAlfa = Math.max(lodAlfa, 0.6f + 0.35f * kp);
+                        dalgaH = Math.max(dalgaH, h - w.taban());
                     }
                 }
                 dortgenUst(gx - uzakOx, gz - uzakOz, LOD, y, y, y, y, lodRenk, lodAlfa, gIsik);
+                if (dalgaH > 1) {
+                    lodEtek(d, gx, gz, y, lodRenk, Math.max(0.8f, lodAlfa), gIsik);
+                }
             }
         }
         uzakDortgen = dortgen;
         uzakBos = !yukle(BB, false);
+    }
+
+    /**
+     * Uzak LOD'da dalga gövdesinin dikey cephesi (SU-37): karonun komşu karodan 1 bloktan fazla yüksek kenarına etek; yoksa
+     * yakın halkanın dışındaki dalga yalnız yatay karolar olarak çizilir ve önden bakınca duvar görünmez. Yalnız dalga
+     * karolarında komşu sorgusu yapılır.
+     */
+    private static void lodEtek(SanalSuDunyasi d, int gx, int gz, float y, int renk, float alfa, int isik) {
+        float rx = gx - uzakOx;
+        float rz = gz - uzakOz;
+        for (int q = 0; q < 4; q++) {
+            int nx = gx + DI[q] * LOD + LOD / 2;
+            int nz = gz + DJ[q] * LOD + LOD / 2;
+            d.araliklar(nx, nz, saat, A_KOMSU);
+            float komsu = A_KOMSU.adet() == 0 ? (float) d.alan().zemin(nx, nz) : (float) A_KOMSU.ust(A_KOMSU.adet() - 1) - 0.16f;
+            if (A_KOMSU.adet() == 0 && d.alan().zemin(nx, nz) == Integer.MIN_VALUE) {
+                komsu = y - 8;
+            }
+            if (y - komsu < 1) {
+                continue;
+            }
+            int c = carp(renk, q < 2 ? 0.75f : 0.9f);
+            switch (q) {
+                case 0 -> dikey(rx + LOD, rz, rx + LOD, rz + LOD, komsu, y, c, alfa, isik);
+                case 1 -> dikey(rx, rz, rx, rz + LOD, komsu, y, c, alfa, isik);
+                case 2 -> dikey(rx, rz + LOD, rx + LOD, rz + LOD, komsu, y, c, alfa, isik);
+                default -> dikey(rx, rz, rx + LOD, rz, komsu, y, c, alfa, isik);
+            }
+        }
     }
 
     /** Kurucuyu ilgili tampona yükler; boşsa {@code false}. */

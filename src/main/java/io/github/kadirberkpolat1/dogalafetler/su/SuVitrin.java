@@ -179,8 +179,8 @@ final class SuVitrin {
                 egim = -12f;
             }
             default -> {
-                // Tsunami vitrini, geniş plan: dalga ekseninde, evlerin arkasından ve üstünden denize bakar; dalga kıyıya 25-30
-                // blok kala duvar kadrajın ortasında, öndeki çatılar ölçek verir (tasarım notu: dalga bir evden belirgin büyük).
+                // Tsunami vitrini, geniş plan: dalga ekseninde, evlerin arkasından ve üstünden denize bakar; dalga kıyıya ~15
+                // blok kala duvar kadrajın ortasında (uzak LOD cephesi, SU-37), öndeki çatılar ölçek verir (tasarım notu).
                 x = s.wx(30, 4);
                 z = s.wz(30, 4);
                 l.getChunk((int) Math.floor(x) >> 4, (int) Math.floor(z) >> 4);
