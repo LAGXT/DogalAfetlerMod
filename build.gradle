@@ -33,6 +33,12 @@ minecraft {
             workingDirectory project.file('run')
             property 'forge.logging.markers', 'REGISTRIES'
             property 'forge.logging.console.level', 'info'
+            // Uyumluluk modlarının mixin refmap'i SRG adlıdır; geliştirme ortamında resmi adlara çevrilmezse hedefler
+            // kayar (Cold Sweat 2.4.5'in required_mods filtresi çalışmaz, dünya kayıt hatasıyla açılmaz).
+            if (uyum != 'yok') {
+                property 'mixin.env.remapRefMap', 'true'
+                property 'mixin.env.refMapRemappingFile', "${projectDir}/build/createSrgToMcp/output.srg"
+            }
 
             mods {
                 "${mod_id}" {
@@ -46,6 +52,13 @@ minecraft {
             // Quick Play: -PquickPlay=<run/saves altındaki dünya klasörü>, ör. -PquickPlay=test
             if (project.hasProperty('quickPlay')) {
                 args '--quickPlaySingleplayer', project.property('quickPlay').toString()
+            }
+            // Çok oyunculu/ekran otomasyonu: -PkullaniciAdi=A (oyuncu adı), -PquickPlaySunucu=localhost:25565 (doğrudan giriş).
+            if (project.hasProperty('kullaniciAdi')) {
+                args '--username', project.property('kullaniciAdi').toString()
+            }
+            if (project.hasProperty('quickPlaySunucu')) {
+                args '--quickPlayMultiplayer', project.property('quickPlaySunucu').toString()
             }
         }
 
@@ -96,6 +109,8 @@ dependencies {
     if (uyum == 'coldsweat' || uyum == 'ikisi') {
         runtimeOnly fg.deobf("maven.modrinth:cold-sweat:${coldsweat_surum}")
     }
+    // Sıcaklık sisteminin Cold Sweat köprüsü (N8): API yalnız derlemede; mods.toml'da isteğe bağlı bağımlılık.
+    compileOnly fg.deobf("maven.modrinth:cold-sweat:${coldsweat_surum}")
 
     testImplementation platform("org.junit:junit-bom:${junit_surum}")
     testImplementation 'org.junit.jupiter:junit-jupiter'
