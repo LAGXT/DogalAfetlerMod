@@ -85,10 +85,14 @@
   "gunes_evresi.dogalafetler.normal": "Normal sun",
   "gunes_evresi.dogalafetler.supernova": "Supernova",
   "mod.dogalafetler.ad": "Natural Disasters",
+  "options.dogalafetler.sirenler": "Sirens",
+  "options.dogalafetler.sirenler.aciklama": "Disaster siren volume, on top of Master Volume. Same setting as uyari.sirenSes in dogalafetler-client.toml.",
   "seviye.dogalafetler.0": "Unleveled",
   "seviye.dogalafetler.1": "Light",
   "seviye.dogalafetler.2": "Moderate",
   "seviye.dogalafetler.3": "Severe",
   "seviye.dogalafetler.4": "Destructive",
-  "seviye.dogalafetler.5": "Catastrophic"
+  "seviye.dogalafetler.5": "Catastrophic",
+  "subtitles.dogalafetler.ortam_test": "Distant rumble",
+  "subtitles.dogalafetler.siren": "Siren wails"
 }

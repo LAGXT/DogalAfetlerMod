@@ -43,9 +43,19 @@ minecraft {
 
         client {
             property 'forge.enabledGameTestNamespaces', mod_id
+            // Entegre sunucuda yaşam döngüsü sınama afeti (core.OyunTestiAfeti), ör. -PoyunTestiAfeti=deprem.
+            if (project.hasProperty('oyunTestiAfeti')) {
+                property 'dogalafetler.oyunTestiAfeti', project.property('oyunTestiAfeti').toString()
+            }
             // Quick Play: -PquickPlay=<run/saves altındaki dünya klasörü>, ör. -PquickPlay=test
             if (project.hasProperty('quickPlay')) {
                 args '--quickPlaySingleplayer', project.property('quickPlay').toString()
+            }
+            // İstemci otomasyonu (K0-21 rev. 2): -Potomasyon=su senaryoyu koşar, ekran görüntüsü alır, oyunu kapatır.
+            if (project.hasProperty('otomasyon')) {
+                property 'dogalafetler.otomasyon', project.property('otomasyon').toString()
+                property 'dogalafetler.otomasyon.bolum', (project.findProperty('otomasyonBolum') ?: 'hepsi').toString()
+                args '--width', '1280', '--height', '720'
             }
         }
 
