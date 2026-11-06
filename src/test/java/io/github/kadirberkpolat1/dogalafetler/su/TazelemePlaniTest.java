@@ -1,0 +1,153 @@
+package io.github.kadirberkpolat1.dogalafetler.su;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.HashSet;
+import java.util.Set;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+
+class TazelemePlaniTest {
+    private static long a(int cx, int cz) {
+        return DenizAlani.anahtar(cx, cz);
+    }
+
+    /** {@code (0,0)} merkezli 9x9 chunk. */
+    private static long[] kare9() {
+        long[] s = new long[81];
+        int i = 0;
+        for (int x = -4; x <= 4; x++) {
+            for (int z = -4; z <= 4; z++) {
+                s[i++] = a(x, z);
+            }
+        }
+        return s;
+    }
+
+    private static Set<Long> kume(long[] dizi) {
+        Set<Long> s = new HashSet<>();
+        for (long k : dizi) {
+            s.add(k);
+        }
+        return s;
+    }
+
+    @Test
+    void yakinHalkaHerPeriyottaTamamenSecilir() {
+        TazelemePlani plan = new TazelemePlani(2, 20, 4);
+        long[] odak = {a(0, 0)};
+        for (long t = 0; t <= 100; t += 20) {
+            Set<Long> secilen = kume(plan.sec(t, odak, kare9()));
+            for (int x = -2; x <= 2; x++) {
+                for (int z = -2; z <= 2; z++) {
+                    assertTrue(secilen.contains(a(x, z)), "t=" + t + " yakın (" + x + "," + z + ") seçilmedi");
+                }
+            }
+            assertEquals(25 + 4, secilen.size(), "yakın halka + uzak bütçe");
+        }
+    }
+
+    @Test
+    void periyotDolmadanBosDoner() {
+        TazelemePlani plan = new TazelemePlani(2, 20, 4);
+        long[] odak = {a(0, 0)};
+        assertTrue(plan.sec(100, odak, kare9()).length > 0);
+        assertEquals(0, plan.sec(105, odak, kare9()).length);
+        assertEquals(0, plan.sec(119, odak, kare9()).length);
+        assertTrue(plan.sec(120, odak, kare9()).length > 0);
+        assertTrue(plan.sec(50, odak, kare9()).length > 0, "zaman geri giderse (yeni dünya) yeniden başlar");
+    }
+
+    @Test
+    void uzakChunklarButceyleDonusumluHepsiKapsanir() {
+        TazelemePlani plan = new TazelemePlani(2, 20, 4);
+        long[] odak = {a(0, 0)};
+        Set<Long> uzak = new HashSet<>();
+        int periyot = 0;
+        while (uzak.size() < 81 - 25 && periyot < 100) {
+            for (long k : plan.sec(periyot * 20L, odak, kare9())) {
+                int cx = (int) (k >> 32);
+                int cz = (int) k;
+                if (Math.abs(cx) > 2 || Math.abs(cz) > 2) {
+                    uzak.add(k);
+                }
+            }
+            periyot++;
+        }
+        assertEquals(56, uzak.size());
+        assertEquals(14, periyot, "56 uzak chunk / 4 bütçe = 14 periyot");
+    }
+
+    @Test
+    void istenmeyenChunkSecilmez() {
+        TazelemePlani plan = new TazelemePlani(2, 20, 4);
+        long[] istenen = {a(0, 0), a(1, 0), a(9, 9)};
+        Set<Long> secilen = kume(plan.sec(0, new long[] {a(0, 0)}, istenen));
+        assertEquals(Set.of(a(0, 0), a(1, 0), a(9, 9)), secilen);
+        assertEquals(0, plan.sec(20, new long[] {a(0, 0)}, new long[0]).length);
+    }
+
+    @Test
+    void birdenCokOdakYakinHalkalariBirlestirir() {
+        TazelemePlani plan = new TazelemePlani(1, 20, 0);
+        long[] odak = {a(-3, 0), a(3, 0)};
+        Set<Long> secilen = kume(plan.sec(0, odak, kare9()));
+        assertEquals(18, secilen.size());
+        assertTrue(secilen.contains(a(-4, -1)));
+        assertTrue(secilen.contains(a(4, 1)));
+    }
+
+    @Test
+    void okumaButcesiTicklereYayilirVeOyuncuyaGoreOlceklenir() {
+        assertEquals(4, TazelemePlani.tickButcesi(32, 1, 1.0), "32 chunk / 10 tick -> tick başına 4");
+        assertEquals(4, TazelemePlani.tickButcesi(32, 2, 1.0), "iki oyuncu aynı bütçe");
+        assertEquals(16, TazelemePlani.tickButcesi(32, 10, 1.0), "10 oyuncu: x5");
+        assertEquals(2, TazelemePlani.tickButcesi(32, 1, 0.5), "TPS kısması yarıya indirir");
+        assertEquals(1, TazelemePlani.tickButcesi(1, 0, 0.25), "en az 1");
+    }
+
+    @Test
+    void istenenlerOdagaYakindanUzagaSiralanir() {
+        java.util.List<Long> istenen = new java.util.ArrayList<>();
+        for (int x = -6; x <= 6; x++) {
+            for (int z = -6; z <= 6; z++) {
+                istenen.add(a(x, z));
+            }
+        }
+        java.util.Collections.shuffle(istenen, new java.util.Random(7));
+        long[] sirali = TazelemePlani.yakindanUzaga(istenen, new long[] {a(4, 4)});
+        assertEquals(169, sirali.length);
+        assertEquals(a(4, 4), sirali[0], "odak chunk'ı önce");
+        int onceki = 0;
+        for (long k : sirali) {
+            int m = Math.max(Math.abs((int) (k >> 32) - 4), Math.abs((int) k - 4));
+            assertTrue(m >= onceki, "mesafe azalmamalı");
+            onceki = m;
+        }
+        assertEquals(0, TazelemePlani.yakindanUzaga(java.util.List.of(), new long[0]).length);
+    }
+
+    @Test
+    @Timeout(10)
+    void yakindanUzagaIkiThreaddenAyniAndaGuvenli() throws Exception {
+        // Tek oyunculuda sunucu ve istemci thread'i aynı anda çağırır (koşu 8'de paylaşılan haritada NPE).
+        java.util.List<Long> istenen = new java.util.ArrayList<>();
+        for (int x = -12; x <= 12; x++) {
+            for (int z = -12; z <= 12; z++) {
+                istenen.add(a(x, z));
+            }
+        }
+        java.util.concurrent.ExecutorService h = java.util.concurrent.Executors.newFixedThreadPool(4);
+        java.util.List<java.util.concurrent.Future<long[]>> sonuc = new java.util.ArrayList<>();
+        for (int i = 0; i < 400; i++) {
+            sonuc.add(h.submit(() -> TazelemePlani.yakindanUzaga(istenen, new long[] {a(3, -2)})));
+        }
+        long[] ilk = sonuc.get(0).get();
+        for (java.util.concurrent.Future<long[]> f : sonuc) {
+            assertTrue(java.util.Arrays.equals(ilk, f.get()));
+        }
+        h.shutdown();
+        assertEquals(a(3, -2), ilk[0]);
+    }
+}

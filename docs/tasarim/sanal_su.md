@@ -96,3 +96,42 @@ Kaynaklar:
 - **Kapandı — bindirme:** gerçek suyla birleşimde 0,02 blok bindirme ve `AFTER_TRANSLUCENT_BLOCKS` ile aynı derinlik tamponu yeterli oldu; sis için `CHUNK_OFFSET` düzeltmesi.
 - Mixin yapılandırması: `dogalafetler.su.mixins.json` (ortak) ve `dogalafetler.client.su.mixins.json` (yalnız istemci); üretim jar'ında refmap ve `MixinConfigs` manifest girdisi.
 - **Açık:** Embeddium/Rubidium gibi sıvı render'ını değiştiren modlar yüklüyken tesselasyon mixin'i çalışmayabilir; yedek "ıslak dip" yüzeyi bu durum için saklanır.
+
+## Faz 2 güncellemesi, 2026-11-06
+
+Kaynak: `.vibe/kararlar/sanal-su.md` (§A sözleşme, SU-11…SU-37), rapor `.vibe/rapor/sanal-su.md`.
+
+- **Deniz alanı su kütlesi başına (SU-11):** spike'ın "kaynak + artış" BFS'i yerine her durgun su kütlesinden öncelikli
+  taşkın; sütun, kütleden ona giden en alçak yolun en yüksek zemini (eşik) yükselen seviyenin altındaysa dolar. Deniz
+  (yüzey ≤ deniz seviyesi) sınırsız yükselir, göl taşma ağzında durur, kıyı kumulunun arkasındaki çukur ancak su kumulu
+  aşınca dolar, 96 adım sınırı yok. Havada asılı su duvarı oluşmaz (rastgele arazi testi). §6'daki "gerçek su yüzeyinden en
+  çok 96 blok" satırı bununla geçersiz: sınır yüklü alandır.
+- **Deniz yükselmesi dönem süreci:** ay yok olunca 10 gerçek dakika (config) bekler, 5 dk'da +4 bloka (üst sınır 6, en
+  çok 8) doğrusal yükselir, kalıcıdır; `/dogalafet denizseviyesi`, `/dogalafet aysonrasi atla`; buharlaşma (N10) artışı
+  kademeli sıfıra indirir. Artış çekirdeğin `DunyaDonemi.deniz()` alanında kalıcı ve senkron.
+- **Mağara suyu:** `SanalSu.magaraDoldur(merkez, hacim, kalış)`; kalış 600 sn, kuruma 0,25 blok / 6 sn, yüzeyden buhar
+  (kalite çarpanlı), bitişte cep kutusu hash'i eşit. `asama ileri` kurumayı beklemeden ilerletir.
+- **Görünüm:** kıyı şeridinde 2 sn periyotla yalayan köpük bandı, sığda alfa 0,25 → derinde 0,85; dalgacık bileşeni ve
+  LOD mesafesi efekt kalitesine bağlı (Düşük 1 bileşen / 8 chunk … Ultra 4 bileşen).
+- **Güneş yansıması (SU-21):** dalgacık normaliyle sahte speküler, ufukta söner, gün batımında turuncu.
+- **Görünüm, tur 2 (SU-28):** köşe başına Fresnel ile gök/ufuk yansıması ve çok oktavlı eğim; kendi köpük dokumuz
+  (`su_kopuk.png`, `tools/assets/su_kopuk.py`) kıyı şeridinde, dalga tepesinde ve kırılan dudakta; tepe boyunca serpinti;
+  çekilen suyun ardında ıslak dip; su altında yüzeyden inen ışık demetleri ve ışığa bağlı turkuaz sis; mağarada
+  dalgacık, tavan ışığı parlaması ve duvar kenarında ıslak şerit.
+- **Kalıcılık (SU-24):** dalga, çekilme ve mağara cebi parametreleri dönemin `ekVeri("su")`'sunda; yeniden başlatmada
+  mağara suyu kaldığı yerden sürer (hücreler dünyadan yeniden hesaplanır).
+- **Görünüm, tur 3 (SU-35, SU-37):** mağara suyunda şader'siz tavan yansıması (dalgacıkla titreyen sıcak ışıltaşı/fener
+  parlaması) ve belirgin dalgacık; su altı ışık demetleri yumuşak kenarlı üç bant, mağarada sıcak renk ve amber sis; uzak LOD'da
+  dalga gövdesinin dikey cephesi (uzaktan da duvar okunur).
+- **Vitrin kareleri (tur 3, K0-21 rev. 2 protokolüyle):** koşu 14 → `KOK/.vibe/kanit/sanal-su/sanal-su-deniz-vitrin.png`
+  (akşam, iskelenin ucundan kıyı köyü, deniz +4; öncesi `sanal-su-deniz-once.png`), su altı `sanal-su-sualti.png`, mağara
+  `sanal-su-magara-once.png` → `sanal-su-magara.png` → `sanal-su-magara-kuruyor.png` (seviye ~1,8 blok inmiş), su altı
+  `sanal-su-magara-sualti.png`; koşu 17 (yalnız dalga bölümü) → `sanal-su-dalga-once.png` → `sanal-su-dalga.png` (16 blok,
+  iskele ekseninde ev sırasının arasından alçaktan, duvar kadraj ortasında). Gün batımı karesi yalnız tur 1'de
+  (`kosu5/sanal-su-deniz-gunbatimi.png`, eski görünüm).
+- **Ölçülen FPS, tur 3 (koşu 14, afet / afetsiz):** deniz +4 256,1 / 260,6 (%98), dalga 281,3 / 273,0 (%103), mağara 387,2 /
+  421,7 (%92); su CPU'su kare başına 0,13–0,25 ms, yakın halka kurulumu tick başına en çok 2,0–2,1 ms; sunucu TPS 20.
+- **Ölçülen FPS (ortanca kare, aynı kamera, afet / afetsiz):** koşu 12: dalga 212,9 / 221,1 (%96), mağara 120,0 / 231,0
+  (%52), deniz çifti geçersiz (afetsiz ölçüm dünya ısınırken: 95 / 225). Su CPU'su kare başına 0,26–0,48 ms; aynı makinede
+  başka işçilerin Gradle/istemci süreçleri açıktı, mutlak FPS koşudan koşuya 30–380 arasında oynadı. Sunucu TPS 20
+  (mspt 9,7–15,4). Tur 1 (koşu 4/5): deniz +4 %87/%91, dalga %101/%106, mağara %100/%56.

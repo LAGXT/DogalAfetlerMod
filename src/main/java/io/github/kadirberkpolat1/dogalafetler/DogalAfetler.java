@@ -14,6 +14,8 @@ import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import io.github.kadirberkpolat1.dogalafetler.network.AgKanali;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.Sicaklik;
 import io.github.kadirberkpolat1.dogalafetler.uyari.Uyari;
+import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
+import io.github.kadirberkpolat1.dogalafetler.su.SuAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.veri.DataGenerators;
 import io.github.kadirberkpolat1.dogalafetler.yangin.YanginSistemi;
 import net.minecraft.resources.ResourceLocation;
@@ -48,6 +50,8 @@ public final class DogalAfetler {
         GokyuzuSistemi.kaydet();
         YanginSistemi.kaydet(modBus);
         DonmaSistemi.kaydet(modBus);
+        SuAyarlari.kaydet();
+        SanalSu.kaydet();
 
         DataGenerators.ceviriEkle(CekirdekCevirileri::yaz);
         DataGenerators.ceviriEkle(Kurallar::cevirileriYaz);

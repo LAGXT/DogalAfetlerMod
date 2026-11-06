@@ -5,6 +5,11 @@ pluginManagement {
             name = 'MinecraftForge'
             url = 'https://maven.minecraftforge.net/'
         }
+        // Sanal su: MixinGradle eklentisi (Entity ve LiquidBlockRenderer kancaları, K0-25).
+        maven {
+            name = 'Sponge'
+            url = 'https://repo.spongepowered.org/repository/maven-public/'
+        }
     }
 }
 
