@@ -58,8 +58,20 @@ public final class SuOyunTestleri {
     }
 
     private static long sablonHash(GameTestHelper h) {
+        return kutuHash(h, 15, 15);
+    }
+
+    /**
+     * {@link #oda} yalnız x/z 0..13'ü kurar; şablonun 14..15 kenarı komşu sahnelere açıktır ve GameTest dünyası koşular
+     * arasında saklanır (K-C24): önceki koşudan kalan su oraya akabilir. Mağara testleri yalnız kendi sahnesini özetler.
+     */
+    private static long odaHash(GameTestHelper h) {
+        return kutuHash(h, 13, 13);
+    }
+
+    private static long kutuHash(GameTestHelper h, int x1, int z1) {
         BlockPos a = m(h, 0, 0, 0);
-        BlockPos b = m(h, 15, 11, 15);
+        BlockPos b = m(h, x1, 11, z1);
         return SanalSu.bolgeHash(h.getLevel(), Math.min(a.getX(), b.getX()), a.getY(), Math.min(a.getZ(), b.getZ()),
                 Math.max(a.getX(), b.getX()), b.getY(), Math.max(a.getZ(), b.getZ()));
     }
@@ -149,7 +161,7 @@ public final class SuOyunTestleri {
         oda(h, true);
         h.setBlock(5, 2, 5, Blocks.TORCH);
         h.setBlock(8, 2, 8, Blocks.POINTED_DRIPSTONE);
-        long hashOnce = sablonHash(h);
+        long hashOnce = odaHash(h);
         int esik = m(h, 0, 4, 0).getY();
         int id = SanalSu.magaraDoldur(l, m(h, 4, 2, 4), 4000, 40);
         h.assertTrue(id > 0, "mağara dolmadı");
@@ -164,7 +176,7 @@ public final class SuOyunTestleri {
                     for (int x = 11; x <= 15; x++) {
                         h.assertTrue(araliklar(h, x, 6).adet() == 0, "ağız/dış sütunu ıslak x=" + x);
                     }
-                    h.assertTrue(sablonHash(h) == hashOnce, "dolu mağarada hash değişti");
+                    h.assertTrue(odaHash(h) == hashOnce, "dolu mağarada hash değişti");
                     komut(h, "dogalafet hiz 50");
                 })
                 .thenWaitUntil(() -> {
@@ -182,7 +194,7 @@ public final class SuOyunTestleri {
                     DogalAfetler.LOGGER.info("Sanal su GameTest: mağara kuruma seviyeleri {}", seviyeler);
                     h.assertTrue(seviyeler.size() >= 3, "seviye kademeli düşmedi: " + seviyeler);
                     h.assertTrue(araliklar(h, 4, 4).adet() == 0, "mağara bitti ama su kaldı");
-                    h.assertTrue(sablonHash(h) == hashOnce, "kurumadan sonra şablon hash'i değişti");
+                    h.assertTrue(odaHash(h) == hashOnce, "kurumadan sonra şablon hash'i değişti");
                 })
                 .thenSucceed();
     }
