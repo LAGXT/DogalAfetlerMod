@@ -17,9 +17,11 @@ import net.minecraftforge.common.Tags;
 
 /**
  * Yıkım koreografisi (tasarım notu §2): cephe ilerledikçe önündeki 3 blokluk şeridin sütunları kuyruğa girer; sütun taraması
- * dalga tepesinden tabanın bir altına kadar yıkılabilir blokları sınıfına göre gecikmeyle sıraya koyar: önce yaprak, bitki, çit,
- * cam (anında), sonra ahşap (0,3 sn), sonra taş yapı (0,6 sn, yalnız S4–5). Doğal arazi (toprak, kum, taş), sıvı içeren ve blok
- * varlıklı (sandık, tabela) bloklar yıkılmaz. Kırılan bloğun %30'u eşya bırakır (dalga onu sürükler); tick başına en çok 6 kırılma
+ * dalga tepesinden tabanın bir altına kadar yıkılabilir blokları sınıfına göre gecikmeyle sıraya koyar: önce yaprak, çit, cam,
+ * halı (anında), sonra ahşap (0,3 sn), sonra taş yapı (0,6 sn, yalnız S4–5). Doğal arazi (toprak, kum, taş), çimen ve çiçek
+ * gibi bitkiler, sıvı içeren ve blok varlıklı (sandık, tabela) bloklar yıkılmaz (her kırılan blok istemcide bölüm yeniden derler;
+ * çayırı düzlemek S5'te FPS'i ve TPS'i çökertti). Kırılan ahşap/taş bloğun %30'u eşya bırakır (dalga onu sürükler), tick
+ * başına en çok {@value #DUSURME_TICK}, afet başına {@code 16·seviye}; tick başına en çok 6 kırılma
  * efekti (ses + parçacık). Her değişen chunk için {@link SanalSu#chunkDegisti}. Tarama sırasında dalgaya açılan mağara ağızları
  * (doğal tavanlı, göğü görmeyen, yanında açık hava olan hücre) afete bildirilir.
  */
@@ -44,6 +46,7 @@ final class TsunamiYikimi {
     static final int KOLON_BUTCESI = 192;
     static final int EFEKT_SINIRI = 6;
     static final double DUSURME_ORANI = 0.3;
+    static final int DUSURME_TICK = 2;
     private static final double ADIM = 0.7;
 
     private final ArrayDeque<Kolon> kolonlar = new ArrayDeque<>();
@@ -53,6 +56,7 @@ final class TsunamiYikimi {
     private final LongOpenHashSet degisenChunk = new LongOpenHashSet();
     private long toplamKirilan;
     private long toplamTaranan;
+    private int toplamDusen;
 
     long toplamKirilan() {
         return toplamKirilan;
@@ -111,15 +115,20 @@ final class TsunamiYikimi {
         }
         int kirilan = 0;
         int efekt = 0;
+        int dusen = 0;
         for (ArrayDeque<Is> kuyruk : isler) {
             while (kirilan < butce && !kuyruk.isEmpty() && kuyruk.peek().hazir() <= simdi) {
                 m.set(kuyruk.poll().konum());
                 BlockState s = l.getBlockState(m);
-                if (!blokHasari || sinif(l, m, s, sv) == null) {
+                Sinif c = blokHasari ? sinif(l, m, s, sv) : null;
+                if (c == null) {
                     continue;
                 }
-                if (l.getRandom().nextDouble() < DUSURME_ORANI) {
+                if (c != Sinif.HAFIF && dusen < DUSURME_TICK && toplamDusen < 16 * sv.seviye()
+                        && l.getRandom().nextDouble() < DUSURME_ORANI) {
                     Block.dropResources(s, l, m);
+                    dusen++;
+                    toplamDusen++;
                 }
                 if (efekt++ < EFEKT_SINIRI) {
                     l.levelEvent(2001, m, Block.getId(s));
@@ -147,8 +156,7 @@ final class TsunamiYikimi {
             return null;
         }
         if (s.is(BlockTags.LEAVES) || s.is(Tags.Blocks.GLASS) || s.is(Tags.Blocks.GLASS_PANES) || s.is(BlockTags.FENCES)
-                || s.is(BlockTags.FENCE_GATES) || s.is(BlockTags.FLOWERS) || s.is(BlockTags.SAPLINGS) || s.is(BlockTags.CROPS)
-                || s.is(BlockTags.WOOL_CARPETS) || s.canBeReplaced() || s.getCollisionShape(l, p).isEmpty()) {
+                || s.is(BlockTags.FENCE_GATES) || s.is(BlockTags.WOOL_CARPETS)) {
             return Sinif.HAFIF;
         }
         SoundType ses = s.getSoundType();

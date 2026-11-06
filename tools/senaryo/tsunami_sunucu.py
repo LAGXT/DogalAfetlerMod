@@ -5,7 +5,8 @@ Kendi dünyasını sıfırdan üretir: `run-server/tsunami-senaryo` silinir, `se
 ve `--port`'a (vars. 25644, workspace 94) çevrilir, sonda özgün içeriğine döner (K-E13).
 
 Koşu 1: dünya doğuşunun üstünde (y 200..208) sahne: batıda duvarlı deniz (29x39 sütun, 3 derin), doğuda toprak kara,
-ahşap kulübe + cam + yaprak, taş yarda dalgaya açılan mağara. Denizsiz yerde `start tsunami` → yer uygun değil (N14).
+ahşap kulübe + cam + yaprak, taş yarda dalgaya açılan mağara (doğuşun batısı gerçek kıyıdır: deniz aynı yönde). Yüklü
+olmayan uzak konumda `start tsunami` → yer uygun değil (N14: yüklü olmayan chunk deniz sayılmaz).
 Sahnede `start tsunami 3`, `asama ileri` x2 → çekilme ve dalga, kıyıya vurur, mağara dolar, `su bilgi`, `stop` → dalga,
 çekilme ve mağara kalmaz, yıkılan blok > 0. Sonra `start tsunami 1` AKTIF'e ilerletilir ve sunucu kapatılır (kalıcılık).
 Koşu 2 (aynı dünya): afet kayıttan yüklenir, dalga aynı kimlikle sürüyor, kendiliğinden biter (doğal bitiş), `su bilgi`
@@ -70,7 +71,7 @@ class TsunamiSunucu(c.Sunucu):
 
 def kosu1(s):
     s.bekle(r"Done \(", 0, c.ACILIS_SURESI, "açılış")
-    s.komut("execute positioned ~10 300 ~ run dogalafet start tsunami 3", r"No suitable place found for Tsunami",
+    s.komut("execute positioned ~3000 100 ~3000 run dogalafet start tsunami 3", r"No suitable place found for Tsunami",
             "denizsiz yerde başlamaz (N14)")
     for komut in SAHNE:
         s.komut(komut, r"Successfully filled \d+ block|Changed the block", komut)

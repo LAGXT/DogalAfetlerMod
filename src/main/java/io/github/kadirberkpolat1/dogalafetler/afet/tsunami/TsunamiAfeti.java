@@ -327,10 +327,14 @@ public final class TsunamiAfeti extends Afet {
         }
     }
 
+    /**
+     * Oyuncusuz da hesaplanacak deniz alanı: kıyı ±32 blok. Dalga tabanı canlı zeminden gelir (SU-36), çekilme istemcide
+     * hesaplanır; çekilmenin tamamını (S5'te ~600 chunk) sabitlemek sunucu tick'ine pahalıydı.
+     */
     private void sabitle(ServerLevel level) {
-        double m = cekilmeMesafesi() * 1.5 + genislik() / 2;
-        double x = geometri.x(-cekilmeMesafesi() / 2, 0);
-        double z = geometri.z(-cekilmeMesafesi() / 2, 0);
+        double m = 32;
+        double x = geometri.kiyiX();
+        double z = geometri.kiyiZ();
         SanalSu.bolgeSabitle(level, new ChunkPos(BlockPos.containing(x - m, 0, z - m)),
                 new ChunkPos(BlockPos.containing(x + m, 0, z + m)));
     }

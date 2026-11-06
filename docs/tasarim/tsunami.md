@@ -96,3 +96,13 @@ Kaynak: `.vibe/kararlar/spike-sanal-su.md` SU-01…SU-05, `docs/KARARLAR.md` K0-
 
 - **Kapandı — çekilme:** Forge 47.4.28 kaynaklarında sıvı tesselasyonunu atlatan ya da chunk geometrisine müdahale eden olay yok (`IClientFluidTypeExtensions` yalnız doku, renk, bindirme ve sis verir); `LiquidBlockRenderer.tesselate` `HEAD` mixin'i seçildi ve çalıştı (K0-25). Gerçek su için alfa 0 renk reddedildi (yine mixin ister, alfa 0 yüzey derinlik yazar ve dibi gizler). "Islak dip" yalnız sıvı render'ını değiştiren modlar için yedek. Gizlenen bölgede sunucu hâlâ su görür; oyuncu orada yürürse yüzme fiziği sürer (kısa süreli, kabul edildi).
 - Hedef oyuncunun 96 blok içinde en az 400 sütunluk deniz/okyanus suyu yoksa N14 uygulanır.
+
+## 7. Faz 4 uygulama güncellemesi, 2026-11-06
+
+Ayrıntı ve gerekçeler `.vibe/kararlar/tsunami.md` TS-01…TS-11.
+
+- **Zaman:** dalga her seviyede kıyıdan `clamp(hız·18 sn, 60, 150)` blok açıkta doğar ve ~18 sn'de kıyıya varır (çarpma ~28. sn); S3+ ikinci dalga birincisi menzile vardığı an başlar. Sığlaşma formülü açıkta %35 pay ile (sıfır yükseklik yerine ufukta alçak çizgi).
+- **Yıkım:** yalnız yapı ve bitki blokları (yaprak, cam, çit, çiçek → ahşap → S4–5 taş yapı); doğal arazi, su dolu ve blok varlıklı bloklar (sandık) yıkılmaz. Enkaz görsel varlık (`SuruklenenBlokVarligi`) yerine kırılan blokların %30'unun gerçek eşyasıdır ve dalgada sürüklenir.
+- **Mağara:** doğal tavanlı, göğü görmeyen ve yanında açık hava olan hücre dalgaya açılan ağız sayılır; seviye başına `1 + seviye/2` cep.
+- **Ses:** vanilla seslerle (çırpınan balık, damlama, alçak perdeli yağmur uğultusu cephe boyunca üç kaynak, çarpmada üç perdeli sıçrama); özel sentez sesler sonraya kaldı.
+- **Yağmur:** kendi damla havuzu (çizgi + zemin/sanal su halkası), iki katman, 25° eğik; sanal su yüzeyindeki halka normal haritası bozulması yerine çizilen halkadır. Ekran kenarındaki su perdesi yapılmadı.
