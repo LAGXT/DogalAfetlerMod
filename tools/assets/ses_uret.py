@@ -180,6 +180,44 @@ def ortam_test() -> np.ndarray:
     return sifir_gecisine_dondur(sinyal)
 
 
+def kasirga_ugultu() -> np.ndarray:
+    """Kasırga uzak katmanı (docs/tasarim/kasirga.md §4): "yük treni" uğultusu. 40–120 Hz pembe gürültü gürlemesi,
+    0,25 ve 0,375 Hz'de yavaş genlik dalgalanması, 52 ve 78 Hz kısmi tonlar çok hafif perde sallanımıyla; çok düşük
+    300–900 Hz hışırtı (ray sürtünmesi), konuşma bandına −6 dB çentik. 16 sn döngü (bütün modülasyonlar tam sayı tur)."""
+    uretec = np.random.default_rng(20261108)
+    sure = 16.0
+    t = np.arange(int(sure * ORNEKLEME)) / ORNEKLEME
+    gurleme = alcak_geciren(pembe_gurultu(t.size, uretec, alt=35.0, ust=160.0), 120.0)
+    gurleme /= np.sqrt(np.mean(gurleme**2))
+    dalga = 0.72 + 0.18 * np.sin(2.0 * np.pi * 0.25 * t) + 0.10 * np.sin(2.0 * np.pi * 0.375 * t + 1.1)
+    ton = (np.sin(tam_turlu_faz(52.0 + 1.5 * np.sin(2.0 * np.pi * 0.125 * t)))
+           + db(-5) * np.sin(tam_turlu_faz(78.0 + 2.0 * np.sin(2.0 * np.pi * 0.125 * t + 0.7))))
+    ton *= db(-8) / np.sqrt(np.mean(ton**2))
+    hisirti = pembe_gurultu(t.size, uretec, alt=300.0, ust=900.0)
+    hisirti *= db(-24) / np.sqrt(np.mean(hisirti**2))
+    sinyal = konusma_centigi((gurleme + ton) * dalga + hisirti * dalga)
+    return sifir_gecisine_dondur(sinyal)
+
+
+def kasirga_ruzgar() -> np.ndarray:
+    """Kasırga yakın katmanı (§4 yakın/orta): derin rüzgâr kükremesi (30–220 Hz) 2 Hz basınç "pompasıyla", üstünde 0,25 Hz
+    şiddetlenen rüzgâr uğultusu (500–1500 Hz, düşük düzey) ve 4–8 kHz enkaz hışırtısı; konuşma bandına −6 dB çentik
+    (orta frekans bilinçli oyuk, ses.md). 12 sn döngü (2 Hz × 12 = 24, 0,25 Hz × 12 = 3 tur)."""
+    uretec = np.random.default_rng(20261109)
+    sure = 12.0
+    t = np.arange(int(sure * ORNEKLEME)) / ORNEKLEME
+    kukreme = alcak_geciren(pembe_gurultu(t.size, uretec, alt=30.0, ust=300.0), 220.0)
+    kukreme /= np.sqrt(np.mean(kukreme**2))
+    pompa = 0.75 + 0.25 * np.sin(2.0 * np.pi * 2.0 * t)
+    ruzgar_zarfi = 0.6 + 0.4 * np.sin(2.0 * np.pi * 0.25 * t + 0.5)
+    ruzgar = pembe_gurultu(t.size, uretec, alt=500.0, ust=1500.0)
+    ruzgar *= db(-14) / np.sqrt(np.mean(ruzgar**2))
+    hisirti = pembe_gurultu(t.size, uretec, alt=4000.0, ust=8000.0)
+    hisirti *= db(-31) / np.sqrt(np.mean(hisirti**2))
+    sinyal = konusma_centigi(kukreme * pompa + (ruzgar + hisirti) * ruzgar_zarfi)
+    return sifir_gecisine_dondur(sinyal)
+
+
 @dataclass(frozen=True)
 class SesTanimi:
     uret: Callable[[], np.ndarray]
@@ -198,6 +236,10 @@ SESLER: dict[str, SesTanimi] = {
     "siren_gunes": SesTanimi(siren_gunes, -21.0, -3.0, (180.0, 300.0), 2500.0, -30.0),
     # Döngülü ortam sesi: −26 LUFS, tepe ≤ −6 dBTP (kural 2); enerji alt basta.
     "ortam_test": SesTanimi(ortam_test, -26.0, -6.0, (30.0, 120.0), 2500.0, -30.0),
+    # Kasırga uzak uğultusu: döngülü ortam sesi kuralı (−6 dBTP), "yük treni" 40–120 Hz.
+    "kasirga_ugultu": SesTanimi(kasirga_ugultu, -26.0, -6.0, (40.0, 120.0), 2500.0, -30.0),
+    # Kasırga yakın rüzgârı: derin kükreme 30–220 Hz baskın; 2,5 kHz üstü en az 30 dB aşağıda.
+    "kasirga_ruzgar": SesTanimi(kasirga_ruzgar, -26.0, -6.0, (30.0, 220.0), 2500.0, -30.0),
 }
 
 

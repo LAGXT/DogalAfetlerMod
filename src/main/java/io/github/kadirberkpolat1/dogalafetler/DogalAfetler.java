@@ -5,6 +5,7 @@ import io.github.kadirberkpolat1.dogalafetler.afet.asit_yagmuru.AsitSistemi;
 import io.github.kadirberkpolat1.dogalafetler.afet.ay_carpmasi.AyCarpmasiSistemi;
 import io.github.kadirberkpolat1.dogalafetler.afet.deprem.DepremSistemi;
 import io.github.kadirberkpolat1.dogalafetler.afet.gunes_patlamasi.GunesPatlamasiSistemi;
+import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.KasirgaSistemi;
 import io.github.kadirberkpolat1.dogalafetler.afet.orman_yangini.OrmanSistemi;
 import io.github.kadirberkpolat1.dogalafetler.afet.sinkhole.SinkholeSistemi;
 import io.github.kadirberkpolat1.dogalafetler.balikcilik.Balikcilik;
@@ -63,6 +64,7 @@ public final class DogalAfetler {
         SinkholeSistemi.kaydet();
         AsitSistemi.kaydet(modBus);
         OrmanSistemi.kaydet();
+        KasirgaSistemi.kaydet(modBus);
         OyunTestiAfeti.ozelliktenKaydet();
         SuAyarlari.kaydet();
         SanalSu.kaydet();
