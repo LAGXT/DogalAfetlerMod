@@ -30,6 +30,10 @@ public final class YanginKayitlari {
             () -> new SimpleParticleType(false));
     public static final RegistryObject<SimpleParticleType> SUTUN = PARCACIKLAR.register("yangin_sutunu",
             () -> new SimpleParticleType(true));
+    public static final RegistryObject<SimpleParticleType> KIVILCIM = PARCACIKLAR.register("yangin_kivilcimi",
+            () -> new SimpleParticleType(true));
+    public static final RegistryObject<SimpleParticleType> KUME = PARCACIKLAR.register("yangin_kumesi",
+            () -> new SimpleParticleType(true));
 
     private YanginKayitlari() {
     }

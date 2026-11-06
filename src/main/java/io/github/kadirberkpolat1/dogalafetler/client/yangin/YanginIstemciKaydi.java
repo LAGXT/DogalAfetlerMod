@@ -18,5 +18,8 @@ public final class YanginIstemciKaydi {
         olay.registerSpriteSet(YanginKayitlari.ALEV.get(), s -> new YanginParcacigi.Saglayici(s, YanginParcacigi.Tur.ALEV));
         olay.registerSpriteSet(YanginKayitlari.DUMAN.get(), s -> new YanginParcacigi.Saglayici(s, YanginParcacigi.Tur.DUMAN));
         olay.registerSpriteSet(YanginKayitlari.SUTUN.get(), s -> new YanginParcacigi.Saglayici(s, YanginParcacigi.Tur.SUTUN));
+        olay.registerSpriteSet(YanginKayitlari.KIVILCIM.get(),
+                s -> new YanginParcacigi.Saglayici(s, YanginParcacigi.Tur.KIVILCIM));
+        olay.registerSpriteSet(YanginKayitlari.KUME.get(), s -> new YanginParcacigi.Saglayici(s, YanginParcacigi.Tur.KUME));
     }
 }

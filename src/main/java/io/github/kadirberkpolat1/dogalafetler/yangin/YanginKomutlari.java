@@ -13,6 +13,7 @@ import net.minecraft.server.level.ServerLevel;
 /** {@code /dogalafet yangin tutustur [yarıçap] | sondur | bilgi} (OP). */
 final class YanginKomutlari {
     static final String TUTUSTUR = "commands.dogalafetler.yangin.tutustur";
+    static final String TUTUSTUR_SURUYOR = "commands.dogalafetler.yangin.tutustur_suruyor";
     static final String SONDUR = "commands.dogalafetler.yangin.sondur";
     static final String BILGI = "commands.dogalafetler.yangin.bilgi";
     private static final int YETKI = 2;
@@ -35,7 +36,8 @@ final class YanginKomutlari {
         ServerLevel level = kaynak.getLevel();
         int sayi = YanginYoneticisi.alanTutustur(level, BlockPos.containing(kaynak.getPosition()), yaricap,
                 YanginKaynagi.KOMUT, 1.0);
-        kaynak.sendSuccess(() -> Component.translatable(TUTUSTUR, sayi), true);
+        boolean suruyor = YanginYoneticisi.bekleyenAlanSayisi(level) > 0;
+        kaynak.sendSuccess(() -> Component.translatable(suruyor ? TUTUSTUR_SURUYOR : TUTUSTUR, sayi), true);
         return sayi;
     }
 
@@ -49,8 +51,11 @@ final class YanginKomutlari {
         int aktif = YanginYoneticisi.aktifSayi(kaynak.getLevel());
         String carpan = String.format(Locale.ROOT, "%.2f", YanginYoneticisi.kismaCarpani());
         String tps = String.format(Locale.ROOT, "%.1f", TpsOlcer.tps());
+        double[] sure = YanginYoneticisi.sureOzeti(kaynak.getLevel());
+        String ortalama = String.format(Locale.ROOT, "%.2f", sure[0]);
+        String enCok = String.format(Locale.ROOT, "%.2f", sure[1]);
         kaynak.sendSuccess(() -> Component.translatable(BILGI, aktif, YanginAyarlari.aktifTavan(),
-                YanginYoneticisi.etkinButce(), YanginAyarlari.tickButcesi(), carpan, tps), false);
+                YanginYoneticisi.etkinButce(), YanginAyarlari.tickButcesi(), carpan, tps, ortalama, enCok), false);
         return aktif;
     }
 }

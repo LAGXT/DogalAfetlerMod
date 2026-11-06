@@ -48,6 +48,14 @@ public final class YanginAyarlari {
         return istemci.get().lodMesafesi.get();
     }
 
+    public static int sutunTavani() {
+        return istemci.get().sutunTavani.get();
+    }
+
+    public static int sutunMesafesi() {
+        return istemci.get().sutunMesafesi.get();
+    }
+
     private static final class Sunucu {
         private final ForgeConfigSpec.IntValue tickButcesi;
         private final ForgeConfigSpec.IntValue aktifTavan;
@@ -74,12 +82,18 @@ public final class YanginAyarlari {
     private static final class Istemci {
         private final ForgeConfigSpec.DoubleValue parcacikYogunlugu;
         private final ForgeConfigSpec.IntValue lodMesafesi;
+        private final ForgeConfigSpec.IntValue sutunTavani;
+        private final ForgeConfigSpec.IntValue sutunMesafesi;
 
         private Istemci(ForgeConfigSpec.Builder k) {
             parcacikYogunlugu = k.comment("Alev ve duman parçacığı çarpanı (efekt kalitesinin üstüne).")
                     .defineInRange("parcacikYogunlugu", 1.0, 0.0, 4.0);
             lodMesafesi = k.comment("Bu mesafenin ötesinde hücre alevi yerine chunk başına duman kümesi çizilir (blok).")
                     .defineInRange("lodMesafesi", 48, 16, 256);
+            sutunTavani = k.comment("Yüksek kalitede aynı anda en çok duman sütunu parçacığı (pirokümülüs dahil); Düşük ×0,25, Orta ×0,5, Ultra ×2.")
+                    .defineInRange("sutunTavani", 64, 8, 1024);
+            sutunMesafesi = k.comment("Bu mesafenin ötesindeki yangın için duman sütunu üretilmez (blok).")
+                    .defineInRange("sutunMesafesi", 160, 32, 512);
         }
     }
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Yangın parçacık dokularını üretir (madde 6, tasarım notu §5): 4 kare alev (16x16) ve 4 kare duman (32x32).
+"""Yangın parçacık dokularını üretir (madde 6, tasarım notu §5): 4 kare alev (16x16), 4 kare duman (32x32; sütun ve pirokümülüs de kullanır) ve 2 kare kıvılcım (8x8).
 
 Kullanım: python3 tools/assets/yangin_dokulari.py  (kökten). Aynı tohumla aynı PNG'leri yazar.
 """
@@ -71,12 +71,29 @@ def duman(kare, rng):
     return img
 
 
+def kivilcim(kare):
+    """8x8 kıvılcım: beyaz çekirdek, yumuşak kenar; renk parçacıkta verilir (sarıdan kızıla)."""
+    boy = 8
+    img = Image.new("RGBA", (boy, boy))
+    yaricap = 3.2 - kare * 0.7
+    for y in range(boy):
+        for x in range(boy):
+            d = math.hypot(x + 0.5 - boy / 2, y + 0.5 - boy / 2) / yaricap
+            if d >= 1:
+                continue
+            a = (1 - d) ** 1.5
+            img.putpixel((x, y), (255, 255, 255, int(255 * a)))
+    return img
+
+
 def main():
     HEDEF.mkdir(parents=True, exist_ok=True)
     for kare in range(4):
         alev(kare, random.Random(100 + kare)).save(HEDEF / f"yangin_alevi_{kare}.png")
         duman(kare, random.Random(200 + kare)).save(HEDEF / f"yangin_dumani_{kare}.png")
-    print(f"8 doku yazıldı: {HEDEF}")
+    for kare in range(2):
+        kivilcim(kare).save(HEDEF / f"yangin_kivilcimi_{kare}.png")
+    print(f"10 doku yazıldı: {HEDEF}")
 
 
 if __name__ == "__main__":

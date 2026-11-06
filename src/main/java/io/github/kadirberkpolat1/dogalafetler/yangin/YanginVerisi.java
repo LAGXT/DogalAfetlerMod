@@ -1,5 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.yangin;
 
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -17,10 +19,13 @@ import net.minecraft.world.level.saveddata.SavedData;
 /** Boyut başına aktif yangın kümesi ({@code dogalafetler_yangin}); sunucu yeniden açılınca yangın sürer. */
 final class YanginVerisi extends SavedData {
     static final String AD = "dogalafetler_yangin";
-    private static final int BICIM_SURUMU = 1;
+    private static final int BICIM_SURUMU = 2;
+    private static final int SURE_PENCERESI = 100;
 
     /** Ekleme sırası = yaş: tavan aşılınca baştakiler söner. */
     final LinkedHashMap<Long, YanginHucresi> hucreler = new LinkedHashMap<>();
+    /** Hücresi kalkmış ama chunk'ı yüklü olmadığı için silinemeyen ateş blokları (Y-19); chunk yüklenince kalkar. */
+    final LongOpenHashSet bekleyenSilmeler = new LongOpenHashSet();
 
     // Çalışma durumu (kaydedilmez).
     final RandomSource rastgele = RandomSource.create();
@@ -28,9 +33,18 @@ final class YanginVerisi extends SavedData {
     final Map<Long, Long> yanmislar = new HashMap<>();
     final List<Long> buharlar = new ArrayList<>();
     final Set<UUID> paketAlanlar = new HashSet<>();
+    /** Birkaç tick'e yayılan {@code alanTutustur} işleri (Y-21), sırayla. */
+    final ArrayDeque<YanginYoneticisi.AlanIsi> alanIsleri = new ArrayDeque<>();
+    long alanButcesiTick = Long.MIN_VALUE;
+    int alanButcesi;
+    /** {@code ChunkEvent.Load} (başka thread'den de gelebilir) bekleyen silmeleri hemen denetletir. */
+    volatile boolean chunkYuklendi;
     int sonButce = -1;
     YanginHucresi[] adaylar = new YanginHucresi[64];
     double[] puanlar = new double[64];
+    private final double[] sureler = new double[SURE_PENCERESI];
+    private int sureIndeksi;
+    private int sureSayisi;
 
     static YanginVerisi yukle(CompoundTag etiket) {
         YanginVerisi veri = new YanginVerisi();
@@ -46,6 +60,9 @@ final class YanginVerisi extends SavedData {
                 hucre.atesVar = true;
             }
             veri.hucreler.put(hucre.konum, hucre);
+        }
+        for (long konum : etiket.getLongArray("bekleyen")) {
+            veri.bekleyenSilmeler.add(konum);
         }
         return veri;
     }
@@ -70,6 +87,7 @@ final class YanginVerisi extends SavedData {
             liste.add(h);
         }
         etiket.put("hucreler", liste);
+        etiket.putLongArray("bekleyen", bekleyenSilmeler.toLongArray());
         return etiket;
     }
 
@@ -79,5 +97,23 @@ final class YanginVerisi extends SavedData {
             adaylar = new YanginHucresi[yeni];
             puanlar = new double[yeni];
         }
+    }
+
+    /** Yöneticinin bu boyuttaki bir tick'lik süresi (ms); son {@value #SURE_PENCERESI} çalışan tick tutulur. */
+    void sureKaydet(double ms) {
+        sureler[sureIndeksi] = ms;
+        sureIndeksi = (sureIndeksi + 1) % sureler.length;
+        sureSayisi = Math.min(sureler.length, sureSayisi + 1);
+    }
+
+    /** {ortalama, en çok} ms; ölçüm yoksa {0, 0}. */
+    double[] sureOzeti() {
+        double toplam = 0;
+        double enCok = 0;
+        for (int i = 0; i < sureSayisi; i++) {
+            toplam += sureler[i];
+            enCok = Math.max(enCok, sureler[i]);
+        }
+        return new double[] {sureSayisi == 0 ? 0 : toplam / sureSayisi, enCok};
     }
 }

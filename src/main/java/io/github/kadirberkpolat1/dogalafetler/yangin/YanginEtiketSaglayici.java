@@ -15,7 +15,8 @@ import net.minecraftforge.data.event.GatherDataEvent;
 
 /**
  * N12 etiketlerinin varsayılanları: taş, deepslate, obsidyen, cevherler, bedrock vb. Başka modların cevherleri isteğe bağlı
- * {@code forge:ores} ile girer; veri paketi etiketi genişletebilir.
+ * {@code forge:ores} ile girer; veri paketi etiketi genişletebilir. Afet ateşi vanilla {@code minecraft:fire} etiketindedir
+ * (Y-22): su iksiri söndürür, yol bulucu ateşten kaçınır, ateşe etiketle tepki veren modlar onu da görür.
  */
 final class YanginEtiketSaglayici extends BlockTagsProvider {
     private static final ResourceLocation FORGE_CEVHERLERI = ResourceLocation.fromNamespaceAndPath("forge", "ores");
@@ -41,6 +42,7 @@ final class YanginEtiketSaglayici extends BlockTagsProvider {
 
     @Override
     protected void addTags(HolderLookup.Provider arama) {
+        tag(BlockTags.FIRE).add(YanginKayitlari.AFET_ATESI.get());
         tag(YanginEtiketleri.DEPREM_DAYANIKLI).add(SERT).addTag(BlockTags.BASE_STONE_OVERWORLD).addTags(CEVHERLER)
                 .addOptionalTag(FORGE_CEVHERLERI);
         tag(YanginEtiketleri.ASIT_DAYANIKLI).add(SERT).addTag(BlockTags.BASE_STONE_OVERWORLD).addTags(CEVHERLER)

@@ -148,4 +148,61 @@ class YanginMantigiTest {
         assertEquals(0.15, s1, 1e-9);
         assertEquals(0.54, s5, 1e-9);
     }
+
+    @Test
+    void yagmurYalnizGokyuzuneYakinAtesiEtkiler() {
+        assertEquals(YanginMantigi.YagisDurumu.YOK, YanginMantigi.yagisDurumu(false, true, true, 0), "yağmur yoksa etkisiz");
+        assertEquals(YanginMantigi.YagisDurumu.ACIK, YanginMantigi.yagisDurumu(true, true, true, 0));
+        assertEquals(YanginMantigi.YagisDurumu.KORUNAKLI, YanginMantigi.yagisDurumu(true, false, true, 0),
+                "yalnız yaprak örtüsü altında");
+        assertEquals(YanginMantigi.YagisDurumu.KORUNAKLI, YanginMantigi.yagisDurumu(true, false, true,
+                YanginMantigi.KORUNAKLI_ORTU), "8 blok içinde çatı");
+        assertEquals(YanginMantigi.YagisDurumu.YOK, YanginMantigi.yagisDurumu(true, false, true,
+                YanginMantigi.KORUNAKLI_ORTU + 1), "yeraltı yağmurdan etkilenmez");
+        assertEquals(YanginMantigi.YagisDurumu.YOK, YanginMantigi.yagisDurumu(true, false, false, 2),
+                "yağışsız ya da karlı biyom");
+    }
+
+    @Test
+    void alanOkumaButcesiKismayaUyar() {
+        assertEquals(4096, YanginMantigi.alanOkumaButcesi(64));
+        assertEquals(1024, YanginMantigi.alanOkumaButcesi(16));
+        assertEquals(64, YanginMantigi.alanOkumaButcesi(1));
+    }
+
+    @Test
+    void kureTarayiciHerKonumuBirKezVerirVeButceyeUyar() {
+        int r = 24;
+        int beklenen = 0;
+        for (int x = -r; x <= r; x++) {
+            for (int y = -r; y <= r; y++) {
+                for (int z = -r; z <= r; z++) {
+                    if (x * x + y * y + z * z <= r * r) {
+                        beklenen++;
+                    }
+                }
+            }
+        }
+        java.util.Set<Long> gorulen = new java.util.HashSet<>();
+        KureTarayici tarayici = new KureTarayici(r);
+        int cagri = 0;
+        while (!tarayici.bitti()) {
+            int harcanan = tarayici.ilerle(4096, (dx, dy, dz) -> {
+                assertTrue(gorulen.add(((long) dx + 64) << 16 | ((long) dy + 64) << 8 | (dz + 64)), "tekrar yok");
+                return 1;
+            });
+            assertTrue(harcanan <= 4096, "bütçe aşılmaz: " + harcanan);
+            cagri++;
+        }
+        assertEquals(beklenen, gorulen.size(), "kürenin bütün konumları");
+        assertEquals((beklenen + 4095) / 4096, cagri, "r=24 tek tick'te değil, bütçeyle birkaç tick'e yayılır");
+        assertEquals(0, tarayici.ilerle(4096, (dx, dy, dz) -> 1), "bitmiş tarayıcı okuma harcamaz");
+    }
+
+    @Test
+    void kureTarayiciCokOkumaliKonumdaDurur() {
+        KureTarayici tarayici = new KureTarayici(3);
+        assertEquals(7, tarayici.ilerle(5, (dx, dy, dz) -> 7), "bir konum 7 okuma harcadı, bütçe 5: tek konumda durur");
+        assertTrue(!tarayici.bitti());
+    }
 }

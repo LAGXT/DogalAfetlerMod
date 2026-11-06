@@ -11,6 +11,10 @@ public final class YanginMantigi {
     public static final double YAYILMA_OLCEGI = 100.0;
     /** Yağan biyomda gökyüzüne kapalı (yaprak, çatı altı) ateşin sönme olasılığı çarpanı: nem yavaş işler. */
     public static final double KORUNAKLI_YAGMUR_ORANI = 0.3;
+    /** Üstünde en çok bu kadar blok katı örtü (yaprak sayılmaz) olan ateş korunaklıdır; daha derini yeraltıdır. */
+    public static final int KORUNAKLI_ORTU = 8;
+    /** {@code alanTutustur}'un tick başına blok okuma bütçesi, hücre bütçesinin bu katı. */
+    public static final int ALAN_OKUMA_KATSAYISI = 64;
 
     private YanginMantigi() {
     }
@@ -101,6 +105,27 @@ public final class YanginMantigi {
         return korunakli ? olasilik * KORUNAKLI_YAGMUR_ORANI : olasilik;
     }
 
+    /**
+     * Ateş konumunun yağış durumu (Y-08). {@code ortu}: konumun üstündeki en yüksek katı bloğun (yaprak hariç) üstüne
+     * kadar blok sayısı; 0 ya da eksi, üstünde yalnız yaprak olduğunu söyler. Yağmur gören ateş açık; yağan biyomda üstü
+     * en çok {@link #KORUNAKLI_ORTU} blokla örtülü ateş korunaklı; daha derindeki (maden, mağara) ve yağışı yağmur olmayan
+     * biyomdaki ateş yağmurdan etkilenmez.
+     */
+    public static YagisDurumu yagisDurumu(boolean dunyadaYagmur, boolean yagmurGoruyor, boolean yagmurluBiyom, int ortu) {
+        if (!dunyadaYagmur) {
+            return YagisDurumu.YOK;
+        }
+        if (yagmurGoruyor) {
+            return YagisDurumu.ACIK;
+        }
+        return yagmurluBiyom && ortu <= KORUNAKLI_ORTU ? YagisDurumu.KORUNAKLI : YagisDurumu.YOK;
+    }
+
+    /** {@code alanTutustur}'un tick başına okuma bütçesi: hücre bütçesiyle (config × TPS kısması) orantılı. */
+    public static int alanOkumaButcesi(int butce) {
+        return Math.max(0, butce) * ALAN_OKUMA_KATSAYISI;
+    }
+
     /** Küçük puan önce işlenir: oyuncuya yakın önce, bekledikçe uzaktaki de öne geçer. */
     public static double oncelik(double mesafeKare, long bekleyenTick) {
         return Math.sqrt(Math.max(0, mesafeKare)) / (1.0 + Math.max(0, bekleyenTick) / (double) YASLANMA_TICK);
@@ -124,6 +149,12 @@ public final class YanginMantigi {
 
     private static double sinirla(double deger, double alt, double ust) {
         return Math.max(alt, Math.min(ust, deger));
+    }
+
+    public enum YagisDurumu {
+        YOK,
+        KORUNAKLI,
+        ACIK
     }
 
     public enum YanmaSonucu {

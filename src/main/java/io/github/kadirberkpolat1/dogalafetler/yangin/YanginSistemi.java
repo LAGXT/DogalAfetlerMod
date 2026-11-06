@@ -24,8 +24,11 @@ public final class YanginSistemi {
     static void cevirileriYaz(CeviriYazici y) {
         y.ekle("block.dogalafetler.afet_atesi", "Disaster Fire", "Afet Ateşi");
         y.ekle(YanginKomutlari.TUTUSTUR, "Ignited %s fire cells", "%s yangın hücresi tutuşturuldu");
+        y.ekle(YanginKomutlari.TUTUSTUR_SURUYOR, "Ignited %s fire cells; the rest of the area ignites over the next ticks",
+                "%s yangın hücresi tutuşturuldu; alanın kalanı sonraki tick'lerde tutuşuyor");
         y.ekle(YanginKomutlari.SONDUR, "Extinguished %s fire cells", "%s yangın hücresi söndürüldü");
-        y.ekle(YanginKomutlari.BILGI, "Burning cells: %s/%s, budget %s/%s per tick (TPS throttle ×%s, TPS %s)",
-                "Yanan hücre: %s/%s, bütçe tick başına %s/%s (TPS kısması ×%s, TPS %s)");
+        y.ekle(YanginKomutlari.BILGI,
+                "Burning cells: %s/%s, budget %s/%s per tick (TPS throttle ×%s, TPS %s), manager %s ms avg / %s ms max",
+                "Yanan hücre: %s/%s, bütçe tick başına %s/%s (TPS kısması ×%s, TPS %s), yönetici %s ms ort / %s ms en çok");
     }
 }

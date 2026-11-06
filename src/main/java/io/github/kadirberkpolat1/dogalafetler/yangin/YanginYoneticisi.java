@@ -4,9 +4,13 @@ import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.core.TpsOlcer;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import io.github.kadirberkpolat1.dogalafetler.network.AgKanali;
+import io.github.kadirberkpolat1.dogalafetler.yangin.mantik.KureTarayici;
 import io.github.kadirberkpolat1.dogalafetler.yangin.mantik.OncelikSecici;
 import io.github.kadirberkpolat1.dogalafetler.yangin.mantik.YanginMantigi;
+import io.github.kadirberkpolat1.dogalafetler.yangin.mantik.YanginMantigi.YagisDurumu;
+import it.unimi.dsi.fastutil.longs.LongIterator;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -14,7 +18,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiPredicate;
 import java.util.function.DoubleSupplier;
+import java.util.function.Predicate;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.ResourceKey;
@@ -28,9 +34,11 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.level.ChunkEvent;
 import net.minecraftforge.event.level.LevelEvent;
 import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -51,6 +59,8 @@ public final class YanginYoneticisi {
     private static final double SICRAMA_SAPMASI = 20;
     private static final int OZET_ARALIGI = 10;
     private static final int ISI_ARALIGI = 20;
+    private static final int BEKLEYEN_ARALIGI = 20;
+    private static final int OZET_LOG_ARALIGI = 600;
     private static final int YANMIS_HAFIZA_TICK = 2400;
     private static final double OZET_MENZILI = 128;
     private static final double HUCRE_MENZILI = 64;
@@ -62,6 +72,7 @@ public final class YanginYoneticisi {
 
     private static final Map<ResourceKey<Level>, YanginVerisi> VERILER = new ConcurrentHashMap<>();
     private static volatile DoubleSupplier kismaKaynagi = TpsOlcer::kismaCarpani;
+    private static volatile BiPredicate<ServerLevel, BlockPos> yukluKaynagi = (level, konum) -> level.isLoaded(konum);
 
     private YanginYoneticisi() {
     }
@@ -90,50 +101,35 @@ public final class YanginYoneticisi {
         return sayi;
     }
 
-    /** Meteor krateri gibi bir alanın yanıcı yüzeyini (havaya değen blokları) {@code yogunluk} olasılığıyla tutuşturur. */
+    /**
+     * Meteor krateri gibi bir alanın yanıcı yüzeyini (havaya değen blokları) {@code alanOrani(yogunluk)} olasılığıyla
+     * tutuşturur. Tarama tick başına okuma bütçesiyle (hücre bütçesi × 64, TPS kısması dahil) yapılır: küçük alan hemen,
+     * büyük alan sonraki tick'lerde biter (Y-21). Bu çağrıda tutuşan hücre sayısını döndürür.
+     */
     public static int alanTutustur(ServerLevel level, BlockPos merkez, int yaricap, YanginKaynagi kaynak,
             double yogunluk) {
         Objects.requireNonNull(kaynak, "kaynak");
-        int r = Math.max(0, Math.min(EN_BUYUK_ALAN_YARICAPI, yaricap));
         YanginVerisi veri = veri(level);
-        BlockPos.MutableBlockPos kom = new BlockPos.MutableBlockPos();
-        int sayi = 0;
-        for (BlockPos p : BlockPos.betweenClosed(merkez.offset(-r, -r, -r), merkez.offset(r, r, r))) {
-            if (p.distSqr(merkez) > (double) r * r + 0.5 || !level.isLoaded(p)
-                    || veri.rastgele.nextDouble() >= YanginMantigi.alanOrani(yogunluk)) {
-                continue;
-            }
-            boolean yuzey = false;
-            for (Direction yon : Direction.values()) {
-                if (havaMi(level, kom.setWithOffset(p, yon))) {
-                    yuzey = true;
-                    break;
-                }
-            }
-            if (yuzey && hucreEkle(level, veri, p.immutable(), kaynak, yogunluk)) {
-                sayi++;
-            }
-        }
-        return sayi;
+        AlanIsi is = new AlanIsi(merkez.immutable(), Math.max(0, Math.min(EN_BUYUK_ALAN_YARICAPI, yaricap)), kaynak,
+                yogunluk);
+        veri.alanIsleri.add(is);
+        alanIsleriniIsle(level, veri);
+        return is.tutusan;
     }
 
-    /** Bölgedeki ({@code null} = boyutun tümü) ateşi iz bırakmadan söndürür: yakıt yerinde kalır, ateş bloğu kalkar. */
+    /** Bu boyutta süren (birkaç tick'e yayılmış) alan tutuşturma işi sayısı. */
+    public static int bekleyenAlanSayisi(ServerLevel level) {
+        return veri(level).alanIsleri.size();
+    }
+
+    /**
+     * Bölgedeki ({@code null} = boyutun tümü) ateşi iz bırakmadan söndürür: yakıt yerinde kalır, ateş bloğu kalkar (chunk'ı
+     * yüklü değilse yüklenince, Y-19). Bölgedeki süren alan tutuşturma işleri de durur.
+     */
     public static int sondur(ServerLevel level, AABB bolge) {
         YanginVerisi veri = veri(level);
-        int sayi = 0;
-        Iterator<YanginHucresi> it = veri.hucreler.values().iterator();
-        while (it.hasNext()) {
-            YanginHucresi h = it.next();
-            if (bolge == null || icinde(bolge, h.konum)) {
-                atesSil(level, h);
-                it.remove();
-                sayi++;
-            }
-        }
-        if (sayi > 0) {
-            veri.setDirty();
-        }
-        return sayi;
+        veri.alanIsleri.removeIf(is -> bolge == null || bolge.contains(Vec3.atCenterOf(is.merkez)));
+        return sondur(level, veri, h -> bolge == null || icinde(bolge, h.konum), "sondur");
     }
 
     public static int aktifSayi(ServerLevel level) {
@@ -151,30 +147,49 @@ public final class YanginYoneticisi {
     }
 
     /**
-     * Afet bitti: o kaynağın ateşleri artık yayılmaz ve en geç {@code afetSonrasiSonumSaniye} içinde (rastgele, yarısından
-     * sonra) söner. Vanilla'ya devredilmez: vanilla ateş bütçe ve tavan dışında yayılırdı (Y-05).
+     * Afet bitti; o kaynağın süren alan tutuşturmaları durur ve yeni tutuşma olmaz (Y-05). {@code temiz=true}
+     * ({@code /dogalafet stop}, {@code sifirla}, gamerule): ateşler hemen söndürülür, ateş blokları kalkar, yanıcı bloklar
+     * korunur. {@code temiz=false} (doğal bitiş, hata): kalan hücreler yayılmaz ve en geç {@code afetSonrasiSonumSaniye}
+     * içinde yanıp biter (yakıt vanilla'daki gibi havaya döner; {@code afetBlokHasari=false} iken blok değişmez).
+     * Vanilla ateşe devredilmez.
      */
-    public static void kaynakBitti(YanginKaynagi kaynak) {
+    public static void kaynakBitti(YanginKaynagi kaynak, boolean temiz) {
         MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
         if (server != null) {
-            kaynakBitti(server, kaynak);
+            kaynakBitti(server, kaynak, temiz);
         }
     }
 
-    public static void kaynakBitti(MinecraftServer server, YanginKaynagi kaynak) {
+    public static void kaynakBitti(MinecraftServer server, YanginKaynagi kaynak, boolean temiz) {
+        Objects.requireNonNull(kaynak, "kaynak");
         int sonum = Math.max(1, YanginAyarlari.afetSonrasiSonumSaniye() * 20);
         for (ServerLevel level : server.getAllLevels()) {
             YanginVerisi veri = VERILER.get(level.dimension());
             if (veri == null) {
                 continue;
             }
+            veri.alanIsleri.removeIf(is -> is.kaynak.equals(kaynak));
+            if (temiz) {
+                int sonen = sondur(level, veri, h -> h.kaynak.equals(kaynak), "kaynakBitti(temiz)");
+                if (sonen > 0) {
+                    DogalAfetler.LOGGER.info("yangın kaynağı bitti (temiz): {} {} hücre söndürüldü ({})",
+                            kaynak, sonen, level.dimension().location());
+                }
+                continue;
+            }
             long simdi = level.getGameTime();
+            int sayi = 0;
             for (YanginHucresi h : veri.hucreler.values()) {
                 if (h.kaynak.equals(kaynak)) {
                     h.yayilabilir = false;
                     h.bitis = Math.min(h.bitis, simdi + sonum / 2 + veri.rastgele.nextInt(sonum / 2 + 1));
-                    veri.setDirty();
+                    sayi++;
                 }
+            }
+            if (sayi > 0) {
+                veri.setDirty();
+                DogalAfetler.LOGGER.info("yangın kaynağı bitti: {} {} hücre yayılmadan en geç {} sn'de yanıp bitecek ({})",
+                        kaynak, sayi, sonum / 20, level.dimension().location());
             }
         }
     }
@@ -186,6 +201,11 @@ public final class YanginYoneticisi {
 
     public static double kismaCarpani() {
         return kismaKaynagi.getAsDouble();
+    }
+
+    /** Yöneticinin bu boyuttaki tick süresi, son 100 çalışan tick: {ortalama ms, en çok ms}. */
+    public static double[] sureOzeti(ServerLevel level) {
+        return veri(level).sureOzeti();
     }
 
     /** Yanıcılık vanilla değerinden gelir ({@code getFlammability}); {@code dogalafetler:yanmaz} onu ezer (N12). */
@@ -200,6 +220,13 @@ public final class YanginYoneticisi {
     static DoubleSupplier kismaKaynagiAyarla(DoubleSupplier kaynak) {
         DoubleSupplier onceki = kismaKaynagi;
         kismaKaynagi = Objects.requireNonNull(kaynak, "kaynak");
+        return onceki;
+    }
+
+    /** Testte "chunk yüklü değil" durumunu taklit eder (ateş silme ve bekleyen silme yolu); önceki kaynağı döndürür. */
+    static BiPredicate<ServerLevel, BlockPos> yukluKaynagiAyarla(BiPredicate<ServerLevel, BlockPos> kaynak) {
+        BiPredicate<ServerLevel, BlockPos> onceki = yukluKaynagi;
+        yukluKaynagi = Objects.requireNonNull(kaynak, "kaynak");
         return onceki;
     }
 
@@ -233,6 +260,17 @@ public final class YanginYoneticisi {
         VERILER.clear();
     }
 
+    /** Chunk yüklendi: bekleyen ateş silmeleri bir sonraki tick'te denetlenir (olay işçi thread'inden de gelebilir). */
+    @SubscribeEvent
+    public static void chunkYuklendi(ChunkEvent.Load olay) {
+        if (olay.getLevel() instanceof ServerLevel level) {
+            YanginVerisi veri = VERILER.get(level.dimension());
+            if (veri != null) {
+                veri.chunkYuklendi = true;
+            }
+        }
+    }
+
     @SubscribeEvent
     public static void dunyaTick(TickEvent.LevelTickEvent olay) {
         if (olay.phase != TickEvent.Phase.END || !(olay.level instanceof ServerLevel level)) {
@@ -242,20 +280,39 @@ public final class YanginYoneticisi {
         if (veri == null) {
             return;
         }
+        long baslangic = System.nanoTime();
         long simdi = level.getGameTime();
         if (simdi % 200 == 0) {
             veri.yanmislar.values().removeIf(bitis -> bitis <= simdi);
         }
-        if (veri.hucreler.isEmpty()) {
+        boolean calisti = false;
+        if (!veri.bekleyenSilmeler.isEmpty() && (veri.chunkYuklendi || simdi % BEKLEYEN_ARALIGI == 0)) {
+            veri.chunkYuklendi = false;
+            bekleyenleriIsle(level, veri);
+            calisti = true;
+        }
+        if (veri.hucreler.isEmpty() && veri.alanIsleri.isEmpty()) {
             if (!veri.paketAlanlar.isEmpty() && simdi % OZET_ARALIGI == 0) {
                 ozetGonder(level, veri, simdi);
+            }
+            if (calisti) {
+                veri.sureKaydet((System.nanoTime() - baslangic) / 1.0e6);
             }
             return;
         }
         int butce = butceyiGuncelle(level, veri);
+        alanIsleriniIsle(level, veri);
         isle(level, veri, simdi, butce);
         if (simdi % OZET_ARALIGI == 0) {
             ozetGonder(level, veri, simdi);
+        }
+        veri.sureKaydet((System.nanoTime() - baslangic) / 1.0e6);
+        if (simdi % OZET_LOG_ARALIGI == 0) {
+            double[] sure = veri.sureOzeti();
+            DogalAfetler.LOGGER.info(String.format(Locale.ROOT,
+                    "yangın özeti: %s aktif %d, bütçe %d, alan işi %d, bekleyen silme %d, yönetici %.2f ms ort / %.2f ms en çok",
+                    level.dimension().location(), veri.hucreler.size(), butce, veri.alanIsleri.size(),
+                    veri.bekleyenSilmeler.size(), sure[0], sure[1]));
         }
     }
 
@@ -295,7 +352,7 @@ public final class YanginYoneticisi {
                 hucreyiIsle(level, veri, h, simdi, hasar, ruzgar);
             }
         }
-        java.util.Arrays.fill(veri.adaylar, 0, m, null);
+        Arrays.fill(veri.adaylar, 0, m, null);
     }
 
     private static void hucreyiIsle(ServerLevel level, YanginVerisi veri, YanginHucresi h, long simdi, boolean hasar,
@@ -313,15 +370,16 @@ public final class YanginYoneticisi {
             return;
         }
         if (hasar && !h.atesVar) {
-            atesYak(level, h, konum);
+            atesYak(level, veri, h, konum);
         } else if (!hasar && h.atesVar) {
-            atesSil(level, h);
+            atesSil(level, veri, h);
         }
         BlockPos ust = h.atesVar ? BlockPos.of(h.atesKonumu) : konum.above();
-        Yagis yagis = yagis(level, ust);
+        YagisDurumu yagis = yagis(level, ust);
         RandomSource r = veri.rastgele;
-        if (yagis != Yagis.YOK && YanginAyarlari.yagmurdaSonme() && r.nextDouble() < YanginMantigi.yagmurSonmeOlasiligi(
-                YanginAyarlari.yagmurSonmeOlasiligi(), h.yasOrani(simdi), yagis == Yagis.KORUNAKLI)) {
+        if (yagis != YagisDurumu.YOK && YanginAyarlari.yagmurdaSonme() && r.nextDouble()
+                < YanginMantigi.yagmurSonmeOlasiligi(YanginAyarlari.yagmurSonmeOlasiligi(), h.yasOrani(simdi),
+                        yagis == YagisDurumu.KORUNAKLI)) {
             if (veri.buharlar.size() < BUHAR_TAVANI) {
                 veri.buharlar.add(ust.asLong());
             }
@@ -335,7 +393,7 @@ public final class YanginYoneticisi {
         if (!hasar) {
             varlikHasari(level, ust);
         }
-        if (h.yayilabilir && yagis == Yagis.YOK) {
+        if (h.yayilabilir && yagis == YagisDurumu.YOK) {
             yay(level, veri, h, konum, ruzgar);
         }
     }
@@ -433,7 +491,7 @@ public final class YanginYoneticisi {
         YanginHucresi h = new YanginHucresi(anahtar, kaynak, (float) Math.max(0.0, Math.min(1.0, yogunluk)), simdi,
                 simdi + YanginMantigi.yanmaSuresiTick(durum.getFlammability(level, konum, Direction.UP)));
         if (Kurallar.blokHasariAcik(level.getGameRules())) {
-            atesYak(level, h, konum);
+            atesYak(level, veri, h, konum);
         }
         veri.hucreler.put(anahtar, h);
         veri.setDirty();
@@ -445,35 +503,75 @@ public final class YanginYoneticisi {
         int tasan = YanginMantigi.tasanSayisi(veri.hucreler.size(), YanginAyarlari.aktifTavan());
         Iterator<YanginHucresi> it = veri.hucreler.values().iterator();
         while (tasan-- > 0 && it.hasNext()) {
-            atesSil(level, it.next());
+            atesSil(level, veri, it.next());
             it.remove();
         }
     }
 
-    /** Görünür ateşi yakıtın hava komşusuna koyar (önce üst, sonra yanlar, en son alt). */
-    private static void atesYak(ServerLevel level, YanginHucresi h, BlockPos konum) {
+    /**
+     * Görünür ateşi yakıtın hava komşusuna koyar (önce üst, sonra yanlar, en son alt). Durum dayanağa göre hesaplanır
+     * (zemin, yan ya da tavan alevi, Y-20); dayanağı olmayan konuma ateş konmaz.
+     */
+    private static void atesYak(ServerLevel level, YanginVerisi veri, YanginHucresi h, BlockPos konum) {
+        AfetAtesiBlogu blok = YanginKayitlari.AFET_ATESI.get();
         for (Direction yon : ATES_YONLERI) {
             BlockPos kom = konum.relative(yon);
-            if (havaMi(level, kom)) {
-                level.setBlock(kom, YanginKayitlari.AFET_ATESI.get().defaultBlockState(), 3);
-                h.atesKonumu = kom.asLong();
-                h.atesVar = true;
-                return;
+            if (!havaMi(level, kom)) {
+                continue;
             }
+            BlockState ates = blok.dayanagaGore(level, kom);
+            if (!ates.canSurvive(level, kom)) {
+                continue;
+            }
+            level.setBlock(kom, ates, 3);
+            veri.bekleyenSilmeler.remove(kom.asLong());
+            h.atesKonumu = kom.asLong();
+            h.atesVar = true;
+            return;
         }
     }
 
     private static final Direction[] ATES_YONLERI = {Direction.UP, Direction.NORTH, Direction.SOUTH, Direction.EAST,
             Direction.WEST, Direction.DOWN};
 
-    private static void atesSil(ServerLevel level, YanginHucresi h) {
+    /** Hücrenin ateş bloğunu kaldırır; konum yüklü değilse bekleyen silmeye yazar (Y-19), chunk zorla yüklenmez. */
+    private static void atesSil(ServerLevel level, YanginVerisi veri, YanginHucresi h) {
         if (!h.atesVar) {
             return;
         }
         h.atesVar = false;
         BlockPos p = BlockPos.of(h.atesKonumu);
-        if (level.isLoaded(p) && level.getBlockState(p).is(YanginKayitlari.AFET_ATESI.get())) {
+        if (!yukluKaynagi.test(level, p)) {
+            veri.bekleyenSilmeler.add(h.atesKonumu);
+            veri.setDirty();
+            return;
+        }
+        if (level.getBlockState(p).is(YanginKayitlari.AFET_ATESI.get())) {
             level.removeBlock(p, false);
+        }
+    }
+
+    /** Yüklenmiş bekleyen silme konumlarındaki ateş bloklarını kaldırır. */
+    static void bekleyenleriIsle(ServerLevel level, YanginVerisi veri) {
+        int kaldirilan = 0;
+        int cozulen = 0;
+        LongIterator it = veri.bekleyenSilmeler.iterator();
+        while (it.hasNext()) {
+            BlockPos p = BlockPos.of(it.nextLong());
+            if (!yukluKaynagi.test(level, p)) {
+                continue;
+            }
+            if (level.getBlockState(p).is(YanginKayitlari.AFET_ATESI.get())) {
+                level.removeBlock(p, false);
+                kaldirilan++;
+            }
+            it.remove();
+            cozulen++;
+        }
+        if (cozulen > 0) {
+            veri.setDirty();
+            DogalAfetler.LOGGER.info("yangın bekleyen silme: {} ateş bloğu kaldırıldı, {} konum zaten boş, {} bekliyor ({})",
+                    kaldirilan, cozulen - kaldirilan, veri.bekleyenSilmeler.size(), level.dimension().location());
         }
     }
 
@@ -488,35 +586,116 @@ public final class YanginYoneticisi {
     }
 
     /**
-     * Ateş konumundaki yağış: konum ya da yatay komşusu yağmur görüyorsa açık (vanilla {@code isNearRain}), yağan biyomda
-     * gökyüzüne kapalıysa korunaklı. Yüklü olmayan komşu okunmaz.
+     * Ateş konumundaki yağış (Y-08): konum ya da yatay komşusu yağmur görüyorsa açık (vanilla {@code isNearRain}); yağan
+     * biyomda üstündeki katı örtü (yaprak hariç, {@code MOTION_BLOCKING_NO_LEAVES}) en çok 8 bloksa korunaklı; daha
+     * derindeki ateş yağmurdan etkilenmez. Yüklü olmayan komşu okunmaz.
      */
-    private static Yagis yagis(ServerLevel level, BlockPos p) {
+    private static YagisDurumu yagis(ServerLevel level, BlockPos p) {
         if (!level.isRaining() || !level.isLoaded(p)) {
-            return Yagis.YOK;
+            return YagisDurumu.YOK;
         }
-        if (level.isRainingAt(p)) {
-            return Yagis.ACIK;
-        }
+        boolean goruyor = level.isRainingAt(p);
         for (Direction yon : Direction.Plane.HORIZONTAL) {
             BlockPos kom = p.relative(yon);
-            if (level.isLoaded(kom) && level.isRainingAt(kom)) {
-                return Yagis.ACIK;
+            if (goruyor) {
+                break;
             }
+            goruyor = level.isLoaded(kom) && level.isRainingAt(kom);
         }
-        return level.getBiome(p).value().getPrecipitationAt(p) == Biome.Precipitation.RAIN ? Yagis.KORUNAKLI : Yagis.YOK;
-    }
-
-    private enum Yagis {
-        YOK,
-        KORUNAKLI,
-        ACIK
+        boolean yagmurlu = level.getBiome(p).value().getPrecipitationAt(p) == Biome.Precipitation.RAIN;
+        int ortu = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, p.getX(), p.getZ()) - p.getY();
+        return YanginMantigi.yagisDurumu(true, goruyor, yagmurlu, ortu);
     }
 
     private static void kaldir(ServerLevel level, YanginVerisi veri, YanginHucresi h) {
-        atesSil(level, h);
+        atesSil(level, veri, h);
         veri.hucreler.remove(h.konum);
         veri.setDirty();
+    }
+
+    /** {@code secici}'ye uyan hücreleri söndürür; yüklü olmayan ateş blokları bekleyen silmeye girer. */
+    private static int sondur(ServerLevel level, YanginVerisi veri, Predicate<YanginHucresi> secici, String neden) {
+        int bekleyenOnce = veri.bekleyenSilmeler.size();
+        int sayi = 0;
+        Iterator<YanginHucresi> it = veri.hucreler.values().iterator();
+        while (it.hasNext()) {
+            YanginHucresi h = it.next();
+            if (secici.test(h)) {
+                atesSil(level, veri, h);
+                it.remove();
+                sayi++;
+            }
+        }
+        if (sayi > 0) {
+            veri.setDirty();
+        }
+        int yeniBekleyen = veri.bekleyenSilmeler.size() - bekleyenOnce;
+        if (yeniBekleyen > 0) {
+            DogalAfetler.LOGGER.info("yangın {}: {} hücre söndü; {} ateş bloğu yüklü olmayan chunk'ta, chunk yüklenince "
+                    + "kaldırılacak (bekleyen silme {}, {})", neden, sayi, yeniBekleyen, veri.bekleyenSilmeler.size(),
+                    level.dimension().location());
+        }
+        return sayi;
+    }
+
+    // ---------------------------------------------------------------- alan tutuşturma (Y-21)
+
+    /** Birkaç tick'e yayılabilen alan tutuşturma işi. */
+    static final class AlanIsi {
+        final BlockPos merkez;
+        final YanginKaynagi kaynak;
+        final double yogunluk;
+        final KureTarayici tarayici;
+        int tutusan;
+
+        AlanIsi(BlockPos merkez, int yaricap, YanginKaynagi kaynak, double yogunluk) {
+            this.merkez = merkez;
+            this.kaynak = kaynak;
+            this.yogunluk = yogunluk;
+            this.tarayici = new KureTarayici(yaricap);
+        }
+    }
+
+    /** Sıradaki alan işlerini bu tick'in kalan okuma bütçesiyle (hücre bütçesi × 64) ilerletir. */
+    private static void alanIsleriniIsle(ServerLevel level, YanginVerisi veri) {
+        long simdi = level.getGameTime();
+        if (veri.alanButcesiTick != simdi) {
+            veri.alanButcesiTick = simdi;
+            veri.alanButcesi = YanginMantigi.alanOkumaButcesi(etkinButce());
+        }
+        BlockPos.MutableBlockPos kom = new BlockPos.MutableBlockPos();
+        while (veri.alanButcesi > 0 && !veri.alanIsleri.isEmpty()) {
+            AlanIsi is = veri.alanIsleri.peek();
+            veri.alanButcesi -= is.tarayici.ilerle(veri.alanButcesi,
+                    (dx, dy, dz) -> alanKonumu(level, veri, is, kom, dx, dy, dz));
+            if (!is.tarayici.bitti()) {
+                return;
+            }
+            veri.alanIsleri.poll();
+        }
+    }
+
+    /** Alandaki bir konum: önce kendisi yanıcı mı (tek okuma), sonra havaya değen yüzü var mı. Harcanan okumayı döndürür. */
+    private static int alanKonumu(ServerLevel level, YanginVerisi veri, AlanIsi is, BlockPos.MutableBlockPos kom, int dx,
+            int dy, int dz) {
+        if (veri.rastgele.nextDouble() >= YanginMantigi.alanOrani(is.yogunluk)) {
+            return 1;
+        }
+        BlockPos p = is.merkez.offset(dx, dy, dz);
+        if (!level.isLoaded(p) || !yanabilir(level.getBlockState(p), level, p)) {
+            return 1;
+        }
+        int okuma = 1;
+        for (Direction yon : Direction.values()) {
+            okuma++;
+            if (havaMi(level, kom.setWithOffset(p, yon))) {
+                if (hucreEkle(level, veri, p, is.kaynak, is.yogunluk)) {
+                    is.tutusan++;
+                }
+                break;
+            }
+        }
+        return okuma;
     }
 
     // ---------------------------------------------------------------- ısı ve istemci özeti
@@ -542,7 +721,7 @@ public final class YanginYoneticisi {
                     ozetler.add(t.ozet(mesafeKare <= HUCRE_MENZILI * HUCRE_MENZILI));
                 }
             }
-            long[] yakinBuhar = java.util.Arrays.stream(buharlar).filter(b -> yatayMesafeKare(oyuncu,
+            long[] yakinBuhar = Arrays.stream(buharlar).filter(b -> yatayMesafeKare(oyuncu,
                     BlockPos.getX(b), BlockPos.getZ(b)) <= HUCRE_MENZILI * HUCRE_MENZILI).toArray();
             boolean bos = ozetler.isEmpty() && yakinBuhar.length == 0;
             if (bos && !veri.paketAlanlar.remove(oyuncu.getUUID())) {
@@ -620,7 +799,7 @@ public final class YanginYoneticisi {
 
         AtesDurumuPaketi.Ozet ozet(boolean hucrelerle) {
             return new AtesDurumuPaketi.Ozet(cx, cz, sayi, (float) ortX(), (float) ortY(), (float) ortZ(), ustY,
-                    hucrelerle ? java.util.Arrays.copyOf(hucreler, hucreSayisi) : new int[0]);
+                    hucrelerle ? Arrays.copyOf(hucreler, hucreSayisi) : new int[0]);
         }
     }
 
