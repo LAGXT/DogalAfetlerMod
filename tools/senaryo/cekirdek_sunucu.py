@@ -3,10 +3,12 @@
 
 Kendi dünyasını sıfırdan üretir: `run-server/cekirdek-senaryo` silinir, `run-server/server.properties` geçici olarak
 `level-name=cekirdek-senaryo` yapılır ve senaryo bitince özgün içeriğine döner (`test` dünyasına dokunulmaz). Sunucu
-Gradle ile pty'siz, stdin'i boruya bağlı açılır (docs/MAKINE.md, K0-18); `-PoyunTestiAfeti=deprem,gunes_patlamasi` ile bu
+Gradle ile pty'siz, stdin'i boruya bağlı açılır (docs/MAKINE.md, K0-18); `-PoyunTestiAfeti=!deprem,!gunes_patlamasi` ile bu
 türlere yaşam döngüsü sınama afeti kaydedilir (core.OyunTestiAfeti; güneş türü AKTIF'te güneşi BUYUYEN, BITIS'te SUPERNOVA
 yapar) ve güneş türüyle birlikte dönem süreci taklidi `oyuntesti_gunes` (core.OyunTestiSureci: SUPERNOVA/GUNESSIZ'de
-aktif) kaydedilir; kasırga kayıtsız kalır.
+aktif) kaydedilir. `!` (K-E23): Faz 4'ün gerçek deprem/güneş patlaması kayıtlıysa taklit onların yerine geçer; senaryo
+gerçek afetlerden bağımsız olarak çekirdeği sınar. Kasırga kayıtsızsa "not registered yet", kayıtlıysa (Faz 4) başlatılıp
+durdurulur.
 
 Koşu 1: yeni config varsayılanlarla yazılır; durum, gun 90, durum (seviye ağırlıkları), hiz 10, durum, start kasirga 3
 ("henüz kayıtlı değil"), asama ileri (ilerletilecek yok), sifirla, durum, gun 42, time add 72000 + durum (gün 42), time set
@@ -51,6 +53,10 @@ ADIM_SURESI = 60
 KAPANIS_SURESI = 180
 VARSAYILAN_PORT = 25565
 PORT = VARSAYILAN_PORT
+# Ortak Sunucu'nun varsayılan bayrağı (diğer *_sunucu.py betikleri): kayıtsız türlere taklit, gerçek afet varsa o (K-E22).
+OYUN_TESTI_AFETI = "deprem,gunes_patlamasi"
+# Çekirdek senaryosu: taklit gerçek afetin yerine geçer (K-E23).
+CEKIRDEK_OYUN_TESTI_AFETI = "!deprem,!gunes_patlamasi"
 
 
 class SenaryoHatasi(Exception):
@@ -60,7 +66,7 @@ class SenaryoHatasi(Exception):
 class Sunucu:
     """Bir runServer süreci: çıktıyı log'a ve belleğe yazar, komut gönderir, desen bekler."""
 
-    def __init__(self, ad, log_yolu):
+    def __init__(self, ad, log_yolu, oyun_testi=OYUN_TESTI_AFETI):
         self.ad = ad
         self.satirlar = []
         self.kilit = threading.Condition()
@@ -68,7 +74,7 @@ class Sunucu:
         self.log = log_yolu.open("w", encoding="utf-8")
         ortam = dict(os.environ, JAVA_HOME=JAVA_HOME)
         self.surec = subprocess.Popen(
-            ["./gradlew", "runServer", "--console=plain", "--offline", "-PoyunTestiAfeti=deprem,gunes_patlamasi"], cwd=KOK, env=ortam,
+            ["./gradlew", "runServer", "--console=plain", "--offline", f"-PoyunTestiAfeti={oyun_testi}"], cwd=KOK, env=ortam,
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8",
             errors="replace", bufsize=1, start_new_session=True)
         threading.Thread(target=self._oku, daemon=True).start()
@@ -225,13 +231,17 @@ def kosu1(sunucu):
     sunucu.bekle(r"Done \(", 0, ACILIS_SURESI, "açılış")
     sunucu.bekle(r"Config dosyası varsayılanlarla oluşturuldu: .*dogalafetler-server\.toml", 0, 5,
                  "yeni dünyada config varsayılanlarla yazıldı")
+    taklit_kontrolu(sunucu)
     sunucu.komut("dogalafet durum", r"Level weights \(day 0, max level 5\): S1 100\.0%", "durum (gün 0: yalnız S1)")
     sunucu.komut("dogalafet gun 90", r"Game day set to 90\. Level weights: S1 ")
     sunucu.komut("dogalafet durum", r"Level weights \(day 90, max level 5\): S1 [0-9.]+%, S2 [0-9.]+%, S3 [0-9.]+%, "
                  r"S4 [0-9.]+%, S5 [1-9][0-9.]*%", "durum (gün 90: S5 görünür)")
     sunucu.komut("dogalafet hiz 10", r"timers run at x10\.00")
     sunucu.komut("dogalafet durum", r"speed: x10\.00", "durum (hız 10)")
-    sunucu.komut("dogalafet start kasirga 3", r"Tornado is not registered yet\.")
+    satir = sunucu.komut("dogalafet start kasirga 3", r"Tornado is not registered yet\.|Tornado started",
+                         "kasırga kayıtsızsa reddedilir, Faz 4'te kayıtlıysa başlar")
+    if "Tornado started" in satir:
+        sunucu.komut("dogalafet stop", r"Tornado stopped\.")
     sunucu.komut("dogalafet asama ileri", r"no disaster or era phase to advance")
     sunucu.komut("dogalafet sifirla", r"disaster and era state was reset")
     sunucu.komut("dogalafet durum", r"Game day: 0 \(offset 0\), speed: x1\.00", "durum (sıfırlandı)")
@@ -287,8 +297,16 @@ def kosu1(sunucu):
     sunucu.komut("dogalafet durum", r"Game day: 42 \(offset", "durum (gün 42)")
 
 
+def taklit_kontrolu(sunucu):
+    """Deprem ve güneş patlaması taklit olmalı (kayıtsız türde kayıt ya da `!` ile gerçek afetin yerine; K-E23)."""
+    for tur in ("deprem", "gunes_patlamasi"):
+        sunucu.bekle(rf"Oyun testi afeti {tur} (için kaydedildi|gerçek afetin yerine kaydedildi)", 0, 5,
+                     f"{tur} taklidi etkin (`!` desteği yoksa mod K-E23'ten eski)")
+
+
 def kosu2(sunucu):
     sunucu.bekle(r"Done \(", 0, ACILIS_SURESI, "açılış")
+    taklit_kontrolu(sunucu)
     sunucu.bekle(r"Aktif afet geri yüklendi: deprem seviye 3 aşama aktif", 0, 30, "aktif afet geri yüklendi")
     sunucu.bekle(r"Dünya dönemi okundu \(dogalafetler_donem\): .*gunOfseti=42 uyku=0 .*gecmis=4 genelBekleme=[1-9][0-9]* "
                  r"sonSeviye=2 aktifAfet=deprem/aktif durdurulanSurec=0", 0, 30,
@@ -329,7 +347,7 @@ def main():
     kodlar = []
     try:
         for ad, adimlar in (("kosu1", kosu1), ("kosu2", kosu2)):
-            sunucu = Sunucu(ad, klasor / f"{ad}.log")
+            sunucu = Sunucu(ad, klasor / f"{ad}.log", CEKIRDEK_OYUN_TESTI_AFETI)
             try:
                 adimlar(sunucu)
             except SenaryoHatasi as hata:

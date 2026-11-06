@@ -50,6 +50,18 @@ public final class AfetKaydi {
         OYUN_TESTI.add(tur);
     }
 
+    /**
+     * Yalnız {@link OyunTestiAfeti#ozelliktenKaydet} ({@code !tür}, K-E23): kayıtlı gerçek afetin fabrikasını oyun testi afetiyle
+     * değiştirir; geliştirme sunucusunun ömrü boyunca geri alınmaz.
+     */
+    static synchronized void oyunTestiEz(AfetTuru tur, Supplier<? extends Afet> fabrika) {
+        if (!FABRIKALAR.containsKey(tur)) {
+            throw new IllegalStateException(tur.kimlik() + " kayıtlı değil; ezilecek gerçek afet yok (K-E23)");
+        }
+        FABRIKALAR.put(tur, Objects.requireNonNull(fabrika, "fabrika"));
+        OYUN_TESTI.add(tur);
+    }
+
     public static synchronized boolean kayitliMi(AfetTuru tur) {
         return FABRIKALAR.containsKey(tur);
     }
