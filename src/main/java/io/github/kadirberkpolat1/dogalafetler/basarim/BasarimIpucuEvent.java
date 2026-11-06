@@ -61,4 +61,23 @@ public class BasarimIpucuEvent extends Event {
             }
         }
     }
+
+    /**
+     * Yalnız GameTest ve otomasyon: türü {@code try}-with-resources boyunca bu ipucunun kayıtsız yayıncısı yapar (yedek
+     * denetim yolu sınanabilsin), sonunda önceki kaydı geri koyar (K-E22). Faz 4 afeti mod kurucusunda {@link #yayinciKaydet}
+     * yaptığı için "kayıtsız tür" örneği olarak gerçek türe güvenen test bununla sarılır. Üretim kodunda kullanılmaz.
+     */
+    public static GeciciKayitsiz geciciKayitsiz(AfetTuru tur, Ipucu ipucu) {
+        return new GeciciKayitsiz(tur, ipucu, YAYINCILAR.kaldir(tur, ipucu));
+    }
+
+    /** {@link #geciciKayitsiz} tutamaçı. */
+    public record GeciciKayitsiz(AfetTuru tur, Ipucu ipucu, boolean kayitliydi) implements AutoCloseable {
+        @Override
+        public void close() {
+            if (kayitliydi) {
+                YAYINCILAR.kaydet(tur, ipucu);
+            }
+        }
+    }
 }
