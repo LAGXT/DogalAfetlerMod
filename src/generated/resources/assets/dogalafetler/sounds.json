@@ -5,6 +5,24 @@
     ],
     "subtitle": "subtitles.dogalafetler.esya.oncu_sarsinti"
   },
+  "kasirga_ruzgar": {
+    "sounds": [
+      {
+        "name": "dogalafetler:kasirga_ruzgar",
+        "stream": true
+      }
+    ],
+    "subtitle": "subtitles.dogalafetler.kasirga_ruzgar"
+  },
+  "kasirga_ugultu": {
+    "sounds": [
+      {
+        "name": "dogalafetler:kasirga_ugultu",
+        "stream": true
+      }
+    ],
+    "subtitle": "subtitles.dogalafetler.kasirga_ugultu"
+  },
   "ortam_test": {
     "sounds": [
       {

@@ -94,6 +94,17 @@ Kaynak: `.vibe/kararlar/spike-kasirga.md` (SK-01…SK-06), `.vibe/rapor/inceleme
 | 5 Felaket | 34 | 55 | 60 | 110 | 4,4 | 180 sn | 51 | 20 | ≤5,0 (taş, kırıktaş) | 4 |
 
 - Spike sonrası güncelleme, 2026-11-06: "Gövde tepe çapı" ve "Etek çapı" sütunları eklendi; gövdenin orta yükseklikteki genişliği (h = 0,5; `h^0.6` = 0,66) S4 ~38,5 / 95 = %41, S5 ~48 / 110 = %44 (kama). Etek yüksekliği S1 6 → S5 14 blok, doğrusal.
-- Yönelim: hedef oyuncudan 80–140 blok uzakta doğar, oyuncu çevresine doğru ±35° sapmalı rastgele yürüyüşle ilerler; doğuş 8 sn (toz girdabı → huni iner), dağılma 10 sn (ip evresi).
+- Yönelim: hedef oyuncudan `[0,5·(R + 56), R + 56]` blok uzakta doğar (R = çekim yarıçapı; S1 32–65, S5 54–107 blok), hedefin başlangıç konumuna doğru ±35° sapmalı yürüyüşle ilerler, 12 bloğuna girince ana yönü donar ve uzaklaşır; doğuş 8 sn (toz girdabı → huni iner), dağılma 10 sn (ip evresi). (Faz 4 düzeltmesi, `.vibe/kararlar/kasirga.md` K-03: eski 80–140 blokta S1–S3’ün hedefi sireni duymazdı; siren alanı etki alanı + 64 blok.)
 - Bloklar `dogalafetler:kasirga_dayanikli` etiketiyle korunur (obsidyen, deepslate, ana kaya varsayılan).
 - Kaldırılan oyuncu en çok 25 blok yükselir; düşme hasarı vanilla.
+
+### Faz 4 güncellemesi, 2026-11-06
+
+Kaynak: `.vibe/kararlar/kasirga.md` K-01…K-12.
+
+- **Evreler aşamalara oturdu (K-02):** siren aşamasında huni yoktur; duvar bulutu 8 bloktan alçalıp koyulaşır, tabanda kısa bir huni bulutu sarkar, uzak uğultu açılır. AKTIF ile huni iner (doğuş), olgun evre seviye süresince sürer, ip ve dağılma evresiyle afet doğal biter.
+- **Zemin (K-04):** S1–3 yalnız üstteki bitki/yaprak/ahşap/camı kaldırır, toprak ve taş zemini yalnız S4–5 sıyırır; S1 "çimen" bitki demektir.
+- **Ses (K-07):** elytra ıslığı konuşma bandını doldurduğu için yazılmadı; yakın katmanın düşük düzeyli 500–1500 Hz rüzgâr uğultusu yerini aldı.
+- **Şimşek (K-08):** sunucuda vanilla `LightningBolt` (yalnız görsel); herkes aynı şimşeği görür.
+- **Yağmur yoğunluğu:** dünya havasını değiştirmeden istemcide artırılamaz; yapılmadı (kararlar §D).
+- **Yakın mesafe (spike B9):** sprite boyutu kameraya uzaklığın %36'sıyla sınırlı, kamera huninin/eteğin içindeyken iç katmanlar atlanır; duvar bulutu alfası 0,88 → 0,74.
