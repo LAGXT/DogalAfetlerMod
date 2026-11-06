@@ -453,13 +453,15 @@ public final class AfetYoneticisi {
     }
 
     /**
-     * {@code /dogalafet asama ileri} aktif afet yokken: önce süren, sonra durdurulmuş dönem süreçlerine sorar; ilk dolu çıktı
-     * döner. Durdurulmuş süreç durmuş kalır, yalnız bir aşama geçer (K-C41); böylece tamamlanırsa kaydı silinir.
+     * {@code /dogalafet asama ileri [süreç]} aktif afet yokken (ya da süreç adı verilince): önce süren, sonra durdurulmuş
+     * dönem süreçlerine sorar; ilk dolu çıktı döner. {@code kimlik} verilirse yalnız o süreç sorulur (K-C48). Durdurulmuş
+     * süreç durmuş kalır, yalnız bir aşama geçer (K-C41); böylece tamamlanırsa kaydı silinir.
      */
-    public Optional<Component> donemAsamaIleri() {
+    public Optional<Component> donemAsamaIleri(Optional<String> kimlik) {
         ServerLevel ust = server.overworld();
         List<DonemSureci> sira = new ArrayList<>(aktifDonemSurecleri());
         sira.addAll(durdurulmusDonemSurecleri().keySet());
+        kimlik.ifPresent(k -> sira.removeIf(surec -> !surec.kimlik().equals(k)));
         for (DonemSureci surec : sira) {
             try {
                 Optional<Component> sonuc = surec.asamaIleri(ust);

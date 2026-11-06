@@ -75,6 +75,7 @@ public final class CekirdekKomutlari {
     public static final String ASAMA_AFET = ON + "asama.afet";
     public static final String ASAMA_AFET_BITTI = ON + "asama.afet_bitti";
     public static final String ASAMA_YOK = ON + "asama.yok";
+    public static final String ASAMA_SUREC_YOK = ON + "asama.surec_yok";
     public static final String SEVIYE = ON + "seviye";
     public static final String YOK = ON + "yok";
     public static final String VAR = ON + "var";
@@ -215,12 +216,13 @@ public final class CekirdekKomutlari {
         return 1;
     }
 
-    static int asamaIleri(CommandContext<CommandSourceStack> baglam) {
+    /** {@code asama ileri [süreç]}: süreç adı verilirse aktif afete dokunmadan yalnız o dönem süreci ilerler (K-C48). */
+    static int asamaIleri(CommandContext<CommandSourceStack> baglam, Optional<String> surec) {
         CommandSourceStack kaynak = baglam.getSource();
         MinecraftServer server = kaynak.getServer();
         AfetYoneticisi yonetici = AfetYoneticisi.al(server);
         Optional<AfetTuru> tur = yonetici.aktifAfet().map(Afet::tur);
-        if (tur.isPresent() && yonetici.asamaIleri()) {
+        if (surec.isEmpty() && tur.isPresent() && yonetici.asamaIleri()) {
             Optional<Afet> sonra = yonetici.aktifAfet();
             Component mesaj = sonra.isPresent()
                     ? Component.translatable(ASAMA_AFET, afetAdi(tur.get()),
@@ -229,13 +231,14 @@ public final class CekirdekKomutlari {
             kaynak.sendSuccess(() -> mesaj, false);
             return 1;
         }
-        Optional<Component> donemMesaji = yonetici.donemAsamaIleri();
+        Optional<Component> donemMesaji = yonetici.donemAsamaIleri(surec);
         if (donemMesaji.isPresent()) {
             Component mesaj = donemMesaji.get();
             kaynak.sendSuccess(() -> mesaj, false);
             return 1;
         }
-        kaynak.sendFailure(Component.translatable(ASAMA_YOK));
+        kaynak.sendFailure(surec.isPresent() ? Component.translatable(ASAMA_SUREC_YOK, surec.get())
+                : Component.translatable(ASAMA_YOK));
         return 0;
     }
 
@@ -419,6 +422,8 @@ public final class CekirdekKomutlari {
         y.ekle(ASAMA_AFET, "%s phase: %s", "%s aşaması: %s");
         y.ekle(ASAMA_AFET_BITTI, "%s has ended.", "%s sona erdi.");
         y.ekle(ASAMA_YOK, "There is no disaster or era phase to advance.", "İlerletilecek afet ya da dönem aşaması yok.");
+        y.ekle(ASAMA_SUREC_YOK, "No running or stopped era process named %s can advance.",
+                "%s adlı, süren ya da durdurulmuş ve ilerleyebilen bir dönem süreci yok.");
         y.ekle(SEVIYE, "Level %s (%s)", "Seviye %s (%s)");
         y.ekle(YOK, "none", "yok");
         y.ekle(VAR, "present", "var");

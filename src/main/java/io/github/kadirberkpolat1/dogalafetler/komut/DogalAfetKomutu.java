@@ -7,9 +7,13 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
+import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
+import io.github.kadirberkpolat1.dogalafetler.core.DonemSureci;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.ZamanOlcegi;
 import java.util.Arrays;
+import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
@@ -43,6 +47,13 @@ public final class DogalAfetKomutu {
     private static final SuggestionProvider<CommandSourceStack> AFET_ADLARI = (baglam, kurucu) ->
             SharedSuggestionProvider.suggest(Arrays.stream(AfetTuru.values()).map(AfetTuru::kimlik), kurucu);
 
+    /** Süren ve durdurulmuş dönem süreçlerinin kimlikleri ({@code asama ileri [süreç]}, K-C48). */
+    private static final SuggestionProvider<CommandSourceStack> SUREC_ADLARI = (baglam, kurucu) -> {
+        AfetYoneticisi yonetici = AfetYoneticisi.al(baglam.getSource().getServer());
+        return SharedSuggestionProvider.suggest(Stream.concat(yonetici.aktifDonemSurecleri().stream(),
+                yonetici.durdurulmusDonemSurecleri().keySet().stream()).map(DonemSureci::kimlik), kurucu);
+    };
+
     private DogalAfetKomutu() {
     }
 
@@ -69,7 +80,11 @@ public final class DogalAfetKomutu {
                 .then(Commands.argument("carpan", DoubleArgumentType.doubleArg(ZamanOlcegi.EN_AZ, ZamanOlcegi.EN_COK))
                         .executes(CekirdekKomutlari::hiz)));
         kok.then(Commands.literal(SIFIRLA).executes(CekirdekKomutlari::sifirla));
-        kok.then(Commands.literal(ASAMA).then(Commands.literal(ILERI).executes(CekirdekKomutlari::asamaIleri)));
+        kok.then(Commands.literal(ASAMA).then(Commands.literal(ILERI)
+                .executes(b -> CekirdekKomutlari.asamaIleri(b, Optional.empty()))
+                .then(Commands.argument("surec", StringArgumentType.word()).suggests(SUREC_ADLARI)
+                        .executes(b -> CekirdekKomutlari.asamaIleri(b,
+                                Optional.of(StringArgumentType.getString(b, "surec")))))));
         KomutKaydi.baglaTumunu(kok, olay.getBuildContext(), CEKIRDEK_ALT_KOMUTLARI);
         olay.getDispatcher().register(kok);
     }

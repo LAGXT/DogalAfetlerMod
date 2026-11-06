@@ -35,10 +35,11 @@ import net.minecraftforge.network.simple.SimpleChannel;
  *
  * Ortak kurulumda ({@code enqueueWork}) bütün tanımlar toplanır ve paket kimlikleri <b>ada göre sıralanmış</b> listeden
  * verilir; katılım sırası ya da sınıf yükleme sırası kimliği değiştirmez, iki tarafta aynı ad kümesi aynı kimlikleri verir.
- * Katılımlar koşulsuz olmalıdır (Dist denetimi yok). Protokol değiştiğinde {@link #PROTOKOL_SURUMU} artırılır.
+ * Katılımlar koşulsuz olmalıdır (Dist denetimi yok). Paket ekleyen dal protokolü artırmaz; entegratör birleştirmede
+ * {@link #PROTOKOL_SURUMU}'nu bir kez artırır (K-C47).
  */
 public final class AgKanali {
-    public static final String PROTOKOL_SURUMU = "3";
+    public static final String PROTOKOL_SURUMU = "4";
 
     public static final SimpleChannel KANAL = NetworkRegistry.newSimpleChannel(
             DogalAfetler.konum("ana"),

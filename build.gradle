@@ -35,13 +35,15 @@ minecraft {
             property 'forge.logging.markers', 'REGISTRIES'
             property 'forge.logging.console.level', 'info'
             // Uyumluluk modlarının mixin refmap'i SRG adlıdır; geliştirme ortamında resmi adlara çevrilmezse hedefler
-            // kayar (Cold Sweat 2.4.5'in required_mods filtresi çalışmaz, dünya kayıt hatasıyla açılmaz).
+            // kayar (Cold Sweat 2.4.5'in required_mods filtresi çalışmaz, dünya kayıt hatasıyla açılmaz). Uyum modu yokken
+            // refmap kapatılır: sanal su mixin'leri geliştirme ortamında resmi adlarla çalışır, refmap (SRG) yalnız üretim
+            // jar'ı içindir. İkisi birlikte kurulmaz: refmap kapalıyken uyum modunun refmap'i hiç okunmaz.
             if (uyum != 'yok') {
                 property 'mixin.env.remapRefMap', 'true'
                 property 'mixin.env.refMapRemappingFile', "${projectDir}/build/createSrgToMcp/output.srg"
+            } else {
+                property 'mixin.env.disableRefMap', 'true'
             }
-            // Sanal su mixin'leri: geliştirme ortamı resmi adlarla çalışır; refmap (SRG) yalnız üretim jar'ı içindir.
-            property 'mixin.env.disableRefMap', 'true'
 
             mods {
                 "${mod_id}" {

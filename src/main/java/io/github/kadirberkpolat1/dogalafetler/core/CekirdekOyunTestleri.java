@@ -380,6 +380,8 @@ public final class CekirdekOyunTestleri {
             yonetici.donemSureciBasladi(ay);
             yonetici.donemSureciBasladi(gunes);
             yardimci.assertTrue(yonetici.aktifDonemSurecleri().size() == 2, "yeni döngü eski durdurma kaydını silmeli (Y4)");
+            yardimci.assertTrue(komut(yardimci, "dogalafet asama ileri " + gunes.kimlik()) == 1 && gunes.asama == 1
+                    && ay.asama == 0, "asama ileri <süreç> yalnız o süreci ilerletmeli (K-C48)");
             kurallar.getRule(Kurallar.AY_CARPMASI_AFETI).set(true, server);
             yardimci.assertTrue(yonetici.kurallariDenetle().isEmpty(), "kurallar açıkken süreç durmamalı");
             kurallar.getRule(Kurallar.AY_CARPMASI_AFETI).set(false, server);
