@@ -9,7 +9,7 @@ import net.minecraft.network.chat.Component;
 
 /**
  * Sismografın sağ tık ekranı (madde 13b): son 60 saniyenin sismik dalga grafiği. Krem renkli kayıt kağıdı tamburdan sola
- * akar (ızgara ve dalga aynı hızla kayar), sağ kenarda kalem kolu şimdiki örneği mürekkeple yazar. Her piksel sütunu 6
+ * akar (ızgara ve dalga aynı hızla kayar), sağ kenarda kalem kolu şimdiki örneği mürekkeple yazar (Hassas'ta mor). Her piksel sütunu 6
  * örneğin en küçük–en büyük aralığıdır (200 dolgu/kare; performansı etkilemez). Oyunu duraklatmaz: dalga açıkken de
  * akmaya devam eder.
  */
@@ -19,6 +19,7 @@ public final class SismografEkrani extends Screen {
     private static final int KAGIT_G = 200;
     private static final int KAGIT_Y = 90;
     private static final int MUREKKEP = 0xFF1C2C6E;
+    private static final int MUREKKEP_HASSAS = 0xFF5A2EA8;
 
     private final float[] enKucuk = new float[KAGIT_G];
     private final float[] enBuyuk = new float[KAGIT_G];
@@ -75,6 +76,7 @@ public final class SismografEkrani extends Screen {
         HalkaTampon tampon = IstemciSismograf.tampon();
         tampon.sutunlar(KAGIT_G, enKucuk, enBuyuk);
         float genlik = KAGIT_Y / 2f - 4;
+        int murekkep = d.hassas() ? MUREKKEP_HASSAS : MUREKKEP;
         float onceki = Float.NaN;
         for (int s = 0; s < KAGIT_G; s++) {
             if (Float.isNaN(enKucuk[s])) {
@@ -88,7 +90,7 @@ public final class SismografEkrani extends Screen {
             }
             int y1 = Math.round(orta - ust * genlik);
             int y2 = Math.round(orta - alt * genlik) + 1;
-            g.fill(kx + s, y1, kx + s + 1, Math.max(y1 + 1, y2), MUREKKEP);
+            g.fill(kx + s, y1, kx + s + 1, Math.max(y1 + 1, y2), murekkep);
             onceki = (enKucuk[s] + enBuyuk[s]) / 2f;
         }
         int uc = Math.round(orta - tampon.son() * genlik);

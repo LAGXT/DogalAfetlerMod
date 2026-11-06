@@ -92,11 +92,13 @@ public final class IstemciSismograf {
         return tick;
     }
 
-    static int darbeSayisi() {
+    /** Oturumdaki öncü darbe sayısı (görsel kanıt otomasyonu log'a yazar). */
+    public static int darbeSayisi() {
         return darbeSayisi;
     }
 
-    static int actionBarSayisi() {
+    /** Oturumda yazılan action bar sayısı (otomasyon). */
+    public static int actionBarSayisi() {
         return actionBarSayisi;
     }
 

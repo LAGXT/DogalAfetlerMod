@@ -91,6 +91,11 @@ public final class EsyaOyunTestleri {
         return coz(ham, SismografPaketi.YOK, SismografPaketi::oku);
     }
 
+    /** Radar ve sismograf paketlerinin sayısı (kanaldaki diğer alt sistemlerin paketleri sayılmaz). */
+    private static int esyaPaketleri(List<byte[]> ham) {
+        return radarlar(ham).size() + sismograflar(ham).size();
+    }
+
     private static <T> T son(GameTestHelper yardimci, List<T> liste, String ne) {
         yardimci.assertTrue(!liste.isEmpty(), ne + ": paket gelmedi");
         return liste.get(liste.size() - 1);
@@ -320,7 +325,7 @@ public final class EsyaOyunTestleri {
             yardimci.assertTrue(radarlar(ilk).size() == 1 && radarlar(ilk).get(0).elde()
                     && sismograflar(ilk).size() == 1 && sismograflar(ilk).get(0).tasiyor(), "ilk durum paketleri");
             guncelle(radarli);
-            yardimci.assertTrue(gelenler(radarli).isEmpty(), "değişmeyen durum yeniden gönderildi");
+            yardimci.assertTrue(esyaPaketleri(gelenler(radarli)) == 0, "değişmeyen durum yeniden gönderildi");
             radarli.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
             radarli.getInventory().setItem(8, ItemStack.EMPTY);
             guncelle(radarli);
@@ -328,7 +333,8 @@ public final class EsyaOyunTestleri {
             yardimci.assertTrue(radarlar(birak).equals(List.of(RadarPaketi.YOK))
                     && sismograflar(birak).equals(List.of(SismografPaketi.YOK)), "bırakınca tek YOK beklendi");
             guncelle(radarli, esyasiz);
-            yardimci.assertTrue(gelenler(radarli).isEmpty() && gelenler(esyasiz).isEmpty(), "eşyasız oyuncuya paket gitti");
+            yardimci.assertTrue(esyaPaketleri(gelenler(radarli)) == 0, "bıraktıktan sonra paket gitti");
+            yardimci.assertTrue(esyaPaketleri(gelenler(esyasiz)) == 0, "eşyasız oyuncuya radar/sismograf paketi gitti");
         });
     }
 

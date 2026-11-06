@@ -16,11 +16,12 @@ class GostergeYerlesimiTest {
     }
 
     @Test
-    void darEkrandaHotbarYanYuvasininUstuneKalkar() {
-        // 1280x720, ölçek 3: 426x240; panel yan el/saldırı göstergesi sütununa giriyor.
+    void darEkrandaActionBarSatirininUstuneKalkar() {
+        // 1280x720, ölçek 3: 426x240; panel yan el/saldırı göstergesi sütununa giriyor: action bar (sismograf) üstte kalır.
         Konum k = GostergeYerlesimi.konum(426, 240, 110, 54, Kose.SAG_ALT, 0, 0);
         assertEquals(426 - 110 - 4, k.x());
-        assertEquals(240 - GostergeYerlesimi.HOTBAR_UST - 54, k.y());
+        assertEquals(240 - GostergeYerlesimi.ALT_YAZI_UST - 54, k.y());
+        assertTrue(k.y() + 54 <= 240 - 68 - 4, "action bar satırıyla örtüşür");
         assertTrue(k.x() >= 426 / 2 + GostergeYerlesimi.HOTBAR_YARI, "orta durum sütunu (sıcaklık barı) ile örtüşmez");
     }
 

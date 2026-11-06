@@ -2,9 +2,9 @@ package io.github.kadirberkpolat1.dogalafetler.esya.mantik;
 
 /**
  * Radar göstergesinin ekrandaki yeri (GUI pikseli). Gösterge seçilen köşeye oturur; alt köşelerde vanilla HUD'un ve
- * sıcaklık barının (XP barının üstü, sıcaklık §A, S-10) üstüne binmez: hotbar sütunu (yan el yuvası ve saldırı göstergesi
- * dahil) ile örtüşürse hotbar'ın, orta durum sütunuyla (kalp, zırh, açlık, hava, sıcaklık barı, XP) örtüşürse onların üstüne
- * kalkar. Sonuç her zaman ekranın içindedir.
+ * sıcaklık barının (XP barının üstü, sıcaklık §A, S-10) üstüne binmez: hotbar'ın yan sütunlarıyla (yan el yuvası, saldırı
+ * göstergesi) örtüşürse action bar'ın ve tutulan eşya adının satırının (sismograf metni oraya yazılır), orta durum sütunuyla
+ * (kalp, zırh, açlık, hava, sıcaklık barı, XP) örtüşürse onların üstüne kalkar. Sonuç her zaman ekranın içindedir.
  */
 public final class GostergeYerlesimi {
     public enum Kose {
@@ -20,8 +20,8 @@ public final class GostergeYerlesimi {
     public static final int HOTBAR_YARI = 91;
     /** Hotbar'ın iki yanında yan el yuvası ve saldırı göstergesi için ek pay. */
     public static final int HOTBAR_YAN = 30;
-    /** Hotbar ve yan el yuvasının üstü (ekranın altından). */
-    public static final int HOTBAR_UST = 26;
+    /** Action bar satırının üstü (vanilla {@code h - 68}) ve 4 px pay, ekranın altından; tutulan eşya adı da bunun altındadır. */
+    public static final int ALT_YAZI_UST = 72;
     /** Orta durum sütununun üstü: iki kalp satırı + zırh/hava + sıcaklık barı + XP (ekranın altından). */
     public static final int DURUM_UST = 86;
 
@@ -38,7 +38,7 @@ public final class GostergeYerlesimi {
             if (ortusur(x, pw, orta - HOTBAR_YARI, orta + HOTBAR_YARI)) {
                 y = Math.min(y, h - DURUM_UST - ph);
             } else if (ortusur(x, pw, orta - HOTBAR_YARI - HOTBAR_YAN, orta + HOTBAR_YARI + HOTBAR_YAN)) {
-                y = Math.min(y, h - HOTBAR_UST - ph);
+                y = Math.min(y, h - ALT_YAZI_UST - ph);
             }
         }
         x = Math.max(0, Math.min(x, w - pw));
