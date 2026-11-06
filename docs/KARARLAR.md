@@ -2635,6 +2635,166 @@ alındı: S5 yarığı ve ±45° dalları (yarım boy 128) doğuş çaprazını 
 - Yarığın boşaltılan hacminin %20'sini ayrıca moloz olarak koymak: S1'de (derinlik 4) yarığı yarıya doldururdu (DS-05).
 - `deprem_dayanikli`'yi kendi sağlayıcımda da yazmak: K-E12 çakışması, biri sessizce kaybolur (DS-03).
 
+## Faz 4 — Asit yağmuru ve orman yangını
+
+Parça `asit-orman-yangini` (dal `is/asit-orman-yangini`, son commit `af7ce04`; `main`'e birleştirme `8048de7`, kod `26514f8`,
+entegrasyon 4 4/6; şartnamede asit bölüm E, orman bölüm G). Kaynak `.vibe/kararlar/asit-orman-yangini.md` §B/§C/§D; sözleşmeler (§A)
+ve entegratör notları (§E) o dosyada kalır. Şef kararları "Şef kararları (Faz 4)" bölümündedir; N17 satırları sondaki tablodadır.
+Rapor `.vibe/rapor/asit-orman-yangini.md`, inceleme `.vibe/rapor/inceleme-asit-orman-yangini.md` (kabul, P0/P1 = 0, P2 = 8),
+doğrulama `.vibe/rapor/dogrulama-asit-orman-yangini.md` (9/9), birleştirme `.vibe/rapor/entegrasyon-4.md`.
+
+**AO-01 Asit yağmuru yaşam döngüsü.** `AsitYagmuru extends Afet`: merkez hedef oyuncunun bloğu (çekirdek varsayılanı),
+alan seviye tablosundaki yarıçapla `EtkiAlani.daire`, AKTIF süresi tablodaki saniye. Alan günün rüzgârı yönünde
+(`YanginMantigi.gununRuzgari`, ortak yangının dumanıyla aynı yön) `asit_yagmuru.kaymaHizi` (0,3 blok/sn) ile kayar.
+Yoğunluk AKTIF'in ilk 10 sn'sinde 0→1, son 15 sn'de 1→0 (`AsitKurallari.yogunluk`); 0,15 altında (giriş/çıkış çisesi)
+hasar ve aşınma yok, yalnız görüntü. SIREN'de sunucu bir şey yapmaz, istemci bulut tavanını ve sisi toplar. BITIS hemen biter
+(çekirdek varsayılanı); `temizle` iki kipte de çatlak kuyruğunu boşaltır ve tek INFO satırı yazar (`asit yağmuru bitti:
+seviye S N blok aşındı, K çatlak örtüsü kaldırıldı`). Kalıcılık: merkez, birikim ve toplam aşınma NBT'de; kuyruk
+kaydedilmez (yeniden açılışta çatlak örtüsü istemcide 400 tick'te vanilla'nın kendi temizliğiyle söner).
+
+**AO-02 Aşınma: örnekleme + çatlak kuyruğu + dönüşüm tablosu.** Her tick alandan 3–16 rastgele sütun (hıza göre, TPS
+kısmasıyla) örneklenir; alanda oyuncu (gözlemci dahil) varsa örneklerin yarısı rastgele bir oyuncunun 24 blok çevresinden
+(değişim görenin önünde olur; madde 9.6'daki yakınlık önceliği gibi, alanın kalanı da aşınır); aday önce `MOTION_BLOCKING` yüksekliğindeki bitki, sonra en üst katı blok (yalnız gökyüzünü
+gören yüzey). Hız birikimi (saniyede tablo değeri × yoğunluk × TPS kısması, tavan 2) el verdikçe aday 3–5 sn'lik
+`destroyBlockProgress` çatlak örtüsüyle kuyruğa girer (aynı anda en çok `eszamanliAsindirma` 64: tasarım §5'teki 32 tavanı
+3–5 sn'lik örtüyle saniyede ancak 6–11 bloğa izin veriyordu, §6'daki S5 16 blok/sn'ye yetmiyordu; kırılma kimlikleri
+negatif, oyuncu varlık kimlikleriyle çakışmaz), süre dolunca dönüşür; o tick'te en çok 4 `block.fire.extinguish` (perde
+1,4–1,8, düzey 0,25). Bu arada blok başka bir şeye dönüştüyse örtü kalkar, dönüşüm olmaz. Tablo (`AsitKurallari.donusum`):
+yaprak, çiçek/uzun ot, ekin, ahşap kalas/çit/kapı/basamak/levha/tuzak kapı, yün ve halı eşya düşürmeden kırılır
+(`destroyBlock(p, false)`: vanilla kırılma parçacığı ve sesi); çimen ve eğrelti kırılır, yarı olasılıkla ölü çalı olur
+(yaşayabiliyorsa); çimen bloğu → toprak → kaba toprak; kırıktaş → yosunlu kırıktaş, taş tuğla → çatlak taş tuğla (yalnız
+`tasSeviyesi` 3 ve üstü); kalsit → çakıl; mumsuz bakır bir oksidasyon aşaması ilerler. İğne yapraklı (ladin)
+yaprak her zaman, diğer yapraklar %70 olasılıkla kuyruğa girer: Kara Orman gözlemi gibi önce iğne yapraklılar yapraksız
+kalır. Tanınmayan (başka modun) blok hiç değişmez. **`dogalafetler:asit_dayanikli` tablonun önündedir** (N12): etiket
+`#minecraft:base_stone_overworld` içerdiği için tasarım tablosundaki "diyorit → çakıl" satırı uygulanmaz (diyorit dayanıklı);
+yalnız kalsit çözünür. Etikete yangının sağlayıcısında (§A4 "satır ekleme serbest") cam ve cam panel (`forge:glass`,
+`forge:glass_panes`, isteğe bağlı), demir blok/parmaklık/kapı/tuzak kapı, tuğla, deepslate tuğla/karo, 16 beton ve
+`#minecraft:terracotta` eklendi: tasarımın "cam sera ile korunma" fikri ve sağlam yapı malzemeleri. `afetBlokHasari=false`
+iken örnekleme yapılmaz ve kuyruktaki örtüler ilk tick'te kalkar. Değişen her chunk için `SanalSu.chunkDegisti` (Faz 4 kuralı).
+
+**AO-03 Oyuncu hasarı ve öldürmeme garantisi.** 4 tick'te bir, alanın içindeki (yatay) her canlı, izleyici ve yaratıcı olmayan
+oyuncu için `MOTION_BLOCKING` yüksekliği göz bloğunun üstünde değilse oyuncu açıktadır (`AsitKurallari.acikta`; yaprak
+da çatı sayılır). Açıkta geçen süre birikir; seviye aralığı (80/60/40/50/40 tick) dolunca hasar (0,5/0,5/0,5/1/1 can
+puanı) `dogalafetler:asit` tipiyle verilir. Hasar canı `asitMinimumCan` (4 = 2 kalp) altına indirmez (`hasarMiktari`); 0'sa
+hiç vurulmaz. Vanilla hasar tipi etiketi olmadığı için zırh hasarı azaltır ve her vuruşta yıpranır: tasarımdaki "zırhın
+dayanıklılığı 4 sn'de 1 azalır" ayrı sayacı yerine vanilla zırh yıpranması (`hurtArmor`) kullanıldı; bir hasar tipi
+etiketi istemek K-E12 ortak sağlayıcı değişikliği gerektirirdi. Hasar `hurt` true döndüğü an `BasarimIpucuEvent(oyuncu,
+HASAR_ALDI)` yayınlanır (§A.3 #6); çatı altındaki oyuncu hiç hasar ve ipucu almaz.
+
+**AO-04 Orman yangını = ortak motor + koreografi.** `OrmanYangini extends Afet` yangın mantığı yazmaz (G.4, madde 6):
+AKTIF'e geçerken `YanginYoneticisi.alanTutustur(level, merkez, r, YanginKaynagi.afet(ORMAN_YANGINI, afetNo), y)` (seviye
+tablosu r 3/6/10/16/24, y 0/0,2/0,4/0,7/1 = yayılma ×0,5…×1,8, sıçrama yok…12 blok). Yayılma, bütçe, tavan, TPS kısması,
+yağmurda sönme, yanmaz etiketi ve ortam ısısı motorun işidir. Afet `kaynakBitti` çağırmaz: motor `AfetBittiEvent`'ten kaynağı
+kendisi kapatır (Y-27; stop/sifirla → söndür, doğal → yayılmadan en geç 30 sn'de yanıp biter); çekirdeğin `temiz` bayrağı
+yangına geçirilmez. AKTIF süresi 2/3/4/6/8 dk; alanda `erkenBitisSaniye` (15) boyunca yanan hücre ve bekleyen tutuşturma
+kalmazsa afet doğal biter (seyrek yakıt, yağmur: "yağmur yağınca sönebilsin" afetin kendisini de bitirir). `temizle`
+ateşe dokunmaz, tek INFO satırı yazar (`orman yangını bitti: seviye S en çok N hücre, alan R blok, yanık izi M blok`).
+
+**AO-05 Başlangıç alanı ve yer uygunluğu.** `merkezSec`: hedef oyuncunun 40–90 blok (`aramaEnAz/EnCok`) uzağında 24
+rastgele nokta; yüklü chunk'larda 5×5 ızgarada yanıcı yüzey sayısı + orman biyomu (`#minecraft:is_forest`) +6 puan; en
+yüksek puanın en üst katı bloğu (yaprak dahil). Hiçbiri puan almazsa oyuncunun kendi sütunu. `yerUygunMu`: merkezin
+çevresinde (ızgara aralığı r/2) yanıcı yüzey yoksa ret (N14 deseni: yönetici başka oyuncu dener, sonra erteler). Chunk
+yüklenmez. Komutla konum (`execute positioned … run dogalafet start orman_yangini S`) o konumda başlar.
+
+**AO-06 Etki alanı yangınla büyür; sıcak kareler.** Motorun hücre konumları public değil; afet saniyede bir etki alanı + 32
+blok üzerindeki 32 blokluk karelerde `YanginYoneticisi.aktifSayi(level, AABB)` sayar (en çok 15×15 sorgu × aktif tavan
+1500 = ~340 bin karşılaştırma/sn). Etki alanı en uzak dolu kare + 16 blok kadar büyür, küçülmez, en çok 192 blok: siren,
+"etkilenen" ve paket alanı yangını izler. En kalabalık 32 kare istemciye gider (sis/ısı için).
+
+**AO-07 "Yanmadan Çıktım" ipucu.** AKTIF'te saniyede bir, etki alanındaki oyuncunun 8 blok çevresinde
+(`aktifSayi(level, AABB(oyuncu).inflate(8))`) yanan hücre varsa `BasarimIpucuEvent(oyuncu, YANGIN_ALANINDA)` (§A.3 #5;
+başarım saniyede en çok birini sayar). Tasarımdaki "yanan hücrelerin dışbükeyi + 8 blok" yerine "bir yanan hücreye 8 blok":
+hücre konumları motorun içinde, dışbükey için ek API gerekirdi; başarımın yedeğiyle aynı ölçüt.
+
+**AO-08 Yanık izi (afet sonrası iz).** `afetBlokHasari` açıkken tick başına `yanikIziButcesi` (8) × TPS kısması sütun sıcak
+karelerden yoklanır; yapraksız en üst katı blok çimen/toprak/podzol/miselyum/köklü toprak/yosun ise ve hemen üstündeki 3
+blokta afet ateşi yanıyorsa kaba toprağa döner; değişen chunk sanal suya bildirilir. Motorun "kömürleşmiş blok reddedildi;
+yanık izi gerekirse Faz 4 zemin dönüşümünü `afetBlokHasari` ile kendi yapar" notunun uygulaması. Odun ve yaprak motorda havaya
+döner (tasarımın "kütüklerin %30'u kalır" satırı motor kararı Y-06 gereği uygulanmadı).
+
+**AO-09 Rüzgâr ve ısı.** Tasarım "rüzgâr afet başında seçilir (±20°)" diyordu; yayılma motorundadır ve motor günün rüzgârını
+kullanır (Y-03), afet ayrı rüzgâr vermez. Ortam ısısı (madde 7) motorun sıcaklık kancasından gelir (K-E1: güç
+4 + 2√n, en çok 18 °C, yarıçap 6 + √n); seviye farkı yanan hücre sayısı üzerinden doğar. Afet `SicaklikKancalari`'nı doğrudan
+çağırmaz (çift kaynak olurdu).
+
+**AO-10 Asit yağmuru istemcisi.** Durum `AfetDurumPaketi`'nden (merkez, yarıçap, aşama, `ozel.y`, `ozel.a`); merkez ve
+yoğunluk 1 Hz paket arasında yumuşatılır; görünen yoğunluk ve bulut tavanı seviyeyle 0,4 / 0,55 / 0,7 / 0,85 / 1
+çarpılır (`AsitKurallari.gorselCarpan`; tasarım §2 "S1 seyrek çise, S5 yoğun sağanak"; görsel koşu 1'de S1 ve S5 aktif kareleri
+aynı tondayı: sarı-yeşil piksel %58,4 / %57,0). Yağış `RenderLevelStageEvent.AFTER_WEATHER`'da vanilla `renderSnowAndRain` sütun
+geometrisiyle (tohumlu kayma/hız, kameraya dönük dörtgen) kendi dokumuzla çizilir; model-görünüm yığını birim yapılır ve
+köşeler olayın poz matrisiyle dönüştürülür (aşamada yığının ne taşıdığına bağlı kalınmaz). Damla %20 kalın; alfa alan
+kenarında 16 blokta söner; yağmur yarıçapı 5/10/10/15. Gerçek hava değişmez. Sis rengi ve görüş: 1,5R içinde gündüz `#9AA35A`,
+gece `#2F3420` (güneş açısıyla), görüş %40'a kadar kısalır (`RenderFog` iptal edilerek; Forge yalnız iptalde uygular).
+Parçacıklar (force eklenir, sayı kademe × vanilla parçacık ayarı): sıçrama 20/50/100/180 tick başına, cızlama dumancığı
+%8/15/25/35, yüzey buharı 0/8/16/24 blok, bulut tavanı 30/60/120/200 canlı (bulut yüksekliği ama kameraya en çok 60 blok
+yukarıda), aşınan bloklardan yoğun cızlama. Hasar anında 0,3 sn sarı-yeşil kenar vinyeti ve içe akan damla izleri (yazı değil).
+
+**AO-11 Ses: yeni ses dosyası yok (tasarım §4 değişti).** Yağış vanilla `weather.rain` (perde 0,9; çatı altında
+`weather.rain.above`) istemcide vanilla `tickRain` deseniyle; "cızlama döngüsü" yerine seyrek, kısık (0,05), tiz (perde 1,8–2,0)
+`block.fire.extinguish`; aşınma anında sunucu `block.fire.extinguish` (en çok 4). Gerekçe: §4'ün istediği üç katman vanilla
+sesleriyle karşılanıyor, `ses_uret.py` + ebur128 ölçüm hattı (uyarı §4 kural 1) gereksiz yeni dosya olurdu; konuşma bandını
+kapatan yeni döngü yok. Orman yangını sesi ortak yangının istemcisindedir (vanilla ateş, sönme tıslaması).
+
+**AO-12 Orman yangını istemcisi.** Alev, duman, kıvılcım, duman sütunu ve pirokümülüs ortak yangının istemcisindedir
+(Y-10, Y-24). Afet ekler: en yakın sıcak kareye 48 blok içinde turuncu-kahverengi sis `#7A5236` (yangın büyüklüğüyle, 40
+hücrede tam) ve görüş %55'e kadar; 24 blok içinde Yüksek/Ultra'da ısı dalgalanması (şader yok: kamera yaw/pitch'ine 0,05°
+3 Hz sinüs, ekranın alt dörtte birinde yukarı kayan yarı saydam ısı dokusu; Y-10'un "ısı titremesi Faz 4" notu); sis
+altında havada süzülen vanilla kül/beyaz kül (1/4/8/14 tick başına; Düşük tur 3'te 2'den 1'e indi, §C). Güneş diskini turuncuya boyamak gokyuzu renderer'ına
+"duman örtüsü" parametresi ister (gökyüzü paketi bu dalın değil): yapılmadı, açık nokta.
+
+**AO-13 Dokular.** `tools/assets/asit_yagmuru_dokulari.py` (PIL, tohumlu; iki üretimde 14 dosyanın md5'i aynı): yağış
+64×256, sıçrama 4×8², duman 4×16², bulut 4×64² (dış iki piksel halkası alfa 0; Y-28 dersi), ısı bandı 64². Parçacık
+JSON'ları el yazımı kaynak (ortak yangının parçacık JSON'ları gibi); dil ve hasar tipi `runData` ile.
+
+**AO-14 Testler.** JUnit `AsitKurallariTest` (12), `OrmanKurallariTest` (8). GameTest (yuvayı kullananlar kendi batch'inde,
+şablon `yangin_sahne`): `asit_asindirma` (tablo ve etiket önceliği, çimen üstü bitki adayı), `asit_hasar` (S5 açık oyuncu 5 → 4
+can, tek `HASAR_ALDI`; cam çatı altı 20 can, ipucu yok), `asit_blok_hasari` (kural kapalı: kuyruk boşalır, sahne hash'i
+aynı), `asit_stop` (stop çatlak kuyruğunu boşaltır, kuyruktaki tahtalar kalır), `orman_baslar` (S3 başlangıç alanı tutuşur,
+yanmaz taş kalır, stop ateş ve hücre bırakmaz), `orman_ipucu` (61 tick'te yakın oyuncuya 2–4 ipucu, 56 blok uzaktakine 0),
+`orman_blok_hasari` (kural kapalı: yangın veri olarak sürer, sahne aynı), `orman_yanik_izi` (ateş altındaki çimen kaba
+toprak, ateşsiz çimen ve taş değişmez). Sahte oyuncunun doğuş dokunulmazlığı sıcaklık testlerindeki gibi
+`ObfuscationReflectionHelper` (`f_8921_`) ile sıfırlanır.
+
+**AO-15 Başarım testiyle çakışma (kapandı, K-E22).** Zorunlu `yayinciKaydet` (§A.3) sonrasında
+`BasarimOyunTestleri.olaysizAfetteYedekTahminSayilir` (basarim paketi, `:580-619`) asit ve orman için yedek tahmin
+bitlerinin sayılmasını beklediğinden kırmızıya döner (kayıtlı türde `BasarimOlaylari:141` yalnız olay bitlerini okur;
+tsunami ve sinkhole dalları da aynı testi kıracak). Kanıt: filtresiz GameTest `kabul-1.log` satır 2221
+`olaysizafetteyedektahminsayilir failed! asit yağmurunda hasar alan Çatı Altı almaz`, satır 2485 `1 required tests failed`
+(166 testin diğer 165'i geçti; `kabul-2.log` aynı). Bu dal basarim paketine yazmadı (sahiplik); Main'e bildirildi. **Şef kararı:** düzeltme main'de K-E22 (`BasarimIpucuEvent.geciciKayitsiz(tur, ipucu)`,
+`olaysizAfetteYedekTahminSayilir` ve `olaysizAfetteYedekKayitliYayincidaYedekKapali` onunla sarılır); bu daldaki iki
+`yayinciKaydet` kalır, dal main'i (`86224a2`) `merge` ile aldı (`60afa52`, çatışma yok), kayıt K-E22 (a) yerine taşındı (`a3409e6`);
+filtresiz `kabul-3.log` ve `kabul-4.log`: `All 166 required tests passed`.
+
+**AO-16 Birleştirme düzeltmeleri (entegrasyon 4, inceleme P2).** (a) Asit ve orman GameTest'leri başarısız bitse de batch
+sonunda temizlenir: ortak `core.OyunTestiTemizligi` (`oyuncu`, `dinle`, `blokHasari`, `batchSonu`; `@AfterBatch` her batch'te)
+afeti durdurur, `afetBlokHasari`'nı batch başındaki değerine, dinleyicileri ve sahte oyuncuları geri alır (K-E15, GP18; AOi-5).
+(b) Gerçek asit → başarım uçtan uca (AOi-4): GameTest `dogalBitenAsitteCatiAltiYalnizHasarsizaAcilir` (batch `asit_basarim`)
+doğal biten S5 asitte cam çatı altındaki sahte oyuncuya "Çatı Altı"nı verir, açıkta hasar alana vermez. Orman tarafında
+`YANGIN_ALANINDA` → "Yanmadan Çıktım" uçtan uca testi yazılmadı (30 saniyelik ipucu birikimi; açık nokta). (c) Asit, meteor ve
+yangın parçacık tanımları datagen'e taşındı (K-E25).
+
+N17 dışı sabitler ve FPS ölçümleri: Kod sabitleri (config dışı): yoğunlaşma 10 sn, seyrelme 15 sn, etki eşiği 0,15; çatlak 3–5 sn; hasar denetimi 4 tick; sıcak
+kare 32 blok, en çok 32 kare paketle; etki alanı payı 16, tavanı 192 blok; ipucu yakınlığı 8 blok; istemci sis 48 / ısı 24 blok.
+Orman kül bütçesi (istemci sabiti `IstemciOrmanYangini.KUL`): Düşük/Orta/Yüksek/Ultra 1/4/8/14 parçacık/tick (Düşük tur 3'te
+2 → 1). FPS sayıları (gizli workspace, koşu 1): orman S5 tepe 19, afetsiz 40, oran 0,48 (hedef 0,5; şef kararı: engel değil);
+görsel koşu 3 (`af7ce04`, vsync kapalı, maxFps 120, ~1000 hücre): taban 120 FPS / 2,40 ms; S5 Düşük 63 FPS / 8,01 ms,
+Yüksek 48 / 7,42, Ultra 60 / 11,70; oran Düşük 0,53, Yüksek 0,40, Ultra 0,50 (taban tavanda, gizli workspace gürültülü).
+Faz 5 görünür koşuda yeniden ölçülür. Görsel otomasyon A-34 kare kapısı ve `enableVsync:false`/`maxFps:120` kasırga K-13'ten alındı.
+
+### Reddedilen yollar
+
+- **Vanilla yağmuru (`setWeatherParameters`) açmak:** bütün dünyada yağar, ortak yangını her yerde söndürür, oyuncunun
+  hava durumunu ezer; tasarım "gerçek hava değişmez" der.
+- **`DimensionSpecialEffects.renderSnowAndRain` sarmalamak:** gökyüzü sistemi zaten sarmalıyor (`SarmalayanGokyuzuEfekti`),
+  ikinci sarmalayıcı sıraya bağlı olurdu; vanilla yağmur zaten bu bölgede yağmıyor, `AFTER_WEATHER` aşaması yeter.
+- **Hasar tipine `bypasses_armor` vermek:** vanilla etiket yazarı olurdu (K-E12) ve zırhın anlamı kalmazdı.
+- **Hücre konum API'si istemek (dışbükey alan için):** ızgara sayımı ve 8 blok yakınlık aynı sonucu yangın paketine
+  dokunmadan veriyor (AO-06, AO-07).
+- **Orman yangınında kendi yağmur söndürme mantığı:** motor zaten yapıyor (Y-08, Y-23); afet yalnız boşta beklememek için
+  erken biter.
+- **Aşınma için kendi parcacık paketi:** 1 Hz `AfetDurumPaketi.ozel.a` (en çok 32 konum, ~260 B) ve vanilla kırılma örtüsü
+  yeterli; protokol değişmedi.
+
 ## Şef kararları (Faz 0–1)
 
 **K0-19 Ay çarpması siren süresi: 60 sn.** Madde 5 "Güneş Patlaması hariç 10 sn" der; bölüm H "siren çaldıktan 60 saniye
@@ -3338,6 +3498,15 @@ ilk metin "tek atımlı sesler ve sirenler −26 ± 1 LUFS" diyordu; ses.md §4 
 AY-07'nin "−26'da tepe sınırı aşılıyordu" gerekçesi ölçümle çelişiyordu (+4 dB ile −7,6 / −7,4 dBTP, sınır içinde); ay
 birleştirmesinde (entegrasyon 4, 2/6) "tasarım tercihi, K-E24" olarak düzeltildi.
 
+**K-E25 Parçacık tanımları da datagen'dir (şef kararı, 2026-11-07).** Doğrulayıcı asit dalında dört elle yazılmış
+`assets/dogalafetler/particles/*.json` buldu; birleşik `main`'de sayı 17'ydi (asit 4, meteor 8, yangın 5). Kaynak JSON'ları elle
+yazılmaz (GOREV §3, AGENTS.md); parçacık listede yoktu. Karar: tek sağlayıcı `veri.ParcacikTanimlari`
+(`ParticleDescriptionProvider`, ad "Doğal Afetler parçacık tanımları", K-E5), alt sistemler `DataGenerators.parcacikEkle(tür,
+doku kökü, kare sayısı)` ile katkı verir (`AsitKayitlari`, `MeteorKayitlari`, `YanginKayitlari`); kareler
+`textures/particle/<kök>_0 … _(n−1)`, Forge eksik dokuda `runData`'yı durdurur. Elle JSON'lar silindi; `runData` sonrası
+`src/generated/.../particles/` 17 dosya, içerik birebir aynı (12 eski dosyadaki sondaki satır sonu dışında bayt bayt; JSON eşit,
+kanıt `.vibe/kanit/entegrasyon-4/asit/parcacik-eski/`). Yeni parçacık ekleyen dal tanımını `parcacikEkle` ile verir.
+
 ### Yiyecek
 
 **F-17 Kutup Balığı Çorbası koşullu tarif (şef kararı, inceleme Yi1).** Tarif ve tarif kitabı başarımı Forge'un üst düzey
@@ -3485,6 +3654,13 @@ başlığındadır.
 - **DS-14 artçı sarsıntılar yapıldı (tur 2):** S3+ 1–3 artçı, 20–60 sn arayla, ana genliğin %15'i; blok yıkmaz.
 - **`deprem_dayanikli` taşınır (§E-1):** işçi yangın paketine yazmadı; entegratör taşıdı (DS-18).
 
+### Asit yağmuru ve orman yangını
+
+- **Orman S5 FPS oranı 0,48 (hedef 0,5) engel değil:** gizli workspace ölçümü gürültülü; Faz 5 görünür koşuda yeniden ölçülür.
+- **Güneşin dumanla turuncu örtüsü (AO-12, gökyüzü API isteği) yapılmaz.**
+- **E.1 dumanlanma zayıf (P2):** Faz 5 görünür koşu yer seviyesi karesiyle yeniden puanlanır.
+- **K-E25 parçacık datagen:** birleştirmede yapıldı.
+
 ## Açık noktalar (Faz 2b)
 
 Entegratöre bırakılan notlardan işlenenler: kancalar (K-E1), protokol (K-C47), `asama ileri [süreç]` (K-C48), sanal su §3a istisnası
@@ -3568,6 +3744,16 @@ Birleşen parçalardan kalanlar (her birleştirmede güncellenir; plan `.vibe/ra
 - **Deprem/sinkhole — DS-02 ve ses:** çöken kütle varlığı, eğilen ağaç, kendi toz dokusu, sinkhole dibinde nem buharı, ayrı
   öncü gürleme/çatlama sesleri Faz 5 cilası.
 - **Deprem/sinkhole — FPS:** gizli workspace 1 FPS (GP17), Faz 5.
+
+- **Asit/orman — görsel kareler (AOi-1–3):** asit kamerası 40 blok üstte; sıçrama/cızlama 24 blok eşiği altında görünmüyor,
+  dumanlanma zayıf. Faz 5'te yere yakın (göz ≤ 10 blok) asit S5 karesi, ufku gören siren karesi, S1 görsel çarpanı 0,25 ile "çise";
+  FPS tabanı `maxFps` sınırsız ve aynı kamerada (taban 120 FPS tavanda kalıyordu).
+- **Asit — maruziyet ölçekli saat (AOi-6):** `AsitYagmuru.java:103, 207` maruziyet gerçek tick'le birikiyor; ölçekli `adim`
+  (K-C11) Faz 5.
+- **Asit — ekran efekti kaynağı (AOi-7):** `IstemciAsitYagmuru.java:288` efekt yalnız son hasar `dogalafetler:asit` iken
+  çalışmalı.
+- **Orman — kayıttan dönüş adımı (AOi-8)** `asit_orman_yangini_sunucu.py`'de yok; "Yanmadan Çıktım" uçtan uca GameTest'i yok
+  (AOi-4'ün orman yarısı; 12–16 blok uzak oyuncu 0 ipucu sahnesi dahil).
 
 ## N17 — Sayısal varsayılanlar
 
@@ -3866,6 +4052,21 @@ Birleşen parçalardan kalanlar (her birleştirmede güncellenir; plan `.vibe/ra
 | sinkhole | `sinkhole.blokButcesi` | 400 | blok/tick | tasarım §5 |
 | sinkhole | `sinkhole.dusenBlokTavani` | 60 | varlık | tasarım §5 "Yüksek" |
 | sinkhole (kod) | sarkma / durulma | 3 / 14 | sn | tasarım §2 zaman çizelgesi |
+| asit yağmuru | `asit_yagmuru.yaricap` (SERVER) | 32, 48, 64, 96, 128 | blok (S1…S5) | tasarım §6; S5 bir köyü ve çevresindeki ormanı kaplar |
+| asit yağmuru | `asit_yagmuru.sureSaniye` | 60, 90, 120, 180, 240 | sn | tasarım §6; S5'te bir orman 4 dk'da yapraksız kalır |
+| asit yağmuru | `asit_yagmuru.asindirmaBlokSaniye` | 2, 4, 7, 11, 16 | blok/sn (tam yoğunluk) | bölüm E "yavaş yavaş"; S5'te 240 sn'de ~3500 yüzey bloğu, 128 blokluk alanın %7'si |
+| asit yağmuru | `asit_yagmuru.hasar` | 0,5, 0,5, 0,5, 1, 1 | can puanı | bölüm E "orta düzey"; zehir (1/1,25 sn) ve soğuk yağmurdan hafif |
+| asit yağmuru | `asit_yagmuru.hasarAraligiTick` | 80, 60, 40, 50, 40 | tick | açıkta 1 dk: S1 7,5 can, S5 30 can (min. can garantisiyle 2 kalpte durur) |
+| asit yağmuru | `asit_yagmuru.tasSeviyesi` | 3 | seviye | tasarım §6: taş tuğla S3+ |
+| asit yağmuru | `asit_yagmuru.asitMinimumCan` | 4,0 | can puanı | madde 10 "Seviye 5'te bile öldürücü olmasın": 2 kalbin altına inmez |
+| asit yağmuru | `asit_yagmuru.eszamanliAsindirma` | 64 | blok | S5 16 blok/sn × ortalama çatlak 4 sn; tasarım §5'in 32'si bu hızı kesiyordu (kırılma örtüsü paketi küçük, yalnız 32 blok içindekilere) |
+| asit yağmuru | `asit_yagmuru.kaymaHizi` | 0,3 | blok/sn | tasarım §6; S5 240 sn'de 72 blok kayar, oyuncu alanda kalır |
+| orman yangını | `orman_yangini.baslangicYaricapi` (SERVER) | 3, 6, 10, 16, 24 | blok | tasarım §6; ortak yangın `alanTutustur` en çok 24 |
+| orman yangını | `orman_yangini.yogunluk` | 0, 0,2, 0,4, 0,7, 1 | 0–1 | yangın §A1 önerisi: yayılma ×0,5…×1,8, sıçrama yok/2/5/8/12 blok |
+| orman yangını | `orman_yangini.sureSaniye` | 120, 180, 240, 360, 480 | sn | tasarım §6 (2–8 dk); sonra yeni tutuşma durur, kalan en geç 30 sn'de yanar |
+| orman yangını | `orman_yangini.aramaEnAz` / `aramaEnCok` | 40 / 90 | blok | tasarım §2: yangın uzaktan görülür, oyuncu kaçabilir |
+| orman yangını | `orman_yangini.yanikIziButcesi` | 8 | sütun/tick | sıcak karelerden örnekleme; 8 okuma × 3 blok, TPS kısmasıyla |
+| orman yangını | `orman_yangini.erkenBitisSaniye` | 15 | sn | yangın söndüyse (yağmur, seyrek yakıt) afet boşta beklemez; başlangıç alan işi bitmeden saymaz |
 
 Config dışı sabitler (oynanış değeri değil, sınır/biçim): siren 200/1200 tick (şartname, K0-19); son afet geçmişi 5
 (madde 13a); tek çarpan ≤ 100, toplam ≤ 1000 (K-C22); hız 0,1–1000; TPS ölçüm aralığı 20 tick; dönem kaydı sınırları
