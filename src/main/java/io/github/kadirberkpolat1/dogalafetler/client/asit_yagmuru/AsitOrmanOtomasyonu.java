@@ -6,6 +6,7 @@ import io.github.kadirberkpolat1.dogalafetler.config.AyarKaydi;
 import io.github.kadirberkpolat1.dogalafetler.config.EfektKalitesi;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.Afet;
+import io.github.kadirberkpolat1.dogalafetler.core.AfetAsamasi;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
 import io.github.kadirberkpolat1.dogalafetler.core.TpsOlcer;
@@ -72,6 +73,9 @@ public final class AsitOrmanOtomasyonu {
     private static volatile boolean hazir;
     private static volatile boolean onUyari;
     private static EfektKalitesi ilkKalite;
+    private static long cizimBasi;
+    private static long cizimNs;
+    private static int cizimSayisi;
 
     static {
         ADIMLAR.add(bekle(100));
@@ -96,8 +100,8 @@ public final class AsitOrmanOtomasyonu {
             Consumer<IntegratedServer> kamera) {
         ADIMLAR.add(sunucu(s -> baslat(s, tur, 1)));
         ADIMLAR.add(sunucu(kamera));
-        ADIMLAR.add(sunucu(AsitOrmanOtomasyonu::ileri));
-        ADIMLAR.add(sunucu(AsitOrmanOtomasyonu::ileri));
+        ADIMLAR.add(sunucu(s -> ileri(s, AfetAsamasi.SIREN)));
+        ADIMLAR.add(sunucu(s -> ileri(s, AfetAsamasi.AKTIF)));
         ADIMLAR.add(bekle(s1));
         ADIMLAR.add(sunucu(s -> olcum(s, ad + "_s1")));
         ADIMLAR.add(kare(ad + "_s1"));
@@ -111,10 +115,10 @@ public final class AsitOrmanOtomasyonu {
         ADIMLAR.add(bekle(60));
         ADIMLAR.add(kare(ad + "_on_uyari_radar"));
         ADIMLAR.add(arayuz(false));
-        ADIMLAR.add(sunucu(AsitOrmanOtomasyonu::ileri));
+        ADIMLAR.add(sunucu(s -> ileri(s, AfetAsamasi.SIREN)));
         ADIMLAR.add(bekle(120));
         ADIMLAR.add(kare(ad + "_siren"));
-        ADIMLAR.add(sunucu(AsitOrmanOtomasyonu::ileri));
+        ADIMLAR.add(sunucu(s -> ileri(s, AfetAsamasi.AKTIF)));
         ADIMLAR.add(bekle(aktif));
         ADIMLAR.add(kare(ad + "_aktif"));
         ADIMLAR.add(bekle(vitrin));
@@ -130,7 +134,7 @@ public final class AsitOrmanOtomasyonu {
             }
             ADIMLAR.add(kalite(null));
         }
-        ADIMLAR.add(sunucu(AsitOrmanOtomasyonu::ileri));
+        ADIMLAR.add(sunucu(s -> ileri(s, AfetAsamasi.BITIS)));
         ADIMLAR.add(bekle(bitis));
         ADIMLAR.add(sunucu(s -> olcum(s, ad + "_bitis")));
         ADIMLAR.add(kare(ad + "_bitis"));
@@ -266,7 +270,18 @@ public final class AsitOrmanOtomasyonu {
 
     @SubscribeEvent
     public static void cizimSonu(TickEvent.RenderTickEvent olay) {
-        if (!AKTIF || olay.phase != TickEvent.Phase.END || istenenKare == null) {
+        if (!AKTIF) {
+            return;
+        }
+        if (olay.phase == TickEvent.Phase.START) {
+            cizimBasi = System.nanoTime();
+            return;
+        }
+        if (cizimBasi != 0) {
+            cizimNs += System.nanoTime() - cizimBasi;
+            cizimSayisi++;
+        }
+        if (istenenKare == null) {
             return;
         }
         Minecraft mc = Minecraft.getInstance();
@@ -274,11 +289,14 @@ public final class AsitOrmanOtomasyonu {
         istenenKare = null;
         Screenshot.grab(mc.gameDirectory, dosya, mc.getMainRenderTarget(), mesaj -> {
         });
-        DogalAfetler.LOGGER.info(ON + "kare {} (adım {}, FPS {}, parçacık {}, asit yoğunluğu {}, kalite {}, kamera {})", dosya,
-                adim, mc.getFps(), mc.particleEngine.countParticles(),
-                String.format(Locale.ROOT, "%.2f", IstemciAsitYagmuru.yogunluk()), IstemciAyarlari.efektKalitesi(),
-                String.format(Locale.ROOT, "%.1f %.1f %.1f yaw %.0f pitch %.0f", mc.player.getX(), mc.player.getY(),
-                        mc.player.getZ(), mc.player.getYRot(), mc.player.getXRot()));
+        double cizimMs = cizimSayisi == 0 ? 0 : cizimNs / 1e6 / cizimSayisi;
+        DogalAfetler.LOGGER.info(ON + "kare {} (adım {}, FPS {}, çizim {} ms/kare ({} kare), parçacık {}, asit yoğunluğu {}, "
+                + "kalite {}, kamera {})", dosya, adim, mc.getFps(), String.format(Locale.ROOT, "%.2f", cizimMs), cizimSayisi,
+                mc.particleEngine.countParticles(), String.format(Locale.ROOT, "%.2f", IstemciAsitYagmuru.yogunluk()),
+                IstemciAyarlari.efektKalitesi(), String.format(Locale.ROOT, "%.1f %.1f %.1f yaw %.0f pitch %.0f",
+                        mc.player.getX(), mc.player.getY(), mc.player.getZ(), mc.player.getYRot(), mc.player.getXRot()));
+        cizimNs = 0;
+        cizimSayisi = 0;
     }
 
     // ---------------------------------------------------------------- sunucu thread'i
@@ -321,10 +339,17 @@ public final class AsitOrmanOtomasyonu {
                 y.aktifAfet().map(a -> a.baglam().merkez().toShortString()).orElse("-"));
     }
 
-    private static void ileri(IntegratedServer s) {
+    /**
+     * Afeti {@code hedef} aşamasına bir adım ilerletir; afet o aşamaya kendiliğinden geçmişse dokunmaz (gizli workspace ~1 FPS
+     * iken istemci tick'i yavaşlar, siren sunucuda kendiliğinden biter; körlemesine ilerletmek AKTIF'i atlatırdı).
+     */
+    private static void ileri(IntegratedServer s, AfetAsamasi hedef) {
         AfetYoneticisi y = AfetYoneticisi.al(s);
-        y.asamaIleri();
-        DogalAfetler.LOGGER.info(ON + "aşama: {}", y.aktifAfet().map(a -> a.asama().kimlik()).orElse("bitti"));
+        if (y.aktifAfet().map(a -> a.asama().ordinal() < hedef.ordinal()).orElse(false)) {
+            y.asamaIleri();
+        }
+        DogalAfetler.LOGGER.info(ON + "aşama: {} (hedef {})", y.aktifAfet().map(a -> a.asama().kimlik()).orElse("bitti"),
+                hedef.kimlik());
     }
 
     private static void dur(IntegratedServer s) {
