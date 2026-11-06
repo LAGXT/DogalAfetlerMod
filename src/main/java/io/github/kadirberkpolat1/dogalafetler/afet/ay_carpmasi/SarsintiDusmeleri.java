@@ -25,8 +25,9 @@ import net.minecraft.world.level.levelgen.Heightmap;
  * Çarpma sarsıntısında haritanın sallanması (bölüm H "harita sallandığında"; tasarım §2 63–75 sn, §5): her oyuncunun
  * {@code sarsintiYaricapi} çevresinde yüzeye yakın, altı boş {@link AyCarpmasiEtiketleri#SARSINTIDA_DUSER} blokları
  * {@code sarsintiYogunlugu} olasılığıyla düşen blok varlığına döner; oyuncu başına en çok {@code sarsintiBlokSayisi},
- * pencereye yayılmış kuyrukla ve TPS kısmasıyla. {@code afetBlokHasari} kapalıyken hiçbir blok düşmez. Değişen her chunk
- * sanal suya bildirilir. Temiz durdurmada havadaki bloklar kökenlerine geri konur (geride varlık kalmaz).
+ * pencereye yayılmış kuyrukla ve TPS kısmasıyla. {@code afetBlokHasari} kapalıyken hiçbir blok düşmez. Yalnız varlık işleyen
+ * chunk'ta düşer: varlık bölümü henüz görünür olmayan chunk'ta blok kalkar ama varlık gizli bölümde donar (AY-12). Değişen
+ * her chunk sanal suya bildirilir. Temiz durdurmada havadaki bloklar kökenlerine geri konur (geride varlık kalmaz).
  */
 final class SarsintiDusmeleri {
     /** Bir yüzey sütununda yukarıdan aşağı aranan en çok blok. */
@@ -99,7 +100,7 @@ final class SarsintiDusmeleri {
         }
         int x = oyuncu.getBlockX() + dx;
         int z = oyuncu.getBlockZ() + dz;
-        if (!level.hasChunkAt(new BlockPos(x, 0, z))) {
+        if (!level.isPositionEntityTicking(new BlockPos(x, 0, z))) {
             return null;
         }
         int ust = level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z) - 1;

@@ -26,6 +26,7 @@ import java.util.UUID;
 import net.minecraft.advancements.Advancement;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
+import net.minecraft.gametest.framework.GameTestAssertException;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
@@ -165,7 +166,7 @@ public final class AyCarpmasiOyunTestleri {
         y.succeed();
     }
 
-    @GameTest(template = "bos", batch = "ay_carpmasi_sarsinti")
+    @GameTest(template = "bos", batch = "ay_carpmasi_sarsinti", timeoutTicks = 200)
     public static void sarsintiDesteksizBloklariDusururStopGeriKoyar(GameTestHelper y) {
         ServerLevel level = y.getLevel();
         BlockPos m = y.absolutePos(BlockPos.ZERO);
@@ -183,6 +184,39 @@ public final class AyCarpmasiOyunTestleri {
         BlockPos.betweenClosed(tavanBas, tavanSon).forEach(p -> level.setBlockAndUpdate(p, Blocks.BARRIER.defaultBlockState()));
         BlockPos.betweenClosed(yaprakBas, yaprakSon).forEach(p -> level.setBlockAndUpdate(p,
                 Blocks.OAK_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true)));
+        // Sahnenin zorlanmış chunk'ları (z < 0 yanı) ilk tick'te henüz varlık işlemeyebilir; sarsıntı bütün tarama alanı varlık
+        // işleyince bir kez koşar (AY-12). Başarısız doğrulama sonraki denemelerde de hata olarak kalır.
+        boolean[] kosuldu = {false};
+        String[] hata = {null};
+        y.succeedWhen(() -> {
+            if (!kosuldu[0]) {
+                y.assertTrue(varlikIsliyor(level, tavanBas, tavanSon), "sahne chunk'ları henüz varlık işlemiyor");
+                kosuldu[0] = true;
+                try {
+                    sarsintiSahnesi(y, level, m, ustY, alan, tavanBas, tavanSon, yaprakBas, yaprakSon);
+                } catch (GameTestAssertException e) {
+                    hata[0] = e.getMessage();
+                }
+            }
+            if (hata[0] != null) {
+                y.fail(hata[0]);
+            }
+        });
+    }
+
+    private static boolean varlikIsliyor(ServerLevel level, BlockPos bas, BlockPos son) {
+        for (int cx = bas.getX() >> 4; cx <= son.getX() >> 4; cx++) {
+            for (int cz = bas.getZ() >> 4; cz <= son.getZ() >> 4; cz++) {
+                if (!level.isPositionEntityTicking(new BlockPos(cx << 4, 0, cz << 4))) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private static void sarsintiSahnesi(GameTestHelper y, ServerLevel level, BlockPos m, int ustY, AABB alan, BlockPos tavanBas,
+            BlockPos tavanSon, BlockPos yaprakBas, BlockPos yaprakSon) {
         ServerPlayer oyuncu = CekirdekOyunTestleri.sahteOyuncu(y, m.getX() + 0.5, ustY - 6, m.getZ() + 0.5);
         GameRules.BooleanValue kural = level.getGameRules().getRule(Kurallar.AFET_BLOK_HASARI);
         boolean oncekiKural = kural.get();
@@ -211,7 +245,6 @@ public final class AyCarpmasiOyunTestleri {
             BlockPos.betweenClosed(tavanBas, tavanSon).forEach(p -> level.setBlockAndUpdate(p, Blocks.AIR.defaultBlockState()));
             BlockPos.betweenClosed(yaprakBas, yaprakSon).forEach(p -> level.setBlockAndUpdate(p, Blocks.AIR.defaultBlockState()));
         }
-        y.succeed();
     }
 
     @GameTest(template = "bos", batch = "ay_carpmasi_kayit")
