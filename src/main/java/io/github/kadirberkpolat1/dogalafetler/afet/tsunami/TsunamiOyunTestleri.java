@@ -1,0 +1,305 @@
+package io.github.kadirberkpolat1.dogalafetler.afet.tsunami;
+
+import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.basarim.BasarimIpucuEvent;
+import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.Ipucu;
+import io.github.kadirberkpolat1.dogalafetler.core.AfetBaglami;
+import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
+import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
+import io.github.kadirberkpolat1.dogalafetler.core.CekirdekOyunTestleri;
+import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
+import io.github.kadirberkpolat1.dogalafetler.su.Dalga;
+import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
+import io.github.kadirberkpolat1.dogalafetler.su.SanalSuDunyasi;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Consumer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.gametest.framework.GameTest;
+import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.animal.Pig;
+import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.gametest.GameTestHolder;
+import net.minecraftforge.gametest.PrefixGameTestTemplate;
+
+/**
+ * Tsunaminin oyun içi testleri. Sahne {@code su_alani} (16x12x16) içinde kurulur: taş taban (y0), batıda duvarlı deniz
+ * (x 1..5, y 1..2; dalga tabanı y2), doğuda kara. Dalga +x yönünde, küçük ölçekle ({@link TsunamiAfeti.Olcek}: açıklık 6,
+ * karaya giriş 8, genişlik 12, uzunluk 10, gecikmesiz) şablonun dışına yıkım taşmaz. Afet çekirdeğin final metotlarıyla
+ * sürülür ({@code baslat}, {@code asamaIleri}, {@code tick}, {@code durdur}); yönetici yuvasını yalnız N14 testi kullanır.
+ * Her test kendi batch'indedir (sanal su ve dünya saati ortaktır; K-E16 komuşu sahneden bağımsızlık).
+ */
+@GameTestHolder(DogalAfetler.MOD_ID)
+@PrefixGameTestTemplate(false)
+public final class TsunamiOyunTestleri {
+    private static final TsunamiAfeti.Olcek OLCEK = new TsunamiAfeti.Olcek(6, 8, 12, 10, 0);
+
+    private TsunamiOyunTestleri() {
+    }
+
+    private static BlockPos m(GameTestHelper h, int x, int y, int z) {
+        return h.absolutePos(new BlockPos(x, y, z));
+    }
+
+    private static void kutu(GameTestHelper h, int x0, int y0, int z0, int x1, int y1, int z1, BlockState s) {
+        for (BlockPos p : BlockPos.betweenClosed(x0, y0, z0, x1, y1, z1)) {
+            h.setBlock(p, s);
+        }
+    }
+
+    /** Taş taban, duvarlı deniz (x 1..5, y 1..{@code derin}) ve x 6..14'te toprak kara (y 1..2). */
+    private static void sahne(GameTestHelper h, int derin) {
+        BlockState tas = Blocks.STONE.defaultBlockState();
+        kutu(h, 0, 0, 0, 15, 0, 15, tas);
+        kutu(h, 0, 1, 0, 0, derin, 15, tas);
+        kutu(h, 1, 1, 0, 5, derin, 0, tas);
+        kutu(h, 1, 1, 15, 5, derin, 15, tas);
+        kutu(h, 6, 1, 0, 14, Math.max(2, derin), 15, Blocks.DIRT.defaultBlockState());
+        kutu(h, 1, 1, 1, 5, derin, 14, Blocks.WATER.defaultBlockState());
+    }
+
+    /** Kaşık: x 7..14 taş yar (y 1..6); ağız x 7..8, y 3..4, z 8; iç boşluk x 9..12, y 1..3, z 6..10 (su eşiği y3). */
+    private static void magaraSahnesi(GameTestHelper h) {
+        sahne(h, 2);
+        kutu(h, 7, 1, 0, 14, 6, 15, Blocks.STONE.defaultBlockState());
+        kutu(h, 9, 1, 6, 12, 3, 10, Blocks.AIR.defaultBlockState());
+        kutu(h, 7, 3, 8, 8, 4, 8, Blocks.AIR.defaultBlockState());
+    }
+
+    private static TsunamiGeometrisi geometri(GameTestHelper h) {
+        BlockPos k = m(h, 6, 2, 8);
+        return new TsunamiGeometrisi(k.getX(), k.getZ() + 0.5, 1, 0, k.getY(), 70);
+    }
+
+    /** Afeti test ölçeğiyle başlatır, AKTIF'e geçirir ve her tick ilerletir. */
+    private static TsunamiAfeti baslat(GameTestHelper h, int seviye) {
+        ServerLevel l = h.getLevel();
+        TsunamiAfeti a = new TsunamiAfeti();
+        a.testIcin(geometri(h), OLCEK);
+        a.baslat(l, new AfetBaglami(AfetTuru.TSUNAMI, seviye, m(h, 10, 3, 8), l.dimension(), null,
+                DunyaDonemi.al(l).saat(), 0, 0, true));
+        a.asamaIleri(l);
+        a.asamaIleri(l);
+        h.onEachTick(() -> a.tick(l, 1));
+        return a;
+    }
+
+    private static SanalSuDunyasi dunya(GameTestHelper h) {
+        return SanalSu.dunya(h.getLevel());
+    }
+
+    /** Boyutta dalga, çekilme ve ({@code magaraDa}) mağara kalmadı mı; boş sanal su dünyası {@code null} döner. */
+    private static boolean bos(GameTestHelper h, boolean magaraDa) {
+        SanalSuDunyasi d = dunya(h);
+        return d == null || (d.dalgalar().isEmpty() && d.cekilmeler().isEmpty() && (!magaraDa || d.magaralar().isEmpty()));
+    }
+
+    private static long magaraHash(GameTestHelper h) {
+        BlockPos a = m(h, 6, 0, 4);
+        BlockPos b = m(h, 14, 7, 12);
+        return SanalSu.bolgeHash(h.getLevel(), a.getX(), a.getY(), a.getZ(), b.getX(), b.getY(), b.getZ());
+    }
+
+    /**
+     * N14/N10: düz dünyada (deniz yok) yönetici tsunamiyi başlatmaz; 70 sütunluk 3 derin deniz küçük eşikle (30) yeterli,
+     * dalga yönü denizden karaya (+x) ve kıyı suyun karaya bakan kenarında; deniz don(dur)ulunca yer uygun değil.
+     */
+    @GameTest(template = "su_alani", batch = "tsunami_yer", timeoutTicks = 100)
+    public static void denizYoksaBaslamazDenizdenKarayaYonlenir(GameTestHelper h) {
+        ServerLevel l = h.getLevel();
+        AfetYoneticisi y = AfetYoneticisi.al(l.getServer());
+        y.durdur();
+        BlockPos merkez = m(h, 10, 3, 8);
+        h.assertTrue(KiyiAnalizi.analiz(l, merkez, 9, 30).isEmpty(), "denizsiz sahne uygun sayıldı");
+        AfetYoneticisi.BaslatmaSonucu sonuc = y.elleBaslat(AfetTuru.TSUNAMI, 1, null, l, merkez);
+        h.assertTrue(sonuc == AfetYoneticisi.BaslatmaSonucu.YER_UYGUN_DEGIL && y.aktifAfet().isEmpty(),
+                "düz dünyada tsunami başladı: " + sonuc);
+        sahne(h, 3);
+        TsunamiGeometrisi g = KiyiAnalizi.analiz(l, merkez, 9, 30).orElse(null);
+        h.assertTrue(g != null, "deniz bulunamadı");
+        h.assertTrue(g.yonX() > 0.9, "dalga yönü karaya değil: " + g.yonX() + ", " + g.yonZ());
+        int kiyiX = (int) Math.floor(g.kiyiX()) - m(h, 0, 0, 0).getX();
+        h.assertTrue(kiyiX == 5, "kıyı suyun kara kenarında değil: x=" + kiyiX);
+        h.assertTrue(g.taban() == m(h, 0, 3, 0).getY(), "taban su yüzeyinde değil: " + g.taban());
+        kutu(h, 1, 3, 1, 5, 3, 14, Blocks.ICE.defaultBlockState());
+        h.assertTrue(KiyiAnalizi.analiz(l, merkez, 9, 30).isEmpty(), "donmuş deniz uygun sayıldı (N10)");
+        DogalAfetler.LOGGER.info("Tsunami GameTest: N14 sonuç={}, deniz sütunu={}, yön=({}, {})", sonuc, g.denizSutunu(),
+                g.yonX(), g.yonZ());
+        h.succeed();
+    }
+
+    /**
+     * B.2 ve temiz durdurma: AKTIF'te çekilme ve S1 tablosuyla dalga başlar (ivme 0,04, hasar 0,5), dalga kıyıya varmadan
+     * önce yükselir (sığlaşma), kıyıya vurunca çekilme biter; mağaraya dalga girince cep dolar; {@code durdur(temiz)}
+     * dalga, çekilme ve mağara bırakmaz, mağara kutusunun hash'i baştakiyle aynı.
+     */
+    @GameTest(template = "su_alani", batch = "tsunami_stop", timeoutTicks = 300)
+    public static void cekilmeDalgaMagaraVeStopTemiz(GameTestHelper h) {
+        ServerLevel l = h.getLevel();
+        magaraSahnesi(h);
+        long hashOnce = magaraHash(h);
+        TsunamiAfeti a = baslat(h, 1);
+        h.assertTrue(dunya(h).cekilmeler().containsKey(a.cekilmeKimligi()), "çekilme başlamadı");
+        Dalga d = dunya(h).dalgalar().get(a.dalga1());
+        h.assertTrue(d != null && d.ivme() == 0.04 && d.hasar() == 0.5, "S1 dalgası tabloyla değil: " + d);
+        double ilk = d.yukseklik();
+        h.startSequence()
+                .thenWaitUntil(() -> h.assertTrue(a.altAsama() >= 2 && a.cekilmeKimligi() < 0, "dalga kıyıya varmadı"))
+                .thenExecute(() -> {
+                    double simdi = dunya(h).dalgalar().get(a.dalga1()).yukseklik();
+                    h.assertTrue(simdi > ilk, "dalga sığlaşırken yükselmedi: " + ilk + " -> " + simdi);
+                    h.assertTrue(dunya(h).cekilmeler().isEmpty(), "kıyıya vuran dalgada çekilme sürüyor");
+                })
+                .thenWaitUntil(() -> h.assertTrue(!a.magaralar().isEmpty(), "mağara dolmadı"))
+                .thenExecute(() -> {
+                    h.assertTrue(dunya(h).magaralar().containsKey(a.magaralar().get(0)), "mağara cebi yok");
+                    a.durdur(l, true);
+                    h.assertTrue(bos(h, true), "stop sanal su bıraktı");
+                    h.assertTrue(magaraHash(h) == hashOnce, "mağara kutusunun blokları değişti");
+                    DogalAfetler.LOGGER.info("Tsunami GameTest: stop temiz, yükseklik {} -> kıyıda, mağara {}, hash={}",
+                            ilk, a.magaralar(), Long.toHexString(hashOnce));
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * B.5 yıkım sırası (S2): aynı cephe satırındaki cam anında, ahşap 0,3 sn sonra kırılır; yaprak kırılır; kırıktaş (yalnız
+     * S4–5) ve doğal arazi (toprak, taş taban) kalır.
+     */
+    @GameTest(template = "su_alani", batch = "tsunami_yikim", timeoutTicks = 300)
+    public static void dalgaOnceCamSonraAhsapYikarAraziKalir(GameTestHelper h) {
+        ServerLevel l = h.getLevel();
+        sahne(h, 2);
+        h.setBlock(9, 3, 8, Blocks.GLASS);
+        h.setBlock(9, 3, 6, Blocks.OAK_PLANKS);
+        h.setBlock(10, 3, 10, Blocks.OAK_LEAVES.defaultBlockState()
+                .setValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT, true));
+        h.setBlock(11, 3, 8, Blocks.COBBLESTONE);
+        TsunamiAfeti a = baslat(h, 2);
+        long[] kirildi = {-1, -1};
+        h.onEachTick(() -> {
+            long t = DunyaDonemi.al(l).saat();
+            if (kirildi[0] < 0 && l.getBlockState(m(h, 9, 3, 8)).isAir()) {
+                kirildi[0] = t;
+            }
+            if (kirildi[1] < 0 && l.getBlockState(m(h, 9, 3, 6)).isAir()) {
+                kirildi[1] = t;
+            }
+        });
+        h.startSequence()
+                .thenWaitUntil(() -> h.assertTrue(kirildi[0] >= 0 && kirildi[1] >= 0
+                        && l.getBlockState(m(h, 10, 3, 10)).isAir(), "cam/ahşap/yaprak henüz kırılmadı"))
+                .thenExecute(() -> {
+                    h.assertTrue(kirildi[1] - kirildi[0] >= 5, "ahşap camdan sonra kırılmadı: " + kirildi[0] + ", "
+                            + kirildi[1]);
+                    h.assertBlockPresent(Blocks.COBBLESTONE, 11, 3, 8);
+                    h.assertBlockPresent(Blocks.DIRT, 9, 2, 8);
+                    h.assertBlockPresent(Blocks.STONE, 9, 0, 8);
+                    DogalAfetler.LOGGER.info("Tsunami GameTest: yıkım cam t={} ahşap t={} kırılan={}", kirildi[0], kirildi[1],
+                            a.kirilan());
+                    a.durdur(l, true);
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * B.3/B.4 ve #2 Dalga Avcısı: karadaki sahte oyuncuyu dalga sürükleyince afet {@link Ipucu#SURUKLENDI} yayınlar (bir kez);
+     * dalgadaki oyuncu ve domuz hasar alır.
+     */
+    @GameTest(template = "su_alani", batch = "tsunami_ipucu", timeoutTicks = 300)
+    public static void dalgaOyuncuyuSurukleyinceIpucuVerirHasarVerir(GameTestHelper h) {
+        ServerLevel l = h.getLevel();
+        sahne(h, 2);
+        BlockPos ayak = m(h, 10, 3, 8);
+        ServerPlayer oyuncu = CekirdekOyunTestleri.sahteOyuncu(h, ayak.getX() + 0.5, ayak.getY(), ayak.getZ() + 0.5);
+        oyuncu.setGameMode(GameType.SURVIVAL);
+        // Hasar dalga ilerlerken verilir (menzilde duran su itmez): domuz kıyıya yakın, cephenin uzun süre geçtiği yerde.
+        Pig domuz = h.spawn(EntityType.PIG, 7, 3, 11);
+        h.onEachTick(oyuncu::doTick);
+        float oyuncuCan = oyuncu.getHealth();
+        float domuzCan = domuz.getHealth();
+        List<Ipucu> gelen = new ArrayList<>();
+        Consumer<BasarimIpucuEvent> dinleyici = e -> {
+            if (e.oyuncu() == oyuncu) {
+                gelen.add(e.ipucu());
+            }
+        };
+        MinecraftForge.EVENT_BUS.addListener(dinleyici);
+        TsunamiAfeti a = baslat(h, 2);
+        h.startSequence()
+                .thenWaitUntil(() -> h.assertTrue(!gelen.isEmpty(), "SURUKLENDI ipucu gelmedi"))
+                .thenWaitUntil(() -> h.assertTrue(oyuncu.getHealth() < oyuncuCan && domuz.getHealth() < domuzCan,
+                        "dalga hasarı yok: oyuncu " + oyuncu.getHealth() + " domuz " + domuz.getHealth()))
+                .thenExecute(() -> {
+                    MinecraftForge.EVENT_BUS.unregister(dinleyici);
+                    h.assertTrue(gelen.size() == 1 && gelen.get(0) == Ipucu.SURUKLENDI, "ipucu: " + gelen);
+                    DogalAfetler.LOGGER.info("Tsunami GameTest: ipucu {} oyuncu can {} -> {} domuz can {} -> {}", gelen, oyuncuCan,
+                            oyuncu.getHealth(), domuzCan, domuz.getHealth());
+                    a.durdur(l, true);
+                    l.getServer().getPlayerList().remove(oyuncu);
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Doğal bitiş: AKTIF son dalga menzile varınca, BITIS dalga sönünce biter; mağara suyu kalır ({@code magara_suyu} süreci
+     * kurutur), dalga ve çekilme kalmaz, mağara kutusunun blokları değişmez.
+     */
+    @GameTest(template = "su_alani", batch = "tsunami_dogal", timeoutTicks = 600)
+    public static void dogalBitisteMagaraSuyuKalirDalgaKalmaz(GameTestHelper h) {
+        ServerLevel l = h.getLevel();
+        magaraSahnesi(h);
+        long hashOnce = magaraHash(h);
+        TsunamiAfeti a = baslat(h, 1);
+        h.startSequence()
+                .thenWaitUntil(() -> h.assertTrue(a.sonlandi(), "afet kendiliğinden bitmedi: " + a.asama()))
+                .thenExecute(() -> {
+                    a.durdur(l, true);
+                    h.assertTrue(bos(h, false), "dalga/çekilme kaldı");
+                    h.assertTrue(!a.magaralar().isEmpty() && dunya(h).magaralar().containsKey(a.magaralar().get(0)),
+                            "doğal bitişte mağara suyu kaldırıldı");
+                    h.assertTrue(magaraHash(h) == hashOnce, "mağara kutusunun blokları değişti");
+                    a.magaralar().forEach(id -> SanalSu.magaraBitir(l, id));
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Kalıcılık (sanal su §A2): kayıttan okunan afet dalgayı yeniden başlatmaz, aynı kimliği sürdürür; aynı afet numarasıyla
+     * ikinci {@code dalgaBaslat} yeni dalga eklemez.
+     */
+    @GameTest(template = "su_alani", batch = "tsunami_kayit", timeoutTicks = 200)
+    public static void kayittanOkunanAfetDalgayiIkilemez(GameTestHelper h) {
+        ServerLevel l = h.getLevel();
+        sahne(h, 2);
+        TsunamiAfeti a = new TsunamiAfeti();
+        a.testIcin(geometri(h), OLCEK);
+        a.baslat(l, new AfetBaglami(AfetTuru.TSUNAMI, 1, m(h, 10, 3, 8), l.dimension(), null, DunyaDonemi.al(l).saat(), 0,
+                0, true));
+        a.asamaIleri(l);
+        a.asamaIleri(l);
+        int dalgaSayisi = dunya(h).dalgalar().size();
+        CompoundTag kayit = a.durumYaz(new CompoundTag());
+        TsunamiAfeti b = new TsunamiAfeti();
+        b.durumOku(kayit);
+        b.yuklendi(l);
+        h.assertTrue(b.dalga1() == a.dalga1() && SanalSu.dalgaVarMi(l, b.dalga1()), "kayıttaki dalga kimliği kayboldu");
+        h.assertTrue(SanalSu.dalgaBaslat(l, dunya(h).dalgalar().get(b.dalga1()), b.baglam().baslangicSaati()) == b.dalga1(),
+                "aynı afet numarasıyla ikinci dalga eklendi");
+        h.onEachTick(() -> b.tick(l, 1));
+        h.startSequence()
+                .thenExecuteAfter(40, () -> {
+                    h.assertTrue(dunya(h).dalgalar().size() == dalgaSayisi, "yüklenen afet dalga ekledi");
+                    b.durdur(l, true);
+                    h.assertTrue(!SanalSu.dalgaVarMi(l, a.dalga1()), "durdurulan afetin dalgası kaldı");
+                })
+                .thenSucceed();
+    }
+}
