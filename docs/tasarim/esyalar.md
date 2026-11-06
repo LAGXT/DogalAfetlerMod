@@ -43,6 +43,7 @@ patates); meydan okuma (dikenli, mor duyuru) 100 XP + ünvan. XP'ler `basarim.od
 Kozmik Kâşif, Felaket Ustası, Her Şeyi Atlatan; en son kazanılan geçerli. Ad çevrilebilir bileşen olduğu için her oyuncu kendi
 dilinde görür. `basarim.unvanGoster=false` öneki kapatır; `/dogalafet unvan <oyuncu> [ad|yok]` OP'nin elidir.
 
-**Vitrin anı.** Seviye 5 bir afetin doğal bitişinde üç toast'ın üst üste akması (İlk Rüzgâr → Fırtınaya Meydan Oku → mor
+**Vitrin anı.** Seviye 5 bir afetin doğal bitişinde üç toast'ın üst üste akması (İlk Rüzgâr, Fırtınaya Meydan Oku, mor
 çerçeveli Felaket Ustası) ve sohbetteki mor duyurunun kendisinde oyuncunun adının önünde beliren altın `[Felaket Ustası]`
-(ünvan duyurudan önce verilir).
+(ünvan duyurudan önce verilir). Üçü aynı tick'te aynı tetikleyiciden gelir; oyunda sıraları garanti değildir. Görsel kanıt
+koşusu sırayı sabitler: tür ve seviye 3 ayrı tick'lerde verilir, doğal bitiş Felaket Ustası'nı açar.

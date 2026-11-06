@@ -768,16 +768,23 @@ public final class BasarimOyunTestleri {
     }
 
     /**
-     * Faz 4 iç davranışı (#2, #4, #5, #6): afetin {@link BasarimIpucuEvent}'i testten yayınlanır. Bir afette o türden
-     * olay geldiyse tek kaynak olaydır; aynı afetteki yedek tahminler (düşüş, yangın yakınlığı, her hasar) sayılmaz
-     * (A-31).
+     * Faz 4 iç davranışı (#2, #4, #5, #6): dört tür yayıncı olarak kayıtlı (Faz 4 işçisinin mod kurucusundaki satırı) ve
+     * afetin {@link BasarimIpucuEvent}'i testten yayınlanır. Tek kaynak olaydır; aynı afetteki yedek tahminler (düşüş,
+     * yangın yakınlığı, her hasar) sayılmaz (A-31, A-35).
      */
     @GameTest(template = "bos", batch = "basarim_ipucu")
     public static void ipucuOlayiTekKaynakDalgaCukurYanginAsit(GameTestHelper y) {
         ServerPlayer a = oyuncu(y, "ipucu-a", 0);
         ServerPlayer b = oyuncu(y, "ipucu-b", 2);
         ServerPlayer c = oyuncu(y, "ipucu-c", 4);
-        try {
+        try (BasarimIpucuEvent.GeciciYayinci tsunami =
+                        BasarimIpucuEvent.geciciYayinci(AfetTuru.TSUNAMI, Ipucu.SURUKLENDI);
+                BasarimIpucuEvent.GeciciYayinci cukur =
+                        BasarimIpucuEvent.geciciYayinci(AfetTuru.SINKHOLE, Ipucu.CUKURA_DUSTU);
+                BasarimIpucuEvent.GeciciYayinci yangin =
+                        BasarimIpucuEvent.geciciYayinci(AfetTuru.ORMAN_YANGINI, Ipucu.YANGIN_ALANINDA);
+                BasarimIpucuEvent.GeciciYayinci asit =
+                        BasarimIpucuEvent.geciciYayinci(AfetTuru.ASIT_YAGMURU, Ipucu.HASAR_ALDI)) {
             afet(y, AfetTuru.TSUNAMI, 1, a, false, () -> ipucu(a, Ipucu.SURUKLENDI));
             dogrula(y, kazandi(y, a, Basarimlar.DALGA_AVCISI), "sürüklenme olayı Dalga Avcısı verir");
             dogrula(y, !kazandi(y, b, Basarimlar.DALGA_AVCISI), "olayı gelmeyen almaz");
@@ -837,6 +844,9 @@ public final class BasarimOyunTestleri {
                 a.fallDistance = 10;
                 BasarimOlaylari.tickDenetimi(a);
                 a.fallDistance = 0;
+                ipucu(b, Ipucu.CUKURA_DUSTU);
+                dogrula(y, BasarimVerisi.afetIzi(b).olayBitleri == 0,
+                        "kayıtsız türden gelen olay yok sayılır ve uyarılır (inceleme Bs2, A-35)");
             });
             dogrula(y, kazandi(y, a, Basarimlar.DELIKTEN_DONUS), "olayı hiç gelmeyen afette yedek düşüş sayılır");
             try (BasarimIpucuEvent.GeciciYayinci kayit =

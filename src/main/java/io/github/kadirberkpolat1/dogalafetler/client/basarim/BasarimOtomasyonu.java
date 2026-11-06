@@ -28,9 +28,11 @@ import net.minecraftforge.fml.util.ObfuscationReflectionHelper;
 /**
  * Başarım görsel kanıt otomasyonu (K0-21 rev. 2). Yalnız {@code -Ddogalafetler.otomasyon=basarim} ile, tek oyunculu
  * Quick Play dünyasında ve {@code -PoyunTestiAfeti=kasirga} ile çalışır; üretimde etkisizdir. Sırayla: seviye 5 sınama
- * kasırgasının sireniyle kök toast'ı, doğal bitişte üç başarımın toast'ı ve sohbet duyurusu (meydan okumada ünvanın
- * kendisiyle), ünvanlı sohbet satırı, ünvanlı tab listesi, başarım sekmesinin erken hali (kök + iki kat), gizliler
- * dışındaki bütün başarımlar açıkken sekmenin dört kaydırma konumu (gizli iki başarım görünmez) ve gizliler açılınca
+ * kasırgasının sireniyle kök toast'ı, üç başarımın toast'ı ve sohbet duyurusu (tür ve seviye 3 ayrı tick'lerde verilir,
+ * doğal bitiş seviye 5'i ünvanıyla açar: sıra belirlenimci, A-35), ünvanlı sohbet satırı, ünvanlı tab listesi (liste
+ * hedefi: tek oyunculu dünyada tek oyuncuyla vanilla listeyi ancak liste hedefi varken çizer), başarım sekmesinin erken
+ * hali (kök + iki kat), gizliler dışındaki bütün başarımlar açıkken sekmenin dört kaydırma konumu (gizli iki başarım
+ * görünmez) ve gizliler açılınca
  * üç konum (gizliler ortada tam görünür). Sahne komutları entegre sunucunun konsol kaynağından çıktısız verilir:
  * sohbete komut satırı (başarı ya da hata) düşmez; sohbet kareden önce temizlenir (A-33). Toast üreten komuttan önce
  * istemci en az {@value #AKICI_FPS} FPS çizmeli ve toast karesi ancak toast'ın kayma süresi boyunca gerçekten kare
@@ -211,7 +213,8 @@ public final class BasarimOtomasyonu {
                     "gamerule doDaylightCycle false", "time set 6000", "weather clear 100000",
                     "gamerule doWeatherCycle false",
                     "gamerule announceAdvancements true", "advancement revoke @s from dogalafetler:dogalafetler/root",
-                    "dogalafet unvan @s yok",
+                    "dogalafet unvan @s yok", "scoreboard objectives add basarim_kanit dummy",
+                    "scoreboard objectives setdisplay list basarim_kanit",
                     "dogalafet stop", "xp set @s 0 levels", "xp set @s 0 points"}) {
                 komut(mc, k);
             }
@@ -224,6 +227,12 @@ public final class BasarimOtomasyonu {
         ekle("kök toast kare", () -> kare(mc, "toast_kok"), bekle(10), 20);
         ekle("aktif", () -> komut(mc, "dogalafet asama ileri"), bekle(60), 80);
         ekle("akıcı çizim (son)", () -> { }, akici(mc), 1200);
+        // Doğal bitişte üç başarım aynı tetikleyicinin dinleyicileri; sıraları garanti değil. Vitrinde sıra sabit: tür ve
+        // seviye 3 ayrı tick'lerde verilir, doğal bitiş yalnız seviye 5'i (ünvanlı meydan okuma) açar (A-35).
+        ekle("İlk Rüzgâr", () -> komut(mc, "advancement grant @s only dogalafetler:dogalafetler/"
+                + Basarimlar.ILK_RUZGAR.yol()), kazanildi(mc, Basarimlar.ILK_RUZGAR), 40);
+        ekle("Fırtınaya Meydan Oku", () -> komut(mc, "advancement grant @s only dogalafetler:dogalafetler/"
+                + Basarimlar.FIRTINAYA_MEYDAN_OKU.yol()), kazanildi(mc, Basarimlar.FIRTINAYA_MEYDAN_OKU), 40);
         // AKTIF → BITIS: sınama afetinin sönümü hemen biter, afet doğal sonlanır (dördüncü "asama ileri" yok).
         ekle("doğal son", () -> komut(mc, "dogalafet asama ileri"), kazanildi(mc, Basarimlar.FELAKET_USTASI), 200);
         ekle("toast'lar", () -> { }, cizimle(25, 20), 60);
@@ -287,6 +296,7 @@ public final class BasarimOtomasyonu {
         ekle("kapanış", () -> {
             mc.setScreen(null);
             komut(mc, "gamerule announceAdvancements true");
+            komut(mc, "scoreboard objectives remove basarim_kanit");
             logKomutu(mc, "dogalafet basarim bilgi @s");
             DogalAfetler.LOGGER.info(ON + "bitti; FPS {}", mc.getFps());
         }, bekle(40), 60);

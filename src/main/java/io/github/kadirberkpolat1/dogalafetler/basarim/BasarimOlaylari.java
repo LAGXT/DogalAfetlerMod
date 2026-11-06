@@ -71,8 +71,8 @@ import net.minecraftforge.server.ServerLifecycleHooks;
  * Başarım ölçütlerini tetikleyen olay dinleyicileri (madde 12, N16; tablo {@code .vibe/kararlar/basarim.md} §A). Hepsi
  * sunucu ana thread'inde ve oyuncu başınadır. Afet sonuçları çekirdeğin {@link AfetBittiEvent}'inden (yalnız doğal
  * bitiş), ilk siren {@link SirenIstegiEvent}'ten (sireni gerçekten alan oyuncular), dönem eşikleri
- * {@link DonemDegistiEvent}'ten ve saniyelik denetimden gelir. Afete özgü koşulların kaynağı afetin
- * {@link BasarimIpucuEvent}'idir; başarımın yedek denetimi yalnız o ipucunun olayı yokken sayılır (A-31). Sahte
+ * {@link DonemDegistiEvent}'ten ve saniyelik denetimden gelir. Afete özgü koşulların kaynağı, türü yayıncı olarak kayıtlıysa
+ * afetin {@link BasarimIpucuEvent}'i, değilse başarımın yedek denetimidir (A-31, A-35). Sahte
  * oyuncular (GameTest) tick almadığı için {@link #saniyelikDenetim} ve {@link #tickDenetimi} testten doğrudan
  * çağrılabilir.
  */
@@ -144,7 +144,7 @@ public final class BasarimOlaylari {
         }
         Set<UUID> sagCikanlar = SagCikanTuretimi.sagCikanlar(olay.dogalBitti(), olay.etkilenenler(), olay.sagCikanlar(),
                 payliAlanda, payliOlenler, cevrimici);
-        Set<Ipucu> olayli = BasarimIpucuEvent.YAYINCILAR.olayli(olay.tur(), BasarimVerisi.gelenIpuclari(server, no));
+        Set<Ipucu> olayli = BasarimIpucuEvent.YAYINCILAR.olayli(olay.tur());
         for (UUID kimlik : sagCikanlar) {
             ServerPlayer oyuncu = server.getPlayerList().getPlayer(kimlik);
             if (oyuncu == null) {
@@ -165,15 +165,21 @@ public final class BasarimOlaylari {
     }
 
     /**
-     * Faz 4 afetinin ipucu (§A.3): oyuncunun izine olay kaynağı olarak yazılır ve bu afette o ipucunun tek kaynağı
-     * artık olaydır (yedek tahminler sayılmaz, A-31). Yalnız AKTIF aşamada.
+     * Faz 4 afetinin ipucu (§A.3): türü o ipucunun kayıtlı yayıncısıysa oyuncunun izine olay kaynağı olarak yazılır.
+     * Kayıtsız kaynaktan gelen olay yok sayılır ve tür + ipucu başına bir kez uyarılır: o türde tek kaynak yedek
+     * denetimdir (A-35). Yalnız AKTIF aşamada.
      */
     @SubscribeEvent
     public static void ipucuGeldi(BasarimIpucuEvent olay) {
         ServerPlayer oyuncu = olay.oyuncu();
         aktifAsamadakiAfet(oyuncu.server).ifPresent(afet -> {
-            BasarimVerisi.ipucuGeldi(oyuncu.server, afetNo(afet), olay.ipucu());
-            isaretle(oyuncu, afet, olay.ipucu(), true);
+            switch (BasarimIpucuEvent.YAYINCILAR.olayGeldi(afet.tur(), olay.ipucu())) {
+                case KABUL -> isaretle(oyuncu, afet, olay.ipucu(), true);
+                case UYAR_YOK_SAY -> DogalAfetler.LOGGER.warn("[basarim] {} ipucu olayı {} afetinden geldi ama tür "
+                        + "yayıncı olarak kayıtlı değil (BasarimIpucuEvent.yayinciKaydet); olay yok sayıldı, başarım yedek "
+                        + "denetimle sayılır", olay.ipucu(), afet.tur().kimlik());
+                case YOK_SAY -> { }
+            }
         });
     }
 

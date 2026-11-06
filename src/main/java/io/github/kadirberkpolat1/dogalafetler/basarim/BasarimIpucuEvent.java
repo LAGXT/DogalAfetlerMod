@@ -12,7 +12,8 @@ import net.minecraftforge.eventbus.api.Event;
  * kendisinin bildiği "o afette ayrıca" koşullar içindir (madde 12 #2, #4, #5, #6); ipucu oyuncunun süren (AKTIF) afetteki
  * izine yazılır ve afet doğal bitince {@code afetten_sag_cikti} ölçütünün {@code kosul} alanına döner. Sözleşme
  * {@code .vibe/kararlar/basarim.md} §A.3: ipucunun ait olduğu afet türü onu yayınladığını mod kurucusunda
- * {@link #yayinciKaydet} ile bildirir; o türde başarımın yedek denetimi çalışmaz, tek kaynak bu olaydır (A-31).
+ * {@link #yayinciKaydet} ile bildirir; o türde başarımın yedek denetimi çalışmaz, tek kaynak bu olaydır (A-31). Kayıtsız
+ * türden gelen olay yok sayılır ve tür + ipucu başına bir kez {@code WARN} yazılır (A-35).
  *
  * <pre>{@code
  * BasarimIpucuEvent.yayinciKaydet(AfetTuru.SINKHOLE, Ipucu.CUKURA_DUSTU);            // mod kurucusunda

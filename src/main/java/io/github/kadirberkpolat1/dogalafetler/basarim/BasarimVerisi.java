@@ -3,7 +3,6 @@ package io.github.kadirberkpolat1.dogalafetler.basarim;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.AfetIzi;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.AfetKumesi;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.DenizTakibi;
-import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.Ipucu;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.KutupSayaci;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.Unvan;
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
@@ -14,7 +13,6 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.StringTag;
 import net.minecraft.nbt.Tag;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 
 /**
@@ -24,15 +22,13 @@ import net.minecraft.server.level.ServerPlayer;
  * {@code atlatilan} (sağ çıkılan afet türleri), {@code balik} (buz deliğinden toplam balık), {@code unvan},
  * {@code kutup}/{@code kutupSon}/{@code kutupDongu} (Kutup Sığınağı sayacı ve ait olduğu sıfırlama döngüsü),
  * {@code denizOlum} (yükselişte ölüm döngüsü), {@code afet} (süren afetteki iz: olay ve yedek tahmin
- * ipuçları ayrı, A-31). Dünya verisinde ({@code DunyaDonemi.ekVeri("basarim")}) yalnız sıfırlama işareti ve süren
- * afetin gelen ipuçları. Yalnız sunucu ana thread'inde.
+ * ipuçları ayrı, A-31). Dünya verisinde ({@code DunyaDonemi.ekVeri("basarim")}) yalnız sıfırlama işareti. Yalnız
+ * sunucu ana thread'inde.
  */
 public final class BasarimVerisi {
     public static final String ETIKET = "dogalafetler_basarim";
     static final String EK_VERI = "basarim";
     private static final String SIFIRLAMA = "sifirlama";
-    private static final String IPUCU_AFET = "ipucuAfet";
-    private static final String IPUCU_BITLERI = "ipucuBitleri";
     private static long sonIsaret;
 
     private BasarimVerisi() {
@@ -172,28 +168,6 @@ public final class BasarimVerisi {
             etiket.putLong("yanginTahminSon", iz.yanginTahminSon);
         }
         kok(oyuncu).put("afet", etiket);
-    }
-
-    /**
-     * {@code afetNo}'lu afet sürerken olayı gelmiş ipuçları ({@link Ipucu#bit()} maskesi; dünya verisinde, bütün
-     * oyuncular için ortak, A-31). Başka bir afete aitse 0.
-     */
-    static int gelenIpuclari(MinecraftServer server, long afetNo) {
-        CompoundTag ek = DunyaDonemi.al(server).ekVeri(EK_VERI);
-        return ek.contains(IPUCU_AFET, Tag.TAG_LONG) && ek.getLong(IPUCU_AFET) == afetNo ? ek.getInt(IPUCU_BITLERI) : 0;
-    }
-
-    /** Afetten ipucu olayı geldi: bu afette o ipucunun tek kaynağı artık olaydır. */
-    static void ipucuGeldi(MinecraftServer server, long afetNo, Ipucu ipucu) {
-        int bitler = gelenIpuclari(server, afetNo);
-        if ((bitler & ipucu.bit()) != 0) {
-            return;
-        }
-        DunyaDonemi donem = DunyaDonemi.al(server);
-        CompoundTag ek = donem.ekVeri(EK_VERI);
-        ek.putLong(IPUCU_AFET, afetNo);
-        ek.putInt(IPUCU_BITLERI, bitler | ipucu.bit());
-        donem.ekVeriDegisti(EK_VERI);
     }
 
     /** Ölüm ya da End dönüşü ({@code PlayerEvent.Clone}): veri yeni oyuncu nesnesine taşınır. */
