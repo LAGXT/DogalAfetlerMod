@@ -14,7 +14,7 @@ focus_on_activate off]); (b) JVM'de HL_EXEC_RULE_TOKEN yoksa öldürülür; (c) 
 tutmazsa öldürülür; (d) 5 sn'de bir bekçi: etkin pencere bizimse ALARM, süreç öldürülür, odak kaydedilen pencereye
 verilir, koşu geçersiz; (e) oyun içi girdi sayıları kapanış satırından okunur, sıfırdan farklıysa koşu geçersiz.
 Sahibin oturumunda tıklama/odak/workspace değişimi yok. Aynı anda tek runClient (`runclient_kilit.py kos`; kilit satırları
-protokole kopyalanır); ağır süreç kapısı (en çok 20 dk). Sayılar ve adımlar
+protokole kopyalanır); ağır süreç kapısı (en çok 60 dk: altı Faz 4 işçisi aynı anda Gradle/runClient koşuyor). Sayılar ve adımlar
 KOK/.vibe/kanit/deprem-sinkhole/gorsel/protokol.log'a, kareler KOK/.vibe/kanit/deprem-sinkhole/gorsel/kareler/'e.
 """
 import hashlib
@@ -60,7 +60,7 @@ def hypr_json(*a):
 
 
 def kapi():
-    for _ in range(21):
+    for _ in range(61):
         gradle = int(subprocess.run(["pgrep", "-fc", "GradleWrapperMain"], capture_output=True, text=True).stdout
                      .strip() or 0)
         istemci = subprocess.run(["pgrep", "-fa", "runClient"], capture_output=True, text=True).stdout.strip()
@@ -150,7 +150,7 @@ def girdi_sayilari(istemci_log):
 def main():
     no = kosu_no()
     if not kapi():
-        log("kapı 20 dk'da açılmadı")
+        log("kapı 60 dk'da açılmadı")
         return 2
     hazirla()
     istemci_log = KANIT / f"runClient-{no}.log"
