@@ -89,14 +89,32 @@ class GunesZinciriTest {
     }
 
     @Test
+    void dogusNedeniKapiSafakVeGunDongusu() {
+        GunesZinciri.DogusNedeni bekle = GunesZinciri.DogusNedeni.BEKLE;
+        assertEquals(bekle, GunesZinciri.dogusNedeni(false, 22_000, 23_500, true), "kapı kapalıyken şafak da doğurmaz");
+        assertEquals(bekle, GunesZinciri.dogusNedeni(false, 6_000, 6_001, false), "kapı kapalıyken döngü kapalı da doğurmaz");
+        assertEquals(bekle, GunesZinciri.dogusNedeni(true, 5_999, 6_000, true), "öğlen şafak beklenir");
+        assertEquals(GunesZinciri.DogusNedeni.SAFAK, GunesZinciri.dogusNedeni(true, 22_999, 23_000, true));
+        assertEquals(GunesZinciri.DogusNedeni.SAFAK_GECILDI, GunesZinciri.dogusNedeni(true, 13_000, 24_000, true),
+                "uyku şafağı atlayınca");
+        assertEquals(GunesZinciri.DogusNedeni.GUN_DONGUSU_KAPALI, GunesZinciri.dogusNedeni(true, 6_000, 6_000, false),
+                "şef kararı: gün döngüsü kapalıyken o anki gün saatinde doğar");
+        assertEquals(GunesZinciri.DogusNedeni.GUN_DONGUSU_KAPALI, GunesZinciri.dogusNedeni(true, Long.MIN_VALUE, 18_000, false),
+                "gece yarısı da olsa beklenmez");
+        assertEquals(GunesZinciri.DogusNedeni.GUN_DONGUSU_KAPALI, GunesZinciri.dogusNedeni(true, 23_100, 23_100, false),
+                "döngü kapalıyken şafak penceresinde de neden döngüdür (log aynı)");
+        assertFalse(GunesZinciri.DogusNedeni.BEKLE.dogar());
+        assertTrue(GunesZinciri.DogusNedeni.GUN_DONGUSU_KAPALI.dogar());
+    }
+
+    @Test
     void dogusIlkSafagaHizalanir() {
-        assertFalse(GunesZinciri.safakMi(6_000, true), "öğlen doğmaz");
-        assertFalse(GunesZinciri.safakMi(22_999, true));
-        assertTrue(GunesZinciri.safakMi(23_000, true), "şafak başlangıcı");
-        assertTrue(GunesZinciri.safakMi(23_999, true));
-        assertFalse(GunesZinciri.safakMi(24_000, true), "yeni gün 0 = şafak penceresi kapandı");
-        assertTrue(GunesZinciri.safakMi(24_000L * 5 + 23_500, true), "çok günlü saat");
-        assertTrue(GunesZinciri.safakMi(6_000, false), "gün döngüsü kapalıysa şafak hiç gelmez: hemen doğar");
+        assertFalse(GunesZinciri.safakMi(6_000), "öğlen doğmaz");
+        assertFalse(GunesZinciri.safakMi(22_999));
+        assertTrue(GunesZinciri.safakMi(23_000), "şafak başlangıcı");
+        assertTrue(GunesZinciri.safakMi(23_999));
+        assertFalse(GunesZinciri.safakMi(24_000), "yeni gün 0 = şafak penceresi kapandı");
+        assertTrue(GunesZinciri.safakMi(24_000L * 5 + 23_500), "çok günlü saat");
         assertEquals(17_000, GunesZinciri.safagaKalan(6_000));
         assertEquals(0, GunesZinciri.safagaKalan(23_400));
         assertEquals(23_000, GunesZinciri.safagaKalan(24_000));

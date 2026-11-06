@@ -48,6 +48,7 @@ public final class GokyuzuKomutlari {
     static final String KALAN_SUPERNOVA = ON + "bilgi.kalan.supernova";
     static final String KALAN_DONMA = ON + "bilgi.kalan.donma";
     static final String KALAN_GECIKME = ON + "bilgi.kalan.gecikme";
+    static final String KALAN_GECIKME_DONGUSUZ = ON + "bilgi.kalan.gecikme_dongusuz";
     static final String KALAN_SAFAK = ON + "bilgi.kalan.safak";
     static final String KALAN_DOGUS = ON + "bilgi.kalan.dogus";
     static final String KALAN_TAMAM = ON + "bilgi.kalan.tamam";
@@ -162,11 +163,12 @@ public final class GokyuzuKomutlari {
                 if (donem.donmaIlerlemesi() < GunesZinciri.DONMA_TAM - 1e-3f) {
                     yield Component.translatable(KALAN_DONMA, yuzde(donem.donmaIlerlemesi()));
                 }
-                if (!GunesZinciri.kapiAcik(kapi, ayar)) {
-                    yield Component.translatable(KALAN_GECIKME, gun(ayar.gecikmeTick() - kapi));
-                }
                 boolean dongu = ust.getGameRules().getBoolean(GameRules.RULE_DAYLIGHT);
-                yield Component.translatable(KALAN_SAFAK, dongu ? GunesZinciri.safagaKalan(ust.getDayTime()) : 0);
+                if (!GunesZinciri.kapiAcik(kapi, ayar)) {
+                    yield Component.translatable(dongu ? KALAN_GECIKME : KALAN_GECIKME_DONGUSUZ,
+                            gun(ayar.gecikmeTick() - kapi));
+                }
+                yield Component.translatable(KALAN_SAFAK, GunesZinciri.safagaKalan(ust.getDayTime()));
             }
             case KIZIL_CUCE -> p < 1f ? Component.translatable(KALAN_DOGUS, yuzde(p * 100f))
                     : Component.translatable(KALAN_TAMAM);
@@ -225,6 +227,8 @@ public final class GokyuzuKomutlari {
                 "Kızıl cüce: donmanın %%100 olması bekleniyor (şu an %%%s).");
         y.ekle(KALAN_GECIKME, "Red dwarf rises %s from now, at the first dawn after that.",
                 "Kızıl cüce %s sonra, ardından gelen ilk şafakta doğar.");
+        y.ekle(KALAN_GECIKME_DONGUSUZ, "Red dwarf rises %s from now (daylight cycle is off: dawn is not awaited).",
+                "Kızıl cüce %s sonra doğar (gün döngüsü kapalı: şafak beklenmez).");
         y.ekle(KALAN_SAFAK, "Red dwarf rises at the next dawn (%s ticks of daytime).",
                 "Kızıl cüce ilk şafakta doğar (gün saatinde %s tick).");
         y.ekle(KALAN_DOGUS, "Red dwarf dawn in progress: %s%%", "Kızıl cüce doğuşu sürüyor: %%%s");

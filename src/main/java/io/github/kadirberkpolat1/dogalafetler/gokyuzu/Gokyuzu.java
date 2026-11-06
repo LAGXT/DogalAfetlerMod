@@ -2,6 +2,7 @@ package io.github.kadirberkpolat1.dogalafetler.gokyuzu;
 
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
+import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.GokyuzuOlcutleri;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -10,14 +11,11 @@ import net.minecraft.world.level.Level;
 
 /**
  * Gökyüzü durumunun sunucu tarafı okuma kısa yolları (madde 16). Başarım işçisi N16 ölçütleri için kullanır:
- * "Süpernova Tanığı" {@link #supernovayiGoruyorMu}, "Yıldızlı Gece" {@link #yildizliGeceyiGoruyorMu} (10 saniyelik
- * süre sayacı başarımındır). Durum değişimini dinlemek için {@code core.olay.DonemDegistiEvent} ({@code alan() ==
- * GUNES_EVRESI} ya da {@code AY}). Yalnız sunucu ana thread'inde.
+ * "Süpernova Tanığı" {@link #supernovayiGoruyorMu}, "Yıldızlı Gece" {@link #yildizliGeceMi} (10 saniyelik süre sayacı
+ * başarımındır; tanımlar {@code mantik.GokyuzuOlcutleri}). Durum değişimini dinlemek için {@code core.olay.DonemDegistiEvent}
+ * ({@code alan() == GUNES_EVRESI} ya da {@code AY}). Yalnız sunucu ana thread'inde.
  */
 public final class Gokyuzu {
-    private static final long GECE_BASI = 13_000L;
-    private static final long GECE_SONU = 23_000L;
-
     private Gokyuzu() {
     }
 
@@ -39,19 +37,19 @@ public final class Gokyuzu {
         return level.dimension() == Level.OVERWORLD && level.canSeeSky(BlockPos.containing(oyuncu.getEyePosition()));
     }
 
-    /** Overworld gün saatinde gece mi (13000–23000; gün/gece döngüsü vanilla). */
+    /** Overworld gün saatinde gece mi (vanilla 13000–23000, güneşsiz dönemde de). */
     public static boolean geceMi(ServerLevel ustDunya) {
-        long saat = Math.floorMod(ustDunya.getDayTime(), 24_000L);
-        return saat >= GECE_BASI && saat < GECE_SONU;
+        return GokyuzuOlcutleri.geceMi(ustDunya.getDayTime());
     }
 
     /** N16 "Süpernovayı gökyüzünde gör": süpernova evresinde göğü gören konumda. */
     public static boolean supernovayiGoruyorMu(ServerPlayer oyuncu) {
-        return gunesEvresi(oyuncu.server) == GunesEvresi.SUPERNOVA && gokyuzunuGoruyorMu(oyuncu);
+        return GokyuzuOlcutleri.supernovaTanigi(gunesEvresi(oyuncu.server), gokyuzunuGoruyorMu(oyuncu));
     }
 
-    /** N16 "Yıldızlı Gece": ay yokken gece, göğü gören konumda. */
-    public static boolean yildizliGeceyiGoruyorMu(ServerPlayer oyuncu) {
-        return !ayVar(oyuncu.server) && geceMi(oyuncu.server.overworld()) && gokyuzunuGoruyorMu(oyuncu);
+    /** N16 "Yıldızlı Gece": ay yok + gece (gündüz saymaz) + göğü gören konum. */
+    public static boolean yildizliGeceMi(ServerPlayer oyuncu) {
+        return GokyuzuOlcutleri.yildizliGece(ayVar(oyuncu.server), oyuncu.server.overworld().getDayTime(),
+                gokyuzunuGoruyorMu(oyuncu));
     }
 }

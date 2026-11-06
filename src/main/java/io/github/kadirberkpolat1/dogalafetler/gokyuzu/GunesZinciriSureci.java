@@ -31,7 +31,6 @@ public final class GunesZinciriSureci implements DonemSureci {
     public static final String AD_ANAHTARI = "donem_sureci.dogalafetler." + KIMLIK;
     static final String DONGU = "dongu";
     static final String KAPI = "kapi";
-    private static final int KAYIT_ARALIGI_TICK = 20;
 
     private static GunesZinciriSureci ornek;
 
@@ -150,6 +149,11 @@ public final class GunesZinciriSureci implements DonemSureci {
         }
     }
 
+    /**
+     * Kapı sayacı donma %100'deyken her tick değişir. Değişen her tick'te yalnız {@code setDirty} (bayrak; diske dünya
+     * kaydında bir kez yazılır, çöküşte kayıp oto-kayıt aralığından fazla olmaz); {@code ekVeriDegisti} (olay) yalnız durum
+     * geçişinde: sayacın sıfırlanması ve kapının açılması (G20).
+     */
     private static void kapiyiIsle(ServerLevel ust, DunyaDonemi donem, CompoundTag veri, int adim,
             GunesZinciri.Ayarlar ayar, long oncekiGunSaati, long gunSaati) {
         long once = veri.getLong(KAPI);
@@ -157,18 +161,27 @@ public final class GunesZinciriSureci implements DonemSureci {
         if (gecen != once) {
             veri.putLong(KAPI, gecen);
             boolean yeniAcildi = GunesZinciri.kapiAcik(gecen, ayar) && !GunesZinciri.kapiAcik(once, ayar);
-            if (yeniAcildi || gecen == 0 || ust.getGameTime() % KAYIT_ARALIGI_TICK == 0) {
+            if (yeniAcildi || gecen == 0) {
                 donem.ekVeriDegisti(KIMLIK);
+            } else {
+                donem.setDirty();
             }
             if (yeniAcildi) {
                 DogalAfetler.LOGGER.info("Kızıl cüce kapısı açıldı (donma %100 + {} gün); ilk şafak bekleniyor",
                         ayar.kizilCuceGecikmeGun());
             }
         }
-        boolean gunDongusu = ust.getGameRules().getBoolean(GameRules.RULE_DAYLIGHT);
-        if (GunesZinciri.kapiAcik(gecen, ayar) && (GunesZinciri.safakMi(gunSaati, gunDongusu)
-                || GunesZinciri.safakGecti(oncekiGunSaati, gunSaati))) {
-            dogusBaslat(donem, "ilk şafak");
+        GunesZinciri.DogusNedeni neden = GunesZinciri.dogusNedeni(GunesZinciri.kapiAcik(gecen, ayar), oncekiGunSaati,
+                gunSaati, ust.getGameRules().getBoolean(GameRules.RULE_DAYLIGHT));
+        switch (neden) {
+            case SAFAK -> dogusBaslat(donem, "ilk şafak");
+            case SAFAK_GECILDI -> dogusBaslat(donem, "şafak geçildi");
+            case GUN_DONGUSU_KAPALI -> {
+                DogalAfetler.LOGGER.info("Kızıl cüce: gün döngüsü kapalı, şafak beklenmedi (gün saati {})", gunSaati);
+                dogusBaslat(donem, "gün döngüsü kapalı");
+            }
+            case BEKLE -> {
+            }
         }
     }
 

@@ -95,12 +95,42 @@ public final class GunesZinciri {
         return gecen >= ayar.gecikmeTick();
     }
 
+    /** Kızıl cücenin bu tick doğup doğmayacağı ve nedeni (log'a yazılır). */
+    public enum DogusNedeni {
+        /** Kapı kapalı ya da şafak bekleniyor. */
+        BEKLE,
+        /** Gün saati şafak penceresinde. */
+        SAFAK,
+        /** Uyku ya da zaman atlaması şafağı geçti. */
+        SAFAK_GECILDI,
+        /** {@code doDaylightCycle=false}: şafak hiç gelmez, o anki gün saatinde doğar (şef kararı, G19). */
+        GUN_DONGUSU_KAPALI;
+
+        public boolean dogar() {
+            return this != BEKLE;
+        }
+    }
+
     /**
-     * Gün saati şafak penceresinde mi ({@value #SAFAK_SAATI}–{@value #GUN_TICK}). Gün döngüsü kapalıysa şafak hiç gelmez;
-     * doğuş bekletilmez.
+     * Kapı açıkken doğuş nedeni: gün döngüsü kapalıysa beklenmez, açıksa şafak penceresi ya da şafağı geçen atlama
+     * ({@link #safakGecti}) gerekir. Gün saatine dokunulmaz (madde 16).
      */
-    public static boolean safakMi(long gunSaati, boolean gunDongusu) {
-        return !gunDongusu || Math.floorMod(gunSaati, GUN_TICK) >= SAFAK_SAATI;
+    public static DogusNedeni dogusNedeni(boolean kapiAcik, long oncekiGunSaati, long gunSaati, boolean gunDongusu) {
+        if (!kapiAcik) {
+            return DogusNedeni.BEKLE;
+        }
+        if (!gunDongusu) {
+            return DogusNedeni.GUN_DONGUSU_KAPALI;
+        }
+        if (safakMi(gunSaati)) {
+            return DogusNedeni.SAFAK;
+        }
+        return safakGecti(oncekiGunSaati, gunSaati) ? DogusNedeni.SAFAK_GECILDI : DogusNedeni.BEKLE;
+    }
+
+    /** Gün saati şafak penceresinde mi ({@value #SAFAK_SAATI}–{@value #GUN_TICK}). */
+    public static boolean safakMi(long gunSaati) {
+        return Math.floorMod(gunSaati, GUN_TICK) >= SAFAK_SAATI;
     }
 
     /**
