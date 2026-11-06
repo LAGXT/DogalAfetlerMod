@@ -292,11 +292,18 @@ public final class IstemciSu {
     @SubscribeEvent
     public static void sis(ViewportEvent.RenderFog e) {
         if (kameraSuda(e.getCamera())) {
+            // Mağara 10-20 blok: 56 blokluk sis orada renk vermez, sıcak sis yakına çekilir (SU-40: 56 -> en yakın 24 blok).
+            float sicak = sicaklik(Minecraft.getInstance().level, e.getCamera().getBlockPosition());
             e.setNearPlaneDistance(-8f);
-            e.setFarPlaneDistance(56f);
+            e.setFarPlaneDistance(56f - 64f * sicak);
             e.setFogShape(FogShape.SPHERE);
             e.setCanceled(true);
         }
+    }
+
+    /** Su altı sisinin sıcak payı 0..0,5: blok ışığı var, gökyüzü ışığı yok (mağara, fener). */
+    private static float sicaklik(ClientLevel l, BlockPos kp) {
+        return l.getBrightness(LightLayer.BLOCK, kp) / 15f * (1 - l.getBrightness(LightLayer.SKY, kp) / 15f) * 0.5f;
     }
 
     @SubscribeEvent
@@ -314,8 +321,7 @@ public final class IstemciSu {
             float r = ((sis >> 16 & 255) * 0.3f + (su >> 16 & 255) * 0.7f) / 255f * k;
             float g = ((sis >> 8 & 255) * 0.3f + (su >> 8 & 255) * 0.7f) / 255f * k;
             float b = ((sis & 255) * 0.3f + (su & 255) * 0.7f) / 255f * k;
-            BlockPos kp = e.getCamera().getBlockPosition();
-            float sicak = l.getBrightness(LightLayer.BLOCK, kp) / 15f * (1 - l.getBrightness(LightLayer.SKY, kp) / 15f) * 0.5f;
+            float sicak = sicaklik(l, e.getCamera().getBlockPosition());
             r += (0.85f * k - r) * sicak;
             g += (0.55f * k - g) * sicak;
             b += (0.3f * k - b) * sicak;

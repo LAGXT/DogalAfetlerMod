@@ -211,8 +211,9 @@ public final class SuOtomasyon {
 
     /**
      * Mağara sahnesi: oyuncunun altında taş bir oda (hava y 10..16), damlataş tavanda ışıltaşı yamaları, sarkıtlar ve asılı
-     * fenerler, yosunlu duvarlar, bir duvarda deniz fenerleri, iki sütun ve çakıl zemin; kamera bir köşede yüzeyin ~1 blok
-     * üstünde, tavan ışıklarının yansıması kadrajın ortasında (SU-35).
+     * fenerler, yosunlu duvarlar, bir duvarda deniz fenerleri, iki sütun ve çakıl zemin; kamera bir köşede dolu cebin yüzeyinin
+     * ({@code ustY} = 13) bir blok üstünde (y 14; altında kalan kamera yansıma görmez, SU-40), tavan ışıklarının yansıması
+     * kadrajın ortasında (SU-35).
      */
     private static void magara(Minecraft mc, String ne) {
         if ("kur".equals(ne)) {
@@ -246,7 +247,7 @@ public final class SuOtomasyon {
                 k.add("setblock %d 16 %d lantern[hanging=true]".formatted(ox + q[0], oz + q[1]));
             }
             k.add("time set 6000");
-            k.add("tp @s %d 12.3 %d -45 27".formatted(ox - 7, oz - 7));
+            k.add("tp @s %d 14.0 %d -45 27".formatted(ox - 7, oz - 7));
             for (String komut : k) {
                 mc.player.connection.sendCommand(komut);
             }
@@ -255,7 +256,7 @@ public final class SuOtomasyon {
             mc.player.connection.sendCommand("tp @s %d.5 11 %d.5 -45 -22".formatted(ox - 5, oz - 5));
         } else if ("kamera".equals(ne)) {
             mc.player.connection.sendCommand("gamemode spectator");
-            mc.player.connection.sendCommand("tp @s %d 12.3 %d -45 27".formatted(ox - 7, oz - 7));
+            mc.player.connection.sendCommand("tp @s %d 14.0 %d -45 27".formatted(ox - 7, oz - 7));
         } else {
             mc.player.connection.sendCommand("dogalafet su magara %d 10 %d 900 600".formatted(ox, oz));
         }

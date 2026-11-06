@@ -223,13 +223,35 @@ public final class SuOyunTestleri {
                 .thenSucceed();
     }
 
+    /** Vanilla {@code LivingEntity.getWaterSlowDown()} varsayılanı: suda yürüyen mob'un yatay hızı her tick bu çarpanla söner. */
+    static final double SU_SURTUNMESI = 0.8;
+
+    /**
+     * SU-39: durgun başlayıp {@code n} tick tam batık kalan mob'un dalga yönünde beklenen kayması (blok). Tick sırası: sunucu
+     * {@code baseTick}'te hıza {@code ivme} ekler ({@link SanalSu#itmeUygula}), {@code travel} o hızla yürütür ve vanilla su
+     * sürtünmesiyle ({@link #SU_SURTUNMESI}) çarpar; mob dalgadan hızlı gidemez. Tick başına sınır kayma {@code 5 * ivme}
+     * (0,325 blok); 15 tick'te ~3,6 blok.
+     */
+    static double beklenenSurukleme(double ivme, double dalgaHizi, int n) {
+        double v = 0;
+        double x = 0;
+        for (int i = 0; i < n; i++) {
+            double adim = Math.min(dalgaHizi, v + ivme);
+            x += adim;
+            v = SU_SURTUNMESI * adim;
+        }
+        return x;
+    }
+
     /**
      * Düz taş zeminde +x yönünde ilerleyen dalga: dalga tabanının altındaki hendekteki domuz ve zemindeki eşya dalga
-     * yönünde 3 bloktan fazla sürüklenir ve domuz suda sayılır (sunucu); sahte oyuncu ıslaktır ve istemcisinin uygulayacağı
+     * yönünde sürüklenir ve domuz suda sayılır (sunucu); sahte oyuncu ıslaktır ve istemcisinin uygulayacağı
      * ivme dalga yönündedir (oyuncuyu kendi istemcisi iter, SU-03). Doğrulama-2'nin kararsız koşusu belirlenimci kurulur
      * (SU-36): deniz alanı taş zemini okuduktan sonra okuması dondurulur ve iki blok derin hendek kodla kazılır (blok
      * olayı yok), alanın zemini bayat kalır; dalga tabanı canlı zeminden gelmezse dipteki domuz kuru kalır (doğrulayıcının
-     * düşen koşusunda domuz dipte kalmıştı, geçenlerde zıplayıp çıkmıştı). Bütün koşullar aynı tick'te.
+     * düşen koşusunda domuz dipte kalmıştı, geçenlerde zıplayıp çıkmıştı). Bütün koşullar aynı tick'te. Domuzun kayma eşiği
+     * sabit 3 blok değil: ilk ıslandığı konumdan kayma, suda geçen tick sayısından fizik beklentisinin %60'ı, en az 1 blok
+     * (SU-39; ıslanmadan önceki gezinme sayılmaz, yapay zekâ açık kalır: kapalıyken mob {@code travel} etmez); eşya 3 blok (ölçülen 6,4–11).
      */
     @GameTest(template = "su_alani", batch = "su_dalga", timeoutTicks = 400)
     public static void dalgaMobuVeEsyayiSurukler(GameTestHelper h) {
@@ -248,9 +270,12 @@ public final class SuOyunTestleri {
         int[] bayat = new int[1];
         int[] id = new int[1];
         double[] it = new double[2];
+        int[] islak = new int[1];
+        double[] esik = new double[1];
+        double[] islakX = {Double.NaN};
         // Dalga açıkta başlar (alan yalnız dalga varken okunur); hendek kazılana kadar domuzun sütününe varmaz.
-        id[0] = SanalSu.dalgaBaslat(l, new Dalga(koken.getX(), koken.getZ() + 0.5, 1, 0, SanalSu.sunucuSaati, 0.5, 6, 60, 60,
-                koken.getY(), 200));
+        Dalga dalga = new Dalga(koken.getX(), koken.getZ() + 0.5, 1, 0, SanalSu.sunucuSaati, 0.5, 6, 60, 60, koken.getY(), 200);
+        id[0] = SanalSu.dalgaBaslat(l, dalga);
         h.startSequence()
                 .thenWaitUntil(() -> h.assertTrue(dunya.alan().zemin(hendek.getX(), hendek.getZ()) == dalgaTabani,
                         "deniz alanı taş zemini henüz okumadı"))
@@ -273,6 +298,12 @@ public final class SuOyunTestleri {
                 })
                 .thenWaitUntil(() -> {
                     Pig p = domuz[0];
+                    if (p.isInWater()) {
+                        if (islak[0]++ == 0) {
+                            islakX[0] = p.xo;
+                        }
+                    }
+                    esik[0] = Math.max(1, 0.6 * beklenenSurukleme(dalga.ivme(), dalga.hiz(), islak[0]));
                     h.assertTrue(dunya.alan().zemin(hendek.getX(), hendek.getZ()) == bayat[0],
                             "deniz alanı hendeği yeniden okudu (dondurma tutmadı)");
                     h.assertTrue(p.isInWater(), "hendekteki domuz suyu tanımadı (y=" + p.getY() + ", dalga tabanı " + dalgaTabani
@@ -280,15 +311,18 @@ public final class SuOyunTestleri {
                     h.assertTrue(SanalSu.icindeMi(oyuncu[0]), "oyuncu dalgada ıslak değil");
                     h.assertTrue(SanalSu.itmeHesapla(oyuncu[0], it) != null && it[0] > 0 && Math.abs(it[1]) < 1e-9,
                             "oyuncunun sürükleme ivmesi dalga yönünde değil");
-                    h.assertTrue(p.getX() - bas[0] > 3, "domuz sürüklenmedi: dx=" + (p.getX() - bas[0]));
+                    h.assertTrue(p.getX() - islakX[0] > esik[0], "domuz sürüklenmedi: ıslakken dx=" + (p.getX() - islakX[0])
+                            + " eşik " + esik[0] + " (" + islak[0] + " tick suda)");
                     h.assertTrue(esya[0].getX() - bas[1] > 3, "eşya sürüklenmedi: dx=" + (esya[0].getX() - bas[1]));
                     h.assertTrue(dunya.canliZeminSayisi() > canli0[0], "canlı zemin yolu kullanılmadı");
                 })
                 .thenExecute(() -> {
                     Pig p = domuz[0];
-                    DogalAfetler.LOGGER.info("Sanal su GameTest: dalga domuz dx={} y={} eşya dx={} oyuncu ivme={} domuz suda={} "
-                            + "alan zemini (bayat)={} canlı zemin={} canlı okuma={} tick={}", p.getX() - bas[0], p.getY(),
-                            esya[0].getX() - bas[1], it[0], p.isInWater(), bayat[0],
+                    DogalAfetler.LOGGER.info("Sanal su GameTest: dalga domuz dx={} ıslakken dx={} eşik={} (ivme={} sürtünme={} hız sınırı={} suda {} tick, "
+                            + "beklenen={}) y={} eşya dx={} oyuncu ivme={} domuz suda={} alan zemini (bayat)={} canlı zemin={} "
+                            + "canlı okuma={} tick={}", p.getX() - bas[0], p.getX() - islakX[0], esik[0], dalga.ivme(), SU_SURTUNMESI, dalga.hiz(), islak[0],
+                            beklenenSurukleme(dalga.ivme(), dalga.hiz(), islak[0]), p.getY(), esya[0].getX() - bas[1], it[0],
+                            p.isInWater(), bayat[0],
                             l.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, hendek.getX(), hendek.getZ()),
                             dunya.canliZeminSayisi() - canli0[0], h.getTick());
                     SanalSu.dalgaBitir(l, id[0]);

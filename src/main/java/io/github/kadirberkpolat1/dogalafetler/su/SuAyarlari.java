@@ -91,7 +91,7 @@ public final class SuAyarlari {
                     .defineInRange("parcacikYogunlugu", 1.0, 0.0, 4.0);
             okumaButcesi = k.comment("İstemci deniz alanı: 10 tick'te okunan en çok chunk (tick'lere yayılır).")
                     .defineInRange("okumaButcesi", 64, 1, 512);
-            yakinKurulumButcesiMs = k.comment("Yakın su halkası kurulumunun tick başına zaman bütçesi (ms); kalanı sonraki tick'e kalır.")
+            yakinKurulumButcesiMs = k.comment("Yakın su halkası ve uzak LOD kurulumunun tick başına ortak zaman bütçesi (ms); kalanı sonraki tick'e kalır.")
                     .defineInRange("yakinKurulumButcesiMs", 2.0, 0.25, 50.0);
         }
     }

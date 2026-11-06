@@ -45,8 +45,10 @@ import org.joml.Matrix4f;
 
 /**
  * Sanal su yüzeyi (şader'siz). İki {@link VertexBuffer}: yakın halka (kamera çevresi {@link #YAKIN} blok, 1 blok hücre,
- * dalgacık, yan yüzler, köpük) her oyun tick'inde; uzak LOD ({@link #LOD}x{@link #LOD} blok düz hücre, görüş mesafesine
- * kadar; kalite ve config sınırları) {@link #UZAK_YENILEME} tick'te bir kurulur (SU-02). Çizim {@code AFTER_TRANSLUCENT_BLOCKS} aşamasında vanilla
+ * dalgacık, yan yüzler, köpük) sürekli; uzak LOD ({@link #LOD}x{@link #LOD} blok düz hücre, görüş mesafesine kadar; kalite
+ * ve config sınırları) dalga, çekilme ya da mağara varken {@link #UZAK_YENILEME}, sakin denizde {@link #UZAK_SAKIN_YENILEME} tick'te
+ * bir (ya da kamera 8 bloktan fazla kayınca, deniz artışı değişince) kurulur (SU-02, SU-38). İkisi de sütun parçalarıyla ortak
+ * {@link KurulumButcesi}'nden ilerler; yapım bitene kadar önceki tampon çizilir. Çizim {@code AFTER_TRANSLUCENT_BLOCKS} aşamasında vanilla
  * {@code rendertype_translucent} şaderi, su dokusu, biyom su rengi ve ışık haritasıyla yapılır. Biyom rengi ve ışık
  * sütun başına önbellektedir (vanilla renk önbelleği 256 chunk ile sınırlı; LOD onu taşırıyordu).
  */
@@ -55,6 +57,7 @@ public final class SuRenderer {
     static final int YAKIN = 40;
     static final int LOD = 4;
     static final int UZAK_YENILEME = 10;
+    static final int UZAK_SAKIN_YENILEME = 100;
     private static final ResourceLocation SU = ResourceLocation.fromNamespaceAndPath("minecraft", "block/water_still");
     /** Kendi köpük dokumuz (animasyonlu, {@code tools/assets/su_kopuk.py}); blok atlası {@code block/} klasöründen toplar. */
     private static final ResourceLocation KOPUK = DogalAfetler.konum("block/su_kopuk");
@@ -174,6 +177,22 @@ public final class SuRenderer {
     /** Yapım sayısı: {@link #YANSIMA} köşe önbelleğinin damgası. */
     private static int yapNo;
     private static final KurulumButcesi BUTCE = new KurulumButcesi();
+    // Uzak LOD yapımı (SU-38): köken, yarıçap ve zaman yapım boyunca sabit; sıradaki sütun {@code uzakYapGx}.
+    private static boolean uzakYapiyor;
+    private static boolean uzakKirli = true;
+    private static double uzakArtis = Double.NaN;
+    private static int uzakYapCx;
+    private static int uzakYapOy;
+    private static int uzakYapCz;
+    private static int uzakYapR;
+    private static int uzakYapGx;
+    private static int uzakYapGz0;
+    private static double uzakYapT;
+    private static int uzakYapDortgen;
+    private static int uzakYapTickSayisi;
+    private static long uzakSonTick;
+    private static long olcUzakTickToplam;
+    private static long logUzakTick;
     /** Tick'in gerçek kurulum işi (borç hariç, ölçüm). */
     private static long tickIsNs;
     private static long tickIsTick = Long.MIN_VALUE;
@@ -202,6 +221,7 @@ public final class SuRenderer {
         olcUzak = 0;
         olcEnCokTickNs = 0;
         olcTickToplam = 0;
+        olcUzakTickToplam = 0;
     }
 
     /** Son sıfırlamadan beri kare başına ortalama CPU maliyeti ve kurulum ortalamaları. */
@@ -209,10 +229,10 @@ public final class SuRenderer {
         double kare = Math.max(1, olcKare);
         return String.format(Locale.ROOT,
                 "kare=%d su_cpu_kare_basina=%.2fms (yakin_kurulum_ort=%.2fms x%d, yakin_tick_en_cok=%.2fms yayilma=%.1f tick, "
-                        + "uzak_kurulum_ort=%.2fms x%d, cizim_ort=%.3fms) dortgen yakin=%d uzak=%d",
+                        + "uzak_kurulum_ort=%.2fms x%d, uzak_yayilma=%.1f tick, cizim_ort=%.3fms) dortgen yakin=%d uzak=%d",
                 olcKare, (olcYakinNs + olcUzakNs + olcCizimNs) / kare / 1e6, olcYakinNs / Math.max(1.0, olcYakin) / 1e6,
                 olcYakin, olcEnCokTickNs / 1e6, olcTickToplam / Math.max(1.0, olcYakin), olcUzakNs / Math.max(1.0, olcUzak) / 1e6,
-                olcUzak, olcCizimNs / kare / 1e6, yakinDortgen, uzakDortgen);
+                olcUzak, olcUzakTickToplam / Math.max(1.0, olcUzak), olcCizimNs / kare / 1e6, yakinDortgen, uzakDortgen);
     }
 
     @SubscribeEvent
@@ -265,21 +285,21 @@ public final class SuRenderer {
             }
             int dx = (int) Math.floor(cam.x) - uzakOx;
             int dz = (int) Math.floor(cam.z) - uzakOz;
-            if (tick - uzakTick >= UZAK_YENILEME || tick < uzakTick || dx * dx + dz * dz > 64) {
+            // Sakin denizde karolar değişmez: yenileme seyrek (güneş açısı için), kayma ve artış değişimi hemen.
+            boolean hareketli = d.dalgaDizisi().length > 0 || d.cekilmeDizisi().length > 0 || !d.magaralar().isEmpty();
+            int periyot = hareketli ? UZAK_YENILEME : UZAK_SAKIN_YENILEME;
+            if (!uzakYapiyor && (uzakKirli || tick - uzakTick >= periyot || tick < uzakTick || dx * dx + dz * dz > 64
+                    || d.denizArtisi() != uzakArtis)) {
                 uzakTick = tick;
-                long t1 = System.nanoTime();
-                uzakKur(mc, l, d, e.getCamera(), tick);
-                long gecen = System.nanoTime() - t1;
-                olcUzakNs += gecen;
-                olcUzak++;
-                logUzakNs += gecen;
-                logUzak++;
+                uzakKirli = false;
+                uzakArtis = d.denizArtisi();
+                uzakBaslat(mc, e.getCamera());
             }
         }
         if (yapAsama == 0 && tick != yapTick) {
             yapBaslat(e.getCamera(), tick);
         }
-        yapIlerlet(l, d, tick);
+        kurulumIlerlet(l, d, tick);
         if (yakinBos && uzakBos) {
             return;
         }
@@ -551,16 +571,22 @@ public final class SuRenderer {
             BB_YAKIN.end().release();
         }
         yapAsama = 0;
+        if (uzakYapiyor) {
+            BB.end().release();
+            uzakYapiyor = false;
+        }
+        uzakKirli = true;
     }
 
     /**
-     * Yapımı {@code su.yakinKurulumButcesiMs} (tick başına, CLIENT) dolana kadar {@link #PARCA} sütunluk parçalarla sürdürür;
-     * kalanı sonraki tick'e, aşım sonraki tick'in bütçesinden düşülür ({@link KurulumButcesi}). Yapım bitene kadar önceki tampon
-     * çizilir.
+     * Yakın halka ve uzak LOD yapımını {@code su.yakinKurulumButcesiMs} (tick başına, CLIENT, ortak) dolana kadar parça parça
+     * sürdürür: yakın halkada {@link #PARCA} sütun, uzakta bir LOD sütunu; ikisi de bekliyorsa bu tick'te az harcayan önce
+     * (SU-38). Kalanı sonraki tick'e, aşım sonraki tick'in bütçesinden düşülür ({@link KurulumButcesi}). Yapım bitene kadar
+     * önceki tampon çizilir.
      */
-    private static void yapIlerlet(ClientLevel l, SanalSuDunyasi d, long tick) {
+    private static void kurulumIlerlet(ClientLevel l, SanalSuDunyasi d, long tick) {
         BUTCE.tickBasla(tick, (long) (SuAyarlari.istemci().yakinKurulumButcesiMs.get() * 1e6));
-        if (yapAsama == 0 || !BUTCE.calisabilir()) {
+        if (yapAsama == 0 && !uzakYapiyor || !BUTCE.calisabilir()) {
             return;
         }
         if (tickIsTick != tick) {
@@ -568,50 +594,78 @@ public final class SuRenderer {
             tickIsNs = 0;
         }
         long t0 = System.nanoTime();
-        if (yapSonTick != tick) {
-            yapSonTick = tick;
-            yapTickSayisi++;
+        long onceki = t0;
+        while (BUTCE.calisabilir()) {
+            int is = BUTCE.siradaki(yapAsama != 0, uzakYapiyor);
+            if (is == KurulumButcesi.YOK) {
+                break;
+            }
+            if (is == KurulumButcesi.YAKIN) {
+                if (yapSonTick != tick) {
+                    yapSonTick = tick;
+                    yapTickSayisi++;
+                }
+                yakinParca(l, d);
+            } else {
+                if (uzakSonTick != tick) {
+                    uzakSonTick = tick;
+                    uzakYapTickSayisi++;
+                }
+                uzakParca(l, d);
+            }
+            long simdi = System.nanoTime();
+            long g = simdi - onceki;
+            onceki = simdi;
+            BUTCE.harca(is, g);
+            if (is == KurulumButcesi.YAKIN) {
+                yapNs += g;
+                olcYakinNs += g;
+                if (yapAsama == 0) {
+                    olcYakin++;
+                    olcTickToplam += yapTickSayisi;
+                    logYapim++;
+                    logYapimNs += yapNs;
+                    logTickToplam += yapTickSayisi;
+                }
+            } else {
+                olcUzakNs += g;
+                logUzakNs += g;
+                if (!uzakYapiyor) {
+                    olcUzak++;
+                    olcUzakTickToplam += uzakYapTickSayisi;
+                    logUzak++;
+                    logUzakTick += uzakYapTickSayisi;
+                }
+            }
         }
+        tickIsNs += System.nanoTime() - t0;
+        olcEnCokTickNs = Math.max(olcEnCokTickNs, tickIsNs);
+        logEnCokTickNs = Math.max(logEnCokTickNs, tickIsNs);
+    }
+
+    /** Yakın halkanın bir parçası ({@link #PARCA} sütun). */
+    private static void yakinParca(ClientLevel l, SanalSuDunyasi d) {
         bb = BB_YAKIN;
         oyAktif = yapOy;
         dortgen = yapDortgen;
-        long onceki = t0;
-        while (yapAsama != 0 && BUTCE.calisabilir()) {
-            int j0 = yapSutun;
-            int j1 = Math.min(N, j0 + PARCA);
-            if (yapAsama == 1) {
-                sorguParcasi(d, yapSatir, j0, j1);
-            } else {
-                for (int j = j0; j < j1; j++) {
-                    if (TUR[yapSatir * N + j] != 0) {
-                        sutun(l, d.alan(), yapOx - YAKIN + yapSatir, yapOz - YAKIN + j, yapSatir, j, yapT, yapTick);
-                    }
+        int j0 = yapSutun;
+        int j1 = Math.min(N, j0 + PARCA);
+        if (yapAsama == 1) {
+            sorguParcasi(d, yapSatir, j0, j1);
+        } else {
+            for (int j = j0; j < j1; j++) {
+                if (TUR[yapSatir * N + j] != 0) {
+                    sutun(l, d.alan(), yapOx - YAKIN + yapSatir, yapOz - YAKIN + j, yapSatir, j, yapT, yapTick);
                 }
             }
-            yapSutun = j1;
-            if (j1 == N) {
-                yapSutun = 0;
-                satirBitti();
-            }
-            long simdi = System.nanoTime();
-            BUTCE.harca(simdi - onceki);
-            onceki = simdi;
+        }
+        yapSutun = j1;
+        if (j1 == N) {
+            yapSutun = 0;
+            satirBitti();
         }
         yapDortgen = dortgen;
         bb = BB;
-        long gecen = System.nanoTime() - t0;
-        tickIsNs += gecen;
-        yapNs += gecen;
-        olcYakinNs += gecen;
-        olcEnCokTickNs = Math.max(olcEnCokTickNs, tickIsNs);
-        logEnCokTickNs = Math.max(logEnCokTickNs, tickIsNs);
-        if (yapAsama == 0) {
-            olcYakin++;
-            olcTickToplam += yapTickSayisi;
-            logYapim++;
-            logYapimNs += yapNs;
-            logTickToplam += yapTickSayisi;
-        }
     }
 
     /** Satır sonu: aşama geçişi ya da yapımın bitmesi. */
@@ -686,86 +740,114 @@ public final class SuRenderer {
         }
     }
 
-    /** 10 sn'de bir kurulum maliyeti log'a (S-P2-3 ölçümü): yapım başına ve tick başına en çok ms, yayılma. */
+    /**
+     * 10 sn'de bir kurulum maliyeti log'a (S-P2-3, SU-38 ölçümü): yakın ve uzak yapım başına ms ve yayılma, tick başına en çok
+     * gerçek iş (ikisi birlikte, borç hariç).
+     */
     private static void kurulumLogu() {
         if (logYapim == 0 && logUzak == 0) {
             return;
         }
-        DogalAfetler.LOGGER.info("Sanal su: kurulum ms yakın_ort={} tick_en_cok={} (bütçe {}) yayılma={} tick yapım={} uzak_ort={} x{}",
+        DogalAfetler.LOGGER.info("Sanal su: kurulum ms yakın_ort={} tick_en_cok={} (bütçe {}) yayılma={} tick yapım={} uzak_ort={} x{} "
+                        + "uzak_yayılma={} tick",
                 String.format(Locale.ROOT, "%.2f", logYapimNs / Math.max(1.0, logYapim) / 1e6),
                 String.format(Locale.ROOT, "%.2f", logEnCokTickNs / 1e6),
                 String.format(Locale.ROOT, "%.2f", SuAyarlari.istemci().yakinKurulumButcesiMs.get()),
                 String.format(Locale.ROOT, "%.1f", logTickToplam / Math.max(1.0, logYapim)), logYapim,
-                String.format(Locale.ROOT, "%.2f", logUzakNs / Math.max(1.0, logUzak) / 1e6), logUzak);
+                String.format(Locale.ROOT, "%.2f", logUzakNs / Math.max(1.0, logUzak) / 1e6), logUzak,
+                String.format(Locale.ROOT, "%.1f", logUzakTick / Math.max(1.0, logUzak)));
         logYapim = 0;
         logYapimNs = 0;
         logEnCokTickNs = 0;
         logTickToplam = 0;
         logUzak = 0;
         logUzakNs = 0;
+        logUzakTick = 0;
     }
 
-    private static void uzakKur(Minecraft mc, ClientLevel l, SanalSuDunyasi d, Camera camera, long tick) {
+    /** Uzak LOD yapımını başlatır: köken (kamera), yarıçap ve zaman yapım boyunca sabit; çizilen tampon bitene kadar eskisi. */
+    private static void uzakBaslat(Minecraft mc, Camera camera) {
         Vec3 cam = camera.getPosition();
-        int cx = (int) Math.floor(cam.x);
-        int cz = (int) Math.floor(cam.z);
-        uzakOx = cx;
-        uzakOy = (int) Math.floor(cam.y);
-        uzakOz = cz;
-        oyAktif = uzakOy;
-        int r = lodChunk(mc) * 16;
-        int gx0 = Math.floorDiv(cx - r, LOD) * LOD;
-        int gz0 = Math.floorDiv(cz - r, LOD) * LOD;
-        bb = BB;
+        uzakYapCx = (int) Math.floor(cam.x);
+        uzakYapOy = (int) Math.floor(cam.y);
+        uzakYapCz = (int) Math.floor(cam.z);
+        uzakYapR = lodChunk(mc) * 16;
+        uzakYapGx = Math.floorDiv(uzakYapCx - uzakYapR, LOD) * LOD;
+        uzakYapGz0 = Math.floorDiv(uzakYapCz - uzakYapR, LOD) * LOD;
+        uzakYapT = saat;
+        uzakYapDortgen = 0;
+        uzakYapTickSayisi = 0;
+        uzakSonTick = Long.MIN_VALUE;
         BB.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
-        dortgen = 0;
+        uzakYapiyor = true;
+    }
+
+    /** Uzak LOD'un bir parçası (bir {@code gx} sütunu); son sütunda tampon yüklenir. */
+    private static void uzakParca(ClientLevel l, SanalSuDunyasi d) {
+        bb = BB;
+        oyAktif = uzakYapOy;
+        dortgen = uzakYapDortgen;
+        uzakSutun(l, d, uzakYapGx);
+        uzakYapDortgen = dortgen;
+        uzakYapGx += LOD;
+        if (uzakYapGx > uzakYapCx + uzakYapR) {
+            uzakYapiyor = false;
+            uzakOx = uzakYapCx;
+            uzakOy = uzakYapOy;
+            uzakOz = uzakYapCz;
+            uzakDortgen = dortgen;
+            uzakBos = !yukle(BB, false);
+        }
+    }
+
+    private static void uzakSutun(ClientLevel l, SanalSuDunyasi d, int gx) {
+        int cx = uzakYapCx;
+        int cz = uzakYapCz;
+        int r = uzakYapR;
+        int gz0 = uzakYapGz0;
         int tamIsik = LightTexture.pack(0, 15);
-        for (int gx = gx0; gx <= cx + r; gx += LOD) {
-            for (int gz = gz0; gz <= cz + r; gz += LOD) {
-                int dx = gx + LOD / 2 - cx;
-                int dz = gz + LOD / 2 - cz;
-                boolean yakinda = gx >= cx - YAKIN && gx + LOD <= cx + YAKIN + 1 && gz >= cz - YAKIN
-                        && gz + LOD <= cz + YAKIN + 1;
-                if (yakinda || dx * dx + dz * dz > r * r) {
-                    continue;
-                }
-                d.araliklar(gx + LOD / 2, gz + LOD / 2, saat, A);
-                if (A.adet() == 0) {
-                    continue;
-                }
-                float y = (float) A.ust(A.adet() - 1) - 0.16f;
-                double mx = gx + LOD / 2.0;
-                double mz = gz + LOD / 2.0;
-                if (A.sakin(A.adet() - 1)) {
-                    esX = 0;
-                    esZ = 0;
-                } else {
-                    egim(mx, mz, saat, 2.5);
-                }
-                gunesKipi();
-                golgele(renk(l, gx, gz), 0.72f, mx, y, mz, esX, esZ, tamIsik);
-                int lodRenk = gRenk;
-                float lodAlfa = gAlfa;
-                double dalgaH = 0;
-                for (Dalga w : d.dalgaDizisi()) {
-                    // Uzakta da dalga tepesi okunsun: cepheye 0..5 blok karolar beyaz köpük, gövde turkuaz.
-                    double h = w.yuzey(mx, mz, saat);
-                    if (!Double.isNaN(h) && h - w.taban() > 1) {
-                        double s = w.cepheyeUzaklik(mx, mz, saat);
-                        float kp = s < 5 ? (float) Math.max(0, 0.9 * (1 - Math.abs(s - 2.5) / 2.5)) : 0;
-                        lodRenk = karistir(karistir(lodRenk, 0x3E8F94, (float) Math.min(0.6, (h - w.taban()) / 8)), 0xFFFFFF, kp);
-                        lodAlfa = Math.max(lodAlfa, 0.6f + 0.35f * kp);
-                        dalgaH = Math.max(dalgaH, h - w.taban());
-                    }
-                }
-                dortgenUst(gx - uzakOx, gz - uzakOz, LOD, y, y, y, y, lodRenk, lodAlfa, gIsik);
-                if (dalgaH > 1) {
-                    lodEtek(d, gx, gz, y, lodRenk, Math.max(0.8f, lodAlfa), gIsik);
+        for (int gz = gz0; gz <= cz + r; gz += LOD) {
+            int dx = gx + LOD / 2 - cx;
+            int dz = gz + LOD / 2 - cz;
+            boolean yakinda = gx >= cx - YAKIN && gx + LOD <= cx + YAKIN + 1 && gz >= cz - YAKIN
+                    && gz + LOD <= cz + YAKIN + 1;
+            if (yakinda || dx * dx + dz * dz > r * r) {
+                continue;
+            }
+            d.araliklar(gx + LOD / 2, gz + LOD / 2, uzakYapT, A);
+            if (A.adet() == 0) {
+                continue;
+            }
+            float y = (float) A.ust(A.adet() - 1) - 0.16f;
+            double mx = gx + LOD / 2.0;
+            double mz = gz + LOD / 2.0;
+            if (A.sakin(A.adet() - 1)) {
+                esX = 0;
+                esZ = 0;
+            } else {
+                egim(mx, mz, uzakYapT, 2.5);
+            }
+            gunesKipi();
+            golgele(renk(l, gx, gz), 0.72f, mx, y, mz, esX, esZ, tamIsik);
+            int lodRenk = gRenk;
+            float lodAlfa = gAlfa;
+            double dalgaH = 0;
+            for (Dalga w : d.dalgaDizisi()) {
+                // Uzakta da dalga tepesi okunsun: cepheye 0..5 blok karolar beyaz köpük, gövde turkuaz.
+                double h = w.yuzey(mx, mz, uzakYapT);
+                if (!Double.isNaN(h) && h - w.taban() > 1) {
+                    double s = w.cepheyeUzaklik(mx, mz, uzakYapT);
+                    float kp = s < 5 ? (float) Math.max(0, 0.9 * (1 - Math.abs(s - 2.5) / 2.5)) : 0;
+                    lodRenk = karistir(karistir(lodRenk, 0x3E8F94, (float) Math.min(0.6, (h - w.taban()) / 8)), 0xFFFFFF, kp);
+                    lodAlfa = Math.max(lodAlfa, 0.6f + 0.35f * kp);
+                    dalgaH = Math.max(dalgaH, h - w.taban());
                 }
             }
+            dortgenUst(gx - uzakYapCx, gz - uzakYapCz, LOD, y, y, y, y, lodRenk, lodAlfa, gIsik);
+            if (dalgaH > 1) {
+                lodEtek(d, gx, gz, y, lodRenk, Math.max(0.8f, lodAlfa), gIsik);
+            }
         }
-        uzakDortgen = dortgen;
-        uzakBos = !yukle(BB, false);
     }
 
     /**
@@ -774,12 +856,12 @@ public final class SuRenderer {
      * karolarında komşu sorgusu yapılır.
      */
     private static void lodEtek(SanalSuDunyasi d, int gx, int gz, float y, int renk, float alfa, int isik) {
-        float rx = gx - uzakOx;
-        float rz = gz - uzakOz;
+        float rx = gx - uzakYapCx;
+        float rz = gz - uzakYapCz;
         for (int q = 0; q < 4; q++) {
             int nx = gx + DI[q] * LOD + LOD / 2;
             int nz = gz + DJ[q] * LOD + LOD / 2;
-            d.araliklar(nx, nz, saat, A_KOMSU);
+            d.araliklar(nx, nz, uzakYapT, A_KOMSU);
             float komsu = A_KOMSU.adet() == 0 ? (float) d.alan().zemin(nx, nz) : (float) A_KOMSU.ust(A_KOMSU.adet() - 1) - 0.16f;
             if (A_KOMSU.adet() == 0 && d.alan().zemin(nx, nz) == Integer.MIN_VALUE) {
                 komsu = y - 8;
