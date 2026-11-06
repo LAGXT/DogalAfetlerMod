@@ -1423,6 +1423,16 @@ Note'u verir. `-Xlint:deprecation` ile dört yer (`xlint-deprecation.log`): `Sic
 `@Deprecated` işareti burada "doğrudan çağırma, üzerine yaz" anlamındadır), `DonmaOyunTestleri:680` `LevelChunk.writeCapsToNBT`.
 Kabul edildi: ikisi test kodu, ikisi vanilla blok davranışının üzerine yazımı.
 
+**K-E11 `/dogalafet sifirla` yangın hücrelerini söndürür (şef kararı).** N18 "dünyanın afet ve dönem durumunu ilk haline
+döndürür". Önceden aktif afet yokken `sifirla` olay üretmediği için biten afetin yanan hücreleri (en çok 30 sn) ve komut ateşleri
+sürüyordu (yangın §E). `YanginYoneticisi.donemDegisti` çekirdeğin `DonemDegistiEvent(SIFIRLAMA)` olayına abonedir (yalnız
+sunucunun kendi dönem nesnesi, donma ile aynı koruma): her boyutta süren alan tutuşturma işleri durur ve bütün hücreler
+kaynaktan bağımsız (komutla yakılanlar dahil) `temiz=true` yoluyla söner; yüklü olmayan chunk'taki ateş blokları bekleyen silmeye
+girer ve chunk yüklenince kalkar (Y-19). Kanıt: GameTest `YanginOyunTestleri#sifirlaYanginlariSondurur` (`yangin tutustur 4` →
+`sifirla` → `aktifSayi` 0, alan işi 0, `afet_atesi` 0, sahne baştaki gibi), dedicated `yangin_sunucu.py` (`tutustur 6` → `sifirla` →
+"yangın: dünya dönemi sıfırlandı, 241 hücre söndürüldü" → `bilgi` 0 → `fill … replace dogalafetler:afet_atesi` "No blocks
+were filled"); `.vibe/kanit/entegrasyon-2b/tur3/`.
+
 ## Şef kararları (Faz 0–1)
 
 **K0-19 Ay çarpması siren süresi: 60 sn.** Madde 5 "Güneş Patlaması hariç 10 sn" der; bölüm H "siren çaldıktan 60 saniye
@@ -1910,12 +1920,10 @@ Kamera y 14'e alındı. Mağara-sualtı: amber sis rengi uygulanıyordu ama sis 
 
 Entegratöre bırakılan notlardan işlenenler: kancalar (K-E1), protokol (K-C47), `asama ileri [süreç]` (K-C48), sanal su §3a istisnası
 (K-C49), güneş evresi ilerlemesi (K-C50), runClient kilidi (K0-21 rev. 2 (k), K-E4), yangın `-Potomasyon` (K-E3), donma N15
-istisnası (K-E9). Açık kalanlar:
+istisnası (K-E9), `sifirla` ↔ yangın (K-E11). Açık kalanlar:
 
 - **README gamerule notu (yangın §E):** afet ateşi `doFireTick`'ten bağımsızdır (Y-01); haritayı korumak için tek denetim
   `afetBlokHasari=false`. README Faz 5 teslimatında yazılır.
-- **`sifirla` ve yangın (yangın §E):** aktif afet yokken `sifirla` olay üretmez; biten afetin yanan hücreleri (en çok 30 sn) ve
-  komut ateşleri sürer. Çekirdeğin sıfırlamada `YanginYoneticisi.sondur(level, null)` çağırması şefin kararına bırakıldı.
 - **Ay veri modeli (gökyüzü G8):** yaklaşan ay / parçalanma için `DunyaDonemi`'nde ay olay saati (ya da `AyDurumu`) ve
   `DonemPaketi` alanı yok; Faz 4 ay çarpması işçisi çekirdeğe ekler (K-C47 kuralıyla).
 - **Faz 4 kuralı (sanal su §E):** kodla blok değiştiren her afet (tsunami, deprem, sinkhole, meteor) değişen chunk için
