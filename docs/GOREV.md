@@ -51,6 +51,8 @@ Ağır süreç = bir `./gradlew` çağrısı (Gradle JVM'i ve başlattığı Min
 
 **Yoklama yok (K-E19 e):** işçi, doğrulayıcı ve entegratör bir arka plan işini `sleep N` döngüsüyle ya da log kuyruğunu tekrar tekrar okuyarak beklemez; işi arka planda başlatır, beklemek zorundaysa bloklayan `wait` aracını kullanır, beklerken başka işi sürdürür. Her yoklama turu kota ve bağlam harcar.
 
+**GameTest filtresi (K-E20):** işçi geliştirirken yalnız kendi test sınıfını/batch'ini koşar: `TEST_FILTRE='<regex>' tools/senaryo/gradle_kapisi.sh <log> runGameTestServer` ya da `JAVA_HOME=/home/lagxt/.jdks/jdk-17.0.21+9 ./gradlew runGameTestServer --offline -Ptest_filtre='<regex>'` (sınıf, batch ya da test adında `find`, büyük/küçük harfe duyarlı; bekçi her koşuda kalır; bekçi dışında hiçbir teste uymayan ya da geçersiz regex sunucuyu açmadan çıkış ≠ 0 verir). Kabul, doğrulama ve entegrasyon koşuları filtresizdir.
+
 ### Kota ve hız sınırı
 
 İşçiler bir API anahtarıyla çalışır; anahtarın eşzamanlı istek ve aylık kredi sınırı olabilir.
@@ -201,7 +203,7 @@ Entegratör bütün dalları `main`'e birleştirir, `.vibe/kararlar/*.md`'yi `do
 | 15 | Sanal su | tsunami, mağara suyu ve deniz yükselmesi öncesi ve sonrası etkilenen bölgedeki blokların sayımı ya da hash'i; GameTest ve istemcide sanal suya giren oyuncu ve mob | bloklar birebir aynı (harita bozulmadı; mağara suyu kuruduktan sonra iz yok); oyuncu sanal suda yüzer, havası azalır ve boğulur, sürüklenir, ıslanır (sıcaklık); mob'lar da etkilenir |
 | 16 | Başarımlar | 27 başarımın her biri komut ve senaryolarla tetiklenir | her biri doğru oyuncuda açılır; toast ve sohbet duyurusu; ödüller verilir; gizli olanlar açılana kadar görünmez |
 
-**Doğrulama turları (K-E19 c):** ilk doğrulama kabul komutlarının hepsini koşar. Tur 2 ve sonrası yalnız değişen yolu koşar (değişen dosyaların testleri, etkilenen matris satırları, gerekiyorsa tam derleme); değişmeyen kanıt önceki rapordan satırıyla atıfla aktarılır ("değişmedi, `dogrulama-<parça>.md` madde N"). GameTest varsayılan **2** ardışık koşudur; aralıklı düşme şüphesinde (bir koşuda düşüp diğerinde geçen test, zamanlamaya bağlı ileti) 3.
+**Doğrulama turları (K-E19 c):** ilk doğrulama kabul komutlarının hepsini koşar. Tur 2 ve sonrası yalnız değişen yolu koşar (değişen dosyaların testleri, etkilenen matris satırları, gerekiyorsa tam derleme); değişmeyen kanıt önceki rapordan satırıyla atıfla aktarılır ("değişmedi, `dogrulama-<parça>.md` madde N"). GameTest varsayılan **2** ardışık koşudur; aralıklı düşme şüphesinde (bir koşuda düşüp diğerinde geçen test, zamanlamaya bağlı ileti) 3. Kabul GameTest'i filtresizdir: `gradle_kapisi.sh` log'unun ilk satırı `FILTRE=yok` olmalı ve sonuç `All <tam sayı> required tests passed`; `FILTRE=<regex>` satırlı log kabul kanıtı sayılmaz (K-E20).
 
 ## 7. Teslimat
 

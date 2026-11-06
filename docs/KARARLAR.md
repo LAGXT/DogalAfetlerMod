@@ -2810,6 +2810,8 @@ klasörüne yazması, doğrulama-radar-sismograf-2 (c), böylece kapandı). `gra
 süreç kalmamasını da bekler (`ss -Hltn`). Sınır: aynı worktree'de `run-server/` (server.properties, senaryo dünyaları)
 paylaşıldığı için senaryolar yine sırayla koşar. Kanıt: duman testi (`--help` 10/10; port dinlenirken `port_bos` False,
 kapanınca True; `server.properties` yaz/geri al), entegrasyon 3 senaryoları 25611–25621'de (`.vibe/rapor/entegrasyon-3.md`).
+Not (K-E20 birleştirmesi): `gradle_kapisi.sh` Gradle'ı `LC_ALL=C.UTF-8` ile başlatır; `tr_TR.UTF-8` altında sonuç satırı
+`BUİLD SUCCESSFUL` yazılıyor ve `BUILD` grep'leri kaçırıyordu (doğrulayıcı-2 notu). Log'un ilk satırı `FILTRE=...` (K-E20).
 
 **K-E14 Donma test sahnesi kurulumu zamanlayıcının yarım işini atar.** Belirti: `kiyiUzakligiChunkSinirindanBagimsiz` (batch
 `donma_zamanlayici_5`) balıkçılık doğrulamasında 3 koşudan 1'inde "113 sütun … beklenen ice gerçek water" ile düştü
@@ -2860,6 +2862,38 @@ düzeltme), entegratör birleştirmede uygular ya da açık noktaya yazar. Gerek
 `dogrulayici-2` (25631–25640); işçi dedicated portu 25640 + (workspace − 90). (e) **Yoklama yok** (GOREV §2): işçi,
 doğrulayıcı ve entegratör `sleep N` döngüsüyle yoklamaz; arka plan işini bloklayan `wait` ile bekler. Faz 4 görev taslakları
 `.vibe/gorev/4-<parça>.md` bu kuralları ve GameTest filtresini (`-Ptest_filtre=<regex>`, K-E20, dal `is/gametest-filtre`) taşır.
+
+**K-E20 GameTest filtresi: işçi yalnız kendi testlerini koşar; kabul ve entegrasyon filtresiz (şef kararı, dal
+`is/gametest-filtre` `62ed7f4`).** `runGameTestServer` her koşuda bütün testleri koşuyordu. Sistem özelliği
+`dogalafetler.gametest.filtre` (Java regex) verilirse bir test, test sınıfının basit adı, batch adı ya da test fonksiyonunun
+(metot) adından birinde regex `find` ile uyarsa koşar; eşleme büyük/küçük harfe duyarlıdır. Özellik yoksa ya da boşsa davranış
+değişmez. Geçersiz regex açık hata verir (`IllegalArgumentException`, özellik adı ve desen iletide; GameTest sunucusu
+açılmaz, çıkış 1). Saf eşleme `core.mantik.OyunTestiFiltresi` (JUnit `OyunTestiFiltresiTest`), sunucu ucu
+`core.OyunTestiSecimi`. Yer: Forge `@GameTestHolder` metotlarını `RegisterGameTestsEvent`'ten sonra kaydeder ve `Main` batch'leri
+hemen kurar; arada kanca yoktur. Bu yüzden kayıt defteri tam kalır, süzme `ServerAboutToStartEvent`'te
+`GameTestServer.testBatches`'te (SRG `f_177587_`) testler başlamadan yapılır; boşalan batch düşer, kısmen kalan batch adı ve
+before/after işlevleriyle yeniden kurulur. Geçiş: `build.gradle` `gameTestServer` `-Ptest_filtre=<regex>` verilirse özelliği
+geçirir; `tools/senaryo/gradle_kapisi.sh` `TEST_FILTRE` ortam değişkenini `-Ptest_filtre` olarak ekler. Açılışta tek satır:
+`[dogalafetler] GameTest filtresi '<regex>': N/M test` ya da `GameTest filtresi yok: M test`.
+
+- **Bekçi kararı:** `CekirdekOyunTestleri.hicBirBatchSatirKirmaz` filtreden bağımsız her koşuda kalır ve tam kayıt defterini
+  sayar; batch ≤ 7 kuralı (K-E16) filtreli koşuda da korunur. Her koşu boş dünya kuralı değişmedi.
+- **Süreler:** işçi `-Ptest_filtre=Meteor` 57 sn (16/157), filtresiz 170 sn; doğrulama-2 Meteor 75 sn (16/157), filtresiz
+  157/157 ×2 169–185 sn, geçersiz regex çıkış 1 (Gf1 kapandı; `.vibe/kanit/gametest-filtre-dogrulama/`).
+- **Gf2 (birleştirmede):** filtre bekçi dışında hiçbir teste uymazsa sunucu açılmaz:
+  `OyunTestiFiltresi.bosSecimiReddet` `IllegalStateException` ("<özellik> '<desen>' bekçi dışında hiçbir teste uymadı") fırlatır,
+  geçersiz regex'le aynı yoldan çıkış ≠ 0; yanlış yazılan regex yalnız bekçiyi koşup yeşil bitmez. JUnit
+  `bekciDisindaHicTesteUymayanFiltreAcikHataVerir`.
+- **Gf4 (birleştirmede):** `gradle_kapisi.sh` log'un ilk satırına `FILTRE=<regex> (kabul için geçersiz koşu)` ya da
+  `FILTRE=yok` yazar; dışa aktarılı kalmış `TEST_FILTRE` kabul koşusunu sessizce süzemez. Doğrulayıcılar kabul loglarında
+  `FILTRE=yok` arar (GOREV §6).
+- **Açık (Gf3):** filtresiz yol da `f_177587_` yansımasıyla batch listesini okur (yalnız toplamı loglamak için); kabul
+  koşuları gereksiz yere SRG adına bağlı. Şef kararıyla dokunulmadı.
+- **Reddedilen:** `RegisterGameTestsEvent`'te süzmek (Forge metotları olaydan sonra ekler); `GameTestRegistry.TEST_FUNCTIONS`'ı
+  süzmek (bekçi batch'lerin yalnız bir kısmını sayardı); vanilla `/test runall` ya da mixin.
+
+İşçi kullanımı: `TEST_FILTRE='Meteor|meteor_' tools/senaryo/gradle_kapisi.sh <log> runGameTestServer` ya da
+`JAVA_HOME=/home/lagxt/.jdks/jdk-17.0.21+9 ./gradlew runGameTestServer --offline -Ptest_filtre='Meteor|meteor_'`.
 
 ### Yiyecek
 
