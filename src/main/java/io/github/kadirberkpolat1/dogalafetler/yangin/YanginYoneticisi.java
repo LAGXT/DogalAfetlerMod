@@ -25,6 +25,7 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
@@ -317,10 +318,10 @@ public final class YanginYoneticisi {
             atesSil(level, h);
         }
         BlockPos ust = h.atesVar ? BlockPos.of(h.atesKonumu) : konum.above();
-        boolean yagmur = level.isRainingAt(ust);
+        Yagis yagis = yagis(level, ust);
         RandomSource r = veri.rastgele;
-        if (yagmur && YanginAyarlari.yagmurdaSonme() && r.nextDouble() < YanginMantigi.yagmurSonmeOlasiligi(
-                YanginAyarlari.yagmurSonmeOlasiligi(), h.yasOrani(simdi))) {
+        if (yagis != Yagis.YOK && YanginAyarlari.yagmurdaSonme() && r.nextDouble() < YanginMantigi.yagmurSonmeOlasiligi(
+                YanginAyarlari.yagmurSonmeOlasiligi(), h.yasOrani(simdi), yagis == Yagis.KORUNAKLI)) {
             if (veri.buharlar.size() < BUHAR_TAVANI) {
                 veri.buharlar.add(ust.asLong());
             }
@@ -335,7 +336,7 @@ public final class YanginYoneticisi {
             varlikHasari(level, ust);
         }
         if (h.yayilabilir) {
-            yay(level, veri, h, konum, yagmur, ruzgar);
+            yay(level, veri, h, konum, yagis != Yagis.YOK, ruzgar);
         }
     }
 
@@ -484,6 +485,32 @@ public final class YanginYoneticisi {
 
     private static boolean havaMi(ServerLevel level, BlockPos p) {
         return level.isLoaded(p) && level.getBlockState(p).isAir();
+    }
+
+    /**
+     * Ateş konumundaki yağış: konum ya da yatay komşusu yağmur görüyorsa açık (vanilla {@code isNearRain}), yağan biyomda
+     * gökyüzüne kapalıysa korunaklı. Yüklü olmayan komşu okunmaz.
+     */
+    private static Yagis yagis(ServerLevel level, BlockPos p) {
+        if (!level.isRaining() || !level.isLoaded(p)) {
+            return Yagis.YOK;
+        }
+        if (level.isRainingAt(p)) {
+            return Yagis.ACIK;
+        }
+        for (Direction yon : Direction.Plane.HORIZONTAL) {
+            BlockPos kom = p.relative(yon);
+            if (level.isLoaded(kom) && level.isRainingAt(kom)) {
+                return Yagis.ACIK;
+            }
+        }
+        return level.getBiome(p).value().getPrecipitationAt(p) == Biome.Precipitation.RAIN ? Yagis.KORUNAKLI : Yagis.YOK;
+    }
+
+    private enum Yagis {
+        YOK,
+        KORUNAKLI,
+        ACIK
     }
 
     private static void kaldir(ServerLevel level, YanginVerisi veri, YanginHucresi h) {

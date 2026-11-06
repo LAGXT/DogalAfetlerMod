@@ -4,7 +4,10 @@ import com.mojang.datafixers.util.Pair;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.config.EfektKalitesi;
 import io.github.kadirberkpolat1.dogalafetler.yangin.YanginKaynagi;
+import io.github.kadirberkpolat1.dogalafetler.yangin.YanginKayitlari;
 import io.github.kadirberkpolat1.dogalafetler.yangin.YanginYoneticisi;
+import io.github.kadirberkpolat1.dogalafetler.yangin.mantik.YanginMantigi;
+import java.util.Locale;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.screens.PauseScreen;
@@ -14,10 +17,13 @@ import net.minecraft.core.Holder;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.InputEvent;
 import net.minecraftforge.event.TickEvent;
@@ -26,18 +32,21 @@ import net.minecraftforge.fml.common.Mod;
 
 /**
  * Görsel kanıt otomasyonu (K0-21 rev. 2). Yalnız {@code -Ddogalafetler.otomasyon=yangin} ile tek oyunculu dünyada çalışır;
- * üretimde etkisizdir. Entegre sunucuda en yakın ormanın en sık bölümünü bulur, alacakaranlığa alır, seyirci kamerayı
- * yangın cephesinin 36 blok yanına koyar, ağaç tepelerinde bir cephe tutuşturur; Yüksek ve Düşük kalite karelerini alır,
- * yağmurdan önce yeni bir cephe yakar, yağmurla sönme karelerini alır, yangını söndürüp kapanır. Klavye, fare ve tekerlek
- * girdileri kapanışa kadar sayılır.
+ * üretimde etkisizdir. Entegre sunucuda en yakın ormanın en sık bölümünü bulur, alacakaranlığa alır, günün rüzgârına dik
+ * bir taç cephesi tutuşturur ve seyirci kamerayı cephenin rüzgâr üstüne, ağaç tepelerinin üstüne koyar (tasarım notu §3).
+ * Yüksek ve Düşük kalite karelerini, ardından yağmurla sönme karelerini alır; her karede kameradan görünen ateş bloklarını
+ * sayar, yangını söndürüp kapanır. Klavye, fare ve tekerlek girdileri kapanışa kadar sayılır.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class YanginOtomasyonu {
     private static final boolean AKTIF = "yangin".equals(System.getProperty("dogalafetler.otomasyon", ""));
     private static final String ON = "YANGIN_OTOMASYON ";
-    private static final int KAMERA_UZAKLIGI = 36;
-    /** Eski kademenin parçacıkları en çok 280 tick yaşar; kare yalnız yeni kademeyi gösterir. */
-    private static final int KALITE_BEKLEMESI = 300;
+    private static final int KAMERA_UZAKLIGI = 34;
+    private static final int KAMERA_YUKSEKLIGI = 14;
+    /** Tasarım notu §6 seviye 4: taç yangını ve 8 blok sıçrama. */
+    private static final double VITRIN_YOGUNLUGU = 0.7;
+    private static final int KARE_ARALIGI = 240;
+    private static final int TARAMA = 40;
 
     private static int tus;
     private static int fare;
@@ -46,6 +55,7 @@ public final class YanginOtomasyonu {
     private static int sayac;
     private static volatile boolean sunucuHazir;
     private static volatile BlockPos odak;
+    private static volatile int cepheTepesi;
 
     private YanginOtomasyonu() {
     }
@@ -95,6 +105,7 @@ public final class YanginOtomasyonu {
             server.execute(() -> DogalAfetler.LOGGER.info(ON + "adım {} tick {}: aktif {}", a, s,
                     YanginYoneticisi.aktifSayi(server.overworld())));
         }
+        double enBoy = mc.getWindow().getWidth() / (double) Math.max(1, mc.getWindow().getHeight());
         switch (adim) {
             case -1 -> {
                 if (sayac >= 100) {
@@ -106,42 +117,35 @@ public final class YanginOtomasyonu {
             case 0 -> {
                 if (sunucuHazir && sayac >= 300) {
                     mc.options.hideGui = true;
+                    kaliteyle(mc, EfektKalitesi.YUKSEK);
                     server.execute(() -> tutustur(server));
                     sonraki();
                 }
             }
             case 1 -> {
-                if (sayac == 350) {
+                if (sayac == KARE_ARALIGI) {
                     komut(server, "forge tps");
                     komut(server, "dogalafet yangin bilgi");
-                    kaliteyle(EfektKalitesi.YUKSEK);
-                } else if (sayac == 350 + KALITE_BEKLEMESI) {
-                    kare(mc, "vitrin_yuksek");
-                    kaliteyle(EfektKalitesi.DUSUK);
-                } else if (sayac == 350 + 2 * KALITE_BEKLEMESI) {
-                    kare(mc, "vitrin_dusuk");
+                    kare(mc, server, "vitrin_yuksek", enBoy);
+                    kaliteyle(mc, EfektKalitesi.DUSUK);
+                } else if (sayac == 2 * KARE_ARALIGI) {
+                    kare(mc, server, "vitrin_dusuk", enBoy);
                     komut(server, "dogalafet yangin bilgi");
-                    kaliteyle(null);
+                    kaliteyle(mc, null);
                     sonraki();
                 }
             }
             case 2 -> {
-                if (sayac == 1) {
-                    server.execute(() -> {
-                        int[] tepe = {server.overworld().getMinBuildHeight()};
-                        int sayi = cephe(server.overworld(), odak.getX() - 10, odak.getZ(), tepe);
-                        DogalAfetler.LOGGER.info(ON + "yağmur öncesi yeni cephe: {} hücre", sayi);
-                    });
-                } else if (sayac == 120) {
+                if (sayac == 20) {
                     server.execute(() -> {
                         server.overworld().setWeatherParameters(0, 6000, true, false);
                         DogalAfetler.LOGGER.info(ON + "yağmur başladı; aktif {}", YanginYoneticisi.aktifSayi(server.overworld()));
                     });
-                } else if (sayac == 180) {
-                    kare(mc, "yagmur");
+                } else if (sayac == 80) {
+                    kare(mc, server, "yagmur", enBoy);
                     komut(server, "dogalafet yangin bilgi");
-                } else if (sayac == 420) {
-                    kare(mc, "yagmur_sonra");
+                } else if (sayac == 320) {
+                    kare(mc, server, "yagmur_sonra", enBoy);
                     komut(server, "dogalafet yangin bilgi");
                     sonraki();
                 }
@@ -169,7 +173,7 @@ public final class YanginOtomasyonu {
         sayac = 0;
     }
 
-    /** Sunucu thread'inde: kurallar, alacakaranlık, en yakın orman, seyirci kamera. */
+    /** Sunucu thread'inde: kurallar, alacakaranlık, en yakın orman, seyirci kamera (chunk'lar yüklensin). */
     private static void hazirla(IntegratedServer server) {
         for (String k : new String[] {"gamerule sendCommandFeedback false", "gamerule doDaylightCycle false",
                 "gamerule doWeatherCycle false", "gamerule doMobSpawning false", "time set 13000", "weather clear"}) {
@@ -186,40 +190,48 @@ public final class YanginOtomasyonu {
         odak = merkez;
         ServerPlayer oyuncu = server.getPlayerList().getPlayers().get(0);
         oyuncu.setGameMode(GameType.SPECTATOR);
-        oyuncu.teleportTo(level, merkez.getX() - KAMERA_UZAKLIGI + 0.5, 150, merkez.getZ() + 0.5, -90.0F, 10.0F);
+        oyuncu.teleportTo(level, merkez.getX() + 0.5, 150, merkez.getZ() + 0.5, 0.0F, 30.0F);
         sunucuHazir = true;
     }
 
-    /** Sunucu thread'inde: ormanın en sık bölümünde ağaç tepelerinde bir cephe; kamera cepheyi yandan görür. */
+    /**
+     * Sunucu thread'inde: ormanın en sık bölümünde günün rüzgârına dik bir taç cephesi; kamera rüzgâr üstünde, ağaç
+     * tepelerinin {@link #KAMERA_YUKSEKLIGI} blok üstünde, cepheye bakar (yangın kameradan uzağa ilerler).
+     */
     private static void tutustur(IntegratedServer server) {
         ServerLevel level = server.overworld();
         BlockPos m = enSikOrman(level, odak);
         odak = m;
-        int[] tepe = {level.getMinBuildHeight()};
-        int toplam = cephe(level, m.getX(), m.getZ(), tepe);
-        int kameraY = tepe[0];
-        for (int dx = 0; dx <= KAMERA_UZAKLIGI; dx += 4) {
-            kameraY = Math.max(kameraY, level.getHeight(Heightmap.Types.MOTION_BLOCKING, m.getX() - dx, m.getZ()));
-        }
-        kameraY += 8;
-        float egim = (float) Math.toDegrees(Math.atan2(kameraY - (tepe[0] + 6.0), KAMERA_UZAKLIGI));
-        ServerPlayer oyuncu = server.getPlayerList().getPlayers().get(0);
-        oyuncu.teleportTo(level, m.getX() - KAMERA_UZAKLIGI + 0.5, kameraY, m.getZ() + 0.5, -90.0F, egim);
-        DogalAfetler.LOGGER.info(ON + "tutuşan {} hücre; cephe tepesi y={}, kamera y={} eğim {}", toplam, tepe[0], kameraY,
-                egim);
-    }
-
-    /** {@code x} hattı boyunca her 4 blokta tepesi yaprak olan sütunda 3 blok yarıçaplı tutuşturma (yoğunluk 1). */
-    private static int cephe(ServerLevel level, int x, int zMerkez, int[] tepe) {
+        double[] ruzgar = YanginMantigi.gununRuzgari(level.getGameTime() / 24000L);
+        double guc = Math.hypot(ruzgar[0], ruzgar[1]);
+        double yx = ruzgar[0] / guc;
+        double yz = ruzgar[1] / guc;
         int toplam = 0;
-        for (int dz = -16; dz <= 16; dz += 4) {
-            BlockPos ust = ustBlok(level, x, zMerkez + dz);
+        int tepe = level.getMinBuildHeight();
+        for (int k = -16; k <= 16; k += 4) {
+            BlockPos ust = ustBlok(level, m.getX() + (int) Math.round(-yz * k), m.getZ() + (int) Math.round(yx * k));
             if (ust != null && level.getBlockState(ust).is(BlockTags.LEAVES)) {
-                tepe[0] = Math.max(tepe[0], ust.getY());
-                toplam += YanginYoneticisi.alanTutustur(level, ust, 3, YanginKaynagi.KOMUT, 1.0);
+                tepe = Math.max(tepe, ust.getY());
+                toplam += YanginYoneticisi.alanTutustur(level, ust, 3, YanginKaynagi.KOMUT, VITRIN_YOGUNLUGU);
             }
         }
-        return toplam;
+        cepheTepesi = tepe;
+        double kx = m.getX() + 0.5 - yx * KAMERA_UZAKLIGI;
+        double kz = m.getZ() + 0.5 - yz * KAMERA_UZAKLIGI;
+        int zemin = tepe;
+        for (int i = 0; i <= KAMERA_UZAKLIGI; i += 2) {
+            zemin = Math.max(zemin, level.getHeight(Heightmap.Types.MOTION_BLOCKING, (int) Math.floor(kx + yx * i),
+                    (int) Math.floor(kz + yz * i)));
+        }
+        double ky = zemin + KAMERA_YUKSEKLIGI;
+        float yon = (float) Math.toDegrees(Math.atan2(-yx, yz));
+        float egim = (float) Math.toDegrees(Math.atan2(ky - (tepe - 2.0), KAMERA_UZAKLIGI));
+        ServerPlayer oyuncu = server.getPlayerList().getPlayers().get(0);
+        oyuncu.teleportTo(level, kx, ky, kz, yon, egim);
+        DogalAfetler.LOGGER.info(ON + "rüzgâr ({}, {}); cephe {} hücre, tepe y={}; kamera ({}, {}, {}) yön {} eğim {}",
+                String.format(Locale.ROOT, "%.2f", ruzgar[0]), String.format(Locale.ROOT, "%.2f", ruzgar[1]),
+                toplam, tepe, (int) kx, (int) ky, (int) kz, String.format(Locale.ROOT, "%.1f", yon),
+                String.format(Locale.ROOT, "%.1f", egim));
     }
 
     /** Bulunan orman noktası çoğunlukla kenardır: ±24 blok içinde tepesi yaprak olan sütunu en çok merkez seçilir. */
@@ -253,19 +265,72 @@ public final class YanginOtomasyonu {
         return level.isLoaded(p) ? p : null;
     }
 
+    /**
+     * Sunucu thread'inde: cephe çevresindeki ateş bloklarından kaçı kameranın görüş alanında (dikey 70°, pencere en/boy
+     * oranı) ve kameradan açık görüş hattında (yaprak dahil katı blok araya girmiyor). Kare kanıtının sayısal eşi.
+     */
+    private static void gorunurlukYaz(IntegratedServer server, String ad, double enBoy) {
+        ServerLevel level = server.overworld();
+        ServerPlayer oyuncu = server.getPlayerList().getPlayers().get(0);
+        Vec3 goz = oyuncu.getEyePosition();
+        Vec3 ileri = oyuncu.getViewVector(1.0F);
+        Vec3 sag = ileri.cross(new Vec3(0, 1, 0)).normalize();
+        Vec3 yukari = sag.cross(ileri);
+        double dikey = Math.tan(Math.toRadians(35));
+        double yatay = dikey * enBoy;
+        BlockPos m = odak;
+        int toplam = 0;
+        int cercevede = 0;
+        int gorunen = 0;
+        double uzaklik = 0;
+        BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
+        for (int x = -TARAMA; x <= TARAMA; x++) {
+            for (int z = -TARAMA; z <= TARAMA; z++) {
+                for (int y = cepheTepesi - 24; y <= cepheTepesi + 8; y++) {
+                    p.set(m.getX() + x, y, m.getZ() + z);
+                    if (!level.isLoaded(p) || !level.getBlockState(p).is(YanginKayitlari.AFET_ATESI.get())) {
+                        continue;
+                    }
+                    toplam++;
+                    Vec3 hedef = new Vec3(p.getX() + 0.5, p.getY() + 0.3, p.getZ() + 0.5);
+                    Vec3 v = hedef.subtract(goz);
+                    double ileriBilesen = v.dot(ileri);
+                    if (ileriBilesen <= 0 || Math.abs(v.dot(sag) / ileriBilesen) > yatay
+                            || Math.abs(v.dot(yukari) / ileriBilesen) > dikey) {
+                        continue;
+                    }
+                    cercevede++;
+                    HitResult carpma = level.clip(new ClipContext(goz, hedef, ClipContext.Block.COLLIDER,
+                            ClipContext.Fluid.NONE, oyuncu));
+                    if (carpma.getType() == HitResult.Type.MISS
+                            || carpma.getLocation().distanceTo(goz) >= v.length() - 1.0) {
+                        gorunen++;
+                        uzaklik += v.length();
+                    }
+                }
+            }
+        }
+        DogalAfetler.LOGGER.info(ON + "{}: görünen ateş bloğu {} (çerçevede {}, taranan {}), ortalama uzaklık {} blok, aktif {}",
+                ad, gorunen, cercevede, toplam, gorunen == 0 ? "-" : String.format(Locale.ROOT, "%.1f",
+                        uzaklik / gorunen), YanginYoneticisi.aktifSayi(level));
+    }
+
     private static void komut(IntegratedServer server, String komut) {
         server.execute(() -> server.getCommands().performPrefixedCommand(server.createCommandSourceStack(), komut));
     }
 
-    private static void kaliteyle(EfektKalitesi kalite) {
+    /** Kalite değişince eski kademenin parçacıkları silinir ({@code setLevel} motoru boşaltır): kare yalnız yenisini gösterir. */
+    private static void kaliteyle(Minecraft mc, EfektKalitesi kalite) {
         IstemciYangin.kaliteZorla(kalite);
-        DogalAfetler.LOGGER.info(ON + "kalite {}", kalite == null ? "config" : kalite);
+        mc.particleEngine.setLevel(mc.level);
+        DogalAfetler.LOGGER.info(ON + "kalite {} (parçacıklar silindi)", kalite == null ? "config" : kalite);
     }
 
-    private static void kare(Minecraft mc, String ad) {
+    private static void kare(Minecraft mc, IntegratedServer server, String ad, double enBoy) {
         String dosya = "yangin_" + ad + ".png";
         Screenshot.grab(mc.gameDirectory, dosya, mc.getMainRenderTarget(), mesaj -> {
         });
         DogalAfetler.LOGGER.info(ON + "kare {} (FPS {}, parçacık {})", dosya, mc.getFps(), mc.particleEngine.countParticles());
+        server.execute(() -> gorunurlukYaz(server, ad, enBoy));
     }
 }

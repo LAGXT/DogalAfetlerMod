@@ -91,15 +91,20 @@ public final class YanginOyunTestleri {
         });
     }
 
-    /** Oyun içinde yayılma: yoğun yaprak kümesinin tepesindeki tek hücre kümeye yayılır (sıçrama eşiğinin altında). */
-    @GameTest(template = SAHNE, batch = "yangin_yayilma", timeoutTicks = 240)
+    /**
+     * Oyun içinde yayılma: yoğun yaprak kümesinin alt katmanındaki iki hücre kümeye yayılır (sıçrama eşiğinin altında).
+     * İki tohum: bu yoğunlukta tek hücre yayılmadan sönebilir (Y-16).
+     */
+    @GameTest(template = SAHNE, batch = "yangin_yayilma", timeoutTicks = 300)
     public static void yaprakKumesindeYayilir(GameTestHelper y) {
         ServerLevel level = y.getLevel();
         for (BlockPos p : BlockPos.betweenClosed(new BlockPos(1, 1, 1), new BlockPos(7, 3, 7))) {
             y.setBlock(p, kaliciYaprak());
         }
-        y.assertTrue(YanginYoneticisi.tutustur(level, y.absolutePos(new BlockPos(4, 3, 4)), YanginKaynagi.KOMUT,
-                DUSUK) == 1, "kümenin tepesi tutuşmalı");
+        for (BlockPos tohum : new BlockPos[] {new BlockPos(3, 1, 4), new BlockPos(5, 1, 4)}) {
+            y.assertTrue(YanginYoneticisi.tutustur(level, y.absolutePos(tohum), YanginKaynagi.KOMUT, DUSUK) == 1,
+                    "tohum yaprağı tutuşmalı: " + tohum.toShortString());
+        }
         long baslangic = level.getGameTime();
         y.succeedWhen(() -> {
             int etkilenen = 0;

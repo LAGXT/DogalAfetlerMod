@@ -68,11 +68,21 @@ class YanginMantigiTest {
 
     @Test
     void yagmurdaSonmeYaslaArtar() {
-        assertEquals(0.25, YanginMantigi.yagmurSonmeOlasiligi(0.25, 0), 1e-9);
-        assertEquals(0.55, YanginMantigi.yagmurSonmeOlasiligi(0.25, 1), 1e-9);
-        assertEquals(0.55, YanginMantigi.yagmurSonmeOlasiligi(0.25, 3), 1e-9);
-        assertEquals(1.0, YanginMantigi.yagmurSonmeOlasiligi(0.9, 1), 1e-9);
-        assertEquals(0.0, YanginMantigi.yagmurSonmeOlasiligi(0, 0), 1e-9);
+        assertEquals(0.25, YanginMantigi.yagmurSonmeOlasiligi(0.25, 0, false), 1e-9);
+        assertEquals(0.55, YanginMantigi.yagmurSonmeOlasiligi(0.25, 1, false), 1e-9);
+        assertEquals(0.55, YanginMantigi.yagmurSonmeOlasiligi(0.25, 3, false), 1e-9);
+        assertEquals(1.0, YanginMantigi.yagmurSonmeOlasiligi(0.9, 1, false), 1e-9);
+        assertEquals(0.0, YanginMantigi.yagmurSonmeOlasiligi(0, 0, false), 1e-9);
+    }
+
+    @Test
+    void korunakliAtesYagmurdaDahaYavasSoner() {
+        double acik = YanginMantigi.yagmurSonmeOlasiligi(0.25, 0.5, false);
+        double korunakli = YanginMantigi.yagmurSonmeOlasiligi(0.25, 0.5, true);
+        assertEquals(0.40, acik, 1e-9);
+        assertEquals(0.12, korunakli, 1e-9);
+        assertTrue(korunakli > 0, "yaprak altındaki ateş de sonunda söner");
+        assertEquals(0.0, YanginMantigi.yagmurSonmeOlasiligi(0, 0, true), 1e-9);
     }
 
     @Test

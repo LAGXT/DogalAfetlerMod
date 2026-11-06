@@ -9,6 +9,8 @@ public final class YanginMantigi {
     public static final int YASLANMA_TICK = 100;
     /** Vanilla {@code getFireSpreadSpeed} ölçeği: çimen/çiçek 60, yaprak/yün 30, odun 5. */
     public static final double YAYILMA_OLCEGI = 100.0;
+    /** Yağan biyomda gökyüzüne kapalı (yaprak, çatı altı) ateşin sönme olasılığı çarpanı: nem yavaş işler. */
+    public static final double KORUNAKLI_YAGMUR_ORANI = 0.3;
 
     private YanginMantigi() {
     }
@@ -90,9 +92,13 @@ public final class YanginMantigi {
         return new int[] {(int) Math.round(Math.cos(aci) * mesafe), (int) Math.round(Math.sin(aci) * mesafe)};
     }
 
-    /** Yağmur altındaki hücrenin bir işlenişte sönme olasılığı; yaşlı ateş daha kolay söner (vanilla 0,2 + yaş). */
-    public static double yagmurSonmeOlasiligi(double taban, double yasOrani) {
-        return sinirla(taban + 0.3 * sinirla(yasOrani, 0, 1), 0, 1);
+    /**
+     * Yağmurdaki hücrenin bir işlenişte sönme olasılığı; yaşlı ateş daha kolay söner (vanilla 0,2 + yaş). Korunaklı
+     * hücre {@link #KORUNAKLI_YAGMUR_ORANI} ile çarpılır: vanilla yalnız yağmur gören ateşi söndürür, bölüm G tüm yangını.
+     */
+    public static double yagmurSonmeOlasiligi(double taban, double yasOrani, boolean korunakli) {
+        double olasilik = sinirla(taban + 0.3 * sinirla(yasOrani, 0, 1), 0, 1);
+        return korunakli ? olasilik * KORUNAKLI_YAGMUR_ORANI : olasilik;
     }
 
     /** Küçük puan önce işlenir: oyuncuya yakın önce, bekledikçe uzaktaki de öne geçer. */

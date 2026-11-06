@@ -26,6 +26,12 @@ def gurultu(rng, boy, olcek):
     return deger
 
 
+def kenar_sonumu(d, ic=0.6):
+    """Merkezden normalize uzaklık d için 1 (d <= ic) → 0 (d >= 1): büyük quad'ın kenarı görünmez."""
+    t = min(1.0, max(0.0, (1.0 - d) / (1.0 - ic)))
+    return t * t * (3 - 2 * t)
+
+
 def alev(kare, rng):
     boy = 16
     img = Image.new("RGBA", (boy, boy))
@@ -42,7 +48,10 @@ def alev(kare, rng):
             r = 255
             g = int(90 + 165 * sicak ** 1.5)
             b = int(30 + 170 * max(0.0, sicak - 0.7) / 0.3) if sicak > 0.7 else 30
-            a = int(255 * min(1.0, kenar * 9))
+            # kenar satır ve sütunlarda alfa düşer: sprite kenarı sert kesilmesin
+            alt = min(1.0, (boy - 1 - y + 0.5) / 2.5, (y + 0.5) / 2.5)
+            yan = min(1.0, (min(x, boy - 1 - x) + 0.5) / 1.5)
+            a = int(255 * min(1.0, kenar * 9) * alt * yan)
             img.putpixel((x, y), (r, min(255, g), min(255, b), a))
     return img
 
@@ -54,7 +63,7 @@ def duman(kare, rng):
     for y in range(boy):
         for x in range(boy):
             d = math.hypot(x + 0.5 - boy / 2, y + 0.5 - boy / 2) / (boy / 2)
-            yogun = (1 - d) * 1.3 + (n(x, y) - 0.5) * 0.9 - kare * 0.08
+            yogun = ((1 - d) * 1.3 + (n(x, y) - 0.5) * 0.9 - kare * 0.08) * kenar_sonumu(d)
             if yogun <= 0:
                 continue
             ton = int(150 + 70 * n(y, x))
