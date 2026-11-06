@@ -1,0 +1,36 @@
+{
+  "parent": "dogalafetler:dogalafetler/root",
+  "criteria": {
+    "olcut": {
+      "conditions": {
+        "kosul": "hasarsiz",
+        "tur": "asit_yagmuru"
+      },
+      "trigger": "dogalafetler:afetten_sag_cikti"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "translate": "advancements.dogalafetler.cati_alti.description"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:brick_stairs"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.cati_alti.title"
+    }
+  },
+  "requirements": [
+    [
+      "olcut"
+    ]
+  ],
+  "rewards": {
+    "experience": 15
+  },
+  "sends_telemetry_event": true
+}

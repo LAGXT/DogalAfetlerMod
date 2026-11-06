@@ -1,0 +1,36 @@
+{
+  "parent": "dogalafetler:dogalafetler/gunesi_atlattim",
+  "criteria": {
+    "olcut": {
+      "conditions": {},
+      "trigger": "dogalafetler:supernova_gorundu"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "translate": "advancements.dogalafetler.supernova_tanigi.description"
+    },
+    "frame": "goal",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:nether_star"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.supernova_tanigi.title"
+    }
+  },
+  "requirements": [
+    [
+      "olcut"
+    ]
+  ],
+  "rewards": {
+    "experience": 40,
+    "loot": [
+      "dogalafetler:rewards/hedef"
+    ]
+  },
+  "sends_telemetry_event": true
+}

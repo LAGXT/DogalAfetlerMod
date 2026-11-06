@@ -433,7 +433,9 @@ public final class BasarimOlaylari {
 
     /**
      * Dönem eşikleri hemen: komutla sıçrayan donma (süreçteki küçük adımları saniyelik denetim yakalar), deniz
-     * yükselmesinin tamamlanması ve süpernovanın başlaması.
+     * yükselmesinin tamamlanması ve süpernovanın başlaması. {@code sifirla} (K-E11): kazanılmış başarımlar ve oyuncu
+     * verisindeki kalıcı ilerleme (atlatılan türler, balık, ünvan) kalır; döneme bağlı ara sayaç (donma %100'den beri
+     * gün) yeni döngü işaretiyle sıfırdan başlar.
      */
     @SubscribeEvent
     public static void donemDegisti(DonemDegistiEvent olay) {
@@ -464,7 +466,10 @@ public final class BasarimOlaylari {
                     }
                 }
             }
-            case SIFIRLAMA -> sonDonma = donem.donmaIlerlemesi();
+            case SIFIRLAMA -> {
+                sonDonma = donem.donmaIlerlemesi();
+                BasarimVerisi.sifirlandi(donem, server.overworld().getGameTime());
+            }
             default -> {
             }
         }
@@ -560,6 +565,7 @@ public final class BasarimOlaylari {
     public static void sunucuDurdu(ServerStoppedEvent olay) {
         GECICI.clear();
         sonDonma = 0;
+        BasarimVerisi.sunucuDurdu();
     }
 
     // ---------------------------------------------------------------- yardımcılar

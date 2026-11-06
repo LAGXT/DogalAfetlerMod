@@ -3,8 +3,10 @@ package io.github.kadirberkpolat1.dogalafetler.basarim;
 import com.mojang.authlib.GameProfile;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.AfetIzi;
+import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.AfetKumesi;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.BasarimTuru;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.Basarimlar;
+import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.KutupSayaci;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.Unvan;
 import io.github.kadirberkpolat1.dogalafetler.core.Afet;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetAsamasi;
@@ -155,7 +157,7 @@ public final class BasarimOyunTestleri {
     @GameTest(template = "bos", batch = "basarim_kasirga")
     public static void dogalBitenKasirgaIlkRuzgariYalnizAlandakineVerir(GameTestHelper y) {
         ServerPlayer a = oyuncu(y, "ruzgar-a", 0);
-        ServerPlayer b = oyuncu(y, "ruzgar-b", YARICAP + 24);
+        ServerPlayer b = oyuncu(y, "ruzgar-b", YARICAP + 8);
         try {
             kasirga(y, 1, a, false, () -> { });
             dogrula(y, kazandi(y, a, Basarimlar.ILK_RUZGAR), "alandaki oyuncu İlk Rüzgâr'ı almalı");
@@ -295,6 +297,43 @@ public final class BasarimOyunTestleri {
             dogrula(y, kazandi(y, a, Basarimlar.BUZUL_CAGI), "%60 (%50'yi geçti) Buzul Çağı verir");
         } finally {
             donem.donmaIlerlemesiAyarla(eski);
+            cikar(y, List.of(a));
+        }
+        y.succeed();
+    }
+
+    @GameTest(template = "bos", batch = "basarim_kutup")
+    public static void kutupSiginagiUcGunSifirlaYalnizAraSayaciSifirlar(GameTestHelper y) {
+        ServerPlayer a = oyuncu(y, "kutup-a", 0);
+        AfetYoneticisi yonetici = AfetYoneticisi.al(y.getLevel().getServer());
+        DunyaDonemi donem = yonetici.donem();
+        try {
+            yonetici.sifirla();
+            donem.donmaIlerlemesiAyarla(100);
+            BasarimVerisi.kutupYaz(a, new KutupSayaci(3 * KutupSayaci.GUN_TICK - 40, KutupSayaci.YOK));
+            BasarimOlaylari.saniyelikDenetim(a);
+            dogrula(y, !kazandi(y, a, Basarimlar.KUTUP_SIGINAGI), "3 günden az yetmez");
+            BasarimVerisi.kutupYaz(a, new KutupSayaci(3 * KutupSayaci.GUN_TICK, KutupSayaci.YOK));
+            BasarimOlaylari.saniyelikDenetim(a);
+            dogrula(y, kazandi(y, a, Basarimlar.KUTUP_SIGINAGI), "donma %100'den beri 3 gün: Kutup Sığınağı");
+            dogrula(y, BasarimVerisi.unvan(a).orElse(null) == Unvan.KUTUP_SAKINI, "meydan okuma ünvanı");
+            AfetKumesi kume = new AfetKumesi();
+            kume.ekle(AfetTuru.KASIRGA);
+            BasarimVerisi.atlatilanlariYaz(a, kume);
+            BasarimVerisi.balikEkle(a, 3);
+            BasarimVerisi.kutupYaz(a, new KutupSayaci(KutupSayaci.GUN_TICK, KutupSayaci.YOK));
+            yonetici.sifirla();
+            dogrula(y, donem.donmaIlerlemesi() == 0, "sifirla donmayı sıfırlar");
+            dogrula(y, BasarimVerisi.kutup(a).birikim() == 0, "K-E11: döneme bağlı ara sayaç sıfırlanır");
+            dogrula(y, kazandi(y, a, Basarimlar.KUTUP_SIGINAGI) && kazandi(y, a, Basarimlar.BUZUL_CAGI),
+                    "kazanılmış başarımlar kalır");
+            dogrula(y, BasarimVerisi.unvan(a).orElse(null) == Unvan.KUTUP_SAKINI
+                    && BasarimVerisi.atlatilanlar(a).iceriyor(AfetTuru.KASIRGA) && BasarimVerisi.balik(a) == 3,
+                    "oyuncu verisindeki kalıcı ilerleme (ünvan, atlatılanlar, balık) kalır");
+            BasarimVerisi.kutupYaz(a, new KutupSayaci(500, KutupSayaci.YOK));
+            dogrula(y, BasarimVerisi.kutup(a).birikim() == 500, "yeni döngüde yeniden birikir");
+        } finally {
+            yonetici.sifirla();
             cikar(y, List.of(a));
         }
         y.succeed();

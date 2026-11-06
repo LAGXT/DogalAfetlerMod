@@ -1,0 +1,35 @@
+{
+  "parent": "dogalafetler:dogalafetler/radar_altinda",
+  "criteria": {
+    "uret": {
+      "conditions": {
+        "esya": "dogalafetler:sismograf"
+      },
+      "trigger": "dogalafetler:esya_uretildi"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "translate": "advancements.dogalafetler.yer_dinleyici.description"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:sculk_sensor"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.yer_dinleyici.title"
+    }
+  },
+  "requirements": [
+    [
+      "uret"
+    ]
+  ],
+  "rewards": {
+    "experience": 15
+  },
+  "sends_telemetry_event": true
+}

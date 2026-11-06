@@ -1,0 +1,29 @@
+{
+  "replace": false,
+  "values": [
+    {
+      "id": "dogalafetler:sicak_salep",
+      "required": false
+    },
+    {
+      "id": "dogalafetler:sicak_cikolata",
+      "required": false
+    },
+    {
+      "id": "dogalafetler:sicak_tavuk_corbasi",
+      "required": false
+    },
+    {
+      "id": "dogalafetler:atesli_guvec",
+      "required": false
+    },
+    {
+      "id": "dogalafetler:isitici_cay",
+      "required": false
+    },
+    {
+      "id": "dogalafetler:kutup_baligi_corbasi",
+      "required": false
+    }
+  ]
+}

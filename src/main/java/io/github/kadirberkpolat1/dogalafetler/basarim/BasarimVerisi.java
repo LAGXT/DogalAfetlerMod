@@ -5,6 +5,7 @@ import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.AfetKumesi;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.DenizTakibi;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.KutupSayaci;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.Unvan;
+import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -19,11 +20,14 @@ import net.minecraft.server.level.ServerPlayer;
  * {@code VucutSicakligi} deseni). Capability yerine bu seçildi: veri yalnız sunucuda okunur, istemciye gitmez, küçüktür
  * (&lt; 200 bayt) ve oyuncu dosyasıyla kaydedilir; ölüm/boyut dönüşünde {@link #kopyala} ile taşınır (A-03). Alanlar:
  * {@code atlatilan} (sağ çıkılan afet türleri), {@code balik} (buz deliğinden toplam balık), {@code unvan},
- * {@code kutup}/{@code kutupSon} (Kutup Sığınağı sayacı), {@code denizOlum} (yükselişte ölüm döngüsü), {@code afet}
- * (süren afetteki iz). Yalnız sunucu ana thread'inde.
+ * {@code kutup}/{@code kutupSon}/{@code kutupDongu} (Kutup Sığınağı sayacı ve ait olduğu sıfırlama döngüsü),
+ * {@code denizOlum} (yükselişte ölüm döngüsü), {@code afet} (süren afetteki iz). Yalnız sunucu ana thread'inde.
  */
 public final class BasarimVerisi {
     public static final String ETIKET = "dogalafetler_basarim";
+    static final String EK_VERI = "basarim";
+    private static final String SIFIRLAMA = "sifirlama";
+    private static long sonIsaret;
 
     private BasarimVerisi() {
     }
@@ -73,20 +77,48 @@ public final class BasarimVerisi {
         kok(oyuncu).putString("unvan", unvan.map(Unvan::kimlik).orElse(""));
     }
 
+    /**
+     * Kutup Sığınağı sayacı. Döneme bağlı ara sayaçtır (K-E11): {@code /dogalafet sifirla} sonrası (döngü işareti
+     * {@link #sifirlamaDongusu} değişti) sıfırdan başlar; çevrim dışı oyuncunun eski birikimi de ilk okumada düşer.
+     */
     public static KutupSayaci kutup(ServerPlayer oyuncu) {
         CompoundTag etiket = kok(oyuncu);
+        if (etiket.getLong("kutupDongu") != sifirlamaDongusu(oyuncu)) {
+            return new KutupSayaci(0, KutupSayaci.YOK);
+        }
         return new KutupSayaci(etiket.getLong("kutup"),
                 etiket.contains("kutupSon", Tag.TAG_LONG) ? etiket.getLong("kutupSon") : KutupSayaci.YOK);
     }
 
     public static void kutupYaz(ServerPlayer oyuncu, KutupSayaci sayac) {
         CompoundTag etiket = kok(oyuncu);
+        etiket.putLong("kutupDongu", sifirlamaDongusu(oyuncu));
         etiket.putLong("kutup", sayac.birikim());
         if (sayac.son() == KutupSayaci.YOK) {
             etiket.remove("kutupSon");
         } else {
             etiket.putLong("kutupSon", sayac.son());
         }
+    }
+
+    /** Dünyanın son {@code sifirla} işareti ({@code DunyaDonemi.ekVeri("basarim")}); hiç sıfırlanmamışsa 0. */
+    static long sifirlamaDongusu(ServerPlayer oyuncu) {
+        return DunyaDonemi.al(oyuncu.server).ekVeri(EK_VERI).getLong(SIFIRLAMA);
+    }
+
+    /**
+     * {@code DonemDegistiEvent(SIFIRLAMA)}: yeni döngü işareti (sıfırlama ek veriyi boşaltır). Oyun saatinden ve oturumda
+     * kesin artan: aynı tick'teki iki {@code sifirla} de farklı işaret alır; hep sıfırdan farklıdır.
+     */
+    static void sifirlandi(DunyaDonemi donem, long oyunZamani) {
+        sonIsaret = Math.max(oyunZamani + 1, sonIsaret + 1);
+        donem.ekVeri(EK_VERI).putLong(SIFIRLAMA, sonIsaret);
+        donem.ekVeriDegisti(EK_VERI);
+    }
+
+    /** Sunucu kapanınca: bir sonraki dünya kendi oyun saatinden başlar. */
+    static void sunucuDurdu() {
+        sonIsaret = 0;
     }
 
     public static long denizOlum(ServerPlayer oyuncu) {

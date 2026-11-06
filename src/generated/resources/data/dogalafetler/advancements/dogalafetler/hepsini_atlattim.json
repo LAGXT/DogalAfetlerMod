@@ -1,0 +1,33 @@
+{
+  "parent": "dogalafetler:dogalafetler/felaket_ustasi",
+  "criteria": {
+    "olcut": {
+      "conditions": {},
+      "trigger": "dogalafetler:hepsini_atlatti"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "translate": "advancements.dogalafetler.hepsini_atlattim.description"
+    },
+    "frame": "challenge",
+    "hidden": true,
+    "icon": {
+      "item": "minecraft:beacon"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.hepsini_atlattim.title"
+    }
+  },
+  "requirements": [
+    [
+      "olcut"
+    ]
+  ],
+  "rewards": {
+    "experience": 100
+  },
+  "sends_telemetry_event": true
+}

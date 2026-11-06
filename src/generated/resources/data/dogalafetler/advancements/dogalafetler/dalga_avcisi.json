@@ -1,0 +1,37 @@
+{
+  "parent": "dogalafetler:dogalafetler/root",
+  "criteria": {
+    "olcut": {
+      "conditions": {
+        "kosul": "suruklendi",
+        "tur": "tsunami"
+      },
+      "trigger": "dogalafetler:afetten_sag_cikti"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "translate": "advancements.dogalafetler.dalga_avcisi.description"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:trident",
+      "nbt": "{Damage:0}"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.dalga_avcisi.title"
+    }
+  },
+  "requirements": [
+    [
+      "olcut"
+    ]
+  ],
+  "rewards": {
+    "experience": 15
+  },
+  "sends_telemetry_event": true
+}

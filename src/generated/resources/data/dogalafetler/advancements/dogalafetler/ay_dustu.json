@@ -1,0 +1,38 @@
+{
+  "parent": "dogalafetler:dogalafetler/root",
+  "criteria": {
+    "olcut": {
+      "conditions": {
+        "tur": "ay_carpmasi"
+      },
+      "trigger": "dogalafetler:afetten_sag_cikti"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "translate": "advancements.dogalafetler.ay_dustu.description"
+    },
+    "frame": "goal",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:end_stone"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.ay_dustu.title"
+    }
+  },
+  "requirements": [
+    [
+      "olcut"
+    ]
+  ],
+  "rewards": {
+    "experience": 40,
+    "loot": [
+      "dogalafetler:rewards/hedef"
+    ]
+  },
+  "sends_telemetry_event": true
+}

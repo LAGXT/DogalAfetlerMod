@@ -1,0 +1,38 @@
+{
+  "parent": "dogalafetler:dogalafetler/root",
+  "criteria": {
+    "olcut": {
+      "conditions": {
+        "min_seviye": 3
+      },
+      "trigger": "dogalafetler:afetten_sag_cikti"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "translate": "advancements.dogalafetler.firtinaya_meydan_oku.description"
+    },
+    "frame": "goal",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:lightning_rod"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.firtinaya_meydan_oku.title"
+    }
+  },
+  "requirements": [
+    [
+      "olcut"
+    ]
+  ],
+  "rewards": {
+    "experience": 40,
+    "loot": [
+      "dogalafetler:rewards/hedef"
+    ]
+  },
+  "sends_telemetry_event": true
+}

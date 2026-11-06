@@ -78,6 +78,14 @@ def istemci_pid():
     return None
 
 
+def kos_pid():
+    """Bu worktree için kilit bekleyen ya da istemciyi taşıyan `runclient_kilit.py kos` süreci."""
+    for pid in subprocess.run(["pgrep", "-f", f"runclient_kilit.py kos {W} "], capture_output=True,
+                              text=True).stdout.split():
+        return int(pid)
+    return None
+
+
 def belirtec_var(pid):
     try:
         return b"HL_EXEC_RULE_TOKEN=" in Path(f"/proc/{pid}/environ").read_bytes()
@@ -108,9 +116,10 @@ def hazirla():
     yol = run / "options.txt"
     satirlar = yol.read_text().splitlines() if yol.exists() else []
     satirlar = [s for s in satirlar if not s.startswith(("tutorialStep:", "pauseOnLostFocus:", "renderDistance:",
-                                                         "simulationDistance:"))]
+                                                         "simulationDistance:", "lang:"))]
+    # Kareler Türkçe başarım adlarını göstersin (madde 12: TR ad ve açıklama).
     yol.write_text("\n".join(satirlar + ["tutorialStep:none", "pauseOnLostFocus:false", "renderDistance:8",
-                                         "simulationDistance:8"]) + "\n")
+                                         "simulationDistance:8", "lang:tr_tr"]) + "\n")
     for eski in (run / "screenshots").glob("basarim_*.png"):
         eski.unlink()
     latest = run / "logs/latest.log"
@@ -149,11 +158,18 @@ def main():
     log("exec:", hypr("dispatch", f'hl.dsp.exec_cmd("{kural}")'))
     baslangic = time.time()
     pid = None
-    while time.time() - baslangic < 300 and pid is None:
+    # Kilit 1800 sn'ye kadar bekletebilir: JVM, `kos` yaşadıkça beklenir; gelmezse `kos` kapatılır (istemci bekçisiz açılmasın).
+    while pid is None:
         pid = istemci_pid()
+        gecen = time.time() - baslangic
+        if pid is None and (gecen > 2100 or (gecen > 30 and kos_pid() is None)):
+            break
         time.sleep(1)
     if pid is None:
-        log("istemci JVM'i 300 sn'de görünmedi")
+        kilit = kos_pid()
+        log(f"istemci JVM'i görünmedi ({time.time() - baslangic:.0f} sn); kos süreci: {kilit}")
+        if kilit is not None:
+            os.kill(kilit, signal.SIGTERM)
         return 1
     if not belirtec_var(pid):
         oldur(pid, "HL_EXEC_RULE_TOKEN yok (belirteç kapısı)")

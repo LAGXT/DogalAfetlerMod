@@ -27,7 +27,7 @@ import net.minecraftforge.fml.common.Mod;
  * Quick Play dünyasında ve {@code -PoyunTestiAfeti=kasirga} ile çalışır; üretimde etkisizdir. Sırayla: seviye 5 sınama
  * kasırgasının sireniyle kök toast'ı, doğal bitişte üç başarımın toast'ı ve sohbet duyurusu, ünvanlı sohbet satırı,
  * ünvanlı tab listesi, başarım sekmesinin erken hali (kök + iki kat), gizliler dışındaki bütün başarımlar açıkken
- * sekmenin üç kaydırma konumu (gizli iki başarım görünmez) ve gizliler açılınca son hali. Klavye, fare ve tekerlek
+ * sekmenin dört kaydırma konumu (gizli iki başarım görünmez) ve gizliler açılınca son hali. Klavye, fare ve tekerlek
  * girdileri kapanışa kadar sayılır; kendi açmadığı duraklatma ekranını kapatır.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
@@ -197,11 +197,14 @@ public final class BasarimOtomasyonu {
             mc.getToasts().clear();
             sekmeyiAc(mc);
         }, bekle(40), 60);
+        ekle("en üste kaydır", () -> kaydir(mc, 1000), bekle(10), 20);
         ekle("sekme tam kare 1", () -> kare(mc, "sekme_tam_ust"), bekle(10), 20);
-        ekle("kaydır 1", () -> kaydir(mc, -110), bekle(10), 20);
+        ekle("kaydır 1", () -> kaydir(mc, -100), bekle(10), 20);
         ekle("sekme tam kare 2", () -> kare(mc, "sekme_tam_orta"), bekle(10), 20);
-        ekle("kaydır 2", () -> kaydir(mc, -110), bekle(10), 20);
-        ekle("sekme tam kare 3", () -> kare(mc, "sekme_tam_alt"), bekle(10), 20);
+        ekle("kaydır 2", () -> kaydir(mc, -100), bekle(10), 20);
+        ekle("sekme tam kare 3", () -> kare(mc, "sekme_tam_orta2"), bekle(10), 20);
+        ekle("kaydır 3", () -> kaydir(mc, -1000), bekle(10), 20);
+        ekle("sekme tam kare 4", () -> kare(mc, "sekme_tam_alt"), bekle(10), 20);
         ekle("gizliler", () -> {
             mc.setScreen(null);
             komut(mc, "advancement grant @s only dogalafetler:dogalafetler/" + Basarimlar.BIRLIKTE_HAYATTA.yol());
@@ -211,8 +214,9 @@ public final class BasarimOtomasyonu {
             mc.getToasts().clear();
             sekmeyiAc(mc);
         }, bekle(40), 60);
+        ekle("en üste kaydır 2", () -> kaydir(mc, 1000), bekle(10), 20);
         ekle("gizliler kare 1", () -> kare(mc, "sekme_gizliler_acik_ust"), bekle(10), 20);
-        ekle("kaydır 3", () -> kaydir(mc, -220), bekle(10), 20);
+        ekle("kaydır 4", () -> kaydir(mc, -1000), bekle(10), 20);
         ekle("gizliler kare 2", () -> kare(mc, "sekme_gizliler_acik_alt"), bekle(10), 20);
         ekle("kapanış", () -> {
             mc.setScreen(null);

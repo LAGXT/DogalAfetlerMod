@@ -8,7 +8,8 @@
 Koşu: açılışta vanilla `Loaded N advancements` satırı; `dogalafet basarim bilgi` → sekmenin 27/27 başarımı yüklü;
 `forceload add 0 0` + `loot spawn 0 100 0 loot dogalafetler:rewards/hedef` → hedef ödül tablosu 1–2 eşya düşürür;
 `dogalafet unvan Kimse` → oyuncu yok (komut kayıtlı, OP konsolu); `dogalafet start deprem 5` + `asama ileri` x3 → doğal
-bitiş, başarım dinleyicisi oyuncusuz olayda hata vermez; `dogalafet basarim bilgi` yeniden. Sonda log denetimi: `invalid
+bitiş, başarım dinleyicisi oyuncusuz olayda hata vermez; `dogalafet sifirla` → başarımın K-E11 döngü işareti (A-27) hatasız
+yazılır; `dogalafet basarim bilgi` yeniden. Sonda log denetimi: `invalid
 dist` yok, istisna yok, advancement/loot/etiket yükleme hatası yok, config düzeltme WARN'ı yok, yeni config'te `[basarim]`
 ve `[basarim.odul]` bölümleri var, süreç 0 ile çıktı.
 
@@ -51,6 +52,9 @@ def kosu(sunucu):
     sunucu.bekle(r"Afet bitti: deprem seviye 5 neden DOGAL", isaret, 10, "doğal bitiş olayı (oyuncusuz)")
     sunucu.komut("dogalafet basarim bilgi", rf"Natural Disasters tab: {BASARIM_SAYISI}/{BASARIM_SAYISI}",
                  "bitiş sonrası sekme")
+    sunucu.komut("dogalafet sifirla", r"disaster and era state was reset", "sifirla (K-E11 döngü işareti)")
+    sunucu.komut("dogalafet basarim bilgi", rf"Natural Disasters tab: {BASARIM_SAYISI}/{BASARIM_SAYISI}",
+                 "sıfırlama sonrası sekme")
 
 
 def log_denetimi(yol):

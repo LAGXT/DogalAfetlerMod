@@ -1,0 +1,38 @@
+{
+  "parent": "dogalafetler:dogalafetler/root",
+  "criteria": {
+    "olcut": {
+      "conditions": {
+        "tur": "gunes_patlamasi"
+      },
+      "trigger": "dogalafetler:afetten_sag_cikti"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "translate": "advancements.dogalafetler.gunesi_atlattim.description"
+    },
+    "frame": "goal",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:sunflower"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.gunesi_atlattim.title"
+    }
+  },
+  "requirements": [
+    [
+      "olcut"
+    ]
+  ],
+  "rewards": {
+    "experience": 40,
+    "loot": [
+      "dogalafetler:rewards/hedef"
+    ]
+  },
+  "sends_telemetry_event": true
+}
