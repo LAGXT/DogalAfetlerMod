@@ -801,6 +801,10 @@ public final class SuRenderer {
         float kopuk = tur == 1 && bilesen > 1 ? Math.max(0, Math.min(0.85f, (egimH - 0.6f) / 2.5f)) : 0;
         float derin = UST[k] - alt;
         boolean kiyi = kuruKomsu(i, j);
+        if (tur == 2 && kiyi) {
+            // Mağara suyunun duvara değen kenarı: ince, parlak ıslak şerit (köpük dokusu, yavaş nabız).
+            kopuk = 0.22f + 0.08f * (float) Math.sin(t * 0.08 + (x * 3 + z) * 0.7);
+        }
         if (tur == 1 && (derin < 1.5f || kiyi)) {
             // Kıyı şeridi: kuru karaya değen ya da çok sığ sütunda 2 sn periyotla ileri geri "yalayan" köpük bandı.
             float yalama = 0.55f + 0.45f * (float) Math.sin(t * 0.157 + (x + z) * 0.35);
@@ -864,20 +868,29 @@ public final class SuRenderer {
                 dudak(dalga, rx, rz, dalga.taban() + dalgaH, dalgaH, isik);
             }
         } else if (tur == 2) {
-            // Mağara suyu sakin ama cımsız değil: dalgacığın %30'u yükseklikte, eğimin %60'ı ışıkta (SU-28).
+            // Mağara suyu sakin ama cımsız değil: dalgacığın %55'i yükseklikte, eğim ışıkta (SU-28).
             int v00 = i * (N + 1) + j;
             int v01 = v00 + 1;
             int v10 = v00 + N + 1;
             int v11 = v10 + 1;
-            float y00 = yu + 0.3f * VH[v00];
-            float y01 = yu + 0.3f * VH[v01];
-            float y11 = yu + 0.3f * VH[v11];
-            float y10 = yu + 0.3f * VH[v10];
+            float y00 = yu + 0.55f * VH[v00];
+            float y01 = yu + 0.55f * VH[v01];
+            float y11 = yu + 0.55f * VH[v11];
+            float y10 = yu + 0.55f * VH[v10];
             kosegolgeOlcekli(0, tabanRenk, a, x, y00, z, v00, isik);
             kosegolgeOlcekli(1, tabanRenk, a, x, y01, z + 1, v01, isik);
             kosegolgeOlcekli(2, tabanRenk, a, x + 1, y11, z + 1, v11, isik);
             kosegolgeOlcekli(3, tabanRenk, a, x + 1, y10, z, v10, isik);
             dortgenSerbest(rx, y00, rz, rx, y01, rz + 1, rx + 1, y11, rz + 1, rx + 1, y10, rz, false, x, z);
+            if (kopuk > 0.08f) {
+                for (int q = 0; q < 4; q++) {
+                    QC[q] = 0xFFF4E0;
+                    QA[q] = kopuk;
+                    QI[q] = isik;
+                }
+                dortgenSerbest(rx, y00 + 0.015f, rz, rx, y01 + 0.015f, rz + 1, rx + 1, y11 + 0.015f, rz + 1, rx + 1,
+                        y10 + 0.015f, rz, true, x, z);
+            }
         }
         for (int q = 0; q < 4; q++) {
             int n = komsu(i + DI[q], j + DJ[q]);
@@ -934,7 +947,7 @@ public final class SuRenderer {
     }
 
     private static void kosegolgeOlcekli(int q, int taban, float alfa, double x, double y, double z, int v, int isik) {
-        golgele(taban, alfa, x, y, z, VSX[v] * 0.6, VSZ[v] * 0.6, isik);
+        golgele(taban, alfa, x, y, z, VSX[v] * 1.1, VSZ[v] * 1.1, isik);
         QC[q] = gRenk;
         QA[q] = gAlfa;
         QI[q] = gIsik;
@@ -1056,7 +1069,7 @@ public final class SuRenderer {
                 double boy = 9 + ((h >>> 24) & 7);
                 double kx = -gunesX * boy * 0.25 + 0.4 * Math.sin(saat * 0.02 + (h & 255));
                 double kz = 0.3 * Math.cos(saat * 0.017 + (h & 127));
-                float a = (float) (0.16 * (0.6 + 0.4 * Math.sin(saat * 0.05 + (h & 63))));
+                float a = (float) (0.26 * (0.6 + 0.4 * Math.sin(saat * 0.05 + (h & 63))));
                 float sx = (float) (px - ox);
                 float sz = (float) (pz - oz);
                 float ua = u0 + du * ((h >>> 8) & 7);

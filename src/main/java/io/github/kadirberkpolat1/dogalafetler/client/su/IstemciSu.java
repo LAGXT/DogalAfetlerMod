@@ -291,7 +291,7 @@ public final class IstemciSu {
     public static void sis(ViewportEvent.RenderFog e) {
         if (kameraSuda(e.getCamera())) {
             e.setNearPlaneDistance(-8f);
-            e.setFarPlaneDistance(40f);
+            e.setFarPlaneDistance(56f);
             e.setFogShape(FogShape.SPHERE);
             e.setCanceled(true);
         }
@@ -300,10 +300,20 @@ public final class IstemciSu {
     @SubscribeEvent
     public static void sisRengi(ViewportEvent.ComputeFogColor e) {
         if (kameraSuda(e.getCamera())) {
-            int c = Minecraft.getInstance().level.getBiome(e.getCamera().getBlockPosition()).value().getWaterFogColor();
-            e.setRed((c >> 16 & 255) / 255f);
-            e.setGreen((c >> 8 & 255) / 255f);
-            e.setBlue((c & 255) / 255f);
+            // Biyom su sisi (çoğu biyomda neredeyse siyah lacivert) su rengine kaydırılır, kamera noktasının ışığıyla ölçeklenir:
+            // gündüz sığ su turkuaz-mavi ve okunur, gece ve mağarada karanlık kalır (SU-28).
+            ClientLevel l = Minecraft.getInstance().level;
+            var biyom = l.getBiome(e.getCamera().getBlockPosition()).value();
+            int sis = biyom.getWaterFogColor();
+            int su = biyom.getWaterColor();
+            float isik = l.getMaxLocalRawBrightness(e.getCamera().getBlockPosition()) / 15f;
+            float k = 0.25f + 0.75f * isik;
+            float r = ((sis >> 16 & 255) * 0.3f + (su >> 16 & 255) * 0.7f) / 255f * k;
+            float g = ((sis >> 8 & 255) * 0.3f + (su >> 8 & 255) * 0.7f) / 255f * k;
+            float b = ((sis & 255) * 0.3f + (su & 255) * 0.7f) / 255f * k;
+            e.setRed(r);
+            e.setGreen(g);
+            e.setBlue(b);
         }
     }
 }

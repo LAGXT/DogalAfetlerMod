@@ -98,7 +98,7 @@ public final class SuOtomasyon {
         }
         if (hepsi || BOLUM.contains("dalga")) {
             a.addAll(List.of("k:time set 10500", "k:dogalafet su vitrin kamera tepe", "b:200", "f:dalga-afetsiz",
-                    "s:sanal-su-dalga-once", "k:dogalafet su vitrin dalga 14", "b:110", "f:dalga-afet", "s:sanal-su-dalga",
+                    "s:sanal-su-dalga-once", "k:dogalafet su vitrin dalga 16", "b:110", "f:dalga-afet", "s:sanal-su-dalga",
                     "k:dogalafet su temizle", "b:40"));
         }
         if (hepsi || BOLUM.contains("magara")) {
