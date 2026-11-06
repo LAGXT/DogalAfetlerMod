@@ -58,11 +58,36 @@ public final class YanginMantigi {
     }
 
     /**
-     * Yakıtın yanma süresi (tick): vanilla {@code getFlammability} ne kadar yüksekse o kadar çabuk tükenir. Yaprak (60)
-     * ~6 sn, odun (5) ~13 sn, çimen (100) ~5 sn.
+     * Yakıtın yanma süresi (tick): vanilla {@code getFlammability} ne kadar yüksekse o kadar çabuk tükenir. Çimen (100)
+     * ~7 sn, yaprak (60) 9 sn, tahta (20) 15 sn, odun (5) ~22 sn.
      */
     public static int yanmaSuresiTick(int yanicilik) {
-        return (int) Math.round(60 + 4800.0 / (Math.max(0, yanicilik) + 20));
+        return (int) Math.round(60 + 9600.0 / (Math.max(0, yanicilik) + 20));
+    }
+
+    /** Yoğunluğun (0–1) yayılma olasılığı çarpanı: tasarım notu §6 seviye tablosu ×0,5…×1,8. */
+    public static double yayilmaCarpani(double yogunluk) {
+        return 0.5 + 1.3 * sinirla(yogunluk, 0, 1);
+    }
+
+    /** Rüzgâr altına kıvılcım sıçramasının en uzak mesafesi (blok); 2'nin altı sıçrama yok demektir (0). */
+    public static int sicramaMesafesi(double yogunluk) {
+        int mesafe = (int) Math.round(12.0 * sinirla(yogunluk, 0, 1));
+        return mesafe >= 2 ? mesafe : 0;
+    }
+
+    /** {@code alanTutustur}'da yüzey yakıtının tutuşma oranı: seviye 1'de de başlangıç alanı tutuşur. */
+    public static double alanOrani(double yogunluk) {
+        return 0.3 + 0.7 * sinirla(yogunluk, 0, 1);
+    }
+
+    /**
+     * Sıçrayan kıvılcımın yatay kayması: rüzgâr yönünden {@code sapmaDerece} sapan doğrultuda {@code mesafe} blok.
+     * Rüzgârsızken doğrultu yalnız sapmadır.
+     */
+    public static int[] sicramaKaymasi(double ruzgarX, double ruzgarZ, double sapmaDerece, int mesafe) {
+        double aci = (ruzgarX == 0 && ruzgarZ == 0 ? 0 : Math.atan2(ruzgarZ, ruzgarX)) + Math.toRadians(sapmaDerece);
+        return new int[] {(int) Math.round(Math.cos(aci) * mesafe), (int) Math.round(Math.sin(aci) * mesafe)};
     }
 
     /** Yağmur altındaki hücrenin bir işlenişte sönme olasılığı; yaşlı ateş daha kolay söner (vanilla 0,2 + yaş). */

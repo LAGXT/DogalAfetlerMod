@@ -62,7 +62,8 @@ class YanginMantigiTest {
         int odun = YanginMantigi.yanmaSuresiTick(5);
         int cimen = YanginMantigi.yanmaSuresiTick(100);
         assertTrue(cimen < yaprak && yaprak < odun, cimen + " < " + yaprak + " < " + odun);
-        assertEquals(120, yaprak);
+        assertEquals(180, yaprak);
+        assertEquals(444, odun);
     }
 
     @Test
@@ -104,5 +105,37 @@ class YanginMantigiTest {
         assertArrayEquals(YanginMantigi.gununRuzgari(7), YanginMantigi.gununRuzgari(7));
         double[] r = YanginMantigi.gununRuzgari(3);
         assertEquals(0.6, Math.hypot(r[0], r[1]), 1e-9);
+    }
+
+    @Test
+    void yogunlukSeviyeTablosunuVerir() {
+        assertEquals(0.5, YanginMantigi.yayilmaCarpani(0), 1e-9);
+        assertEquals(1.8, YanginMantigi.yayilmaCarpani(1), 1e-9);
+        assertEquals(1.8, YanginMantigi.yayilmaCarpani(3), 1e-9, "yoğunluk 0–1'e sıkıştırılır");
+        assertEquals(0, YanginMantigi.sicramaMesafesi(0));
+        assertEquals(2, YanginMantigi.sicramaMesafesi(0.2));
+        assertEquals(5, YanginMantigi.sicramaMesafesi(0.4));
+        assertEquals(8, YanginMantigi.sicramaMesafesi(0.7));
+        assertEquals(12, YanginMantigi.sicramaMesafesi(1));
+        assertEquals(0.3, YanginMantigi.alanOrani(0), 1e-9, "S1 başlangıç alanı da tutuşur");
+        assertEquals(1.0, YanginMantigi.alanOrani(1), 1e-9);
+    }
+
+    @Test
+    void sicramaRuzgarAltinaDuser() {
+        assertArrayEquals(new int[] {5, 0}, YanginMantigi.sicramaKaymasi(0.6, 0, 0, 5));
+        assertArrayEquals(new int[] {0, 8}, YanginMantigi.sicramaKaymasi(0, 0.6, 0, 8));
+        int[] sapan = YanginMantigi.sicramaKaymasi(0.6, 0, 20, 12);
+        assertEquals(11, sapan[0]);
+        assertEquals(4, sapan[1]);
+        assertArrayEquals(new int[] {3, 0}, YanginMantigi.sicramaKaymasi(0, 0, 0, 3), "rüzgârsızken doğrultu yalnız sapma");
+    }
+
+    @Test
+    void yogunlukOlasiligiCarpar() {
+        double s1 = YanginMantigi.tutusmaOlasiligi(30, YanginMantigi.yayilmaCarpani(0), 1, 1, 1);
+        double s5 = YanginMantigi.tutusmaOlasiligi(30, YanginMantigi.yayilmaCarpani(1), 1, 1, 1);
+        assertEquals(0.15, s1, 1e-9);
+        assertEquals(0.54, s5, 1e-9);
     }
 }

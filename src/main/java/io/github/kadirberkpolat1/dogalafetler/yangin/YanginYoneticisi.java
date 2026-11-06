@@ -45,7 +45,9 @@ import net.minecraftforge.server.ServerLifecycleHooks;
 public final class YanginYoneticisi {
     /** Bir hücre en sık bu aralıkla işlenir (yayılma denemesi, sönme, bitiş). */
     static final int ISLEME_ARALIGI = 10;
-    private static final int YAYILMA_DENEMESI = 2;
+    private static final int YAYILMA_DENEMESI = 3;
+    private static final double SICRAMA_OLASILIGI = 0.04;
+    private static final double SICRAMA_SAPMASI = 20;
     private static final int OZET_ARALIGI = 10;
     private static final int ISI_ARALIGI = 20;
     private static final int YANMIS_HAFIZA_TICK = 2400;
@@ -55,7 +57,7 @@ public final class YanginYoneticisi {
     private static final int OZET_HUCRE_TAVANI = 48;
     private static final int BUHAR_TAVANI = 32;
     private static final double OYUNCUSUZ_MESAFE_KARE = 1.0e6;
-    private static final int EN_BUYUK_ALAN_YARICAPI = 16;
+    private static final int EN_BUYUK_ALAN_YARICAPI = 24;
 
     private static final Map<ResourceKey<Level>, YanginVerisi> VERILER = new ConcurrentHashMap<>();
     private static volatile DoubleSupplier kismaKaynagi = TpsOlcer::kismaCarpani;
@@ -75,7 +77,7 @@ public final class YanginYoneticisi {
         if (hucreEkle(level, veri, konum, kaynak, yogunluk)) {
             return 1;
         }
-        if (!level.getBlockState(konum).isAir()) {
+        if (!havaMi(level, konum)) {
             return 0;
         }
         int sayi = 0;
@@ -96,12 +98,13 @@ public final class YanginYoneticisi {
         BlockPos.MutableBlockPos kom = new BlockPos.MutableBlockPos();
         int sayi = 0;
         for (BlockPos p : BlockPos.betweenClosed(merkez.offset(-r, -r, -r), merkez.offset(r, r, r))) {
-            if (p.distSqr(merkez) > (double) r * r + 0.5 || veri.rastgele.nextDouble() >= yogunluk) {
+            if (p.distSqr(merkez) > (double) r * r + 0.5 || !level.isLoaded(p)
+                    || veri.rastgele.nextDouble() >= YanginMantigi.alanOrani(yogunluk)) {
                 continue;
             }
             boolean yuzey = false;
             for (Direction yon : Direction.values()) {
-                if (level.getBlockState(kom.setWithOffset(p, yon)).isAir()) {
+                if (havaMi(level, kom.setWithOffset(p, yon))) {
                     yuzey = true;
                     break;
                 }
@@ -303,6 +306,11 @@ public final class YanginYoneticisi {
             kaldir(level, veri, h);
             return;
         }
+        if (h.atesVar && !atesYerinde(level, h)) {
+            h.atesVar = false;
+            kaldir(level, veri, h);
+            return;
+        }
         if (hasar && !h.atesVar) {
             atesYak(level, h, konum);
         } else if (!hasar && h.atesVar) {
@@ -335,7 +343,7 @@ public final class YanginYoneticisi {
             double[] ruzgar) {
         RandomSource r = veri.rastgele;
         int yaricap = YanginMantigi.kivilcimYaricapi(h.yogunluk);
-        double hiz = YanginAyarlari.yayilmaHizCarpani();
+        double hiz = YanginAyarlari.yayilmaHizCarpani() * YanginMantigi.yayilmaCarpani(h.yogunluk);
         for (int deneme = 0; deneme < YAYILMA_DENEMESI; deneme++) {
             int dx = r.nextInt(2 * yaricap + 1) - yaricap;
             int dy = r.nextInt(4) - 1;
@@ -356,8 +364,37 @@ public final class YanginYoneticisi {
                     YanginMantigi.ruzgarKatsayisi(ruzgar[0], ruzgar[1], dx, dz), YanginMantigi.egimKatsayisi(dy),
                     YanginMantigi.nemKatsayisi(nem));
             if (r.nextDouble() < olasilik) {
-                hucreEkle(level, veri, hedef, h.kaynak, Math.max(0.2, h.yogunluk * 0.97));
+                hucreEkle(level, veri, hedef, h.kaynak, h.yogunluk);
             }
+        }
+        int enUzak = YanginMantigi.sicramaMesafesi(h.yogunluk);
+        if (enUzak >= 2 && r.nextDouble() < SICRAMA_OLASILIGI) {
+            sicra(level, veri, h, konum, enUzak, hiz, ruzgar);
+        }
+    }
+
+    /** Rüzgâr altına sıçrayan kıvılcım: iniş sütununun en üst bloğu yanıcıysa rüzgârsız olasılıkla tutuşur. */
+    private static void sicra(ServerLevel level, YanginVerisi veri, YanginHucresi h, BlockPos konum, int enUzak, double hiz,
+            double[] ruzgar) {
+        RandomSource r = veri.rastgele;
+        int[] kayma = YanginMantigi.sicramaKaymasi(ruzgar[0], ruzgar[1], (r.nextDouble() * 2 - 1) * SICRAMA_SAPMASI,
+                2 + r.nextInt(enUzak - 1));
+        BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos(konum.getX() + kayma[0], konum.getY() + 3,
+                konum.getZ() + kayma[1]);
+        if (!level.isLoaded(p)) {
+            return;
+        }
+        for (int i = 0; i < 10; i++, p.move(Direction.DOWN)) {
+            BlockState durum = level.getBlockState(p);
+            if (durum.isAir() || durum.is(YanginKayitlari.AFET_ATESI.get())) {
+                continue;
+            }
+            double nem = level.isRainingAt(p.above()) ? 1.0 : 0.0;
+            if (!veri.hucreler.containsKey(p.asLong()) && r.nextDouble() < YanginMantigi.tutusmaOlasiligi(
+                    durum.getFireSpreadSpeed(level, p, Direction.UP), hiz, 1, 1, YanginMantigi.nemKatsayisi(nem))) {
+                hucreEkle(level, veri, p.immutable(), h.kaynak, h.yogunluk);
+            }
+            return;
         }
     }
 
@@ -416,7 +453,7 @@ public final class YanginYoneticisi {
     private static void atesYak(ServerLevel level, YanginHucresi h, BlockPos konum) {
         for (Direction yon : ATES_YONLERI) {
             BlockPos kom = konum.relative(yon);
-            if (level.getBlockState(kom).isAir()) {
+            if (havaMi(level, kom)) {
                 level.setBlock(kom, YanginKayitlari.AFET_ATESI.get().defaultBlockState(), 3);
                 h.atesKonumu = kom.asLong();
                 h.atesVar = true;
@@ -437,6 +474,16 @@ public final class YanginYoneticisi {
         if (level.isLoaded(p) && level.getBlockState(p).is(YanginKayitlari.AFET_ATESI.get())) {
             level.removeBlock(p, false);
         }
+    }
+
+    /** Ateş bloğu yerinde mi; o konum yüklü değilse yerinde sayılır (chunk zorla yüklenmez). */
+    private static boolean atesYerinde(ServerLevel level, YanginHucresi h) {
+        BlockPos p = BlockPos.of(h.atesKonumu);
+        return !level.isLoaded(p) || level.getBlockState(p).is(YanginKayitlari.AFET_ATESI.get());
+    }
+
+    private static boolean havaMi(ServerLevel level, BlockPos p) {
+        return level.isLoaded(p) && level.getBlockState(p).isAir();
     }
 
     private static void kaldir(ServerLevel level, YanginVerisi veri, YanginHucresi h) {

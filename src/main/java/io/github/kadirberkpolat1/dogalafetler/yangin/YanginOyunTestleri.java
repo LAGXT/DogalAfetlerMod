@@ -28,6 +28,8 @@ import net.minecraftforge.gametest.PrefixGameTestTemplate;
 @PrefixGameTestTemplate(false)
 public final class YanginOyunTestleri {
     private static final String SAHNE = "yangin_sahne";
+    /** Sıçrama eşiğinin altında (kıvılcım komşu test alanlarına düşmez); yerel yayılma sürer. */
+    private static final double DUSUK = 0.1;
 
     private YanginOyunTestleri() {
     }
@@ -77,15 +79,57 @@ public final class YanginOyunTestleri {
         y.setBlock(tas, Blocks.STONE);
         y.setBlock(yaprak, kaliciYaprak());
         y.assertTrue(Blocks.STONE.defaultBlockState().is(YanginEtiketleri.YANMAZ), "taş dogalafetler:yanmaz etiketinde");
-        y.assertTrue(YanginYoneticisi.tutustur(level, y.absolutePos(tas), YanginKaynagi.KOMUT, 1.0) == 0,
+        y.assertTrue(YanginYoneticisi.tutustur(level, y.absolutePos(tas), YanginKaynagi.KOMUT, DUSUK) == 0,
                 "yanmaz taş tutuşmamalı");
-        y.assertTrue(YanginYoneticisi.tutustur(level, y.absolutePos(yaprak), YanginKaynagi.KOMUT, 1.0) == 1,
+        y.assertTrue(YanginYoneticisi.tutustur(level, y.absolutePos(yaprak), YanginKaynagi.KOMUT, DUSUK) == 1,
                 "yaprak tutuşmalı");
         y.assertBlockPresent(YanginKayitlari.AFET_ATESI.get(), yaprak.above());
         y.succeedWhen(() -> {
             y.assertBlockPresent(Blocks.AIR, yaprak);
             y.assertBlockPresent(Blocks.STONE, tas);
             y.assertTrue(aktif(y) == 0 && atesSayisi(y) == 0, "yangın bitmeli, ateş bloğu kalmamalı");
+        });
+    }
+
+    /** Oyun içinde yayılma: yoğun yaprak kümesinin tepesindeki tek hücre kümeye yayılır (sıçrama eşiğinin altında). */
+    @GameTest(template = SAHNE, batch = "yangin_yayilma", timeoutTicks = 240)
+    public static void yaprakKumesindeYayilir(GameTestHelper y) {
+        ServerLevel level = y.getLevel();
+        for (BlockPos p : BlockPos.betweenClosed(new BlockPos(1, 1, 1), new BlockPos(7, 3, 7))) {
+            y.setBlock(p, kaliciYaprak());
+        }
+        y.assertTrue(YanginYoneticisi.tutustur(level, y.absolutePos(new BlockPos(4, 3, 4)), YanginKaynagi.KOMUT,
+                DUSUK) == 1, "kümenin tepesi tutuşmalı");
+        long baslangic = level.getGameTime();
+        y.succeedWhen(() -> {
+            int etkilenen = 0;
+            for (BlockPos p : BlockPos.betweenClosed(new BlockPos(1, 1, 1), new BlockPos(7, 3, 7))) {
+                if (!y.getBlockState(p).is(Blocks.OAK_LEAVES)
+                        || YanginYoneticisi.veri(level).hucreler.containsKey(y.absolutePos(p).asLong())) {
+                    etkilenen++;
+                }
+            }
+            y.assertTrue(etkilenen >= 12, "yaprak kümesinde yayılmalı: " + etkilenen);
+            DogalAfetler.LOGGER.info("yayılma deneyi: {} tick'te {} yaprak tutuştu ya da yandı",
+                    level.getGameTime() - baslangic, etkilenen);
+            YanginYoneticisi.sondur(level, genisAlan(y));
+        });
+    }
+
+    /** Y-12: ateş bloğu dışarıdan kalkarsa (oyuncu vurdu, su sildi) hücre söner, yakıt yerinde kalır. */
+    @GameTest(template = SAHNE, batch = "yangin_genel", timeoutTicks = 60)
+    public static void atesBloguKalkincaHucreSoner(GameTestHelper y) {
+        ServerLevel level = y.getLevel();
+        BlockPos yaprak = new BlockPos(4, 1, 4);
+        y.setBlock(yaprak, kaliciYaprak());
+        y.assertTrue(YanginYoneticisi.tutustur(level, y.absolutePos(yaprak), YanginKaynagi.KOMUT, DUSUK) == 1,
+                "yaprak tutuşmalı");
+        y.assertBlockPresent(YanginKayitlari.AFET_ATESI.get(), yaprak.above());
+        y.setBlock(yaprak.above(), Blocks.AIR);
+        y.succeedWhen(() -> {
+            y.assertTrue(aktif(y) == 0, "ateş bloğu kalkınca hücre sönmeli");
+            y.assertBlockPresent(Blocks.OAK_LEAVES, yaprak);
+            y.assertTrue(atesSayisi(y) == 0, "yeni ateş bloğu konmamalı");
         });
     }
 
@@ -106,7 +150,7 @@ public final class YanginOyunTestleri {
             y.runAfterDelay(300, () -> {
                 kural.set(onceki, level.getServer());
                 int son = ozet(y);
-                YanginYoneticisi.sondur(level, alan(y));
+                YanginYoneticisi.sondur(level, genisAlan(y));
                 y.assertTrue(tutusan > 0 && aktif > 0, "blok hasarı kapalıyken de yangın (veri/görsel) sürmeli: "
                         + tutusan + "/" + aktif);
                 y.assertTrue(ozet == ilk && son == ilk, "blok hasarı kapalıyken blok hash'i değişmemeli");
@@ -126,7 +170,7 @@ public final class YanginOyunTestleri {
         });
         BlockPos kutuk = new BlockPos(4, 1, 4);
         y.setBlock(kutuk, Blocks.OAK_LOG);
-        y.assertTrue(YanginYoneticisi.tutustur(level, y.absolutePos(kutuk), YanginKaynagi.KOMUT, 1.0) == 1,
+        y.assertTrue(YanginYoneticisi.tutustur(level, y.absolutePos(kutuk), YanginKaynagi.KOMUT, DUSUK) == 1,
                 "kütük tutuşmalı");
         y.succeedWhen(() -> {
             y.assertTrue(aktif(y) == 0, "yağmurda ateş sönmeli");
@@ -207,6 +251,11 @@ public final class YanginOyunTestleri {
 
     private static AABB alan(GameTestHelper y) {
         return new AABB(y.absolutePos(BlockPos.ZERO), y.absolutePos(new BlockPos(8, 7, 8))).inflate(1.0);
+    }
+
+    /** Batch'inde tek başına duran testlerin temizliği: sıçramayla sahne dışına düşen hücreler de söner. */
+    private static AABB genisAlan(GameTestHelper y) {
+        return alan(y).inflate(14.0);
     }
 
     private static int aktif(GameTestHelper y) {
