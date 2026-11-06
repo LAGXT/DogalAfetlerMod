@@ -2948,6 +2948,40 @@ koyar (şef kararı, 2026-11-06).** Üç Faz 4 işçisi (deprem-sinkhole, asit-o
 
 Kanıt `.vibe/kanit/k-e22/` (`ozet.txt`).
 
+**K-E23 Çekirdek senaryosu taklidi gerçek afetin yerine geçirir (`!tür`); ağır süreç kapısı zaman aşımında görevi
+başlatmaz (şef kararı, 2026-11-06).** (a) **Sorun:** K-E22'den sonra gerçek `gunes_patlamasi` kayıtlıyken
+`-PoyunTestiAfeti=deprem,gunes_patlamasi` bayrağı güneş türünü atlar; `cekirdek_sunucu.py` K-C41 bloğu taklidin üç
+`asama ileri`'de biten AKTİF'ine ve `oyuntesti_gunes` sürecine dayanıyordu (güneş §E c; gerçek afet 5 günlük AKTİF,
+`gunes_zinciri`). Deprem adımları da deprem birleşince gerçek depremi (blok hasarı, süre, geri yükleme) açardı. **Karar:**
+`!` önekli tür (`-PoyunTestiAfeti=!deprem,!gunes_patlamasi`) gerçek afeti kayıtlıysa onun fabrikasını oyun testi afetiyle
+değiştirir (`AfetKaydi.oyunTestiEz`, paket içi; yalnız `ozelliktenKaydet`), kayıtsızsa düz kayıt gibi davranır; log "Oyun testi
+afeti <tür> gerçek afetin yerine kaydedildi (…, K-E23)". Güneş türü taklit olunca `OyunTestiSureci` kaydedilir ve
+`GunesZinciriSureci`'nin mevcut koruması zinciri kaydetmez (K-C41 süreci tek). Saf seçim `OyunTestiAfetSecimi` (`ezilecek` listesi;
+JUnit `unlemliTurGercekKaydinYerineGecer`). `cekirdek_sunucu.py` kendi `Sunucu`'sunu `!deprem,!gunes_patlamasi` ile açar ve iki
+açılışta iki taklit satırını ister (yoksa "mod K-E23'ten eski" hatası); `start kasirga 3` kasırga kayıtsızsa "not registered
+yet", kayıtlıysa başlat + `stop`. Ortak `Sunucu`'nun varsayılan bayrağı (`deprem,gunes_patlamasi`, diğer betikler) değişmedi.
+**Reddedilen:** blokta 7 `asama ileri` + `gunes_zinciri` (çekirdek senaryosu güneş afetinin süresine ve donma/buharılaşma
+yan etkilerine bağlanır, deprem adımları yine gerçek depreme düşer); K-C41 bloğunu `gunes_patlamasi_sunucu.py`'ye devretmek
+(çekirdek kendi sözleşmesini sınamaz, başka parçanın betiklerine bağlanır); kalıcı `oyun_testi` `AfetTuru` (üretim yüzeyine
+test türü sızar: N18 adları, tab tamamlama, zamanlayıcı, gamerule haritası, dil, başarım sayımları; ayrıca K-C41 tam da
+`gunes_patlamasi` türünü, onun gamerule'ünü ve ona bağlı dönem süreçlerini ister, sentetik türle sınanamaz). Aynı bayrağa
+dayanan diğer betikler (`esya_sunucu.py`, `uyari_istemci.py`, `uyari_sunucu.py`, `basarim_sunucu.py`, `basarim_gorsel.py`,
+`radar_gorsel.py`) Faz 4 birleştirme turunda `!tür`'e geçer ya da gerçek afete uyarlanır (`.vibe/rapor/entegrasyon-4.md` §3.6).
+(b) **Kapı zaman aşımı (doğrulayıcı-2):** `gradle_kapisi.sh` 20 dk dolunca kapı açılmasa da görevi başlatıyordu (GOREV §2,
+K-E19 a tavanını sessizce deliyordu); artık görev başlatılmaz, log'a ve çıktıya `KAPI: açılmadı (N dk)`, çıkış 3
+(`agir_surec_kapisi` ile aynı); `KAPI_DK` üst sınırı (varsayılan 20), `TEST_FILTRE`/`KAPI_PORT` davranışı aynı. Kanıt
+(`.vibe/kanit/k-e23/`): `build --rerun-tasks` 0, `warning:` 0, JUnit 482/0; main'de `cekirdek_sunucu.py --port 25611` 0 (iki taklit
+satırı "için kaydedildi", kasırga "not registered yet"); güneş dalı `84b2faf` + `26acbfd` geçici birleşiminde (`.worktrees/k-e23-gunes`, dal dosyalarına yazılmadı) `cekirdek_sunucu.py --port 25612` 0 (`cekirdek-gunes/kosu1.log`:56 "gunes_patlamasi gerçek afetin yerine kaydedildi", :390 `Solar Flare phase: Ending`, :455-499 `oyuntesti_gunes` zinciri; doğrulayıcı-2'nin K-E23 öncesi düşüşü `gunes-patlamasi-dogrulama/sunucu-cekirdek/kosu1.log`:328-329 kapandı). Değişmemiş güneş worktree'sinde main betiği koşmaz: `!` desteği modun Java tarafındadır, dal `main`'i (`26acbfd`) alınca geçer; kapı dolu portla `KAPI_DK=1` → 60 sn'de
+`KAPI: açılmadı (1 dk)`, çıkış 3, Gradle başlamadı (`kapi-zaman-asimi.*`).
+
+**K-E24 Döngülü ortam ses katmanı −26…−30 LUFS (şef kararı, 2026-11-06).** Döngülü ortam katmanları (afet süresince çalan
+uğultu, rüzgâr, çıtırtı) için hedef −26…−30 LUFS (±1) bandıdır; bu bir izindir, zorunluluk değildir (−26 da geçerli). Tek atımlı
+sesler ve sirenler −26 ± 1 LUFS'te kalır (`docs/tasarim/ses.md` §4 değişmez). Gerekçe: ay çarpmasının döngülü sesleri
+(`ay_carpmasi_yaklasma`, `ay_carpmasi_citirti`; AY-07) −30 LUFS'te uzun süre kulağı yormuyor, siren ve çarpma gibi tek atımlı
+olayların önünde kalıyor; şef 2026-11-06'da kabul etti. AY-07'nin "−26'da tepe sınırı aşılıyordu" gerekçesi ölçümle çelişir
+(+4 dB ile −7,6 / −7,4 dBTP, sınır içinde); ay birleştirmesinde gerekçe "tasarım tercihi, K-E24" olarak düzeltilir
+(inceleme-ay-carpmasi P2).
+
 ### Yiyecek
 
 **F-17 Kutup Balığı Çorbası koşullu tarif (şef kararı, inceleme Yi1).** Tarif ve tarif kitabı başarımı Forge'un üst düzey
