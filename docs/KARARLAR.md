@@ -2919,6 +2919,35 @@ aşımıyla beklenmez. **Reddedilen:** `timeoutTicks`'i büyütmek (oran yine y�
 sahnesi bozulur); GameTest sunucusuna tick sınırı mixin'i (üretim jar'ına test yaması, bütün koşular yavaşlar); üretim kodunu
 değiştirmek (bekleme vanilla üretimde); yeniden koşup geçeni kabul etmek (olasılık yükle artar).
 
+**K-E22 Faz 4 engelleri: test afeti gerçek kaydı ezmez, başarım testleri geçici kayıtsızlık kullanır, balıkçılık dönemi geri
+koyar (şef kararı, 2026-11-06).** Üç Faz 4 işçisi (deprem-sinkhole, asit-orman-yangını, tsunami) aynı üç engele çarptı.
+
+- **(a) Kayıt sırası:** `-PoyunTestiAfeti=deprem[,sinkhole]` kurucuda gerçek `AfetKaydi.kaydet(DEPREM)`'den önce koşuyordu; gerçek
+  kayıt "deprem zaten kayıtlı" `IllegalStateException` atıyor, mod yüklenmiyordu (`cekirdek_sunucu.py`, `esya_sunucu.py`,
+  `uyari_istemci.py`, `uyari_sunucu.py`, `basarim_sunucu.py`, `radar_gorsel.py` bayrağı taşır). Karar: **gerçek kayıt önce**.
+  `DogalAfetler` kurucusunda afet kayıtları (Faz 4 satırları) `OyunTestiAfeti.ozelliktenKaydet()`'in üstüne yazılır (yorum
+  satırı yeri gösterir). `ozelliktenKaydet` gerçek afeti kayıtlı türü `WARN` ile atlar ("Oyun testi afeti deprem atlandı …
+  gerçek afet kayıtlı (K-E22)"); güneş türü atlanırsa `OyunTestiSureci` de kaydedilmez, gerçek `GunesZinciriSureci` kalır.
+  Saf seçim `core.mantik.OyunTestiAfetSecimi` (JUnit `OyunTestiAfetSecimiTest`, 3). Sıra yine ters yazılırsa (gerçek kayıt
+  `ozelliktenKaydet`'ten sonra) `AfetKaydi.kaydet` hatası nedenini ve K-E22'yi söyler. Betiklere dokunulmadı: Faz 4 sonunda
+  bayrak etkisiz kalır (yalnız uyarı); Faz 5 temizliğinde betiklerden kaldırılır ya da kayıtsız türle değiştirilir.
+- **(b) Başarım testleri ve kayıtlı yayıncı:** `olaysizAfetteYedekTahminSayilir` ve
+  `olaysizAfetteYedekKayitliYayincidaYedekKapali` SINKHOLE/ASIT_YAGMURU/ORMAN_YANGINI/TSUNAMI'yi "kayıtsız yayıncı" örneği
+  sayıyordu; Faz 4 kuralı `yayinciKaydet` zorunlu olduğundan dört işçinin dalında da kırılırdı. Karar:
+  `BasarimIpucuEvent.geciciKayitsiz(tur, ipucu)` (AutoCloseable; `IpucuKaynaklari.kaldir` artık önceki kaydı döndürür, `close`
+  kayıtlıysa geri koyar; yalnız GameTest/otomasyon, javadoc'ta). İki test bununla sarıldı; JUnit
+  `IpucuKaynaklariTest.kaldirVeGeriKoyOncekiKaydiKorur`. Başarım §A.3'e not düşüldü.
+- **(c) Balıkçılık dönem hijyeni:** `BalikcilikOyunTestleri.donma()` global donmayı 50/60'ta bırakıyordu (Faz 3 açık noktası);
+  `YanginOyunTestleri.afetAtesiKendiBasinaYayilmaz` komşu sahneye kar girince 25 ≠ 27 ile düşüyordu (`main`'de yerleşim
+  sayesinde işlenmiyordu, Faz 4 yerleşimi kayınca düşer). Karar (K-E15 b): balıkçılığın altı batch'i `@BeforeBatch` ile
+  global dönemi (donma, çözülme, güneş evresi ve ilerlemesi) saklar, `@AfterBatch` ile geri koyar. Test başına geri koyma
+  reddedildi: aynı batch'in testleri eşzamanlı koşar, kısa test süren kardeşinin donmasını erken sıfırlardı. Forge
+  `@GameTestHolder` sınıfının bütün metotlarını `GameTestRegistry.register(Method)`'a verir, o da `BeforeBatch`/`AfterBatch`'i
+  batch adıyla kaydeder (`javap`; K-E20 filtresi batch işlevlerini korur). Yangın testine dokunulmadı. "Koşu sonunda G = 0"
+  bekçisi yazılmadı: GameTest batch sırası son koşan testi garanti etmez.
+
+Kanıt `.vibe/kanit/k-e22/` (`ozet.txt`).
+
 ### Yiyecek
 
 **F-17 Kutup Balığı Çorbası koşullu tarif (şef kararı, inceleme Yi1).** Tarif ve tarif kitabı başarımı Forge'un üst düzey
@@ -3076,8 +3105,8 @@ birleşmiş beş worktree kaldırıldı (`.vibe/diff/<parça>.patch` kalır). A�
   açılmış delik eski buza döner (bilinen sınır). Donmaya `hedefDonmusMu` sorgusu önerisi (balıkçılık §E) Faz 5.
 - **Cold Sweat (S-18, F-18):** Cold Sweat yüklüyken yiyecekler (balıklar dahil) yalnız yemek değeri verir; yiyecek etkisinin Cold
   Sweat vücut sıcaklığına köprüsü Faz 5'te S-18 reçetesiyle araştırılır; README "bilinen sınırlar".
-- **GameTest hijyeni:** balıkçılık testleri global donmayı 50/60'ta bırakıyor (`BalikcilikOyunTestleri.donma()`); mutlak ortam ölçen
-  testler kendi dönemini kurar (K-E15 b). Öneri: `donma()` test sonunda eski değeri geri koysun.
+- **GameTest hijyeni:** balıkçılık testleri global donmayı 50/60'ta bırakıyordu (`BalikcilikOyunTestleri.donma()`); K-E22 (c)
+  ile kapandı (batch başında saklanır, sonunda geri konur).
 - **Faz 4 görev metinlerine girecek kurallar:** her batch en çok 7 test (K-E16; bekçi `hicBirBatchSatirKirmaz`); dedicated
   senaryolar `cekirdek_sunucu.argumanlar` / `agir_surec_kapisi` ile `--port` / `--kanit` alır (K-E13); tsunami, sinkhole, orman
   yangını ve asit yağmuru mod kurucusunda `BasarimIpucuEvent.yayinciKaydet`, koşulda `BasarimIpucuEvent` yayınlar (başarım §A.3,
