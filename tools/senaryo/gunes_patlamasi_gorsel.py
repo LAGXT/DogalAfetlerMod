@@ -195,7 +195,7 @@ def kosu(no):
     # runclient_kilit.py çıktısı istemci log'una gider; kilit satırları protokole kopyalanır.
     if istemci_log.exists():
         for satir in istemci_log.read_text(errors="replace").splitlines():
-            if "kilit" in satir.lower() and "[" not in satir[:3]:
+            if satir.startswith(("runClient kilidi", "kilit ", "kos: ")):
                 log("kilit:", satir.strip())
     latest = W / "run/logs/latest.log"
     if latest.exists():
