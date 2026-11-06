@@ -41,7 +41,7 @@ public final class IstemciOrmanYangini {
     private static final float[] DUMAN = {0x7A / 255f, 0x52 / 255f, 0x36 / 255f};
     private static final double[] VANILLA_AYAR_CARPANI = {1.0, 0.5, 0.2};
     /** Kül parçacığı/tick: Düşük, Orta, Yüksek, Ultra. */
-    private static final int[] KUL = {2, 4, 8, 14};
+    private static final int[] KUL = {1, 4, 8, 14};
     private static final double KUL_MENZILI = 14;
 
     private static int[] kareler = new int[0];

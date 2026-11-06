@@ -2,6 +2,9 @@ package io.github.kadirberkpolat1.dogalafetler.client.asit_yagmuru;
 
 import com.mojang.datafixers.util.Pair;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.config.AyarKaydi;
+import io.github.kadirberkpolat1.dogalafetler.config.EfektKalitesi;
+import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.Afet;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
@@ -30,18 +33,23 @@ import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.InputEvent;
+import net.minecraftforge.common.ForgeConfigSpec;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.config.ConfigTracker;
+import net.minecraftforge.fml.config.ModConfig;
 
 /**
  * Görsel kanıt otomasyonu (K0-21 rev. 2). Yalnız {@code -Ddogalafetler.otomasyon=asit_orman} ile tek oyunculu dünyada
  * çalışır; üretimde etkisizdir. Yaratıcı kipte uçan kamera en yakın ormanın tepesinde: asit yağmuru S1 aktif karesi, sonra S5
- * ile ön-uyarı (elde Hava Radarı, arayüz açık), siren, aktif, vitrin (yoğun yağış, aşınan yapraklar) ve bitiş kareleri; ardından
- * alacakaranlıkta orman yangını S1 ve S5 aynı dizide, kamera yangın merkezinin 34 blok rüzgâr üstünde, 10 blok yukarıda.
+ * ile ön-uyarı (elde Hava Radarı, arayüz açık), siren, aktif, vitrin (yoğun yağış, aşınan yapraklar) ve bitiş kareleri; asit
+ * kamerası iki seviyede aynı yerde durur. Ardından alacakaranlıkta orman yangını S1 ve S5 aynı dizide, kamera yangın merkezinin
+ * 34 blok rüzgâr üstünde, 10 blok yukarıda; orman S5 vitrininden sonra efekt kalitesi Düşük, Yüksek ve Ultra'ya zorlanır
+ * (istemci config değeri, koşu sonunda geri konur), afet durunca aynı kamerada afetsiz taban ölçülür.
  * Ön-uyarı penceresi {@code hiz 20} ile kısaltılır, radar karesinden önce hız 1'e döner. Her ölçüm satırı TPS'i, her kare
- * FPS'i ve parçacık sayısını yazar. Klavye, fare ve tekerlek girdileri kapanışa kadar sayılır; kare istenen tick'te değil
- * sonraki çizilmiş karenin sonunda alınır (gizli workspace ~1 FPS).
+ * FPS'i, parçacık sayısını ve kamerayı yazar. Klavye, fare ve tekerlek girdileri kapanışa kadar sayılır; kare istenen tick'te
+ * değil sonraki çizilmiş karenin sonunda alınır (gizli workspace ~1 FPS).
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class AsitOrmanOtomasyonu {
@@ -63,23 +71,28 @@ public final class AsitOrmanOtomasyonu {
     private static String istenenKare;
     private static volatile boolean hazir;
     private static volatile boolean onUyari;
+    private static EfektKalitesi ilkKalite;
 
     static {
         ADIMLAR.add(bekle(100));
         ADIMLAR.add(sunucu(AsitOrmanOtomasyonu::hazirla));
         ADIMLAR.add(bekle(240));
         ADIMLAR.add(arayuz(false));
-        dizi(AfetTuru.ASIT_YAGMURU, "asit", 300, 300, 400, 60, s -> {
+        dizi(AfetTuru.ASIT_YAGMURU, "asit", 300, 300, 400, 60, false, s -> {
         });
         ADIMLAR.add(sunucu(s -> komut(s, "time set 13000")));
-        dizi(AfetTuru.ORMAN_YANGINI, "orman", 400, 120, 400, 500, AsitOrmanOtomasyonu::ormanKamera);
+        dizi(AfetTuru.ORMAN_YANGINI, "orman", 400, 120, 400, 500, true, AsitOrmanOtomasyonu::ormanKamera);
+        ADIMLAR.add(kalite(null));
     }
 
     private AsitOrmanOtomasyonu() {
     }
 
-    /** S1 aktif karesi, sonra S5'in ön-uyarı, siren, aktif, vitrin ve bitiş kareleri. */
-    private static void dizi(AfetTuru tur, String ad, int s1, int aktif, int vitrin, int bitis,
+    /**
+     * S1 aktif karesi, sonra S5'in ön-uyarı, siren, aktif, vitrin ve bitiş kareleri; {@code kademeler} ise vitrinden sonra
+     * Düşük/Yüksek/Ultra kareleri ve durduktan sonra afetsiz taban.
+     */
+    private static void dizi(AfetTuru tur, String ad, int s1, int aktif, int vitrin, int bitis, boolean kademeler,
             Consumer<IntegratedServer> kamera) {
         ADIMLAR.add(sunucu(s -> baslat(s, tur, 1)));
         ADIMLAR.add(sunucu(kamera));
@@ -107,11 +120,26 @@ public final class AsitOrmanOtomasyonu {
         ADIMLAR.add(bekle(vitrin));
         ADIMLAR.add(sunucu(s -> olcum(s, ad + "_vitrin")));
         ADIMLAR.add(kare(ad + "_vitrin"));
+        if (kademeler) {
+            for (EfektKalitesi k : new EfektKalitesi[] {EfektKalitesi.DUSUK, EfektKalitesi.YUKSEK, EfektKalitesi.ULTRA}) {
+                String e = ad + "_s5_" + k.name().toLowerCase(Locale.ROOT);
+                ADIMLAR.add(kalite(k));
+                ADIMLAR.add(bekle(200));
+                ADIMLAR.add(sunucu(s -> olcum(s, e)));
+                ADIMLAR.add(kare(e));
+            }
+            ADIMLAR.add(kalite(null));
+        }
         ADIMLAR.add(sunucu(AsitOrmanOtomasyonu::ileri));
         ADIMLAR.add(bekle(bitis));
         ADIMLAR.add(sunucu(s -> olcum(s, ad + "_bitis")));
         ADIMLAR.add(kare(ad + "_bitis"));
         ADIMLAR.add(sunucu(AsitOrmanOtomasyonu::dur));
+        if (kademeler) {
+            ADIMLAR.add(bekle(200));
+            ADIMLAR.add(sunucu(s -> olcum(s, ad + "_taban")));
+            ADIMLAR.add(kare(ad + "_taban"));
+        }
     }
 
     private static Adim bekle(int tick) {
@@ -123,6 +151,27 @@ public final class AsitOrmanOtomasyonu {
             mc.options.hideGui = !acik;
             return true;
         };
+    }
+
+    /** Efekt kalitesini istemci config değeriyle zorlar ({@code null}: koşu başındaki değer); eski parçacıklar silinir. */
+    private static Adim kalite(EfektKalitesi kalite) {
+        return (mc, s, t) -> {
+            ForgeConfigSpec.EnumValue<EfektKalitesi> deger = kaliteDegeri();
+            if (ilkKalite == null) {
+                ilkKalite = deger.get();
+            }
+            deger.set(kalite == null ? ilkKalite : kalite);
+            mc.particleEngine.setLevel(mc.level);
+            DogalAfetler.LOGGER.info(ON + "kalite {} (parçacıklar silindi)", deger.get());
+            return true;
+        };
+    }
+
+    @SuppressWarnings("unchecked")
+    private static ForgeConfigSpec.EnumValue<EfektKalitesi> kaliteDegeri() {
+        ModConfig config = ConfigTracker.INSTANCE.fileMap().get(AyarKaydi.ISTEMCI_DOSYASI);
+        return (ForgeConfigSpec.EnumValue<EfektKalitesi>) ((ForgeConfigSpec) config.getSpec()).getValues()
+                .get("gorsel.efektKalitesi");
     }
 
     /** Sunucu thread'inde bir iş; bitince sıradaki adım. */
@@ -225,8 +274,11 @@ public final class AsitOrmanOtomasyonu {
         istenenKare = null;
         Screenshot.grab(mc.gameDirectory, dosya, mc.getMainRenderTarget(), mesaj -> {
         });
-        DogalAfetler.LOGGER.info(ON + "kare {} (adım {}, FPS {}, parçacık {}, asit yoğunluğu {})", dosya, adim, mc.getFps(),
-                mc.particleEngine.countParticles(), String.format(Locale.ROOT, "%.2f", IstemciAsitYagmuru.yogunluk()));
+        DogalAfetler.LOGGER.info(ON + "kare {} (adım {}, FPS {}, parçacık {}, asit yoğunluğu {}, kalite {}, kamera {})", dosya,
+                adim, mc.getFps(), mc.particleEngine.countParticles(),
+                String.format(Locale.ROOT, "%.2f", IstemciAsitYagmuru.yogunluk()), IstemciAyarlari.efektKalitesi(),
+                String.format(Locale.ROOT, "%.1f %.1f %.1f yaw %.0f pitch %.0f", mc.player.getX(), mc.player.getY(),
+                        mc.player.getZ(), mc.player.getYRot(), mc.player.getXRot()));
     }
 
     // ---------------------------------------------------------------- sunucu thread'i
