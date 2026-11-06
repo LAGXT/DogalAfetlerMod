@@ -3,7 +3,8 @@
 
 Çalıştırma alt yapısı tools/senaryo/cekirdek_sunucu.py'den gelir (argümanlar, ağır süreç kapısı, server.properties,
 log denetimi); sunucu `-PoyunTestiAfeti` olmadan açılır çünkü deprem ve sinkhole artık gerçek afet olarak kayıtlıdır. Dünya
-`run-server/deprem-senaryo` her koşuda sıfırdan üretilir; oyuncusuz sunucuda afet konsolun konumuna (doğuş noktası) kurulur.
+`run-server/deprem-senaryo` her koşuda sıfırdan üretilir; oyuncusuz sunucuda afet konsolun konumuna (doğuş noktası) kurulur,
+sinkhole'lar yarığın üstüne düşmesin diye `execute positioned` ile doğuşun 48 blok çaprazına (doğuş chunk'ları yüklü).
 
 Koşu 1: `start deprem 2`, `asama ileri` x2 (AKTIF) → `[deprem] yarık tamam` (değişen blok > 0) ve doğal bitiş;
 `start sinkhole 3`, `asama ileri` x2 → `[sinkhole] çukur tamam` (değişen blok > 0) ve doğal bitiş; `start deprem 5`, AKTIF,
@@ -67,7 +68,7 @@ def kosu1(sunucu):
         raise cs.SenaryoHatasi(f"yarık blok değiştirmedi: {satir.strip()}")
     sunucu.bekle(r"Afet bitti: deprem seviye 2 neden DOGAL", 0, 90, "deprem doğal bitiş")
 
-    sunucu.komut("dogalafet start sinkhole 3", r"Afet başladı: sinkhole seviye 3")
+    sunucu.komut("execute positioned ~48 ~ ~48 run dogalafet start sinkhole 3", r"Afet başladı: sinkhole seviye 3")
     aktife(sunucu, "sinkhole")
     satir = sunucu.bekle(r"\[sinkhole\] çukur tamam: seviye 3", 0, 60, "seviye 3 çukur")
     if degisen(satir) <= 0:
@@ -80,7 +81,7 @@ def kosu1(sunucu):
     sunucu.komut("dogalafet stop", r"Afet bitti: deprem seviye 5 neden KOMUT")
 
     sunucu.komut("gamerule afetBlokHasari false", r"afetBlokHasari is now set to: false")
-    sunucu.komut("dogalafet start sinkhole 1", r"Afet başladı: sinkhole seviye 1")
+    sunucu.komut("execute positioned ~-48 ~ ~48 run dogalafet start sinkhole 1", r"Afet başladı: sinkhole seviye 1")
     aktife(sunucu, "sinkhole")
     satir = sunucu.bekle(r"\[sinkhole\] çukur tamam: seviye 1", 0, 40, "seviye 1 çukur (hasar kapalı)")
     if degisen(satir) != 0:

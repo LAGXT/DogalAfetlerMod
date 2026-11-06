@@ -109,7 +109,7 @@ public final class Sinkhole extends Afet {
 
     /**
      * Hedef oyuncudan 12–40 blok uzakta, çap boyunca yüksekliği ±4 blok düz, merkezi sıvı olmayan yer (8 deneme); hiçbiri
-     * uymazsa en düz aday ({@link #yerUygunMu} son sözü söyler).
+     * uymazsa en düz aday. Düzlük yalnız tercihtir: elle verilen konumda da çukur açılır ({@link #yerUygunMu}).
      */
     @Override
     public BlockPos merkezSec(ServerLevel level, ServerPlayer hedef, int seviye, RandomSource r) {
@@ -141,8 +141,7 @@ public final class Sinkhole extends Afet {
         if (sabitMerkez != null) {
             return true;
         }
-        double yaricap = SinkholeAyarlari.seviye(seviye).yaricap();
-        if (duzlukFarki(level, merkez.getX(), merkez.getZ(), yaricap) > 8) {
+        if (!level.hasChunk(merkez.getX() >> 4, merkez.getZ() >> 4)) {
             return false;
         }
         BlockPos ust = new BlockPos(merkez.getX(), level.getHeight(Heightmap.Types.MOTION_BLOCKING, merkez.getX(),
