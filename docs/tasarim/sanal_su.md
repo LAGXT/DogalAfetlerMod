@@ -113,6 +113,11 @@ Kaynak: `.vibe/kararlar/sanal-su.md` (§A sözleşme, SU-11…SU-19), rapor `.vi
   (kalite çarpanlı), bitişte cep kutusu hash'i eşit. `asama ileri` kurumayı beklemeden ilerletir.
 - **Görünüm:** kıyı şeridinde 2 sn periyotla yalayan köpük bandı, sığda alfa 0,25 → derinde 0,85; dalgacık bileşeni ve
   LOD mesafesi efekt kalitesine bağlı (Düşük 1 bileşen / 8 chunk … Ultra 4 bileşen).
-- **Vitrin karesi:** `KÖK/.vibe/kanit/sanal-su/sanal-su-deniz-vitrin.png` (gün batımı, kumsal, deniz +4; öncesi
-  `sanal-su-deniz-once.png`). Dalga: `sanal-su-dalga.png`; mağara: `sanal-su-magara.png`, `sanal-su-magara-kuruyor.png`.
+- **Güneş yansıması (SU-21):** dalgacık normaliyle sahte speküler, ufukta söner, gün batımında turuncu.
+- **Vitrin karesi:** `KÖK/.vibe/kanit/sanal-su/sanal-su-deniz-vitrin.png` (akşam, kumsal, deniz +4; öncesi
+  `sanal-su-deniz-once.png`, gün batımı `sanal-su-deniz-gunbatimi.png`, su altı `sanal-su-sualti.png`). Dalga:
+  `sanal-su-dalga-once.png` → `sanal-su-dalga.png`; mağara: `sanal-su-magara-once.png` → `sanal-su-magara.png` →
+  `sanal-su-magara-kuruyor.png`, su altı `sanal-su-magara-sualti.png` (koşu 5, K0-21 rev. 2 protokolüyle).
+- **Ölçülen FPS (ortanca kare, aynı kamera, afetsiz/afet; koşu 4, makine yükü düşük):** deniz +4 %87, dalga %101, mağara
+  %100; koşu 5 (yüklü): %91 / %106 / %56. Sunucu TPS 20 (mspt 11–21). Hedef ≥ %50 her çiftte tuttu.
 
