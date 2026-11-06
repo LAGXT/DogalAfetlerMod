@@ -36,7 +36,8 @@ import org.joml.Vector3f;
  * dörtgenler kameraya göre birlikte sıralanır; parçacık motoru kullanılmaz (16384 sınırı, parçacık tick'i yok). Enkaz
  * kopyaları vanilla blok modelleriyle opak blok tamponlarına gider. Dönüş siklonik: yukarıdan bakınca saat yönünün tersi.
  * Sprite boyutu kameraya uzaklığın {@link #EKRAN_ORANI} katıyla sınırlıdır: kamera huninin ya da eteğin içindeyken tek
- * sprite ekranı kaplamaz (doldurma oranı, spike B9); uzaktan görüntü değişmez.
+ * sprite ekranı kaplamaz (doldurma oranı, spike B9); uzaktan görüntü değişmez. Yakın LOD eşiğinde sınır
+ * {@link #EKRAN_ORANI_YAKIN}'a iner.
  */
 final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
     private static final float[] TOZ = {0.52f, 0.42f, 0.31f};
@@ -47,6 +48,8 @@ final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
     private static final double TAM_TUR = Math.PI * 2;
     /** Sprite yarı boyutu / kameraya uzaklık üst sınırı (~ 20° yarı açı). */
     private static final float EKRAN_ORANI = 0.36f;
+    /** Yakın LOD'da (kamera eteğin içinde) sınır: yakındaki her sprite sınıra takılır, üst üste binme kare süresini belirler. */
+    private static final float EKRAN_ORANI_YAKIN = 0.18f;
     /** Duvar bulutu sprite alfası (spike 0,88: üst üste binen 200 sprite GPU doldurma oranının en pahalı kalemiydi). */
     private static final double DUVAR_ALFA = 0.74;
 
@@ -56,6 +59,7 @@ final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
     private static int sonDuvar;
     private static int sonGirdap;
 
+    private float ekranOrani = EKRAN_ORANI;
     private final BlockRenderDispatcher bloklar;
 
     private float[] noktaX = new float[0];
@@ -135,6 +139,7 @@ final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
         KasirgaSeviyesi s = k.seviyeBilgisi();
         KasirgaKaliteButcesi butce = KasirgaKaliteButcesi.icin(IstemciKasirga.kalite());
         KasirgaKaliteButcesi.Lod lod = KasirgaAyarlari.lod();
+        ekranOrani = lod.yakinda(mesafe) ? EKRAN_ORANI_YAKIN : EKRAN_ORANI;
         double t = IstemciKasirga.zaman(k, kismi);
         RankineProfili rankine = s.rankine();
 
@@ -530,7 +535,7 @@ final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
         float dx = x - kamX;
         float dy = y - kamY;
         float dz = z - kamZ;
-        float sinir = EKRAN_ORANI * (float) Math.sqrt(dx * dx + dy * dy + dz * dz) + 0.3f;
+        float sinir = ekranOrani * (float) Math.sqrt(dx * dx + dy * dy + dz * dz) + 0.3f;
         float bo = Math.min(boyut, sinir);
         float c = Mth.cos(donus);
         float s = Mth.sin(donus);

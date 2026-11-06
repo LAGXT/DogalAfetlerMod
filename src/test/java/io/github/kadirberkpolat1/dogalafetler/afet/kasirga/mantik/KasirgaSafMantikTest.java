@@ -139,8 +139,10 @@ class KasirgaSafMantikTest {
     void kaliteButcesiVeLod() {
         KasirgaKaliteButcesi.Lod lod = KasirgaKaliteButcesi.Lod.VARSAYILAN;
         KasirgaKaliteButcesi y = KasirgaKaliteButcesi.icin(EfektKalitesi.YUKSEK);
-        assertEquals(700, y.tabanSpriteSayisi(5, 30, lod));
-        assertEquals(140, y.tabanSpriteSayisi(1, 30, lod));
+        assertEquals(175, y.tabanSpriteSayisi(5, 30, lod));
+        assertEquals(35, y.tabanSpriteSayisi(1, 30, lod));
+        assertEquals(700, y.tabanSpriteSayisi(5, 60, lod));
+        assertEquals(140, y.tabanSpriteSayisi(1, 60, lod));
         assertEquals(350, y.tabanSpriteSayisi(5, 100, lod));
         assertEquals(0, y.tabanSpriteSayisi(5, 300, lod));
         assertEquals(4, y.gorselEnkazSayisi(150, lod));
@@ -157,7 +159,8 @@ class KasirgaSafMantikTest {
             assertTrue(b.huniDilim() * b.huniHalka() > onceki, "kalite arttıkça ağ sıklaşır: " + k);
             onceki = b.huniDilim() * b.huniHalka();
         }
-        assertThrows(IllegalArgumentException.class, () -> new KasirgaKaliteButcesi.Lod(100, 50, 200));
+        assertThrows(IllegalArgumentException.class, () -> new KasirgaKaliteButcesi.Lod(0, 100, 50, 200));
+        assertThrows(IllegalArgumentException.class, () -> new KasirgaKaliteButcesi.Lod(120, 100, 150, 200));
     }
 
     @Test

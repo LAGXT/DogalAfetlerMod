@@ -37,7 +37,8 @@ public final class KasirgaAyarlari {
         Istemci i = istemci.get();
         double taban = i.lodTabanYari.get();
         double enkaz = Math.max(taban, i.lodEnkazYok.get());
-        return new KasirgaKaliteButcesi.Lod(taban, enkaz, Math.max(enkaz, i.lodYalnizHuni.get()));
+        return new KasirgaKaliteButcesi.Lod(Math.min(taban, i.lodYakin.get()), taban, enkaz,
+                Math.max(enkaz, i.lodYalnizHuni.get()));
     }
 
     /** İstemcide aynı anda kasırga başına en çok yalnız görsel enkaz kopyası. */
@@ -83,6 +84,7 @@ public final class KasirgaAyarlari {
     }
 
     private static final class Istemci {
+        private final ForgeConfigSpec.DoubleValue lodYakin;
         private final ForgeConfigSpec.DoubleValue lodTabanYari;
         private final ForgeConfigSpec.DoubleValue lodEnkazYok;
         private final ForgeConfigSpec.DoubleValue lodYalnizHuni;
@@ -91,6 +93,9 @@ public final class KasirgaAyarlari {
         private final ForgeConfigSpec.BooleanValue sisEtkisi;
 
         private Istemci(ForgeConfigSpec.Builder k) {
+            lodYakin = k.comment("Kamera kasırga merkezine bu mesafeden (blok) yakınken taban toz sprite'ları dörtte bire iner ve",
+                    "sprite'ların ekran kaplama sınırı yarıya düşer (K0-33 yakın kare süresi); 0 kapatır.")
+                    .defineInRange("lodYakin", 48.0, 0.0, 512.0);
             lodTabanYari = k.comment("Bu mesafeden (blok) sonra taban toz sprite'ları yarıya iner; içeride seçili kalitenin tamamı.")
                     .defineInRange("lodTabanYari", 96.0, 16.0, 512.0);
             lodEnkazYok = k.comment("Bu mesafeden sonra yalnız görsel enkaz kopyaları üretilmez (gerçek uçan bloklar görünür).")

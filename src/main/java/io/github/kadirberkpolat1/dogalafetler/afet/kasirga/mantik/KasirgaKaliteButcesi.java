@@ -3,21 +3,27 @@ package io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik;
 import io.github.kadirberkpolat1.dogalafetler.config.EfektKalitesi;
 
 /**
- * Efekt kalitesine göre görsel bütçe (tasarım notu §5, spike SK-06) ve mesafe LOD'u. Yakındaki oyuncu (LOD eşiğinin
- * içinde) seçili kalitenin tamamını görür; ilk eşikten sonra taban sprite'ları yarıya iner, ikincide görsel enkaz durur,
- * üçüncüde yalnız huni ve duvar bulutu kalır.
+ * Efekt kalitesine göre görsel bütçe (tasarım notu §5, spike SK-06) ve mesafe LOD'u. Yakın eşiğin içinde (kamera eteğin
+ * ya da huninin içinde) taban sprite'ları dörtte bire iner: oradaki her sprite ekran kaplama sınırına takılır ve üst üste
+ * binerek kare süresini belirler (K0-33). Yakın ile ilk eşik arasında seçili kalitenin tamamı görünür; ilk eşikten sonra
+ * taban sprite'ları yarıya iner, ikincide görsel enkaz durur, üçüncüde yalnız huni ve duvar bulutu kalır.
  */
 public record KasirgaKaliteButcesi(int huniDilim, int huniHalka, int tabanSprite, int gorselEnkazBlokBasina,
         int duvarSprite, int altGirdapEnFazla) {
 
     /** LOD eşikleri (blok; CLIENT {@code kasirga.lod*}). */
-    public record Lod(double tabanYari, double enkazYok, double yalnizHuni) {
-        public static final Lod VARSAYILAN = new Lod(96, 160, 256);
+    public record Lod(double yakin, double tabanYari, double enkazYok, double yalnizHuni) {
+        public static final Lod VARSAYILAN = new Lod(48, 96, 160, 256);
 
         public Lod {
-            if (!(tabanYari > 0 && enkazYok >= tabanYari && yalnizHuni >= enkazYok)) {
-                throw new IllegalArgumentException("LOD eşikleri artan olmalı: " + tabanYari + ", " + enkazYok + ", " + yalnizHuni);
+            if (!(yakin >= 0 && tabanYari > 0 && tabanYari >= yakin && enkazYok >= tabanYari && yalnizHuni >= enkazYok)) {
+                throw new IllegalArgumentException("LOD eşikleri artan olmalı: " + yakin + ", " + tabanYari + ", " + enkazYok
+                        + ", " + yalnizHuni);
             }
+        }
+
+        public boolean yakinda(double mesafe) {
+            return mesafe < yakin;
         }
     }
 
@@ -30,12 +36,15 @@ public record KasirgaKaliteButcesi(int huniDilim, int huniHalka, int tabanSprite
         };
     }
 
-    /** Seviye 1'de bütçenin %20'si (seyrek toz girdabı), seviye 5'te tamamı; mesafeye göre LOD. */
+    /** Seviye 1'de bütçenin %20'si (seyrek toz girdabı), seviye 5'te tamamı; mesafeye göre LOD (yakında dörtte bir). */
     public int tabanSpriteSayisi(int seviye, double mesafe, Lod lod) {
         if (mesafe > lod.yalnizHuni()) {
             return 0;
         }
         int sayi = tabanSprite * Math.max(1, Math.min(5, seviye)) / 5;
+        if (lod.yakinda(mesafe)) {
+            return sayi / 4;
+        }
         return mesafe > lod.tabanYari() ? sayi / 2 : sayi;
     }
 
