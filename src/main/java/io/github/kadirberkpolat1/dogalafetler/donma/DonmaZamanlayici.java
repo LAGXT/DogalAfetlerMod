@@ -89,7 +89,11 @@ public final class DonmaZamanlayici {
     private static long ozetNs;
     private static long ozetEnUzunNs;
     private static int ozetSureSiniri;
-    /** Isınma: istatistik sıfırlandıktan sonraki ilk {@value #ISINMA_TICK} işçi tick'i (soğuk JIT, sınıf yükleme, ilk BFS'ler). */
+    /**
+     * Isınma: istatistik sıfırlandıktan sonraki ilk {@value #ISINMA_TICK} iş yapan (sütun işleyen) işçi tick'i (soğuk JIT,
+     * sınıf yükleme, ilk BFS'ler). Boş tick'ler (bekleyen chunk'lar hedefte ya da işlenemez) pencereyi doldurmaz ve en uzun
+     * tick'e girmez (inceleme-3 D3-1).
+     */
     private static final int ISINMA_TICK = 100;
     private static int isciTick;
     private static long isinmaEnUzunNs;
@@ -390,10 +394,12 @@ public final class DonmaZamanlayici {
         ozetSutun += bakilan;
         ozetNs += gecen;
         ozetEnUzunNs = Math.max(ozetEnUzunNs, gecen);
-        if (++isciTick <= ISINMA_TICK) {
-            isinmaEnUzunNs = Math.max(isinmaEnUzunNs, gecen);
-        } else {
-            enUzunNs = Math.max(enUzunNs, gecen);
+        if (bakilan > 0) {
+            if (++isciTick <= ISINMA_TICK) {
+                isinmaEnUzunNs = Math.max(isinmaEnUzunNs, gecen);
+            } else {
+                enUzunNs = Math.max(enUzunNs, gecen);
+            }
         }
         return bakilan > 0;
     }

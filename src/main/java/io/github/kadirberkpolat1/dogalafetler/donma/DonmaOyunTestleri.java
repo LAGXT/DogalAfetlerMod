@@ -28,11 +28,13 @@ import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LeavesBlock;
+import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.SnowLayerBlock;
 import net.minecraft.world.level.block.SnowyDirtBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.material.Fluids;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.level.ChunkEvent;
 import net.minecraftforge.gametest.GameTestHolder;
@@ -409,6 +411,43 @@ public final class DonmaOyunTestleri {
         y.assertTrue(is(y, 4, 3, 4, Blocks.ICE) && is(y, 4, 1, 4, Blocks.WATER),
                 "geri dolan göl yüzeyinden donmalı; " + sutunTani(y, 4, 4));
         y.succeed();
+    }
+
+    /**
+     * K-D37: kurumuş sütuna komşu suyun planlı sıvı tick'i akmaz, sonradan gelen su yeniden kurur. Gölün yanında üstü taşla
+     * kapalı bir kaynak (buharlaşmaz) var ve sahne kurulumundan sıvı tick'i planlı; göl kururken tick silinir, 20 tick sonra
+     * kıyı sütunu hâlâ kuru. Kurumuş yatağa konan kaynak ve akıcı su aynı derinlikte yeniden kurur; derinlik 0'da sahne
+     * başlangıçla aynı.
+     */
+    @GameTest(template = ALAN)
+    public static void komsuSiviTikiKurumusSutunuDoldurmaz(GameTestHelper y) {
+        sahneKur(y);
+        y.setBlock(p(1, 4, 4), Blocks.STONE);
+        y.setBlock(p(1, 3, 4), Blocks.WATER);
+        BlockState[] baslangic = anlik(y);
+        ServerLevel level = y.getLevel();
+        BlockPos kaynak = y.absolutePos(p(1, 3, 4));
+        y.assertTrue(level.getFluidTicks().hasScheduledTick(kaynak, Fluids.WATER),
+                "sahne: komşu kaynağın sıvı tick'i planlı olmalı");
+        buharla(y, 6);
+        y.assertTrue(!level.getFluidTicks().hasScheduledTick(kaynak, Fluids.WATER),
+                "kuruyan sütunun komşusundaki tick silinmeli");
+        y.runAfterDelay(20, () -> {
+            y.assertTrue(y.getBlockState(p(2, 3, 4)).isAir() && y.getBlockState(p(2, 2, 4)).isAir()
+                    && y.getBlockState(p(2, 1, 4)).isAir(), "kıyı sütunu kuru kalmalı; " + sutunTani(y, 2, 4));
+            y.assertTrue(is(y, 1, 3, 4, Blocks.WATER), "kapalı komşu kaynak kalmalı");
+            y.setBlock(p(4, 1, 4), Blocks.WATER);
+            y.setBlock(p(3, 1, 4), Blocks.WATER.defaultBlockState().setValue(LiquidBlock.LEVEL, 2));
+            int degisen = buharla(y, 6);
+            y.assertTrue(degisen == 2 && y.getBlockState(p(4, 1, 4)).isAir() && y.getBlockState(p(3, 1, 4)).isAir(),
+                    "kurumuş yatağa gelen su yeniden kurumalı (değişen " + degisen + "); " + sutunTani(y, 3, 4));
+            buharla(y, 0);
+            ayniMi(y, baslangic, "derinlik 0'da sahne başlangıçla aynı olmalı");
+            y.runAfterDelay(20, () -> {
+                ayniMi(y, baslangic, "geri dolduktan 20 tick sonra su akmamış olmalı");
+                y.succeed();
+            });
+        });
     }
 
     @GameTest(template = ALAN)
@@ -837,9 +876,10 @@ public final class DonmaOyunTestleri {
     }
 
     /**
-     * D3 (N9): buharlaşmanın geri dolması çok tick'e ve chunk'lara yayılır; erken dolan sütundan akan su sonraki sütunları
-     * durdurmaz. Chunk sınırını kesen göl (sahnenin planlı sıvı tick'leri bittikten sonra) 6 blok kurur, sonra 0'a geri
-     * dolar; sahne başlangıçla aynı (akıcı su kalmaz).
+     * D3 (N9), K-D37: chunk sınırını kesen göl, sahnenin {@code setBlock}'la planladığı sıvı tick'leri henüz çalışmadan, gerçek
+     * kuyrukla birkaç tick'e ve chunk'a yayılarak 6 blok kurur. Tick'ler çalıştıktan sonra (20 tick) gölde hiç su kalmaz:
+     * kuruyan sütunun komşusundaki planlı tick silindiği için henüz kurumamış sütundan deliğe su akmaz. Sonra 0'a geri
+     * dolar; erken dolan sütundan akan su sonrakileri durdurmaz, sahne başlangıçla aynı (akıcı su kalmaz).
      */
     @GameTest(template = GOL, batch = "donma_zamanlayici_6", timeoutTicks = 3000)
     public static void buharlasmaCokTickliGeriDolmaBaslangicVerir(GameTestHelper y) {
@@ -847,19 +887,18 @@ public final class DonmaOyunTestleri {
         BlockState[] baslangic = anlik(y, GOL_EN, GOL_BOY);
         LongOpenHashSet chunklar = zamanlayiciHazirla(y, GOL_EN);
         DunyaDonemi d = DunyaDonemi.al(y.getLevel().getServer());
+        d.buharlasmaDerinligiAyarla(6f);
         int[] asama = {0};
         int[] bekle = {0};
         y.onEachTick(() -> {
-            if (asama[0] == 0 && ++bekle[0] >= 20) {
-                // Sahnenin setBlock'la koyduğu su sıvı tick'i planlar; kuruyan sütuna henüz işlenmemiş komşudan akan su
-                // kaynağa döner. Planlı tick'ler bitince (doğal göl gibi) buharlaşma başlar.
-                d.buharlasmaDerinligiAyarla(6f);
-                bekle[0] = 0;
+            if (asama[0] == 0 && buharHepsi(y, chunklar, 6)) {
                 asama[0] = 1;
-            } else if (asama[0] == 1 && buharHepsi(y, chunklar, 6)) {
-                y.assertTrue(y.getBlockState(p(15, 1, 15)).isAir(), "6 blokta 3 derin göl tamamen kurumalı; "
-                        + sutunTani(y, 15, 15) + " | " + buharTani(y, chunklar));
+            } else if (asama[0] == 1 && ++bekle[0] >= 20) {
+                int su = suSayisi(y, GOL_EN);
+                y.assertTrue(su == 0, "kurumuş gölde " + su + " su bloğu kaldı; " + sutunTani(y, 15, 15) + " | "
+                        + buharTani(y, chunklar));
                 asama[0] = 2;
+                bekle[0] = 0;
                 d.buharlasmaDerinligiAyarla(0f);
             } else if (asama[0] == 2 && buharHepsi(y, chunklar, 0)) {
                 asama[0] = 3;
@@ -868,10 +907,25 @@ public final class DonmaOyunTestleri {
             }
         });
         y.succeedWhen(() -> {
-            y.assertTrue(asama[0] == 3 && bekle[0] >= 40, "kuruma, geri dolma ve 40 tick bekleme bitmedi");
+            y.assertTrue(asama[0] == 3 && bekle[0] >= 40, "kuruma, 20 tick bekleme, geri dolma ve 40 tick bekleme bitmedi");
             ayniMi(y, baslangic, "çok tick'li geri dolma başlangıcı vermeli", GOL_EN, GOL_BOY);
             zamanlayiciBitir(y);
         });
+    }
+
+    /** Sahnenin y=1..3 katmanlarındaki su blokları (kaynak ya da akıcı). */
+    private static int suSayisi(GameTestHelper y, int en) {
+        int n = 0;
+        for (int yy = 1; yy <= 3; yy++) {
+            for (int x = 0; x < en; x++) {
+                for (int z = 0; z < en; z++) {
+                    if (y.getBlockState(p(x, yy, z)).is(Blocks.WATER)) {
+                        n++;
+                    }
+                }
+            }
+        }
+        return n;
     }
 
     private static boolean buharHepsi(GameTestHelper y, LongOpenHashSet chunklar, int buhar) {

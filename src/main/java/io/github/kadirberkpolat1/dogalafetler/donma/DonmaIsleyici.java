@@ -11,8 +11,10 @@ import io.github.kadirberkpolat1.dogalafetler.donma.mantik.KiyiUzakligi;
 import io.github.kadirberkpolat1.dogalafetler.donma.mantik.SuSutunu;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
@@ -23,6 +25,10 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.ticks.LevelTicks;
 
 /**
  * Donma tablosunu ve buharlaşmayı dünyaya uygular (madde 9, N9, N10). Sütun başına önce buharlaşma (kuru kaydı hedef
@@ -41,7 +47,8 @@ import net.minecraft.world.level.levelgen.Heightmap;
  * <li>Sütun sanal suyun altındaysa ({@link DisKancalar#sanalSuVarMi}) donmaz.</li>
  * </ul>
  * Donma blokları {@link Block#UPDATE_CLIENTS} ile konur (şekil güncellemesi var, komşu fizik yok); buharlaşma ve geri dolma
- * ayrıca şekil güncellemesi göndermez ki komşu su akarak deliği doldurmasın.
+ * ayrıca şekil güncellemesi göndermez ki komşu su akarak deliği doldurmasın; kuruyan konumun komşularındaki planlı sıvı
+ * tick'leri de silinir (K-D37).
  */
 public final class DonmaIsleyici {
     public static final TagKey<Block> KAR_ZEMINI = BlockTags.create(DogalAfetler.konum("donma/kar_zemini"));
@@ -51,6 +58,7 @@ public final class DonmaIsleyici {
     private static final int SU_BAYRAGI = Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE;
     /** Sınırsız üst Y: yüzey doğrudan {@code MOTION_BLOCKING} heightmap'inden okunur. */
     static final int SINIRSIZ = Integer.MAX_VALUE;
+    private static final Direction[] YATAY = {Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST};
 
     /**
      * Bir chunk geçişi: {@code (eskiG, eskiCozulme) → (yeniG, yeniCozulme)}; {@code buhar}: gerçek suya uygulanan buharlaşma
@@ -324,7 +332,8 @@ public final class DonmaIsleyici {
      * Sütunun buharlaşma kaydını {@code hedef} derinliğe getirir (N9): kayıt yoksa ve üst blok üstü açık su kaynağıysa
      * yüzeyden aşağı kurur; kayıt varsa eksik kalanı kurutur ya da derinlik düşünce suyu alttan yukarı geri koyar. Geri
      * dolmada kaynak su "zaten dolu" sayılır (komşu sütundan akan ve vanilla'nın kaynağa çevirdiği su, D3), akıcı su kaynakla
-     * değiştirilir; yalnız katı bir blokta (oyuncu doldurdu) durulur ve kayıt bırakılır. Blok değişti mi döner.
+     * değiştirilir; yalnız katı bir blokta (oyuncu doldurdu) durulur ve kayıt bırakılır. Kayıtlı sütunun kurumuş kalan
+     * aralığına sonradan gelen su (kaynak ya da akıcı) yeniden kurur, kayıt değişmez (K-D37). Blok değişti mi döner.
      */
     static boolean buharla(ServerLevel level, LevelChunk chunk, ChunkDonmaVerisi durum, int i, int x, int y, int z,
             int hedef, Tablo tablo, BlockPos.MutableBlockPos konum, Sayac sayac) {
@@ -352,16 +361,14 @@ public final class DonmaIsleyici {
             }
             k = BuharlasmaHedefi.kaldirilacak(hedef, derinlik);
         }
-        if (k == kaldirilan) {
-            return false;
-        }
         int once = sayac.degisen;
         if (k > kaldirilan) {
             for (int j = kaldirilan; j < k; j++) {
                 level.setBlock(konum.set(x, ust - j, z), Blocks.AIR.defaultBlockState(), SU_BAYRAGI);
+                komsuSiviTikleriniSil(level, konum);
                 sayac.degisen++;
             }
-        } else {
+        } else if (k < kaldirilan) {
             for (int j = kaldirilan - 1; j >= k; j--) {
                 BlockState s = chunk.getBlockState(konum.set(x, ust - j, z));
                 if (s.is(tablo.suKaynak()) && s.getFluidState().isSource()) {
@@ -375,11 +382,37 @@ public final class DonmaIsleyici {
                 sayac.degisen++;
             }
         }
-        durum.kuru(i, ust, k);
+        for (int j = 0; j < Math.min(k, kaldirilan); j++) {
+            if (chunk.getBlockState(konum.set(x, ust - j, z)).is(tablo.suKaynak())) {
+                level.setBlock(konum, Blocks.AIR.defaultBlockState(), SU_BAYRAGI);
+                komsuSiviTikleriniSil(level, konum);
+                sayac.degisen++;
+            }
+        }
+        if (k != kaldirilan) {
+            durum.kuru(i, ust, k);
+        }
         if (sayac.degisen != once) {
             sayac.suDegisti = true;
         }
         return sayac.degisen != once;
+    }
+
+    /**
+     * Kuruyan konumun yatay komşularındaki suyun planlı sıvı tick'ini siler (K-D37). Şekil güncellemesiz yazımda komşu yeni
+     * tick almaz, ama önceden planlanmış tick (yeni üretilen chunk, oyuncu, sahne kurulumu) kuru deliğe akar; vanilla iki
+     * kaynak arasındaki akıcı suyu kaynağa çevirir ve kayıtlı sütun su dolu kalırdı. {@code konum} değişmeden döner.
+     */
+    private static void komsuSiviTikleriniSil(ServerLevel level, BlockPos.MutableBlockPos konum) {
+        LevelTicks<Fluid> tikler = level.getFluidTicks();
+        for (Direction yon : YATAY) {
+            konum.move(yon);
+            FluidState su = level.getFluidState(konum);
+            if (su.is(FluidTags.WATER) && tikler.hasScheduledTick(konum, su.getType())) {
+                tikler.clearArea(new BoundingBox(konum));
+            }
+            konum.move(yon.getOpposite());
+        }
     }
 
     /** Hedef bloka kaynak durumun aynı adlı özelliklerini taşır (ör. {@code snowy}); diğerleri varsayılan. */
