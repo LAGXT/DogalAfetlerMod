@@ -189,6 +189,26 @@ public final class DonmaZamanlayici {
         siraKirli = true;
     }
 
+    /**
+     * Yalnız GameTest sahne kurulumu: chunk verisini {@link ChunkDonmaVerisi#donguyeGec} ile sıfırlar ve chunk'ın yarım işini
+     * atar (K-E14). İş eski verinin adımına göre kurulmuştur (ör. önceki testin genel G'sinde, kapsam dışında kalıp yarım
+     * duran spawn chunk'ı); sürdürülürse bitişinde {@code sonG}'yi yeni sahnenin blokları işlenmeden eski hedefe yazar.
+     */
+    public static void chunkVerisiniSifirla(LevelChunk chunk, long dongu, int g, boolean cozulmeDonemi) {
+        ChunkDonmaVerisi.al(chunk).donguyeGec(dongu, g, cozulmeDonemi);
+        chunk.setUnsaved(true);
+        long anahtar = chunk.getPos().toLong();
+        ChunkIsi eski = ISLER.remove(anahtar);
+        if (eski != null) {
+            DogalAfetler.LOGGER.info("[donma] test sahnesi: chunk {},{} yarım işi atıldı (G {} -> {}, {}/256 sütun)",
+                    chunk.getPos().x, chunk.getPos().z, eski.gecis.eskiG(), eski.gecis.yeniG(), eski.sutun);
+        }
+        if (YUKLU.contains(anahtar)) {
+            BEKLEYEN.add(anahtar);
+        }
+        siraKirli = true;
+    }
+
     public static void istatistikSifirla() {
         tamamlananAdim = hedefeUlasan = toplamDegisen = 0;
         sonTickDegisen = enCokTickDegisen = 0;

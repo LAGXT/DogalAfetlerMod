@@ -600,7 +600,7 @@ public final class DonmaOyunTestleri {
             if (asama[0] == 0 && DonmaZamanlayici.islenebilir(level, chunk, hedef.x, hedef.z)) {
                 y.assertTrue(!kaynak.isPositionTicking(anahtar), "hedef chunk simülasyon dışında olmalı (sahne geçersiz)");
                 level.setBlock(cimen, Blocks.GRASS_BLOCK.defaultBlockState(), 2);
-                v.donguyeGec(DonmaZamanlayici.dongu(d), 0, false);
+                DonmaZamanlayici.chunkVerisiniSifirla(chunk, DonmaZamanlayici.dongu(d), 0, false);
                 d.donmaIlerlemesiAyarla(60f);
                 asama[0] = 1;
             } else if (asama[0] == 1 && v.sonG() == 60 && !v.yarimVar()) {
@@ -723,7 +723,10 @@ public final class DonmaOyunTestleri {
         return s;
     }
 
-    /** Zamanlayıcı testinin başı: dönem ve kuyruk temiz, kapsam sahnenin chunk'ları, chunk'lar G=0'da ve güncel döngüde. */
+    /**
+     * Zamanlayıcı testinin başı: dönem ve kuyruk temiz, kapsam sahnenin chunk'ları, chunk'lar G=0'da ve güncel döngüde;
+     * önceki testlerden kalan yarım işleri atılır (K-E14).
+     */
     private static LongOpenHashSet zamanlayiciHazirla(GameTestHelper y) {
         return zamanlayiciHazirla(y, EN);
     }
@@ -736,8 +739,8 @@ public final class DonmaOyunTestleri {
         d.buharlasmaDerinligiAyarla(0f);
         LongOpenHashSet chunklar = sahneChunklari(y, en);
         for (long c : chunklar) {
-            ChunkDonmaVerisi v = ChunkDonmaVerisi.al(y.getLevel().getChunk(ChunkPos.getX(c), ChunkPos.getZ(c)));
-            v.donguyeGec(DonmaZamanlayici.dongu(d), 0, false);
+            DonmaZamanlayici.chunkVerisiniSifirla(y.getLevel().getChunk(ChunkPos.getX(c), ChunkPos.getZ(c)),
+                    DonmaZamanlayici.dongu(d), 0, false);
         }
         DonmaZamanlayici.kapsamAyarla(chunklar);
         DonmaZamanlayici.istatistikSifirla();
