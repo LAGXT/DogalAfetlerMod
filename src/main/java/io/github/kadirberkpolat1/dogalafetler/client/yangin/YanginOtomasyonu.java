@@ -8,6 +8,8 @@ import io.github.kadirberkpolat1.dogalafetler.yangin.YanginKayitlari;
 import io.github.kadirberkpolat1.dogalafetler.yangin.YanginYoneticisi;
 import io.github.kadirberkpolat1.dogalafetler.yangin.mantik.YanginMantigi;
 import java.util.Locale;
+import java.util.Map;
+import java.util.TreeMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.screens.PauseScreen;
@@ -48,7 +50,7 @@ public final class YanginOtomasyonu {
     private static final double VITRIN_YOGUNLUGU = 0.7;
     /** Her kare, parçacıklar silindikten bu kadar tick sonra: iki kalite karesi aynı parçacık yaşında, 6 sn arayla. */
     private static final int KARE_ARALIGI = 120;
-    private static final int TARAMA = 40;
+    private static final int TARAMA = 64;
 
     private static int tus;
     private static int fare;
@@ -269,7 +271,8 @@ public final class YanginOtomasyonu {
 
     /**
      * Sunucu thread'inde: cephe çevresindeki ateş bloklarından kaçı kameranın görüş alanında (dikey 70°, pencere en/boy
-     * oranı) ve kameradan açık görüş hattında (yaprak dahil katı blok araya girmiyor). Kare kanıtının sayısal eşi.
+     * oranı) ve kameradan açık görüş hattında (yaprak dahil katı blok araya girmiyor). Kare kanıtının sayısal eşi; ateş
+     * blokları biyomlarına göre de sayılır (yağışsız biyomda yağmur yangını söndürmez).
      */
     private static void gorunurlukYaz(IntegratedServer server, String ad, double enBoy) {
         ServerLevel level = server.overworld();
@@ -285,6 +288,7 @@ public final class YanginOtomasyonu {
         int cercevede = 0;
         int gorunen = 0;
         double uzaklik = 0;
+        Map<String, Integer> biyomlar = new TreeMap<>();
         BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
         for (int x = -TARAMA; x <= TARAMA; x++) {
             for (int z = -TARAMA; z <= TARAMA; z++) {
@@ -294,6 +298,9 @@ public final class YanginOtomasyonu {
                         continue;
                     }
                     toplam++;
+                    Holder<Biome> biyom = level.getBiome(p);
+                    biyomlar.merge(biyom.unwrapKey().map(k -> k.location().getPath()).orElse("?")
+                            + (biyom.value().hasPrecipitation() ? "" : "(yağışsız)"), 1, Integer::sum);
                     Vec3 hedef = new Vec3(p.getX() + 0.5, p.getY() + 0.3, p.getZ() + 0.5);
                     Vec3 v = hedef.subtract(goz);
                     double ileriBilesen = v.dot(ileri);
@@ -312,9 +319,10 @@ public final class YanginOtomasyonu {
                 }
             }
         }
-        DogalAfetler.LOGGER.info(ON + "{}: görünen ateş bloğu {} (çerçevede {}, taranan {}), ortalama uzaklık {} blok, aktif {}",
-                ad, gorunen, cercevede, toplam, gorunen == 0 ? "-" : String.format(Locale.ROOT, "%.1f",
-                        uzaklik / gorunen), YanginYoneticisi.aktifSayi(level));
+        String ortalama = gorunen == 0 ? "-" : String.format(Locale.ROOT, "%.1f", uzaklik / gorunen);
+        DogalAfetler.LOGGER.info(ON + "{}: görünen ateş bloğu {} (çerçevede {}, taranan {}), ortalama uzaklık {} blok, "
+                + "aktif {}; biyomlar {}", ad, gorunen, cercevede, toplam, ortalama, YanginYoneticisi.aktifSayi(level),
+                biyomlar);
     }
 
     private static void komut(IntegratedServer server, String komut) {

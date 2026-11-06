@@ -97,7 +97,8 @@ orman yangını afeti siren, seviye ve başlangıç alanını ekler; yangın man
 - **Yanma sonucu:** yaprak ve odun havaya döner (vanilla gibi); kömürleşmiş blok yok. `afetBlokHasari=false` iken hiçbir
   blok değişmez (ateş bloğu da konmaz); yangın parçacık, ısı ve hasar olarak sürer.
 - **Yağmur:** yağmur gören ateş ~2–3 sn'de, yaprak ya da çatı altındaki ateş ~5–8 sn'de söner (buhar + tıslama);
-  yağmurdaki yakıt %70 daha zor tutuşur. Yağışı olmayan biyomda (çöl, savan) yağmur yangını söndürmez.
+  yağmurdaki ateş yayılmaz ve kıvılcım sıçratmaz, yangın tekdüze azalır. Yağışı olmayan biyomda (çöl, savan)
+  yağmur yangını söndürmez.
 - **Isı:** yangın chunk'ı başına geçici ortam kaynağı (güç 4 + 2√n, en çok 18; yarıçap 6 + √n); sicaklik birleşince
   `YanginKancalari.isiKaynagiAyarla(SicaklikKancalari::ortamKaynagiEkle)` ile bağlanır. §6'daki "+4…+14 birim" Faz 4'te
   sicaklik ölçeğine göre ayarlanır.
