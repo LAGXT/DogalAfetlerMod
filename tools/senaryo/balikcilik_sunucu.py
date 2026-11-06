@@ -5,7 +5,8 @@ Kullanım (worktree kökünden): python3 tools/senaryo/balikcilik_sunucu.py
 Adımlar: runServer açılır (stdin boruya bağlı, pty'siz) → `[balikcilik] loot tablosu yüklendi` satırı aranır →
 `forceload add 0 0` ve y=200'de küçük sahne donma 0'da kurulur (taş, su, üstünde son donma aşamasında `buz_deligi[asama=3]`).
 Aşama 1: `dogalafet donma 50` → aşama süresi (15 sn) dolunca delik **buz** olur, alttaki su kalır. Aşama 2: `dogalafet donma 0`
-(sıfırlanmış dünya), buzun yerine yeni delik → 15 sn sonra delik **su** olur (B-20). Sıra bu yönde: donma 50 sırasında
+(sıfırlanmış dünya), buzun yerine donmanın buzunda açılmış gibi yeni delik (`donma=true`) → 15 sn sonra delik **su** olur
+(B-20; bitsiz/vanilla kökenli delik eski buza dönerdi, Bc2). Sıra bu yönde: donma 50 sırasında
 açık su yüzeyi olsaydı donma süreci sütunu kalın buzla dondururdu (ilk tur 2 koşusu). → `loot spawn ... loot
 dogalafetler:gameplay/buz_deligi_balikcilik` (özel kategori girdisi sunucuda çalışır) → temizlik → `forge tps` → `stop`.
 Ham log `KOK/.vibe/kanit/balikcilik/runServer-<n>.log`, özet `sunucu.log`. Kendi worktree'sinin `run-server/` klasörünü
@@ -110,8 +111,8 @@ def sina(s, blok, ad):
     return gecti
 
 
-def delik_koy(s):
-    s.komut("setblock 1 202 1 dogalafetler:buz_deligi[asama=3]")
+def delik_koy(s, donma=False):
+    s.komut(f"setblock 1 202 1 dogalafetler:buz_deligi[asama=3,donma={'true' if donma else 'false'}]")
     time.sleep(0.5)
     return sina(s, "1 202 1 dogalafetler:buz_deligi", "delik kondu")
 
@@ -143,7 +144,7 @@ def main():
         sonuc["su"] = sina(s, "1 201 1 minecraft:water", "alttaki su kaldı")
         s.komut("dogalafet donma 0 donma")
         time.sleep(1)
-        sonuc["delik2"] = delik_koy(s)
+        sonuc["delik2"] = delik_koy(s, donma=True)
         time.sleep(18)
         sonuc["suyaDondu"] = sina(s, "1 202 1 minecraft:water", "donma 0'da aşama süresinden sonra su (B-20)")
         s.komut("loot spawn 1 204 1 loot dogalafetler:gameplay/buz_deligi_balikcilik")

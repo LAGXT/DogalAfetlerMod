@@ -7,7 +7,9 @@ import io.github.kadirberkpolat1.dogalafetler.balikcilik.mantik.IsirmaSuresi;
 import io.github.kadirberkpolat1.dogalafetler.core.CekirdekOyunTestleri;
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
+import io.github.kadirberkpolat1.dogalafetler.donma.ChunkDonmaVerisi;
 import io.github.kadirberkpolat1.dogalafetler.donma.DonmaBloklari;
+import io.github.kadirberkpolat1.dogalafetler.donma.DonmaIsleyici;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.SicaklikKapisi;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.SicaklikYoneticisi;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.VucutSicakligi;
@@ -39,6 +41,8 @@ import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.loot.BuiltInLootTables;
+import net.minecraft.world.level.storage.loot.LootContext;
 import net.minecraft.world.level.storage.loot.LootParams;
 import net.minecraft.world.level.storage.loot.LootTable;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets;
@@ -97,6 +101,15 @@ public final class BalikcilikOyunTestleri {
                 }
             }
         }
+        // Kalıcı GameTest dünyası: önceki koşulardan kalmış donma buz bitleri sahnenin sütunlarından silinir.
+        BlockPos a = y.absolutePos(BlockPos.ZERO);
+        BlockPos b = y.absolutePos(new BlockPos(4, 0, 4));
+        DonmaIsleyici.bitleriTemizle(y.getLevel(), Math.min(a.getX(), b.getX()), Math.min(a.getZ(), b.getZ()),
+                Math.max(a.getX(), b.getX()), Math.max(a.getZ(), b.getZ()));
+    }
+
+    private static void sutunBiti(ServerLevel level, BlockPos p, boolean deger) {
+        ChunkDonmaVerisi.al(level.getChunkAt(p)).buz(ChunkDonmaVerisi.indeks(p.getX(), p.getZ()), deger);
     }
 
     private static void temizle(GameTestHelper y, ServerPlayer... oyuncular) {
@@ -163,6 +176,7 @@ public final class BalikcilikOyunTestleri {
         BlockState s = level.getBlockState(delik);
         y.assertTrue(delikMi(s), "eğilip kazmayla sağ tıkta buz deliği olmalı: " + s);
         y.assertTrue(!s.getValue(BuzDeligiBlogu.INCE), "vanilla buzda açılan delik ince değil");
+        y.assertTrue(!s.getValue(BuzDeligiBlogu.DONMA), "bitsiz (vanilla) buzda açılan delik donma kökenli değil");
         y.assertTrue(s.getFluidState().isSource(), "delik su göstermeli (kaynak su sıvı durumu)");
         y.assertTrue(olay.isCanceled() && olay.getCancellationResult() == InteractionResult.SUCCESS,
                 "olay başarıyla kapanmalı");
@@ -340,21 +354,40 @@ public final class BalikcilikOyunTestleri {
         });
     }
 
-    /** B-20: global donma 0 (sıfırlanmış dünya) iken son aşamadaki delik buz değil su olur. */
+    /**
+     * B-20 + Bc2: delik açılırken kökeni (sütunun donma buz biti) blok durumuna yazılır; global donma 0 iken son aşama yalnız
+     * donmanın buzunda açılan deliği suya çevirir, vanilla/oyuncu buzundaki delik eski buza döner (madde 15).
+     */
     @GameTest(template = "bos", batch = "balikcilik_sifir")
-    public static void sifirDonmadaDelikSuyaDoner(GameTestHelper y) {
+    public static void sifirDonmadaYalnizDonmaBuzundakiDelikSuyaDoner(GameTestHelper y) {
         ServerLevel level = y.getLevel();
-        donma(y, 0f);
+        donma(y, 50f);
         havuzKur(y);
-        BlockPos delik = y.absolutePos(DELIK);
-        level.setBlock(delik, BalikcilikKayitlari.BUZ_DELIGI.get().defaultBlockState()
-                .setValue(BuzDeligiBlogu.ASAMA, DelikOmru.SON_ASAMA).setValue(BuzDeligiBlogu.INCE, true), Block.UPDATE_ALL);
-        BlockState s = level.getBlockState(delik);
-        s.tick(level, delik, level.random);
-        BlockState sonra = level.getBlockState(delik);
-        y.assertTrue(sonra.is(Blocks.WATER) && sonra.getFluidState().isSource(),
-                "donma 0'da delik kaynak su olmalı (ince buz değil): " + sonra);
-        temizle(y);
+        BlockPos donmaBuzu = y.absolutePos(DELIK);
+        BlockPos vanillaBuz = y.absolutePos(new BlockPos(1, 4, 1));
+        sutunBiti(level, donmaBuzu, true);
+        ServerPlayer o = oyuncu(y, 3, 3);
+        o.setShiftKeyDown(true);
+        o.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.IRON_PICKAXE));
+        sagTik(o, donmaBuzu);
+        sagTik(o, vanillaBuz);
+        BlockState d = level.getBlockState(donmaBuzu);
+        BlockState v = level.getBlockState(vanillaBuz);
+        y.assertTrue(delikMi(d) && delikMi(v), "iki delik açılmalı: " + d + ", " + v);
+        y.assertTrue(d.getValue(BuzDeligiBlogu.DONMA), "bitli sütunda açılan delik donma kökenli olmalı: " + d);
+        y.assertTrue(!v.getValue(BuzDeligiBlogu.DONMA), "bitsiz sütunda açılan delik vanilla kökenli olmalı: " + v);
+        donma(y, 0f);
+        for (BlockPos p : List.of(donmaBuzu, vanillaBuz)) {
+            level.setBlock(p, level.getBlockState(p).setValue(BuzDeligiBlogu.ASAMA, DelikOmru.SON_ASAMA), Block.UPDATE_CLIENTS);
+            level.getBlockState(p).tick(level, p, level.random);
+        }
+        BlockState dSonra = level.getBlockState(donmaBuzu);
+        y.assertTrue(dSonra.is(Blocks.WATER) && dSonra.getFluidState().isSource(),
+                "donma 0'da donmanın buzundaki delik kaynak su olmalı: " + dSonra);
+        y.assertTrue(level.getBlockState(vanillaBuz).is(Blocks.ICE),
+                "donma 0'da vanilla buzdaki delik eski buza dönmeli: " + level.getBlockState(vanillaBuz));
+        sutunBiti(level, donmaBuzu, false);
+        temizle(y, o);
         y.succeed();
     }
 
@@ -489,6 +522,16 @@ public final class BalikcilikOyunTestleri {
                 // Isırmada vanilla şamandırayı aşağı çeker: olta deliğin altındaki suya inse de delikte sayılmalı.
                 olta.setPos(olta.getX(), delik.getY() - 0.35, olta.getZ());
                 y.assertTrue(BuzBalikciligi.delikteMi(olta), "deliğin altındaki suya inen olta delikte sayılmalı");
+                // Bc1 pozitif kontrol: delikte GLM vanilla sonucunu değiştirir; GLM'li sonuç yalnız bizim tablodandır.
+                int farkli = 0;
+                List<ItemStack> glmToplam = new ArrayList<>();
+                for (int i = 0; i < 20; i++) {
+                    List<List<ItemStack>> k = glmKarsilastir(level, olta, glmTohumu(i));
+                    glmToplam.addAll(k.get(0));
+                    farkli += ayniYiginlar(k.get(0), k.get(1)) ? 0 : 1;
+                }
+                lootuDenetle(y, glmToplam, "delikte GLM'li 20 tohum");
+                y.assertTrue(farkli >= 18, "delikte GLM vanilla sonucunu değiştirmeli: " + farkli + "/20 farklı");
                 isirmaZorla(y, olta);
                 int hasar = olta.retrieve(olta_);
                 y.assertTrue(hasar == 1, "çekme oltaya 1 hasar vermeli: " + hasar);
@@ -513,13 +556,49 @@ public final class BalikcilikOyunTestleri {
                 + ", konum " + olta.blockPosition() + ", kaldırıldı: " + olta.isRemoved() + ")"));
     }
 
+    /**
+     * Aynı tohumla vanilla balıkçılık tablosu iki kez yuvarlanır: [0] Forge yolu (global loot değiştiricileri uygulanır),
+     * [1] ham yuvarlama (değiştirici yok). İkisi aynıysa bizim GLM bu oltada tetiklenmedi.
+     */
+    @SuppressWarnings("deprecation")
+    private static List<List<ItemStack>> glmKarsilastir(ServerLevel level, FishingHook olta, long tohum) {
+        LootTable vanilla = level.getServer().getLootData().getLootTable(BuiltInLootTables.FISHING);
+        LootParams p = new LootParams.Builder(level).withParameter(LootContextParams.ORIGIN, olta.position())
+                .withParameter(LootContextParams.TOOL, new ItemStack(Items.FISHING_ROD))
+                .withParameter(LootContextParams.THIS_ENTITY, olta).withLuck(0).create(LootContextParamSets.FISHING);
+        List<ItemStack> glmli = vanilla.getRandomItems(p, tohum);
+        List<ItemStack> ham = new ArrayList<>();
+        vanilla.getRandomItemsRaw(new LootContext.Builder(p).withOptionalRandomSeed(tohum).create(null),
+                LootTable.createStackSplitter(level, ham::add));
+        return List.of(glmli, ham);
+    }
+
+    private static boolean ayniYiginlar(List<ItemStack> a, List<ItemStack> b) {
+        if (a.size() != b.size()) {
+            return false;
+        }
+        for (int i = 0; i < a.size(); i++) {
+            if (!ItemStack.matches(a.get(i), b.get(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Bc1: 20 sabit tohum (sıfırdan farklı). */
+    private static long glmTohumu(int i) {
+        long t = karistir(0x0BC1_0000L + i);
+        return t == 0 ? 1 : t;
+    }
+
     private static void dinle(Consumer<BalikTutulduEvent> dinleyici) {
         MinecraftForge.EVENT_BUS.addListener(EventPriority.NORMAL, false, BalikTutulduEvent.class, dinleyici);
     }
 
     /**
-     * Ba4: vanilla açık suda (buzsuz havuz) zorlanmış ısırmada {@code ItemFishedEvent} sonucu vanilla tablodandır: hiçbir
-     * yığın bizim ad alanımızdan değil (GLM tetiklenmedi) ve {@link BalikTutulduEvent} yayınlanmaz. Kendi batch'inde donma
+     * Ba4/Bc1: vanilla açık suda (buzsuz havuz) bizim GLM tetiklenmez: 20 sabit tohumda vanilla tablonun Forge yolu (GLM'li)
+     * ham yuvarlamayla birebir aynı; zorlanmış ısırmada {@code ItemFishedEvent} sonucunda bizim eşya yok ve
+     * {@link BalikTutulduEvent} yayınlanmaz. Kendi batch'inde donma
      * 0: donma %50 iken süreç gökyüzüne açık havuz yüzeyini buza çeviriyordu (şamandıra buzun içinde kalıyordu).
      */
     @GameTest(template = "bos", batch = "balikcilik_acik_su", timeoutTicks = 200)
@@ -555,6 +634,12 @@ public final class BalikcilikOyunTestleri {
             try {
                 y.assertTrue(!BuzBalikciligi.delikteMi(olta) && BuzBalikciligi.kalanBekleme(olta) == -1,
                         "açık suda bizim bekleme işlememeli");
+                // Bc1: GLM'nin tetiklenmediği doğrudan; 20 tohumun her birinde Forge yolu = ham vanilla yuvarlaması.
+                for (int i = 0; i < 20; i++) {
+                    List<List<ItemStack>> k = glmKarsilastir(level, olta, glmTohumu(i));
+                    y.assertTrue(ayniYiginlar(k.get(0), k.get(1)), "açık suda GLM vanilla sonucunu değiştirdi (tohum " + i
+                            + "): " + k.get(0) + " ≠ " + k.get(1));
+                }
                 isirmaZorla(y, olta);
                 olta.retrieve(olta_);
                 y.assertTrue(!vanilla.isEmpty(), "vanilla balıkçılık bir şey vermeli");

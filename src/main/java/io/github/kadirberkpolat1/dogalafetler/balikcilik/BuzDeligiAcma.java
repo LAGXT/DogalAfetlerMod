@@ -1,6 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.balikcilik;
 
 import io.github.kadirberkpolat1.dogalafetler.balikcilik.mantik.DelikOmru;
+import io.github.kadirberkpolat1.dogalafetler.donma.ChunkDonmaVerisi;
 import io.github.kadirberkpolat1.dogalafetler.donma.DonmaBloklari;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.BlockParticleOption;
@@ -56,7 +57,8 @@ public final class BuzDeligiAcma {
             return;
         }
         level.setBlock(konum, BalikcilikKayitlari.BUZ_DELIGI.get().defaultBlockState()
-                .setValue(BuzDeligiBlogu.INCE, buz.is(DonmaBloklari.INCE_BUZ.get())), Block.UPDATE_ALL);
+                .setValue(BuzDeligiBlogu.INCE, buz.is(DonmaBloklari.INCE_BUZ.get()))
+                .setValue(BuzDeligiBlogu.DONMA, donmaBuzuMu(level, konum)), Block.UPDATE_ALL);
         alet.hurtAndBreak(BalikcilikAyarlari.aletHasari(), oyuncu, o -> o.broadcastBreakEvent(olay.getHand()));
         oyuncu.awardStat(Stats.ITEM_USED.get(alet.getItem()));
         double x = konum.getX() + 0.5;
@@ -68,6 +70,12 @@ public final class BuzDeligiAcma {
         level.sendParticles(ParticleTypes.SPLASH, x, y - 0.05, z, 14, 0.25, 0.05, 0.25, 0.1);
         level.sendParticles(ParticleTypes.SNOWFLAKE, x, y + 0.1, z, 8, 0.3, 0.1, 0.3, 0.02);
         olay.setCancellationResult(InteractionResult.SUCCESS);
+    }
+
+    /** Sütunun üst buzunu donma sistemi mi koydu (chunk verisindeki buz biti, donma §A.6). */
+    public static boolean donmaBuzuMu(ServerLevel level, BlockPos konum) {
+        ChunkDonmaVerisi v = ChunkDonmaVerisi.al(level.getChunkAt(konum));
+        return v != null && v.buz(ChunkDonmaVerisi.indeks(konum.getX(), konum.getZ()));
     }
 
     /** Kazma ya da balta (vanilla ve {@code ToolActions} bildiren modlu aletler). */

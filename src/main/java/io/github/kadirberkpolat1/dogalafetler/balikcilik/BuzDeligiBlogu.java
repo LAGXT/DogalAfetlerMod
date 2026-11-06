@@ -38,8 +38,8 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  *
  * <p>Ömür zamanlanmış blok tick'iyle işler (chunk'la kaydedilir): açılınca {@link DelikOmru#ilkGecikme}, sonra üç donma
  * aşamasının ({@link #ASAMA} 1–3, giderek kapanan buz zarı) her biri {@link DelikOmru#asamaGecikmesi}; son aşamadan sonra
- * eski buz ({@link #INCE}: donma sisteminin ince buzu ya da buz) geri gelir; global donma ilerlemesi 0 ise (sıfırlanmış
- * dünya) su kalır (B-20). Donma sisteminin sütun biti ("bizim buz") deliğe dokunulmadan kalır; donma süreci üstü buz ya
+ * eski buz ({@link #INCE}: donma sisteminin ince buzu ya da buz) geri gelir; delik donmanın buzunda açıldıysa
+ * ({@link #DONMA}) ve global donma ilerlemesi 0 ise (sıfırlanmış dünya) su kalır (B-20). Donma sisteminin sütun biti ("bizim buz") deliğe dokunulmadan kalır; donma süreci üstü buz ya
  * da su olmayan sütuna dokunmaz (donma §A).
  */
 public final class BuzDeligiBlogu extends Block {
@@ -47,15 +47,17 @@ public final class BuzDeligiBlogu extends Block {
     public static final IntegerProperty ASAMA = IntegerProperty.create("asama", 0, DelikOmru.SON_ASAMA);
     /** Delik donma sisteminin ince buzunda açıldı; yeniden donunca ince buz olur. */
     public static final BooleanProperty INCE = BooleanProperty.create("ince");
+    /** Delik donma sisteminin buzunda açıldı (sütunun donma buz biti, donma §A); vanilla ve oyuncu buzunda false. */
+    public static final BooleanProperty DONMA = BooleanProperty.create("donma");
 
     public BuzDeligiBlogu(Properties ozellikler) {
         super(ozellikler);
-        registerDefaultState(stateDefinition.any().setValue(ASAMA, 0).setValue(INCE, false));
+        registerDefaultState(stateDefinition.any().setValue(ASAMA, 0).setValue(INCE, false).setValue(DONMA, false));
     }
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> kurucu) {
-        kurucu.add(ASAMA, INCE);
+        kurucu.add(ASAMA, INCE, DONMA);
     }
 
     /** Deliğin yerine gelecek eski buz. */
@@ -111,7 +113,7 @@ public final class BuzDeligiBlogu extends Block {
         double y = konum.getY() + 0.95;
         double z = konum.getZ() + 0.5;
         if (DelikOmru.buzaDonerMi(asama)) {
-            if (DelikOmru.suyaDonerMi(DunyaDonemi.al(level).donmaIlerlemesi())) {
+            if (DelikOmru.suyaDonerMi(DunyaDonemi.al(level).donmaIlerlemesi(), durum.getValue(DONMA))) {
                 level.setBlock(konum, Blocks.WATER.defaultBlockState(), Block.UPDATE_ALL);
                 level.playSound(null, konum, SoundEvents.GENERIC_SPLASH, SoundSource.BLOCKS, 0.3f, 1.2f);
                 level.sendParticles(ParticleTypes.SPLASH, x, y, z, 10, 0.25, 0.05, 0.25, 0.1);

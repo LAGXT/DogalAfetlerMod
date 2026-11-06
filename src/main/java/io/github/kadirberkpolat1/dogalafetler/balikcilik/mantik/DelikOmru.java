@@ -52,11 +52,12 @@ public final class DelikOmru {
     }
 
     /**
-     * Son aşamada delik buz yerine su mu olur: global donma ilerlemesi 0 (sıfırlanmış ya da tamamen çözülmüş dünya). Donma
-     * süreci deliğin sütununu açıkken atladığı için geri gelen buz bir daha çözülmezdi (karar B-20).
+     * Son aşamada delik buz yerine su mu olur: delik donma sisteminin buzunda (sütun buz biti) açıldıysa ve global donma
+     * ilerlemesi 0 ise (sıfırlanmış ya da tamamen çözülmüş dünya). Donma süreci deliğin sütununu açıkken atladığı için geri
+     * gelen buz bir daha çözülmezdi. Vanilla ve oyuncu buzu her zaman eski buza döner (madde 15; karar B-20).
      */
-    public static boolean suyaDonerMi(double donmaIlerlemesi) {
-        return donmaIlerlemesi <= 0;
+    public static boolean suyaDonerMi(double donmaIlerlemesi, boolean donmaBuzu) {
+        return donmaBuzu && donmaIlerlemesi <= 0;
     }
 
     /** Chunk'ta {@code acik} delik varken yenisi açılabilir mi (sınır 0 = hiç). */
