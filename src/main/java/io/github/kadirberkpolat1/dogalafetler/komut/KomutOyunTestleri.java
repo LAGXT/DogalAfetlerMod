@@ -12,6 +12,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.DenizSeviyesi;
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
 import io.github.kadirberkpolat1.dogalafetler.core.OyunTestiAfeti;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.OyunGunu;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SonumTipi;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.gametest.framework.GameTest;
@@ -125,7 +126,9 @@ public final class KomutOyunTestleri {
         yardimci.assertTrue(donem.deniz().equals(DenizSeviyesi.VARSAYILAN), "deniz");
         yardimci.assertTrue(donem.carpanlar().isEmpty(), "çarpanlar");
         yardimci.assertTrue(donem.gunOfseti() == 0, "gün ofseti");
-        yardimci.assertTrue(donem.uykuBirikimi() == 0, "uyku birikimi");
+        yardimci.assertTrue(donem.uykuBirikimi() == uykuOnce + 48_000, "sifirla uyku birikimini korumalı: " + donem.uykuBirikimi());
+        yardimci.assertTrue(yonetici.oyunGunu() == OyunGunu.gun(server.overworld().getGameTime(), donem.uykuBirikimi(), 0),
+                "sifirla sonrası gün = (oyun zamanı + uyku) günü: " + yonetici.oyunGunu());
         yardimci.assertTrue(donem.sonAfetler().isEmpty() && donem.sonHedef().isEmpty() && donem.sonSeviye() == 0,
                 "geçmiş");
         yardimci.assertTrue(donem.genelBeklemeKalan() == 0, "bekleme");

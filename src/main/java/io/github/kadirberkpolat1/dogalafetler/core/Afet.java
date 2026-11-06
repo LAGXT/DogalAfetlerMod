@@ -52,7 +52,11 @@ public abstract class Afet {
 
     // ---------------------------------------------------------------- alt sınıfın yazdıkları
 
-    /** Güncel etki alanı. Sunucu geneli afet {@link EtkiAlani#herYer()} döner. */
+    /**
+     * Güncel etki alanı. Sunucu geneli afet {@link EtkiAlani#herYer()} döner. Çekirdek dışındaki kod bunu doğrudan çağırmaz,
+     * yöneticinin korumalı {@code AfetYoneticisi.etkiAlani(afet)} okumasını kullanır (alt sınıf hatası sunucu tick'ine
+     * çıkmasın; K-C32, K-C46).
+     */
     public abstract EtkiAlani etkiAlani();
 
     /** Afetin her tick'teki işi; aşama geçişleri çağrıdan sonra temel sınıfta yapılır. */
@@ -159,7 +163,11 @@ public abstract class Afet {
         return sonlandi;
     }
 
-    /** Geçerli aşamanın kalan ölçekli tick'i; bilinmiyorsa -1. */
+    /**
+     * Geçerli aşamanın kalan ölçekli tick'i; bilinmiyorsa -1. AKTIF'te alt sınıfın {@link #aktifKalanTick()}'ine iner:
+     * çekirdek dışındaki kod (radar, sismograf) bunu doğrudan çağırmaz, yöneticinin korumalı
+     * {@code AfetYoneticisi.kalanOku(afet)} okumasını kullanır (K-C32, K-C46).
+     */
     public final long asamaKalanTick() {
         return switch (asama) {
             case ON_UYARI -> Math.max(0, baglam().onUyariSuresi() - asamaGecen);

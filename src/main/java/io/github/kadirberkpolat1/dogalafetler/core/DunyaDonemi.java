@@ -373,8 +373,9 @@ public final class DunyaDonemi extends SavedData {
 
     /**
      * {@code /dogalafet sifirla}: ay, güneş, donma, buharlaşma, deniz, çarpanlar, beklemeler, geçmiş, son hedef, gün ofseti,
-     * uyku birikimi, süreç durdurma kayıtları ve ek veri ilk hâline döner. Afet saati monoton kalır; aktif afeti ve dönem
-     * süreçlerini önce yönetici durdurur.
+     * süreç durdurma kayıtları ve ek veri ilk hâline döner. Uyku birikimi korunur: yaşanmış gecelerin payıdır, dünya
+     * yaşının parçasıdır (K-C42 rev., K-C46). Afet saati monoton kalır; aktif afeti ve dönem süreçlerini önce yönetici
+     * durdurur.
      */
     public void sifirla() {
         ayVar = true;
@@ -391,7 +392,6 @@ public final class DunyaDonemi extends SavedData {
         sonHedef = null;
         sonSeviye = 0;
         gunOfseti = 0;
-        uykuBirikimi = 0;
         surecDurdurmalari.clear();
         for (String anahtar : List.copyOf(ekVeri.getAllKeys())) {
             if (ekVeri.get(anahtar) instanceof CompoundTag altSistem) {
