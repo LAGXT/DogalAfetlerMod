@@ -7,7 +7,8 @@
 Koşu 1 (zincir, §6 #12): `forceload add ~-32 ~-32 ~32 ~32` (oyuncusuz dünya 300 tick sonra varlık işlemeyi bırakır; zorlanan
 chunk varken sürer, meteor_sunucu.py gibi) → `start ay_carpmasi` → `asama ileri` (SIREN: "ay yaklaşıyor", global yaklaşma ve çıtırtı katmanları)
 → `asama ileri` (çarpma: "ay çarptı ... tsunami çarpanı x3.50", deniz sürecinin 10 dk beklemesi) → 15 sn içinde
-"sarsıntı bitti" ve 10. sn'de "ay parçası yağmuru" → doğuş noktasına en az bir AY görünümlü krater → `asama ileri` x2
+"sarsıntı bitti" ve 10. sn'de "ay parçası yağmuru" → doğuş noktasına en az bir AY görünümlü krater → `asama ileri` (BİTİŞ anında biter;
+ikinci `asama ileri` dönem sürecine geçerdi, K-C48)
 (doğal bitiş) → `start ay_carpmasi` reddedilir (ay yok, madde 4) → `aysonrasi atla` (deniz yükseliyor) → `asama ileri`
 (hedefe) → `durum` (ay yok, deniz +4) → `sifirla` → `start` + `asama ileri` (ikinci yaklaşma, SIREN'de kalır) → sunucu `stop`.
 Koşu 2 (aynı dünya): dönem `ay=true ... ayOlay=<n>` (yaklaşma kalıcı), aktif ay çarpması SIREN'de geri yüklendi, yaklaşma
@@ -50,8 +51,7 @@ def kosu1(sunucu):
     sunucu.bekle(r"\[ay_carpmasi\] ay parçası yağmuru #\d+ başladı: 1800 tick", isaret, 30, "10. sn'de yağmur")
     sunucu.bekle(r"\[ay_carpmasi\] sarsıntı bitti: 0 blok düştü", isaret, 30, "sarsıntı penceresi (oyuncusuz: 0 blok)")
     sunucu.bekle(AY_KRATERI, isaret, 120, "doğuş noktasına ay görünümlü krater")
-    sunucu.komut("dogalafet asama ileri", r"Moon Impact phase")
-    sunucu.komut("dogalafet asama ileri", r"Moon Impact has ended")
+    sunucu.komut("dogalafet asama ileri", r"Moon Impact phase: Ending|Moon Impact has ended")
     sunucu.bekle(r"Afet bitti: ay_carpmasi seviye 0 neden DOGAL", isaret, 10, "doğal bitiş")
     sunucu.komut("dogalafet start ay_carpmasi", r"No suitable place found for Moon Impact", "ay yokken yeniden başlamaz")
     sunucu.komut("dogalafet aysonrasi atla", r"Waiting skipped: the sea is rising")
