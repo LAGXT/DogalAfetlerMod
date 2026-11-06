@@ -76,6 +76,9 @@ public final class AsitOrmanOtomasyonu {
     private static long cizimBasi;
     private static long cizimNs;
     private static int cizimSayisi;
+    private static long toplamCizim;
+    private static long kapiCizim;
+    private static long kapiBasi;
 
     static {
         ADIMLAR.add(bekle(100));
@@ -210,9 +213,27 @@ public final class AsitOrmanOtomasyonu {
         };
     }
 
-    /** Kareyi ister; sonraki çizilmiş karenin sonunda alınır, adımlar o zamana dek bekler. */
+    /**
+     * Kareyi A-34 kapısından sonra ister: istekten sonra en az 20 kare çizilmiş ve FPS ≥ 15 olmalı, en çok 60 sn beklenir
+     * (gizli workspace'te tek kare bayat kalabilir). Kare sonraki çizilmiş karenin sonunda alınır; çizim ms/kare kapı
+     * penceresinin ortalamasıdır.
+     */
     private static Adim kare(String ad) {
         return (mc, s, t) -> {
+            if (t == 1) {
+                kapiCizim = toplamCizim;
+                kapiBasi = System.nanoTime();
+                cizimNs = 0;
+                cizimSayisi = 0;
+                return false;
+            }
+            long cizilen = toplamCizim - kapiCizim;
+            boolean acik = cizilen >= 20 && mc.getFps() >= 15;
+            if (!acik && System.nanoTime() - kapiBasi < 60_000_000_000L) {
+                return false;
+            }
+            DogalAfetler.LOGGER.info(ON + "kare kapısı {}: {} ({} kare çizildi, FPS {})", ad,
+                    acik ? "kapı açık" : "60 sn doldu, UYARI", cizilen, mc.getFps());
             istenenKare = ad;
             return true;
         };
@@ -280,6 +301,7 @@ public final class AsitOrmanOtomasyonu {
         if (cizimBasi != 0) {
             cizimNs += System.nanoTime() - cizimBasi;
             cizimSayisi++;
+            toplamCizim++;
         }
         if (istenenKare == null) {
             return;
