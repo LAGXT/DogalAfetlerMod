@@ -2,12 +2,15 @@ package io.github.kadirberkpolat1.dogalafetler.client.esya.radar;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.client.esya.sismograf.IstemciSismograf;
+import io.github.kadirberkpolat1.dogalafetler.core.Afet;
+import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
 import io.github.kadirberkpolat1.dogalafetler.client.esya.sismograf.SismografEkrani;
 import io.github.kadirberkpolat1.dogalafetler.esya.mantik.GostergeYerlesimi;
 import io.github.kadirberkpolat1.dogalafetler.esya.mantik.RadarGorunumu;
 import io.github.kadirberkpolat1.dogalafetler.esya.radar.RadarPaketi;
 import io.github.kadirberkpolat1.dogalafetler.esya.sismograf.SismografPaketi;
 import java.util.Locale;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
@@ -40,6 +43,7 @@ public final class RadarOtomasyonu {
     private static int sayac;
     private static int toplam;
     private static boolean bitti;
+    private static final AtomicBoolean NORMAL_PENCERE = new AtomicBoolean();
 
     private RadarOtomasyonu() {
     }
@@ -88,7 +92,7 @@ public final class RadarOtomasyonu {
         }
         sayac++;
         toplam++;
-        if (toplam > 20 * 600) {
+        if (toplam > 20 * 900) {
             DogalAfetler.LOGGER.error(ON + "zaman aşımı (adım {}); kapanıyor", adim);
             kapat(mc);
             return;
@@ -119,13 +123,19 @@ public final class RadarOtomasyonu {
             case 3 -> bekle(100, () -> IstemciSismograf.durum().algilandi()
                     && IstemciRadar.durum().gorunum() == RadarGorunumu.GIZLI, "hassas_erken");
             case 4 -> {
+                NORMAL_PENCERE.set(false);
                 komut(server, "dogalafet hiz 20");
-                sonraki("erken bölüm hızlandırıldı (hiz 20, 30 tick)");
+                sonraki("erken bölüm hızlandırıldı (hiz 20)");
             }
             case 5 -> {
-                if (sayac >= 30) {
+                // İstemci tick'i değil sunucunun kendi durumu: yüklü makinede gömülü sunucu saniyelerce geride kalabilir.
+                if (sayac % 10 == 0) {
+                    server.execute(() -> NORMAL_PENCERE.set(AfetYoneticisi.al(server).aktifAfet()
+                            .map(Afet::normalOnUyariBasladi).orElse(false)));
+                }
+                if (NORMAL_PENCERE.get() || sayac >= 2400) {
                     komut(server, "dogalafet hiz 1");
-                    sonraki("hiz 1");
+                    sonraki("hiz 1; sunucuda normal ön-uyarı penceresi başladı=" + NORMAL_PENCERE.get());
                 }
             }
             case 6 -> bekle(60, () -> IstemciRadar.durum().gorunum() == RadarGorunumu.AFET, "radar_normal");
@@ -216,12 +226,13 @@ public final class RadarOtomasyonu {
             int y1 = RadarGostergesi.sonY;
             int x2 = x1 + RadarGostergesi.sonG;
             int y2 = y1 + RadarGostergesi.sonY2;
+            GostergeYerlesimi.Alt alt = RadarGostergesi.sonAlt;
             boolean orta = x1 < w / 2 + GostergeYerlesimi.HOTBAR_YARI && x2 > w / 2 - GostergeYerlesimi.HOTBAR_YARI
-                    && y2 > h - GostergeYerlesimi.DURUM_UST;
-            int yan = GostergeYerlesimi.HOTBAR_YARI + GostergeYerlesimi.HOTBAR_YAN;
-            boolean altYazi = x1 < w / 2 + yan && x2 > w / 2 - yan && y2 > h - GostergeYerlesimi.ALT_YAZI_UST;
-            cakisma = String.format(Locale.ROOT, "panel x=%d..%d y=%d..%d ekran %dx%d; sıcaklık barı/durum çakışması=%s,"
-                    + " hotbar yanı/action bar çakışması=%s", x1, x2, y1, y2, w, h, orta ? "VAR" : "yok",
+                    && y2 > h - alt.durumUst();
+            boolean altYazi = x1 < w / 2 + alt.altYaziYari() && x2 > w / 2 - alt.altYaziYari() && y2 > h - alt.altYaziUst();
+            cakisma = String.format(Locale.ROOT, "panel x=%d..%d y=%d..%d ekran %dx%d; durum sütunu üstü alttan %d, action bar"
+                    + " üstü alttan %d yarı genişlik %d; sıcaklık barı/durum çakışması=%s, action bar çakışması=%s", x1, x2, y1,
+                    y2, w, h, alt.durumUst(), alt.altYaziUst(), alt.altYaziYari(), orta ? "VAR" : "yok",
                     altYazi ? "VAR" : "yok");
         }
         DogalAfetler.LOGGER.info(ON + "kare {}: radar[görünüm={} tür={} aşama={} seviye={} kalan={} sn geçmiş={}]"

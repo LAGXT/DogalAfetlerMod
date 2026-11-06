@@ -15,6 +15,7 @@ import io.github.kadirberkpolat1.dogalafetler.esya.sismograf.SismografPaketi;
 import java.util.function.Consumer;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.network.chat.Component;
@@ -53,6 +54,9 @@ public final class IstemciSismograf {
     private static float oncekiZarf;
     private static int darbeSayisi;
     private static int actionBarSayisi;
+    /** Son yazılan action bar metni ve tick'i: radar paneli o satırın üstüne kalkar. */
+    private static Component sonMetin;
+    private static long sonMetinTick = Long.MIN_VALUE;
 
     private IstemciSismograf() {
     }
@@ -100,6 +104,11 @@ public final class IstemciSismograf {
     /** Oturumda yazılan action bar sayısı (otomasyon). */
     public static int actionBarSayisi() {
         return actionBarSayisi;
+    }
+
+    /** Ekrandaki sismograf action bar satırının genişliği (vanilla 60 tick + 20 tick sönüm); yoksa 0. */
+    public static int actionBarGenisligi(Font font) {
+        return sonMetin != null && tick - sonMetinTick <= 80 ? font.width(sonMetin) : 0;
     }
 
     static float zarf(float pt) {
@@ -154,7 +163,9 @@ public final class IstemciSismograf {
 
     private static void actionBar(Minecraft mc) {
         if (mc.player != null && durum.algilandi()) {
-            mc.player.displayClientMessage(metin(mc.player, durum), true);
+            sonMetin = metin(mc.player, durum);
+            sonMetinTick = tick;
+            mc.player.displayClientMessage(sonMetin, true);
             actionBarSayisi++;
         }
     }
@@ -198,6 +209,7 @@ public final class IstemciSismograf {
     @SubscribeEvent
     public static void cikis(ClientPlayerNetworkEvent.LoggingOut olay) {
         durum = SismografPaketi.YOK;
+        sonMetin = null;
         TAMPON.temizle();
         zarf = oncekiZarf = 0;
         darbede = -1;

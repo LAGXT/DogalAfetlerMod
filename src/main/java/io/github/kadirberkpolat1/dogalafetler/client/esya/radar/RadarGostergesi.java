@@ -3,6 +3,7 @@ package io.github.kadirberkpolat1.dogalafetler.client.esya.radar;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.client.esya.sismograf.IstemciSismograf;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetAsamasi;
 import io.github.kadirberkpolat1.dogalafetler.esya.radar.HavaRadari;
 import io.github.kadirberkpolat1.dogalafetler.esya.radar.RadarCevirileri;
@@ -32,7 +33,8 @@ import net.minecraftforge.fml.common.Mod;
  * taramalı radar kapı (afet merkezi bakış yönüne göre bir nokta olarak), sağda afetin adı, yön oku ve mesafe, varış ya da
  * kalan süre. Güneş patlaması ve ay çarpması sirenden sonra mor bir "gökyüzü anomalisi" ve geri sayım olarak görünür
  * (N7). Gelişmiş radar mor-mavi çerçevelidir ve altına şiddet seviyesi, hareket yönü/hızı ve son 5 afeti ekler. Yer
- * CLIENT config'tedir; alt köşelerde hotbar, kalpler ve sıcaklık barıyla çakışmaz ({@link GostergeYerlesimi}).
+ * CLIENT config'tedir; alt köşelerde hotbar, kalpler, sıcaklık barı ve sismograf action bar'ıyla çakışmaz
+ * ({@link GostergeYerlesimi}; yükseklikler Forge'un {@code leftHeight/rightHeight}'ından, katman bunlar dolduktan sonra çizilir).
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
 public final class RadarGostergesi {
@@ -60,6 +62,7 @@ public final class RadarGostergesi {
     static int sonY2;
     static int sonEkranG;
     static int sonEkranY;
+    static GostergeYerlesimi.Alt sonAlt = GostergeYerlesimi.VARSAYILAN;
 
     private RadarGostergesi() {
     }
@@ -139,8 +142,10 @@ public final class RadarGostergesi {
             pw = Math.max(pw, IC + font.width(alt.get(i)) + (i == (d.seviye() > 0 ? 1 : 0) && okluHareket ? 12 : 0) + IC + 2);
         }
         int ph = IC + KAP + IC + (alt.isEmpty() ? 0 : 3 + alt.size() * SATIR);
+        GostergeYerlesimi.Alt altBolge = GostergeYerlesimi.forgeAlt(gui.leftHeight, gui.rightHeight,
+                IstemciSismograf.actionBarGenisligi(font));
         GostergeYerlesimi.Konum k = GostergeYerlesimi.konum(w, h, pw, ph, RadarIstemciAyarlari.kose(),
-                RadarIstemciAyarlari.xOfset(), RadarIstemciAyarlari.yOfset());
+                RadarIstemciAyarlari.xOfset(), RadarIstemciAyarlari.yOfset(), altBolge);
         int x = k.x();
         int y = k.y();
         sonX = x;
@@ -149,6 +154,7 @@ public final class RadarGostergesi {
         sonY2 = ph;
         sonEkranG = w;
         sonEkranY = h;
+        sonAlt = altBolge;
 
         int cerceve = d.gelismis() ? CERCEVE_GELISMIS : CERCEVE;
         g.fill(x, y, x + pw, y + ph, ZEMIN);
