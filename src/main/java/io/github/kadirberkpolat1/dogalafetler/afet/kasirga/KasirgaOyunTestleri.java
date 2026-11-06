@@ -148,6 +148,8 @@ public final class KasirgaOyunTestleri {
             {Blocks.OAK_PLANKS, false, true, true},
             {Blocks.OBSIDIAN, false, false, false},
             {Blocks.DEEPSLATE, false, false, false},
+            {Blocks.DEEPSLATE_DIAMOND_ORE, false, false, false},
+            {Blocks.DEEPSLATE_BRICK_STAIRS, false, false, false},
             {Blocks.BEDROCK, false, false, false},
             {Blocks.CHEST, false, false, false},
         };

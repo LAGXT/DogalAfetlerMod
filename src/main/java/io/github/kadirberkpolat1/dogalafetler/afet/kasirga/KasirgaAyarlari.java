@@ -64,8 +64,9 @@ public final class KasirgaAyarlari {
         private final ForgeConfigSpec.DoubleValue hasar;
 
         private Sunucu(ForgeConfigSpec.Builder k) {
-            ucanBlokTavani = k.comment("Kasırga başına aynı anda havada en çok gerçek uçan blok (spike K0-33: 40). Fazlası koparılınca eşya olarak düşer.")
-                    .defineInRange("ucanBlokTavani", 40, 0, 200);
+            ucanBlokTavani = k.comment("Kasırga başına aynı anda havada en çok gerçek uçan blok (K0-33: en çok 40). Tavan doluyken",
+                    "koparılan blok parçalanır: tick başına denemenin en çok dörtte biri, yalnız 1/16'sı eşya düşürür.")
+                    .defineInRange("ucanBlokTavani", 40, 0, 40);
             kaldirmaTavani = k.comment("Kaldırılan oyuncu ve mob kasırga zemininden en çok bu kadar yükselir (blok); düşme hasarı vanilla.")
                     .defineInRange("kaldirmaTavani", 25.0, 0.0, 64.0);
             boyut = k.comment("Seviye tablosu çarpanı: huni çapı/yüksekliği, etek ve çekim yarıçapı (madde 10).")

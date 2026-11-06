@@ -20,6 +20,7 @@ import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.MinecraftServer;
@@ -336,6 +337,24 @@ public final class Kasirga extends Afet {
         hedefGecildi = t.getBoolean("hedefGecildi");
         aktifGecen = Math.max(0, t.getLong("aktifGecen"));
         toplamKaldirilan = Math.max(0, t.getLong("kaldirilan"));
+    }
+
+    /** Kayıttan dönüş: evre ilk tick beklenmeden {@code aktifGecen}'den kurulur, görüntü varlığı hemen doğar (inceleme Kn5). */
+    @Override
+    protected void yuklendi(ServerLevel level) {
+        if (asama() == AfetAsamasi.AKTIF) {
+            durum = KasirgaEvresi.aktifte(aktifGecen, seviyeBilgisi().aktifSureTick());
+        } else if (asama() == AfetAsamasi.SIREN) {
+            durum = new KasirgaEvresi.Durum(KasirgaEvresi.OLUSUM,
+                    Math.min(1, (double) asamaGecenTick() / Math.max(1, SirenTuru.sureTick(tur()))));
+        }
+        altAsamaAyarla(durum.evre().ordinal());
+        if (asama() == AfetAsamasi.SIREN || asama() == AfetAsamasi.AKTIF) {
+            varlikGuncelle(level);
+        }
+        DogalAfetler.LOGGER.info("[kasirga] kayıttan dönüş: evre {} ({}), konum {}, kaldırılan {}", durum.evre(),
+                String.format(Locale.ROOT, "%.2f", durum.ilerleme()), BlockPos.containing(konum()).toShortString(),
+                toplamKaldirilan);
     }
 
     // ---------------------------------------------------------------- davranış

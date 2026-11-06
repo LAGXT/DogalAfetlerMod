@@ -52,7 +52,7 @@ public final class KasirgaKayitlari {
     public static final ResourceKey<DamageType> HASAR = ResourceKey.create(Registries.DAMAGE_TYPE,
             DogalAfetler.konum("kasirga"));
 
-    /** Kasırganın kaldıramadığı bloklar (N12; varsayılan obsidyen, deepslate ailesi, ana kaya); veri paketiyle genişler. */
+    /** Kasırganın kaldıramadığı bloklar (N12; varsayılan obsidyen, deepslate ailesi ve cevherleri/varyantları, ana kaya); veri paketiyle genişler. */
     public static final TagKey<Block> DAYANIKLI = TagKey.create(Registries.BLOCK, DogalAfetler.konum("kasirga_dayanikli"));
 
     private KasirgaKayitlari() {

@@ -16,11 +16,21 @@ import net.minecraftforge.data.event.GatherDataEvent;
  * (K-E12).
  */
 final class KasirgaVerileri implements DataProvider {
-    /** Kasırganın kaldıramadığı bloklar: obsidyen, ağlayan obsidyen, ana kaya, deepslate ailesi, güçlendirilmiş deepslate. */
+    /**
+     * Kasırganın kaldıramadığı bloklar: obsidyen, ağlayan obsidyen, ana kaya, deepslate ailesi (tam bloklar, cevherler,
+     * merdiven/basamak/duvar varyantları; K0-33), güçlendirilmiş deepslate, canlanma çapası.
+     */
     static final String[] DAYANIKLI = {"minecraft:obsidian", "minecraft:crying_obsidian", "minecraft:bedrock",
         "minecraft:deepslate", "minecraft:cobbled_deepslate", "minecraft:polished_deepslate", "minecraft:deepslate_bricks",
         "minecraft:cracked_deepslate_bricks", "minecraft:deepslate_tiles", "minecraft:cracked_deepslate_tiles",
-        "minecraft:chiseled_deepslate", "minecraft:reinforced_deepslate", "minecraft:respawn_anchor"};
+        "minecraft:chiseled_deepslate", "minecraft:reinforced_deepslate", "minecraft:respawn_anchor",
+        "minecraft:deepslate_coal_ore", "minecraft:deepslate_iron_ore", "minecraft:deepslate_copper_ore",
+        "minecraft:deepslate_gold_ore", "minecraft:deepslate_redstone_ore", "minecraft:deepslate_emerald_ore",
+        "minecraft:deepslate_lapis_ore", "minecraft:deepslate_diamond_ore",
+        "minecraft:cobbled_deepslate_stairs", "minecraft:cobbled_deepslate_slab", "minecraft:cobbled_deepslate_wall",
+        "minecraft:polished_deepslate_stairs", "minecraft:polished_deepslate_slab", "minecraft:polished_deepslate_wall",
+        "minecraft:deepslate_brick_stairs", "minecraft:deepslate_brick_slab", "minecraft:deepslate_brick_wall",
+        "minecraft:deepslate_tile_stairs", "minecraft:deepslate_tile_slab", "minecraft:deepslate_tile_wall"};
 
     private final PackOutput cikti;
 
