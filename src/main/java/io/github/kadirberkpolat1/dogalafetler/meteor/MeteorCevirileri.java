@@ -25,7 +25,7 @@ final class MeteorCevirileri {
                 "Meteor yağmuru #%s başladı: %s sn, oyuncu başına dakikada %s");
         y.ekle(MeteorKomutlari.DURDUR, "Stopped %s command meteor shower(s); flying command meteors removed",
                 "%s komut meteor yağmuru durdu; uçan komut meteorları kaldırıldı");
-        y.ekle(MeteorKomutlari.BILGI, "Flying meteors: %s/%s, showers: %s, pending craters: %s",
-                "Uçan meteor: %s/%s, yağmur: %s, bekleyen krater: %s");
+        y.ekle(MeteorKomutlari.BILGI, "Flying meteors: %s/%s, showers: %s, pending craters: %s (%s waiting for unloaded chunks)",
+                "Uçan meteor: %s/%s, yağmur: %s, bekleyen krater: %s (%s yüklü olmayan chunk bekliyor)");
     }
 }

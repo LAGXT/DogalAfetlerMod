@@ -23,8 +23,10 @@ import net.minecraftforge.fml.common.Mod;
 
 /**
  * Meteor ödülleri (madde 13c): yalnız meteordan, yere düşen eşya olarak (adil kapış). Sıcak parçanın bitiş tick'i eşya
- * NBT'sinde {@value #SICAK_ETIKETI}: sıcakken alan ya da üstüne gelen oyuncu yanar; su ya da kar/buz üstünde, ya da süre
- * dolunca etiket silinir (soğuk parçalar envanterde yığılır). Ömür {@code Item#getEntityLifespan} ile (M-07).
+ * NBT'sinde {@value #SICAK_ETIKETI} (mutlak oyun tick'i, {@code getGameTime}; yeniden açılışta da geçerli, M-26): sıcakken alan
+ * ya da üstüne gelen oyuncu yanar; su ya da kar/buz üstünde, ya da süre dolunca etiket silinir (soğuk parçalar envanterde
+ * yığılır). Yakınlık takibine eşya dünyaya girerken alınır ({@link MeteorYoneticisi#varlikGirdi}). Ömür
+ * {@code Item#getEntityLifespan} ile (M-07).
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID)
 public final class MeteorOdulleri {
@@ -42,9 +44,6 @@ public final class MeteorOdulleri {
                 0.25, (level.random.nextDouble() - 0.5) * 0.08);
         e.setPickUpDelay(20);
         level.addFreshEntity(e);
-        if (sicakSaniye > 0) {
-            MeteorYoneticisi.sicakEkle(level, e);
-        }
         return e;
     }
 

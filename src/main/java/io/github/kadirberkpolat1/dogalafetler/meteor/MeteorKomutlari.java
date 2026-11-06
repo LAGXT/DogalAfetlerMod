@@ -100,7 +100,9 @@ final class MeteorKomutlari {
         int ucan = MeteorAPI.aktifMeteorSayisi(level);
         int yagmur = MeteorAPI.aktifYagmurSayisi(level);
         int krater = MeteorAPI.bekleyenKraterSayisi(level);
-        kaynak.sendSuccess(() -> Component.translatable(BILGI, ucan, MeteorAyarlari.varlikTavani(), yagmur, krater), false);
+        int bekleyen = MeteorYoneticisi.bekleyenChunkKraterSayisi(level);
+        kaynak.sendSuccess(() -> Component.translatable(BILGI, ucan, MeteorAyarlari.varlikTavani(), yagmur, krater, bekleyen),
+                false);
         return ucan;
     }
 }

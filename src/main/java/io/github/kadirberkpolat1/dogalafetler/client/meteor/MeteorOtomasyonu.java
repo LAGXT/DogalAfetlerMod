@@ -12,6 +12,7 @@ import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorOdulleri;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.ZirhEkleri;
 import io.github.kadirberkpolat1.dogalafetler.yangin.YanginKaynagi;
 import io.github.kadirberkpolat1.dogalafetler.yangin.YanginYoneticisi;
+import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
@@ -22,6 +23,7 @@ import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
@@ -47,11 +49,15 @@ import net.minecraftforge.fml.common.Mod;
  * tekerlek girdileri kapanışa kadar sayılır. Gizli workspace'te istemci ~1 FPS çizer: kare istenen tick'te değil, sonraki
  * çizilmiş karenin sonunda ({@code RenderTickEvent} END) alınır ve vitrinde meteorlar yavaş çekimde düşer
  * ({@code meteor.dusmeHizi} 0,6; sonra eski değere döner) ki uçuş birkaç çizilmiş kareye yayılsın.
+ * {@code -PotomasyonBolum=odul} (M-22): yalnız ödül ve ipucu kareleri, öğlen ışığında; her ipucu kendi karesinde, satırlar
+ * ekran genişliğine göre sarılır (tooltip'ler üst üste binmez).
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class MeteorOtomasyonu {
     private static final boolean AKTIF = "meteor".equals(System.getProperty("dogalafetler.otomasyon", ""));
     private static final String ON = "METEOR_OTOMASYON ";
+    private static final boolean YALNIZ_ODUL = "odul".equals(System.getProperty("dogalafetler.otomasyon.bolum", "hepsi"));
+    private static final String[] IPUCLARI = {"cekirdek", "parca", "plaka", "zirh"};
     private static final int UZAKLIK = 48;
     private static final int KAMERA_YUKSEKLIGI = 18;
     private static final double YAVAS_CEKIM = 0.6;
@@ -79,6 +85,7 @@ public final class MeteorOtomasyonu {
     private static String istenenKare;
     private static int carpmaSonrasiKare;
     private static int kraterAdimi;
+    private static int ipucu;
 
     private MeteorOtomasyonu() {
     }
@@ -135,6 +142,9 @@ public final class MeteorOtomasyonu {
                     mc.options.hideGui = true;
                     carpmaBaslangic = IstemciMeteor.carpmaSayisi();
                     sonraki();
+                    if (YALNIZ_ODUL) {
+                        sonraki();
+                    }
                 }
             }
             case 1 -> vitrin(mc, server);
@@ -149,11 +159,14 @@ public final class MeteorOtomasyonu {
                 }
             }
             case 3 -> {
-                if (sayac == 1 && istenenKare == null) {
-                    mc.setScreen(new IpucuEkrani());
-                } else if (sayac == 30) {
-                    kare("ipuclari");
-                } else if (sayac > 30 && istenenKare == null) {
+                if (ipucu < IPUCLARI.length && sayac == 1) {
+                    mc.setScreen(new IpucuEkrani(ipucuYigini(ipucu)));
+                } else if (ipucu < IPUCLARI.length && sayac == 30) {
+                    kare("ipucu_" + IPUCLARI[ipucu]);
+                } else if (ipucu < IPUCLARI.length && sayac > 30 && istenenKare == null) {
+                    ipucu++;
+                    sayac = 0;
+                } else if (ipucu >= IPUCLARI.length) {
                     mc.setScreen(null);
                     server.execute(() -> {
                         int sonen = YanginYoneticisi.sondur(server.overworld(), null);
@@ -241,7 +254,8 @@ public final class MeteorOtomasyonu {
     /** Sunucu thread'inde: kurallar, alacakaranlık, en yakın orman, seyirci kamera. */
     private static void hazirla(IntegratedServer server) {
         for (String k : new String[] {"gamerule sendCommandFeedback false", "gamerule doDaylightCycle false",
-                "gamerule doWeatherCycle false", "gamerule doMobSpawning false", "time set 13200", "weather clear"}) {
+                "gamerule doWeatherCycle false", "gamerule doMobSpawning false", YALNIZ_ODUL ? "time set 6000" : "time set 13200",
+                "weather clear"}) {
             server.getCommands().performPrefixedCommand(server.createCommandSourceStack(), k);
         }
         ServerLevel level = server.overworld();
@@ -291,12 +305,16 @@ public final class MeteorOtomasyonu {
                 }
             }
         }
-        MeteorOdulleri.birak(level, new Vec3(taban.getX() + 0.0, y + 1.1, taban.getZ() + 0.5),
-                new ItemStack(MeteorEsyaKayitlari.METEORIT_PARCASI.get()), 20);
-        MeteorOdulleri.birak(level, new Vec3(taban.getX() + 1.6, y + 1.1, taban.getZ() + 0.5),
-                new ItemStack(MeteorEsyaKayitlari.KOZMIK_CEKIRDEK.get()), 0);
+        for (int[] k : new int[][] {{-3, -3}, {3, -3}, {-3, 3}, {3, 3}}) {
+            level.setBlockAndUpdate(new BlockPos(taban.getX() + k[0], y + 1, taban.getZ() + k[1]),
+                    Blocks.SEA_LANTERN.defaultBlockState());
+        }
+        MeteorOdulleri.birak(level, new Vec3(taban.getX() - 0.1, y + 1.1, taban.getZ() + 0.5),
+                new ItemStack(MeteorEsyaKayitlari.METEORIT_PARCASI.get()), 20).setPickUpDelay(32767);
+        MeteorOdulleri.birak(level, new Vec3(taban.getX() + 1.5, y + 1.1, taban.getZ() + 0.5),
+                new ItemStack(MeteorEsyaKayitlari.KOZMIK_CEKIRDEK.get()), 0).setPickUpDelay(32767);
         ServerPlayer oyuncu = server.getPlayerList().getPlayers().get(0);
-        oyuncu.teleportTo(level, taban.getX() + 0.8, y + 2.2, taban.getZ() - 0.9, 0F, 55F);
+        oyuncu.teleportTo(level, taban.getX() + 0.7, y + 2.0, taban.getZ() - 1.1, 0F, 48F);
         DogalAfetler.LOGGER.info(ON + "ödüller {} y={}", taban.toShortString(), y + 1);
     }
 
@@ -322,19 +340,29 @@ public final class MeteorOtomasyonu {
                 mc.getFps(), mc.particleEngine.countParticles(), IstemciMeteor.carpmaSayisi());
     }
 
-    /** Kozmik Çekirdek (büyü parlamalı simge + ipucu) ve Termostatlı elmas göğüslüğün ipucu; dünya arkada görünür. */
-    private static final class IpucuEkrani extends Screen {
-        private final ItemStack cekirdek = new ItemStack(MeteorEsyaKayitlari.KOZMIK_CEKIRDEK.get());
-        private final ItemStack parca = new ItemStack(MeteorEsyaKayitlari.METEORIT_PARCASI.get());
-        private final ItemStack plaka = new ItemStack(MeteorEsyaKayitlari.TERMOSTAT_PLAKASI.get());
-        private final ItemStack zirh = new ItemStack(Items.DIAMOND_CHESTPLATE);
+    private static ItemStack ipucuYigini(int i) {
+        return switch (i) {
+            case 0 -> new ItemStack(MeteorEsyaKayitlari.KOZMIK_CEKIRDEK.get());
+            case 1 -> new ItemStack(MeteorEsyaKayitlari.METEORIT_PARCASI.get());
+            case 2 -> new ItemStack(MeteorEsyaKayitlari.TERMOSTAT_PLAKASI.get());
+            default -> {
+                ItemStack zirh = new ItemStack(Items.DIAMOND_CHESTPLATE);
+                zirh.enchant(Enchantments.ALL_DAMAGE_PROTECTION, 3);
+                ZirhEkleri.koy(zirh, Termostat.TERMOSTATLI);
+                ZirhEkleri.koy(zirh, ZirhEkleri.YUNLU);
+                ZirhEkleri.tuyAyarla(zirh, 8);
+                yield zirh;
+            }
+        };
+    }
 
-        IpucuEkrani() {
+    /** Tek eşya: büyütülmüş simge (çekirdeğin büyü parlaması görünür) ve sağında ekrana sığdırılmış ipucu; dünya arkada. */
+    private static final class IpucuEkrani extends Screen {
+        private final ItemStack yigin;
+
+        IpucuEkrani(ItemStack yigin) {
             super(Component.literal("meteor"));
-            zirh.enchant(Enchantments.ALL_DAMAGE_PROTECTION, 3);
-            ZirhEkleri.koy(zirh, Termostat.TERMOSTATLI);
-            ZirhEkleri.koy(zirh, ZirhEkleri.YUNLU);
-            ZirhEkleri.tuyAyarla(zirh, 8);
+            this.yigin = yigin;
         }
 
         @Override
@@ -344,23 +372,21 @@ public final class MeteorOtomasyonu {
 
         @Override
         public void render(GuiGraphics g, int fareX, int fareY, float kismi) {
-            g.fill(0, 0, width, height, 0x60000000);
-            simge(g, cekirdek, 24, 24);
-            simge(g, parca, 24, 100);
-            simge(g, plaka, width / 2 + 10, 24);
-            simge(g, zirh, width / 2 + 10, 100);
-            g.renderTooltip(font, cekirdek, 96, 40);
-            g.renderTooltip(font, parca, 96, 116);
-            g.renderTooltip(font, plaka, width / 2 + 82, 40);
-            g.renderTooltip(font, zirh, width / 2 + 82, 116);
-        }
-
-        private static void simge(GuiGraphics g, ItemStack yigin, int x, int y) {
+            g.fill(0, 0, width, height, 0x70000000);
+            int simgeX = width / 6;
+            int ust = height / 2 - 32;
             g.pose().pushPose();
-            g.pose().translate(x, y, 0);
+            g.pose().translate(simgeX, ust, 0);
             g.pose().scale(4, 4, 1);
             g.renderItem(yigin, 0, 0);
             g.pose().popPose();
+            int metinX = simgeX + 76;
+            int genislik = Math.max(60, width - metinX - 20);
+            List<FormattedCharSequence> satirlar = new ArrayList<>();
+            for (Component satir : getTooltipFromItem(Minecraft.getInstance(), yigin)) {
+                satirlar.addAll(font.split(satir, genislik));
+            }
+            g.renderTooltip(font, satirlar, metinX - 12, ust + 12);
         }
     }
 }

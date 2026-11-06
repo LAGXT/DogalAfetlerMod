@@ -21,15 +21,21 @@ import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Yalitim;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
 import io.github.kadirberkpolat1.dogalafetler.yangin.YanginKaynagi;
 import io.github.kadirberkpolat1.dogalafetler.yangin.YanginYoneticisi;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.BiPredicate;
+import java.util.function.Consumer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.inventory.CraftingMenu;
@@ -46,7 +52,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.event.entity.player.EntityItemPickupEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
 
@@ -214,6 +220,7 @@ public final class MeteorOyunTestleri {
         });
     }
 
+    /** Gerçek alma yolu ({@code ItemEntity.playerTouch} → {@code EntityItemPickupEvent} → envanter) ve yakınlık yanması. */
     @GameTest(template = SAHNE, batch = "meteor_sicak", timeoutTicks = 520)
     public static void sicakParcaYakarYirmiSaniyeSonraYakmaz(GameTestHelper y) {
         zemin(y, Blocks.STONE);
@@ -231,30 +238,275 @@ public final class MeteorOyunTestleri {
                 new ItemStack(MeteorEsyaKayitlari.METEORIT_PARCASI.get()), 20);
         try {
             dogrula(y, MeteorOdulleri.sicakMi(sicak.getItem(), level.getGameTime()), "yeni parça sıcak olmalı");
+            dogrula(y, MeteorYoneticisi.sicakTakipte(level, sicak), "bırakılan sıcak parça takipte olmalı");
             o.clearFire();
-            MinecraftForge.EVENT_BUS.post(new EntityItemPickupEvent(o, sicak));
+            sicak.setNoPickUpDelay();
+            sicak.playerTouch(o);
+            dogrula(y, sicak.isRemoved(), "parça envantere alınmalı");
             dogrula(y, o.getRemainingFireTicks() > 0, "sıcak parçayı alan oyuncu yanmalı");
-            dogrula(y, MeteorOdulleri.sicakBitis(sicak.getItem()) == OdulZamani.SOGUK, "alınan parça soğumalı (yığılır)");
-            sicak.discard();
+            int slot = o.getInventory().findSlotMatchingItem(new ItemStack(MeteorEsyaKayitlari.METEORIT_PARCASI.get()));
+            dogrula(y, slot >= 0, "envanterde etiketsiz (soğumuş, yığılabilir) parça olmalı: " + slot);
             o.clearFire();
         } catch (RuntimeException hata) {
             level.getServer().getPlayerList().remove(o);
             throw hata;
         }
-        y.runAfterDelay(40, () -> dogrula(y, MeteorOdulleri.sicakBitis(suda.getItem()) == OdulZamani.SOGUK,
-                "suya düşen parça hemen soğumalı"));
-        y.runAfterDelay(20L * OdulZamani.SICAK_SANIYE + 10, () -> {
+        y.runAfterDelay(15, () -> {
+            ItemEntity yakin = MeteorOdulleri.birak(level, new Vec3(o.getX(), o.getY() + 0.1, o.getZ()),
+                    new ItemStack(MeteorEsyaKayitlari.METEORIT_PARCASI.get()), 20);
+            yakin.setPickUpDelay(32767);
+        });
+        y.runAfterDelay(40, () -> {
+            dogrula(y, MeteorOdulleri.sicakBitis(suda.getItem()) == OdulZamani.SOGUK, "suya düşen parça hemen soğumalı");
+            dogrula(y, o.getRemainingFireTicks() > 0, "sıcak parçanın yanına gelen oyuncu yanmalı");
+        });
+        y.runAfterDelay(20L * OdulZamani.SICAK_SANIYE + 30, () -> {
             try {
                 dogrula(y, !MeteorOdulleri.sicakMi(bekleyen.getItem(), level.getGameTime()), "20 sn sonra soğuk olmalı");
                 dogrula(y, bekleyen.isAlive(), "parça 10 dk dolmadan kaybolmamalı");
                 o.clearFire();
-                MinecraftForge.EVENT_BUS.post(new EntityItemPickupEvent(o, bekleyen));
+                bekleyen.setNoPickUpDelay();
+                bekleyen.playerTouch(o);
+                dogrula(y, bekleyen.isRemoved(), "soğuk parça alınmalı");
                 dogrula(y, o.getRemainingFireTicks() <= 0, "soğumuş parça yakmamalı");
                 sahneyiTemizle(y);
                 y.succeed();
             } finally {
                 level.getServer().getPlayerList().remove(o);
             }
+        });
+    }
+
+    /**
+     * M-26: sıcak parça kaydedilip (ör. sunucu kapanışı) yeniden yüklenince NBT'deki mutlak bitiş tick'inden takibe
+     * alınır ve yanına gelen yanar; süresi kayıtlıyken dolmuş parça dünyaya girerken soğur.
+     */
+    @GameTest(template = SAHNE, batch = "meteor_sicak_kayit", timeoutTicks = 100)
+    public static void sicakParcaKaydedilipOkununcaTakipSurer(GameTestHelper y) {
+        zemin(y, Blocks.STONE);
+        ServerLevel level = y.getLevel();
+        BlockPos m = y.absolutePos(new BlockPos(7, 6, 7));
+        ServerPlayer o = CekirdekOyunTestleri.sahteOyuncu(y, new GameProfile(UUID.randomUUID(), "meteor-kayit"),
+                m.getX() + 0.5, m.getY(), m.getZ() + 0.5);
+        o.setGameMode(GameType.SURVIVAL);
+        ItemEntity ilk = MeteorOdulleri.birak(level, Vec3.atBottomCenterOf(m),
+                new ItemStack(MeteorEsyaKayitlari.METEORIT_PARCASI.get()), 20);
+        CompoundTag kayit = new CompoundTag();
+        ilk.save(kayit);
+        ilk.discard();
+        MeteorYoneticisi.sicakTakibiniUnut(level);
+        ItemEntity okunan = yukle(level, kayit);
+        try {
+            dogrula(y, MeteorOdulleri.sicakMi(okunan.getItem(), level.getGameTime()), "okunan parça sıcak kalmalı");
+            dogrula(y, MeteorYoneticisi.sicakTakipte(level, okunan), "okunan sıcak parça takibe alınmalı");
+            CompoundTag eski = kayit.copy();
+            eski.getCompound("Item").getCompound("tag").putLong(MeteorOdulleri.SICAK_ETIKETI, level.getGameTime() - 1);
+            ItemEntity sogumus = yukle(level, eski);
+            dogrula(y, MeteorOdulleri.sicakBitis(sogumus.getItem()) == OdulZamani.SOGUK,
+                    "süresi dolmuş kayıt dünyaya girerken soğumalı");
+            dogrula(y, !MeteorYoneticisi.sicakTakipte(level, sogumus), "soğuk parça takipte olmamalı");
+            o.clearFire();
+        } catch (RuntimeException hata) {
+            level.getServer().getPlayerList().remove(o);
+            throw hata;
+        }
+        y.runAfterDelay(12, () -> {
+            try {
+                dogrula(y, o.getRemainingFireTicks() > 0, "okunan sıcak parçanın yanındaki oyuncu yanmalı");
+                sahneyiTemizle(y);
+                y.succeed();
+            } finally {
+                level.getServer().getPlayerList().remove(o);
+            }
+        });
+    }
+
+    private static ItemEntity yukle(ServerLevel level, CompoundTag kayit) {
+        Entity varlik = EntityType.loadEntityRecursive(kayit, level, e -> e);
+        if (!(varlik instanceof ItemEntity e)) {
+            throw new IllegalStateException("eşya varlığı okunamadı: " + varlik);
+        }
+        e.setUUID(UUID.randomUUID());
+        e.setPickUpDelay(32767);
+        level.addFreshEntity(e);
+        return e;
+    }
+
+    /** M-02: suya (gerçek su) düşen meteor buhar çıkarır; krater, ateş ve ödül yok, sahne değişmez. */
+    @GameTest(template = SAHNE, batch = "meteor_su", timeoutTicks = 200)
+    public static void suyaDusenMeteorKraterAcmaz(GameTestHelper y) {
+        blokHasari(y, true);
+        zemin(y, Blocks.STONE);
+        for (int x = 1; x < 14; x++) {
+            for (int z = 1; z < 14; z++) {
+                y.setBlock(new BlockPos(x, 5, z), Blocks.WATER);
+            }
+        }
+        ServerLevel level = y.getLevel();
+        BlockPos a = y.absolutePos(BlockPos.ZERO);
+        BlockPos b = y.absolutePos(new BlockPos(14, 11, 14));
+        long once = SanalSu.bolgeHash(level, a.getX(), a.getY(), a.getZ(), b.getX(), b.getY(), b.getZ());
+        List<MeteorCarptiEvent> olaylar = new ArrayList<>();
+        Consumer<MeteorCarptiEvent> dinleyici = olaylar::add;
+        MinecraftForge.EVENT_BUS.addListener(EventPriority.NORMAL, false, MeteorCarptiEvent.class, dinleyici);
+        Optional<MeteorVarligi> m = MeteorAPI.dusur(level, y.absolutePos(MERKEZ), MeteorBoyutu.BUYUK, MeteorGorunumu.GUNES,
+                YanginKaynagi.KOMUT, false, 90, 0, HEP);
+        dogrula(y, m.isPresent(), "meteor varlığı oluşmalı");
+        y.succeedWhen(() -> {
+            y.assertTrue(m.get().isRemoved() && !olaylar.isEmpty(), "meteor henüz çarpmadı");
+            MinecraftForge.EVENT_BUS.unregister(dinleyici);
+            MeteorCarptiEvent olay = olaylar.get(0);
+            y.assertTrue(olay.suya(), "çarpma suya olmalı");
+            y.assertTrue(olay.odul().bos(), "suda ödül zarı atılmaz (zar 1'de bile): " + olay.odul());
+            y.assertTrue(MeteorAPI.bekleyenKraterSayisi(level) == 0, "suda krater işi olmamalı");
+            y.assertTrue(esyalar(y).isEmpty(), "suda ödül düşmemeli");
+            y.assertTrue(YanginYoneticisi.aktifSayi(level, kutu(y).inflate(4)) == 0, "suda ateş olmamalı");
+            long sonra = SanalSu.bolgeHash(level, a.getX(), a.getY(), a.getZ(), b.getX(), b.getY(), b.getZ());
+            y.assertTrue(once == sonra, "suya düşen meteor sahneyi değiştirmemeli");
+            sahneyiTemizle(y);
+        });
+    }
+
+    /**
+     * Yağmur: iki oyuncuya sırayla (fark ≤ 1) ve uçan meteor tavanı ({@code meteor.varlikTavani} 48) aşılmaz. Dağıtım
+     * halkası 0–2 blok ve giriş dik: meteorlar sahneye düşer.
+     */
+    @GameTest(template = SAHNE, batch = "meteor_yagmur", timeoutTicks = 300)
+    public static void yagmurOyuncularaDengeliTavanAsilmaz(GameTestHelper y) {
+        zemin(y, Blocks.STONE);
+        ServerLevel level = y.getLevel();
+        BlockPos m = y.absolutePos(BlockPos.ZERO);
+        ServerPlayer a = CekirdekOyunTestleri.sahteOyuncu(y, new GameProfile(UUID.randomUUID(), "meteor-yagmur-a"),
+                m.getX() + 3.5, m.getY() + 6, m.getZ() + 7.5);
+        ServerPlayer b = CekirdekOyunTestleri.sahteOyuncu(y, new GameProfile(UUID.randomUUID(), "meteor-yagmur-b"),
+                m.getX() + 11.5, m.getY() + 6, m.getZ() + 7.5);
+        List<MeteorCarptiEvent> olaylar = new ArrayList<>();
+        Consumer<MeteorCarptiEvent> dinleyici = olaylar::add;
+        MinecraftForge.EVENT_BUS.addListener(EventPriority.NORMAL, false, MeteorCarptiEvent.class, dinleyici);
+        int[] enCok = {0};
+        int tavan = MeteorAyarlari.varlikTavani();
+        // Tick başına 2 × 36000/1200 = 60 meteor isteği: ilk tick'te tavan dolar.
+        MeteorAPI.yagmur(level, List.of(a, b), 2, 36000, 0, YanginKaynagi.KOMUT, 0, 2, 90);
+        y.onEachTick(() -> enCok[0] = Math.max(enCok[0], MeteorAPI.aktifMeteorSayisi(level)));
+        y.succeedWhen(() -> {
+            y.assertTrue(MeteorAPI.aktifYagmurSayisi(level) == 0, "yağmur sürüyor");
+            y.assertTrue(MeteorAPI.aktifMeteorSayisi(level) == 0 && MeteorAPI.bekleyenKraterSayisi(level) == 0,
+                    "meteorlar düşmedi");
+            y.assertTrue(olaylar.size() == enCok[0], "her uçan meteor çarpmalı: " + olaylar.size() + " / " + enCok[0]);
+            MinecraftForge.EVENT_BUS.unregister(dinleyici);
+            int aSayisi = 0;
+            int bSayisi = 0;
+            for (MeteorCarptiEvent olay : olaylar) {
+                if (olay.konum().distSqr(a.blockPosition()) < olay.konum().distSqr(b.blockPosition())) {
+                    aSayisi++;
+                } else {
+                    bSayisi++;
+                }
+            }
+            DogalAfetler.LOGGER.info("meteor yağmur GameTest: en çok uçan {}/{}, çarpma A={} B={}", enCok[0], tavan,
+                    aSayisi, bSayisi);
+            y.assertTrue(enCok[0] == tavan, "uçan meteor tavanı dolmalı ve aşılmamalı: " + enCok[0] + " / " + tavan);
+            y.assertTrue(Math.abs(aSayisi - bSayisi) <= 1, "dağılım dengeli olmalı: " + aSayisi + " / " + bSayisi);
+            level.getServer().getPlayerList().remove(a);
+            level.getServer().getPlayerList().remove(b);
+            sahneyiTemizle(y);
+        });
+    }
+
+    /**
+     * M-04: {@code afetBlokHasari=false} iken krater yok, meteor ateşi yangın yöneticisinde yanar ama yakıtı tüketmez
+     * (blok değişmez); ödül eşya olduğu için düşer.
+     */
+    @GameTest(template = SAHNE, batch = "meteor_kural_ates", timeoutTicks = 300)
+    public static void blokHasariKapaliykenAtesYanarBlokDegismez(GameTestHelper y) {
+        GameRules.BooleanValue kural = blokHasari(y, false);
+        zemin(y, Blocks.DIRT);
+        List<BlockPos> tahtalar = new ArrayList<>();
+        for (int x = 0; x < 15; x++) {
+            for (int z = 0; z < 15; z++) {
+                double r = Math.hypot(x - MERKEZ.getX(), z - MERKEZ.getZ());
+                if (r > 5.6 && r <= 7.0) {
+                    y.setBlock(new BlockPos(x, 5, z), Blocks.OAK_PLANKS);
+                    tahtalar.add(new BlockPos(x, 5, z));
+                }
+            }
+        }
+        ServerLevel level = y.getLevel();
+        BlockPos a = y.absolutePos(BlockPos.ZERO);
+        BlockPos b = y.absolutePos(new BlockPos(14, 11, 14));
+        long once = SanalSu.bolgeHash(level, a.getX(), a.getY(), a.getZ(), b.getX(), b.getY(), b.getZ());
+        YanginKaynagi kaynak = YanginKaynagi.afet(AfetTuru.AY_CARPMASI, 910_000_000L + level.getGameTime());
+        KraterIsi is = carp(y, MeteorBoyutu.BUYUK, kaynak, HEP);
+        int[] gorulen = {0};
+        y.onEachTick(() -> gorulen[0] = Math.max(gorulen[0], YanginYoneticisi.aktifSayi(level, kutu(y).inflate(4))));
+        y.runAfterDelay(120, () -> {
+            try {
+                y.assertTrue(is.bitti() && is.kazilan() == 0, "krater açılmamalı: kazılan " + is.kazilan());
+                y.assertTrue(gorulen[0] > 0, "meteor ateşi yangın yöneticisinde yanmalı");
+                for (BlockPos t : tahtalar) {
+                    y.assertBlockPresent(Blocks.OAK_PLANKS, t);
+                }
+                long sonra = SanalSu.bolgeHash(level, a.getX(), a.getY(), a.getZ(), b.getX(), b.getY(), b.getZ());
+                y.assertTrue(once == sonra, "blok hasarı kapalıyken 120 tick yanan ateş blok değiştirmemeli");
+                List<ItemEntity> e = esyalar(y);
+                y.assertTrue(e.stream().anyMatch(i -> i.getItem().is(MeteorEsyaKayitlari.KOZMIK_CEKIRDEK.get()))
+                        && e.stream().anyMatch(i -> i.getItem().is(MeteorEsyaKayitlari.METEORIT_PARCASI.get())),
+                        "ödüller eşya olarak düşmeli");
+                YanginYoneticisi.kaynakBitti(level.getServer(), kaynak, true);
+                sahneyiTemizle(y);
+                y.succeed();
+            } finally {
+                kural.set(true, level.getServer());
+            }
+        });
+    }
+
+    /**
+     * M-25: krater işinin sıradaki hücresi yüklü olmayan chunk'taysa iş bekler (kayıttan aynen okunur), chunk yüklenince
+     * tamamlanır; zamanı gelmiş magma soğuması da yüklenene kadar kayıtta kalır.
+     */
+    @GameTest(template = SAHNE, batch = "meteor_bekleyen", timeoutTicks = 200)
+    public static void kraterIsiYukluDegilkenBeklerSonraTamamlanir(GameTestHelper y) {
+        blokHasari(y, true);
+        zemin(y, Blocks.DIRT);
+        ServerLevel level = y.getLevel();
+        int sinirX = y.absolutePos(MERKEZ).getX() + 3;
+        BlockPos magma = y.absolutePos(new BlockPos(1, 6, 1));
+        y.setBlock(new BlockPos(1, 6, 1), Blocks.MAGMA_BLOCK);
+        BiPredicate<ServerLevel, BlockPos> onceki = MeteorYoneticisi.yukluKaynagiAyarla(
+                (l, p) -> p.getX() < sinirX && !p.equals(magma) && l.isLoaded(p));
+        KraterIsi is;
+        try {
+            MeteorYoneticisi.sogumaEkle(level, magma, level.getGameTime() + 2, Blocks.BLACKSTONE.defaultBlockState());
+            is = carp(y, MeteorBoyutu.BUYUK, YanginKaynagi.KOMUT, HIC);
+        } catch (RuntimeException hata) {
+            MeteorYoneticisi.yukluKaynagiAyarla(onceki);
+            throw hata;
+        }
+        y.runAfterDelay(30, () -> {
+            try {
+                dogrula(y, !is.bitti() && is.bekliyor(), "krater işi yüklü olmayan hücrede beklemeli");
+                dogrula(y, MeteorYoneticisi.bekleyenChunkKraterSayisi(level) >= 1, "bekleyen krater sayılmalı");
+                y.assertBlockPresent(Blocks.DIRT, MERKEZ.offset(4, 0, 0));
+                y.assertBlockPresent(Blocks.MAGMA_BLOCK, new BlockPos(1, 6, 1));
+                MeteorVerisi veri = MeteorYoneticisi.veri(level);
+                dogrula(y, veri.sogumalar.stream().anyMatch(s -> s.konum().equals(magma)), "soğuma kayıtta kalmalı");
+                MeteorVerisi okunan = MeteorVerisi.yukle(veri.save(new CompoundTag()));
+                int i = veri.kraterler.indexOf(is);
+                dogrula(y, i >= 0 && okunan.kraterler.size() == veri.kraterler.size()
+                        && okunan.kraterler.get(i).ozet().equals(is.ozet()), "krater işi kayıttan aynen okunmalı: "
+                        + is.ozet() + " / " + (i >= 0 ? okunan.kraterler.get(i).ozet() : "yok"));
+                dogrula(y, okunan.sogumalar.size() == veri.sogumalar.size(), "soğumalar kayıttan okunmalı");
+            } finally {
+                MeteorYoneticisi.yukluKaynagiAyarla(onceki);
+            }
+        });
+        y.runAfterDelay(60, () -> {
+            dogrula(y, is.bitti(), "chunk yüklenince krater işi tamamlanmalı");
+            y.assertBlockPresent(Blocks.AIR, MERKEZ.offset(4, 0, 0));
+            y.assertBlockPresent(Blocks.BLACKSTONE, new BlockPos(1, 6, 1));
+            sahneyiTemizle(y);
+            y.succeed();
         });
     }
 
@@ -368,22 +620,10 @@ public final class MeteorOyunTestleri {
         ServerPlayer duz = CekirdekOyunTestleri.sahteOyuncu(y, new GameProfile(UUID.randomUUID(), "termostat-b"),
                 m.getX() + 0.7, m.getY(), m.getZ() + 0.5);
         try {
-            for (ServerPlayer o : List.of(termostatli, duz)) {
-                o.setGameMode(GameType.SURVIVAL);
-                for (EquipmentSlot yuva : List.of(EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS,
-                        EquipmentSlot.FEET)) {
-                    ItemStack parca = new ItemStack(switch (yuva) {
-                        case HEAD -> Items.IRON_HELMET;
-                        case CHEST -> Items.IRON_CHESTPLATE;
-                        case LEGS -> Items.IRON_LEGGINGS;
-                        default -> Items.IRON_BOOTS;
-                    });
-                    if (o == termostatli) {
-                        ZirhEkleri.koy(parca, Termostat.TERMOSTATLI);
-                    }
-                    o.setItemSlot(yuva, parca);
-                }
-            }
+            termostatli.setGameMode(GameType.SURVIVAL);
+            duz.setGameMode(GameType.SURVIVAL);
+            giydir(termostatli, true, false);
+            giydir(duz, false, false);
             dogrula(y, ZirhEkleri.yalitimGirdisi(termostatli).termostatParcasi() == 4, "4 termostatlı parça sayılmalı");
             dogrula(y, ZirhEkleri.yalitimGirdisi(duz).termostatParcasi() == 0, "düz zırh termostatsız");
             Yalitim.Ayarlar ayar = SicaklikAyarlari.al().yalitim();
@@ -394,6 +634,26 @@ public final class MeteorOyunTestleri {
             dogrula(y, ilimliFark > 0, "termostat −60'taki vücudu nötre çekmeli: " + ilimliFark);
             dogrula(y, Math.abs(ilimliFark - ilimliBeklenen) < 0.02,
                     "çekim fizikle aynı: " + ilimliFark + " / " + ilimliBeklenen + " (E=" + ilimliE + ")");
+
+            // Termostat + yün + tüy birlikte (madde 13c "hepsi birlikte dengeli", N4): sıcakta çok yalıtımlı ikisi de ısınır,
+            // termostatlı fizikteki kadar az; yalıtım girdisi üç eki birlikte sayar, termostat tam koruma vermez.
+            giydir(termostatli, true, true);
+            giydir(duz, false, true);
+            Yalitim.Girdi girdi = ZirhEkleri.yalitimGirdisi(termostatli);
+            dogrula(y, girdi.termostatParcasi() == 4 && girdi.yunluParca() == 4 && girdi.toplamTuy() == 120,
+                    "termostat, yün ve tüy birlikte sayılmalı: " + girdi);
+            SicaklikKancalari.ortamKaynagiEkle(level, new Vec3(m.getX() + 0.6, m.getY() + 1, m.getZ() + 0.5), 45, 16, 40);
+            double sicakE = SicaklikYoneticisi.analiz(duz).ortamBirim();
+            double sicakFark = adim(termostatli, duz, 60);
+            double sicakBeklenen = Yalitim.termostatCekimi(60, sicakE, 4, ayar);
+            DogalAfetler.LOGGER.info("termostat GameTest (yün + 30 tüy): sıcak E={} fark={} vücut {} / {}", sicakE, sicakFark,
+                    VucutSicakligi.al(termostatli), VucutSicakligi.al(duz));
+            dogrula(y, sicakFark < 0, "termostat sıcakta nötre (aşağı) çekmeli: " + sicakFark);
+            dogrula(y, Math.abs(sicakFark - sicakBeklenen) < 0.02, "sıcak çekim fizikle aynı: " + sicakFark + " / "
+                    + sicakBeklenen + " (E=" + sicakE + ")");
+            dogrula(y, VucutSicakligi.al(termostatli) > 60, "çok yalıtımlı termostatlı da sıcakta ısınır (tam koruma yok)");
+            giydir(termostatli, true, false);
+            giydir(duz, false, false);
 
             SicaklikKancalari.ortamKaynagiEkle(level, new Vec3(m.getX() + 0.6, m.getY() + 1, m.getZ() + 0.5), -200, 16, 60);
             double ucE = SicaklikYoneticisi.analiz(duz).ortamBirim();
@@ -409,6 +669,26 @@ public final class MeteorOyunTestleri {
         } finally {
             level.getServer().getPlayerList().remove(termostatli);
             level.getServer().getPlayerList().remove(duz);
+        }
+    }
+
+    /** Dört demir zırh parçası; {@code termostat}: termostatlı, {@code yunTuy}: yünlü ve parça başına 30 tüy. */
+    private static void giydir(ServerPlayer o, boolean termostat, boolean yunTuy) {
+        for (EquipmentSlot yuva : List.of(EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET)) {
+            ItemStack parca = new ItemStack(switch (yuva) {
+                case HEAD -> Items.IRON_HELMET;
+                case CHEST -> Items.IRON_CHESTPLATE;
+                case LEGS -> Items.IRON_LEGGINGS;
+                default -> Items.IRON_BOOTS;
+            });
+            if (termostat) {
+                ZirhEkleri.koy(parca, Termostat.TERMOSTATLI);
+            }
+            if (yunTuy) {
+                ZirhEkleri.koy(parca, ZirhEkleri.YUNLU);
+                ZirhEkleri.tuyAyarla(parca, 30);
+            }
+            o.setItemSlot(yuva, parca);
         }
     }
 

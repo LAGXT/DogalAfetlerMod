@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Meteor ve termostatın görsel kanıtı (K0-21 rev. 2 ekran protokolü, kilit (k)).
 
-Kullanım (worktree kökünden): python3 tools/senaryo/meteor_gorsel.py
+Kullanım (worktree kökünden): python3 tools/senaryo/meteor_gorsel.py [odul]
+(`odul`: yalnız ödül ve ipucu kareleri, `-PotomasyonBolum=odul`, M-22; argümansız: bütün vitrin.)
 
 Tek oyunculu Quick Play dünyası `run/saves/meteor` her koşuda KOK/run/saves/test'ten (seed 20261105, allowCommands=1) taze
 kopyalanır; istemci `-Potomasyon=meteor` (K-E3) ile açılır ve `client.meteor.MeteorOtomasyonu`
@@ -25,6 +26,7 @@ import time
 from pathlib import Path
 
 WS = 92
+BOLUM = sys.argv[1] if len(sys.argv) > 1 else "hepsi"
 W = Path(__file__).resolve().parents[2]
 KOK = W.parents[1] if W.parent.name == ".worktrees" else W
 KANIT = KOK / ".vibe/kanit/meteor-termostat"
@@ -141,6 +143,7 @@ def main():
                      f"export JAVA_HOME='{JAVA_HOME}'\n"
                      f"exec python3 tools/senaryo/runclient_kilit.py kos '{W}' --bekle 1800 -- "
                      "timeout 3000 ./gradlew runClient --offline --no-daemon --console=plain -PquickPlay=meteor -Potomasyon=meteor "
+                     f"-PotomasyonBolum={BOLUM} "
                      f"> '{istemci_log}' 2>&1\n")
     sahip = hypr_json("activewindow")
     sahip_adres = sahip.get("address") if isinstance(sahip, dict) else None

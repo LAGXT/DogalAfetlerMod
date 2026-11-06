@@ -1,5 +1,13 @@
 package io.github.kadirberkpolat1.dogalafetler.client.meteor;
 
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.BufferBuilder;
+import com.mojang.blaze3d.vertex.BufferUploader;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.Tesselator;
+import com.mojang.blaze3d.vertex.VertexFormat;
+import com.mojang.blaze3d.vertex.VertexSorting;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.esya.MeteorEsyaKayitlari;
@@ -14,6 +22,7 @@ import java.util.function.Consumer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.Particle;
+import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleOptions;
@@ -25,8 +34,10 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
+import org.joml.Matrix4f;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
+import net.minecraftforge.client.event.RenderLevelStageEvent;
 import net.minecraftforge.client.event.ViewportEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
@@ -186,13 +197,57 @@ public final class IstemciMeteor {
         return tam + (r.nextDouble() < beklenen - tam ? 1 : 0);
     }
 
-    /** Ekran parlaması katmanının alfası (0–255). */
-    static int parlamaAlfasi(float kismi) {
+    /** Ekran parlamasının gücü (0–1). */
+    static float parlama(float kismi) {
         if (parlamaKalan <= 0) {
             return 0;
         }
         float oran = Math.max(0, (parlamaKalan - kismi) / PARLAMA_TICK);
-        return Math.min(255, (int) (255 * parlamaGucu * oran));
+        return Math.min(1, parlamaGucu * oran);
+    }
+
+    /**
+     * Çarpma parlaması: dünya çizimi bitince (el ve GUI'den önce) tam ekran sıcak beyaz örtü. GUI katmanı değildir; F1
+     * ({@code hideGui}) iken de görünür (M-23). Derinlik ve sis yok; izdüşüm geçici olarak birim matris.
+     */
+    @SubscribeEvent
+    public static void dunyaCizimi(RenderLevelStageEvent olay) {
+        if (olay.getStage() != RenderLevelStageEvent.Stage.AFTER_LEVEL) {
+            return;
+        }
+        float guc = parlama(olay.getPartialTick());
+        if (guc <= 0.004F) {
+            return;
+        }
+        RenderSystem.backupProjectionMatrix();
+        RenderSystem.setProjectionMatrix(new Matrix4f(), VertexSorting.ORTHOGRAPHIC_Z);
+        PoseStack gorus = RenderSystem.getModelViewStack();
+        gorus.pushPose();
+        gorus.setIdentity();
+        RenderSystem.applyModelViewMatrix();
+        RenderSystem.disableDepthTest();
+        RenderSystem.depthMask(false);
+        RenderSystem.disableCull();
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.setShader(GameRenderer::getPositionColorShader);
+        BufferBuilder tampon = Tesselator.getInstance().getBuilder();
+        tampon.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+        float r = 1.0F;
+        float g = 0.965F;
+        float b = 0.91F;
+        tampon.vertex(-1, -1, 0).color(r, g, b, guc).endVertex();
+        tampon.vertex(1, -1, 0).color(r, g, b, guc).endVertex();
+        tampon.vertex(1, 1, 0).color(r, g, b, guc).endVertex();
+        tampon.vertex(-1, 1, 0).color(r, g, b, guc).endVertex();
+        BufferUploader.drawWithShader(tampon.end());
+        RenderSystem.disableBlend();
+        RenderSystem.enableCull();
+        RenderSystem.depthMask(true);
+        RenderSystem.enableDepthTest();
+        gorus.popPose();
+        RenderSystem.applyModelViewMatrix();
+        RenderSystem.restoreProjectionMatrix();
     }
 
     @SubscribeEvent

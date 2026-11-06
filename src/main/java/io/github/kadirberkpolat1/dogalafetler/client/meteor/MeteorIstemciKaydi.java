@@ -4,12 +4,11 @@ import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorKayitlari;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.EntityRenderersEvent;
-import net.minecraftforge.client.event.RegisterGuiOverlaysEvent;
 import net.minecraftforge.client.event.RegisterParticleProvidersEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
-/** Meteor varlık çizicisi, parçacık sağlayıcıları ve çarpma parlaması katmanı (mod veri yolu). */
+/** Meteor varlık çizicisi ve parçacık sağlayıcıları (mod veri yolu). */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
 public final class MeteorIstemciKaydi {
     private MeteorIstemciKaydi() {
@@ -34,15 +33,5 @@ public final class MeteorIstemciKaydi {
         olay.registerSpriteSet(MeteorKayitlari.PARILTI.get(),
                 s -> new MeteorParcacigi.Saglayici(s, MeteorParcacigi.Tur.PARILTI));
         olay.registerSpriteSet(MeteorKayitlari.KOZMIK.get(), s -> new MeteorParcacigi.Saglayici(s, MeteorParcacigi.Tur.KOZMIK));
-    }
-
-    @SubscribeEvent
-    public static void katmanlar(RegisterGuiOverlaysEvent olay) {
-        olay.registerAboveAll("meteor_parlamasi", (gui, cizim, kismiTick, genislik, yukseklik) -> {
-            int alfa = IstemciMeteor.parlamaAlfasi(kismiTick);
-            if (alfa > 0) {
-                cizim.fill(0, 0, genislik, yukseklik, (alfa << 24) | 0xFFF6E8);
-            }
-        });
     }
 }

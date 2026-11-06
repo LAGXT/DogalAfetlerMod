@@ -29,6 +29,10 @@ final class MeteorYagmuru {
     private final Random rastgele;
     private int kalanTick;
     private double birikim;
+    /** Test: sabit dağıtım halkası (− 1: config) ve giriş açısı (NaN: rastgele). */
+    private int icYaricap = -1;
+    private int disYaricap = -1;
+    private double aci = Double.NaN;
 
     MeteorYagmuru(int kimlik, Set<UUID> oyuncular, int sureTick, double dakikaBasina, double buyukOran,
             YanginKaynagi kaynak, long tohum) {
@@ -47,6 +51,13 @@ final class MeteorYagmuru {
         return kalanTick;
     }
 
+    MeteorYagmuru testAyari(int ic, int dis, double girisAcisi) {
+        icYaricap = ic;
+        disYaricap = dis;
+        aci = girisAcisi;
+        return this;
+    }
+
     /** Bir tick ilerler; bitince {@code false}. */
     boolean tick(ServerLevel level) {
         if (kalanTick-- <= 0) {
@@ -54,15 +65,19 @@ final class MeteorYagmuru {
         }
         List<BlockPos> merkezler = merkezler(level);
         birikim += merkezler.size() * dakikaBasina / 1200.0;
-        int ic = MeteorAyarlari.dagitimIcYaricap();
-        int dis = MeteorAyarlari.dagitimDisYaricap();
+        int ic = icYaricap >= 0 ? icYaricap : MeteorAyarlari.dagitimIcYaricap();
+        int dis = disYaricap >= 0 ? disYaricap : MeteorAyarlari.dagitimDisYaricap();
         while (birikim >= 1) {
             birikim -= 1;
             BlockPos merkez = merkezler.get(dagitim.siradaki(merkezler.size()));
             double[] o = MeteorDagitimi.ofset(rastgele, ic, dis);
             BlockPos hedef = merkez.offset((int) Math.round(o[0]), 0, (int) Math.round(o[1]));
             MeteorBoyutu boyut = rastgele.nextDouble() < buyukOran ? MeteorBoyutu.BUYUK : MeteorBoyutu.KUCUK;
-            MeteorAPI.dusur(level, hedef, boyut, gorunum, kaynak, true);
+            if (Double.isNaN(aci)) {
+                MeteorAPI.dusur(level, hedef, boyut, gorunum, kaynak, true);
+            } else {
+                MeteorAPI.dusur(level, hedef, boyut, gorunum, kaynak, true, aci, rastgele.nextDouble() * 2 * Math.PI);
+            }
         }
         return true;
     }

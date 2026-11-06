@@ -113,6 +113,18 @@ public final class MeteorAPI {
                 k -> new MeteorYagmuru(k, kimlikler, sureTick, dakikaBasinaAdet, buyukOran, kaynak, tohum));
     }
 
+    /** Test: dağıtım halkası ve giriş açısı sabit yağmur (meteorlar test sahnesine düşsün). */
+    static int yagmur(ServerLevel level, Collection<ServerPlayer> oyuncular, int sureTick, double dakikaBasinaAdet,
+            double buyukOran, YanginKaynagi kaynak, int ic, int dis, double aci) {
+        Set<UUID> kimlikler = new HashSet<>();
+        for (ServerPlayer o : oyuncular) {
+            kimlikler.add(o.getUUID());
+        }
+        long tohum = level.random.nextLong();
+        return MeteorYoneticisi.yagmurEkle(level, k -> new MeteorYagmuru(k, kimlikler, sureTick, dakikaBasinaAdet, buyukOran,
+                kaynak, tohum).testAyari(ic, dis, aci));
+    }
+
     public static boolean yagmurDurdur(ServerLevel level, int kimlik) {
         return MeteorYoneticisi.yagmurDurdur(level, kimlik);
     }

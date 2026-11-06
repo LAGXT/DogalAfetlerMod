@@ -8,7 +8,6 @@ import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorGorunumu;
 import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorVarligi;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
@@ -31,6 +30,8 @@ final class MeteorCizici extends EntityRenderer<MeteorVarligi> {
     private static final ResourceLocation IZ = DogalAfetler.konum("textures/entity/meteor_izi.png");
     private static final int IZ_PARCASI = 14;
     private static final double DISK_ONCESI = 30;
+    /** Bunun ötesinde blok kümesi gövde çizilmez: uzaktan kare leke gibi okunuyordu, plazma panosu yeterli. */
+    private static final double GOVDE_MESAFESI = 96;
     private static final float[][] PARCALAR = {{0.42F, 0.3F, 0.1F}, {-0.38F, 0.25F, -0.2F}, {0.05F, -0.4F, 0.35F},
         {-0.1F, 0.1F, -0.45F}};
 
@@ -61,7 +62,7 @@ final class MeteorCizici extends EntityRenderer<MeteorVarligi> {
         Vec3 goz = entityRenderDispatcher.camera.getPosition().subtract(merkez);
         float yas = m.yas() + kismi;
 
-        VertexConsumer izTampon = tampon.getBuffer(RenderType.eyes(IZ));
+        VertexConsumer izTampon = tampon.getBuffer(MeteorIsikTipi.ISIK.apply(IZ));
         double uzunluk = m.izUzunlugu();
         if (ay) {
             iz(ps, izTampon, yon, uzunluk, goz, 1.3F * olcek, 0.30F, 0.50F, 1.0F, 0.75F);
@@ -71,9 +72,11 @@ final class MeteorCizici extends EntityRenderer<MeteorVarligi> {
             iz(ps, izTampon, yon, uzunluk * 0.7, goz, 0.5F * olcek, 1.0F, 0.88F, 0.55F, 1.0F);
         }
 
-        govde(m, ps, tampon, ay, olcek, yas);
+        if (goz.lengthSqr() < GOVDE_MESAFESI * GOVDE_MESAFESI) {
+            govde(m, ps, tampon, ay, olcek, yas);
+        }
 
-        VertexConsumer plazma = tampon.getBuffer(RenderType.eyes(PLAZMA));
+        VertexConsumer plazma = tampon.getBuffer(MeteorIsikTipi.ISIK.apply(PLAZMA));
         float titresim = 0.92F + 0.08F * Mth.sin(yas * 1.7F);
         if (ay) {
             pano(ps, plazma, yon.scale(0.35 * olcek), 2.0F * olcek * titresim, 0.75F, 0.88F, 1.0F, 1.0F);

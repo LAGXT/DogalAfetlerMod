@@ -2,7 +2,6 @@ package io.github.kadirberkpolat1.dogalafetler.meteor;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
-import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.KraterProfili;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.OdulZari;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.Sarsinti;
 import io.github.kadirberkpolat1.dogalafetler.network.AgKanali;
@@ -58,10 +57,8 @@ final class MeteorCarpmasi {
         }
         boolean blokHasari = Kurallar.blokHasariAcik(level.getGameRules());
         long tohum = level.random.nextLong();
-        KraterProfili.Plan plan = KraterProfili.planla(yaricap, derinlik, tohum, UST_TEMIZLIK, blokHasari);
         OdulZari.Sonuc odul = OdulZari.at(boyut.buyuk(), sanslar, new Random(tohum ^ 0x5DEECE66DL));
-        KraterIsi is = new KraterIsi(zemin.immutable(), plan, yaricap, derinlik, boyut, gorunum, kaynak, odul,
-                blokHasari, new Random(tohum));
+        KraterIsi is = new KraterIsi(zemin, yaricap, derinlik, tohum, boyut, gorunum, kaynak, odul, blokHasari);
         MeteorYoneticisi.kraterEkle(level, is);
         return is;
     }

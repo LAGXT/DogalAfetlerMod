@@ -91,7 +91,7 @@
   "commands.dogalafetler.kizilcuce.var": "present",
   "commands.dogalafetler.kizilcuce.yok": "gone",
   "commands.dogalafetler.kizilcuce.zaten": "The red dwarf era has already begun.",
-  "commands.dogalafetler.meteor.bilgi": "Flying meteors: %s/%s, showers: %s, pending craters: %s",
+  "commands.dogalafetler.meteor.bilgi": "Flying meteors: %s/%s, showers: %s, pending craters: %s (%s waiting for unloaded chunks)",
   "commands.dogalafetler.meteor.durdur": "Stopped %s command meteor shower(s); flying command meteors removed",
   "commands.dogalafetler.meteor.dusur": "Meteor (%s) falling towards %s, %s",
   "commands.dogalafetler.meteor.dusur_hemen": "Meteor (%s) struck %s, %s at once (target chunk is not entity-ticking)",

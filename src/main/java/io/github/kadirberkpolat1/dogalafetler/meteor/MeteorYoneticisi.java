@@ -8,12 +8,12 @@ import io.github.kadirberkpolat1.dogalafetler.core.olay.AfetBittiEvent;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.OdulZamani;
 import io.github.kadirberkpolat1.dogalafetler.yangin.YanginKaynagi;
 import io.github.kadirberkpolat1.dogalafetler.yangin.mantik.YanginMantigi;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiPredicate;
 import java.util.function.IntFunction;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceKey;
@@ -24,6 +24,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraftforge.event.entity.EntityJoinLevelEvent;
+import net.minecraftforge.event.level.LevelEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -32,32 +34,52 @@ import net.minecraftforge.server.ServerLifecycleHooks;
 
 /**
  * Boyut başına meteor durumu (sunucu ana thread'i): uçan meteorlar (tavan), krater işleri (ortak blok bütçesi × TPS
- * kısması), yağmurlar, magma astarının soğuması ve sıcak ödül parçaları. Kaydedilmez (M-05): yeniden açılışta uçan
- * meteor ve yağmur yoktur, kazısı süren krater yarım kalır.
+ * kısması), yağmurlar, magma astarının soğuması ve sıcak ödül parçaları. Krater işleri ve soğumalar {@link MeteorVerisi}'nde
+ * kalıcıdır ve chunk yüklü değilken bekler (M-25); uçan meteor ve yağmur kaydedilmez (M-05). Sıcak parça takibi
+ * eşyanın NBT'sinden kurulur: dünyaya giren (yeniden açılış, chunk yüklenmesi dahil) etiketli eşya listeye alınır (M-26).
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID)
 public final class MeteorYoneticisi {
     private static final int SICAK_ARALIGI = 5;
-
-    record Soguma(BlockPos konum, long zaman, BlockState yeni) {
-    }
+    private static final int SOGUMA_ARALIGI = 10;
 
     static final class Durum {
+        final MeteorVerisi veri;
         final List<MeteorVarligi> meteorlar = new ArrayList<>();
-        final ArrayDeque<KraterIsi> kraterler = new ArrayDeque<>();
         final List<MeteorYagmuru> yagmurlar = new ArrayList<>();
-        final List<Soguma> sogumalar = new ArrayList<>();
         final List<ItemEntity> sicaklar = new ArrayList<>();
+
+        Durum(MeteorVerisi veri) {
+            this.veri = veri;
+        }
     }
 
     private static final Map<ResourceKey<Level>, Durum> DURUMLAR = new HashMap<>();
     private static int sonrakiYagmur = 1;
+    private static BiPredicate<ServerLevel, BlockPos> yukluKaynagi = ServerLevel::isLoaded;
 
     private MeteorYoneticisi() {
     }
 
     private static Durum durum(ServerLevel level) {
-        return DURUMLAR.computeIfAbsent(level.dimension(), k -> new Durum());
+        return DURUMLAR.computeIfAbsent(level.dimension(), k -> new Durum(level.getDataStorage()
+                .computeIfAbsent(MeteorVerisi::yukle, MeteorVerisi::new, MeteorVerisi.AD)));
+    }
+
+    /** Krater ve soğuma yazabilir mi (chunk yüklü). */
+    static boolean yuklu(ServerLevel level, BlockPos konum) {
+        return yukluKaynagi.test(level, konum);
+    }
+
+    /** Test: "chunk yüklü değil" durumunu taklit eder; öncekini döndürür (geri koyun). */
+    static BiPredicate<ServerLevel, BlockPos> yukluKaynagiAyarla(BiPredicate<ServerLevel, BlockPos> kaynak) {
+        BiPredicate<ServerLevel, BlockPos> onceki = yukluKaynagi;
+        yukluKaynagi = kaynak;
+        return onceki;
+    }
+
+    static MeteorVerisi veri(ServerLevel level) {
+        return durum(level).veri;
     }
 
     static void meteorEkle(ServerLevel level, MeteorVarligi m) {
@@ -74,12 +96,20 @@ public final class MeteorYoneticisi {
     }
 
     static void kraterEkle(ServerLevel level, KraterIsi is) {
-        durum(level).kraterler.add(is);
+        MeteorVerisi veri = durum(level).veri;
+        veri.kraterler.add(is);
+        veri.setDirty();
     }
 
     static int bekleyenKraterSayisi(ServerLevel level) {
         Durum d = DURUMLAR.get(level.dimension());
-        return d == null ? 0 : d.kraterler.size();
+        return d == null ? 0 : d.veri.kraterler.size();
+    }
+
+    /** Bekleyen krater işlerinden sıradaki hücresinin chunk'ı yüklü olmadığı için duranlar. */
+    static int bekleyenChunkKraterSayisi(ServerLevel level) {
+        Durum d = DURUMLAR.get(level.dimension());
+        return d == null ? 0 : (int) d.veri.kraterler.stream().filter(KraterIsi::bekliyor).count();
     }
 
     static int yagmurEkle(ServerLevel level, IntFunction<MeteorYagmuru> kurucu) {
@@ -123,11 +153,58 @@ public final class MeteorYoneticisi {
     }
 
     static void sogumaEkle(ServerLevel level, BlockPos konum, long zaman, BlockState yeni) {
-        durum(level).sogumalar.add(new Soguma(konum.immutable(), zaman, yeni));
+        MeteorVerisi veri = durum(level).veri;
+        veri.sogumalar.add(new MeteorVerisi.Soguma(konum.immutable(), zaman, yeni));
+        veri.setDirty();
     }
 
-    static void sicakEkle(ServerLevel level, ItemEntity e) {
-        durum(level).sicaklar.add(e);
+    static int bekleyenSogumaSayisi(ServerLevel level) {
+        Durum d = DURUMLAR.get(level.dimension());
+        return d == null ? 0 : d.veri.sogumalar.size();
+    }
+
+    /** Sıcak parça dünyaya girdi (bırakılış, yeniden açılış ya da chunk yüklenmesi): NBT'den takibe alınır ya da soğutulur. */
+    @SubscribeEvent
+    public static void varlikGirdi(EntityJoinLevelEvent olay) {
+        if (!(olay.getLevel() instanceof ServerLevel level) || !(olay.getEntity() instanceof ItemEntity e)) {
+            return;
+        }
+        long bitis = MeteorOdulleri.sicakBitis(e.getItem());
+        if (bitis == OdulZamani.SOGUK) {
+            return;
+        }
+        if (!OdulZamani.sicakMi(level.getGameTime(), bitis)) {
+            ItemStack kopya = e.getItem().copy();
+            MeteorOdulleri.sogut(kopya);
+            e.setItem(kopya);
+            return;
+        }
+        List<ItemEntity> sicaklar = durum(level).sicaklar;
+        if (!sicaklar.contains(e)) {
+            sicaklar.add(e);
+        }
+    }
+
+    static boolean sicakTakipte(ServerLevel level, ItemEntity e) {
+        Durum d = DURUMLAR.get(level.dimension());
+        return d != null && d.sicaklar.contains(e);
+    }
+
+    /** Test: yeniden açılışı taklit eder (bellekteki sıcak parça listesi boş). */
+    static void sicakTakibiniUnut(ServerLevel level) {
+        durum(level).sicaklar.clear();
+    }
+
+    /** Kayıtlı krater işleri olan boyut açılınca hemen yüklenir (işler beklemeden sürsün). */
+    @SubscribeEvent
+    public static void dunyaYuklendi(LevelEvent.Load olay) {
+        if (olay.getLevel() instanceof ServerLevel level) {
+            MeteorVerisi veri = durum(level).veri;
+            if (!veri.kraterler.isEmpty() || !veri.sogumalar.isEmpty()) {
+                DogalAfetler.LOGGER.info("meteor kaydı ({}): {} bekleyen krater işi, {} magma soğuması",
+                        level.dimension().location(), veri.kraterler.size(), veri.sogumalar.size());
+            }
+        }
     }
 
     @SubscribeEvent
@@ -140,30 +217,55 @@ public final class MeteorYoneticisi {
             return;
         }
         d.yagmurlar.removeIf(y -> !y.tick(level));
-        int butce = Math.max(1, (int) Math.round(MeteorAyarlari.kraterBlokButcesi() * TpsOlcer.kismaCarpani()));
-        while (butce > 0 && !d.kraterler.isEmpty()) {
-            KraterIsi is = d.kraterler.peek();
-            butce -= Math.max(1, is.ilerlet(level, butce));
-            if (is.bitti()) {
-                d.kraterler.poll();
-            }
-        }
-        if (!d.sogumalar.isEmpty()) {
-            long simdi = level.getGameTime();
-            for (Iterator<Soguma> it = d.sogumalar.iterator(); it.hasNext();) {
-                Soguma s = it.next();
-                if (simdi < s.zaman()) {
-                    continue;
-                }
-                it.remove();
-                if (level.isLoaded(s.konum()) && level.getBlockState(s.konum()).is(Blocks.MAGMA_BLOCK)) {
-                    level.setBlockAndUpdate(s.konum(), s.yeni());
-                }
-            }
+        kraterleriIlerlet(level, d.veri);
+        if (!d.veri.sogumalar.isEmpty() && level.getGameTime() % SOGUMA_ARALIGI == 0) {
+            sogumalariIsle(level, d.veri, false);
         }
         if (!d.sicaklar.isEmpty() && level.getGameTime() % SICAK_ARALIGI == 0) {
             MeteorOdulleri.sicaklariIsle(level, d.sicaklar);
         }
+    }
+
+    /**
+     * Krater işleri sırayla, ortak bütçeyle. Bekleyen (chunk'ı yüklü olmayan) iş sırayı tıkamaz. İndeksli döngü: bir işin
+     * bitiş olayı yeni krater ekleyebilir.
+     */
+    private static void kraterleriIlerlet(ServerLevel level, MeteorVerisi veri) {
+        int butce = Math.max(1, (int) Math.round(MeteorAyarlari.kraterBlokButcesi() * TpsOlcer.kismaCarpani()));
+        int i = 0;
+        while (butce > 0 && i < veri.kraterler.size()) {
+            KraterIsi is = veri.kraterler.get(i);
+            int kullanilan = is.ilerlet(level, butce);
+            butce -= kullanilan;
+            if (kullanilan > 0) {
+                veri.setDirty();
+            }
+            if (is.bitti()) {
+                veri.kraterler.remove(i);
+                veri.setDirty();
+            } else {
+                i++;
+            }
+        }
+    }
+
+    /** Zamanı gelmiş (ya da {@code hepsi}) soğumalar: chunk yüklüyse magma kayaya döner, değilse kayıt bekler. */
+    private static int sogumalariIsle(ServerLevel level, MeteorVerisi veri, boolean hepsi) {
+        long simdi = level.getGameTime();
+        int soguyan = 0;
+        for (Iterator<MeteorVerisi.Soguma> it = veri.sogumalar.iterator(); it.hasNext();) {
+            MeteorVerisi.Soguma s = it.next();
+            if (!hepsi && simdi < s.zaman() || !yuklu(level, s.konum())) {
+                continue;
+            }
+            it.remove();
+            veri.setDirty();
+            if (level.getBlockState(s.konum()).is(Blocks.MAGMA_BLOCK)) {
+                level.setBlockAndUpdate(s.konum(), s.yeni());
+                soguyan++;
+            }
+        }
+        return soguyan;
     }
 
     /**
@@ -185,7 +287,8 @@ public final class MeteorYoneticisi {
 
     /**
      * {@code /dogalafet sifirla} (K-E11): bütün yağmurlar durur, uçan meteorlar kalkar, sıcak ödül parçaları soğur ve magma
-     * astarı hemen soğumuş kayaya döner. Açılmış kraterler (kalıcı iz) ve yerdeki ödüller kalır.
+     * astarı hemen soğumuş kayaya döner (yüklü olmayan chunk'takiler yüklenince). Açılmış ve süren kraterler (kalıcı iz)
+     * ve yerdeki ödüller kalır.
      */
     @SubscribeEvent
     public static void donemDegisti(DonemDegistiEvent olay) {
@@ -213,13 +316,8 @@ public final class MeteorYoneticisi {
                 }
             }
             d.sicaklar.clear();
-            for (Soguma s : d.sogumalar) {
-                if (level.isLoaded(s.konum()) && level.getBlockState(s.konum()).is(Blocks.MAGMA_BLOCK)) {
-                    level.setBlockAndUpdate(s.konum(), s.yeni());
-                    soguma++;
-                }
-            }
-            d.sogumalar.clear();
+            soguma += sogumalariIsle(level, d.veri, true);
+            d.veri.sogumalar.replaceAll(s -> new MeteorVerisi.Soguma(s.konum(), 0L, s.yeni()));
         }
         DogalAfetler.LOGGER.info("meteor sıfırlama: {} yağmur durdu, uçan meteorlar kalktı, {} sıcak parça ve {} magma soğudu",
                 yagmur, sicak, soguma);

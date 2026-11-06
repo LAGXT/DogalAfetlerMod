@@ -91,7 +91,7 @@
   "commands.dogalafetler.kizilcuce.var": "var",
   "commands.dogalafetler.kizilcuce.yok": "yok",
   "commands.dogalafetler.kizilcuce.zaten": "Kızıl cüce dönemi zaten başladı.",
-  "commands.dogalafetler.meteor.bilgi": "Uçan meteor: %s/%s, yağmur: %s, bekleyen krater: %s",
+  "commands.dogalafetler.meteor.bilgi": "Uçan meteor: %s/%s, yağmur: %s, bekleyen krater: %s (%s yüklü olmayan chunk bekliyor)",
   "commands.dogalafetler.meteor.durdur": "%s komut meteor yağmuru durdu; uçan komut meteorları kaldırıldı",
   "commands.dogalafetler.meteor.dusur": "Meteor (%s) %s, %s noktasına düşüyor",
   "commands.dogalafetler.meteor.dusur_hemen": "Meteor (%s) %s, %s noktasına hemen çarptı (hedef chunk varlık işlemiyor)",

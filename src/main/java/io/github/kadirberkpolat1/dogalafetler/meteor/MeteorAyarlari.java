@@ -31,6 +31,10 @@ public final class MeteorAyarlari {
         return sunucu.get().odulOmruSaniye.get();
     }
 
+    public static int magmaSogumaSaniye() {
+        return sunucu.get().magmaSogumaSaniye.get();
+    }
+
     public static int yanmaSaniye() {
         return sunucu.get().yanmaSaniye.get();
     }
@@ -123,6 +127,7 @@ public final class MeteorAyarlari {
         private final ForgeConfigSpec.IntValue sicakSaniye;
         private final ForgeConfigSpec.IntValue odulOmruSaniye;
         private final ForgeConfigSpec.IntValue yanmaSaniye;
+        private final ForgeConfigSpec.IntValue magmaSogumaSaniye;
         private final ForgeConfigSpec.DoubleValue kucukKraterYaricapi;
         private final ForgeConfigSpec.DoubleValue kucukKraterDerinligi;
         private final ForgeConfigSpec.DoubleValue buyukKraterYaricapi;
@@ -159,6 +164,8 @@ public final class MeteorAyarlari {
                     .defineInRange("odulOmruSaniye", OdulZamani.OMUR_SANIYE, 30, 3600);
             yanmaSaniye = k.comment("Sıcak parçaya dokunan oyuncunun yanma süresi (sn).")
                     .defineInRange("yanmaSaniye", 3, 0, 20);
+            magmaSogumaSaniye = k.comment("Krater tabanının magma astarı bu kadar saniye sonra kayaya döner (chunk yüklü değilse yüklenince).")
+                    .defineInRange("magmaSogumaSaniye", OdulZamani.SICAK_SANIYE, 1, 600);
             kucukKraterYaricapi = k.comment("Küçük meteor krater yarıçapı (blok).").defineInRange("kucukKraterYaricapi", 2.5, 0.0, 8.0);
             kucukKraterDerinligi = k.comment("Küçük meteor krater derinliği (merkezde, yüzey dahil blok).")
                     .defineInRange("kucukKraterDerinligi", 2.0, 0.0, 8.0);
