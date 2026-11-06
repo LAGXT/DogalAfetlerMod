@@ -1,6 +1,8 @@
 package io.github.kadirberkpolat1.dogalafetler;
 
 import com.mojang.logging.LogUtils;
+import io.github.kadirberkpolat1.dogalafetler.afet.deprem.DepremSistemi;
+import io.github.kadirberkpolat1.dogalafetler.afet.sinkhole.SinkholeSistemi;
 import io.github.kadirberkpolat1.dogalafetler.balikcilik.Balikcilik;
 import io.github.kadirberkpolat1.dogalafetler.basarim.Basarim;
 import io.github.kadirberkpolat1.dogalafetler.config.AyarKaydi;
@@ -62,6 +64,8 @@ public final class DogalAfetler {
         Meteor.kaydet(modBus);
         Balikcilik.kaydet(modBus);
         Basarim.kaydet(modBus);
+        DepremSistemi.kaydet(modBus);
+        SinkholeSistemi.kaydet();
         Kancalar.bagla();
 
         DataGenerators.ceviriEkle(CekirdekCevirileri::yaz);

@@ -74,3 +74,14 @@ Kaynaklar:
 - Yer seçimi: hedef oyuncudan 12–40 blok uzakta, yüzeyi çoğunlukla doğal blok olan, yüksekliği çap boyunca ±4 blok düz bir alan; 8 deneme başarısızsa başka oyuncu.
 - Derinlik yüzeyden ölçülür, Y = −50 altına inmez; çukur gerçek bir mağaraya denk gelirse o boşluğa bağlanır (ek kazı yapılmaz).
 - İlk 4 sn'lik çatlama aşaması oyuncuya kaçma fırsatı verir; "Delikten Dönüş" başarımı için çekirdek alanındaki oyuncu işaretlenir.
+
+## 7. Uygulama notu (Faz 4)
+
+Uygulanan: beş alt aşama (çatlama, sarkma, çekirdek çöküşü, basamaklı geri çekilme, durulma; `afet.sinkhole.mantik`),
+eş merkezli + radyal çatlak örtüleri, merkezin %40'ının bir blok oturması, pürüzlü duvarlı halkalı basamaklı çukur (S4–5 dipte
+mağara ağzı), dibe moloz, kenar çatlak halkası (çimen → kaba toprak), aralıklı kenar dökülmesi, çöküş gümü
+(`sinkhole_cokus.ogg`) ve toz patlaması, istemcide 0,2° titreme + tek sert sarsma + aşağı bakış çekimi + düşen oyuncuda 6° FOV,
+"Delikten Dönüş" ipucu. Sapma (`.vibe/kararlar/deprem-sinkhole.md` DS-02): tek "çöken kütle" varlığı yerine halkanın içi önce
+görünmeden boşaltılır, sonra yüzey ve üstündekiler aynı tick'te tavanlı `FallingBlockEntity` olarak düşer (tavanı aşan
+bloklar parçacıkla kalkar); eğilen ağaç görseli yok, ağaçlar dik düşer. Bu turda yapılmayanlar (DS-14): dipte nem buharı, ayrı
+`sinkhole_catlama.ogg` (vanilla çıtırtı + ortak gürleme döngüsü kullanılıyor).
