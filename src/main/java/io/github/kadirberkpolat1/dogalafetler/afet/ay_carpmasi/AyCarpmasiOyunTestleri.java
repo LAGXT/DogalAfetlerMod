@@ -174,14 +174,18 @@ public final class AyCarpmasiOyunTestleri {
         BlockPos tavanSon = new BlockPos(m.getX() + 8, ustY + 10, m.getZ() + 8);
         BlockPos yaprakBas = new BlockPos(m.getX() - 3, ustY, m.getZ() - 3);
         BlockPos yaprakSon = new BlockPos(m.getX() + 3, ustY, m.getZ() + 3);
-        // Bariyer tavanı yüzeyi sahneye sabitler: tarama tavandan 12 blok iner, alttaki başka sahnelere ulaşmaz.
+        // Bariyer tavanı yüzeyi sahneye sabitler: tarama tavandan 12 blok iner, alttaki başka sahnelere ulaşmaz. Tam pakette
+        // önceki batch'lerin yüksekte bıraktığı bloklar ve düşen bloklar yarıçap içinde kalırsa aday olur: hacim önce boşaltılır.
+        AABB alan = new AABB(tavanBas.offset(-1, -24, -1), tavanSon.offset(2, 15, 2));
+        BlockPos.betweenClosed(tavanBas.offset(-1, -24, -1), tavanSon.offset(1, 14, 1))
+                .forEach(p -> level.setBlock(p, Blocks.AIR.defaultBlockState(), 2));
+        level.getEntitiesOfClass(FallingBlockEntity.class, alan).forEach(FallingBlockEntity::discard);
         BlockPos.betweenClosed(tavanBas, tavanSon).forEach(p -> level.setBlockAndUpdate(p, Blocks.BARRIER.defaultBlockState()));
         BlockPos.betweenClosed(yaprakBas, yaprakSon).forEach(p -> level.setBlockAndUpdate(p,
                 Blocks.OAK_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true)));
         ServerPlayer oyuncu = CekirdekOyunTestleri.sahteOyuncu(y, m.getX() + 0.5, ustY - 6, m.getZ() + 0.5);
         GameRules.BooleanValue kural = level.getGameRules().getRule(Kurallar.AFET_BLOK_HASARI);
         boolean oncekiKural = kural.get();
-        AABB alan = new AABB(yaprakBas.offset(-2, -20, -2), yaprakSon.offset(3, 2, 3));
         try {
             kural.set(false, level.getServer());
             SarsintiDusmeleri kapali = new SarsintiDusmeleri();
