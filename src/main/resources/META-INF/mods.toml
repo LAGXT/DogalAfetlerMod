@@ -25,3 +25,12 @@ description='''${mod_description}'''
     versionRange="${minecraft_version_range}"
     ordering="NONE"
     side="BOTH"
+
+# Cold Sweat isteğe bağlıdır (N8): yüklüyse kendi sıcaklık sistemimiz OTOMATIK'te kapanır ve dünya dönemi sıcaklığı
+# Cold Sweat'e aktarılır. 2.4 öncesi sürümlerde API farklıdır.
+[[dependencies.${mod_id}]]
+    modId="cold_sweat"
+    mandatory=false
+    versionRange="[2.4,)"
+    ordering="NONE"
+    side="BOTH"

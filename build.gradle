@@ -96,6 +96,8 @@ dependencies {
     if (uyum == 'coldsweat' || uyum == 'ikisi') {
         runtimeOnly fg.deobf("maven.modrinth:cold-sweat:${coldsweat_surum}")
     }
+    // Sıcaklık sisteminin Cold Sweat köprüsü (N8): API yalnız derlemede; mods.toml'da isteğe bağlı bağımlılık.
+    compileOnly fg.deobf("maven.modrinth:cold-sweat:${coldsweat_surum}")
 
     testImplementation platform("org.junit:junit-bom:${junit_surum}")
     testImplementation 'org.junit.jupiter:junit-jupiter'
