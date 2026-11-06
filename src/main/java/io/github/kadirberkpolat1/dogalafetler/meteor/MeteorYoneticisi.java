@@ -1,8 +1,11 @@
 package io.github.kadirberkpolat1.dogalafetler.meteor;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.core.DonemAlani;
 import io.github.kadirberkpolat1.dogalafetler.core.TpsOlcer;
+import io.github.kadirberkpolat1.dogalafetler.core.olay.DonemDegistiEvent;
 import io.github.kadirberkpolat1.dogalafetler.core.olay.AfetBittiEvent;
+import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.OdulZamani;
 import io.github.kadirberkpolat1.dogalafetler.yangin.YanginKaynagi;
 import io.github.kadirberkpolat1.dogalafetler.yangin.mantik.YanginMantigi;
 import java.util.ArrayDeque;
@@ -17,6 +20,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -29,7 +33,7 @@ import net.minecraftforge.server.ServerLifecycleHooks;
 /**
  * Boyut başına meteor durumu (sunucu ana thread'i): uçan meteorlar (tavan), krater işleri (ortak blok bütçesi × TPS
  * kısması), yağmurlar, magma astarının soğuması ve sıcak ödül parçaları. Kaydedilmez (M-05): yeniden açılışta uçan
- * meteor ve yağmur yoktur, kazsı süren krater yarım kalır.
+ * meteor ve yağmur yoktur, kazısı süren krater yarım kalır.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID)
 public final class MeteorYoneticisi {
@@ -177,6 +181,48 @@ public final class MeteorYoneticisi {
         if (sayi > 0) {
             DogalAfetler.LOGGER.info("meteor: {} afeti bitti ({}), {} yağmur durdu", olay.tur(), olay.neden(), sayi);
         }
+    }
+
+    /**
+     * {@code /dogalafet sifirla} (K-E11): bütün yağmurlar durur, uçan meteorlar kalkar, sıcak ödül parçaları soğur ve magma
+     * astarı hemen soğumuş kayaya döner. Açılmış kraterler (kalıcı iz) ve yerdeki ödüller kalır.
+     */
+    @SubscribeEvent
+    public static void donemDegisti(DonemDegistiEvent olay) {
+        if (olay.alan() != DonemAlani.SIFIRLAMA) {
+            return;
+        }
+        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+        if (server == null) {
+            return;
+        }
+        int yagmur = durdur(server, null, true);
+        int sicak = 0;
+        int soguma = 0;
+        for (ServerLevel level : server.getAllLevels()) {
+            Durum d = DURUMLAR.get(level.dimension());
+            if (d == null) {
+                continue;
+            }
+            for (ItemEntity e : d.sicaklar) {
+                if (e.isAlive() && MeteorOdulleri.sicakBitis(e.getItem()) != OdulZamani.SOGUK) {
+                    ItemStack kopya = e.getItem().copy();
+                    MeteorOdulleri.sogut(kopya);
+                    e.setItem(kopya);
+                    sicak++;
+                }
+            }
+            d.sicaklar.clear();
+            for (Soguma s : d.sogumalar) {
+                if (level.isLoaded(s.konum()) && level.getBlockState(s.konum()).is(Blocks.MAGMA_BLOCK)) {
+                    level.setBlockAndUpdate(s.konum(), s.yeni());
+                    soguma++;
+                }
+            }
+            d.sogumalar.clear();
+        }
+        DogalAfetler.LOGGER.info("meteor sıfırlama: {} yağmur durdu, uçan meteorlar kalktı, {} sıcak parça ve {} magma soğudu",
+                yagmur, sicak, soguma);
     }
 
     @SubscribeEvent

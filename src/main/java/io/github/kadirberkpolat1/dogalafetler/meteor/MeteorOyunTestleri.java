@@ -4,6 +4,9 @@ import com.mojang.authlib.GameProfile;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.CekirdekOyunTestleri;
+import io.github.kadirberkpolat1.dogalafetler.core.DonemAlani;
+import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
+import io.github.kadirberkpolat1.dogalafetler.core.olay.DonemDegistiEvent;
 import io.github.kadirberkpolat1.dogalafetler.esya.MeteorEsyaKayitlari;
 import io.github.kadirberkpolat1.dogalafetler.esya.termostat.Termostat;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
@@ -96,6 +99,23 @@ public final class MeteorOyunTestleri {
                 kaynak, false, sanslar, false);
     }
 
+    /**
+     * Test geçince sahne boşaltılır: ateş (yangın alanı kutunun 2 blok dışına taşar), ödül eşyaları ve kutudaki bloklar.
+     * GameTest dünyası koşular arasında saklanır (K-C24) ve test sayısı değişince batch konumları kayar; kalan yakıt ya da
+     * ateş başka bir testin sahnesine değer.
+     */
+    private static void sahneyiTemizle(GameTestHelper y) {
+        YanginYoneticisi.sondur(y.getLevel(), kutu(y).inflate(4));
+        esyalariTemizle(y);
+        for (int x = 0; x < 15; x++) {
+            for (int z = 0; z < 15; z++) {
+                for (int k = 0; k < 12; k++) {
+                    y.setBlock(new BlockPos(x, k, z), Blocks.AIR);
+                }
+            }
+        }
+    }
+
     private static List<ItemEntity> esyalar(GameTestHelper y) {
         return y.getLevel().getEntitiesOfClass(ItemEntity.class, kutu(y));
     }
@@ -129,6 +149,7 @@ public final class MeteorOyunTestleri {
             y.assertBlockPresent(Blocks.MAGMA_BLOCK, MERKEZ.below(4));
             y.assertBlockPresent(Blocks.DIRT, MERKEZ.offset(-7, 0, 0));
             y.assertTrue(esyalar(y).isEmpty(), "zar 0'da ödül çıkmamalı");
+            sahneyiTemizle(y);
         });
     }
 
@@ -143,10 +164,13 @@ public final class MeteorOyunTestleri {
         KraterIsi is = carp(y, MeteorBoyutu.BUYUK, YanginKaynagi.KOMUT, HIC);
         y.succeedWhen(() -> {
             y.assertTrue(is.bitti(), "krater işi bitmedi");
+            y.assertTrue(YanginYoneticisi.bekleyenAlanSayisi(y.getLevel()) == 0, "alan tutuşturma sürüyor");
+            YanginYoneticisi.sondur(y.getLevel(), kutu(y).inflate(4));
             kural.set(true, y.getLevel().getServer());
             long sonra = SanalSu.bolgeHash(y.getLevel(), a.getX(), a.getY(), a.getZ(), b.getX(), b.getY(), b.getZ());
             y.assertTrue(once == sonra, "afetBlokHasari=false iken blok değişmemeli");
             y.assertTrue(is.kazilan() == 0, "kazılan " + is.kazilan());
+            sahneyiTemizle(y);
         });
     }
 
@@ -163,7 +187,7 @@ public final class MeteorOyunTestleri {
                     "Meteorit Parçası düşmeli");
             y.assertTrue(e.stream().noneMatch(i -> i.getItem().is(MeteorEsyaKayitlari.KOZMIK_CEKIRDEK.get())),
                     "küçük meteor Kozmik Çekirdek vermemeli");
-            esyalariTemizle(y);
+            sahneyiTemizle(y);
         });
     }
 
@@ -186,7 +210,7 @@ public final class MeteorOyunTestleri {
             y.assertTrue(cekirdek.get().getItem().hasFoil(), "çekirdek büyü parlamalı");
             y.assertTrue(cekirdek.get().lifespan == OdulZamani.omurTick(MeteorAyarlari.odulOmruSaniye()),
                     "ödül ömrü 10 dk: " + cekirdek.get().lifespan);
-            esyalariTemizle(y);
+            sahneyiTemizle(y);
         });
     }
 
@@ -226,7 +250,7 @@ public final class MeteorOyunTestleri {
                 o.clearFire();
                 MinecraftForge.EVENT_BUS.post(new EntityItemPickupEvent(o, bekleyen));
                 dogrula(y, o.getRemainingFireTicks() <= 0, "soğumuş parça yakmamalı");
-                esyalariTemizle(y);
+                sahneyiTemizle(y);
                 y.succeed();
             } finally {
                 level.getServer().getPlayerList().remove(o);
@@ -241,8 +265,8 @@ public final class MeteorOyunTestleri {
         for (int x = 0; x < 15; x++) {
             for (int z = 0; z < 15; z++) {
                 double r = Math.hypot(x - MERKEZ.getX(), z - MERKEZ.getZ());
-                if (r > 7.2 && r <= 9.0) {
-                    y.setBlock(new BlockPos(x, 6, z), Blocks.OAK_PLANKS);
+                if (r > 5.6 && r <= 7.0) {
+                    y.setBlock(new BlockPos(x, 5, z), Blocks.OAK_PLANKS);
                 }
             }
         }
@@ -257,7 +281,30 @@ public final class MeteorOyunTestleri {
             YanginYoneticisi.kaynakBitti(level.getServer(), kaynak, true);
             y.assertTrue(YanginYoneticisi.aktifSayi(level, kutu(y).inflate(2)) == 0,
                     "temiz kaynakBitti meteor ateşini söndürmeli");
+            sahneyiTemizle(y);
         });
+    }
+
+    /** K-E11: sıfırlama uçan meteoru ve yağmuru kaldırır, sıcak parçayı soğutur (yalnız meteor dinleyicisi çağrılır). */
+    @GameTest(template = SAHNE, batch = "meteor_sifirla", timeoutTicks = 100)
+    public static void sifirlamaUcanMeteorVeSicakParcayiTemizler(GameTestHelper y) {
+        zemin(y, Blocks.STONE);
+        ServerLevel level = y.getLevel();
+        Optional<MeteorVarligi> m = MeteorAPI.dusur(level, y.absolutePos(MERKEZ), MeteorBoyutu.KUCUK, MeteorGorunumu.GUNES,
+                YanginKaynagi.KOMUT, false, 90, 0, HIC);
+        int yagmur = MeteorAPI.yagmur(level, List.of(), 2000, 1, 0, YanginKaynagi.KOMUT);
+        ItemEntity sicak = MeteorOdulleri.birak(level, Vec3.atBottomCenterOf(y.absolutePos(new BlockPos(3, 6, 3))),
+                new ItemStack(MeteorEsyaKayitlari.METEORIT_PARCASI.get()), 20);
+        dogrula(y, m.isPresent() && !m.get().isRemoved(), "meteor uçuyor olmalı");
+        dogrula(y, MeteorAPI.aktifYagmurSayisi(level) >= 1, "yağmur başlamalı: " + yagmur);
+        MeteorYoneticisi.donemDegisti(new DonemDegistiEvent(DunyaDonemi.al(level), DonemAlani.SIFIRLAMA));
+        dogrula(y, m.get().isRemoved(), "uçan meteor kalkmalı");
+        dogrula(y, MeteorAPI.aktifMeteorSayisi(level) == 0, "uçan meteor sayısı 0");
+        dogrula(y, MeteorAPI.aktifYagmurSayisi(level) == 0, "yağmur durmalı");
+        dogrula(y, MeteorOdulleri.sicakBitis(sicak.getItem()) == OdulZamani.SOGUK, "sıcak parça soğumalı");
+        dogrula(y, sicak.isAlive(), "yerdeki ödül kalır");
+        sahneyiTemizle(y);
+        y.succeed();
     }
 
     /** Tezgaha yığınları koyup tarifin sonucunu verir (eşleşme yoksa boş). */

@@ -67,6 +67,11 @@ public final class MeteorAyarlari {
         return sunucu.get().dusmeHizi.get();
     }
 
+    /** Görsel otomasyonun yavaş çekimi: düşüş hızını çalışan config'te değiştirir (yalnız sunucu thread'i). */
+    public static void dusmeHiziAyarla(double hiz) {
+        sunucu.get().dusmeHizi.set(hiz);
+    }
+
     public static int girisAcisiEnAz() {
         return sunucu.get().girisAcisiEnAz.get();
     }
