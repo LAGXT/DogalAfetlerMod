@@ -534,12 +534,12 @@ final class GokyuzuCizici {
         }
     }
 
-    /** Şişen güneş: disk normal karışım + %30 toplamalı (parlak gökte beyaza doymasın), etrafında toplamalı hale. */
+    /** Şişen güneş: disk normal karışım + %12 toplamalı (parlak gökte sarı-beyaza doymasın), etrafında turuncu hale. */
     private static void buyuyen(Matrix4f m, float olcek, float[] c, float haleP, float a, float sn) {
         float disk = GUNES_DISK * olcek;
-        kuad(m, HALE, TEPE, disk * (3f + 3f * haleP), 0f, c[0], c[1] * 0.9f, c[2] * 0.7f, (0.2f + 0.3f * haleP) * a);
+        kuad(m, HALE, TEPE, disk * (3f + 3f * haleP), 0f, c[0], c[1] * 0.8f, c[2] * 0.55f, (0.2f + 0.3f * haleP) * a);
         kuadOrtu(m, GUNES, TEPE, disk / DOKU_DISK_ORANI, sn * 2f, c[0], c[1], c[2], a);
-        kuad(m, GUNES, TEPE, disk / DOKU_DISK_ORANI, sn * 2f, c[0], c[1], c[2], 0.3f * a);
+        kuad(m, GUNES, TEPE, disk / DOKU_DISK_ORANI, sn * 2f, c[0], c[1], c[2], 0.12f * a);
     }
 
     /** Süpernova: çekirdek hale, 12 ışın, genişleyen kabuk; Düşük kalitede büyük toplamalı kareler küçülür (G6). */
