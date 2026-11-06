@@ -327,6 +327,13 @@ public final class BalikcilikOyunTestleri {
         }
     }
 
+    /** SplitMix64 karıştırıcısı. */
+    private static long karistir(long z) {
+        z = (z ^ (z >>> 30)) * 0xBF58476D1CE4E5B9L;
+        z = (z ^ (z >>> 27)) * 0x94D049BB133111EBL;
+        return z ^ (z >>> 31);
+    }
+
     /** Meteor ödülü hiç çıkmaz; oranlar config'e yakın (1000 çekiliş, sabit tohumlar). */
     @GameTest(template = "bos", batch = BATCH)
     public static void bincekiliseMeteorCikmazOranlarTutar(GameTestHelper y) {
@@ -342,7 +349,8 @@ public final class BalikcilikOyunTestleri {
             LootParams p = new LootParams.Builder(level).withParameter(LootContextParams.ORIGIN, merkez)
                     .withParameter(LootContextParams.TOOL, new ItemStack(Items.FISHING_ROD)).withLuck(0)
                     .create(LootContextParamSets.FISHING);
-            List<ItemStack> l = tablo.getRandomItems(p, 0x15_0000L + i);
+            // Ardışık tohumların ilk zarı (LCG) ilişkili; tohumlar karıştırılır.
+            List<ItemStack> l = tablo.getRandomItems(p, karistir(0x15_0000L + i));
             y.assertTrue(l.size() == 1, "her çekiliş tek yığın vermeli: " + l);
             hepsi.addAll(l);
             for (ItemStack s : l) {
@@ -397,13 +405,14 @@ public final class BalikcilikOyunTestleri {
         boolean[] bitti = {false};
         y.onEachTick(() -> {
             int kalan = BuzBalikciligi.kalanBekleme(olta);
-            if (bitti[0] || kalan <= 0) {
+            // isInWater oltanın bir sonraki tick başında güncellenir: delikteki ilk tick'te hâlâ false olabilir.
+            if (bitti[0] || kalan <= 0 || !olta.isInWater()) {
                 return;
             }
             bitti[0] = true;
             dinle(dinleyici);
             try {
-                y.assertTrue(BuzBalikciligi.delikteMi(olta) && olta.isInWater(), "olta deliğin suyunda yüzmeli");
+                y.assertTrue(BuzBalikciligi.delikteMi(olta), "olta deliğin suyunda yüzmeli");
                 y.assertTrue(kalan <= enCok && kalan >= enAz - 200, "bekleme 30–60 sn aralığında olmalı: " + kalan
                         + " (" + enAz + ".." + enCok + ")");
                 isirmaZorla(y, olta);
