@@ -108,3 +108,23 @@ orman yangını afeti siren, seviye ve başlangıç alanını ekler; yangın man
   `YanginKancalari.isiKaynagiAyarla(SicaklikKancalari::ortamKaynagiEkle)` ile bağlanır. §6'daki "+4…+14 birim" Faz 4'te
   sicaklik ölçeğine göre ayarlanır.
 - "Yanmadan Çıktım" alanı için `aktifSayi(level, AABB)` ve hücre konumları motorda; dışbükey hesabı Faz 4/başarım.
+
+## Faz 4 güncellemesi (afet, `is/asit-orman-yangini`)
+
+Afet `afet.orman_yangini` + `client.orman_yangini`; kararlar `.vibe/kararlar/asit-orman-yangini.md` (AO-04…AO-09, AO-12).
+Yangın mantığının tamamı yukarıdaki motordur; afet üzerine şunları koyar:
+
+- **Koreografi:** başlangıç alanı hedef oyuncunun 40–90 blok uzağında, yüzeyi en yanıcı (orman biyomu önde) yüklü nokta;
+  yakıt yoksa yer uygun değil (N14 deseni). AKTIF'e geçerken `alanTutustur(r, yoğunluk)` seviye tablosundan (r 3/6/10/16/24,
+  yoğunluk 0/0,2/0,4/0,7/1), süre 2/3/4/6/8 dk; alanda 15 sn yanan hücre kalmazsa afet doğal biter (yağmur, seyrek yakıt).
+- **Rüzgâr:** afet başında ayrı yön seçilmez; yayılma motorundadır ve günün rüzgârını kullanır.
+- **Etki alanı:** saniyede bir 32 blokluk karelerde yanan hücre sayılır; alan en uzak yanan kare + 16 blok kadar büyür (en çok 192).
+  "Yanmadan Çıktım" alanı dışbükey yerine "bir yanan hücreye 8 blok" (başarımın yedeğiyle aynı ölçüt).
+- **Afet sonrası iz:** ateş altındaki çimen/toprak kaba toprağa döner (`afetBlokHasari`); kütükler motor gibi havaya döner
+  ("%30'u kalır, koyu soyulmuş kütük" yapılmadı: motor Y-06).
+- **Ortam (istemci):** 48 blok içinde `#7A5236` sis, görüş %55'e iner (yangın büyüklüğüyle, 40 hücrede tam); 24 blok içinde
+  Yüksek/Ultra'da ısı dalgalanması (kamera 0,05° 3 Hz, alt kenarda yukarı kayan ısı dokusu); sis altında havada kül. Güneş
+  diskinin turuncuya boyanması gokyuzu renderer'ına parametre ister: yapılmadı (açık nokta). "Kül 3 dk süzülür" afet
+  süresince (afet bitince istemci verisi gelmez).
+- **Isı (madde 7):** motorun sıcaklık kancası (K-E1); seviye farkı yanan hücre sayısından doğar, §6'daki "+4…+14 birim"
+  ayrıca uygulanmaz.

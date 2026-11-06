@@ -80,3 +80,26 @@ Cam asit dayanıklıdır; bu, "çatı altında korun" fikrini cam serayla da mü
 - **Öldürücü olmama garantisi:** asit hasarı oyuncunun canını 4'ün (2 kalp) altına indirmez (config `asitMinimumCan`, varsayılan 4). Böylece S5'te bile şartnamedeki "ortalama hasar, öldürmesin" koşulu kesin sağlanır.
 - Alan hedef oyuncunun çevresinde doğar, 0,3 blok/sn ile rüzgâr yönüne kayar; başlangıçta 10 sn'de yoğunlaşır, sonda 15 sn'de seyrelir.
 - "Çatı Altı" başarımı için alan içindeki oyuncunun asit hasarı sayacı tutulur.
+
+## Faz 4 güncellemesi (afet, `is/asit-orman-yangini`)
+
+Uygulama `afet.asit_yagmuru` + `client.asit_yagmuru`; kararlar `.vibe/kararlar/asit-orman-yangini.md` (AO-01…AO-03, AO-10, AO-11).
+Notun üzerinden değişenler:
+
+- **Yağış kancası:** gokyuzu ile ortak `renderSnowAndRain` kancası yerine `RenderLevelStageEvent.AFTER_WEATHER`; aynı vanilla
+  sütun geometrisi, kendi doku, %20 kalın damla, yağmur yarıçapı 5/10/10/15. Vanilla yağmur bu bölgede zaten yağmadığı için
+  bastırma gerekmedi; gökyüzünün sarmalayıcısına ikinci katman eklenmedi.
+- **Bulut tavanı:** büyük koyu zeytin renkli parçacık quad'ları (12–22 blok), bulut yüksekliğinde ama kameraya en çok 60 blok
+  yukarıda, günün rüzgârıyla 0,03 blok/tick sürüklenir; tavan kademe tablosundaki sayılar.
+- **Taş dönüşümü:** `asit_dayanikli` tablonun önündedir ve `base_stone_overworld` (diyorit dahil) içerir; "kireçtaşı benzeri →
+  çakıl" yalnız kalsitte. Etikete cam, cam panel, demir, tuğla, deepslate tuğla/karo, beton ve pişmiş kil eklendi.
+- **Aşınma hızı (§5):** eşzamanlı çatlak örtüsü tavanı 64 (32, 3–5 sn'lik örtüyle saniyede ancak 6–11 bloğa izin
+  veriyor, §6'daki S5 16 blok/sn'yi kesiyordu); alanda oyuncu varsa örneklerin yarısı bir oyuncunun 24 blok çevresinden
+  seçilir (değişim görenin önünde, vitrin anı mümkün olur).
+- **Zırh:** ayrı "4 sn'de 1 dayanıklılık" sayacı yok; `dogalafetler:asit` hasar tipi zırhı delmez, vanilla zırh hasarı azaltır ve
+  her vuruşta yıpranır.
+- **Ses (§4):** yeni ses dosyası yok. Yağış vanilla `weather.rain` (perde 0,9; çatı altında `weather.rain.above`), "cızlama
+  döngüsü" yerine seyrek, kısık, tiz `block.fire.extinguish`; aşınma anında `block.fire.extinguish` (en çok 4). Hasar anında
+  vanilla hasar sesi.
+- **Afet sonrası 30 sn buhar:** yapılmadı (afet bitince istemci verisi gelmez); buhar ve cızlama yağış süresince.
+- **Çatı Altı:** başarım için hasar sayacı tutulmaz; asit hasar verdiği an `BasarimIpucuEvent(HASAR_ALDI)` yayınlanır.
