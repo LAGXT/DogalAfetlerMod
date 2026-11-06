@@ -33,7 +33,7 @@ import net.minecraftforge.fml.common.Mod;
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID)
 public final class SicaklikYoneticisi {
-    private static final UUID YAVASLAMA = UUID.fromString("6f1b4d2e-35a1-4c7e-9b0e-5d7a2c9e1f40");
+    static final UUID YAVASLAMA = UUID.fromString("6f1b4d2e-35a1-4c7e-9b0e-5d7a2c9e1f40");
     private static final String YAVASLAMA_ADI = "dogalafetler sicaklik yavaslama";
     /** Bu kadar yatay yol (blok/güncelleme) yürüme sayılır. */
     private static final double YURUME_ESIGI = 0.5;

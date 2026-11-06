@@ -126,6 +126,45 @@ class IsiAlisverisiTest {
         assertEquals(100, benzet(0, 200, Etkinlik.KOSMA, Islaklik.KURU, CIPLAK, 36_000), 1e-9);
     }
 
+    /** Yürüyen kuru oyuncunun bu ortamdaki ısınma dengesi: {@code E + U·I} (S-02, etkinlik 1). */
+    private static double denge(double ortam, Yalitim.Girdi yalitim) {
+        return A.esdeger(ortam) + A.metabolikIsi() * Yalitim.toplam(yalitim, Y);
+    }
+
+    @Test
+    void dortYunluAsiriIsinmisVucutSerinOrtamdaDengeyeIner() {
+        Yalitim.Girdi dortYun = new Yalitim.Girdi(4, 4, 0, 0);
+        for (double ortam : new double[] {18, 8}) {
+            double b = benzet(90, ortam, Etkinlik.YURUME, Islaklik.KURU, dortYun, 600);
+            assertTrue(Esikler.VARSAYILAN.kademe(b) != Kademe.YANIYOR, ortam + " °C: " + b);
+            assertEquals(denge(ortam, dortYun), b, 1.5, ortam + " °C dengesi");
+        }
+        assertTrue(egilim(90, 18, dortYun) < -0.2, "sıcaktan nötre dönüş yünle kesilmemeli");
+    }
+
+    @Test
+    void ucYunluAsiriIsinmisVucutDaYunsuzHizlaDoner() {
+        Yalitim.Girdi ucYun = new Yalitim.Girdi(4, 3, 0, 0);
+        Yalitim.Girdi yunsuz = new Yalitim.Girdi(4, 0, 0, 0);
+        assertEquals(egilim(90, 18, yunsuz), egilim(90, 18, ucYun), 1e-12, "nötrün üstünde yün hızı kesmez");
+        double b = benzet(90, 18, Etkinlik.YURUME, Islaklik.KURU, ucYun, 600);
+        assertEquals(denge(18, ucYun), b, 1.5);
+    }
+
+    @Test
+    void yunKesintisiYalnizNotrunAltinda() {
+        Yalitim.Girdi dortYun = new Yalitim.Girdi(4, 4, 0, 0);
+        for (Etkinlik e : new Etkinlik[] {Etkinlik.DURMA, Etkinlik.YURUME}) {
+            assertEquals(0, benzet(0, NORMAL_SOGUK, e, Islaklik.KURU, dortYun, 3600), 1e-9, "N3: " + e);
+        }
+        // Sıcak vücut −10 °C'de nötre iner, sıfırı geçen adım bölünür ve nötrün altında 4 yün soğumayı keser.
+        IsiAlisverisi.Girdi g = new IsiAlisverisi.Girdi(5, NORMAL_SOGUK, Etkinlik.YURUME, Islaklik.KURU, dortYun);
+        assertEquals(0, IsiAlisverisi.adim(g, 120, A, Y), 1e-9, "büyük adım sıfırda durmalı");
+        double ucYun = benzet(20, NORMAL_SOGUK, Etkinlik.YURUME, Islaklik.KURU, new Yalitim.Girdi(4, 3, 0, 0), 600);
+        double yunsuz = benzet(20, NORMAL_SOGUK, Etkinlik.YURUME, Islaklik.KURU, new Yalitim.Girdi(4, 0, 0, 0), 600);
+        assertTrue(ucYun < 0 && ucYun > yunsuz, "nötrün altında 3 yün yavaşlatır: " + ucYun + " / " + yunsuz);
+    }
+
     /** Nötrden donma hasarı eşiğine kaç saniyede inildiği (en çok 48 saat; inilmezse -1). */
     private static int donmaSuresi(double ortam, Yalitim.Girdi yalitim) {
         double b = 0;

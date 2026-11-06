@@ -5,7 +5,8 @@
 - **Isı dengesi.** Vücut sürekli metabolik ısı üretir (dinlenmede ~80–100 W, yürürken ~2×, koşarken 4–6×) ve deri ile
   ortam arasındaki farkla ısı kaybeder (Newton soğuma yasası: kayıp hızı farkla orantılı). Giysi bu iletkenliği böler
   ("clo" birimi): soğukta kaybı azaltır, ılık ortamda üretilen ısının atılmasını engeller. Islak giysi ve suya girmek
-  iletkenliği 2–25 kat artırır; soğuk suda hipotermi havadakinden çok daha hızlıdır.
+  iletkenliği 2–25 kat artırır; soğuk suda hipotermi havadakinden çok daha hızlıdır. İletkenlik iki yönlüdür: sıcak
+  ortamda ıslak oyuncu ortamın dengesine de daha hızlı varır (çöl göletinde serin su dengeyi düşürür, oraya hızlı varılır).
 - **Hipotermi evreleri** (çekirdek ısısı): hafif 35–32 °C titreme, el becerisinin azalması, yavaşlama; orta 32–28 °C
   titremenin durması, bilinç bulanıklığı; ağır < 28 °C organ yetmezliği. Uyarı işaretleri önce gelir, hasar sonra.
 - **Hipertermi evreleri**: sıcak bitkinliği (terleme, baş dönmesi), sıcak çarpması (> 40 °C, bilinç kaybı). Çöl

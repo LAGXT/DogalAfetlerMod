@@ -33,6 +33,12 @@ public final class SicaklikHud {
     /** İşaretçi barın 4 px üstünden başlar; kalpler işaretçinin üstünde kalsın. */
     private static final int ISARETCI_UST = 4;
 
+    /** Son çizilen barın titreşim ofseti (GUI px), yanık satırı ve istemci tick'i: görsel kanıt otomasyonu log'a yazar. */
+    static int sonDx;
+    static int sonDy;
+    static boolean sonYanik;
+    static long sonTick = -1;
+
     private SicaklikHud() {
     }
 
@@ -60,13 +66,21 @@ public final class SicaklikHud {
         Kademe kademe = d.kademe();
         boolean tehlike = kademe.hasarli();
         boolean uyari = tehlike || kademe == Kademe.COK_SOGUK || kademe == Kademe.COK_SICAK;
+        int dx = 0;
+        int dy = 0;
         if (tehlike) {
-            x += (int) Math.floorMod(t / 2 * 7 + 3, 3) - 1;
-            y += (int) Math.floorMod(t / 2 * 5 + 1, 3) - 1;
+            dx = (int) Math.floorMod(t / 2 * 7 + 3, 3) - 1;
+            dy = (int) Math.floorMod(t / 2 * 5 + 1, 3) - 1;
         } else if (uyari && (t / 3) % 4 == 0) {
-            x += (t / 3) % 8 == 0 ? 1 : -1;
+            dx = (t / 3) % 8 == 0 ? 1 : -1;
         }
+        x += dx;
+        y += dy;
         boolean yanik = tehlike && (t / 8) % 2 == 0;
+        sonDx = dx;
+        sonDy = dy;
+        sonYanik = yanik;
+        sonTick = t;
 
         RenderSystem.enableBlend();
         g.blit(DOKU, x, y, 0, yanik ? 8 : 0, GENISLIK, YUKSEKLIK, DOKU_G, DOKU_Y);

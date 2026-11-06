@@ -40,6 +40,10 @@ public final class SicaklikOtomasyonu {
     private static int adim = -1;
     private static int sayac;
     private static int sahne;
+    /** İlk karede çizilmiş barın tick'i ve ofseti (ikinci kare farklı bir titreşim fazından alınır). */
+    private static long ilkTick;
+    private static int ilkDx;
+    private static int ilkDy;
 
     private SicaklikOtomasyonu() {
     }
@@ -124,12 +128,25 @@ public final class SicaklikOtomasyonu {
             Sahne s = SAHNELER.get(sahne);
             if (sayac == 40) {
                 kare(mc, s.ad());
-            } else if (sayac == 70 && s.ikinciKare()) {
-                // Gizli workspace'te istemci ~1 FPS çizer: titreşimin ikinci kareşi yeni bir çizimden gelsin.
-                kare(mc, s.ad() + "_b");
-            } else if (sayac >= (s.ikinciKare() ? 76 : 46)) {
-                sahne++;
-                adim = 0;
+                ilkTick = SicaklikHud.sonTick;
+                ilkDx = SicaklikHud.sonDx;
+                ilkDy = SicaklikHud.sonDy;
+                if (!s.ikinciKare()) {
+                    sahne++;
+                    adim = 0;
+                }
+            } else if (sayac > 40 && s.ikinciKare()) {
+                // Gizli workspace'te istemci ~1 FPS çizer: sabit tick farkı aynı çizimi ya da aynı fazı yakalayabilir.
+                boolean yeniFaz = SicaklikHud.sonTick != ilkTick
+                        && (SicaklikHud.sonDx != ilkDx || SicaklikHud.sonDy != ilkDy);
+                if (yeniFaz || sayac >= 200) {
+                    if (!yeniFaz) {
+                        DogalAfetler.LOGGER.warn(ON + "{}: 160 tick'te farklı titreşim fazı çizilmedi", s.ad());
+                    }
+                    kare(mc, s.ad() + "_b");
+                    sahne++;
+                    adim = 0;
+                }
             }
         } else if (adim == 2 && sayac >= 400) {
             DogalAfetler.LOGGER.info(ON + "kapanıyor; girdi sayıları: tuş={} fare={} tekerlek={}", tus, fare, teker);
@@ -158,8 +175,9 @@ public final class SicaklikOtomasyonu {
     private static void kare(Minecraft mc, String ad) {
         String dosya = "sicaklik_" + ad + ".png";
         Screenshot.grab(mc.gameDirectory, dosya, mc.getMainRenderTarget(), mesaj -> { });
-        DogalAfetler.LOGGER.info(ON + "kare {} (vücut {} kademe {}, FPS {})", dosya,
-                String.format(Locale.ROOT, "%.1f", IstemciSicaklik.durum().vucut()), IstemciSicaklik.durum().kademe(),
-                mc.getFps());
+        DogalAfetler.LOGGER.info(ON + "kare {} (vücut {} kademe {}, FPS {}; bar ofseti dx={} dy={} yanık={} çizim tick'i {})",
+                dosya, String.format(Locale.ROOT, "%.1f", IstemciSicaklik.durum().vucut()),
+                IstemciSicaklik.durum().kademe(), mc.getFps(), SicaklikHud.sonDx, SicaklikHud.sonDy, SicaklikHud.sonYanik,
+                SicaklikHud.sonTick);
     }
 }

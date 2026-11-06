@@ -10,9 +10,11 @@ package io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik;
  *
  * {@code k} eşitlenme hızı, {@code w} ıslaklık iletkenliği, {@code I} toplam yalıtım, {@code U} konfor ortamında metabolik
  * ısının karşılığı, {@code a} etkinlik. Fark büyükse değişim hızlı, küçükse yavaştır; yalıtım hızı böler ve dengeyi sıcağa
- * iter (ılık ortamda çok yalıtımlı oyuncu aşırı ısınır). Soğuma yönünde yün kendi oranıyla ayrıca uygulanır (N3): hız
- * yünsüz yalıtımla hesaplanıp {@code 1 − 0,25·n} ile çarpılır. Aşırı soğuk eşiğinin altında yalıtımın ısı tutma terimi kalkar,
- * yün kesintisi küçülür: yalıtım donmayı yalnız yavaşlatır.
+ * iter (ılık ortamda çok yalıtımlı oyuncu aşırı ısınır). Yünün soğuma kesintisi (N3) yalnız vücut nötrün altındayken
+ * (B ≤ 0) soğuma yönünde uygulanır: hız yünsüz yalıtımla hesaplanıp {@code 1 − 0,25·n} ile çarpılır. Nötrün üstündeki
+ * vücut yünsüz yalıtımla tam hızda soğur (aşırı ısınmış oyuncu yünlü zırhla da dengeye iner); nötrü geçen adım
+ * {@link #adim} içinde ikiye bölünür. Aşırı soğuk eşiğinin altında yalıtımın ısı tutma terimi kalkar, yün kesintisi
+ * küçülür: yalıtım donmayı yalnız yavaşlatır.
  */
 public final class IsiAlisverisi {
     public static final double OLCEK = 100.0;
@@ -73,7 +75,7 @@ public final class IsiAlisverisi {
         double hiz;
         if (g.ortam() <= a.asiriSogukEsigi()) {
             hiz = k / (1 + kuru) * ((e - b) + u * (etkinlik - 1));
-            if (hiz < 0) {
+            if (hiz < 0 && b <= 0) {
                 hiz *= Yalitim.yunSogumaCarpani(yun, true, y);
             }
         } else {
@@ -82,16 +84,29 @@ public final class IsiAlisverisi {
             if (kuvvet >= 0) {
                 hiz = k / (1 + tam) * kuvvet;
             } else {
-                hiz = k / (1 + kuru) * ((e - b) + u * (etkinlik * (1 + kuru) - 1))
-                        * Yalitim.yunSogumaCarpani(yun, false, y);
+                hiz = k / (1 + kuru) * ((e - b) + u * (etkinlik * (1 + kuru) - 1));
+                if (b <= 0) {
+                    hiz *= Yalitim.yunSogumaCarpani(yun, false, y);
+                }
             }
         }
         return hiz + Yalitim.termostatCekimi(b, e, g.yalitim().termostatParcasi(), y);
     }
 
-    /** {@code saniye} sonraki vücut sıcaklığı (ölçeğe sıkıştırılır). */
+    /**
+     * {@code saniye} sonraki vücut sıcaklığı (ölçeğe sıkıştırılır). Nötrün üstünden altına geçen adım iki parçaya bölünür:
+     * 0'a kadar üst tarafın hızıyla, kalan süre 0'daki hızla (yün kesintisi orada başlar).
+     */
     public static double adim(Girdi g, double saniye, Ayarlar a, Yalitim.Ayarlar y) {
-        return sinirla(g.vucut() + egilim(g, a, y) * saniye);
+        double b = g.vucut();
+        double hiz = egilim(g, a, y);
+        double yeni = b + hiz * saniye;
+        if (b > 0 && yeni < 0) {
+            double kalan = saniye - b / -hiz;
+            Girdi notr = new Girdi(0, g.ortam(), g.etkinlik(), g.islaklik(), g.yalitim());
+            yeni = egilim(notr, a, y) * kalan;
+        }
+        return sinirla(yeni);
     }
 
     public static double sinirla(double vucut) {

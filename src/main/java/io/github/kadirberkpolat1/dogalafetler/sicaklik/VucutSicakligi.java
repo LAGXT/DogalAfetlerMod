@@ -17,7 +17,7 @@ import net.minecraft.server.level.ServerPlayer;
  * <ul>
  * <li>{@link #al(ServerPlayer)} — vücut sıcaklığı (başarımlar, yiyecek).</li>
  * <li>{@link #etkiEkle(ServerPlayer, double, int, double)} — yiyecek/içecek etkisi (madde 14): anında bir miktar + süre
- * boyunca giderek azalan hızla toplam bir miktar.</li>
+ * boyunca giderek azalan hızla toplam bir miktar; sistem kapalıyken yok sayılır ({@code false}).</li>
  * <li>{@link #ayarla(ServerPlayer, double)} — komut ve testler.</li>
  * </ul>
  */
@@ -54,9 +54,16 @@ public final class VucutSicakligi {
     /**
      * Yiyecek/içecek sıcaklık etkisi (madde 14). {@code anlikDelta} hemen eklenir; {@code toplamDelta} {@code sureTick}
      * boyunca giderek azalan hızla eklenir. Değerler vücut birimidir (ölçeğin bir yanı 100: "orta %15–25" = 15–25).
-     * Etki sistem kapalıyken de kaydedilir, sıcaklığa sistem açıkken uygulanır.
+     * Sistem kapalıyken ({@link SicaklikKapisi#acikMi}) hiçbir şey yazılmaz ve kaydedilmez, {@code false} döner: kapalı
+     * dünyada gizli sıcaklık birikmez. Açıkken eklenmiş süreli etki sistem sonradan kapanırsa durur, açılınca kaldığı
+     * yerden sürer.
+     *
+     * @return etki uygulandıysa {@code true}
      */
-    public static void etkiEkle(ServerPlayer oyuncu, double anlikDelta, int sureTick, double toplamDelta) {
+    public static boolean etkiEkle(ServerPlayer oyuncu, double anlikDelta, int sureTick, double toplamDelta) {
+        if (!SicaklikKapisi.acikMi(oyuncu.server)) {
+            return false;
+        }
         CompoundTag v = veri(oyuncu);
         if (anlikDelta != 0) {
             v.putDouble("vucut", IsiAlisverisi.sinirla(v.getDouble("vucut") + anlikDelta));
@@ -74,6 +81,7 @@ public final class VucutSicakligi {
             v.put("etkiler", liste);
         }
         SicaklikYoneticisi.hemenGonder(oyuncu);
+        return true;
     }
 
     /** Süreli etkileri {@code tick} kadar ilerletir, bu adımda verdikleri toplamı döndürür. */

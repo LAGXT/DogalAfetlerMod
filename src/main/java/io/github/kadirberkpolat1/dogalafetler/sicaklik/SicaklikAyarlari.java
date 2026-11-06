@@ -51,7 +51,8 @@ public final class SicaklikAyarlari {
                 .defineInRange("paketTazelemeTick", 200, 20, 1200);
         tuyUstSiniri = k.comment("Bir zırh parçasına uygulanabilecek en çok Tüy Upgrade'i (N2).")
                 .defineInRange("tuyUstSiniri", 30, 1, 1000);
-        kaynakTaramaYaricapi = k.comment("Isı/soğuk kaynaklarının arandığı küpün yarıçapı (blok).")
+        kaynakTaramaYaricapi = k.comment("Isı/soğuk kaynaklarının arandığı küpün yarıçapı (blok). Bu mesafeden uzak blok kaynakları",
+                "kendi yarıçapları büyük olsa da sayılmaz (lav 6 blokta katkısı ~1 °C olduğu için varsayılan 5 yeter).")
                 .defineInRange("kaynakTaramaYaricapi", 5, 1, 8);
         hasarMiktari = k.comment("Donma ve aşırı ısınma hasarının her vuruştaki miktarı (yarım kalp = 1).")
                 .defineInRange("hasarMiktari", 1.0, 0.5, 20.0);

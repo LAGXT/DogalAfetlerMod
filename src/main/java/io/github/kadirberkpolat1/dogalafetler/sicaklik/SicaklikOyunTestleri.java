@@ -14,9 +14,15 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.inventory.CraftingMenu;
 import net.minecraft.world.inventory.TransientCraftingContainer;
 import net.minecraft.world.item.ItemStack;
@@ -28,6 +34,7 @@ import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.GameType;
 import net.minecraftforge.common.ForgeHooks;
+import net.minecraftforge.fml.util.ObfuscationReflectionHelper;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
 
@@ -56,6 +63,22 @@ public final class SicaklikOyunTestleri {
         if (!kosul) {
             y.fail(mesaj);
         }
+    }
+
+    /** Kapıya bağlı testler kuralı kendisi açar (önceki bir batch'te kapalı kalmış olabilir). */
+    private static GameRules.BooleanValue kuraliAc(MinecraftServer server) {
+        GameRules.BooleanValue kural = server.getGameRules().getRule(Kurallar.SICAKLIK_SISTEMI);
+        kural.set(true, server);
+        return kural;
+    }
+
+    /**
+     * Sahte oyuncu tick almadığı için {@code ServerPlayer.spawnInvulnerableTime} (60) hiç düşmez ve {@code hurt} reddedilir;
+     * gerçek oyuncuda 3 sn sonra sıfırdır. SRG adı {@code build/createSrgToMcp/output.srg}'den.
+     */
+    private static void hasarAlabilir(ServerPlayer o) {
+        ObfuscationReflectionHelper.setPrivateValue(ServerPlayer.class, o, 0, "f_8921_");
+        o.invulnerableTime = 0;
     }
 
     @GameTest(template = "bos", batch = "sicaklik_tuy")
@@ -199,6 +222,7 @@ public final class SicaklikOyunTestleri {
     @GameTest(template = "bos", batch = "sicaklik_respawn")
     public static void respawndaSifirlanirBoyutDonusundeKorunur(GameTestHelper y) {
         MinecraftServer server = y.getLevel().getServer();
+        kuraliAc(server);
         List<ServerPlayer> izlenen = new ArrayList<>();
         try {
             ServerPlayer olen = oyuncu(y, "respawn-test", 0);
@@ -247,5 +271,99 @@ public final class SicaklikOyunTestleri {
                 }
             });
         });
+    }
+
+    /** Madde 7c: donma ve aşırı ısınma hasarı kendi kaynaklarıyla verilir; Aşırı ısınma {@code is_fire}: Ateşe Direnç korur. */
+    @GameTest(template = "bos", batch = "sicaklik_hasar")
+    public static void hasarKaynaklariVeAteseDirenc(GameTestHelper y) {
+        kuraliAc(y.getLevel().getServer());
+        ServerPlayer donan = oyuncu(y, "donma-test", 0);
+        ServerPlayer yanan = oyuncu(y, "yanma-test", 1);
+        ServerPlayer korunan = oyuncu(y, "direnc-test", 2);
+        try {
+            for (ServerPlayer o : List.of(donan, yanan, korunan)) {
+                hasarAlabilir(o);
+            }
+            korunan.addEffect(new MobEffectInstance(MobEffects.FIRE_RESISTANCE, 1200));
+            VucutSicakligi.yaz(donan, -95);
+            VucutSicakligi.yaz(yanan, 95);
+            VucutSicakligi.yaz(korunan, 95);
+            float can = donan.getHealth();
+            // 100 tick: eşik üstündeki aralık (~65 tick) en az bir vuruş verir.
+            for (ServerPlayer o : List.of(donan, yanan, korunan)) {
+                SicaklikYoneticisi.guncelle(o, 100);
+            }
+            DamageSource donma = donan.getLastDamageSource();
+            dogrula(y, donan.getHealth() < can, "donma hasarı yok: " + donan.getHealth());
+            dogrula(y, donma != null && donma.is(SicaklikKayitlari.DONMA) && donma.is(DamageTypeTags.IS_FREEZING),
+                    "donma kaynağı yanlış: " + donma);
+            DamageSource yanma = yanan.getLastDamageSource();
+            dogrula(y, yanan.getHealth() < can, "aşırı ısınma hasarı yok: " + yanan.getHealth());
+            dogrula(y, yanma != null && yanma.is(SicaklikKayitlari.ASIRI_ISINMA) && yanma.is(DamageTypeTags.IS_FIRE),
+                    "aşırı ısınma kaynağı yanlış: " + yanma);
+            dogrula(y, korunan.getHealth() == can, "Ateşe Direnç korumalı: " + korunan.getHealth());
+            dogrula(y, VucutSicakligi.al(korunan) > 75, "korunan hâlâ aşırı sıcak: " + VucutSicakligi.al(korunan));
+            y.succeed();
+        } finally {
+            cikar(y, List.of(donan, yanan, korunan));
+        }
+    }
+
+    /** Madde 7c ve 3: yavaşlama değiştiricisi soğukta eklenir; respawn'da ve kapı kapanınca kaldırılır. */
+    @GameTest(template = "bos", batch = "sicaklik_yavaslama", timeoutTicks = 100)
+    public static void yavaslamaSoguktaEklenirRespawnVeKuraldaKalkar(GameTestHelper y) {
+        MinecraftServer server = y.getLevel().getServer();
+        GameRules.BooleanValue kural = kuraliAc(server);
+        ServerPlayer o = oyuncu(y, "yavaslama-test", 0);
+        AttributeInstance hiz = o.getAttribute(Attributes.MOVEMENT_SPEED);
+        try {
+            VucutSicakligi.yaz(o, -60);
+            SicaklikYoneticisi.guncelle(o, 20);
+            dogrula(y, hiz.getModifier(SicaklikYoneticisi.YAVASLAMA) != null, "soğukta yavaşlama eklenmedi");
+            dogrula(y, hiz.getModifier(SicaklikYoneticisi.YAVASLAMA).getAmount() < 0, "değiştirici hızı azaltmalı");
+            SicaklikYoneticisi.yenidenDogdu(o);
+            dogrula(y, hiz.getModifier(SicaklikYoneticisi.YAVASLAMA) == null, "respawn'da yavaşlama kalkmadı");
+            VucutSicakligi.yaz(o, -60);
+            SicaklikYoneticisi.guncelle(o, 20);
+            dogrula(y, hiz.getModifier(SicaklikYoneticisi.YAVASLAMA) != null, "ikinci soğukta yavaşlama eklenmedi");
+            kural.set(false, server);
+        } catch (RuntimeException hata) {
+            kural.set(true, server);
+            cikar(y, List.of(o));
+            throw hata;
+        }
+        y.runAfterDelay(5, () -> {
+            try {
+                dogrula(y, hiz.getModifier(SicaklikYoneticisi.YAVASLAMA) == null, "kural kapanınca yavaşlama kalkmadı");
+                y.succeed();
+            } finally {
+                kural.set(true, server);
+                cikar(y, List.of(o));
+            }
+        });
+    }
+
+    /** T6: kapı kapalıyken yiyecek etkisi hiçbir şey yazmaz; açıkken anında ve süreli kısım uygulanır. */
+    @GameTest(template = "bos", batch = "sicaklik_etki")
+    public static void yiyecekEtkisiKapiKapaliykenYokSayilir(GameTestHelper y) {
+        MinecraftServer server = y.getLevel().getServer();
+        GameRules.BooleanValue kural = kuraliAc(server);
+        ServerPlayer o = oyuncu(y, "etki-test", 0);
+        try {
+            VucutSicakligi.yaz(o, 0);
+            kural.set(false, server);
+            boolean kapali = VucutSicakligi.etkiEkle(o, 20, 600, 30);
+            kural.set(true, server);
+            dogrula(y, !kapali, "kapalıyken etki uygulanmamalı");
+            dogrula(y, VucutSicakligi.al(o) == 0, "kapalıyken vücut değişti: " + VucutSicakligi.al(o));
+            dogrula(y, VucutSicakligi.etkiler(o).isEmpty(), "kapalıyken süreli etki kaydedildi");
+            boolean acik = VucutSicakligi.etkiEkle(o, 20, 600, 30);
+            dogrula(y, acik && VucutSicakligi.al(o) == 20, "açıkken anında kısım: " + VucutSicakligi.al(o));
+            dogrula(y, VucutSicakligi.etkiler(o).size() == 1, "açıkken süreli etki kaydedilmeli");
+            y.succeed();
+        } finally {
+            kural.set(true, server);
+            cikar(y, List.of(o));
+        }
     }
 }

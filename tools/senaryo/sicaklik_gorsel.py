@@ -9,6 +9,7 @@ focus_on_activate off]); JVM'de HL_EXEC_RULE_TOKEN yoksa öldürülür; pencere 
 bekçi etkin pencere bizimse ALARM verip süreci öldürür. Sunucu pty'siz, stdin boruya bağlı (K0-18). Sahibin oturumunda
 tıklama/odak/workspace değişimi yok.
 """
+import hashlib
 import json
 import os
 import shutil
@@ -81,8 +82,8 @@ def sunucu_hazirla():
 
 
 class Sunucu:
-    def __init__(self):
-        self.log_yolu = KANIT / "runServer.log"
+    def __init__(self, no):
+        self.log_yolu = KANIT / f"runServer-{no}.log"
         self.dosya = open(self.log_yolu, "w", encoding="utf-8")
         self.p = subprocess.Popen(["timeout", "1500", "./gradlew", "runServer", "--offline", "--console=plain",
                                    "--no-daemon"], cwd=W, env=ortam(), stdin=subprocess.PIPE, stdout=self.dosya,
@@ -143,10 +144,43 @@ def oldur(pid, neden):
         pass
 
 
-def istemci_calistir(kip, ek_ozellikler, bitince=None, her_turda=None):
-    """İstemciyi protokolle açar; otomasyon 'bitti' logunu yazınca bitince bir kez çağrılır."""
+def kosu_no(kip):
+    """Bu etiketin bir sonraki koşu numarası (eski koşuların log'u üzerine yazılmasın)."""
+    var = [int(p.stem.rsplit("-", 1)[1]) for p in KANIT.glob(f"runClient-{kip}-*.log")
+           if p.stem.rsplit("-", 1)[1].isdigit()]
+    return max(var, default=0) + 1
+
+
+def secenekleri_hazirla():
+    """Vanilla öğretici kutusu kanıt karelerini kirletmesin; duraklatma odak kaybında kapalı."""
+    yol = W / "run/options.txt"
+    yol.parent.mkdir(exist_ok=True)
+    satirlar = yol.read_text().splitlines() if yol.exists() else []
+    satirlar = [s for s in satirlar if not s.startswith(("tutorialStep:", "pauseOnLostFocus:"))]
+    yol.write_text("\n".join(satirlar + ["tutorialStep:none", "pauseOnLostFocus:false"]) + "\n")
+
+
+def girdi_sayilari(istemci_log):
+    """İstemci kapanışındaki girdi sayıları satırı (K0-21 rev. 2 e); yoksa None."""
+    for kaynak in (W / "run/logs/latest.log", istemci_log):
+        if not kaynak.exists():
+            continue
+        for no, satir in enumerate(kaynak.read_text(errors="replace").splitlines(), 1):
+            if "SICAKLIK_OTOMASYON kapanıyor; girdi sayıları" in satir:
+                return kaynak, no, satir.split("girdi sayıları: ", 1)[1].strip()
+    return None
+
+
+def istemci_calistir(kip, no, ek_ozellikler, bitince=None, her_turda=None):
+    """İstemciyi protokolle açar; otomasyon 'bitti' logunu yazınca bitince bir kez çağrılır. Geçerlilik: alarm yok ve
+    girdi sayıları satırı var, üçü de 0."""
     betik = Path(f"/tmp/sicaklik_istemci_{kip}.sh")
-    istemci_log = KANIT / f"runClient-{kip}.log"
+    istemci_log = KANIT / f"runClient-{kip}-{no}.log"
+    log(f"koşu {kip}-{no}: istemci log'u {istemci_log.name}")
+    secenekleri_hazirla()
+    eski_latest = W / "run/logs/latest.log"
+    if eski_latest.exists():
+        eski_latest.unlink()
     betik.write_text("#!/bin/sh\n"
                      f"cd '{W}'\n"
                      f"export JAVA_HOME='{JAVA_HOME}'\n"
@@ -203,17 +237,28 @@ def istemci_calistir(kip, ek_ozellikler, bitince=None, her_turda=None):
             bitince()
         time.sleep(5)
     log(f"istemci bitti ({time.time() - baslangic:.0f} sn), alarm={alarm}")
-    return not alarm
+    sayim = girdi_sayilari(istemci_log)
+    if sayim is None:
+        log(f"koşu {kip}-{no} GEÇERSİZ: girdi sayıları satırı yok")
+        return False
+    kaynak, satir_no, sayilar = sayim
+    sifir = sayilar == "tuş=0 fare=0 tekerlek=0"
+    log(f"koşu {kip}-{no} girdi sayıları: {sayilar} (kaynak {kaynak.relative_to(W)}:{satir_no})"
+        + ("" if sifir else " → GEÇERSİZ"))
+    if kaynak.name == "latest.log":
+        shutil.copy2(kaynak, KANIT / f"latest-{kip}-{no}.log")
+    return not alarm and sifir
 
 
 def kareleri_tasi():
     for p in sorted((W / "run/screenshots").glob("sicaklik_*.png")):
         shutil.copy2(p, KANIT / p.name)
-        log("kare:", p.name)
+        log("kare:", p.name, "md5", hashlib.md5(p.read_bytes()).hexdigest()[:12])
 
 
 def main():
     kip = sys.argv[1] if len(sys.argv) > 1 else "hud"
+    no = kosu_no(kip)
     for eski in (W / "run/screenshots").glob("sicaklik_*.png"):
         eski.unlink()
     if not kapi():
@@ -221,7 +266,7 @@ def main():
         return 2
     if kip == "hud":
         sunucu_hazirla()
-        sunucu = Sunucu()
+        sunucu = Sunucu(no)
         if not sunucu.bekle("Done (", 600):
             log("sunucu açılmadı")
             sunucu.durdur()
@@ -245,13 +290,14 @@ def main():
                 op_verildi.append(True)
                 sunucu.komut("op A")
 
-        ok = istemci_calistir("hud", f"-PkullaniciAdi=A -PquickPlaySunucu=localhost:{PORT}", konsol, op_ver)
+        ok = istemci_calistir("hud", no, f"-PkullaniciAdi=A -PquickPlaySunucu=localhost:{PORT}", konsol, op_ver)
         time.sleep(3)
         sunucu.durdur()
         metin = sunucu.metin()
-        log("sunucu log: invalid dist =", metin.count("invalid dist"), "| Exception =", metin.count("Exception"))
+        log(f"sunucu log {sunucu.log_yolu.name}: invalid dist =", metin.count("invalid dist"), "| Exception =",
+            metin.count("Exception"))
     else:
-        ok = istemci_calistir("coldsweat", "-Puyum=coldsweat -PquickPlay=test")
+        ok = istemci_calistir("coldsweat", no, "-Puyum=coldsweat -PquickPlay=test")
     kareleri_tasi()
     return 0 if ok else 1
 
