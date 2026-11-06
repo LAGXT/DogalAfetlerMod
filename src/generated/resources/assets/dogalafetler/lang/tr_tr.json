@@ -35,7 +35,6 @@
   "commands.dogalafetler.donma.surec.durdu": "durduruldu (%s)",
   "commands.dogalafetler.donma.surec.suruyor": "sürüyor",
   "commands.dogalafetler.donma.surec.yok": "sürmüyor",
-  "commands.dogalafetler.donma.surec_asama": "%s aşaması %s'e geçti.",
   "commands.dogalafetler.durum.afet": "Aktif afet: %s, %s; aşama: %s (alt aşama %s), kalan: %s",
   "commands.dogalafetler.durum.afet_konum": "Merkez: %s (%s), etki yarıçapı: %s, hedef: %s",
   "commands.dogalafetler.durum.afet_yok": "Aktif afet yok.",

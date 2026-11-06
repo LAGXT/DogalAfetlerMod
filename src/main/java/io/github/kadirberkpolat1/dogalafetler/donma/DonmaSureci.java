@@ -6,7 +6,6 @@ import io.github.kadirberkpolat1.dogalafetler.core.DonemSureci;
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
 import io.github.kadirberkpolat1.dogalafetler.donma.mantik.DonmaIlerlemesi;
-import java.util.Locale;
 import java.util.Optional;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -18,7 +17,8 @@ import net.minecraft.server.level.ServerLevel;
  * 100'e çıkar; kızıl cücede (çözülme dönemi açık, donma kalıcı değilse) {@code donma.cozulmeSuresi} boyunca tabana iner;
  * güneş normalken ve bağımsız çözülme açıksa 0'a iner. İlerleme {@code zamanAdimi()} ile birikir ({@code devamEt}'te iş
  * yok). Gamerule bağı güneş patlamasıdır; döngü kimliği yalnız süpernova başlangıç koşulunda karşılaştırılır
- * (K-C46). Ulaşılmış ilerleme durdurmada geri alınmaz.
+ * (K-C46). Ulaşılmış ilerleme durdurmada geri alınmaz. Ayrık aşaması yoktur: {@code asama ileri} bu süreci geçer
+ * (varsayılan boş çıktı, K-D31); test aracı {@code /dogalafet donma <yüzde>}.
  */
 final class DonmaSureci implements DonemSureci {
     static final String KIMLIK = "donma";
@@ -50,22 +50,6 @@ final class DonmaSureci implements DonemSureci {
             case NORMAL -> DonmaAyarlari.bagimsizCozulme() && g > PAY;
             default -> false;
         };
-    }
-
-    @Override
-    public Optional<Component> asamaIleri(ServerLevel ustDunya) {
-        DunyaDonemi d = DunyaDonemi.al(ustDunya);
-        if (!aktifMi(ustDunya)) {
-            return Optional.empty();
-        }
-        float hedef = switch (d.gunesEvresi()) {
-            case GUNESSIZ -> 100f;
-            case KIZIL_CUCE -> (float) DonmaAyarlari.cozulmeTabani();
-            default -> 0f;
-        };
-        d.donmaIlerlemesiAyarla(hedef);
-        return Optional.of(Component.translatable(DonmaCevirileri.SUREC_ASAMA, ad(),
-                String.format(Locale.ROOT, "%.0f", hedef)));
     }
 
     /** Sahibinin sunucu tick'inden (END). */

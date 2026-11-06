@@ -7,7 +7,6 @@ public final class DonmaCevirileri {
     private static final String ON = "commands.dogalafetler.donma.";
     static final String SUREC_DONMA = "donem_sureci.dogalafetler.donma";
     static final String SUREC_BUHARLASMA = "donem_sureci.dogalafetler.buharlasma";
-    static final String SUREC_ASAMA = ON + "surec_asama";
     static final String AYARLANDI = ON + "ayarlandi";
     static final String BUHARLASMA_AYARLANDI = ON + "buharlasma_ayarlandi";
     static final String DONEM_DONMA = ON + "donem.donma";
@@ -35,7 +34,6 @@ public final class DonmaCevirileri {
         y.ekle("block.dogalafetler.ince_buz", "Thin Ice", "İnce Buz");
         y.ekle(SUREC_DONMA, "World freeze", "Dünya donması");
         y.ekle(SUREC_BUHARLASMA, "Evaporation", "Buharlaşma");
-        y.ekle(SUREC_ASAMA, "%s advanced to %s.", "%s aşaması %s'e geçti.");
         y.ekle(AYARLANDI, "Freeze progress set to %s%% (%s period).", "Donma ilerlemesi %%%s olarak ayarlandı (%s dönemi).");
         y.ekle(BUHARLASMA_AYARLANDI, "Evaporation depth set to %s blocks (%s applied to real water).",
                 "Buharlaşma derinliği %s blok olarak ayarlandı (gerçek suya %s).");

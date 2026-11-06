@@ -6,7 +6,6 @@ import io.github.kadirberkpolat1.dogalafetler.core.DonemSureci;
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
 import io.github.kadirberkpolat1.dogalafetler.donma.mantik.BuharlasmaHedefi;
-import java.util.Locale;
 import java.util.Optional;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
@@ -17,7 +16,8 @@ import net.minecraft.server.level.ServerLevel;
  * buharlaşma derinliği {@code donma.buharlasmaSuresi} boyunca {@code donma.buharlasmaEnCok}'a çıkar. Afet sürerken de her
  * ilerlemeden önce {@code surecDurdu} sorulur (gamerule ile durur, açılınca sürer). Evre BUYUYEN'den çıkınca (süpernova ya da
  * durdurulan güneş patlaması) {@link DonmaSistemi} derinliği 0'a çeker ve chunk'lar suyu geri doldurur; donma bu chunk'ta
- * geri dolmadan başlamaz (N10). Tek döngülüdür: evre bitince süreç tamamlanır, durdurma kaydı çekirdekçe silinir.
+ * geri dolmadan başlamaz (N10). Tek döngülüdür: evre bitince süreç tamamlanır, durdurma kaydı çekirdekçe silinir. Ayrık
+ * aşaması yoktur: {@code asama ileri} bu süreci geçer (K-D31); test aracı {@code /dogalafet buharlasma <derinlik>}.
  */
 final class BuharlasmaSureci implements DonemSureci {
     static final String KIMLIK = "buharlasma";
@@ -41,17 +41,6 @@ final class BuharlasmaSureci implements DonemSureci {
     public boolean aktifMi(ServerLevel ustDunya) {
         DunyaDonemi d = DunyaDonemi.al(ustDunya);
         return d.gunesEvresi() == GunesEvresi.BUYUYEN && d.buharlasmaDerinligi() < DonmaAyarlari.buharlasmaEnCok() - 1e-3;
-    }
-
-    @Override
-    public Optional<Component> asamaIleri(ServerLevel ustDunya) {
-        if (!aktifMi(ustDunya)) {
-            return Optional.empty();
-        }
-        float enCok = (float) DonmaAyarlari.buharlasmaEnCok();
-        DunyaDonemi.al(ustDunya).buharlasmaDerinligiAyarla(enCok);
-        return Optional.of(Component.translatable(DonmaCevirileri.SUREC_ASAMA, ad(),
-                String.format(Locale.ROOT, "%.1f", enCok)));
     }
 
     void tick(MinecraftServer server) {

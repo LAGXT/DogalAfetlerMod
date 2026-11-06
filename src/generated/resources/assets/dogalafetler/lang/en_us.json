@@ -35,7 +35,6 @@
   "commands.dogalafetler.donma.surec.durdu": "stopped (%s)",
   "commands.dogalafetler.donma.surec.suruyor": "running",
   "commands.dogalafetler.donma.surec.yok": "not running",
-  "commands.dogalafetler.donma.surec_asama": "%s advanced to %s.",
   "commands.dogalafetler.durum.afet": "Active disaster: %s, %s; phase: %s (sub-phase %s), remaining: %s",
   "commands.dogalafetler.durum.afet_konum": "Centre: %s (%s), impact radius: %s, target: %s",
   "commands.dogalafetler.durum.afet_yok": "No active disaster.",
