@@ -414,6 +414,30 @@ public final class BasarimOyunTestleri {
         y.succeed();
     }
 
+    @GameTest(template = "bos")
+    public static void buzDeligiBaliklariBirikirKutupUstasiOyuncuBasina(GameTestHelper y) {
+        ServerPlayer a = oyuncu(y, "balik-a", 0);
+        ServerPlayer b = oyuncu(y, "balik-b", 2);
+        try {
+            BasarimOlaylari.buzDeligiBaligi(a, 0);
+            dogrula(y, !kazandi(y, a, Basarimlar.BUZ_BALIKCISI), "balıksız çekme (çöp) sayılmaz");
+            BasarimOlaylari.buzDeligiBaligi(a, 1);
+            dogrula(y, kazandi(y, a, Basarimlar.BUZ_BALIKCISI), "ilk balık Buz Balıkçısı verir");
+            for (int i = 0; i < 23; i++) {
+                BasarimOlaylari.buzDeligiBaligi(a, 1);
+            }
+            dogrula(y, BasarimVerisi.balik(a) == 24 && !kazandi(y, a, Basarimlar.KUTUP_USTASI), "24 balık yetmez");
+            BasarimOlaylari.buzDeligiBaligi(b, 3);
+            BasarimOlaylari.buzDeligiBaligi(a, 1);
+            dogrula(y, kazandi(y, a, Basarimlar.KUTUP_USTASI), "toplam 25 balık Kutup Ustası verir");
+            dogrula(y, BasarimVerisi.balik(b) == 3 && kazandi(y, b, Basarimlar.BUZ_BALIKCISI)
+                    && !kazandi(y, b, Basarimlar.KUTUP_USTASI), "diğer oyuncunun toplamı ayrı");
+        } finally {
+            cikar(y, List.of(a, b));
+        }
+        y.succeed();
+    }
+
     /** Sentetik bitiş olayı (yalnız başarım dinleyicisine verilir; diğer alt sistemler görmez). */
     private static void bitti(ServerPlayer o, AfetTuru tur, int seviye, long no, BitisNedeni neden) {
         Set<UUID> kim = Set.of(o.getUUID());

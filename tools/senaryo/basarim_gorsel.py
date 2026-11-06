@@ -116,10 +116,11 @@ def hazirla():
     yol = run / "options.txt"
     satirlar = yol.read_text().splitlines() if yol.exists() else []
     satirlar = [s for s in satirlar if not s.startswith(("tutorialStep:", "pauseOnLostFocus:", "renderDistance:",
-                                                         "simulationDistance:", "lang:"))]
-    # Kareler Türkçe başarım adlarını göstersin (madde 12: TR ad ve açıklama).
+                                                         "simulationDistance:", "lang:", "onboardAccessibility:"))]
+    # Kareler Türkçe başarım adlarını göstersin (madde 12: TR ad ve açıklama). Worktree'nin run/ klasörü yeni: ilk açılışın
+    # erişilebilirlik ekranı Quick Play'i bekletmesin.
     yol.write_text("\n".join(satirlar + ["tutorialStep:none", "pauseOnLostFocus:false", "renderDistance:8",
-                                         "simulationDistance:8", "lang:tr_tr"]) + "\n")
+                                         "simulationDistance:8", "lang:tr_tr", "onboardAccessibility:false"]) + "\n")
     for eski in (run / "screenshots").glob("basarim_*.png"):
         eski.unlink()
     latest = run / "logs/latest.log"

@@ -79,6 +79,8 @@ public final class BasarimOlaylari {
     static final float CUKUR_DUSUSU = 4.0f;
     /** Orman yangını: oyuncunun bu kadar blok yakınında yanan hücre varsa "yangın alanında" (afet ipucu yoksa). */
     static final double YANGIN_YAKINLIGI = 8.0;
+    /** Batan kancanın üstünde buz deliğinin aranacağı en çok yükseklik (blok). */
+    static final int DELIK_YUKARI = 3;
     private static final float DONMA_TAM = DunyaDonemi.DONMA_EN_COK - 0.001f;
     private static final Map<UUID, Gecici> GECICI = new HashMap<>();
     private static final double[] ITME = new double[2];
@@ -417,10 +419,14 @@ public final class BasarimOlaylari {
         }
     }
 
+    /**
+     * Kanca bir buz deliğinin sütununda mı: ısırmada olta deliğin altındaki suya 1–2 blok inebilir, bu yüzden kancanın
+     * bloğundan {@value #DELIK_YUKARI} blok yukarıya (ve bir aşağıya) bakılır.
+     */
     private static boolean buzDeliginden(FishingHook kanca) {
         Level level = kanca.level();
         BlockPos konum = kanca.blockPosition();
-        for (int dy = -1; dy <= 1; dy++) {
+        for (int dy = -1; dy <= DELIK_YUKARI; dy++) {
             ResourceLocation blok = ForgeRegistries.BLOCKS.getKey(level.getBlockState(konum.above(dy)).getBlock());
             if (BasarimKimlikleri.BUZ_DELIGI.equals(blok)) {
                 return true;

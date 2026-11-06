@@ -151,7 +151,9 @@ public final class BasarimOtomasyonu {
     private static void plan(Minecraft mc) {
         ekle("kurulum", () -> {
             mc.options.hideGui = false;
-            for (String k : new String[] {"gamemode survival", "difficulty peaceful", "gamerule doDaylightCycle false",
+            // Komut çıktıları sohbet karesini kirletmesin; duyuru ve ünvanlı sohbet satırı kalsın (kapanışta geri açılır).
+            for (String k : new String[] {"gamerule sendCommandFeedback false", "gamemode survival",
+                    "difficulty peaceful", "gamerule doDaylightCycle false",
                     "time set 6000", "weather clear 100000", "gamerule doWeatherCycle false",
                     "gamerule announceAdvancements true", "advancement revoke @s from dogalafetler:dogalafetler/root",
                     "dogalafet unvan @s yok", "dogalafet stop", "scoreboard objectives add basarim_kanit dummy",
@@ -221,6 +223,7 @@ public final class BasarimOtomasyonu {
         ekle("kapanış", () -> {
             mc.setScreen(null);
             komut(mc, "gamerule announceAdvancements true");
+            komut(mc, "gamerule sendCommandFeedback true");
             komut(mc, "dogalafet basarim bilgi @s");
             DogalAfetler.LOGGER.info(ON + "bitti; FPS {}", mc.getFps());
         }, bekle(40), 60);

@@ -1,6 +1,6 @@
-# Eşyalar ve ilerleme — tasarım notları (Faz 3)
+# Özel eşyalar — tasarım notları
 
-Her Faz 3 parçası kendi bölümünü ekler.
+Her eşya işçisi bu dosyaya kendi bölümünü ekler.
 
 ## Başarımlar (madde 12, N16)
 

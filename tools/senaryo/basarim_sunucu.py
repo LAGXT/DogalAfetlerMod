@@ -25,7 +25,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cekirdek_sunucu as cs  # noqa: E402
 
 cs.SENARYO_DUNYASI = "basarim-senaryo"
-cs.SENARYO_OZELLIKLERI = {"level-name": cs.SENARYO_DUNYASI, "level-seed": "20261106", "online-mode": "false"}
+# Paralel işçilerin sunucularıyla çakışmasın: kendi port (ws 95 ile eş).
+cs.SENARYO_OZELLIKLERI = {"level-name": cs.SENARYO_DUNYASI, "level-seed": "20261106", "online-mode": "false",
+                          "server-port": "25595"}
 
 BASARIM_SAYISI = 27
 YUKLEME_HATALARI = re.compile(
@@ -37,8 +39,8 @@ def kosu(sunucu):
     sunucu.bekle(r"Done \(", 0, cs.ACILIS_SURESI, "açılış")
     satir = sunucu.bekle(r"Loaded \d+ advancements", 0, 5, "vanilla advancement yükleme satırı")
     sunucu.yaz(f"### açılış: {satir.strip()}")
-    sunucu.komut("dogalafet basarim bilgi", rf"Natural Disasters tab: {BASARIM_SAYISI}/{BASARIM_SAYISI} advancements loaded",
-                 "sekmenin 27 başarımı yüklü")
+    sunucu.komut("dogalafet basarim bilgi", rf"Natural Disasters tab: {BASARIM_SAYISI}/{BASARIM_SAYISI} advancements "
+                 r"loaded", "sekmenin 27 başarımı yüklü")
     sunucu.komut("forceload add 0 0", r"Marked chunk|is already marked")
     sunucu.komut("loot spawn 0 100 0 loot dogalafetler:rewards/hedef", r"Dropped [12] ", "hedef ödülü 1-2 sıcak yiyecek")
     sunucu.komut("dogalafet unvan Kimse", r"No player was found", "unvan komutu kayıtlı (oyuncu yok)")
@@ -46,9 +48,8 @@ def kosu(sunucu):
     sunucu.komut("dogalafet asama ileri", r"Earthquake phase: Siren")
     sunucu.komut("dogalafet asama ileri", r"Earthquake phase: Active")
     isaret = sunucu.isaret()
+    # BİTİŞ sönümü sınama afetinde hemen biter (bitisTamam varsayılanı): dördüncü "asama ileri" gönderilmez.
     sunucu.komut("dogalafet asama ileri", r"Earthquake (phase: Ending|has ended)")
-    if "has ended" not in "\n".join(sunucu.satirlar[isaret:]):
-        sunucu.komut("dogalafet asama ileri", r"Earthquake has ended")
     sunucu.bekle(r"Afet bitti: deprem seviye 5 neden DOGAL", isaret, 10, "doğal bitiş olayı (oyuncusuz)")
     sunucu.komut("dogalafet basarim bilgi", rf"Natural Disasters tab: {BASARIM_SAYISI}/{BASARIM_SAYISI}",
                  "bitiş sonrası sekme")
@@ -85,6 +86,9 @@ def main():
     signal.signal(signal.SIGTERM, lambda _i, _c: (_ for _ in ()).throw(SystemExit(143)))
     cs.senaryo_dunyasini_sil()
     ozgun = cs.ozellikleri_senaryoya_cevir()
+    eula = cs.SUNUCU_KLASORU / "eula.txt"
+    if not eula.exists():
+        eula.write_text("eula=true\n", encoding="utf-8")
     sonuc = 0
     kod = None
     yol = klasor / "kosu.log"
