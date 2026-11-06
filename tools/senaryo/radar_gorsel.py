@@ -124,13 +124,14 @@ def kos(kanit, otomasyon="radar", gradle_ek=("-PquickPlay=test", "-PoyunTestiAfe
     kanit.mkdir(parents=True, exist_ok=True)
     log = Gunluk(kanit / "pencere-radar.log")
 
-    for _ in range(10):
-        if gradle_sayisi() < 2 and bos_ram_gib() >= 6 and not baska_istemci():
+    # Ağır süreç kapısı (görev: en çok 20 dk). Başka runClient'ı kilit bekler (K0-21 rev. 2 (k)); pgrep yalnız bilgi.
+    for _ in range(20):
+        if gradle_sayisi() < 2 and bos_ram_gib() >= 4:
             break
         log(f"ağır süreç kapısı: gradle={gradle_sayisi()} boş={bos_ram_gib():.1f} GiB istemci={baska_istemci()}; 60 sn")
         time.sleep(60)
     else:
-        log("kapı 10 dk'da açılmadı; koşu iptal")
+        log("kapı 20 dk'da açılmadı; koşu iptal")
         return False
 
     secenekler = RUN / "options.txt"
