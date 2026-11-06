@@ -41,11 +41,13 @@ import net.minecraftforge.fml.common.Mod;
 public final class YanginOtomasyonu {
     private static final boolean AKTIF = "yangin".equals(System.getProperty("dogalafetler.otomasyon", ""));
     private static final String ON = "YANGIN_OTOMASYON ";
-    private static final int KAMERA_UZAKLIGI = 34;
-    private static final int KAMERA_YUKSEKLIGI = 14;
+    /** Cephe ilk karelerde LOD mesafesi (48) içinde kalsın: hücre alevleri kalite kademesine göre çizilir. */
+    private static final int KAMERA_UZAKLIGI = 30;
+    private static final int KAMERA_YUKSEKLIGI = 12;
     /** Tasarım notu §6 seviye 4: taç yangını ve 8 blok sıçrama. */
     private static final double VITRIN_YOGUNLUGU = 0.7;
-    private static final int KARE_ARALIGI = 240;
+    /** Her kare, parçacıklar silindikten bu kadar tick sonra: iki kalite karesi aynı parçacık yaşında, 6 sn arayla. */
+    private static final int KARE_ARALIGI = 120;
     private static final int TARAMA = 40;
 
     private static int tus;
@@ -323,6 +325,7 @@ public final class YanginOtomasyonu {
     private static void kaliteyle(Minecraft mc, EfektKalitesi kalite) {
         IstemciYangin.kaliteZorla(kalite);
         mc.particleEngine.setLevel(mc.level);
+        IstemciYangin.uretileniAl();
         DogalAfetler.LOGGER.info(ON + "kalite {} (parçacıklar silindi)", kalite == null ? "config" : kalite);
     }
 
@@ -330,7 +333,8 @@ public final class YanginOtomasyonu {
         String dosya = "yangin_" + ad + ".png";
         Screenshot.grab(mc.gameDirectory, dosya, mc.getMainRenderTarget(), mesaj -> {
         });
-        DogalAfetler.LOGGER.info(ON + "kare {} (FPS {}, parçacık {})", dosya, mc.getFps(), mc.particleEngine.countParticles());
+        DogalAfetler.LOGGER.info(ON + "kare {} (FPS {}, parçacık {}, kendi üretim {})", dosya, mc.getFps(),
+                mc.particleEngine.countParticles(), IstemciYangin.uretileniAl());
         server.execute(() -> gorunurlukYaz(server, ad, enBoy));
     }
 }

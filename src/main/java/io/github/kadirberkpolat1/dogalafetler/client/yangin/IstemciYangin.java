@@ -38,6 +38,8 @@ public final class IstemciYangin {
     private static final double YAKIN_PARCACIK = 32;
     private static AtesDurumuPaketi son = BOS;
     private static EfektKalitesi kaliteZorlamasi;
+    /** Kendi alev/duman/sütun/kıvılcım üretimimiz (vanilla ateş dumanı hariç); kalite kanıtı için okunup sıfırlanır. */
+    private static int uretilen;
 
     private IstemciYangin() {
     }
@@ -45,6 +47,13 @@ public final class IstemciYangin {
     /** Görsel kanıt otomasyonu için: {@code null} config'teki kaliteye döner. */
     static void kaliteZorla(EfektKalitesi kalite) {
         kaliteZorlamasi = kalite;
+    }
+
+    /** Son çağrıdan beri ürettiğimiz parçacık sayısı; sayaç sıfırlanır. */
+    static int uretileniAl() {
+        int sayi = uretilen;
+        uretilen = 0;
+        return sayi;
     }
 
     public static Consumer<AtesDurumuPaketi> alici() {
@@ -152,6 +161,7 @@ public final class IstemciYangin {
 
     private static void ekle(ClientLevel level, ParticleOptions tur, double x, double y, double z, double vx, double vy,
             double vz, boolean herZaman) {
+        uretilen++;
         if (herZaman) {
             level.addAlwaysVisibleParticle(tur, x, y, z, vx, vy, vz);
         } else {
