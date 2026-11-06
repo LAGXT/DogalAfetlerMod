@@ -36,12 +36,16 @@ class GostergeYerlesimiTest {
 
     @Test
     void uzunActionBarSatiriPaneliYukariItar() {
-        // Kanıt koşusu 1 (468x243): Forge action bar'ı alttan 81+4 px'te, Hassas metni 274 px geniş; panel 331..464 ile örtüşüyordu.
-        GostergeYerlesimi.Alt alt = GostergeYerlesimi.forgeAlt(81, 59, 274);
+        // Kanıt koşuları (468x243 GUI): leftHeight 74; action bar altın metninin pikselleri y 154..164 (aksanlı Ö dahil),
+        // Hassas metni ~274 px geniş. Panel (133x94) bu satırın tamamen üstünde kalmalı.
+        GostergeYerlesimi.Alt alt = GostergeYerlesimi.forgeAlt(74, 59, 274);
+        assertEquals(76, alt.durumUst());
+        assertEquals(91, alt.altYaziUst());
         Konum k = GostergeYerlesimi.konum(468, 243, 133, 94, Kose.SAG_ALT, 0, 0, alt);
         assertEquals(468 - 133 - 4, k.x());
-        assertEquals(243 - (81 + 11) - 94, k.y());
-        assertTrue(k.y() + 94 <= 243 - 81 - 8, "action bar satırının (üstü alttan 89 px) üstünde değil");
+        assertTrue(k.y() + 94 < 154, "panel action bar satırına (y 154) iniyor: " + k);
+        // Durum sütunu kısayken Forge vanilla yüksekliğini (68) korur.
+        assertEquals(68 + 8, GostergeYerlesimi.forgeAlt(39, 39, 0).altYaziUst());
         // Kısa metin (yarı genişlik 121'e sığar) ve geniş ekran: panel köşede kalır.
         Konum genis = GostergeYerlesimi.konum(960, 540, 133, 94, Kose.SAG_ALT, 0, 0, GostergeYerlesimi.forgeAlt(81, 59, 150));
         assertEquals(new Konum(960 - 133 - 4, 540 - 94 - 4), genis);

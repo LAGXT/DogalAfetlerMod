@@ -5,7 +5,7 @@ package io.github.kadirberkpolat1.dogalafetler.esya.mantik;
  * barının (XP barının üstü, sıcaklık §A, S-10) ve action bar'ın (sismograf metni) üstüne binmez: panel yatayda hotbar ve yan el
  * yuvasıyla örtüşürse hotbar'ın, orta durum sütunuyla (kalp, zırh, açlık, hava, sıcaklık barı, XP) örtüşürse onların, ortalanmış
  * action bar satırıyla örtüşürse o satırın üstüne kalkar. Forge action bar'ı durum sütununun hemen üstüne çizer
- * ({@code h - max(leftHeight, rightHeight) - 4}); bu yüksekliklerle genişlik {@link Alt} ile verilir. Sonuç her zaman ekranın
+ * ({@code h - max(max(leftHeight, rightHeight) + 9, 68)}); bu yüksekliklerle genişlik {@link Alt} ile verilir. Sonuç her zaman ekranın
  * içindedir.
  */
 public final class GostergeYerlesimi {
@@ -49,12 +49,12 @@ public final class GostergeYerlesimi {
     }
 
     /**
-     * Forge {@code ForgeGui.leftHeight/rightHeight}'tan: durum sütunu {@code max(left, right)}; action bar onun 4 px üstünde
-     * ortalanır ve 9 px yüksekliğindedir.
+     * Forge {@code ForgeGui.leftHeight/rightHeight}'tan: durum sütunu {@code max(left, right)}. Forge 1.20.1 action bar'ı
+     * {@code h - max(max(left, right) + 9, 68)}'e taşır ve metni 4 px yukarıdan çizer; üstüne aksan (Ö, Ç) için 2 px ve 2 px pay.
      */
     public static Alt forgeAlt(int solYukseklik, int sagYukseklik, int altYaziGenisligi) {
         int durum = Math.max(solYukseklik, sagYukseklik);
-        return new Alt(durum + 2, durum + 11, Math.max(HOTBAR_YARI + HOTBAR_YAN, altYaziGenisligi / 2 + 4));
+        return new Alt(durum + 2, Math.max(durum + 9, 68) + 8, Math.max(HOTBAR_YARI + HOTBAR_YAN, altYaziGenisligi / 2 + 4));
     }
 
     public static Konum konum(int w, int h, int pw, int ph, Kose kose, int ofsetX, int ofsetY, Alt alt) {
