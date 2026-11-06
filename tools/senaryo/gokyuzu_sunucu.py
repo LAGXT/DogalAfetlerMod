@@ -12,7 +12,8 @@ donma 100, kizilcuce bilgi (7 gün), hiz 1000 → kapı açılır, time set 2290
 durum; gün döngüsü kapalı doğuş (şef kararı G19): donma 99, gamerule doDaylightCycle false, time set 6000,
 gokyuzutest evre gunessiz (donma %100 değil: önceki döngünün kapı sayacı sıfırlanır), donma 100, kizilcuce bilgi (şafak beklenmez), hiz 1000 → "gün döngüsü kapalı,
 şafak beklenmedi" ve öğlen doğuş, time query daytime (6000, gün saatine dokunulmadı), hiz 1, gamerule geri, sunucuya `stop`.
-Koşu 2 (aynı dünya): açılışta dönem okundu (ay yok, kızıl cüce), kizilcuce bilgi (ay yok, kızıl cüce), sifirla, `stop`.
+Koşu 2 (aynı dünya): açılışta dönem okundu (ay yok, kızıl cüce; donma sistemi kızıl cücede çözülme dönemini açtığı için
+donma %100'den çözülme tabanına (%40) doğru iner), kizilcuce bilgi (ay yok, kızıl cüce), sifirla, `stop`.
 Sonda iki log da denetlenir: `invalid dist` yok, istisna yok, istemci sınıfı (`client.gokyuzu`, `[gokyuzu] kanca`) yok,
 iki süreç de 0 ile çıktı.
 
@@ -198,8 +199,8 @@ def kosu1(sunucu):
 
 def kosu2(sunucu):
     sunucu.bekle(r"Done \(", 0, ACILIS_SURESI, "açılış")
-    sunucu.bekle(r"Dünya dönemi okundu \(dogalafetler_donem\): .*ay=false gunes=kizil_cuce .*donma=100\.00", 0, 30,
-                 "dönem kaydı okundu (ay yok, kızıl cüce, donma 100)")
+    sunucu.bekle(r"Dünya dönemi okundu \(dogalafetler_donem\): .*ay=false gunes=kizil_cuce .*donma=(?:100|[4-9]\d)\.\d\d "
+                 r"cozulme=true", 0, 30, "dönem kaydı okundu (ay yok, kızıl cüce, çözülme döneminde donma 40–100)")
     sunucu.komut("dogalafet kizilcuce bilgi", r"Sun: Red dwarf era", "bilgi (kızıl cüce korundu)")
     sunucu.komut("dogalafet kizilcuce bilgi", r"Moon: gone", "bilgi (ay yok korundu)")
     sunucu.komut("dogalafet sifirla", r"disaster and era state was reset")
