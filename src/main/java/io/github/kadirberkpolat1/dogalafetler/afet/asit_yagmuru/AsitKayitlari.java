@@ -1,6 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.afet.asit_yagmuru;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.veri.DataGenerators;
 import net.minecraft.core.particles.ParticleType;
 import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraft.core.registries.Registries;
@@ -37,6 +38,10 @@ public final class AsitKayitlari {
 
     static void kaydet(IEventBus modBus) {
         PARCACIKLAR.register(modBus);
+        DataGenerators.parcacikEkle(SICRAMA, "asit_sicramasi", 4);
+        DataGenerators.parcacikEkle(DUMAN, "asit_dumani", 4);
+        DataGenerators.parcacikEkle(BUHAR, "asit_dumani", 4);
+        DataGenerators.parcacikEkle(BULUT, "asit_bulutu", 4);
     }
 
     public static DamageSource hasar(ServerLevel level) {

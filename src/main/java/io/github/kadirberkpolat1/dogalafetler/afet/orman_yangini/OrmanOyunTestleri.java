@@ -6,32 +6,30 @@ import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.Ipucu;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetAsamasi;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
-import io.github.kadirberkpolat1.dogalafetler.core.CekirdekOyunTestleri;
-import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
+import io.github.kadirberkpolat1.dogalafetler.core.OyunTestiTemizligi;
 import io.github.kadirberkpolat1.dogalafetler.yangin.YanginKayitlari;
 import io.github.kadirberkpolat1.dogalafetler.yangin.YanginYoneticisi;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.gametest.framework.AfterBatch;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
-import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
 
 /**
  * Orman yangını afetinin oyun içi testleri (şartname §6 #3, #16; bölüm G). Yangının kendisi ortak yangının testlerindedir
  * ({@code YanginOyunTestleri}); burada afetin başlangıç alanı, temiz stop, başarım ipucu, blok hasarı kuralı ve yanık izi
- * sınanır. Tek afet yuvasını kullanan testler kendi batch'indedir.
+ * sınanır. Tek afet yuvasını kullanan testler kendi batch'indedir; başarısız biten test de batch sonunda temizlenir
+ * ({@code OyunTestiTemizligi.batchSonu}, GP18).
  */
 @GameTestHolder(DogalAfetler.MOD_ID)
 @PrefixGameTestTemplate(false)
@@ -39,6 +37,21 @@ public final class OrmanOyunTestleri {
     private static final String SAHNE = "yangin_sahne";
 
     private OrmanOyunTestleri() {
+    }
+
+    @AfterBatch(batch = "orman_baslar")
+    public static void baslarSonrasi(ServerLevel level) {
+        OyunTestiTemizligi.batchSonu(level);
+    }
+
+    @AfterBatch(batch = "orman_ipucu")
+    public static void ipucuSonrasi(ServerLevel level) {
+        OyunTestiTemizligi.batchSonu(level);
+    }
+
+    @AfterBatch(batch = "orman_blok_hasari")
+    public static void blokHasariSonrasi(ServerLevel level) {
+        OyunTestiTemizligi.batchSonu(level);
     }
 
     /**
@@ -80,8 +93,8 @@ public final class OrmanOyunTestleri {
         baslat(y, 2, y.absolutePos(new BlockPos(4, 3, 4)));
         BlockPos yakinP = y.absolutePos(new BlockPos(4, 5, 4));
         BlockPos uzakP = y.absolutePos(new BlockPos(4, 5, 60));
-        ServerPlayer yakin = CekirdekOyunTestleri.sahteOyuncu(y, yakinP.getX() + 0.5, yakinP.getY(), yakinP.getZ() + 0.5);
-        ServerPlayer uzak = CekirdekOyunTestleri.sahteOyuncu(y, uzakP.getX() + 0.5, uzakP.getY(), uzakP.getZ() + 0.5);
+        ServerPlayer yakin = OyunTestiTemizligi.oyuncu(y, yakinP.getX() + 0.5, yakinP.getY(), yakinP.getZ() + 0.5);
+        ServerPlayer uzak = OyunTestiTemizligi.oyuncu(y, uzakP.getX() + 0.5, uzakP.getY(), uzakP.getZ() + 0.5);
         AtomicInteger yakinIpucu = new AtomicInteger();
         AtomicInteger uzakIpucu = new AtomicInteger();
         Consumer<BasarimIpucuEvent> dinleyici = olay -> {
@@ -89,9 +102,8 @@ public final class OrmanOyunTestleri {
                 (olay.oyuncu() == yakin ? yakinIpucu : olay.oyuncu() == uzak ? uzakIpucu : new AtomicInteger()).incrementAndGet();
             }
         };
-        MinecraftForge.EVENT_BUS.addListener(EventPriority.NORMAL, false, BasarimIpucuEvent.class, dinleyici);
+        OyunTestiTemizligi.dinle(BasarimIpucuEvent.class, dinleyici);
         y.runAfterDelay(61, () -> {
-            MinecraftForge.EVENT_BUS.unregister(dinleyici);
             yonetici.durdur();
             level.getServer().getPlayerList().remove(yakin);
             level.getServer().getPlayerList().remove(uzak);
@@ -107,9 +119,7 @@ public final class OrmanOyunTestleri {
         ServerLevel level = y.getLevel();
         AfetYoneticisi yonetici = AfetYoneticisi.al(level.getServer());
         yonetici.durdur();
-        GameRules.BooleanValue kural = level.getGameRules().getRule(Kurallar.AFET_BLOK_HASARI);
-        boolean onceki = kural.get();
-        kural.set(false, level.getServer());
+        boolean onceki = OyunTestiTemizligi.blokHasari(level, false);
         orman(y);
         int ilk = ozet(y);
         baslat(y, 3, y.absolutePos(new BlockPos(4, 3, 4)));
@@ -117,7 +127,7 @@ public final class OrmanOyunTestleri {
             int aktif = YanginYoneticisi.aktifSayi(level, alan(y));
             int son = ozet(y);
             yonetici.durdur();
-            kural.set(onceki, level.getServer());
+            OyunTestiTemizligi.blokHasari(level, onceki);
             y.assertTrue(aktif > 0, "yangın veri olarak sürmeli: " + aktif);
             y.assertTrue(son == ilk, "blok hasarı kapalıyken sahne değişmemeli");
             y.succeed();

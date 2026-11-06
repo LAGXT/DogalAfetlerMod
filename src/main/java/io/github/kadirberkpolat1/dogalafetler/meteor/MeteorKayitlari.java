@@ -1,6 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.meteor;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.veri.DataGenerators;
 import net.minecraft.core.particles.ParticleType;
 import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraft.world.entity.EntityType;
@@ -49,5 +50,13 @@ public final class MeteorKayitlari {
     static void kaydet(IEventBus modBus) {
         VARLIKLAR.register(modBus);
         PARCACIKLAR.register(modBus);
+        DataGenerators.parcacikEkle(PLAZMA, "meteor_isik", 4);
+        DataGenerators.parcacikEkle(PLAZMA_AY, "meteor_isik", 4);
+        DataGenerators.parcacikEkle(DUMAN, "meteor_duman", 4);
+        DataGenerators.parcacikEkle(KIVILCIM, "meteor_isik", 4);
+        DataGenerators.parcacikEkle(KIVILCIM_AY, "meteor_isik", 4);
+        DataGenerators.parcacikEkle(TOZ, "meteor_duman", 4);
+        DataGenerators.parcacikEkle(PARILTI, "meteor_yildiz", 2);
+        DataGenerators.parcacikEkle(KOZMIK, "meteor_yildiz", 2);
     }
 }

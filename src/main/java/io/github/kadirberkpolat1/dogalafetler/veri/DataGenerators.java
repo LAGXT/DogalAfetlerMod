@@ -10,6 +10,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import net.minecraft.data.DataGenerator;
+import net.minecraft.core.particles.ParticleType;
 import net.minecraft.data.PackOutput;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
@@ -21,7 +22,8 @@ import net.minecraftforge.fml.common.Mod;
 /**
  * Datagen kayıt noktası. Ortak dosyalar (dil dosyaları, sounds.json, vanilla blok ve eşya etiketleri) tek bir provider tarafından
  * yazılır ve alt sistemler bunlara katkı ekler; kendi dosyalarını yazan provider'lar (tarif, loot, advancement,
- * {@code dogalafetler:*} etiketleri) {@link #saglayiciEkle} ile eklenir. Kayıtlar mod inşasında yapılır,
+ * {@code dogalafetler:*} etiketleri) {@link #saglayiciEkle} ile eklenir. Parçacık tanımları ({@code particles/*.json}) da
+ * datagen'dir ({@link #parcacikEkle}, K-E25); elle JSON yazılmaz. Kayıtlar mod inşasında yapılır,
  * {@link GatherDataEvent}'te okunur.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD)
@@ -35,6 +37,7 @@ public final class DataGenerators {
     private static final List<Consumer<CeviriYazici>> CEVIRILER = new CopyOnWriteArrayList<>();
     private static final List<Consumer<SesSaglayici>> SESLER = new CopyOnWriteArrayList<>();
     private static final List<SaglayiciEkleyici> SAGLAYICILAR = new CopyOnWriteArrayList<>();
+    private static final List<ParcacikTanimlari.Tanim> PARCACIKLAR = new CopyOnWriteArrayList<>();
     private static final Map<TagKey<Block>, List<Supplier<? extends Block>>> VANILLA_BLOK_ETIKETLERI = new LinkedHashMap<>();
     private static final Map<TagKey<Item>, List<Supplier<? extends Item>>> VANILLA_ESYA_ETIKETLERI = new LinkedHashMap<>();
 
@@ -51,6 +54,15 @@ public final class DataGenerators {
 
     public static void saglayiciEkle(SaglayiciEkleyici ekleyici) {
         SAGLAYICILAR.add(Objects.requireNonNull(ekleyici, "ekleyici"));
+    }
+
+    /**
+     * Parçacık tanımı (K-E25): {@code tur} parçacığı {@code textures/particle/<doku>_0 … <doku>_(adet−1)} kareleriyle çizilir.
+     * Bütün tanımlar tek sağlayıcıda ({@link ParcacikTanimlari}) yazılır; tür datagen'de çözülür.
+     */
+    public static void parcacikEkle(Supplier<? extends ParticleType<?>> tur, String doku, int adet) {
+        PARCACIKLAR.add(new ParcacikTanimlari.Tanim(Objects.requireNonNull(tur, "tur"), Objects.requireNonNull(doku, "doku"),
+                adet));
     }
 
     /**
@@ -89,6 +101,7 @@ public final class DataGenerators {
         uretici.addProvider(istemci, new DilSaglayici(cikti, DilSaglayici.INGILIZCE, CEVIRILER));
         uretici.addProvider(istemci, new DilSaglayici(cikti, DilSaglayici.TURKCE, CEVIRILER));
         uretici.addProvider(istemci, new SesSaglayici(cikti, olay.getExistingFileHelper(), SESLER));
+        uretici.addProvider(istemci, new ParcacikTanimlari(cikti, olay.getExistingFileHelper(), PARCACIKLAR));
         uretici.addProvider(olay.includeServer(), new OrtakEtiketler(cikti, olay.getLookupProvider(),
                 olay.getExistingFileHelper(), VANILLA_BLOK_ETIKETLERI));
         uretici.addProvider(olay.includeServer(), new OrtakEsyaEtiketleri(cikti, olay.getLookupProvider(),
