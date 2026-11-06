@@ -579,14 +579,14 @@ verir; ekran görüntüsünde OP komut çıktısı (N6'da serbest) da kalmaz, ka
 **U-14 `build.gradle` istemci koşusu.** `client` koşusuna `-PoyunTestiAfeti` (entegre sunucuda test afeti) ve sanal-su ile
 birebir aynı `-Potomasyon` bloğu (1280×720) eklendi; birleştirmede tek blok kalır.
 
-**U-15 İstemci kanıtının sesi dosyaya gider, hoparlöre gitmez (şef kabulü; entegratör K0-35 olarak işler).** → K0-35, Şef kararları (Faz 2b).
+**U-15 İstemci kanıtının sesi dosyaya gider, hoparlöre gitmez (şef kabulü; entegratör K0-35 olarak işler).** → K0-35 (a), Şef kararları (Faz 2b).
 
 **U-16 Sönen siren yeni isteği engellemez.** `afetNo` = afetin başlangıç saati; `stop` ve `start` aynı tick'te gelirse yeni
 afetin numarası eskisininkiyle aynı olabilir (ölçekli saat o tick'te ilerlememiş olabilir). Durdurma almış siren aynı
 afet için bir daha istenmez (çekirdek durdurmada alıcı listesini siler); bu yüzden sönen sirende gelen istek her zaman
 yeni siren başlatır, eskisi kendi fade'iyle söner (`SirenKarari.istek(caliyor, sonuyor, …)`).
 
-**U-17 Otomasyon dosyaya güvenmez; koşu `options.txt`'i geri yazar (inceleme V1 ve U2-1…U2-4, şef kuralı).** → Şef kararları (Faz 2b).
+**U-17 Otomasyon dosyaya güvenmez; koşu `options.txt`'i geri yazar (inceleme V1 ve U2-1…U2-4, şef kuralı).** → K0-35 (b), Şef kararları (Faz 2b).
 
 **U-18 Ana Ses 0 iken yeniden çalma denenmez (inceleme V4).** Vanilla Ana Ses 0 iken sesi başlatmaz, `isActive` false
 kalır; nöbet bunu "motor kesti" sanmaz (`SirenNobeti.yenidenCalinmali(…, anaSesKapali)`), siren ve ortam katmanı için
@@ -1391,6 +1391,7 @@ dogalafetler"), `DataGenerator.addProvider` ikincisini `Duplicate provider` ile 
 (`rundata-1.log`). Her birine `getName()` ile ayrı ad verildi; etiket dosyaları zaten ayrı yollara yazıldığı için içerik
 değişmedi. Lang dosyalarındaki birleştirme çakışmaları anahtar birleşimiyle (ortak anahtarda farklı değer yok denetimi) çözüldü,
 ardından `runData` yeniden üretti: tek fark K-C48'in yeni anahtarı ve dosya sonu satırı (`96b8f8a`); sonraki `runData`'da `status` boş.
+Ayrı ad yalnız kayıt hatasını giderir; iki sağlayıcının aynı etiket dosyasını yazmasını önlemez: sahiplik kuralı K-E12.
 
 **K-E6 Mağara GameTest'i yalnız kendi sahnesini özetler.** Birleşik `main`'de ikinci ve üçüncü GameTest koşusunda
 `magaraDolarKururDunyaDegismez` "kurumadan sonra şablon hash'i değişti" ile düştü (`gametest-2.log`, `-3.log`). Tanı koşusunda
@@ -1398,7 +1399,8 @@ ardından `runData` yeniden üretti: tek fark K-C48'in yeni anahtarı ve dosya s
 gerçek suydu (`water[level=3..6]`). `oda()` yalnız 0..13'ü kurar; kenar komşu sahnelere açıktır ve K-C24 dünyası koşular arasında
 saklanır: önceki koşudan kalan su oraya akıyordu (dalda testler daha az komşuyla koşuyordu; suyun kaynağı ayrıca aranmadı).
 Mağara testi artık kendi kurduğu x/z 0..13 kutusunu özetler (`odaHash`); deniz testi kutunun tamamını kendisi kurduğu için
-değişmedi. Üretim kodu değişmedi. Ardışık iki koşu 85/85 (`gametest-4.log`, `-5.log`; `6ecafb9`).
+değişmedi. Üretim kodu değişmedi. Ardışık iki koşu 85/85 (`gametest-4.log`, `-5.log`; `6ecafb9`). Kapsam daralması şef
+kararıyla kalır; sızan suyun kaynağı "Açık noktalar (Faz 2b)"da.
 
 **K-E7 Gökyüzü senaryosu birleşik donmaya uyarlandı.** `gokyuzu_sunucu.py` koşu 2'de dönem kaydında `donma=100.00` bekliyordu;
 dalda donma sistemi yoktu. Birleşik `main`'de donma süreci kızıl cücede çözülme dönemini açar ve G'yi %100'den çözülme tabanına
@@ -1427,11 +1429,28 @@ Kabul edildi: ikisi test kodu, ikisi vanilla blok davranışının üzerine yaz�
 döndürür". Önceden aktif afet yokken `sifirla` olay üretmediği için biten afetin yanan hücreleri (en çok 30 sn) ve komut ateşleri
 sürüyordu (yangın §E). `YanginYoneticisi.donemDegisti` çekirdeğin `DonemDegistiEvent(SIFIRLAMA)` olayına abonedir (yalnız
 sunucunun kendi dönem nesnesi, donma ile aynı koruma): her boyutta süren alan tutuşturma işleri durur ve bütün hücreler
-kaynaktan bağımsız (komutla yakılanlar dahil) `temiz=true` yoluyla söner; yüklü olmayan chunk'taki ateş blokları bekleyen silmeye
+kaynaktan bağımsız (komutla yakılanlar dahil) `temiz=true` yoluyla söner, yanıp biten konumların 2400 tick'lik "yeniden tutuşmaz"
+hafızası (`yanmislar`) ve buhar listesi silinir (inceleme E4); yüklü olmayan chunk'taki ateş blokları bekleyen silmeye
 girer ve chunk yüklenince kalkar (Y-19). Kanıt: GameTest `YanginOyunTestleri#sifirlaYanginlariSondurur` (`yangin tutustur 4` →
-`sifirla` → `aktifSayi` 0, alan işi 0, `afet_atesi` 0, sahne baştaki gibi), dedicated `yangin_sunucu.py` (`tutustur 6` → `sifirla` →
-"yangın: dünya dönemi sıfırlandı, 241 hücre söndürüldü" → `bilgi` 0 → `fill … replace dogalafetler:afet_atesi` "No blocks
-were filled"); `.vibe/kanit/entegrasyon-2b/tur3/`.
+`sifirla` → `aktifSayi` 0, alan işi 0, yanık hafızası boş, `afet_atesi` 0, sahne baştaki gibi; GameTest toplamı 86), dedicated
+`yangin_sunucu.py` (`tutustur 6` → `sifirla` → "yangın: dünya dönemi sıfırlandı, 252 hücre söndürüldü" → `bilgi` 0 →
+`fill … replace dogalafetler:afet_atesi` "No blocks were filled"); commit'ler `c8477ec`, `7d10047`; kanıt
+`.vibe/kanit/entegrasyon-2b/tur3/`, `tur3-ek/`.
+
+**K-E12 Etiket sağlayıcı sahipliği: vanilla etiketlere tek ortak sağlayıcı (şef kararı; inceleme E2).** Etiket sağlayıcısı
+dosya başına tam içerik yazar: aynı etiketi iki sağlayıcı yazarsa `DataGenerator` hata vermez, son yazan kazanır ve diğerinin
+girdileri sessizce kaybolur. Kural: her `BlockTagsProvider`/`ItemTagsProvider` yalnız kendi ad alanındaki (`dogalafetler:*`)
+etiket dosyalarını yazar; vanilla (`minecraft:*`) blok etiketlerine katkı yalnız çekirdek sahipliğindeki
+`veri.OrtakEtiketler`'den gelir. Alt sistemler mod kurucusunda `DataGenerators.vanillaBlokEtiketiEkle(etiket, blok...)` ile katkı
+ekler (bloklar `Supplier`, datagen'de çözülür; `minecraft` dışı ad alanı `IllegalArgumentException`). Taşınanlar: yangının
+`minecraft:fire` katkısı (Y-22, `YanginSistemi.kaydet`) ve donmanın `minecraft:dirt`, `animals_spawnable_on`, `mineable/shovel`, `ice`,
+`mineable/pickaxe` katkıları (`DonmaSistemi.kaydet`); `YanginEtiketSaglayici` ve donma `Etiketler` artık yalnız kendi etiketlerini
+yazar. Bir alt sistemin kendi `dogalafetler:*` etiketini başka sistem genişletecekse sahibi yine tektir (ör. `yanmaz`,
+`asit_dayanikli`, `deprem_dayanikli` yangının; yangın §A4). Kanıt: `runData` çıkış 0 ve blokların/eşyaların bulunduğu bütün etiket
+dosyalarının sha256'i öncekiyle aynı (`fire.json` farkı boş; `.vibe/kanit/entegrasyon-2b/tur3-ek/etiket-sha-once.txt`,
+`-sonra.txt`), `7d10047`. Bilinen sınır: sıcaklığın `minecraft:damage_type` etiketleri (`is_fire`, `is_freezing`, `bypasses_armor`,
+`no_knockback`) blok/eşya etiketi değil ve bugün tek yazarı sıcaklık; ikinci bir yazar gelirse aynı desenle ortak sağlayıcıya
+taşınır. Eşya etiketi kancası ilk ihtiyaçta aynı şekilde eklenir (Faz 3/4 işçileri için kural çekirdek sözleşmesi §12'de).
 
 ## Şef kararları (Faz 0–1)
 
@@ -1626,7 +1645,7 @@ N18 `sifirla` listesinde gün yok. `sifirla` sonrası oyun günü = (oyun zaman�
 
 Faz 2b parçalarında şefin verdiği ya da kabul ettiği kararlar (kaynak `.vibe/kararlar/<parça>.md` §B; parça bölümlerinde aynı
 kimliklerle atıf vardır). Başlığında "şef kararı/kabulü/kuralı" geçen kararlar ile entegrasyon görevinde sayılanlar (gökyüzü G21,
-sanal su SU-31, SU-38) buradadır. Uyarı-ses U-15 şef kabulü K0-35 kimliğiyle işlendi.
+sanal su SU-31, SU-38) buradadır. Uyarı-ses U-15 ve U-17 (aynı şef kabulünün iki yarısı) K0-35 kimliğiyle, (a) ve (b) olarak işlendi.
 
 ### Sıcaklık
 
@@ -1670,7 +1689,11 @@ log'ları "siren_standart (deprem)" biçiminde hangi afetin sireni olduğunu bun
 okuyabilir; ses seçimi `SirenTuru`'yla, ekranda gösterilmez. Kullanılmayan `SirenSesi.afet` alanı kaldırıldı. ses.md §2'deki
 "siren paketi afet türünü değil siren türünü taşır" maddesinin yerini bu karar aldı (ses.md §7 başında yazılı).
 
-**K0-35 İstemci kanıtının sesi dosyaya gider, hoparlöre gitmez (şef kabulü; uyarı-ses U-15).** Görev "Ana Ses %0 ile başla, ölçümü dosyadan yap"
+**K0-35 İstemci ses kanıtı: ses dosyaya gider, otomasyon dosyaya güvenmez (şef kabulü; uyarı-ses U-15 + U-17).** İki
+yarı birlikte uygulanır: yalnız (a) uygulanırsa Ana Ses 1.0 `options.txt`'e kalabiliyordu (inceleme V1, U2-1), bu yüzden ses kanıtı
+alan her işçi (b)'yi de uygular.
+
+(a) **Ses dosyaya (U-15).** Görev "Ana Ses %0 ile başla, ölçümü dosyadan yap"
 diyor; ama vanilla `SoundEngine.play` Ana Ses 0 iken hiçbir sesi başlatmaz (bytecode: `Skipped playing soundEvent: {},
 master volume was zero`), siren örneği tick almaz, sönüm/yeniden çalma/kaydırıcı etkisi gözlenemez. Yol: oyunun kendi
 OpenAL Soft'u (LWJGL 3.3.1, `libopenal.so` içinde "Wave File Writer" arka ucu) `ALSOFT_DRIVERS=wave` + `ALSOFT_CONF`
@@ -1680,12 +1703,12 @@ Ses'i %100 yapar, değilse oyunu kapatır; koşu betiği de log'daki `OpenAL ini
 başka aygıtta süreci öldürür (iki kat kapı). Kayıt `tools/senaryo/uyari_kayit_olc.py` ile ölçülür (siren bandı
 200–1000 Hz, ortam bandı 30–110 Hz, 100 ms pencere). Gerçek dinleme sahibine kalır.
 
-**U-17 Otomasyon dosyaya güvenmez; koşu `options.txt`'i geri yazar (inceleme V1 ve U2-1…U2-4, şef kuralı).** (a) Koşu
-betiği (`uyari_istemci.py`) worktree'nin `run/options.txt`'ini koşudan önce bayt bayt saklar, sonunda (`finally`; hata,
+(b) **Otomasyon kuralları (U-17; inceleme V1 ve U2-1…U2-4, şef kuralı): otomasyon dosyaya güvenmez, koşu `options.txt`'i geri
+yazar.** (b1) Koşu betiği (`uyari_istemci.py`) worktree'nin `run/options.txt`'ini koşudan önce bayt bayt saklar, sonunda (`finally`; hata,
 SIGINT ve SIGTERM'de de: ana thread'de iki sinyal `SystemExit`'e çevrilir, geri yazım sırasında yok sayılır; istemci açıksa
 önce kapatılır) geri yazar ve önce/sonra sha256'yı log'a yazar. Tur 1'in kirlettiği dosya (`bed47f2d…`: Ana Ses 1.0,
 `lang:tr_tr`, susturulmuş kategoriler) bir kez temizlendi: `lang:en_us`, bütün `soundCategory_*` 1.0 (vanilla
-varsayılanı), sha256 `0bf2e0e7…`; sonraki koşular bu temiz dosyayı saklayıp geri yazar. (b) Java kapısı (`UyariOtomasyonu`):
+varsayılanı), sha256 `0bf2e0e7…`; sonraki koşular bu temiz dosyayı saklayıp geri yazar. (b2) Java kapısı (`UyariOtomasyonu`):
 `FMLClientSetupEvent`'te (`enqueueWork`, ana thread) Ana Ses'i kendisi 0 yapar. Gerçek sıra: kosu4'te ortak kurulum
 07:11:41, ses motoru 07:11:52 ("OpenAL initialized"), oyuncu dünyaya giriş 07:12:05, ilk `ClientTickEvent` 07:12:07; Tur 2'deki
 "ilk tick müzik/oyun sesinden önce" iddiası yanlıştı (ilk tick ses motorundan 15 sn sonra). İstemci kurulumu ses
@@ -1696,8 +1719,10 @@ Ana Ses o an 0'dır ve bir sonraki tick'te geri açılır. Yan etkisi (yalnız o
 kategori düzeyi 0 olan kanalı durdurur (bytecode: `getSoundSourceVolume` ≤ 0 → `Channel.stop`), MASTER'daki siren o tick
 kesilir ve U-11 yoluyla aynı zarfla yeniden çalar (`kosu4/runClient-uyari.log:317`; kayıtta 0,95 sn sessizlik, sonra yeni
 kaydırıcı düzeyi). Kapanışta 0 yazılıp kaydedilir. Böylece betiksiz bir `-Potomasyon=uyari` koşusu da Ana Ses 1.0'ı
-dosyaya yazmaz ve yanlış aygıtta ses çıkarmaz. (c) Senaryo son adımına ("çıkış") ulaşmayan koşu "tamamlanmadı" yazılır.
+dosyaya yazmaz ve yanlış aygıtta ses çıkarmaz. (b3) Senaryo son adımına ("çıkış") ulaşmayan koşu "tamamlanmadı" yazılır.
 Kanıt `kosu4/pencere-uyari.log`: options.txt sha256 önce = sonra (`bed47f2d…`).
+
+**U-17 Otomasyon dosyaya güvenmez; koşu `options.txt`'i geri yazar.** → K0-35 (b).
 
 ### Gökyüzü
 
@@ -1750,7 +1775,8 @@ Y-12 ile söner), yol bulucu `DAMAGE_FIRE` sayar (köylü ve hayvanlar kaçını
 Vanilla ateşle çift yönlü yayılma olmaz: afet ateşinin tick'i yok, vanilla ateş afet ateşinin konumuna yayılamaz (boş
 değil); vanilla ateşin tutuşturduğu blok vanilla kalır, bizim kuyruk yalnız kendi hücrelerini bilir. GameTest
 `afetAtesiAtesEtiketinde`. Not (Faz 4 meteor): `BaseFireBlock.onPlace` obsidyen çerçevenin içine konan afet ateşinde
-Nether portalı açar (vanilla ateş de açar).
+Nether portalı açar (vanilla ateş de açar). Yazım yeri K-E12 ile ortak sağlayıcıya taşındı (`DataGenerators.vanillaBlokEtiketiEkle`;
+`fire.json` içeriği aynı).
 
 **Y-23 Yağmur yalnız gökyüzüne yakın ateşi etkiler (inceleme F6; şef kararı).** `YanginMantigi.yagisDurumu(dünyada yağmur,
 yağmur görüyor, biyom yağışı RAIN, örtü)`: yağmur gören (ya da yatay komşusu gören) ateş açık; yağan biyomda üstündeki
@@ -1920,7 +1946,8 @@ Kamera y 14'e alındı. Mağara-sualtı: amber sis rengi uygulanıyordu ama sis 
 
 Entegratöre bırakılan notlardan işlenenler: kancalar (K-E1), protokol (K-C47), `asama ileri [süreç]` (K-C48), sanal su §3a istisnası
 (K-C49), güneş evresi ilerlemesi (K-C50), runClient kilidi (K0-21 rev. 2 (k), K-E4), yangın `-Potomasyon` (K-E3), donma N15
-istisnası (K-E9), `sifirla` ↔ yangın (K-E11). Açık kalanlar:
+istisnası (K-E9), `sifirla` ↔ yangın (K-E11), etiket sahipliği (K-E12), `.worktrees` temizliği (tur 3; yedi birleşmiş
+worktree kaldırıldı, beş spike kalır). Açık kalanlar:
 
 - **README gamerule notu (yangın §E):** afet ateşi `doFireTick`'ten bağımsızdır (Y-01); haritayı korumak için tek denetim
   `afetBlokHasari=false`. README Faz 5 teslimatında yazılır.
@@ -1932,7 +1959,11 @@ istisnası (K-E9), `sifirla` ↔ yangın (K-E11). Açık kalanlar:
   buharlaşma göl yatağı karesi (K-D38).
 - **Ölçümler:** FPS oranları Faz 4 başsız kalibrasyonu ve Faz 5 (K0-21 rev. 2 (j)); Cold Sweat çift hasar ölçümü Faz 5 (S-18);
   `-Puyum=coldsweat` ile sanal su mixin'lerinin refmap yolu runClient'ta sınanmadı (K-E2).
-- `.worktrees/*` (altı Faz 2b, çekirdek ve beş spike) duruyor; kaldırma kararı şefin.
+- **GameTest dünyasında sızan gerçek su (donma/su ortak bulgusu; K-E6, inceleme E3):** birleşik `main`'de `su_alani`
+  şablonunun x/z 14–15 kenarına gerçek akıcı su (`water[level=3..6]`) aktı; kaynağı bulunmadı. Aday: kalıcı K-C24 dünyasında
+  komuşu bir donma/buharlaşma sahnesinin (geri dolma) ya da zaman aşımıyla temizlenmeden biten bir testin bıraktığı su. Kaynak bir
+  test sahnesiyse o test kendi kutusunu kapatır/temizler; üretim kodundaysa (geri dolmada akıcı su) donma işçisine gider. Faz 4
+  tsunami işçisi mağara testinde (batch yerleşimi ve komşu sahneler) araştırır.
 
 ## N17 — Sayısal varsayılanlar
 
