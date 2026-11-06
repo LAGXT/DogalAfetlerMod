@@ -1,0 +1,25 @@
+{
+  "type": "dogalafetler:kalan_secimli_sekilsiz",
+  "category": "misc",
+  "ingredients": [
+    {
+      "item": "minecraft:glass_bottle"
+    },
+    {
+      "item": "minecraft:sweet_berries"
+    },
+    {
+      "item": "minecraft:sweet_berries"
+    },
+    {
+      "item": "minecraft:honey_bottle"
+    }
+  ],
+  "kalan_birakmayan": [
+    "minecraft:honey_bottle"
+  ],
+  "result": {
+    "count": 2,
+    "item": "dogalafetler:isitici_cay"
+  }
+}
