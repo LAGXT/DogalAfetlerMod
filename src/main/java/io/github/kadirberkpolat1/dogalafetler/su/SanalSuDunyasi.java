@@ -37,10 +37,10 @@ public final class SanalSuDunyasi {
     private Magara[] magaraDizi = MAGARA_YOK;
     private volatile Cekilme[] cekilmeDizi = CEKILME_YOK;
     private final SuAraliklari gecici = new SuAraliklari();
-    private ZeminOkuyucu zeminYedek;
-    private long yedekZeminSayisi;
+    private ZeminOkuyucu canliZemin;
+    private long canliZeminSayisi;
 
-    /** Alanın henüz okumadığı sütunun zemini (dünyadan, yüklü chunk); bilinmiyorsa {@link Integer#MIN_VALUE}. */
+    /** Sütunun şu anki zemini (dünyanın yükseklik haritası, yüklü chunk); bilinmiyorsa {@link Integer#MIN_VALUE}. */
     @FunctionalInterface
     public interface ZeminOkuyucu {
         int zemin(int x, int z);
@@ -55,16 +55,17 @@ public final class SanalSuDunyasi {
     }
 
     /**
-     * Dalga aralığının tabanı için yedek zemin (SU-27): alan sütunu okumadan (okuma bütçesi, uzak bölge) dalga geçerse
-     * aralık dalga tabanından değil gerçek zeminden başlar; yoksa tabanın altındaki varlık kuru kalır.
+     * Dalga aralığının tabanı için canlı zemin (SU-27, SU-36): dalga aralığı önce dünyanın şu anki zemininden başlar,
+     * chunk yüklü değilse alanın okuduğu zeminden, o da yoksa dalga tabanından. Alanın zemini bayat olabilir (kodla
+     * değişen blok olay atmaz, tazeleme periyodiktir); bayat zemin hendekteki varlığı kuru bırakırdı.
      */
-    public void zeminYedek(ZeminOkuyucu okuyucu) {
-        zeminYedek = okuyucu;
+    public void canliZemin(ZeminOkuyucu okuyucu) {
+        canliZemin = okuyucu;
     }
 
-    /** Dalga aralığının tabanı için yedek zeminin kaç kez okunduğu (test: SU-27 yolunun gerçekten kullanıldığı). */
-    public long yedekZeminSayisi() {
-        return yedekZeminSayisi;
+    /** Dalga aralığı için canlı zeminin kaç kez kullanıldığı (test: SU-36 yolunun gerçekten kullanıldığı). */
+    public long canliZeminSayisi() {
+        return canliZeminSayisi;
     }
 
     public void denizArtisiAyarla(double artis) {
@@ -201,10 +202,11 @@ public final class SanalSuDunyasi {
         for (Dalga d : dd) {
             double y = d.yuzey(x + 0.5, z + 0.5, t);
             if (!Double.isNaN(y)) {
-                int zemin = alan.zemin(x, z);
-                if (zemin == Integer.MIN_VALUE && zeminYedek != null) {
-                    zemin = zeminYedek.zemin(x, z);
-                    yedekZeminSayisi++;
+                int zemin = canliZemin == null ? Integer.MIN_VALUE : canliZemin.zemin(x, z);
+                if (zemin != Integer.MIN_VALUE) {
+                    canliZeminSayisi++;
+                } else {
+                    zemin = alan.zemin(x, z);
                 }
                 a.ekle(zemin == Integer.MIN_VALUE ? d.taban() : Math.min(zemin, y), y);
             }

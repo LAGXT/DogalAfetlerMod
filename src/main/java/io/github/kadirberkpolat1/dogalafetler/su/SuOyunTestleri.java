@@ -24,6 +24,7 @@ import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
 
@@ -224,53 +225,75 @@ public final class SuOyunTestleri {
 
     /**
      * Düz taş zeminde +x yönünde ilerleyen dalga: dalga tabanının altındaki hendekteki domuz ve zemindeki eşya dalga
-     * yönünde 3 bloktan fazla sürüklenir ve domuz suda sayılır (sunucu, SU-27); sahte oyuncu ıslaktır ve istemcisinin
-     * uygulayacağı ivme dalga yönündedir (oyuncuyu kendi istemcisi iter, SU-03). Deniz alanı okuması duraklatılır: hendek
-     * sütunu bilinmez, dalga tabanı yalnız yedek zeminden gelir; yedek olmadan domuz kuru kalır (kırmızı: SU-33).
+     * yönünde 3 bloktan fazla sürüklenir ve domuz suda sayılır (sunucu); sahte oyuncu ıslaktır ve istemcisinin uygulayacağı
+     * ivme dalga yönündedir (oyuncuyu kendi istemcisi iter, SU-03). Doğrulama-2'nin kararsız koşusu belirlenimci kurulur
+     * (SU-36): deniz alanı taş zemini okuduktan sonra okuması dondurulur ve iki blok derin hendek kodla kazılır (blok
+     * olayı yok), alanın zemini bayat kalır; dalga tabanı canlı zeminden gelmezse dipteki domuz kuru kalır (doğrulayıcının
+     * düşen koşusunda domuz dipte kalmıştı, geçenlerde zıplayıp çıkmıştı). Bütün koşullar aynı tick'te.
      */
     @GameTest(template = "su_alani", batch = "su_dalga", timeoutTicks = 400)
     public static void dalgaMobuVeEsyayiSurukler(GameTestHelper h) {
         ServerLevel l = h.getLevel();
         kutu(h, 0, 0, 0, 15, 0, 15, Blocks.STONE.defaultBlockState());
-        // Domuz dalga tabanının (y1) bir blok altındaki hendekte (y0, altı düz dünyanın çimeni): doğrulama bulgusunun
-        // (domuz şablon kenarından düşünce kuru) belirlenimci hali (SU-27).
-        kutu(h, 2, 0, 5, 15, 0, 7, Blocks.AIR.defaultBlockState());
-        Pig domuz = h.spawn(EntityType.PIG, 3, 0, 6);
-        int dalgaTabani = m(h, 0, 1, 0).getY();
-        BlockPos ep = m(h, 3, 1, 9);
-        ItemEntity esya = new ItemEntity(l, ep.getX() + 0.5, ep.getY() + 0.1, ep.getZ() + 0.5, new ItemStack(Items.OAK_LOG));
-        l.addFreshEntity(esya);
-        BlockPos op = m(h, 3, 1, 12);
-        ServerPlayer oyuncu = CekirdekOyunTestleri.sahteOyuncu(h, op.getX() + 0.5, op.getY(), op.getZ() + 0.5);
-        BlockPos koken = m(h, -20, 1, 8);
-        double domuzX = domuz.getX();
-        double esyaX = esya.getX();
+        sabitle(h);
         SanalSuDunyasi dunya = SanalSu.boyut(l).dunya;
-        SanalSu.alanOkumasiDuraklat(l, new ChunkPos(m(h, -24, 0, 0)), new ChunkPos(m(h, 16, 0, 16)), 420);
-        long yedek0 = dunya.yedekZeminSayisi();
-        BlockPos hendek = m(h, 6, 0, 6);
-        int id = SanalSu.dalgaBaslat(l, new Dalga(koken.getX(), koken.getZ() + 0.5, 1, 0, SanalSu.sunucuSaati, 0.5, 6, 60, 60,
-                koken.getY(), 200));
+        int dalgaTabani = m(h, 0, 1, 0).getY();
+        BlockPos hendek = m(h, 3, 0, 6);
+        BlockPos koken = m(h, -30, 1, 8);
+        Pig[] domuz = new Pig[1];
+        ItemEntity[] esya = new ItemEntity[1];
+        ServerPlayer[] oyuncu = new ServerPlayer[1];
+        double[] bas = new double[2];
+        long[] canli0 = new long[1];
+        int[] bayat = new int[1];
+        int[] id = new int[1];
         double[] it = new double[2];
-        // Bütün koşullar aynı tick'te doğru olmalı (kilit yok); üst sınır testin 400 tick'i.
+        // Dalga açıkta başlar (alan yalnız dalga varken okunur); hendek kazılana kadar domuzun sütününe varmaz.
+        id[0] = SanalSu.dalgaBaslat(l, new Dalga(koken.getX(), koken.getZ() + 0.5, 1, 0, SanalSu.sunucuSaati, 0.5, 6, 60, 60,
+                koken.getY(), 200));
         h.startSequence()
+                .thenWaitUntil(() -> h.assertTrue(dunya.alan().zemin(hendek.getX(), hendek.getZ()) == dalgaTabani,
+                        "deniz alanı taş zemini henüz okumadı"))
+                .thenExecute(() -> {
+                    SanalSu.alanOkumasiDuraklat(l, 420);
+                    bayat[0] = dunya.alan().zemin(hendek.getX(), hendek.getZ());
+                    // Hendek alan okuduktan sonra kazılır: dibi y0 (altı düz dünyanın çimeni), çevresinde y1'de taş bilezik; iki
+                    // blok derin olduğu için domuz zıplayıp çıkamaz, dalga gelene kadar dipte (y0) kalır.
+                    kutu(h, 1, 1, 4, 15, 1, 8, Blocks.STONE.defaultBlockState());
+                    kutu(h, 2, 0, 5, 14, 1, 7, Blocks.AIR.defaultBlockState());
+                    domuz[0] = h.spawn(EntityType.PIG, 3, 0, 6);
+                    BlockPos ep = m(h, 3, 1, 9);
+                    esya[0] = new ItemEntity(l, ep.getX() + 0.5, ep.getY() + 0.1, ep.getZ() + 0.5, new ItemStack(Items.OAK_LOG));
+                    l.addFreshEntity(esya[0]);
+                    BlockPos op = m(h, 3, 1, 12);
+                    oyuncu[0] = CekirdekOyunTestleri.sahteOyuncu(h, op.getX() + 0.5, op.getY(), op.getZ() + 0.5);
+                    bas[0] = domuz[0].getX();
+                    bas[1] = esya[0].getX();
+                    canli0[0] = dunya.canliZeminSayisi();
+                })
                 .thenWaitUntil(() -> {
-                    h.assertTrue(dunya.alan().zemin(hendek.getX(), hendek.getZ()) == Integer.MIN_VALUE,
-                            "deniz alanı hendek sütununu okudu (duraklatma tutmadı)");
-                    h.assertTrue(domuz.isInWater(), "hendekteki domuz suyu tanımadı (y=" + domuz.getY() + ", dalga tabanı " + dalgaTabani + ")");
-                    h.assertTrue(SanalSu.icindeMi(oyuncu), "oyuncu dalgada ıslak değil");
-                    h.assertTrue(SanalSu.itmeHesapla(oyuncu, it) != null && it[0] > 0 && Math.abs(it[1]) < 1e-9,
+                    Pig p = domuz[0];
+                    h.assertTrue(dunya.alan().zemin(hendek.getX(), hendek.getZ()) == bayat[0],
+                            "deniz alanı hendeği yeniden okudu (dondurma tutmadı)");
+                    h.assertTrue(p.isInWater(), "hendekteki domuz suyu tanımadı (y=" + p.getY() + ", dalga tabanı " + dalgaTabani
+                            + ", alanın bayat zemini " + bayat[0] + ")");
+                    h.assertTrue(SanalSu.icindeMi(oyuncu[0]), "oyuncu dalgada ıslak değil");
+                    h.assertTrue(SanalSu.itmeHesapla(oyuncu[0], it) != null && it[0] > 0 && Math.abs(it[1]) < 1e-9,
                             "oyuncunun sürükleme ivmesi dalga yönünde değil");
-                    h.assertTrue(domuz.getX() - domuzX > 3, "domuz sürüklenmedi: dx=" + (domuz.getX() - domuzX));
-                    h.assertTrue(esya.getX() - esyaX > 3, "eşya sürüklenmedi: dx=" + (esya.getX() - esyaX));
-                    h.assertTrue(dunya.yedekZeminSayisi() > yedek0, "yedek zemin yolu kullanılmadı");
+                    h.assertTrue(p.getX() - bas[0] > 3, "domuz sürüklenmedi: dx=" + (p.getX() - bas[0]));
+                    h.assertTrue(esya[0].getX() - bas[1] > 3, "eşya sürüklenmedi: dx=" + (esya[0].getX() - bas[1]));
+                    h.assertTrue(dunya.canliZeminSayisi() > canli0[0], "canlı zemin yolu kullanılmadı");
                 })
                 .thenExecute(() -> {
-                    DogalAfetler.LOGGER.info("Sanal su GameTest: dalga domuz dx={} y={} eşya dx={} oyuncu ivme={} domuz suda={} yedek zemin={} tick={}",
-                            domuz.getX() - domuzX, domuz.getY(), esya.getX() - esyaX, it[0], domuz.isInWater(),
-                            dunya.yedekZeminSayisi() - yedek0, h.getTick());
-                    SanalSu.dalgaBitir(l, id);
-                    l.getServer().getPlayerList().remove(oyuncu);
+                    Pig p = domuz[0];
+                    DogalAfetler.LOGGER.info("Sanal su GameTest: dalga domuz dx={} y={} eşya dx={} oyuncu ivme={} domuz suda={} "
+                            + "alan zemini (bayat)={} canlı zemin={} canlı okuma={} tick={}", p.getX() - bas[0], p.getY(),
+                            esya[0].getX() - bas[1], it[0], p.isInWater(), bayat[0],
+                            l.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, hendek.getX(), hendek.getZ()),
+                            dunya.canliZeminSayisi() - canli0[0], h.getTick());
+                    SanalSu.dalgaBitir(l, id[0]);
+                    l.getServer().getPlayerList().remove(oyuncu[0]);
+                    SanalSu.bolgeBirak(l);
                 })
                 .thenSucceed();
     }

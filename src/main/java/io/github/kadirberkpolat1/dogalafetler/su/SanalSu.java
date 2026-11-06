@@ -52,7 +52,7 @@ public final class SanalSu {
 
         Boyut(ServerLevel l) {
             dunya = yeniDunya(l.getSeaLevel(), sunucuYurutucu());
-            dunya.zeminYedek(yedekZemin(l));
+            dunya.canliZemin(canliZemin(l));
         }
     }
 
@@ -171,18 +171,13 @@ public final class SanalSu {
     }
 
     /**
-     * Test (SU-27): kutudaki chunk'ları deniz alanından bırakır ve okumayı {@code tick} oyun tick'i duraklatır; bu sürede dalga
-     * aralığının tabanı yalnız yedek zeminden gelebilir. Süre dolunca okuma kendiliğinden sürer.
+     * Test (SU-36): deniz alanının okumasını ve tazelenmesini {@code tick} oyun tick'i dondurur; alanın bildiği zemin bu sürede
+     * bayat kalır (kodla değişen bloğu görmez). Süre dolunca okuma kendiliğinden sürer.
      */
-    static void alanOkumasiDuraklat(ServerLevel l, ChunkPos a, ChunkPos b, int tick) {
-        Boyut by = boyut(l);
-        for (int cx = Math.min(a.x, b.x); cx <= Math.max(a.x, b.x); cx++) {
-            for (int cz = Math.min(a.z, b.z); cz <= Math.max(a.z, b.z); cz++) {
-                by.dunya.alan().birak(DenizAlani.anahtar(cx, cz));
-            }
-        }
-        by.okumaDuraklatBitis = l.getGameTime() + tick;
+    static void alanOkumasiDuraklat(ServerLevel l, int tick) {
+        boyut(l).okumaDuraklatBitis = l.getGameTime() + tick;
     }
+
 
     /** Oyuncu olmasa da deniz alanı hesaplanacak chunk aralığı (tsunami hedefi, GameTest). */
     public static void bolgeSabitle(ServerLevel l, ChunkPos a, ChunkPos b) {
@@ -437,10 +432,10 @@ public final class SanalSu {
     }
 
     /**
-     * Alanın okumadığı sütunun zemini doğrudan dünyadan (SU-27): yaprak hariç hareket engelleyen yüzey (sıvı dahil) ve
-     * üstü; chunk yüklü değilse bilinmiyor. Sunucu ve istemci aynı kural.
+     * Sütunun şu anki zemini doğrudan dünyadan (SU-27, SU-36): yaprak hariç hareket engelleyen yüzey (sıvı dahil) ve
+     * üstü, yükseklik haritasından (blok değişince hemen güncel); chunk yüklü değilse bilinmiyor. Sunucu ve istemci aynı kural.
      */
-    public static SanalSuDunyasi.ZeminOkuyucu yedekZemin(Level l) {
+    public static SanalSuDunyasi.ZeminOkuyucu canliZemin(Level l) {
         return (x, z) -> l.hasChunk(x >> 4, z >> 4) ? l.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z)
                 : Integer.MIN_VALUE;
     }

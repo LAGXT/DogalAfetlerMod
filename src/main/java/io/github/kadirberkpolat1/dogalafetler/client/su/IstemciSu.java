@@ -62,7 +62,7 @@ public final class IstemciSu {
         if (l != seviye) {
             seviye = l;
             dunya = SanalSu.yeniDunya(l.getSeaLevel(), SanalSu.istemciYurutucu());
-            dunya.zeminYedek(SanalSu.yedekZemin(l));
+            dunya.canliZemin(SanalSu.canliZemin(l));
             SanalSu.istemciSaati = () -> IstemciDonem.saat(0f);
             SanalSu.istemci = dunya;
             derlenen = new Cekilme[0];

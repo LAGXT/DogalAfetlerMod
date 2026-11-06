@@ -112,20 +112,34 @@ class SanalSuDunyasiTest {
     }
 
     @Test
-    void alanBilmeyinceDalgaTabaniYedekZemindenGelir() {
+    void alanBilmeyinceDalgaTabaniCanliZemindenGelir() {
         // Doğrulama bulgusu (P1): alan sütunu henüz okumamışken dalga aralığı yalnız taban'dan başlıyordu; tabanın altındaki
-        // varlık (ör. şablon kenarından düşen domuz) kuru kalıyordu. Yedek okuyucu dünyanın zeminini verir.
+        // varlık (ör. şablon kenarından düşen domuz) kuru kalıyordu. Canlı okuyucu dünyanın zeminini verir.
         SanalSuDunyasi dunya = new SanalSuDunyasi(duzKiyi());
         dunya.dalgaEkle(1, new Dalga(-80, 4, 1, 0, 0, 1, 8, 80, 30, 63, 200));
         SuAraliklari a = new SuAraliklari();
         dunya.araliklar(-40, 4, 50, a);
         assertEquals(1, a.adet());
-        assertEquals(63, a.alt(0), "yedek yokken taban");
-        dunya.zeminYedek((x, z) -> 60);
+        assertEquals(63, a.alt(0), "canlı zemin yokken taban");
+        dunya.canliZemin((x, z) -> 60);
         dunya.araliklar(-40, 4, 50, a);
         assertEquals(60, a.alt(0), "alan bilmiyorsa zemin dünyadan okunur");
-        dunya.zeminYedek((x, z) -> Integer.MIN_VALUE);
+        dunya.canliZemin((x, z) -> Integer.MIN_VALUE);
         dunya.araliklar(-40, 4, 50, a);
         assertEquals(63, a.alt(0), "dünya da bilmiyorsa taban");
+    }
+
+    @Test
+    void dalgaTabaniAlaninEskiZemininiDegilCanliZeminiKullanir() {
+        // Doğrulama-2 bulgusu: alan sütunu okuduktan sonra kod blok değiştirdi (blok olayı yok, tazeleme 20 tick sonra);
+        // alan hâlâ eski zemini (64) biliyor, hendeğin dibi 61. Dalga aralığı gerçek zeminden başlamalı.
+        SanalSuDunyasi dunya = new SanalSuDunyasi(duzKiyi());
+        dunya.dalgaEkle(1, new Dalga(-80, 4, 1, 0, 0, 1, 8, 80, 30, 63, 200));
+        assertEquals(64, dunya.alan().zemin(12, 4), "alan eski zemini biliyor");
+        dunya.canliZemin((x, z) -> 61);
+        SuAraliklari a = new SuAraliklari();
+        dunya.araliklar(12, 4, 95, a);
+        assertEquals(1, a.adet());
+        assertEquals(61, a.alt(0), "dalga tabanı canlı zemin");
     }
 }
