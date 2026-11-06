@@ -17,8 +17,9 @@ donma %100'den çözülme tabanına (%40) doğru iner), kizilcuce bilgi (ay yok,
 Sonda iki log da denetlenir: `invalid dist` yok, istisna yok, istemci sınıfı (`client.gokyuzu`, `[gokyuzu] kanca`) yok,
 iki süreç de 0 ile çıktı.
 
-Kullanım (worktree kökünden): python3 tools/senaryo/gokyuzu_sunucu.py <log klasörü>
-Çıkış: 0 geçti, 1 senaryo/denetim hatası, 2 sunucu süreci sıfır dışı kodla çıktı.
+Kullanım (worktree kökünden): python3 tools/senaryo/gokyuzu_sunucu.py <log klasörü> | --kanit <dizin> [--port <n>]
+Çıkış: 0 geçti, 1 senaryo/denetim hatası, 2 sunucu süreci sıfır dışı kodla çıktı, 3 ağır süreç kapısı açılmadı
+(port ve kapı: cekirdek_sunucu.py, K-E13).
 """
 import os
 import re
@@ -29,6 +30,9 @@ import sys
 import threading
 import time
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import cekirdek_sunucu as cs  # noqa: E402
 
 KOK = Path(__file__).resolve().parents[2]
 JAVA_HOME = "/home/lagxt/.jdks/jdk-17.0.21+9"
@@ -126,8 +130,9 @@ def ozellikleri_senaryoya_cevir():
     yol = SUNUCU_KLASORU / "server.properties"
     ozgun = yol.read_bytes() if yol.exists() else None
     eski = [] if ozgun is None else ozgun.decode("iso-8859-1").splitlines()
-    yeni = [s for s in eski if s.split("=", 1)[0].strip() not in SENARYO_OZELLIKLERI]
-    yeni += [f"{anahtar}={deger}" for anahtar, deger in SENARYO_OZELLIKLERI.items()]
+    istenen = {**SENARYO_OZELLIKLERI, "server-port": str(cs.PORT)}
+    yeni = [s for s in eski if s.split("=", 1)[0].strip() not in istenen]
+    yeni += [f"{anahtar}={deger}" for anahtar, deger in istenen.items()]
     SUNUCU_KLASORU.mkdir(parents=True, exist_ok=True)
     yol.write_bytes(("\n".join(yeni) + "\n").encode("iso-8859-1"))
     eula = SUNUCU_KLASORU / "eula.txt"
@@ -224,9 +229,10 @@ def log_denetimi(yol):
 
 
 def main():
-    klasor = Path(sys.argv[1])
+    klasor = cs.argumanlar(__doc__).kanit
     klasor.mkdir(parents=True, exist_ok=True)
     signal.signal(signal.SIGTERM, lambda _i, _c: (_ for _ in ()).throw(SystemExit(143)))
+    cs.kapi_veya_cik(cs.PORT)
     senaryo_dunyasini_sil()
     ozgun = ozellikleri_senaryoya_cevir()
     sonuc = 0

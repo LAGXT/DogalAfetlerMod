@@ -9,16 +9,17 @@ Oyuncusuz (varsayılan): start deprem 1, asama ileri (SIREN: uyarı log'u "SIREN
 sürerken durdurma); sunucuya `stop`.
 
 `--istemci`: sunucu açılınca istemci `uyari_istemci.kos` ile (K0-21 rev. 2 protokolü, ses yalnız wave yazıcıya) açılır
-ve `--quickPlayMultiplayer localhost:25565` ile `Uyari` adıyla bağlanır (otomasyon `uyari-sunucu`: komut vermez). İstemci
+ve `--quickPlayMultiplayer localhost:<port>` ile `Uyari` adıyla bağlanır (otomasyon `uyari-sunucu`: komut vermez). İstemci
 sesi açınca konsoldan start deprem 1 ve asama ileri (SIREN) verilir: sunucu log'unda "siren paketi gönderildi ... ->
 [Uyari]"; 6 sn sonra asama ileri (AKTIF): "siren durdurma paketi gönderildi"; istemci fade-out'tan sonra çıkar, stop.
-Önce ağır süreç kapısı: kullanılabilir RAM ≥ 10 GiB, Gradle sayısı < 2, başka runClient yok (docs/MAKINE.md).
+Önce ağır süreç kapısı: kullanılabilir RAM ≥ 10 GiB, Gradle sayısı < 2, başka runClient yok (docs/MAKINE.md), port boş;
+oyuncusuz koşuda ortak kapı (cekirdek_sunucu.py, K-E13).
 
 Log denetimi: `invalid dist` yok (ortak kod istemci sınıfı yüklemez, N15), istisna yok, config düzeltme WARN'ı yok,
 `uyari/siren` paketleri kayıtlı.
 
-Kullanım (worktree kökünden): python3 tools/senaryo/uyari_sunucu.py <log klasörü> [--istemci]
-Çıkış: 0 geçti, 1 senaryo/denetim hatası, 2 sunucu süreci sıfır dışı kodla çıktı.
+Kullanım (worktree kökünden): python3 tools/senaryo/uyari_sunucu.py <log klasörü> | --kanit <dizin> [--port <n>] [--istemci]
+Çıkış: 0 geçti, 1 senaryo/denetim hatası ya da istemcili kapı açılmadı, 2 sunucu süreci sıfır dışı kodla çıktı, 3 kapı açılmadı.
 """
 import re
 import signal
@@ -61,7 +62,7 @@ def istemcili_kosu(sunucu, klasor):
     istemci_log.unlink(missing_ok=True)
 
     def istemci():
-        sonuc["gecerli"] = ui.kos(klasor, "uyari-sunucu", ("-PquickPlaySunucu=localhost:25565", f"-PkullaniciAdi={OYUNCU}"),
+        sonuc["gecerli"] = ui.kos(klasor, "uyari-sunucu", (f"-PquickPlaySunucu=localhost:{c.PORT}", f"-PkullaniciAdi={OYUNCU}"),
                                   ISTEMCI_WAV)
 
     is_parcacigi = threading.Thread(target=istemci, daemon=True)
@@ -104,22 +105,25 @@ def ek_denetim(yol):
 
 def agir_surec_kapisi():
     for _ in range(10):
-        if ui.gradle_sayisi() < 2 and ui.bos_ram_gib() >= 10 and not ui.baska_istemci():
+        if ui.gradle_sayisi() < 2 and ui.bos_ram_gib() >= 10 and not ui.baska_istemci() and c.port_bos(c.PORT):
             return True
         print(f"ağır süreç kapısı: gradle={ui.gradle_sayisi()} boş={ui.bos_ram_gib():.1f} GiB "
-              f"istemci={ui.baska_istemci()}; 60 sn", flush=True)
+              f"istemci={ui.baska_istemci()} port {c.PORT} boş={c.port_bos(c.PORT)}; 60 sn", flush=True)
         time.sleep(60)
     return False
 
 
 def main():
-    klasor = Path(sys.argv[1]).resolve()
-    istemcili = "--istemci" in sys.argv[2:]
+    a = c.argumanlar(__doc__, ek=lambda p: p.add_argument("--istemci", action="store_true", help="istemciyle bağlan"))
+    klasor = a.kanit.resolve()
+    istemcili = a.istemci
     klasor.mkdir(parents=True, exist_ok=True)
     signal.signal(signal.SIGTERM, lambda _i, _c: (_ for _ in ()).throw(SystemExit(143)))
     if istemcili and not agir_surec_kapisi():
         print("kapı 10 dk'da açılmadı; koşu iptal", file=sys.stderr)
         sys.exit(1)
+    if not istemcili:
+        c.kapi_veya_cik(c.PORT)
     c.senaryo_dunyasini_sil()
     ozgun = c.ozellikleri_senaryoya_cevir()
     sonuc = 0

@@ -17,8 +17,9 @@ were filled"; `forceload remove`. K-E11 (`sifirla` yangını söndürür): spawn
 log'da "yangın: dünya dönemi sıfırlandı, N hücre söndürüldü", bilgi (0), döşemede `afet_atesi` kalmadı; `stop`.
 Sonda iki log da denetlenir: `invalid dist` yok, istisna yok, config düzeltme WARN'ı yok, iki süreç de 0 ile çıktı.
 
-Kullanım (worktree kökünden): python3 tools/senaryo/yangin_sunucu.py <log klasörü>
-Çıkış: 0 geçti, 1 senaryo/denetim hatası, 2 sunucu süreci sıfır dışı kodla çıktı.
+Kullanım (worktree kökünden): python3 tools/senaryo/yangin_sunucu.py <log klasörü> | --kanit <dizin> [--port <n>]
+Çıkış: 0 geçti, 1 senaryo/denetim hatası, 2 sunucu süreci sıfır dışı kodla çıktı, 3 ağır süreç kapısı açılmadı
+(port ve kapı: cekirdek_sunucu.py, K-E13).
 """
 import re
 import signal
@@ -124,9 +125,10 @@ def log_denetimi(yol):
 
 
 def main():
-    klasor = Path(sys.argv[1])
+    klasor = cs.argumanlar(__doc__).kanit
     klasor.mkdir(parents=True, exist_ok=True)
     signal.signal(signal.SIGTERM, lambda _i, _c: (_ for _ in ()).throw(SystemExit(143)))
+    cs.kapi_veya_cik(cs.PORT)
     cs.senaryo_dunyasini_sil()
     ozgun = cs.ozellikleri_senaryoya_cevir()
     sonuc = 0

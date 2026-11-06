@@ -1,6 +1,7 @@
 """Buz altı balıkçılığın dedicated sunucu kabulü (K0-18).
 
-Kullanım (worktree kökünden): python3 tools/senaryo/balikcilik_sunucu.py
+Kullanım (worktree kökünden): python3 tools/senaryo/balikcilik_sunucu.py [--kanit <dizin>] [--port <n>] (varsayılan
+`KOK/.vibe/kanit/balikcilik`, port 25596)
 
 Adımlar: runServer açılır (stdin boruya bağlı, pty'siz) → `[balikcilik] loot tablosu yüklendi` satırı aranır →
 `forceload add 0 0` ve y=200'de küçük sahne donma 0'da kurulur (taş, su, üstünde son donma aşamasında `buz_deligi[asama=3]`).
@@ -10,7 +11,7 @@ Aşama 1: `dogalafet donma 50` → aşama süresi (15 sn) dolunca delik **buz** 
 açık su yüzeyi olsaydı donma süreci sütunu kalın buzla dondururdu (ilk tur 2 koşusu). → `loot spawn ... loot
 dogalafetler:gameplay/buz_deligi_balikcilik` (özel kategori girdisi sunucuda çalışır) → temizlik → `forge tps` → `stop`.
 Ham log `KOK/.vibe/kanit/balikcilik/runServer-<n>.log`, özet `sunucu.log`. Kendi worktree'sinin `run-server/` klasörünü
-kullanır. Ağır süreç kapısı: Gradle < 2 ve boş RAM >= 4 GB (en çok 20 dk).
+kullanır. Ağır süreç kapısı: Gradle < 2, boş RAM >= 4 GB ve port boş (en çok 20 dk; cekirdek_sunucu.py, K-E13).
 """
 import os
 import re
@@ -20,31 +21,27 @@ import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import cekirdek_sunucu as cs  # noqa: E402
+
 W = Path(__file__).resolve().parents[2]
 KOK = W.parents[1] if W.parent.name == ".worktrees" else W
 KANIT = KOK / ".vibe/kanit/balikcilik"
 JAVA_HOME = "/home/lagxt/.jdks/jdk-17.0.21+9"
-KANIT.mkdir(parents=True, exist_ok=True)
-GUNLUK = open(KANIT / "sunucu.log", "a", encoding="utf-8")
+PORT = 25596
+GUNLUK = None
 
 
 def log(*a):
     satir = time.strftime("%H:%M:%S ") + " ".join(str(x) for x in a)
     print(satir, flush=True)
-    GUNLUK.write(satir + "\n")
-    GUNLUK.flush()
+    if GUNLUK:
+        GUNLUK.write(satir + "\n")
+        GUNLUK.flush()
 
 
 def kapi():
-    for _ in range(21):
-        gradle = int(subprocess.run(["pgrep", "-fc", "GradleWrapperMain"], capture_output=True, text=True).stdout
-                     .strip() or 0)
-        bos = int(open("/proc/meminfo").read().split("MemAvailable:")[1].split()[0]) // 1024
-        log(f"kapı: gradle={gradle} bos={bos} MB")
-        if gradle < 2 and bos >= 4096:
-            return True
-        time.sleep(60)
-    return False
+    return cs.agir_surec_kapisi(PORT, log)
 
 
 def hazirla():
@@ -53,7 +50,7 @@ def hazirla():
     (k / "eula.txt").write_text("eula=true\n")
     ozellik = k / "server.properties"
     satirlar = ozellik.read_text().splitlines() if ozellik.exists() else []
-    yonetilen = {"server-port": "25596", "online-mode": "false", "level-name": "test", "level-seed": "20261105"}
+    yonetilen = {"server-port": str(PORT), "online-mode": "false", "level-name": "test", "level-seed": "20261105"}
     satirlar = [s for s in satirlar if s.split("=")[0] not in yonetilen]
     ozellik.write_text("\n".join(satirlar + [f"{a}={d}" for a, d in yonetilen.items()]) + "\n")
 
@@ -118,6 +115,11 @@ def delik_koy(s, donma=False):
 
 
 def main():
+    global KANIT, PORT, GUNLUK
+    a = cs.argumanlar(__doc__, PORT, KANIT)
+    KANIT, PORT = a.kanit, a.port
+    KANIT.mkdir(parents=True, exist_ok=True)
+    GUNLUK = open(KANIT / "sunucu.log", "a", encoding="utf-8")
     if not kapi():
         log("kapı 20 dk'da açılmadı")
         return 2

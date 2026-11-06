@@ -6,7 +6,8 @@ Ayrı `run-server/esya` dünyası (eski serverconfig uyarıları karışmasın, 
 satırları (ağ paketleri listesinde `esya/radar`, `esya/sismograf`; oyun testi afeti deprem), `invalid dist` 0, `Exception` 0,
 çıkış 0. Log KÖK/.vibe/kanit/radar-sismograf/sunucu/.
 
-Kullanım (worktree kökünden): python3 tools/senaryo/esya_sunucu.py
+Kullanım (worktree kökünden): python3 tools/senaryo/esya_sunucu.py [--kanit <dizin>] [--port <n>] (varsayılan port 25591).
+Ağır süreç kapısı: Gradle < 2, boş RAM >= 4 GB ve port boş (en çok 20 dk; cekirdek_sunucu.py, K-E13).
 """
 import os
 import re
@@ -15,6 +16,9 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import cekirdek_sunucu as cs  # noqa: E402
 
 W = Path(__file__).resolve().parents[2]
 KOK = W.parents[1] if W.parent.name == ".worktrees" else W
@@ -31,14 +35,7 @@ def log(*a):
 
 
 def kapi():
-    for _ in range(21):
-        gradle = int(subprocess.run(["pgrep", "-fc", "[G]radleWrapperMain"], capture_output=True, text=True).stdout or 0)
-        bos = int(Path("/proc/meminfo").read_text().split("MemAvailable:")[1].split()[0]) // 1024
-        log(f"kapı: gradle={gradle} boş={bos} MB")
-        if gradle < 2 and bos >= 4096:
-            return True
-        time.sleep(60)
-    return False
+    return cs.agir_surec_kapisi(PORT, log)
 
 
 def hazirla():
@@ -54,6 +51,9 @@ def hazirla():
 
 
 def main():
+    global KANIT, PORT
+    a = cs.argumanlar(__doc__, PORT, KANIT)
+    KANIT, PORT = a.kanit, a.port
     KANIT.mkdir(parents=True, exist_ok=True)
     if not kapi():
         log("kapı 20 dk'da açılmadı")

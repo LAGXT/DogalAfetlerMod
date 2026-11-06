@@ -21,13 +21,20 @@ Koşu 2 (aynı dünya): açılışta dönem okundu (gün ofseti, son afetler, be
 Sonda iki log da denetlenir: `invalid dist` yok, istisna yok, bizim config dosyalarımız için Forge düzeltme WARN'ı yok,
 iki süreç de 0 ile çıktı.
 
-Kullanım (worktree kökünden): python3 tools/senaryo/cekirdek_sunucu.py <log klasörü>
-Çıkış: 0 geçti, 1 senaryo/denetim hatası, 2 sunucu süreci sıfır dışı kodla çıktı.
+Kullanım (worktree kökünden): python3 tools/senaryo/cekirdek_sunucu.py <log klasörü> | --kanit <dizin> [--port <n>]
+Çıkış: 0 geçti, 1 senaryo/denetim hatası, 2 sunucu süreci sıfır dışı kodla çıktı, 3 ağır süreç kapısı açılmadı.
+
+Ortak komut satırı ve kapı (K-E13, diğer `*_sunucu.py` betikleri de kullanır): `--port` (varsayılan 25565) senaryo süresince
+`server.properties`'e `server-port` olarak yazılır; başka worktree'deki paralel senaryo ayrı portla çakışmaz (aynı worktree'de
+`run-server/` paylaşıldığı için senaryolar yine sırayla koşar). Ağır süreç kapısı: Gradle < 2, boş RAM >= 4 GB ve portı
+başka süreç dinlemiyor; 60 sn'de bir, en çok 20 dk bekler.
 """
+import argparse
 import os
 import re
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import threading
@@ -42,6 +49,8 @@ SENARYO_OZELLIKLERI = {"level-name": SENARYO_DUNYASI, "level-seed": "20261105", 
 ACILIS_SURESI = 900
 ADIM_SURESI = 60
 KAPANIS_SURESI = 180
+VARSAYILAN_PORT = 25565
+PORT = VARSAYILAN_PORT
 
 
 class SenaryoHatasi(Exception):
@@ -133,8 +142,9 @@ def ozellikleri_senaryoya_cevir():
     yol = SUNUCU_KLASORU / "server.properties"
     ozgun = yol.read_bytes() if yol.exists() else None
     eski = [] if ozgun is None else ozgun.decode("iso-8859-1").splitlines()
-    yeni = [s for s in eski if s.split("=", 1)[0].strip() not in SENARYO_OZELLIKLERI]
-    yeni += [f"{anahtar}={deger}" for anahtar, deger in SENARYO_OZELLIKLERI.items()]
+    istenen = {**SENARYO_OZELLIKLERI, "server-port": str(PORT)}
+    yeni = [s for s in eski if s.split("=", 1)[0].strip() not in istenen]
+    yeni += [f"{anahtar}={deger}" for anahtar, deger in istenen.items()]
     SUNUCU_KLASORU.mkdir(parents=True, exist_ok=True)
     yol.write_bytes(("\n".join(yeni) + "\n").encode("iso-8859-1"))
     return ozgun
@@ -146,6 +156,61 @@ def ozellikleri_geri_al(ozgun):
         yol.unlink(missing_ok=True)
     else:
         yol.write_bytes(ozgun)
+
+
+def argumanlar(aciklama=None, varsayilan_port=VARSAYILAN_PORT, varsayilan_kanit=None, ek=None):
+    """Ortak komut satırı: konumsal `<log klasörü>` ya da `--kanit <dizin>`, `--port <n>`; `ek(parser)` betiğe özgü
+    seçenek ekler. Port bu modülün `PORT`'una yazılır (`ozellikleri_senaryoya_cevir` onu `server-port` yapar)."""
+    global PORT
+    ayristirici = argparse.ArgumentParser(description=aciklama, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ayristirici.add_argument("klasor", nargs="?", type=Path, help="log/kanıt klasörü (--kanit ile aynı)")
+    ayristirici.add_argument("--kanit", type=Path, help="log/kanıt klasörü")
+    ayristirici.add_argument("--port", type=int, default=varsayilan_port, help=f"sunucu portu (varsayılan {varsayilan_port})")
+    if ek:
+        ek(ayristirici)
+    a = ayristirici.parse_args()
+    if a.klasor and a.kanit and a.klasor.resolve() != a.kanit.resolve():
+        ayristirici.error("konumsal klasör ile --kanit farklı")
+    a.kanit = a.kanit or a.klasor or varsayilan_kanit
+    if a.kanit is None:
+        ayristirici.error("log klasörü gerekli: <log klasörü> ya da --kanit <dizin>")
+    if not 1024 <= a.port <= 65535:
+        ayristirici.error(f"geçersiz port {a.port}")
+    PORT = a.port
+    return a
+
+
+def port_bos(port):
+    """Portta dinleyen süreç yoksa True. SO_REUSEADDR ile TIME_WAIT kalanı boş sayılır, dinleyen soket (IPv6 çift yığın
+    dahil) sayılmaz."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            s.bind(("", port))
+        except OSError:
+            return False
+    return True
+
+
+def agir_surec_kapisi(port, log=print, en_cok_dk=20, ram_mb=4096):
+    """Gradle < 2, boş RAM >= `ram_mb` ve `port` boş olana dek 60 sn'de bir bekler; `en_cok_dk` dakikada açılmazsa False."""
+    for deneme in range(en_cok_dk + 1):
+        gradle = int(subprocess.run(["pgrep", "-fc", "GradleWrapperMain"], capture_output=True, text=True).stdout.strip()
+                     or 0)
+        bos = int(Path("/proc/meminfo").read_text().split("MemAvailable:")[1].split()[0]) // 1024
+        port_uygun = port_bos(port)
+        log(f"kapı: gradle={gradle} bos={bos} MB port {port} {'boş' if port_uygun else 'DOLU'}")
+        if gradle < 2 and bos >= ram_mb and port_uygun:
+            return True
+        if deneme < en_cok_dk:
+            time.sleep(60)
+    return False
+
+
+def kapi_veya_cik(port):
+    if not agir_surec_kapisi(port):
+        print("ağır süreç kapısı 20 dk'da açılmadı (Gradle/RAM/port); koşu iptal", file=sys.stderr)
+        sys.exit(3)
 
 
 def senaryo_dunyasini_sil():
@@ -254,9 +319,10 @@ def log_denetimi(yol):
 
 
 def main():
-    klasor = Path(sys.argv[1])
+    klasor = argumanlar(__doc__).kanit
     klasor.mkdir(parents=True, exist_ok=True)
     signal.signal(signal.SIGTERM, lambda _i, _c: (_ for _ in ()).throw(SystemExit(143)))
+    kapi_veya_cik(PORT)
     senaryo_dunyasini_sil()
     ozgun = ozellikleri_senaryoya_cevir()
     sonuc = 0

@@ -13,8 +13,9 @@ Koşu 2 (aynı dünya): mağara kayıttan kuruldu log'u, durum (deniz +3 korundu
 (deniz +0), su bilgi (mağara 0), `stop`.
 Sonda iki log da denetlenir: `invalid dist` yok, istisna yok, config düzeltme uyarısı yok, iki süreç de 0 ile çıktı.
 
-Kullanım (worktree kökünden): python3 tools/senaryo/su_sunucu.py <log klasörü>
-Çıkış: 0 geçti, 1 senaryo/denetim hatası, 2 sunucu süreci sıfır dışı kodla çıktı.
+Kullanım (worktree kökünden): python3 tools/senaryo/su_sunucu.py <log klasörü> | --kanit <dizin> [--port <n>]
+Çıkış: 0 geçti, 1 senaryo/denetim hatası, 2 sunucu süreci sıfır dışı kodla çıktı, 3 ağır süreç kapısı açılmadı
+(port ve kapı: cekirdek_sunucu.py, K-E13).
 """
 import importlib.util
 import signal
@@ -85,9 +86,10 @@ def kosu2(s):
 
 
 def main():
-    klasor = Path(sys.argv[1])
+    klasor = c.argumanlar(__doc__).kanit
     klasor.mkdir(parents=True, exist_ok=True)
     signal.signal(signal.SIGTERM, lambda _i, _c: (_ for _ in ()).throw(SystemExit(143)))
+    c.kapi_veya_cik(c.PORT)
     c.senaryo_dunyasini_sil()
     ozgun = c.ozellikleri_senaryoya_cevir()
     sonuc = 0
