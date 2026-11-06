@@ -14,6 +14,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.TagKey;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.SnowLayerBlock;
@@ -137,22 +138,45 @@ public final class DonmaIsleyici {
         return c != null ? c : new ChunkDonmaVerisi();
     }
 
-    /** Bölge ve 1 blokluk halkasının yüzey türlerinden kıyı uzaklıkları; yüklü olmayan komşu chunk bilinmiyor sayılır. */
+    /**
+     * Bölgenin su sütunları için kıyı uzaklığı (K-D20). BFS bölgenin çevresinde {@code kiyiUzaklikSiniri} blokluk hale üzerinde
+     * çalışır: sınıra kadarki her yol bu halenin içinde kaldığı için sonuç bölgenin chunk'a göre nereden kesildiğinden
+     * bağımsızdır (komuş chunk'taki kıyı da görülür; tek blokluk halede göl buzu chunk hizalı kenarla donuyordu).
+     * Yüklü olmayan chunk bilinmiyor sayılır; ticking chunk'ın komşuları yüklüdür.
+     */
     static int[] kiyiUzakliklari(ServerLevel level, int minX, int minZ, int genislik, int derinlik, int ustY, Tablo tablo,
             DonmaEsikleri e) {
-        int gw = genislik + 2;
-        byte[] tur = new byte[gw * (derinlik + 2)];
+        int hale = e.kiyiUzaklikSiniri();
+        int gg = genislik + 2 * hale;
+        int gd = derinlik + 2 * hale;
+        int gw = gg + 2;
+        byte[] tur = new byte[gw * (gd + 2)];
         BlockPos.MutableBlockPos konum = new BlockPos.MutableBlockPos();
-        for (int dz = -1; dz <= derinlik; dz++) {
-            for (int dx = -1; dx <= genislik; dx++) {
-                tur[(dz + 1) * gw + dx + 1] = yuzeyTuru(level, minX + dx, minZ + dz, ustY, tablo, konum);
+        int x0 = minX - hale - 1;
+        int z0 = minZ - hale - 1;
+        LevelChunk chunk = null;
+        long chunkAnahtari = Long.MIN_VALUE;
+        for (int dz = 0; dz < gd + 2; dz++) {
+            for (int dx = 0; dx < gw; dx++) {
+                int x = x0 + dx;
+                int z = z0 + dz;
+                long anahtar = ChunkPos.asLong(x >> 4, z >> 4);
+                if (anahtar != chunkAnahtari) {
+                    chunk = level.getChunkSource().getChunkNow(x >> 4, z >> 4);
+                    chunkAnahtari = anahtar;
+                }
+                tur[dz * gw + dx] = yuzeyTuru(chunk, x, z, ustY, tablo, konum);
             }
         }
-        return KiyiUzakligi.hesapla(genislik, derinlik, tur, e.kiyiUzaklikSiniri());
+        int[] genis = KiyiUzakligi.hesapla(gg, gd, tur, hale);
+        int[] sonuc = new int[genislik * derinlik];
+        for (int z = 0; z < derinlik; z++) {
+            System.arraycopy(genis, (z + hale) * gg + hale, sonuc, z * genislik, genislik);
+        }
+        return sonuc;
     }
 
-    private static byte yuzeyTuru(ServerLevel level, int x, int z, int ustY, Tablo tablo, BlockPos.MutableBlockPos konum) {
-        LevelChunk chunk = level.getChunkSource().getChunkNow(x >> 4, z >> 4);
+    private static byte yuzeyTuru(LevelChunk chunk, int x, int z, int ustY, Tablo tablo, BlockPos.MutableBlockPos konum) {
         if (chunk == null) {
             return KiyiUzakligi.BILINMIYOR;
         }

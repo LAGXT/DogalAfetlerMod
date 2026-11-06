@@ -49,6 +49,9 @@ public final class DonmaOyunTestleri {
     private static final int EN = 9;
     private static final int BOY = 6;
     private static final String ALAN = "donma_alan";
+    private static final String GOL = "donma_gol";
+    private static final int GOL_EN = 32;
+    private static final int GOL_BOY = 5;
 
     private DonmaOyunTestleri() {
     }
@@ -62,8 +65,13 @@ public final class DonmaOyunTestleri {
     }
 
     private static int[] kutu(GameTestHelper y) {
+        return kutu(y, EN);
+    }
+
+    /** Sahnenin mutlak kutusu: minX, minZ, maxX, maxZ ({@code en × en}). */
+    private static int[] kutu(GameTestHelper y, int en) {
         BlockPos a = y.absolutePos(BlockPos.ZERO);
-        BlockPos b = y.absolutePos(new BlockPos(EN - 1, 0, EN - 1));
+        BlockPos b = y.absolutePos(new BlockPos(en - 1, 0, en - 1));
         return new int[] {Math.min(a.getX(), b.getX()), Math.min(a.getZ(), b.getZ()), Math.max(a.getX(), b.getX()),
                 Math.max(a.getZ(), b.getZ())};
     }
@@ -91,11 +99,15 @@ public final class DonmaOyunTestleri {
     }
 
     private static BlockState[] anlik(GameTestHelper y) {
-        BlockState[] d = new BlockState[EN * BOY * EN];
+        return anlik(y, EN, BOY);
+    }
+
+    private static BlockState[] anlik(GameTestHelper y, int en, int boy) {
+        BlockState[] d = new BlockState[en * boy * en];
         int i = 0;
-        for (int yy = 0; yy < BOY; yy++) {
-            for (int z = 0; z < EN; z++) {
-                for (int x = 0; x < EN; x++) {
+        for (int yy = 0; yy < boy; yy++) {
+            for (int z = 0; z < en; z++) {
+                for (int x = 0; x < en; x++) {
                     d[i++] = y.getBlockState(p(x, yy, z));
                 }
             }
@@ -103,18 +115,22 @@ public final class DonmaOyunTestleri {
         return d;
     }
 
-    private static List<String> farklar(BlockState[] beklenen, BlockState[] gercek) {
+    private static List<String> farklar(BlockState[] beklenen, BlockState[] gercek, int en) {
         List<String> f = new ArrayList<>();
         for (int i = 0; i < beklenen.length; i++) {
             if (beklenen[i] != gercek[i]) {
-                f.add("(" + i % EN + "," + i / (EN * EN) + "," + (i / EN) % EN + ") " + beklenen[i] + " ≠ " + gercek[i]);
+                f.add("(" + i % en + "," + i / (en * en) + "," + (i / en) % en + ") " + beklenen[i] + " ≠ " + gercek[i]);
             }
         }
         return f;
     }
 
     private static void ayniMi(GameTestHelper y, BlockState[] beklenen, String ne) {
-        List<String> f = farklar(beklenen, anlik(y));
+        ayniMi(y, beklenen, ne, EN, BOY);
+    }
+
+    private static void ayniMi(GameTestHelper y, BlockState[] beklenen, String ne, int en, int boy) {
+        List<String> f = farklar(beklenen, anlik(y, en, boy), en);
         y.assertTrue(f.isEmpty(), ne + ": " + f.size() + " blok farklı, ilki " + (f.isEmpty() ? "" : f.get(0)));
     }
 
@@ -488,8 +504,8 @@ public final class DonmaOyunTestleri {
 
     // ---------------------------------------------------------------- zamanlayıcı yolu (kendi batch'lerinde)
 
-    private static LongOpenHashSet sahneChunklari(GameTestHelper y) {
-        int[] k = kutu(y);
+    private static LongOpenHashSet sahneChunklari(GameTestHelper y, int en) {
+        int[] k = kutu(y, en);
         LongOpenHashSet s = new LongOpenHashSet();
         for (int cx = k[0] >> 4; cx <= k[2] >> 4; cx++) {
             for (int cz = k[1] >> 4; cz <= k[3] >> 4; cz++) {
@@ -501,12 +517,16 @@ public final class DonmaOyunTestleri {
 
     /** Zamanlayıcı testinin başı: dönem ve kuyruk temiz, kapsam sahnenin chunk'ları, chunk'lar G=0'da ve güncel döngüde. */
     private static LongOpenHashSet zamanlayiciHazirla(GameTestHelper y) {
+        return zamanlayiciHazirla(y, EN);
+    }
+
+    private static LongOpenHashSet zamanlayiciHazirla(GameTestHelper y, int en) {
         MinecraftServer server = y.getLevel().getServer();
         DunyaDonemi d = DunyaDonemi.al(server);
         d.donmaIlerlemesiAyarla(0f);
         d.cozulmeDonemiAyarla(false);
         d.buharlasmaDerinligiAyarla(0f);
-        LongOpenHashSet chunklar = sahneChunklari(y);
+        LongOpenHashSet chunklar = sahneChunklari(y, en);
         for (long c : chunklar) {
             ChunkDonmaVerisi v = ChunkDonmaVerisi.al(y.getLevel().getChunk(ChunkPos.getX(c), ChunkPos.getZ(c)));
             v.donguyeGec(DonmaZamanlayici.dongu(d), 0, false);
@@ -641,6 +661,77 @@ public final class DonmaOyunTestleri {
             y.assertTrue(donuk[0] != null && bekle[0] >= 40, "30'a donma ve sıfırlama sonrası bekleme");
             y.assertTrue(hepsi(y, chunklar, 0), "chunk'lar yeni döngüde G=0 olmalı");
             ayniMi(y, donuk[0], "sifirla blokları çözmemeli");
+            zamanlayiciBitir(y);
+        });
+    }
+
+    /**
+     * K-D20 (madde 9 "kıyılardan içeri"): kıyı uzaklığı chunk'tan bağımsızdır. 32x32 sahnede chunk sınırını her zaman
+     * kesen yuvarlak göl (yarıçap 12, 3 derin); zamanlayıcı G=35'e getirince her su sütununun üst bloğu, bütün sahne
+     * üzerinden ölçülen gerçek kıyı uzaklığına göre beklenen evrededir (kıyıda buz, ortada açık su; chunk hizalı kenar
+     * yok). Sonra 0'a çözülür ve sahne başlangıçla aynıdır.
+     */
+    @GameTest(template = GOL, batch = "donma_zamanlayici_5", timeoutTicks = 3000)
+    public static void kiyiUzakligiChunkSinirindanBagimsiz(GameTestHelper y) {
+        for (int x = 0; x < GOL_EN; x++) {
+            for (int z = 0; z < GOL_EN; z++) {
+                double dx = x - 15.5;
+                double dz = z - 15.5;
+                boolean gol = dx * dx + dz * dz <= 144;
+                y.setBlock(p(x, 0, z), Blocks.STONE);
+                y.setBlock(p(x, 1, z), gol ? Blocks.WATER : Blocks.DIRT);
+                y.setBlock(p(x, 2, z), gol ? Blocks.WATER : Blocks.DIRT);
+                y.setBlock(p(x, 3, z), gol ? Blocks.WATER : Blocks.GRASS_BLOCK);
+            }
+        }
+        ServerLevel level = y.getLevel();
+        int[] k = kutu(y, GOL_EN);
+        DonmaIsleyici.bitleriTemizle(level, k[0], k[1], k[2], k[3]);
+        BlockState[] baslangic = anlik(y, GOL_EN, GOL_BOY);
+        LongOpenHashSet chunklar = zamanlayiciHazirla(y, GOL_EN);
+        DonmaEsikleri e = DonmaAyarlari.esikler();
+        int[] kiyi = DonmaIsleyici.kiyiUzakliklari(level, k[0], k[1], GOL_EN, GOL_EN, DonmaIsleyici.SINIRSIZ,
+                DonmaTablosuYukleyici.etkin(), e);
+        komut(y, "dogalafet donma 35 donma");
+        boolean[] cozuluyor = {false};
+        y.onEachTick(() -> {
+            if (cozuluyor[0] || !hepsi(y, chunklar, 35)) {
+                return;
+            }
+            List<String> hatalar = new ArrayList<>();
+            int donmus = 0;
+            int acik = 0;
+            for (int x = 0; x < GOL_EN; x++) {
+                for (int z = 0; z < GOL_EN; z++) {
+                    BlockPos m = y.absolutePos(p(x, 3, z));
+                    int c = kiyi[(m.getZ() - k[1]) * GOL_EN + (m.getX() - k[0])];
+                    if (c < 0) {
+                        continue;
+                    }
+                    int etkin = 35 + DonmaEsikleri.titresim(level.getSeed(), m.getX(), m.getZ(), e.titresimGenligi());
+                    int seviye = e.buzSeviyesi(etkin, c);
+                    Block beklenen = seviye == 0 ? Blocks.WATER : seviye == 1 ? DonmaBloklari.INCE_BUZ.get() : Blocks.ICE;
+                    BlockState s = level.getBlockState(m);
+                    if (!s.is(beklenen)) {
+                        hatalar.add("(" + x + "," + z + ") chunk " + (m.getX() >> 4) + "," + (m.getZ() >> 4) + " c=" + c
+                                + " etkin=" + etkin + ": beklenen " + beklenen + ", gerçek " + s);
+                    }
+                    if (seviye > 0) {
+                        donmus++;
+                    } else {
+                        acik++;
+                    }
+                }
+            }
+            y.assertTrue(hatalar.isEmpty(), hatalar.size() + " sütun gerçek kıyı uzaklığına uymuyor; ilki "
+                    + (hatalar.isEmpty() ? "" : hatalar.get(0)));
+            y.assertTrue(donmus > 0 && acik > 0, "35'te kıyı donmuş, orta açık olmalı: donmuş " + donmus + ", açık " + acik);
+            cozuluyor[0] = true;
+            komut(y, "dogalafet donma 0");
+        });
+        y.succeedWhen(() -> {
+            y.assertTrue(cozuluyor[0] && hepsi(y, chunklar, 0), "35'e donma ve geri çözülme bitmedi");
+            ayniMi(y, baslangic, "chunk sınırını kesen göl çözülünce başlangıçla aynı", GOL_EN, GOL_BOY);
             zamanlayiciBitir(y);
         });
     }

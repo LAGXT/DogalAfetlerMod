@@ -111,7 +111,7 @@ Tablo `.vibe/kararlar/spike-donma.md` "Önerilen config varsayılanları (N17)" 
 
 ## 7. Faz 2 güncellemesi, 2026-11-06
 
-Uygulama `is/donma` dalında; kararlar `.vibe/kararlar/donma.md` (K-D6…K-D19), rapor `.vibe/rapor/donma.md`.
+Uygulama `is/donma` dalında; kararlar `.vibe/kararlar/donma.md` (K-D6…K-D21), rapor `.vibe/rapor/donma.md`.
 
 - **İnce buz yapıldı:** su sütununun üst bloğu donarken ilk 6 puan (kıyıda %20–26) `ince_buz`, sonra buz; çözülürken
   son 6 puan yine `ince_buz` (çürük buz), sonra su (`donma.esikler.inceBuzPayi`). Doku: koyu, ~%70 saydam, beyaz çatlak ağı
@@ -125,6 +125,12 @@ Uygulama `is/donma` dalında; kararlar `.vibe/kararlar/donma.md` (K-D6…K-D19),
 - **Buharlaşma (N9):** sütun başına yüzeyden en çok derinlik kadar kurur, sığ göl tamamen kurur; kuruyan sütunun
   orijinal su yüzeyi ve kaldırılan blok sayısı chunk verisinde. Güneş büyümesi bitince (süpernova) derinlik 0'a iner ve su
   alttan yukarı geri gelir; aynı chunk işinde önce geri dolma sonra donma (N10).
+- **Kıyı uzaklığı chunk'tan bağımsız:** BFS chunk'ın çevresinde 15 blok hale okur; göl chunk sınırını kesse de halka
+  kıyıyı izler (spike'taki 1 blokluk halede chunk hizalı düz buz kenarı çıkıyordu).
+- **Vitrin yüzdesi:** §2 eşiklerine göre kıyıdan 15 blok içerisi 50'de buzlanır; %55'te yarıçapı ≤ 15 blok gölün
+  çoğu buzdur, orta yalnız titreşimle ince buz ve açık su beneklidir. Kıyıdan içeri ilerleyen halka %35–45'te en
+  belirgin; görsel tur %35, %45 ve %55 karelerini birlikte alır (§3'teki "%55'te gölün yarısı buz" eşik tablosuyla
+  çelişiyor, şef kararına bırakıldı).
 - **`sifirla`:** veri döngüsü; bloklar çözülmez, kalan kar/buz yabancı sayılır.
 - **Bu turda yapılmayanlar (açık):** vanilla çimen/yaprak biyom rengi tonlaması, kayrağı örtüsü ve sarkit çizimi, rüzgâr ve
   buz şarkısı sesleri. Blok düzeyindeki adımlar (kırağı, kar katmanları, kıyıdan içeri ince buz → buz → kalınlaşma,

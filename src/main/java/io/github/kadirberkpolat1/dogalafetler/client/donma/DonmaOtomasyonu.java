@@ -28,8 +28,8 @@ import net.minecraftforge.fml.common.Mod;
 /**
  * Donma görsel kanıt otomasyonu (K0-21 rev. 2). Yalnız {@code -Ddogalafetler.otomasyon=donma} ile, tek oyunculu Quick Play
  * dünyasında çalışır; üretimde etkisizdir. Yakındaki bir gölü (yoksa nehir/kıyıyı) bulur, kıyısındaki tepeden ona bakar
- * ve sırayla: vitrin (güneşsiz evre, G 40'tan gerçek donma süreciyle {@code hiz 20} altında %55'e, kar yağışı; %55'te
- * kenardan içeri donan göl, üstten ikinci kare), %100 donmuş manzara, büyüyen güneşte buharlaşmış göl yatağı ve
+ * ve sırayla: vitrin (güneşsiz evre, G 30'dan gerçek donma süreciyle {@code hiz 20} altında %55'e, kar yağışı; kıyıdan
+ * içeri donan göl %35, %45 ve %55'te, %47'de üstten), %100 donmuş manzara, büyüyen güneşte buharlaşmış göl yatağı ve
  * süpernovada geri dolması, kızıl cücede bir kalıcı kış sınırında çözülme (G=40). Güneş evresi entegre sunucuda doğrudan
  * ayarlanır (evre komutu gökyüzü dalında). Aralarda {@code /forge tps} ve {@code /dogalafet donma bilgi} çıktıları log'a
  * düşer. Karelerde arayüz gizlidir. Klavye, fare ve tekerlek girdileri kapanışa kadar sayılır; kendi açmadığı duraklatma
@@ -142,6 +142,11 @@ public final class DonmaOtomasyonu {
         return () -> adimTick >= tick;
     }
 
+    /** İstemcideki donma ilerlemesi en az {@code g} (sunucu paketinden). */
+    private static BooleanSupplier gEnAz(float g) {
+        return () -> IstemciDonem.durum().donmaIlerlemesi() >= g;
+    }
+
     /** Kuyruk 60 tick boyunca boş (yetişme bitti) ve en az {@code enAz} tick geçti. */
     private static BooleanSupplier yetisti(int enAz) {
         return () -> adimTick >= enAz && bosTick >= 60;
@@ -162,13 +167,22 @@ public final class DonmaOtomasyonu {
                             gol[3], gol[4]));
             yanBak(mc);
         }, bekle(120), 200);
-        ekle("G 40, güneşsiz", () -> {
+        ekle("G 30, güneşsiz", () -> {
             evre(mc, GunesEvresi.GUNESSIZ);
-            komut(mc, "dogalafet donma 40 donma");
+            komut(mc, "dogalafet donma 30 donma");
             komut(mc, "weather rain 100000");
         }, yetisti(60), 3000);
-        ekle("hiz 20 ile 55'e", () -> komut(mc, "dogalafet hiz 20"),
-                () -> IstemciDonem.durum().donmaIlerlemesi() >= 55f, 2400);
+        // Gerçek donma süreci hiz 20 altında (72 tick'te 1 puan); kıyıdan içeri halka 35 ve 45'te, 55'te gölün çoğu buz.
+        ekle("hiz 20 ile 35'e", () -> komut(mc, "dogalafet hiz 20"), gEnAz(35f), 1200);
+        ekle("vitrin %35", () -> kare(mc, "vitrin_35"), gEnAz(45f), 1200);
+        ekle("vitrin %45", () -> {
+            kare(mc, "vitrin_45");
+            ustBak(mc);
+        }, gEnAz(47f), 400);
+        ekle("vitrin %47 üstten", () -> {
+            kare(mc, "vitrin_47_ust");
+            yanBak(mc);
+        }, gEnAz(55f), 1200);
         ekle("vitrin %55 yetişme sırasında", () -> {
             kare(mc, "vitrin_55_yetisirken");
             komut(mc, "dogalafet stop");

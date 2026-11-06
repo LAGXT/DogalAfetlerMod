@@ -51,7 +51,8 @@ import net.minecraftforge.event.server.ServerAboutToStartEvent;
 public final class DonmaZamanlayici {
     /** Bir blok değişiminin bütçe birimi (sütun taraması 1). */
     public static final int BLOK_MALIYETI = 8;
-    private static final int BFS_MALIYETI = 64;
+    /** Kıyı BFS'i chunk + 15 blok halede ~2300 yüzey okur: bir chunk taraması kadar sayılır (K-D20). */
+    private static final int BFS_MALIYETI = 256;
     private static final int[] SUTUN_SIRASI = sutunSirasi();
 
     private static final LongOpenHashSet YUKLU = new LongOpenHashSet();
