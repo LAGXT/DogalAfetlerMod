@@ -335,13 +335,13 @@ public final class YanginYoneticisi {
         if (!hasar) {
             varlikHasari(level, ust);
         }
-        if (h.yayilabilir) {
-            yay(level, veri, h, konum, yagis != Yagis.YOK, ruzgar);
+        if (h.yayilabilir && yagis == Yagis.YOK) {
+            yay(level, veri, h, konum, ruzgar);
         }
     }
 
-    private static void yay(ServerLevel level, YanginVerisi veri, YanginHucresi h, BlockPos konum, boolean yagmur,
-            double[] ruzgar) {
+    /** Kuru hücrenin yayılması; yağmurdaki (açık ya da korunaklı) hücre yaymaz, yalnız söner ya da yanar biter (Y-08). */
+    private static void yay(ServerLevel level, YanginVerisi veri, YanginHucresi h, BlockPos konum, double[] ruzgar) {
         RandomSource r = veri.rastgele;
         int yaricap = YanginMantigi.kivilcimYaricapi(h.yogunluk);
         double hiz = YanginAyarlari.yayilmaHizCarpani() * YanginMantigi.yayilmaCarpani(h.yogunluk);
@@ -360,7 +360,7 @@ public final class YanginYoneticisi {
             if (durum.isAir() || durum.is(YanginEtiketleri.YANMAZ)) {
                 continue;
             }
-            double nem = level.isRainingAt(hedef.above()) ? 1.0 : yagmur ? 0.5 : 0.0;
+            double nem = level.isRainingAt(hedef.above()) ? 1.0 : 0.0;
             double olasilik = YanginMantigi.tutusmaOlasiligi(durum.getFireSpreadSpeed(level, hedef, Direction.UP), hiz,
                     YanginMantigi.ruzgarKatsayisi(ruzgar[0], ruzgar[1], dx, dz), YanginMantigi.egimKatsayisi(dy),
                     YanginMantigi.nemKatsayisi(nem));

@@ -8,6 +8,7 @@ import java.util.function.DoubleSupplier;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.gametest.framework.GameTestServer;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.GameRules;
@@ -16,6 +17,9 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
+import net.minecraftforge.event.server.ServerStartedEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
 
@@ -26,12 +30,31 @@ import net.minecraftforge.gametest.PrefixGameTestTemplate;
  */
 @GameTestHolder(DogalAfetler.MOD_ID)
 @PrefixGameTestTemplate(false)
+@Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID)
 public final class YanginOyunTestleri {
     private static final String SAHNE = "yangin_sahne";
     /** Sıçrama eşiğinin altında (kıvılcım komşu test alanlarına düşmez); yerel yayılma sürer. */
     private static final double DUSUK = 0.1;
 
     private YanginOyunTestleri() {
+    }
+
+    /**
+     * GameTest dünyası koşular arasında saklanır (K-C24) ve test sırası sabit olduğundan sahneler aynı yere kurulur: zaman
+     * aşımıyla biten bir testin kayıtlı hücreleri sonraki koşuda aynı sahnenin yeni yakıtını tutuşturmasın.
+     */
+    @SubscribeEvent
+    public static void oyunTestiSunucusuBasladi(ServerStartedEvent olay) {
+        if (!(olay.getServer() instanceof GameTestServer)) {
+            return;
+        }
+        for (ServerLevel level : olay.getServer().getAllLevels()) {
+            int sonen = YanginYoneticisi.sondur(level, null);
+            if (sonen > 0) {
+                DogalAfetler.LOGGER.info("GameTest dünyası: önceki koşudan kalan {} yangın hücresi söndürüldü ({})", sonen,
+                        level.dimension().location());
+            }
+        }
     }
 
     /**
@@ -186,6 +209,49 @@ public final class YanginOyunTestleri {
         });
     }
 
+    /**
+     * Yağmurda yangın yayılmaz (Y-08): cam çatı altındaki (korunaklı) yaprak katmanında seviye 4 yoğunluğundaki iki hücre
+     * komşularına geçmeden söner ya da yanıp biter.
+     */
+    @GameTest(template = SAHNE, batch = "yangin_yagmur_korunakli", timeoutTicks = 300)
+    public static void yagmurdaKorunakliAtesYayilmaz(GameTestHelper y) {
+        ServerLevel level = y.getLevel();
+        level.setWeatherParameters(0, 6000, true, false);
+        level.setRainLevel(1.0F);
+        y.runAfterDelay(295, () -> {
+            level.setWeatherParameters(6000, 0, false, false);
+            level.setRainLevel(0.0F);
+        });
+        for (int x = 0; x <= 8; x++) {
+            for (int z = 0; z <= 8; z++) {
+                y.setBlock(new BlockPos(x, 3, z), Blocks.GLASS);
+                if (x >= 2 && x <= 6 && z >= 2 && z <= 6) {
+                    y.setBlock(new BlockPos(x, 1, z), kaliciYaprak());
+                }
+            }
+        }
+        for (BlockPos tohum : new BlockPos[] {new BlockPos(3, 1, 4), new BlockPos(5, 1, 4)}) {
+            y.assertTrue(YanginYoneticisi.tutustur(level, y.absolutePos(tohum), YanginKaynagi.KOMUT, 0.7) == 1,
+                    "tohum yaprağı tutuşmalı: " + tohum.toShortString());
+        }
+        int[] enCok = {0};
+        String[] enCokDurum = {""};
+        y.onEachTick(() -> {
+            int sayi = aktif(y);
+            if (sayi > enCok[0]) {
+                enCok[0] = sayi;
+                enCokDurum[0] = hucreKonumlari(y) + " yağmur=" + level.isRaining();
+            }
+        });
+        y.succeedWhen(() -> {
+            y.assertTrue(enCok[0] <= 2, "yağmurda yayılmamalı: en çok " + enCok[0] + " hücre " + enCokDurum[0]);
+            y.assertTrue(aktif(y) == 0 && atesSayisi(y) == 0, "korunaklı ateş de sönmeli");
+            level.setWeatherParameters(6000, 0, false, false);
+            level.setRainLevel(0.0F);
+            YanginYoneticisi.sondur(level, genisAlan(y));
+        });
+    }
+
     /** §6 #10: TPS kademesi düşünce bütçe düşer ve log'a {@code yangın kısma} satırı düşer. */
     @GameTest(template = SAHNE, batch = "yangin_kisma", timeoutTicks = 60)
     public static void tpsKismasiButceyiDusurur(GameTestHelper y) {
@@ -265,6 +331,19 @@ public final class YanginOyunTestleri {
 
     private static int aktif(GameTestHelper y) {
         return YanginYoneticisi.aktifSayi(y.getLevel(), alan(y));
+    }
+
+    /** Sahnedeki yanan hücrelerin göreli konumları (hata iletisi için). */
+    private static String hucreKonumlari(GameTestHelper y) {
+        AABB bolge = alan(y);
+        StringBuilder sb = new StringBuilder("[");
+        for (long konum : YanginYoneticisi.veri(y.getLevel()).hucreler.keySet()) {
+            BlockPos p = BlockPos.of(konum);
+            if (bolge.contains(p.getX() + 0.5, p.getY() + 0.5, p.getZ() + 0.5)) {
+                sb.append(y.relativePos(p).toShortString()).append("; ");
+            }
+        }
+        return sb.append(']').toString();
     }
 
     private static int atesSayisi(GameTestHelper y) {
