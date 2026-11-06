@@ -1,0 +1,26 @@
+{
+  "ortam_test": {
+    "sounds": [
+      {
+        "name": "dogalafetler:ortam_test",
+        "stream": true
+      }
+    ],
+    "subtitle": "subtitles.dogalafetler.ortam_test"
+  },
+  "siren_gunes": {
+    "sounds": [
+      {
+        "name": "dogalafetler:siren_gunes",
+        "stream": true
+      }
+    ],
+    "subtitle": "subtitles.dogalafetler.siren"
+  },
+  "siren_standart": {
+    "sounds": [
+      "dogalafetler:siren_standart"
+    ],
+    "subtitle": "subtitles.dogalafetler.siren"
+  }
+}
