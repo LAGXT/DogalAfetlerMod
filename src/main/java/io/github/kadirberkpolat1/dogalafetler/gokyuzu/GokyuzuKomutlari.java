@@ -1,0 +1,242 @@
+package io.github.kadirberkpolat1.dogalafetler.gokyuzu;
+
+import com.mojang.brigadier.arguments.FloatArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.context.CommandContext;
+import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
+import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
+import io.github.kadirberkpolat1.dogalafetler.core.DonemSureci;
+import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
+import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
+import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.GunesZinciri;
+import io.github.kadirberkpolat1.dogalafetler.komut.KomutKaydi;
+import io.github.kadirberkpolat1.dogalafetler.veri.CeviriYazici;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.commands.SharedSuggestionProvider;
+import net.minecraft.network.chat.Component;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.GameRules;
+import net.minecraftforge.fml.loading.FMLEnvironment;
+
+/**
+ * {@code /dogalafet kizilcuce baslat|bilgi} (KOMUTLAR, N18). Geliştirme ortamında (üretim jar'ında yok) görsel kanıt için
+ * {@code /dogalafet gokyuzutest evre <evre> [ilerleme] | ay <var|yok> | donma <yüzde>} de kaydedilir. Çıktılar yalnız
+ * komutu yazana gider (N6); başarılı komut 1, reddedilen 0 döner.
+ */
+public final class GokyuzuKomutlari {
+    private static final String ON = "commands.dogalafetler.kizilcuce.";
+    static final String BASLADI = ON + "basladi";
+    static final String BASLADI_DURMUS = ON + "basladi_durmus";
+    static final String ZATEN = ON + "zaten";
+    static final String AFET_SURUYOR = ON + "afet_suruyor";
+    static final String BASLIK = ON + "bilgi.baslik";
+    static final String EVRE = ON + "bilgi.evre";
+    static final String AY = ON + "bilgi.ay";
+    static final String SUREC = ON + "bilgi.surec";
+    static final String SUREC_AKTIF = ON + "bilgi.surec.aktif";
+    static final String SUREC_KOMUT = ON + "bilgi.surec.komut";
+    static final String SUREC_KURAL = ON + "bilgi.surec.kural";
+    static final String SUREC_YOK = ON + "bilgi.surec.yok";
+    static final String KALAN_SUPERNOVA = ON + "bilgi.kalan.supernova";
+    static final String KALAN_DONMA = ON + "bilgi.kalan.donma";
+    static final String KALAN_GECIKME = ON + "bilgi.kalan.gecikme";
+    static final String KALAN_SAFAK = ON + "bilgi.kalan.safak";
+    static final String KALAN_DOGUS = ON + "bilgi.kalan.dogus";
+    static final String KALAN_TAMAM = ON + "bilgi.kalan.tamam";
+    static final String KALAN_BASLAMADI = ON + "bilgi.kalan.baslamadi";
+    static final String DONMA = ON + "bilgi.donma";
+    static final String KIS_YOK = ON + "bilgi.kis_yok";
+    static final String GUN = ON + "gun";
+    static final String VAR = ON + "var";
+    static final String YOK = ON + "yok";
+    static final String ASAMA_EVRE = "commands.dogalafetler.gokyuzu.asama";
+    static final String ASAMA_DOGUS_TAMAM = "commands.dogalafetler.gokyuzu.dogus_tamam";
+
+    private static final List<KizilCuceBilgiKatkisi> KATKILAR = new CopyOnWriteArrayList<>();
+
+    private GokyuzuKomutlari() {
+    }
+
+    static void katkiEkle(KizilCuceBilgiKatkisi katki) {
+        KATKILAR.add(java.util.Objects.requireNonNull(katki, "katki"));
+    }
+
+    static void kaydet() {
+        KomutKaydi.ekle(Commands.literal("kizilcuce")
+                .then(Commands.literal("baslat").executes(GokyuzuKomutlari::baslat))
+                .then(Commands.literal("bilgi").executes(GokyuzuKomutlari::bilgi)));
+        if (!FMLEnvironment.production) {
+            KomutKaydi.ekle(Commands.literal("gokyuzutest")
+                    .then(Commands.literal("evre").then(Commands.argument("evre", StringArgumentType.word())
+                            .suggests((b, k) -> SharedSuggestionProvider.suggest(
+                                    Arrays.stream(GunesEvresi.values()).map(GunesEvresi::kimlik), k))
+                            .executes(b -> testEvre(b, -1f))
+                            .then(Commands.argument("ilerleme", FloatArgumentType.floatArg(0f, 1f))
+                                    .executes(b -> testEvre(b, FloatArgumentType.getFloat(b, "ilerleme"))))))
+                    .then(Commands.literal("ay")
+                            .then(Commands.literal("var").executes(b -> testAy(b, true)))
+                            .then(Commands.literal("yok").executes(b -> testAy(b, false))))
+                    .then(Commands.literal("donma").then(Commands.argument("yuzde", FloatArgumentType.floatArg(0f, 100f))
+                            .executes(b -> {
+                                DunyaDonemi.al(b.getSource().getServer())
+                                        .donmaIlerlemesiAyarla(FloatArgumentType.getFloat(b, "yuzde"));
+                                return yaz(b.getSource(), Component.literal("[test] donma = "
+                                        + FloatArgumentType.getFloat(b, "yuzde")));
+                            }))));
+        }
+    }
+
+    static int baslat(CommandContext<CommandSourceStack> baglam) {
+        CommandSourceStack kaynak = baglam.getSource();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(kaynak.getServer());
+        DunyaDonemi donem = yonetici.donem();
+        if (donem.gunesEvresi() == GunesEvresi.KIZIL_CUCE) {
+            kaynak.sendFailure(Component.translatable(ZATEN));
+            return 0;
+        }
+        if (yonetici.aktifAfet().filter(a -> a.tur() == AfetTuru.GUNES_PATLAMASI).isPresent()) {
+            kaynak.sendFailure(Component.translatable(AFET_SURUYOR));
+            return 0;
+        }
+        GunesZinciriSureci.dogusBaslat(donem, "komut");
+        if (yonetici.surecDurdu(GunesZinciriSureci.al())) {
+            donem.evreIlerlemesiAyarla(1f);
+            return yaz(kaynak, Component.translatable(BASLADI_DURMUS));
+        }
+        return yaz(kaynak, Component.translatable(BASLADI));
+    }
+
+    static int bilgi(CommandContext<CommandSourceStack> baglam) {
+        CommandSourceStack kaynak = baglam.getSource();
+        MinecraftServer server = kaynak.getServer();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(server);
+        DunyaDonemi donem = yonetici.donem();
+        ServerLevel ust = server.overworld();
+        GunesEvresi evre = donem.gunesEvresi();
+        List<Component> satirlar = new ArrayList<>();
+        satirlar.add(Component.translatable(BASLIK));
+        satirlar.add(Component.translatable(EVRE, Component.translatable(evre.ceviriAnahtari()),
+                yuzde(donem.evreIlerlemesi() * 100f)));
+        satirlar.add(Component.translatable(AY, Component.translatable(donem.ayVar() ? VAR : YOK)));
+        satirlar.add(Component.translatable(SUREC, surecDurumu(yonetici, ust)));
+        satirlar.add(kalan(donem, ust));
+        satirlar.add(Component.translatable(DONMA, yuzde(donem.donmaIlerlemesi()),
+                Component.translatable(donem.cozulmeDonemi() ? VAR : YOK)));
+        if (KATKILAR.isEmpty()) {
+            satirlar.add(Component.translatable(KIS_YOK));
+        }
+        for (KizilCuceBilgiKatkisi katki : KATKILAR) {
+            satirlar.addAll(katki.satirlar(kaynak));
+        }
+        for (Component satir : satirlar) {
+            kaynak.sendSuccess(() -> satir, false);
+        }
+        return 1;
+    }
+
+    private static Component surecDurumu(AfetYoneticisi yonetici, ServerLevel ust) {
+        GunesZinciriSureci surec = GunesZinciriSureci.al();
+        if (!surec.aktifMi(ust)) {
+            return Component.translatable(SUREC_YOK);
+        }
+        Optional<DonemSureci.DurdurmaNedeni> neden = yonetici.durdurmaNedeni(surec);
+        return Component.translatable(neden.map(n -> n == DonemSureci.DurdurmaNedeni.KOMUT ? SUREC_KOMUT : SUREC_KURAL)
+                .orElse(SUREC_AKTIF));
+    }
+
+    private static Component kalan(DunyaDonemi donem, ServerLevel ust) {
+        GunesZinciri.Ayarlar ayar = GokyuzuAyarlari.zincir();
+        float p = donem.evreIlerlemesi();
+        return switch (donem.gunesEvresi()) {
+            case SUPERNOVA -> Component.translatable(KALAN_SUPERNOVA, gun((1f - p) * ayar.supernovaTick()));
+            case GUNESSIZ -> {
+                long kapi = GunesZinciriSureci.kapiSayaci(donem);
+                if (donem.donmaIlerlemesi() < GunesZinciri.DONMA_TAM - 1e-3f) {
+                    yield Component.translatable(KALAN_DONMA, yuzde(donem.donmaIlerlemesi()));
+                }
+                if (!GunesZinciri.kapiAcik(kapi, ayar)) {
+                    yield Component.translatable(KALAN_GECIKME, gun(ayar.gecikmeTick() - kapi));
+                }
+                boolean dongu = ust.getGameRules().getBoolean(GameRules.RULE_DAYLIGHT);
+                yield Component.translatable(KALAN_SAFAK, dongu ? GunesZinciri.safagaKalan(ust.getDayTime()) : 0);
+            }
+            case KIZIL_CUCE -> p < 1f ? Component.translatable(KALAN_DOGUS, yuzde(p * 100f))
+                    : Component.translatable(KALAN_TAMAM);
+            default -> Component.translatable(KALAN_BASLAMADI);
+        };
+    }
+
+    private static int testEvre(CommandContext<CommandSourceStack> b, float ilerleme) {
+        GunesEvresi evre = GunesEvresi.kimlikIle(StringArgumentType.getString(b, "evre"));
+        DunyaDonemi donem = DunyaDonemi.al(b.getSource().getServer());
+        donem.gunesEvresiAyarla(evre);
+        if (ilerleme >= 0f) {
+            donem.evreIlerlemesiAyarla(ilerleme);
+        }
+        return yaz(b.getSource(), Component.literal("[test] güneş = " + evre.kimlik() + " ilerleme = "
+                + donem.evreIlerlemesi()));
+    }
+
+    private static int testAy(CommandContext<CommandSourceStack> b, boolean var) {
+        DunyaDonemi.al(b.getSource().getServer()).ayVarAyarla(var);
+        return yaz(b.getSource(), Component.literal("[test] ay = " + var));
+    }
+
+    private static int yaz(CommandSourceStack kaynak, Component metin) {
+        kaynak.sendSuccess(() -> metin, false);
+        return 1;
+    }
+
+    private static String yuzde(float deger) {
+        return String.format(Locale.ROOT, "%.1f", deger);
+    }
+
+    private static Component gun(double tick) {
+        return Component.translatable(GUN, String.format(Locale.ROOT, "%.2f", Math.max(0.0, tick) / GunesZinciri.GUN_TICK));
+    }
+
+    public static void cevirileriYaz(CeviriYazici y) {
+        y.ekle(GunesZinciriSureci.AD_ANAHTARI, "Sun chain (supernova, sunless era, red dwarf)",
+                "Güneş zinciri (süpernova, güneşsiz dönem, kızıl cüce)");
+        y.ekle(BASLADI, "The red dwarf is rising.", "Kızıl cüce doğuyor.");
+        y.ekle(BASLADI_DURMUS, "The red dwarf has risen (sun chain is stopped, dawn skipped).",
+                "Kızıl cüce doğdu (güneş zinciri durdurulmuş, doğuş atlandı).");
+        y.ekle(ZATEN, "The red dwarf era has already begun.", "Kızıl cüce dönemi zaten başladı.");
+        y.ekle(AFET_SURUYOR, "A solar flare is active; use /dogalafet stop first.",
+                "Güneş patlaması sürüyor; önce /dogalafet stop.");
+        y.ekle(BASLIK, "Sky era", "Gökyüzü dönemi");
+        y.ekle(EVRE, "Sun: %s (progress %s%%)", "Güneş: %s (ilerleme %%%s)");
+        y.ekle(AY, "Moon: %s", "Ay: %s");
+        y.ekle(SUREC, "Sun chain process: %s", "Güneş zinciri süreci: %s");
+        y.ekle(SUREC_AKTIF, "running", "sürüyor");
+        y.ekle(SUREC_KOMUT, "stopped (stop)", "durduruldu (stop)");
+        y.ekle(SUREC_KURAL, "stopped (rule)", "durduruldu (kural)");
+        y.ekle(SUREC_YOK, "not running", "sürmüyor");
+        y.ekle(KALAN_SUPERNOVA, "Supernova fades into the sunless era in %s.", "Süpernova %s sonra sönüp güneşsiz dönem başlar.");
+        y.ekle(KALAN_DONMA, "Red dwarf: waiting for freeze to reach 100%% (now %s%%).",
+                "Kızıl cüce: donmanın %%100 olması bekleniyor (şu an %%%s).");
+        y.ekle(KALAN_GECIKME, "Red dwarf rises %s from now, at the first dawn after that.",
+                "Kızıl cüce %s sonra, ardından gelen ilk şafakta doğar.");
+        y.ekle(KALAN_SAFAK, "Red dwarf rises at the next dawn (%s ticks of daytime).",
+                "Kızıl cüce ilk şafakta doğar (gün saatinde %s tick).");
+        y.ekle(KALAN_DOGUS, "Red dwarf dawn in progress: %s%%", "Kızıl cüce doğuşu sürüyor: %%%s");
+        y.ekle(KALAN_TAMAM, "Red dwarf era established.", "Kızıl cüce dönemi kuruldu.");
+        y.ekle(KALAN_BASLAMADI, "The sun chain has not started (it begins with the supernova).",
+                "Güneş zinciri başlamadı (süpernovayla başlar).");
+        y.ekle(DONMA, "Freeze progress: %s%%, thaw era: %s", "Donma ilerlemesi: %%%s, çözülme dönemi: %s");
+        y.ekle(KIS_YOK, "Permanent winter zone: freeze system not loaded.", "Kalıcı kış bölgesi: donma sistemi yüklü değil.");
+        y.ekle(GUN, "%s days", "%s gün");
+        y.ekle(VAR, "present", "var");
+        y.ekle(YOK, "gone", "yok");
+        y.ekle(ASAMA_EVRE, "%s: %s", "%s: %s");
+        y.ekle(ASAMA_DOGUS_TAMAM, "%s: red dwarf dawn completed", "%s: kızıl cüce doğuşu tamamlandı");
+    }
+}
