@@ -2520,6 +2520,121 @@ batch sonunda (`@AfterBatch`) afet durur, dönem sıfırlanır, `meteorDakikaBas
   (yansıma bozuk) yaklaşan ay vanilla ayın üstüne çizilir (bilinen sınır, gökyüzü G1 ile aynı).
 - **Sarsıntıyı meteor sarsıntı paketiyle göndermek:** o paket mesafeyle söner (M-11); ay çarpması mesafeden bağımsız.
 
+## Faz 4 — Deprem ve sinkhole
+
+Parça `deprem-sinkhole` (dal `is/deprem-sinkhole`, son commit `2f02ffe`; `main`'e birleştirme `455b801`, kod `d5fd7cb`, entegrasyon 4 3/6; plan
+sırası tsunamiden önceye alındı). Kaynak `.vibe/kararlar/deprem-sinkhole.md` §B/§C/§D; sözleşmeler (§A) ve entegratör notları (§E) o
+dosyada kalır. Şef kararları (DS-02 Faz 5, DS-14 yapıldı) "Şef kararları (Faz 4)" bölümündedir; N17 satırları sondaki tablodadır.
+Rapor `.vibe/rapor/deprem-sinkhole.md`, inceleme `.vibe/rapor/inceleme-deprem-sinkhole.md` (kabul, P0/P1 = 0, P2 = 6), doğrulama
+`.vibe/rapor/dogrulama-deprem-sinkhole.md` (9/9), birleştirme `.vibe/rapor/entegrasyon-4.md`.
+
+- **DS-01 Yeni ağ paketi yok.** Sarsıntı ve toz istemcide `IstemciAfetDurumu`'ndan hesaplanır: paket aşama/alt aşama
+  değişiminde hemen, sonra 1 Hz gelir; aradaki tick'ler yerel saatle (en çok 40 tick) tahmin edilir. Sinkhole'un çekirdek
+  çöküşü alt aşama değişimi olduğu için sert sarsma gecikmesiz başlar. Tasarım notunun "sunucu yalnız başlangıç anı, merkez,
+  seviye ve süreyi bir kez gönderir" ilkesiyle aynı trafik; protokol değişmedi (K-C47).
+- **DS-02 Çöken kütle varlığı yerine tavanlı `FallingBlockEntity`.** Tasarım notu sinkhole §2'deki derlenmiş `VertexBuffer`li tek
+  "çöken kütle" varlığı yazılmadı. Yerine: halkanın içi önce görünmeden boşaltılır, sonra yüzey ve üstündeki her şey aynı
+  tick'te düşen blok olur (sıra karıştırılır, böylece tavan dolsa da düşen bloklar tüm halkaya yayılır); tavanı aşan bloklar
+  kırılma parçacığıyla kaldırılır (config `sinkhole.dusenBlokTavani` 60, tasarım §5 "Yüksek"). Gerekçe: özel varlık + istemci
+  ağı + parçalanma bu turun bütçesini aşıyordu; eğilen ağaç görseli (§2 "Eğilen ağaçlar") da bu yüzden yok, ağaçlar çekirdekle
+  birlikte dik düşer. Tasarım notu güncellendi. **Şef kararı (tur 2): çöken kütle varlığı ve eğilen ağaç bu fazda
+  yapılmaz; Faz 5 cilası, performans gerekçesi** (S5 çukurunun ~29 000 bloğunu istemcide ayrı ağ olarak taşımanın maliyeti
+  ölçülmeden kabul edilmedi; tavanlı düşen blok yolu TPS/FPS ölçüsüyle sınandı, rapor). Tasarım notu sinkhole §7'ye işlendi.
+- **DS-03 `deprem_dayanikli` yazıcısı yangın kalır.** Görev metni "kendi etiketin (kendi sağlayıcın)" diyor; ama etiket
+  dosyasını bugün `YanginEtiketSaglayici` yazıyor ve K-E12 "bir etiketin yazıcısı tektir" diyor (iki sağlayıcı aynı dosyayı
+  yazarsa son yazan sessizce kazanır). Yangın paketine yazma yetkim yok. Deprem `DepremEtiketleri.DAYANIKLI` ile okur; kendi
+  sağlayıcım yalnız yeni `deprem_kirilgan`'ı yazar. Taşıma isteği §E-1'de.
+- **DS-04 Yıkım kuralı.** Yarık hattında (ana yarık, yan çatlak, fay basamağı) dayanıklı dahil her kırılabilir blok kaldırılır;
+  hat dışında yalnız `deprem_kirilgan` (yaprak kırılır, altı boş olan düşer, üstü dolu olan kırılır) ve S4–5 heyelanında
+  komşusundan ≥ 2 blok yüksek toprak/kum/çakıl yüzeyi. Hiçbir yol blok varlıklı (sandık vb.), kırılmaz bloklara ve sıvılara
+  dokunmaz; eşya düşürmez (`dropItem=false`, eşya yağmuru yok). `afetBlokHasari=false` iken hiçbir blok değişmez; örtü, toz,
+  ses ve sarsıntı sürer.
+- **DS-05 Yarık dibi molozu.** "Boşaltılan bloğun %20'si dibe moloz" sütunların beşte birinde yüzey bloğunun iç boşaldıktan
+  sonra düşmesiyle yapılır (düşen blok dipte durur); ek moloz konmaz, yarığın derinliği korunur.
+- **DS-06 Kazı tabanı config'te.** "En alt Y −50" `deprem.enAltY` (vars. −50) oldu; GameTest dünyası y ≈ −60'ta olduğu için
+  testler sürelerince `geciciEnAltY` ile dünya tabanına iner ve temizlikte geri alır (K-E15).
+- **DS-07 Yüklü olmayan chunk.** Yarık ve çukur yalnız yüklü chunk'larda kazar (chunk zorla yüklenmez); S5 yarığının (256
+  blok) yüklü alan dışındaki ucu açılmaz (bilinen sınır). Gerekçe: eşzamanlı chunk üretimi TPS'i düşürür; oyuncunun
+  gördüğü alan zaten yüklüdür.
+- **DS-08 Deprem merkezi.** Hedef oyuncudan `6 + 2·seviye` blok uzakta rastgele yönde; hat doğrultusu rastgele. Yarık oyuncunun
+  ayak altından başlamaz (S5'te 6 blok geniş yarığa ilk anda düşmesin), ama hat oyuncunun yakınından geçebilir.
+- **DS-09 Sinkhole yeri.** Tasarım §6: oyuncudan 12–40 blok, merkez ve çap çemberindeki 8 noktada yükseklik farkı ≤ 4 (8 deneme,
+  en düz aday). `yerUygunMu` yalnız merkez chunk'ı yüklü değilse ya da merkez sıvıysa reddeder (yönetici başka oyuncu
+  dener/erteler, N14 deseni). Düzlük reddetme ölçütü değil: ilk sürümde `fark ≤ 8` şartı dedicated senaryoda konsolun
+  (doğuş noktası) `start sinkhole 3`'ünü "uygun yer yok" ile reddetti; elle verilen konumda da çukur açılmalı.
+- **DS-10 Sinkhole zaman çizelgesi.** Çöküş süresi tablosu (3–10 sn) çekirdek + basamaklı geri çekilmenin toplamıdır: tek
+  halkada hepsi çekirdek, çok halkada yarısı çekirdek, yarısı halkalara eşit. Sarkma 3 sn, durulma 14 sn. TPS düşünce süre
+  uzamaz, bütçe düşer; aşama biterken kalan halka işi zorla tamamlanır (sıra bozulmaz).
+- **DS-11 "Delikten Dönüş" ipucu.** `CUKURA_DUSTU` oyuncu başına afet başına bir kez: çekirdek düşerken çekirdek yarıçapında
+  yüzeyde/yakınında duran ya da sonraki alt aşamalarda çukurun içinde (yatay ≤ R + 0,5, Y < zemin) bulunan oyuncu. Etki
+  alanı (R + 16) bu bölgeyi kapsar; ipucu yalnız AKTIF'te yayınlanır.
+- **DS-12 Hasar.** Deprem S4/S5: yarık hattına yatay 8 blok içindeki canlılara 2 sn'de bir 1/2 can puanı; sinkhole S3–5:
+  çöken halkadaki canlılara bir kez 4/6/8 (düşme hasarı ayrıca). Kaynak `damageSources().generic()` (yeni `damage_type` ve
+  vanilla etiket katkısı gerekmez).
+- **DS-13 Ses.** Ana gürleme kendi döngümüz (−26 LUFS, ≤ −6 dBTP, konuşma çentiği); nokta sesler vanilla (`stone/deepslate.break`
+  0,6–0,8, tick başına en çok 2; `dripstone_block.break` çıtırtı; `gravel.fall`, `sand.fall`). Kategori `BLOCKS` (zemin
+  sesi; ses.md kural 6 "kırılma BLOCKS"). Tasarım notundaki ayrı `deprem_oncu.ogg` ve `sinkhole_catlama.ogg` üretilmedi: öncü
+  gürleme `HacimEgrisi.giris(30)` ile ana döngünün yükselen girişidir, çatlama vanilla çıtırtı + alçak gürlemedir.
+- **DS-14 Artçı sarsıntılar (tur 2, yapıldı).** `mantik.ArtciPlani`: S1…S5 0, 0, 1, 2, 3 artçı (config `deprem.artciSayisi`);
+  her biri bir öncekinin (ilki ana sarsıntının) bitişinden `artciEnAzAralik`–`artciEnCokAralik` (20–60 sn) sonra, 3–5 sn sürer;
+  ilki ana genliğin `artciSiddeti` (0,15) kesri, sonrakiler 0,8 kat (Båth yasasının oyun karşılığı). Plan depremin tohumundan
+  türetilir, kayıttan dönüşte aynıdır (ek NBT yok). AKTIF aşama son artçı bitene kadar sürer (`aktifKalanTick` artçıları kapsar,
+  radar "Kalan"); süren artçının sırası `altAsama()`'dır: değişim durum paketini hemen gönderir, istemci sarsıntıyı gecikmesiz
+  başlatır (yeni paket yok, DS-01 korunur). Artçı blok yıkmaz: ana sarsıntı bitince `yik`, heyelan ve yakın hasar durur, ana
+  gürleme 3 sn'de söner; artçıda `deprem/artci` kısa gürleme katmanı ve yarık boyunca 16 noktada toz/çakıl. Neden AKTIF içinde,
+  BITIS'te değil: istemci sarsıntısı ve "etkilenen" takibi AKTIF'e bağlı; BITIS çekirdeğin sönüm aşamasıdır ve `asama ileri`
+  AKTIF'ten BITIS'e artçıları atlayıp biter. JUnit `artciPlaniAralikSureVeZayiflama`, `artcisizPlanAnaSarsintidaBiterZarfSinirli`;
+  GameTest `depremArtciSarsintilariPlanlaBlokYikmaz` (S3, blok hasarı kapalı: 96 bloklu yarık komşu test alanlarına taşmasın);
+  dedicated senaryo `[deprem] artçı sarsıntı 1/1`. Hâlâ yapılmayanlar: kendi toz sprite dokusu (vanilla `campfire_cosy_smoke` +
+  `falling_dust` + `block`), sinkhole dibinde nem buharı; çöken kütle ve eğilen ağaç DS-02 (Faz 5).
+- **DS-16 Görsel otomasyon (tur 2).** `client.deprem.DepremOtomasyonu` (`-Potomasyon=deprem`) + `tools/senaryo/deprem_gorsel.py`
+  (ws 92, `runclient_kilit.py kos`). Afet merkezi oyuncuya göre seçildiği için kamera başlatmadan sonra sunucudan okunan merkeze
+  ve fay doğrultusuna (`Deprem.fayAcisi()`, salt okuma) göre seyirci modda konur; sahneye ahşap ev (köşeler kütük, duvar kalas,
+  cam, kalas çatı) ve `place feature minecraft:oak` ağaçları kurulur. S1/S5 karşılaştırması aynı göreli bakıştan (hatta dik
+  40 blok, 22 blok yukarı). A-34 kapıları: FPS ≥ 15, adım başından ≥ 20 çizilen kare, iç imleç köşede; dar zamanlı kareler
+  (vitrin, sarsıntı) kapıyı eylemden önce geçer. Artçı beklemesi `dogalafet hiz 20` ile kısalır. Tepe TPS dedicated senaryoda
+  `forge tps` örnekleriyle (`tps.txt`). **Gizli workspace ~1 FPS (GP17 emsali):** ilk koşu (protokol koşu 1, 22:48) istemci
+  FPS 1 çizerken her kapıda 1200–3000 tick tam süre bekledi; 25 dk tavanına çarpıp sinkhole karelerini kaçıracağı görülünce
+  hiç kare alınmadan durduruldu (`kos`'a SIGTERM, kilit bırakıldı). Kapı GP17 desenine çekildi: FPS ≥ 15 ve ≥ 20 kare, ya da
+  60 tick sonra ≥ 2 yeni çizilmiş kare. FPS 1 compositor kısmasıdır; gerçek FPS ölçümü Faz 5 görünür pencerede (K0-21 rev. 2 (j)).
+- **DS-15 Çekirdeğin "kasıtlı deprem ERROR" satırları.** `.vibe/kanit/**/gametest*.log`'daki iki satır (`Afet kodu hata verdi
+  (deprem.etkiAlani|deprem.aktifKalanTick)`) çekirdeğin `CekirdekOyunTestleri.afetKancasiHataVerince` testinden gelir: test
+  DEPREM yuvasını `geciciKaydet` ile `HataVerenAfet`'e bağlar ve kapanışta gerçek fabrikayı geri koyar. Bu parçanın afetiyle
+  ilgisi yok; satırlar beklenen hata sınamasıdır, dokunulmadı (çekirdek dosyası). Kabul log'unda bu iki satır dışında
+  `Afet kodu hata verdi (deprem|sinkhole` 0 olmalı.
+- **DS-17 Düşen yüzey yalnız altında boşluk varsa (tur 2, kabul bulgusu).** K-E22 sonrası filtresiz GameTest ×2'de
+  `depremYarikAcarKirilganYikarDayanikliKorur` iki koşuda da "yarık yüzeyi boş değil" ile düştü (yarık uçlarında, y = yüzey;
+  `gametest-3/4.log`). Neden kendi kodumuzda: sütunların beşte birinde yüzey bloğu yarığa düşer (DS-05); uçlardaki tek blok
+  derin sütunda yüzeyin altı boşaltılmadığı için düşen blok anında yerine kondu. Rastgeleye bağlı olduğu için filtreli
+  koşular tesadüfen geçmişti. Düzeltme (`4aa012a`): yüzey yalnız `taban < zemin` iken düşürülür. Aynı desen sinkhole
+  halkasında: tek blokluk boşlukta dibe konan moloz o boşluğu doldurup yüzeyi yerine geri koyuyordu; moloz artık yalnız
+  ≥ 2 boşlukta, boşluk yoksa yüzey kaldırılır ve üstündekiler onun yerine iner (yalnız çok sığ config'lerde oluşur).
+
+**DS-18 `deprem_dayanikli` yazıcısı deprem sağlayıcısına taşındı (entegrasyon 4, deprem §E-1; DS-03'ü değiştirir).** K-E12 tek
+yazar kuralı korunur: satır `YanginEtiketSaglayici`'dan silindi, `DepremEtiketleri.Saglayici` aynı içeriği aynı sırayla yazar (SERT +
+`#minecraft:base_stone_overworld` + vanilla cevher etiketleri + isteğe bağlı `#forge:ores`; sabitlerin kendi kopyası).
+`YanginEtiketleri.DEPREM_DAYANIKLI` okuyucuları (meteor krateri) ve `DepremEtiketleri.DAYANIKLI` aynı etikettir. Kanıt: `runData`
+sonrası `tags/blocks/deprem_dayanikli.json` bayt bayt aynı (`git diff` boş).
+
+**DS-19 Birleştirme düzeltmeleri (entegrasyon 4, inceleme P2).** (a) `BlokIsleri.dusur` varlık işlemeyen chunk'ta
+(`isPositionEntityTicking` değil) bloğa dokunmaz, false döner (AY-12 ailesi: düşen blok görünmez ya da havada asılı kalırdı);
+yarık sütununun yüzeyi düşemezse `kaldir` ile alınır (yarık yine açılır). (b) Sinkhole `merkezSec` yüklü olmayan chunk'a
+değen adayı atlar (`duzlukFarki` `YUKLU_DEGIL`): yükseklik okuması chunk'ı eşzamanlı yüklemez. (c) Sinkhole düşüş FOV'u (+6°)
+`deprem.sarsintiCarpani` × vanilla FOV efekti ölçeğiyle çarpılır (0'da kapalı, erişilebilirlik). (d) Deprem ve sinkhole GameTest'leri
+başarısız bitse de batch sonunda (`@AfterBatch`, `DepremOyunTestleri.batchSonu`) afet durur, kazı tabanı (`geciciEnAltY`),
+`afetBlokHasari`, olay dinleyicileri ve sahte oyuncular geri döner (K-E15, GP18); deprem testlerinin geçen yolda da çıkarılmayan
+sahte oyuncuları artık `sahneyiTemizle`'de çıkar. (e) `deprem_sunucu.py`'de hasar kapalı S1 sinkhole adımı S5 depremden önceye
+alındı: S5 yarığı ve ±45° dalları (yarım boy 128) doğuş çaprazını kesip yüzeye su açabiliyor, sinkhole "uygun yer yok" diyordu
+(birleşik `main`'de ilk koşu `deprem-sunucu-1-s5-sonrasi-sinkhole/`, sıra değişince 0).
+
+### Reddedilen yollar
+
+- Yeni `deprem/sarsinti` paketi (meteor deseni): durum paketi zaten aşama/alt aşama anında gidiyor; ikinci kanal
+  eşzamanlama hatası riski ve protokol artışı getirirdi.
+- Chunk'ları zorla yükleyip S5 yarığını tam açmak: eşzamanlı chunk üretimi TPS düşürür (DS-07).
+- Yarığın boşaltılan hacminin %20'sini ayrıca moloz olarak koymak: S1'de (derinlik 4) yarığı yarıya doldururdu (DS-05).
+- `deprem_dayanikli`'yi kendi sağlayıcımda da yazmak: K-E12 çakışması, biri sessizce kaybolur (DS-03).
+
 ## Şef kararları (Faz 0–1)
 
 **K0-19 Ay çarpması siren süresi: 60 sn.** Madde 5 "Güneş Patlaması hariç 10 sn" der; bölüm H "siren çaldıktan 60 saniye
@@ -3363,6 +3478,13 @@ başlığındadır.
   entegratör birleştirmede "5" → "6" yaptı (`d0fe4b9`). Diğer Faz 4 dalları paket eklemedi, artırmaz.
 - **AY-07 döngülü sesler −30 LUFS (K-E24):** şef kabul, 2026-11-06; K-E24 döngülü ortam katmanına −26…−30 bandını tanır.
 
+### Deprem ve sinkhole
+
+- **DS-02 çöken kütle varlığı ve eğilen ağaç görseli Faz 5 cilası:** tavanlı `FallingBlockEntity` yeterli; tasarım notunun tek
+  varlıklı çöken kütlesi Faz 5'e.
+- **DS-14 artçı sarsıntılar yapıldı (tur 2):** S3+ 1–3 artçı, 20–60 sn arayla, ana genliğin %15'i; blok yıkmaz.
+- **`deprem_dayanikli` taşınır (§E-1):** işçi yangın paketine yazmadı; entegratör taşıdı (DS-18).
+
 ## Açık noktalar (Faz 2b)
 
 Entegratöre bırakılan notlardan işlenenler: kancalar (K-E1), protokol (K-C47), `asama ileri [süreç]` (K-C48), sanal su §3a istisnası
@@ -3438,6 +3560,14 @@ Birleşen parçalardan kalanlar (her birleştirmede güncellenir; plan `.vibe/ra
 - **Ay — #13 Yıldızlı Gece ve #14 Yükselen Sular gerçek zincirle sınanmadı:** zincir GameTest'ine sahte oyuncuyla iki iddia
   eklenmeli (bugün başarımın kendi testleri dönem alanından sınıyor).
 - **Ay — FPS:** gizli workspace 1 FPS (GP17 ile aynı), Faz 5.
+
+- **Deprem/sinkhole — görsel kareler (inceleme P2):** kare `RenderTickEvent.END`'de, istekten sonra ≥ 2 yeni çizilmiş kareyle
+  alınmalı; çöküş ve S1 yavaş çekimde (`hiz 0.2`), siren karesi siren aşamasında (`client/deprem/DepremOtomasyonu.java:286-291,
+  615-617`). Rapordaki "bayat kopya yok" cümlesi yanlış: `sinkhole_cokus_vitrin` bayat; `deprem_s1` sarsıntı bittikten sonra,
+  `deprem_siren` AKTIF'te alındı. Faz 5 görünür koşu.
+- **Deprem/sinkhole — DS-02 ve ses:** çöken kütle varlığı, eğilen ağaç, kendi toz dokusu, sinkhole dibinde nem buharı, ayrı
+  öncü gürleme/çatlama sesleri Faz 5 cilası.
+- **Deprem/sinkhole — FPS:** gizli workspace 1 FPS (GP17), Faz 5.
 
 ## N17 — Sayısal varsayılanlar
 
@@ -3710,6 +3840,32 @@ Birleşen parçalardan kalanlar (her birleştirmede güncellenir; plan `.vibe/ra
 | ay çarpması | (sabit) parlama | 0,5 sn %70 | — | tasarım §2 |
 | ay çarpması | (sabit) mantar | 45 sn'de 25°, 1 günde söner | — | tasarım §2, §2 "afet sonrası iz" |
 | ay çarpması | (sabit) halka | 3 gün, alfa 0,6 → 0 | — | tasarım §2 |
+| deprem | `deprem.yarikUzunlugu` | 24, 48, 96, 160, 256 | blok | tasarım §6; S5 "haritayı ikiye bölen" görüş mesafesi ölçeği |
+| deprem | `deprem.yarikGenisligi` | 1, 2, 3, 4, 6 | blok | S1 tek blok çatlak, S5 kanyon |
+| deprem | `deprem.yarikDerinligi` | 4, 8, 14, 22, 32 | blok | yüzeyden; S1 düşülüp çıkılır, S5 ölümcül |
+| deprem | `deprem.sarsintiSuresi` | 8, 15, 25, 40, 60 | sn | Richter 4–9 hissi; S5 gerçek büyük deprem süresi mertebesi |
+| deprem | `deprem.kameraGenligi` | 0,3; 0,8; 1,5; 2,5; 4,0 | derece | okunabilirliği bozmayan üst sınır; istemci çarpanı 0–200 % |
+| deprem | `deprem.yikimYaricapi` | 16, 32, 48, 72, 100 | blok | etki alanı = max(yarıçap, yarım boy + 8) |
+| deprem | `deprem.yakinHasar` | 0, 0, 0, 1, 2 | can puanı / 2 sn | tasarım §6: S4 0,5 kalp, S5 1 kalp |
+| deprem | `deprem.blokButcesi` | 32, 48, 64, 96, 128 | blok/tick | tasarım §5 (S5 64) iki katı: S5 hacmi (~24 bin blok) 60 sn içinde bitsin; TPS kademesiyle çarpılır |
+| deprem | `deprem.dusenBlokTavani` | 60 | varlık | tasarım §5 "Yüksek" |
+| deprem | `deprem.enAltY` | −50 | Y | ana kaya ve deepslate tabanı korunur (sinkhole da kullanır) |
+| deprem | `deprem.artciSayisi` | 0, 0, 1, 2, 3 | artçı | tasarım §2 "S3+: 1–3 adet" |
+| deprem | `deprem.artciEnAzAralik` / `artciEnCokAralik` | 20 / 60 | sn | tasarım §2 "20–60 sn arayla" |
+| deprem | `deprem.artciSiddeti` | 0,15 | ana genliğe oran | tasarım §2 "ana sarsıntının %15'i"; sonrakiler 0,8 kat (kod) |
+| deprem (kod) | artçı süresi | 3–5 | sn | kısa, fark edilir; blok yıkmaz |
+| deprem (istemci) | `deprem.sarsintiCarpani` | 100 | % (0–200) | erişilebilirlik |
+| deprem (kod) | açılma hızı | 6 + 1,2·seviye | blok/sn | tasarım §2 "6–12 blok/sn" |
+| deprem (kod) | yıkım yoğunluğu | 0,15; 0,4; 0,7; 1,0; 1,4 × 12 sütun/tick | çarpan | S1 "birkaç yaprak", S5 "ahşap köy çökmüş" |
+| sinkhole | `sinkhole.cap` | 6, 10, 16, 24, 34 | blok | tasarım §6 |
+| sinkhole | `sinkhole.derinlik` | 6, 10, 16, 24, 32 | blok | tasarım §6 |
+| sinkhole | `sinkhole.catlamaSuresi` | 4, 4, 5, 6, 7 | sn | kaçma fırsatı |
+| sinkhole | `sinkhole.cokusSuresi` | 3, 4, 6, 8, 10 | sn | çekirdek + geri çekilme (DS-10) |
+| sinkhole | `sinkhole.basamak` | 1, 1, 2, 2, 3 | halka | S1 tek adımlı, S5 üç basamaklı çanak |
+| sinkhole | `sinkhole.dusenBlokHasari` | 0, 0, 4, 6, 8 | can puanı | tasarım §6 "düşen blok 2–4 can" |
+| sinkhole | `sinkhole.blokButcesi` | 400 | blok/tick | tasarım §5 |
+| sinkhole | `sinkhole.dusenBlokTavani` | 60 | varlık | tasarım §5 "Yüksek" |
+| sinkhole (kod) | sarkma / durulma | 3 / 14 | sn | tasarım §2 zaman çizelgesi |
 
 Config dışı sabitler (oynanış değeri değil, sınır/biçim): siren 200/1200 tick (şartname, K0-19); son afet geçmişi 5
 (madde 13a); tek çarpan ≤ 100, toplam ≤ 1000 (K-C22); hız 0,1–1000; TPS ölçüm aralığı 20 tick; dönem kaydı sınırları
