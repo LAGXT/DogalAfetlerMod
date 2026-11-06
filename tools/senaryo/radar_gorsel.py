@@ -104,7 +104,18 @@ def oldur(log, java_pid, neden):
                 pass
 
 
+def dunyayi_hazirla(log):
+    """Quick Play `test` dünyası (MAKINE.md seed 20261105) worktree'nin run/saves'inde yoksa KÖK'ten kopyalanır."""
+    hedef = RUN / "saves/test"
+    kaynak = KOK_ANA / "run/saves/test"
+    if not hedef.exists() and kaynak.exists():
+        shutil.copytree(kaynak, hedef, ignore=shutil.ignore_patterns("session.lock"))
+        log(f"test dünyası kopyalandı: {kaynak} -> {hedef}")
+    return hedef.exists()
+
+
 def secenekleri_hazirla():
+    RUN.mkdir(parents=True, exist_ok=True)
     yol = RUN / "options.txt"
     satirlar = yol.read_text(encoding="utf-8").splitlines() if yol.exists() else []
     ayar = {"pauseOnLostFocus": "false", "showSubtitles": "false", "tutorialStep": "none",
@@ -170,6 +181,9 @@ def sha256(veri):
 
 
 def _kos(kanit, log, otomasyon, gradle_ek, wav):
+    if not dunyayi_hazirla(log):
+        log("Quick Play dünyası run/saves/test yok; iptal")
+        return False
     secenekleri_hazirla()
     for eski in (RUN / "radar-kanit").glob("*") if (RUN / "radar-kanit").exists() else []:
         eski.unlink()
