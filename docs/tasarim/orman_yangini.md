@@ -74,7 +74,7 @@ Kaynaklar:
 
 ## Faz 2 güncellemesi (ortak yangın motoru, `is/yangin`)
 
-Motor `yangin.YanginYoneticisi` olarak hazır; sözleşme ve kararlar `.vibe/kararlar/yangin.md` (§A API, Y-01…Y-25). Faz 4
+Motor `yangin.YanginYoneticisi` olarak hazır; sözleşme ve kararlar `.vibe/kararlar/yangin.md` (§A API, Y-01…Y-29). Faz 4
 orman yangını afeti siren, seviye ve başlangıç alanını ekler; yangın mantığı bu motordur.
 
 - **Ateş bloğu:** kendi `dogalafetler:afet_atesi` (vanilla ateş dokusu, multipart zemin/yan/tavan alevi, ışığı 15, kendi
@@ -93,9 +93,9 @@ orman yangını afeti siren, seviye ve başlangıç alanını ekler; yangın man
 - **§6 seviye tablosu motorda:** yoğunluk 0–1 yayılma çarpanını (0,5 + 1,3·y → ×0,5…×1,8), rüzgâr altı kıvılcım sıçramasını
   (round(12·y) → yok…12 blok) ve başlangıç alanı tutuşma oranını belirler. Öneri S1…S5: 0 / 0,2 / 0,4 / 0,7 / 1
   (sıçrama yok / 2 / 5 / 8 / 12; tablodaki S2 değeri 3 yerine 2). Başlangıç yarıçapı `alanTutustur` ile (en çok 24; büyük
-  alan bütçeyle birkaç tick'te tutuşur). Afet bitince `kaynakBitti(kaynak, temiz)`: stop/sıfırlama/gamerule (`temiz`) ateşi
-  hemen söndürür, yanıcı bloklar kalır; doğal bitişte yeni tutuşma durur, kalan hücreler en geç 30 sn'de yanıp biter
-  (yakıt havaya döner, "afet temiz biter").
+  alan bütçeyle birkaç tick'te tutuşur). Afet bitince motor kendisi karar verir (`AfetBittiEvent`): stop ve sıfırlama ateşi
+  hemen söndürür, yanıcı bloklar kalır; doğal bitiş, gamerule ve hata bitişinde yeni tutuşma durur, kalan hücreler en
+  geç 30 sn'de yanıp biter (yakıt havaya döner, "afet temiz biter").
 - **Taç yangını ve cephe:** günün rüzgârı (oyun gününden türeyen yön) yayılmayı rüzgâr yönünde ×1,6, karşısında ×0,4
   yapar; yukarı yayılma ×1,6, aşağı ×0,5; yaprak yakıtı ateşi tepelere taşır, sıçrama tepeden tepeye atlar.
 - **Yanma sonucu:** yaprak ve odun havaya döner (vanilla gibi); kömürleşmiş blok yok. `afetBlokHasari=false` iken hiçbir
