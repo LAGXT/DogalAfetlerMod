@@ -293,8 +293,9 @@ public final class YanginYoneticisi {
 
     /**
      * {@code /dogalafet sifirla} dünyayı ilk hâline döndürür (N18, K-E11): her boyuttaki bütün hücreler kaynağından bağımsız
-     * (komut ateşleri dahil) iz bırakmadan söner ve süren alan işleri durur; yüklü olmayan chunk'taki ateş blokları bekleyen
-     * silmede kalır ve chunk yüklenince kalkar (Y-19). Yalnız sunucunun kendi dönem nesnesi sayılır.
+     * (komut ateşleri dahil) iz bırakmadan söner, süren alan işleri durur ve yanıp biten konumların "yeniden tutuşmaz" hafızası
+     * silinir; yüklü olmayan chunk'taki ateş blokları bekleyen silmede kalır ve chunk yüklenince kalkar (Y-19). Yalnız
+     * sunucunun kendi dönem nesnesi sayılır.
      */
     @SubscribeEvent
     public static void donemDegisti(DonemDegistiEvent olay) {
@@ -308,6 +309,8 @@ public final class YanginYoneticisi {
                 continue;
             }
             veri.alanIsleri.clear();
+            veri.yanmislar.clear();
+            veri.buharlar.clear();
             int sonen = sondur(level, veri, h -> true, "sifirla");
             if (sonen > 0) {
                 DogalAfetler.LOGGER.info("yangın: dünya dönemi sıfırlandı, {} hücre söndürüldü ({})", sonen,

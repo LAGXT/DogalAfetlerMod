@@ -301,7 +301,10 @@ public final class YanginOyunTestleri {
         y.succeed();
     }
 
-    /** K-E11: {@code /dogalafet sifirla} komutla yakılanlar dahil bütün hücreleri söndürür; ateş bloğu kalmaz. */
+    /**
+     * K-E11: {@code /dogalafet sifirla} komutla yakılanlar dahil bütün hücreleri söndürür, ateş bloğu kalmaz ve yanıp biten
+     * konumların "yeniden tutuşmaz" hafızası silinir.
+     */
     @GameTest(template = SAHNE, batch = "yangin_sifirla")
     public static void sifirlaYanginlariSondurur(GameTestHelper y) {
         ServerLevel level = y.getLevel();
@@ -310,11 +313,14 @@ public final class YanginOyunTestleri {
         int ilk = ozet(y);
         y.assertTrue(komut(y, Vec3.atCenterOf(y.absolutePos(new BlockPos(4, 3, 4))), "dogalafet yangin tutustur 4") > 0
                 && atesSayisi(y) > 0, "tutustur 4 ateş koymalı");
+        long yanmis = y.absolutePos(new BlockPos(1, 1, 1)).asLong();
+        YanginYoneticisi.veri(level).yanmislar.put(yanmis, level.getGameTime() + 2400);
         y.assertTrue(komut(y, Vec3.atCenterOf(y.absolutePos(BlockPos.ZERO)), "dogalafet sifirla") == 1, "sifirla");
         y.assertTrue(YanginYoneticisi.aktifSayi(level) == 0, "sifirla sonrası aktif hücre kaldı: "
                 + YanginYoneticisi.aktifSayi(level));
         y.assertTrue(YanginYoneticisi.bekleyenAlanSayisi(level) == 0, "sifirla sonrası alan işi kaldı");
         y.assertTrue(atesSayisi(y) == 0, "sifirla sonrası afet_atesi kaldı: " + atesSayisi(y));
+        y.assertTrue(!YanginYoneticisi.veri(level).yanmislar.containsKey(yanmis), "sifirla yanık hafızasını silmeli");
         y.assertTrue(ozet(y) == ilk, "sıfırlama iz bırakmamalı (yakıt yerinde)");
         y.succeed();
     }

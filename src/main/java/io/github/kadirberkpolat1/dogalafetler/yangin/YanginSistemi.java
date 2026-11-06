@@ -4,6 +4,7 @@ import io.github.kadirberkpolat1.dogalafetler.komut.KomutKaydi;
 import io.github.kadirberkpolat1.dogalafetler.network.AgKanali;
 import io.github.kadirberkpolat1.dogalafetler.veri.CeviriYazici;
 import io.github.kadirberkpolat1.dogalafetler.veri.DataGenerators;
+import net.minecraft.tags.BlockTags;
 import net.minecraftforge.eventbus.api.IEventBus;
 
 /** Yangın alt sisteminin tek kayıt noktası; {@code DogalAfetler} kurucusundan koşulsuz çağrılır (K-C33). */
@@ -19,6 +20,7 @@ public final class YanginSistemi {
         KomutKaydi.ekle(YanginKomutlari.komut());
         DataGenerators.ceviriEkle(YanginSistemi::cevirileriYaz);
         DataGenerators.saglayiciEkle(YanginEtiketSaglayici::ekle);
+        DataGenerators.vanillaBlokEtiketiEkle(BlockTags.FIRE, YanginKayitlari.AFET_ATESI);
     }
 
     static void cevirileriYaz(CeviriYazici y) {

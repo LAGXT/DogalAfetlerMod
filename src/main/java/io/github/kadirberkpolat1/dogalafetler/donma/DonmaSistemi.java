@@ -13,6 +13,7 @@ import java.util.Optional;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.AddReloadListenerEvent;
@@ -55,6 +56,11 @@ public final class DonmaSistemi {
         KomutKaydi.ekle(baglam -> DonmaKomutlari.donma());
         KomutKaydi.ekle(baglam -> DonmaKomutlari.buharlasma());
         DataGenerators.ceviriEkle(DonmaCevirileri::yaz);
+        DataGenerators.vanillaBlokEtiketiEkle(BlockTags.DIRT, DonmaBloklari.KIRAGILI_CIMEN);
+        DataGenerators.vanillaBlokEtiketiEkle(BlockTags.ANIMALS_SPAWNABLE_ON, DonmaBloklari.KIRAGILI_CIMEN);
+        DataGenerators.vanillaBlokEtiketiEkle(BlockTags.MINEABLE_WITH_SHOVEL, DonmaBloklari.KIRAGILI_CIMEN);
+        DataGenerators.vanillaBlokEtiketiEkle(BlockTags.ICE, DonmaBloklari.INCE_BUZ);
+        DataGenerators.vanillaBlokEtiketiEkle(BlockTags.MINEABLE_WITH_PICKAXE, DonmaBloklari.INCE_BUZ);
         // Lambda: sağlayıcı sınıfı (istemci model üreticilerine bağlı) yalnız datagen'de yüklenir.
         DataGenerators.saglayiciEkle(olay -> DonmaVeriSaglayicilari.ekle(olay));
     }

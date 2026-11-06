@@ -35,8 +35,8 @@ import net.minecraftforge.data.event.GatherDataEvent;
 
 /**
  * Donma sisteminin datagen çıktıları (GOREV §3, N12): dönüşüm tablosu veri paketi ({@code data/dogalafetler/donma/vanilla.json}),
- * blok etiketleri ({@code #dogalafetler:donma/kar_zemini} ve vanilla etiketlerine kendi bloklarımız), blok loot tabloları,
- * blok durumu ve modeller (doku dosyaları {@code tools/assets/donma_dokular.py} üretir).
+ * {@code dogalafetler:donma/*} blok etiketleri (vanilla etiketlere kendi bloklarımız ortak sağlayıcıdan, {@code DonmaSistemi.kaydet},
+ * K-E12), blok loot tabloları, blok durumu ve modeller (doku dosyaları {@code tools/assets/donma_dokular.py} üretir).
  */
 public final class DonmaVeriSaglayicilari {
     private DonmaVeriSaglayicilari() {
@@ -105,13 +105,6 @@ public final class DonmaVeriSaglayicilari {
                             Blocks.POLISHED_DEEPSLATE, Blocks.DEEPSLATE_BRICKS, Blocks.DEEPSLATE_TILES, Blocks.SANDSTONE,
                             Blocks.SMOOTH_SANDSTONE, Blocks.CUT_SANDSTONE, Blocks.RED_SANDSTONE, Blocks.SMOOTH_RED_SANDSTONE,
                             Blocks.CUT_RED_SANDSTONE, Blocks.QUARTZ_BLOCK, Blocks.SMOOTH_QUARTZ, Blocks.TERRACOTTA);
-            Block kiragili = DonmaBloklari.KIRAGILI_CIMEN.get();
-            Block ince = DonmaBloklari.INCE_BUZ.get();
-            tag(BlockTags.DIRT).add(kiragili);
-            tag(BlockTags.ANIMALS_SPAWNABLE_ON).add(kiragili);
-            tag(BlockTags.MINEABLE_WITH_SHOVEL).add(kiragili);
-            tag(BlockTags.ICE).add(ince);
-            tag(BlockTags.MINEABLE_WITH_PICKAXE).add(ince);
         }
     }
 
