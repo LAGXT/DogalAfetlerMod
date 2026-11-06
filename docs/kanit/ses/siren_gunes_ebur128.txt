@@ -1,0 +1,24 @@
+Dosya: src/main/resources/assets/dogalafetler/sounds/siren_gunes.ogg (123565 bayt, 20.0 sn, mono, 48000 Hz, Vorbis q5)
+Hedef (docs/tasarim/ses.md §4): -21.0 LUFS ±1, gerçek tepe <= -3.0 dBTP, baskın frekans 180–300 Hz, 2500 Hz üstü <= -30 dB
+Ölçülen (ogg): I = -20.9 LUFS, gerçek tepe = -9.3 dBTP
+Baskın frekanslar (20 Hz kümeleri, güçlüden zayıfa): 240 Hz, 180 Hz, 220 Hz
+Perde izi (0,5 sn pencerelerde en güçlü frekans, ilk 20): 182, 182, 214, 238, 270, 288, 298, 300, 298, 290, 272, 252, 246, 240, 240, 240, 238, 222, 202, 182 Hz
+Bant enerjisi / toplam: 180–300 Hz -0.7 dB; 300–3400 Hz (konuşma) -9.6 dB; >2500 Hz -50.9 dB; >8000 Hz -85.2 dB
+Döngü dikişi: |ilk - son| / en büyük iç adım = 0.385 (<= 1 ise süreksizlik yok); ilk örnek = +0.00197
+Hedefle karşılaştırma: UYGUN
+
+ffmpeg -i siren_gunes.ogg -af ebur128=peak=true -f null -
+Summary:
+
+  Integrated loudness:
+    I:         -20.9 LUFS
+    Threshold: -30.9 LUFS
+
+  Loudness range:
+    LRA:         0.9 LU
+    Threshold: -40.9 LUFS
+    LRA low:   -21.4 LUFS
+    LRA high:  -20.5 LUFS
+
+  True peak:
+    Peak:       -9.3 dBFS
