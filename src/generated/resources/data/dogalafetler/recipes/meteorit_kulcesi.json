@@ -1,0 +1,22 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {
+      "item": "dogalafetler:meteorit_parcasi"
+    },
+    {
+      "item": "dogalafetler:meteorit_parcasi"
+    },
+    {
+      "item": "dogalafetler:meteorit_parcasi"
+    },
+    {
+      "tag": "forge:ingots/iron"
+    }
+  ],
+  "result": {
+    "count": 1,
+    "item": "dogalafetler:meteorit_kulcesi"
+  }
+}
