@@ -132,7 +132,8 @@ def main():
     betik = Path("/tmp/sanal-su-istemci.sh")
     betik.write_text("#!/bin/sh\n"
                      f"cd '{KOK}' || exit 9\n"
-                     f"JAVA_HOME='{JAVA_HOME}' timeout 1200 ./gradlew runClient --no-daemon --offline --console=plain "
+                     f"JAVA_HOME='{JAVA_HOME}' python3 tools/senaryo/runclient_kilit.py kos '{KOK}' --bekle 1800 -- "
+                     f"timeout 1200 ./gradlew runClient --no-daemon --offline --console=plain "
                      f"-PquickPlay=test -Potomasyon=su -PotomasyonBolum={bolum} > '{oyun_log}' 2>&1\n"
                      f"echo \"cikis=$?\" >> '{oyun_log}'\n")
     ifade = f'hl.dsp.exec_cmd("{KURAL} sh {betik}")'

@@ -185,7 +185,8 @@ def istemci_calistir(kip, no, ek_ozellikler, bitince=None, her_turda=None):
                      f"cd '{W}'\n"
                      f"export JAVA_HOME='{JAVA_HOME}'\n"
                      f"export JAVA_TOOL_OPTIONS='-Ddogalafetler.otomasyon={'sicaklik' if kip == 'hud' else 'sicaklik_coldsweat'}'\n"
-                     f"exec timeout 900 ./gradlew runClient --offline --no-daemon --console=plain {ek_ozellikler} "
+                     f"exec python3 tools/senaryo/runclient_kilit.py kos '{W}' --bekle 1800 -- "
+                     f"timeout 900 ./gradlew runClient --offline --no-daemon --console=plain {ek_ozellikler} "
                      f"> '{istemci_log}' 2>&1\n")
     sahip = hypr_json("activewindow")
     sahip_adres = sahip.get("address") if isinstance(sahip, dict) else None

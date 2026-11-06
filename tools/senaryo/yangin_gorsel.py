@@ -5,7 +5,7 @@ Kullanım (worktree kökünden, önce tools/senaryo/yangin_sunucu.py koşmuş ol
   python3 tools/senaryo/yangin_gorsel.py
 
 Dünya: run-server/yangin-senaryo → run/saves/yangin (session.lock hariç), Quick Play tek oyunculu. Oyun içi adımları
-`client.yangin.YanginOtomasyonu` (-Ddogalafetler.otomasyon=yangin) yürütür: en yakın orman, alacakaranlık, seyirci kamera,
+`client.yangin.YanginOtomasyonu` (`-Potomasyon=yangin`) yürütür: en yakın orman, alacakaranlık, seyirci kamera,
 taç cephesi, kareler, yağmur, söndürme, kapanış.
 
 Ekran protokolü: istemci yalnız Hyprland exec kuralıyla açılır ([workspace 95 silent; no_initial_focus; no_focus on;
@@ -138,8 +138,9 @@ def istemci_calistir(no):
     betik.write_text("#!/bin/sh\n"
                      f"cd '{W}'\n"
                      f"export JAVA_HOME='{JAVA_HOME}'\n"
-                     "export JAVA_TOOL_OPTIONS='-Ddogalafetler.otomasyon=yangin'\n"
-                     "exec timeout 900 ./gradlew runClient --offline --no-daemon --console=plain -PquickPlay=yangin "
+                     f"exec python3 tools/senaryo/runclient_kilit.py kos '{W}' --bekle 1800 -- "
+                     "timeout 900 ./gradlew runClient --offline --no-daemon --console=plain -PquickPlay=yangin "
+                     "-Potomasyon=yangin "
                      f"> '{istemci_log}' 2>&1\n")
     sahip = hypr_json("activewindow")
     sahip_adres = sahip.get("address") if isinstance(sahip, dict) else None

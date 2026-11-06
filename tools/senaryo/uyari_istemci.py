@@ -187,7 +187,8 @@ def _kos(kanit, log, otomasyon, gradle_ek, wav):
     BASLATMA_BETIGI.write_text(
         f"#!/bin/sh\ncd '{KOK}' || exit 1\nexport JAVA_HOME='{JAVA_HOME}' DISPLAY=:0 ALSOFT_DRIVERS=wave "
         f"ALSOFT_CONF='{ALSOFT_CONF}'\n"
-        f"exec timeout {TOPLAM_SURE} ./gradlew runClient --no-daemon --offline --console=plain "
+        f"exec python3 tools/senaryo/runclient_kilit.py kos '{KOK}' --bekle 1800 -- "
+        f"timeout {TOPLAM_SURE} ./gradlew runClient --no-daemon --offline --console=plain "
         f"-Potomasyon={otomasyon} {' '.join(gradle_ek)} > '{istemci_log}' 2>&1\n", encoding="utf-8")
 
     sahibin = json.loads(hyprctl("activewindow", "-j") or "{}")
