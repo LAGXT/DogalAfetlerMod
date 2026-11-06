@@ -172,6 +172,16 @@ public final class TsunamiOtomasyonu {
                     List.of("k:gamerule afetBlokHasari true")));
             a.add("q:YUKSEK");
         }
+        if (BOLUM.contains("tekrar")) {
+            // K0-33 ölçüsü Yüksek: her sahne yeni kumsal olduğu için tek ölçüm gürültülü; bölüm bütçesi 2 ve 1 dönüşümlü ikişer kez.
+            a.addAll(List.of("k:dogalafet su vitrin", "b:300", "k:dogalafet su vitrin kamera tepe", "b:600"));
+            for (int i = 1; i <= 2; i++) {
+                for (int b : new int[] {2, 1}) {
+                    a.addAll(olcum("tsunami-olc-yuksek-bolum" + b + "-" + i, EfektKalitesi.YUKSEK,
+                            List.of("c:tsunami.yikimBolumTick=" + b), List.of("c:tsunami.yikimBolumTick=2")));
+                }
+            }
+        }
         if (hepsi || BOLUM.contains("avci")) {
             a.addAll(avci());
         }
