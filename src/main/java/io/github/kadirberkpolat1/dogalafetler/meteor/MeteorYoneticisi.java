@@ -238,8 +238,8 @@ public final class MeteorYoneticisi {
         if (!d.veri.sogumalar.isEmpty() && level.getGameTime() % SOGUMA_ARALIGI == 0) {
             sogumalariIsle(level, d.veri, false);
         }
-        if (!d.sicaklar.isEmpty() && level.getGameTime() % SICAK_ARALIGI == 0) {
-            MeteorOdulleri.sicaklariIsle(level, d.sicaklar);
+        if (!d.sicaklar.isEmpty()) {
+            MeteorOdulleri.sicaklariIsle(level, d.sicaklar, level.getGameTime() % SICAK_ARALIGI == 0);
         }
     }
 

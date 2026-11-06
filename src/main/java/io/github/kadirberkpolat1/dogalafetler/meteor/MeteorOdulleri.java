@@ -83,8 +83,11 @@ public final class MeteorOdulleri {
         }
     }
 
-    /** Sıcak parçalar: süre doldu mu, su/kar üstünde mi, yanında oyuncu var mı (5 tick'te bir). */
-    static void sicaklariIsle(ServerLevel level, List<ItemEntity> sicaklar) {
+    /**
+     * Sıcak parçalar, her tick: süre doldu mu, su/kar/buz üstünde mi (M-31: suya değme iki tick sürüp sekebilir; seyrek
+     * örnekleme kaçırır). {@code yakinlik} ise yanındaki oyuncular da yakılır (5 tick'te bir).
+     */
+    static void sicaklariIsle(ServerLevel level, List<ItemEntity> sicaklar, boolean yakinlik) {
         long simdi = level.getGameTime();
         for (Iterator<ItemEntity> it = sicaklar.iterator(); it.hasNext();) {
             ItemEntity e = it.next();
@@ -101,7 +104,7 @@ public final class MeteorOdulleri {
                 level.playSound(null, e.getX(), e.getY(), e.getZ(), SoundEvents.FIRE_EXTINGUISH, SoundSource.BLOCKS, 0.7f,
                         1.6f);
                 level.sendParticles(ParticleTypes.CLOUD, e.getX(), e.getY() + 0.2, e.getZ(), 8, 0.15, 0.1, 0.15, 0.02);
-            } else {
+            } else if (yakinlik) {
                 for (Player oyuncu : level.getEntitiesOfClass(Player.class, e.getBoundingBox().inflate(0.6))) {
                     if (!oyuncu.isSpectator()) {
                         oyuncu.setSecondsOnFire(MeteorAyarlari.yanmaSaniye());

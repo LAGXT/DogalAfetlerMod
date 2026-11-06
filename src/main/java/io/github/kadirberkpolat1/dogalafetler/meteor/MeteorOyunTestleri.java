@@ -269,10 +269,11 @@ public final class MeteorOyunTestleri {
                     new ItemStack(MeteorEsyaKayitlari.METEORIT_PARCASI.get()), 20);
             yakin.setPickUpDelay(32767);
         });
-        y.runAfterDelay(40, () -> {
-            dogrula(y, MeteorOdulleri.sicakBitis(suda.getItem()) == OdulZamani.SOGUK, "suya düşen parça hemen soğumalı");
-            dogrula(y, o.getRemainingFireTicks() > 0, "sıcak parçanın yanına gelen oyuncu yanmalı");
-        });
+        // Su hücresinin ortasında doğan parça yalnız ilk iki tick suya değer, sonra seker ve kenardaki taşa düşebilir (M-31).
+        y.runAfterDelay(5, () -> dogrula(y, MeteorOdulleri.sicakBitis(suda.getItem()) == OdulZamani.SOGUK,
+                "suya düşen parça hemen soğumalı"));
+        y.runAfterDelay(40, () -> dogrula(y, o.getRemainingFireTicks() > 0,
+                "sıcak parçanın yanına gelen oyuncu yanmalı"));
         y.runAfterDelay(20L * OdulZamani.SICAK_SANIYE + 30, () -> {
             try {
                 dogrula(y, !MeteorOdulleri.sicakMi(bekleyen.getItem(), level.getGameTime()), "20 sn sonra soğuk olmalı");
