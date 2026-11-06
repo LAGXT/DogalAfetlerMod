@@ -234,7 +234,7 @@ public final class DepremOtomasyonu {
         ekle("deprem S1 aktif", () -> {
             mc.options.hideGui = true;
             komut(mc, "dogalafet asama ileri");
-        }, bekle(90), 100);
+        }, () -> adimTick >= 90 && mc.getFps() >= AKICI_FPS, 125);
         ekle("kare S1", () -> kare(mc, "deprem_s1"), bekle(2), 4);
         ekle("deprem S1 bitsin", () -> { }, afetYok(mc), 1200);
         ekle("S1 bitiş kamerası", () -> kamera(mc, yakin(mc, sahne)), () -> akici(mc, 40, 20), 1200);
@@ -283,7 +283,8 @@ public final class DepremOtomasyonu {
         ekle("sinkhole S5 aktif", () -> komut(mc, "dogalafet asama ileri", "dogalafet asama ileri"), bekle(100), 110);
         ekle("kare S5 çatlama", () -> kare(mc, "sinkhole_s5_catlama"), bekle(2), 4);
         ekle("çekirdek çöküşü", () -> { }, () -> altAsama() >= SinkholeSeviyesi.COKUS && dusenSayisi(mc) >= 20, 900);
-        ekle("kare çöküş vitrini", () -> kare(mc, "sinkhole_cokus_vitrin"), bekle(12), 14);
+        ekle("düşüş başladı", () -> { }, bekle(6), 8);
+        ekle("kare çöküş vitrini", () -> kare(mc, "sinkhole_cokus_vitrin"), bekle(14), 16);
         ekle("kare çöküş vitrini b", () -> kare(mc, "sinkhole_cokus_vitrin_b"), bekle(2), 4);
         ekle("sinkhole S5 durulma", () -> { }, () -> altAsama() == SinkholeSeviyesi.DURULMA && adimTick >= 2, 1200);
         ekle("üstten kamera", () -> kamera(mc, ustten(mc, sahne)), () -> akici(mc, 60, 20), 1200);

@@ -53,6 +53,8 @@ public final class DogalAfetler {
         IstemciAyarlari.kaydet();
         // Afet kayıtları (Faz 4: AfetKaydi.kaydet yapan satırlar) buraya, ozelliktenKaydet'in üstüne: test afeti gerçek
         // afeti kayıtlı türü atlar; tersi sırada gerçek kayıt "zaten kayıtlı" ile modu düşürür (K-E22).
+        DepremSistemi.kaydet(modBus);
+        SinkholeSistemi.kaydet();
         OyunTestiAfeti.ozelliktenKaydet();
         SuAyarlari.kaydet();
         SanalSu.kaydet();
@@ -66,8 +68,6 @@ public final class DogalAfetler {
         Meteor.kaydet(modBus);
         Balikcilik.kaydet(modBus);
         Basarim.kaydet(modBus);
-        DepremSistemi.kaydet(modBus);
-        SinkholeSistemi.kaydet();
         Kancalar.bagla();
 
         DataGenerators.ceviriEkle(CekirdekCevirileri::yaz);
