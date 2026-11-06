@@ -7,7 +7,9 @@
 Koşu 1: forceload, y=199 meşe tahta ve y=200 kalıcı yaprak döşemesi (13x13), yangin bilgi (0), y=201'den `yangin tutustur 6`,
 yangin bilgi (aktif > 0), `stop`.
 Koşu 2 (aynı dünya): açılışta SavedData'dan aktif yangın sürer (bilgi > 0), `yangin sondur`, bilgi (0), döşemede
-`dogalafetler:afet_atesi` kalmadı (fill replace "No blocks were filled"), ikinci sondur 0, `stop`.
+`dogalafetler:afet_atesi` kalmadı (fill replace "No blocks were filled"), ikinci sondur 0. §6 #10: döşeme yeniden döşenir
+ve tutuşturulur, yangın sürerken 144 uzak chunk forceload ile üretilir; TPS düşünce yönetici `yangın kısma: ... bütçe
+64 -> 32|16` satırını yazar; bilgi (> 0), sondur, bilgi (0), `forceload remove all`, `stop`.
 Sonda iki log da denetlenir: `invalid dist` yok, istisna yok, config düzeltme WARN'ı yok, iki süreç de 0 ile çıktı.
 
 Kullanım (worktree kökünden): python3 tools/senaryo/yangin_sunucu.py <log klasörü>
@@ -45,6 +47,17 @@ def kosu2(sunucu):
     sunucu.komut("fill -6 199 -6 6 202 6 minecraft:air replace dogalafetler:afet_atesi", r"No blocks were filled",
                  "söndürme ateş bloğu bırakmadı")
     sunucu.komut("dogalafet yangin sondur", r"Extinguished 0 fire cells")
+    sunucu.komut("fill -6 199 -6 6 199 6 minecraft:oak_planks", r"Successfully filled [0-9]+ block|No blocks were filled")
+    sunucu.komut("fill -6 200 -6 6 200 6 minecraft:oak_leaves[persistent=true]",
+                 r"Successfully filled [0-9]+ block|No blocks were filled")
+    sunucu.komut("execute positioned 0 201 0 run dogalafet yangin tutustur 6", r"Ignited [1-9][0-9]* fire cells")
+    isaret = sunucu.isaret()
+    sunucu.komut("forceload add 320 320 511 511", r"to be force loaded")
+    sunucu.bekle(r"yangın kısma: minecraft:overworld bütçe 64 -> (32|16) hücre/tick", isaret, 180,
+                 "yangın sürerken TPS düşünce bütçe kısıldı (§6 #10)")
+    sunucu.komut("dogalafet yangin bilgi", rf"Burning cells: [1-9][0-9]*/{TAVAN}", "bilgi (kısma sırasında yangın sürüyor)")
+    sunucu.komut("dogalafet yangin sondur", r"Extinguished [1-9][0-9]* fire cells")
+    sunucu.komut("dogalafet yangin bilgi", rf"Burning cells: 0/{TAVAN}", "bilgi (aktif 0)")
     sunucu.komut("forceload remove all", r"Unmarked all force loaded chunks")
 
 
