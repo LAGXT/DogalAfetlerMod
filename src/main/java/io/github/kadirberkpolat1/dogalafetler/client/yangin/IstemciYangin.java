@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.function.Consumer;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.ParticleStatus;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleOptions;
@@ -29,13 +30,15 @@ import org.joml.Vector3f;
 /**
  * Sunucunun {@code yangin/ates_durumu} özetinden parçacık üretir (tasarım notu §5): LOD mesafesine kadar en yakın hücrelerde
  * büyük alev, kıvılcım ve hücre dumani; ötesinde chunk başına duman kümesi; her yangın chunk'ında duman sütunu. Kamera
- * arkasındaki hücreler parçacık üretmez. Kalite kademeleri {@link IstemciAyarlari#efektKalitesi()}'nden gelir.
+ * arkasındaki hücreler parçacık üretmez. Kalite kademeleri {@link IstemciAyarlari#efektKalitesi()}'nden gelir. Parçacıklar
+ * vanilla'nın 32 blok kesimini atlayarak ({@code force}) eklenir: mesafeyi ve sayıyı yalnız LOD ve kademe sınırlar; vanilla
+ * parçacık ayarı (Tümü / Azaltılmış / En Az) yoğunluğu 1 / 0,5 / 0,2 ile çarpar.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class IstemciYangin {
     private static final AtesDurumuPaketi BOS = new AtesDurumuPaketi(List.of(), new long[0]);
     private static final double KUME_MESAFESI = 96;
-    private static final double YAKIN_PARCACIK = 32;
+    private static final double[] VANILLA_AYAR_CARPANI = {1.0, 0.5, 0.2};
     private static AtesDurumuPaketi son = BOS;
     private static EfektKalitesi kaliteZorlamasi;
     /** Kendi alev/duman/sütun/kıvılcım üretimimiz (vanilla ateş dumanı hariç); kalite kanıtı için okunup sıfırlanır. */
@@ -71,7 +74,7 @@ public final class IstemciYangin {
             double y = BlockPos.getY(b) + 0.2;
             double z = BlockPos.getZ(b) + 0.5;
             for (int i = 0; i < 8; i++) {
-                level.addAlwaysVisibleParticle(ParticleTypes.CLOUD, x + level.random.nextGaussian() * 0.3, y,
+                level.addParticle(ParticleTypes.CLOUD, true, x + level.random.nextGaussian() * 0.3, y,
                         z + level.random.nextGaussian() * 0.3, 0, 0.06 + level.random.nextDouble() * 0.06, 0);
             }
             level.playLocalSound(x, y, z, SoundEvents.FIRE_EXTINGUISH, SoundSource.BLOCKS, 0.5F,
@@ -92,7 +95,8 @@ public final class IstemciYangin {
             return;
         }
         Kademe kademe = Kademe.al(kaliteZorlamasi != null ? kaliteZorlamasi : IstemciAyarlari.efektKalitesi());
-        double yogunluk = YanginAyarlari.parcacikYogunlugu();
+        ParticleStatus vanillaAyari = mc.options.particles().get();
+        double yogunluk = YanginAyarlari.parcacikYogunlugu() * VANILLA_AYAR_CARPANI[vanillaAyari.getId()];
         double lod = YanginAyarlari.lodMesafesi();
         Camera kamera = mc.gameRenderer.getMainCamera();
         Vec3 goz = kamera.getPosition();
@@ -104,12 +108,12 @@ public final class IstemciYangin {
             double mesafe = Math.sqrt(goz.distanceToSqr(o.x(), o.y(), o.z()));
             if (o.sayi() >= 3 && r.nextDouble() < kademe.sutunOrani * yogunluk) {
                 ekle(level, YanginKayitlari.SUTUN.get(), o.x() + r.nextGaussian() * 2, o.ustY() + 2.0,
-                        o.z() + r.nextGaussian() * 2, 0, 0.18 + r.nextDouble() * 0.06, 0, true);
+                        o.z() + r.nextGaussian() * 2, 0, 0.18 + r.nextDouble() * 0.06, 0);
             }
             if (mesafe > lod || o.hucreler().length == 0) {
                 if (mesafe <= KUME_MESAFESI && r.nextDouble() < 0.3 * yogunluk) {
                     ekle(level, YanginKayitlari.DUMAN.get(), o.x() + r.nextGaussian() * 2.5, o.ustY() + 1.5,
-                            o.z() + r.nextGaussian() * 2.5, 0, 0.07, 0, true);
+                            o.z() + r.nextGaussian() * 2.5, 0, 0.07, 0);
                 }
                 continue;
             }
@@ -137,15 +141,14 @@ public final class IstemciYangin {
         int adet = Math.min(yakinlar.size(), kademe.alevHucresi);
         for (int i = 0; i < adet; i++) {
             double[] h = yakinlar.get(i);
-            boolean uzak = h[3] > YAKIN_PARCACIK * YAKIN_PARCACIK;
             if (r.nextDouble() < 0.18 * yogunluk) {
                 ekle(level, YanginKayitlari.ALEV.get(), h[0] + r.nextGaussian() * 0.25, h[1] + 0.4 + r.nextDouble() * 0.5,
                         h[2] + r.nextGaussian() * 0.25, r.nextGaussian() * 0.01, 0.03 + r.nextDouble() * 0.04,
-                        r.nextGaussian() * 0.01, uzak);
+                        r.nextGaussian() * 0.01);
             }
             if (i % kademe.dumanAdimi == 0 && r.nextDouble() < 0.05 * kademe.dumanCarpani * yogunluk) {
                 ekle(level, YanginKayitlari.DUMAN.get(), h[0] + r.nextGaussian() * 0.3, h[1] + 1.2, h[2] + r.nextGaussian() * 0.3,
-                        0, 0.05 + r.nextDouble() * 0.03, 0, uzak);
+                        0, 0.05 + r.nextDouble() * 0.03, 0);
             }
         }
         if (adet > 0) {
@@ -154,19 +157,15 @@ public final class IstemciYangin {
             for (int i = 0; i < sayi; i++) {
                 double[] h = yakinlar.get(r.nextInt(adet));
                 ekle(level, ParticleTypes.LAVA, h[0] + r.nextGaussian() * 0.3, h[1] + 0.6, h[2] + r.nextGaussian() * 0.3,
-                        0, 0, 0, h[3] > YAKIN_PARCACIK * YAKIN_PARCACIK);
+                        0, 0, 0);
             }
         }
     }
 
     private static void ekle(ClientLevel level, ParticleOptions tur, double x, double y, double z, double vx, double vy,
-            double vz, boolean herZaman) {
+            double vz) {
         uretilen++;
-        if (herZaman) {
-            level.addAlwaysVisibleParticle(tur, x, y, z, vx, vy, vz);
-        } else {
-            level.addParticle(tur, x, y, z, vx, vy, vz);
-        }
+        level.addParticle(tur, true, x, y, z, vx, vy, vz);
     }
 
     /** Tasarım notu §5 tablosu: alevli en yakın hücre, kıvılcım/sn, her kaç hücrede duman, sütun sıklığı. */
