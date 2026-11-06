@@ -3,8 +3,10 @@
 Kullanım (worktree kökünden): python3 tools/senaryo/balikcilik_sunucu.py
 
 Adımlar: runServer açılır (stdin boruya bağlı, pty'siz) → `[balikcilik] loot tablosu yüklendi` satırı aranır →
-`forceload add 0 0` ve y=200'de küçük sahne (taş, su, üstünde son donma aşamasında `buz_deligi[asama=3]`) → aşama süresi
-(15 sn) dolunca `execute if block ... minecraft:ice` (delik dedicated'da yeniden donar) → `loot spawn ... loot
+`forceload add 0 0` ve y=200'de küçük sahne donma 0'da kurulur (taş, su, üstünde son donma aşamasında `buz_deligi[asama=3]`).
+Aşama 1: `dogalafet donma 50` → aşama süresi (15 sn) dolunca delik **buz** olur, alttaki su kalır. Aşama 2: `dogalafet donma 0`
+(sıfırlanmış dünya), buzun yerine yeni delik → 15 sn sonra delik **su** olur (B-20). Sıra bu yönde: donma 50 sırasında
+açık su yüzeyi olsaydı donma süreci sütunu kalın buzla dondururdu (ilk tur 2 koşusu). → `loot spawn ... loot
 dogalafetler:gameplay/buz_deligi_balikcilik` (özel kategori girdisi sunucuda çalışır) → temizlik → `forge tps` → `stop`.
 Ham log `KOK/.vibe/kanit/balikcilik/runServer-<n>.log`, özet `sunucu.log`. Kendi worktree'sinin `run-server/` klasörünü
 kullanır. Ağır süreç kapısı: Gradle < 2 ve boş RAM >= 4 GB (en çok 20 dk).
@@ -98,6 +100,22 @@ def no_al():
     return max(var, default=0) + 1
 
 
+def sina(s, blok, ad):
+    """`execute if block` sonucunu yeni gelen Test passed/failed satırından okur."""
+    once = len(re.findall(r"Test (?:passed|failed)", s.metin()))
+    s.komut(f"execute if block {blok}")
+    m = s.bekle(r"Test (passed|failed)", 10, sonra=once)
+    gecti = bool(m) and m.group(1) == "passed"
+    log(f"{ad}: {gecti}")
+    return gecti
+
+
+def delik_koy(s):
+    s.komut("setblock 1 202 1 dogalafetler:buz_deligi[asama=3]")
+    time.sleep(0.5)
+    return sina(s, "1 202 1 dogalafetler:buz_deligi", "delik kondu")
+
+
 def main():
     if not kapi():
         log("kapı 20 dk'da açılmadı")
@@ -113,29 +131,27 @@ def main():
         loot = s.bekle(r"\[balikcilik\] loot tablosu yüklendi: .*", 5)
         sonuc["loot"] = bool(loot)
         log("loot satırı:", loot.group(0) if loot else "yok")
-        for k in ("forceload add 0 0", "fill 0 199 0 2 202 2 minecraft:air", "fill 0 199 0 2 199 2 minecraft:stone",
-                  "fill 0 200 0 2 201 2 minecraft:stone", "setblock 1 200 1 minecraft:water",
-                  "setblock 1 201 1 minecraft:water", "setblock 1 202 1 dogalafetler:buz_deligi[asama=3]",
-                  "execute if block 1 202 1 dogalafetler:buz_deligi"):
+        for k in ("dogalafet donma 0 donma", "forceload add 0 0", "fill 0 199 0 2 202 2 minecraft:air",
+                  "fill 0 199 0 2 199 2 minecraft:stone", "fill 0 200 0 2 202 2 minecraft:stone",
+                  "setblock 1 200 1 minecraft:water", "setblock 1 201 1 minecraft:water"):
             s.komut(k)
             time.sleep(0.5)
-        delik = s.bekle(r"Test passed", 10)
-        sonuc["delik"] = bool(delik)
-        log("delik kondu:", bool(delik))
+        sonuc["delik"] = delik_koy(s)
+        s.komut("dogalafet donma 50 donma")
         time.sleep(18)
-        s.komut("execute if block 1 202 1 minecraft:ice")
-        dondu = s.bekle(r"Test passed", 10, sonra=1)
-        sonuc["dondu"] = bool(dondu)
-        log("aşama süresinden sonra buz:", bool(dondu))
-        s.komut("execute if block 1 201 1 minecraft:water")
-        su = s.bekle(r"Test passed", 10, sonra=2)
-        sonuc["su"] = bool(su)
-        log("alttaki su kaldı:", bool(su))
+        sonuc["dondu"] = sina(s, "1 202 1 minecraft:ice", "donma 50'de aşama süresinden sonra buz")
+        sonuc["su"] = sina(s, "1 201 1 minecraft:water", "alttaki su kaldı")
+        s.komut("dogalafet donma 0 donma")
+        time.sleep(1)
+        sonuc["delik2"] = delik_koy(s)
+        time.sleep(18)
+        sonuc["suyaDondu"] = sina(s, "1 202 1 minecraft:water", "donma 0'da aşama süresinden sonra su (B-20)")
         s.komut("loot spawn 1 204 1 loot dogalafetler:gameplay/buz_deligi_balikcilik")
         dusen = s.bekle(r"Dropped \d+ .*", 10)
         sonuc["lootSpawn"] = bool(dusen)
         log("loot spawn:", dusen.group(0) if dusen else "yok")
-        for k in ("kill @e[type=minecraft:item]", "fill 0 199 0 2 204 2 minecraft:air", "forceload remove 0 0"):
+        for k in ("kill @e[type=minecraft:item]", "fill 0 199 0 2 204 2 minecraft:air", "forceload remove 0 0",
+                  "dogalafet donma 0 donma"):
             s.komut(k)
             time.sleep(0.5)
         s.komut("forge tps")
@@ -149,8 +165,8 @@ def main():
     sonuc["exception"] = metin.count("Exception")
     sonuc["error"] = len(re.findall(r"/ERROR\]", metin))
     log(f"özet: {sonuc}")
-    tamam = (sonuc.get("loot") and sonuc.get("delik") and sonuc.get("dondu") and sonuc.get("su")
-             and sonuc.get("lootSpawn") and sonuc["invalidDist"] == 0)
+    tamam = all(sonuc.get(a) for a in ("loot", "delik", "suyaDondu", "delik2", "dondu", "su", "lootSpawn")) \
+        and sonuc["invalidDist"] == 0
     return 0 if tamam else 1
 
 

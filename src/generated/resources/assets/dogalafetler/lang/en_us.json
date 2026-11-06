@@ -227,9 +227,9 @@
   "sicaklik.dogalafetler.katki.yukseklik": "altitude",
   "subtitles.dogalafetler.ortam_test": "Distant rumble",
   "subtitles.dogalafetler.siren": "Siren wails",
-  "tooltip.dogalafetler.buz_baligi.cig": "Raw: cools the body slightly",
+  "tooltip.dogalafetler.buz_baligi.cig": "Raw: cools the body (small)",
   "tooltip.dogalafetler.buz_baligi.pismis": "Warms the body (medium)",
-  "tooltip.dogalafetler.buz_baligi.pismis_ringa": "Warms the body strongly",
+  "tooltip.dogalafetler.buz_baligi.pismis_ringa": "Warms the body strongly (large)",
   "tooltip.dogalafetler.tuy": "Feather Upgrade: %s",
   "tooltip.dogalafetler.yunlu": "Woolen"
 }

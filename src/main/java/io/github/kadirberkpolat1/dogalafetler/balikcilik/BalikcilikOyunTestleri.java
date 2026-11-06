@@ -22,6 +22,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -518,12 +519,13 @@ public final class BalikcilikOyunTestleri {
 
     /**
      * Ba4: vanilla açık suda (buzsuz havuz) zorlanmış ısırmada {@code ItemFishedEvent} sonucu vanilla tablodandır: hiçbir
-     * yığın bizim ad alanımızdan değil (GLM tetiklenmedi) ve {@link BalikTutulduEvent} yayınlanmaz.
+     * yığın bizim ad alanımızdan değil (GLM tetiklenmedi) ve {@link BalikTutulduEvent} yayınlanmaz. Kendi batch'inde donma
+     * 0: donma %50 iken süreç gökyüzüne açık havuz yüzeyini buza çeviriyordu (şamandıra buzun içinde kalıyordu).
      */
-    @GameTest(template = "bos", batch = BATCH, timeoutTicks = 200)
+    @GameTest(template = "bos", batch = "balikcilik_acik_su", timeoutTicks = 200)
     public static void acikSudaVanillaLootDegismez(GameTestHelper y) {
         ServerLevel level = y.getLevel();
-        donma(y, 50f);
+        donma(y, 0f);
         havuzKur(y);
         for (int x = 1; x <= 3; x++) {
             for (int z = 1; z <= 3; z++) {
@@ -541,7 +543,10 @@ public final class BalikcilikOyunTestleri {
         Consumer<ItemFishedEvent> tutulan = e -> vanilla.addAll(e.getDrops());
         boolean[] bitti = {false};
         y.onEachTick(() -> {
-            if (bitti[0] || !olta.isInWater()) {
+            // Koşul şamandıranın bloğundaki sıvı (ilk koşuda isInWater bu pencerede hiç true olmadı); retrieve zorlanmış
+            // ısırmada sıvıya bakmadan loot yuvarlar, GLM'nin kararı yalnız delikteMi'ye bağlıdır.
+            if (bitti[0] || olta.isRemoved() || olta.tickCount < 10
+                    || !level.getFluidState(olta.blockPosition()).is(FluidTags.WATER)) {
                 return;
             }
             bitti[0] = true;
@@ -566,7 +571,8 @@ public final class BalikcilikOyunTestleri {
                 temizle(y, o);
             }
         });
-        y.succeedWhen(() -> y.assertTrue(bitti[0], "olta açık suya düşmedi: " + olta.blockPosition()));
+        y.succeedWhen(() -> y.assertTrue(bitti[0], "olta açık suya düşmedi: " + olta.blockPosition() + " kaldırıldı="
+                + olta.isRemoved() + " sıvı=" + level.getFluidState(olta.blockPosition()) + " yüzme=" + olta.isInWater()));
     }
 
     /** Normal buza atılan olta suya değmez: bekleme başlamaz, zorlanmış çekme bizim olayımızı yayınlamaz. */
