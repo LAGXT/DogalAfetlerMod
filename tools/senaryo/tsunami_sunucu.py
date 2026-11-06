@@ -99,7 +99,9 @@ def kosu1(s):
 
 def kosu2(s):
     s.bekle(r"Done \(", 0, c.ACILIS_SURESI, "açılış")
-    s.bekle(r"Tsunami: kayıttan yüklendi, dalga #\d+ sürüyor=true", 0, 30, "afet kayıttan, dalga aynı kimlikle")
+    s.bekle(r"Tsunami: kayıttan yüklendi, dalga #\d+", 0, 30, "afet kayıttan yüklendi")
+    s.bekle(r"Sanal su: kayıttan yeniden kuruldu: 1 dalga", 0, 30, "dalga kayıttan kuruldu")
+    s.bekle(r"Tsunami: kayıttan sürüyor, dalga #\d+ var=true", 0, 30, "afetin dalgası aynı kimlikle sürüyor")
     s.komut("dogalafet durum", r"Tsunami", "durum (tsunami sürüyor)")
     s.bekle(r"Tsunami: temizlendi \(temiz=true, doğal=true\).*boyutta kalan dalga 0, çekilme 0", 0, 300,
             "doğal bitiş")

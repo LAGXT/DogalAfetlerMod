@@ -69,6 +69,7 @@ public final class TsunamiAfeti extends Afet {
     private final Set<UUID> suruklenenler = new HashSet<>();
     private final TsunamiYikimi yikim = new TsunamiYikimi();
     private final double[] itme = new double[2];
+    private boolean yuklemeDenetimi;
 
     public TsunamiAfeti() {
         super(AfetTuru.TSUNAMI);
@@ -205,6 +206,11 @@ public final class TsunamiAfeti extends Afet {
             return;
         }
         simdi = DunyaDonemi.al(level).saat();
+        if (yuklemeDenetimi) {
+            yuklemeDenetimi = false;
+            DogalAfetler.LOGGER.info("Tsunami: kayıttan sürüyor, dalga #{} var={}, ikinci #{} var={}", dalga1,
+                    dalga1 > 0 && SanalSu.dalgaVarMi(level, dalga1), dalga2, dalga2 > 0 && SanalSu.dalgaVarMi(level, dalga2));
+        }
         TsunamiSeviyesi sv = sv();
         if (asama == AfetAsamasi.AKTIF && sv.ikinciDalga() && dalga2 < 0 && simdi >= b1 + menzil() / sv.hizTick()) {
             b2 = b1 + menzil() / sv.hizTick();
@@ -413,13 +419,14 @@ public final class TsunamiAfeti extends Afet {
                 d == null ? 0 : d.cekilmeler().size(), d == null ? 0 : d.magaralar().size());
     }
 
+    /** Sanal su dalgaları bundan sonra ({@code ServerStartedEvent}) kayıttan döner: süreklilik ilk tick'te log'lanır. */
     @Override
     protected void yuklendi(ServerLevel level) {
         if (aktifBaslangic >= 0 && geometri != null) {
             sabitle(level);
         }
-        DogalAfetler.LOGGER.info("Tsunami: kayıttan yüklendi, dalga #{} sürüyor={}, ikinci #{}, çekilme #{}", dalga1,
-                dalga1 > 0 && SanalSu.dalgaVarMi(level, dalga1), dalga2, cekilme);
+        yuklemeDenetimi = true;
+        DogalAfetler.LOGGER.info("Tsunami: kayıttan yüklendi, dalga #{}, ikinci #{}, çekilme #{}", dalga1, dalga2, cekilme);
     }
 
     @Override
