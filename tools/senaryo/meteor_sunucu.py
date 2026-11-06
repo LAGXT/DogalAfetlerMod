@@ -8,7 +8,7 @@ Adımlar: doğuşün 60 blok üstüne 25x25 meşe tahta platform (yakıt; meteor
 `meteor dusur buyuk` → log'da `meteor krateri tamam: ... (BUYUK, GUNES, ...)` ve kazılan > 0, `yangin bilgi` > 0;
 `meteor dusur ay` (küçük ay meteoru) → krater satırı; `meteor yagmur 15 40` → en az bir krater daha, 15 sn sonra
 `showers: 0`; `meteor durdur`, `yangin sondur`.
-Bekleyen krater (M-25): 992..1007 (chunk 62,62) forceload; iki halka ötesi (chunk 64) yüklü ama varlık işlemez, üçüncü
+Bekleyen krater (M-25): 992..1007 (chunk 62,62) forceload, chunk 64'te y 120'de 11x11 tahta platform (altı okyanus); iki halka ötesi (chunk 64) yüklü ama varlık işlemez, üçüncü
 halka (chunk 65, x ≥ 1040) yüklü değil. 1037,1000'e `meteor dusur buyuk` → hemen çarpar, kraterın x ≥ 1040 kısmı bekler
 (`pending craters: 1 (1 waiting`); `forceload remove` (chunk'lar boşalır), `stop`. Koşu 2 (aynı dünya): açılışta
 `meteor kaydı ... 1 bekleyen krater işi`, `forceload add` chunk 64–65 → `meteor krateri tamam: 1037, …` ve `pending
@@ -69,12 +69,16 @@ def kosu1(sunucu):
 def bekleyen_krater(sunucu):
     """M-25: yüklü olmayan chunk'a taşan krater işi bekler ve kayıtta kalır."""
     sunucu.komut("forceload add 992 992 1007 1007", r"to be force loaded")
+    # `execute if loaded` yalnız varlık işleyen chunk'ta geçer: zorlanan 62,62 yoklanır, sınır chunk'ı 64 onunla yüklenir.
     for _ in range(30):
-        if "passed" in sunucu.komut("execute if loaded 1037 64 1000", r"Test (passed|failed)"):
+        if "passed" in sunucu.komut("execute if loaded 1000 64 1000", r"Test (passed|failed)"):
             break
         time.sleep(1)
     else:
-        raise cs.SenaryoHatasi("sınır chunk'ı 64,62 30 sn'de yüklenmedi")
+        raise cs.SenaryoHatasi("zorlanan chunk 62,62 30 sn'de yüklenmedi")
+    time.sleep(2)
+    # Tohumda 1037,1000 okyanus: chunk 64'e katı platform, meteor ona çarpar (suya düşen krater açmaz).
+    sunucu.komut("fill 1029 120 995 1039 120 1005 minecraft:oak_planks", r"Successfully filled 121 block")
     sunucu.komut("execute positioned 1037 0 1000 run dogalafet meteor dusur buyuk",
                  r"Meteor \(buyuk/gunes\) struck 1037, 1000 at once", "sınır chunk'ında hemen çarpma")
     time.sleep(2)
@@ -82,11 +86,12 @@ def bekleyen_krater(sunucu):
                  "krater işi yüklü olmayan chunk'ta bekliyor")
     sunucu.komut("forceload remove 992 992 1007 1007", r"Unmarked")
     for _ in range(30):
-        if "failed" in sunucu.komut("execute if loaded 1037 64 1000", r"Test (passed|failed)"):
+        if "failed" in sunucu.komut("execute if loaded 1000 64 1000", r"Test (passed|failed)"):
             break
         time.sleep(1)
     else:
-        raise cs.SenaryoHatasi("chunk 64,62 30 sn'de boşalmadı")
+        raise cs.SenaryoHatasi("chunk 62,62 30 sn'de boşalmadı")
+    time.sleep(2)
     sunucu.komut("dogalafet meteor bilgi", r"pending craters: 1 ", "chunk boşalınca iş kayıtta")
 
 

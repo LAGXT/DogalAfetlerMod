@@ -65,14 +65,16 @@ final class MeteorKomutlari {
 
     private static int dusur(CommandSourceStack kaynak, BlockPos hedef, MeteorBoyutu boyut, MeteorGorunumu gorunum) {
         ServerLevel level = kaynak.getLevel();
-        int onceki = MeteorAPI.bekleyenKraterSayisi(level);
+        // API'nin boş dönüşü üç durumu kapsar; ilk ikisi değilse çarpma hemen oldu (krater ya da suya düşüş).
+        boolean atilabilir = level.hasChunkAt(hedef)
+                && MeteorYoneticisi.aktifMeteorSayisi(level) < MeteorAyarlari.varlikTavani();
         Optional<MeteorVarligi> m = MeteorAPI.dusur(level, hedef, boyut, gorunum, YanginKaynagi.KOMUT, true);
         String ad = boyut.name().toLowerCase(Locale.ROOT) + "/" + gorunum.name().toLowerCase(Locale.ROOT);
         if (m.isPresent()) {
             kaynak.sendSuccess(() -> Component.translatable(DUSUR, ad, hedef.getX(), hedef.getZ()), true);
             return 1;
         }
-        if (MeteorAPI.bekleyenKraterSayisi(level) > onceki) {
+        if (atilabilir) {
             kaynak.sendSuccess(() -> Component.translatable(DUSUR_HEMEN, ad, hedef.getX(), hedef.getZ()), true);
             return 1;
         }
