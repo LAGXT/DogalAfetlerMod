@@ -180,6 +180,8 @@ public final class GunesPatlamasiOtomasyonu {
             DogalAfetler.LOGGER.info(ON + "kendi açmadığım duraklatma ekranı kapatıldı");
             mc.setScreen(null);
         }
+        // Başarım toast'ları (Felaket Başlıyor, Güneşi Atlattım, Süpernova Tanığı) F1'de de çizilir; vitrin karesine girmesin.
+        mc.getToasts().clear();
         IntegratedServer server = mc.getSingleplayerServer();
         if (mc.player == null || mc.level == null || server == null) {
             return;

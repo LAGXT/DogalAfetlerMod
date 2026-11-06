@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Güneş patlaması + kızıl cüce dedicated server senaryosu (bölüm D, GOREV §6 #4, #8, #12, #14), gerçek afetle.
 
-Çekirdeğin `cekirdek_sunucu.py` altyapısı kullanılır; tek fark sunucunun `-PoyunTestiAfeti` **olmadan** açılmasıdır (ortak
-`Sunucu` taklidi `gunes_patlamasi`'na kaydeder ve gerçek afet o zaman kaydedilmez). Kendi dünyası silinip yeniden üretilir,
-`server.properties` sonda geri döner. Üç açılış:
+Çekirdeğin `cekirdek_sunucu.py` altyapısı (ortak `Sunucu`, `-PoyunTestiAfeti=deprem,gunes_patlamasi`) kullanılır: K-E22'den beri
+gerçek güneş patlaması `ozelliktenKaydet`'ten önce kaydedilir ve taklit bu türü uyarıyla atlar (log'da "Oyun testi afeti
+gunes_patlamasi atlandı"; `oyuntesti_gunes` süreci kaydedilmez). Kendi dünyası silinip yeniden üretilir, `server.properties`
+sonda geri döner. Üç açılış:
 
 koşu 1: start gunes_patlamasi, durum (normal güneş, ön-uyarıda gök değişmez), asama ileri (siren: güneş büyümeye başlar),
 durum (büyüyen güneş), asama ileri (AKTIF: meteorlar), meteor bilgi (yağmur var), stop (temiz: yağmur durur, tamamlanmamış
@@ -15,18 +16,15 @@ donma 100, kizilcuce baslat, kizilcuce bilgi (doğuş tamam), hiz 1, start gunes
 başlar) + stop (ön-uyarıda: kızıl cüce kalır), `stop`.
 koşu 3: kizilcuce bilgi (kızıl cüce kalıcı), sifirla, `stop`.
 
-Log denetimi (her koşu): `invalid dist` yok, istisna yok, config düzeltme WARN'ı yok, `yayıncı olarak kayıtlı değil` yok, gerçek
-afet kayıtlı (taklit uyarısı yok).
+Log denetimi (her koşu): `invalid dist` yok, istisna yok, config düzeltme WARN'ı yok, `yayıncı olarak kayıtlı değil` yok, güneş
+patlaması için taklit atlandı (K-E22) ve taklit kaydı yok.
 
 Kullanım (worktree kökünden): python3 tools/senaryo/gunes_patlamasi_sunucu.py <log klasörü> | --kanit <dizin> [--port <n>]
 Çıkış: 0 geçti, 1 senaryo/denetim hatası, 2 sunucu süreci sıfır dışı kodla çıktı, 3 ağır süreç kapısı açılmadı.
 """
-import os
 import re
 import signal
-import subprocess
 import sys
-import threading
 import time
 from pathlib import Path
 
@@ -34,23 +32,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import cekirdek_sunucu as c  # noqa: E402
 
 GUNES = "Solar Flare"
-
-
-class GercekAfetSunucusu(c.Sunucu):
-    """`cekirdek_sunucu.Sunucu` ile aynı; yalnız `-PoyunTestiAfeti` verilmez (gerçek güneş patlaması kayıtlı olsun)."""
-
-    def __init__(self, ad, log_yolu):  # noqa: super().__init__ taklitli Gradle başlatır; bilerek çağrılmaz
-        self.ad = ad
-        self.satirlar = []
-        self.kilit = threading.Condition()
-        self.baslangic = time.monotonic()
-        self.log = log_yolu.open("w", encoding="utf-8")
-        ortam = dict(os.environ, JAVA_HOME=c.JAVA_HOME)
-        self.surec = subprocess.Popen(
-            ["./gradlew", "runServer", "--console=plain", "--offline"], cwd=c.KOK, env=ortam,
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8",
-            errors="replace", bufsize=1, start_new_session=True)
-        threading.Thread(target=self._oku, daemon=True).start()
 
 
 def bekle_komut(sunucu, komut, desen, aciklama, sure=60, aralik=2):
@@ -134,7 +115,9 @@ def ek_denetim(yol):
     hatalar = []
     if "yayıncı olarak kayıtlı değil" in metin:
         hatalar.append("[basarim] yayıncı olarak kayıtlı değil satırı var")
-    if "gerçek afet kaydedilmedi" in metin:
+    if "Oyun testi afeti gunes_patlamasi atlandı" not in metin:
+        hatalar.append("taklit güneş patlamasını atlamadı (K-E22 kayıt sırası)")
+    if "Oyun testi afeti gunes_patlamasi için kaydedildi" in metin:
         hatalar.append("güneş patlaması taklitle kayıtlı (gerçek afet yok)")
     if re.search(r"Incorrect key gunes_patlamasi\b", metin):
         hatalar.append("gunes_patlamasi config bölümü düzeltildi")
@@ -153,7 +136,7 @@ def main():
     kosular = (("kosu1", kosu1), ("kosu2", kosu2), ("kosu3", kosu3))
     try:
         for ad, adimlar in kosular:
-            sunucu = GercekAfetSunucusu(ad, klasor / f"gunes-{ad}.log")
+            sunucu = c.Sunucu(ad, klasor / f"gunes-{ad}.log")
             try:
                 adimlar(sunucu)
             except c.SenaryoHatasi as hata:
