@@ -13,6 +13,7 @@ import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.RankineProfili
 import io.github.kadirberkpolat1.dogalafetler.client.kasirga.IstemciKasirga.GorselEnkaz;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
 import net.minecraft.client.renderer.culling.Frustum;
@@ -48,6 +49,12 @@ final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
     private static final float EKRAN_ORANI = 0.36f;
     /** Duvar bulutu sprite alfası (spike 0,88: üst üste binen 200 sprite GPU doldurma oranının en pahalı kalemiydi). */
     private static final double DUVAR_ALFA = 0.74;
+
+    /** Son çizilen bulut geçişinin LOD kademesi (görsel otomasyonun kanıtı); yalnız render thread'i yazar ve okur. */
+    private static double sonMesafe = -1;
+    private static int sonTaban;
+    private static int sonDuvar;
+    private static int sonGirdap;
 
     private final BlockRenderDispatcher bloklar;
 
@@ -114,6 +121,7 @@ final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
         kamY = (float) (kamera.y - ey);
         kamZ = (float) (kamera.z - ez);
         double mesafe = Math.hypot(kamX, kamZ);
+        sonMesafe = mesafe;
         Quaternionf yonelim = entityRenderDispatcher.cameraOrientation();
         Vector3f sag = yonelim.transform(new Vector3f(1, 0, 0));
         Vector3f ust = yonelim.transform(new Vector3f(0, 1, 0));
@@ -208,6 +216,8 @@ final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
             }
         }
         int girdap = evre == KasirgaEvresi.OLGUN ? butce.altGirdapSayisi(s.seviye(), mesafe, lod) : 0;
+        sonGirdap = girdap;
+        sonTaban = 0;
         for (int g = 0; g < girdap; g++) {
             double faz = g * TAM_TUR / girdap - t * Math.PI;
             double yorunge = s.tabanYaricapi() * 1.2;
@@ -229,10 +239,21 @@ final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
                 etekAgi(t, dilim, halka, rEtek * 0.82, rEtekUst * 0.9, hE * 0.85, etekOmega * 1.4, 0.5, etekAlfa * 0.7f);
             }
             int adet = (int) (butce.tabanSpriteSayisi(s.seviye(), mesafe, lod) * tabanOrani);
+            sonTaban = adet;
             taban(k, s, rankine, adet, t, alfa, rEtek, rEtekUst);
         }
-        duvar(k, s, butce.duvarSpriteSayisi(mesafe, lod), t, duvarAlfa * Math.min(1, 0.4 + Math.max(inis, 0.6 * duvarAlfa)),
+        sonDuvar = butce.duvarSpriteSayisi(mesafe, lod);
+        duvar(k, s, sonDuvar, t, duvarAlfa * Math.min(1, 0.4 + Math.max(inis, 0.6 * duvarAlfa)),
                 evre == KasirgaEvresi.OLUSUM ? 8 * (1 - p) : 0);
+    }
+
+    static void lodSifirla() {
+        sonMesafe = -1;
+    }
+
+    static String lodOzeti() {
+        return sonMesafe < 0 ? "çizilmedi" : String.format(Locale.ROOT,
+                "kamera %.0f blok: taban sprite %d, duvar sprite %d, alt girdap %d", sonMesafe, sonTaban, sonDuvar, sonGirdap);
     }
 
     /** Yüzey dönüşü: U zamanla artar, doku -θ yönünde (siklonik) kayar. */

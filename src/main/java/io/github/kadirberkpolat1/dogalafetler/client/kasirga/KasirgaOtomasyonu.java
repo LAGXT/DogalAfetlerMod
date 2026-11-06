@@ -41,17 +41,32 @@ import net.minecraftforge.registries.ForgeRegistries;
 /**
  * Görsel kanıt otomasyonu (K0-21 rev. 2, GOREV §6 #6/#10). Yalnız {@code -Ddogalafetler.otomasyon=kasirga} ile tek
  * oyunculu dünyada çalışır; üretimde etkisizdir. Sırayla: S5 kasırga oyuncuyu hedefler; ön-uyarı karesi (Gelişmiş Hava
- * Radarı elde, arayüz açık), siren (duvar bulutu alçalır), aktif doğuş, vitrin (olgun evre, kasırganın 55 blok önünde,
- * zemin +10, eğim −8°) ve aynı kameranın kasırgasız kontrol karesi, yakın kare; vitrin kamerasında Düşük/Yüksek/Ultra
- * ve kasırgasız (çizimi atlanmış) FPS; {@code stop} sonrası istemci varlık sayımı; S1 vitrini, ip evresi, doğal bitiş ve
- * afet sonrası iz karesi. Kareler istenen tick'te değil sonraki çizilmiş karenin sonunda alınır (gizli workspace).
- * Klavye, fare ve tekerlek girdileri kapanışa kadar sayılır.
+ * Radarı elde, arayüz açık), siren (duvar bulutu alçalır), aktif doğuş, vitrin (olgun evre, {@link #VITRIN} kamerası) ve
+ * aynı kameranın kasırgasız kontrol karesi; vitrinde Düşük/Yüksek/Ultra ve kasırgasız (çizimi atlanmış) FPS; LOD
+ * kademeleri (120 ve 180 blok); K0-33 mesafeleri 52/36/20/5 blok Yüksek; yakın ve iç kare; {@code stop} sonrası istemci
+ * varlık sayımı ve aynı noktada afetsiz taban FPS; S1 aynı vitrin kamerasından, ip evresi, doğal bitiş ve iz karesi.
+ * Ölçüm süresince kamera kasırgayı izler (mesafe sabit kalır). Kareler A-34 kapısıyla alınır: istekten sonra en az
+ * {@link #KARE_CIZIM} kare çizilmiş ve FPS en az {@link #AKICI_FPS} olmalı (gizli workspace'te bayat framebuffer), en çok
+ * 60 sn beklenir. Klavye, fare ve tekerlek girdileri kapanışa kadar sayılır.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class KasirgaOtomasyonu {
     private static final boolean AKTIF = "kasirga".equals(System.getProperty("dogalafetler.otomasyon", ""));
     private static final String ON = "KASIRGA_OTOMASYON ";
     private static final ResourceLocation RADAR = DogalAfetler.konum("gelismis_hava_radari");
+    private static final int AKICI_FPS = 15;
+    private static final int KARE_CIZIM = 20;
+    private static final long KARE_BEKLEME_NS = 60_000_000_000L;
+    private static final int TAKIP_ARALIGI = 10;
+
+    /** Kasırganın hareket yönünde {@code mesafe} blok önünde, zemin + {@code yukseklik}, {@code egim} derece. */
+    private record Kamera(double mesafe, double yukseklik, float egim) {
+    }
+
+    private static final Kamera VITRIN = new Kamera(55, 10, -8);
+    private static final Kamera YAKIN = new Kamera(22, 4, -20);
+    /** Kaldırılan oyuncu noktası (K0-33 "≤ 5 blok"): etek ve huninin içi. */
+    private static final Kamera IC = new Kamera(5, 3, -25);
 
     /** {@code bekle} tick sonra (ve istenen kare alınmışsa) {@code kosul} doğruysa {@code is} çalışır; {@code enCok} tick sonra zorla. */
     private record Adim(String ad, int bekle, BooleanSupplier kosul, int enCok, Runnable is) {
@@ -64,7 +79,11 @@ public final class KasirgaOtomasyonu {
     private static int fare;
     private static int teker;
     private static String istenenKare;
+    private static int kareCizim;
+    private static long kareIstek;
     private static String olcum;
+    private static Kamera takip;
+    private static int takipSayac;
     private static long[] kareSureleri = new long[4096];
     private static int kareSayisi;
     private static long sonKare;
@@ -124,19 +143,19 @@ public final class KasirgaOtomasyonu {
     }
 
     /** Kamerayı kasırganın hareket yönünde {@code mesafe} blok önüne, zemin + {@code yukseklik}'e, kasırgaya bakar koyar. */
-    private static void kamera(IntegratedServer server, double mesafe, double yukseklik, float egim) {
+    private static void kamera(IntegratedServer server, Kamera kam) {
         sunucuda(server, level -> {
             Kasirga k = kasirga(server);
             if (k == null) {
                 return;
             }
             Vec3 m = k.konum();
-            double cx = m.x + Math.cos(k.yon()) * mesafe;
-            double cz = m.z + Math.sin(k.yon()) * mesafe;
+            double cx = m.x + Math.cos(k.yon()) * kam.mesafe();
+            double cz = m.z + Math.sin(k.yon()) * kam.mesafe();
             int zemin = level.getHeight(Heightmap.Types.MOTION_BLOCKING, Mth.floor(cx), Mth.floor(cz));
             float yaw = (float) Math.toDegrees(Math.atan2(-(m.x - cx), m.z - cz));
-            oyuncu(server).teleportTo(level, cx, Math.max(zemin, m.y) + yukseklik, cz, yaw, egim);
-            DogalAfetler.LOGGER.info(ON + "kamera {} blok, kasırga {} evre {} ({}), uçan blok {}, kaldırılan {}", mesafe,
+            oyuncu(server).teleportTo(level, cx, Math.max(zemin, m.y) + kam.yukseklik(), cz, yaw, kam.egim());
+            DogalAfetler.LOGGER.info(ON + "kamera {} blok, kasırga {} evre {} ({}), uçan blok {}, kaldırılan {}", kam.mesafe(),
                     BlockPos.containing(m).toShortString(), k.durum().evre(), String.format(Locale.ROOT, "%.2f",
                             k.durum().ilerleme()), k.ucanBlokSayisi(), k.toplamKaldirilan());
         });
@@ -144,12 +163,17 @@ public final class KasirgaOtomasyonu {
 
     private static void kare(String ad) {
         istenenKare = ad;
+        kareCizim = 0;
+        kareIstek = System.nanoTime();
     }
 
-    private static void olcBasla(String etiket, EfektKalitesi kalite, boolean gizli) {
+    private static void olcBasla(String etiket, Kamera kam, EfektKalitesi kalite, boolean gizli) {
         IstemciKasirga.zorlananKalite = kalite;
         IstemciKasirga.gizli = gizli;
+        KasirgaRenderer.lodSifirla();
         olcum = etiket;
+        takip = kam;
+        takipSayac = 0;
         kareSayisi = 0;
         sonKare = 0;
     }
@@ -159,13 +183,24 @@ public final class KasirgaOtomasyonu {
         long[] sureler = Arrays.copyOf(kareSureleri, kareSayisi);
         Arrays.sort(sureler);
         double ortanca = sureler.length == 0 ? Double.NaN : sureler[sureler.length / 2] / 1e6;
-        DogalAfetler.LOGGER.info(ON + "FPS {} = {} (ortanca kare {} ms, {} kare), sunucu TPS {} ort {} ms, görsel enkaz {}",
-                olcum, String.format(Locale.ROOT, "%.1f", 1000 / ortanca), String.format(Locale.ROOT, "%.2f", ortanca),
-                sureler.length, String.format(Locale.ROOT, "%.2f", TpsOlcer.tps()),
-                String.format(Locale.ROOT, "%.2f", server.getAverageTickTime()), IstemciKasirga.gorselEnkazSayisi());
+        Minecraft mc = Minecraft.getInstance();
+        int ucan = mc.level.getEntitiesOfClass(UcanBlokVarligi.class, mc.player.getBoundingBox().inflate(512)).size();
+        DogalAfetler.LOGGER.info(ON + "FPS {} = {} (ortanca kare {} ms, {} kare), sunucu TPS {} ort {} ms, istemci uçan blok {}, "
+                + "görsel enkaz {}, LOD {}", olcum, String.format(Locale.ROOT, "%.1f", 1000 / ortanca),
+                String.format(Locale.ROOT, "%.2f", ortanca), sureler.length, String.format(Locale.ROOT, "%.2f", TpsOlcer.tps()),
+                String.format(Locale.ROOT, "%.2f", server.getAverageTickTime()), ucan, IstemciKasirga.gorselEnkazSayisi(),
+                KasirgaRenderer.lodOzeti());
         olcum = null;
+        takip = null;
         IstemciKasirga.zorlananKalite = null;
         IstemciKasirga.gizli = false;
+    }
+
+    /** Kamera kurulur, 20 tick oturur, 100 tick boyunca kare süreleri toplanır; kamera kasırgayı izler. */
+    private static void fps(IntegratedServer server, String etiket, Kamera kam, EfektKalitesi kalite, boolean gizli) {
+        adim("FPS " + etiket + " kamerası", 5, () -> kamera(server, kam));
+        adim("FPS " + etiket, 20, () -> olcBasla(etiket, kam, kalite, gizli));
+        adim("FPS " + etiket + " son", 100, () -> olcBitir(server));
     }
 
     /** Akış kendiliğinden ilerlemişse (gizli workspace'te kare beklenirken) aşama atlanmasın: yalnız koşul tutarsa ilerletir. */
@@ -214,35 +249,33 @@ public final class KasirgaOtomasyonu {
             });
             mc.options.hideGui = true;
         });
-        adim("siren kamerası", 20, () -> kamera(server, 70, 12, -12));
+        adim("siren kamerası", 20, () -> kamera(server, new Kamera(70, 12, -12)));
         adim("siren karesi", 140, () -> kare("siren"));
         adim("aktif", 30, () -> ilerletEger(server, k -> k.asama() == AfetAsamasi.SIREN));
-        adim("aktif kamerası", 60, () -> kamera(server, 60, 10, -10));
+        adim("aktif kamerası", 60, () -> kamera(server, new Kamera(60, 10, -10)));
         adim("aktif doğuş karesi", 40, () -> kare("aktif_dogus"));
         adim("olgun", 20, () -> ilerletEger(server, k -> k.durum().evre() == KasirgaEvresi.DOGUS));
-        adim("vitrin kamerası", 100, () -> kamera(server, 55, 10, -8));
-        adim("vitrin karesi", 30, () -> kare("vitrin"));
+        adim("vitrin kamerası", 100, () -> kamera(server, VITRIN));
+        adim("vitrin karesi", 30, () -> kare("s5_vitrin"));
         adim("kontrol", 5, () -> IstemciKasirga.gizli = true);
-        adim("kontrol karesi", 10, () -> kare("vitrin_kontrol"));
+        adim("kontrol karesi", 10, () -> kare("s5_vitrin_kontrol"));
         adim("kontrol bitti", 5, () -> IstemciKasirga.gizli = false);
-        adim("vitrin karesi b", 60, () -> kare("vitrin_b"));
-        adim("FPS düşük kamerası", 5, () -> kamera(server, 55, 10, -8));
-        adim("FPS düşük", 20, () -> olcBasla("S5 vitrin DÜŞÜK", EfektKalitesi.DUSUK, false));
-        adim("FPS düşük son", 100, () -> olcBitir(server));
-        adim("FPS yüksek kamerası", 5, () -> kamera(server, 55, 10, -8));
-        adim("FPS yüksek", 20, () -> olcBasla("S5 vitrin YÜKSEK", EfektKalitesi.YUKSEK, false));
-        adim("FPS yüksek son", 100, () -> olcBitir(server));
-        adim("FPS ultra kamerası", 5, () -> kamera(server, 55, 10, -8));
-        adim("FPS ultra", 20, () -> olcBasla("S5 vitrin ULTRA", EfektKalitesi.ULTRA, false));
-        adim("FPS ultra son", 100, () -> olcBitir(server));
-        adim("FPS kasırgasız kamerası", 5, () -> kamera(server, 55, 10, -8));
-        adim("FPS kasırgasız", 20, () -> olcBasla("S5 vitrin kasırgasız (çizim yok)", null, true));
-        adim("FPS kasırgasız son", 100, () -> olcBitir(server));
-        adim("yakın kamera", 10, () -> kamera(server, 22, 4, -20));
+        adim("vitrin karesi b", 60, () -> kare("s5_vitrin_b"));
+        fps(server, "S5 55 blok DÜŞÜK", VITRIN, EfektKalitesi.DUSUK, false);
+        fps(server, "S5 55 blok YÜKSEK", VITRIN, EfektKalitesi.YUKSEK, false);
+        fps(server, "S5 55 blok ULTRA", VITRIN, EfektKalitesi.ULTRA, false);
+        fps(server, "S5 55 blok kasırgasız (çizim yok)", VITRIN, null, true);
+        fps(server, "S5 LOD 120 blok YÜKSEK", new Kamera(120, 14, -6), EfektKalitesi.YUKSEK, false);
+        fps(server, "S5 LOD 180 blok YÜKSEK", new Kamera(180, 18, -5), EfektKalitesi.YUKSEK, false);
+        fps(server, "S5 52 blok YÜKSEK", new Kamera(52, 10, -8), EfektKalitesi.YUKSEK, false);
+        fps(server, "S5 36 blok YÜKSEK", new Kamera(36, 8, -12), EfektKalitesi.YUKSEK, false);
+        fps(server, "S5 20 blok YÜKSEK", new Kamera(20, 4, -20), EfektKalitesi.YUKSEK, false);
+        adim("yakın kamera", 10, () -> kamera(server, YAKIN));
         adim("yakın karesi", 40, () -> kare("yakin"));
-        adim("FPS yakın kamerası", 5, () -> kamera(server, 22, 4, -20));
-        adim("FPS yakın yüksek", 20, () -> olcBasla("S5 22 blok YÜKSEK", EfektKalitesi.YUKSEK, false));
-        adim("FPS yakın son", 100, () -> olcBitir(server));
+        adim("iç kamera", 10, () -> kamera(server, IC));
+        adim("iç karesi", 40, () -> kare("ic"));
+        fps(server, "S5 5 blok YÜKSEK", IC, EfektKalitesi.YUKSEK, false);
+        fps(server, "S5 5 blok kasırgasız (çizim yok)", IC, null, true);
         adim("stop", 5, () -> komut(server, "dogalafet stop"));
         adim("stop sayımı", 60, () -> {
             DogalAfetler.LOGGER.info(ON + "stop sonrası istemci: kasirga={}, ucan_blok={}, gorsel_kopya={}",
@@ -252,7 +285,7 @@ public final class KasirgaOtomasyonu {
                     level.getEntities(KasirgaKayitlari.KASIRGA.get(), e -> true).size(),
                     level.getEntities(KasirgaKayitlari.UCAN_BLOK.get(), e -> true).size()));
         });
-        adim("afetsiz FPS", 10, () -> olcBasla("afetsiz (stop sonrası, aynı nokta)", null, false));
+        adim("afetsiz FPS", 10, () -> olcBasla("afetsiz taban (stop sonrası, 5 blok noktası)", null, null, false));
         adim("afetsiz FPS son", 100, () -> olcBitir(server));
         adim("S1 başlat", 40, () -> {
             komut(server, "dogalafet start kasirga 1 " + mc.player.getGameProfile().getName());
@@ -260,10 +293,10 @@ public final class KasirgaOtomasyonu {
             ilerletEger(server, k -> k.asama() == AfetAsamasi.SIREN);
             ilerletEger(server, k -> k.durum().evre() == KasirgaEvresi.DOGUS);
         });
-        adim("S1 kamerası", 80, () -> kamera(server, 40, 6, -10));
+        adim("S1 kamerası", 80, () -> kamera(server, VITRIN));
         adim("S1 karesi", 40, () -> kare("s1_vitrin"));
         adim("S1 ip", 10, () -> ilerletEger(server, k -> k.durum().evre() == KasirgaEvresi.OLGUN));
-        adim("S1 ip kamerası", 60, () -> kamera(server, 40, 6, -10));
+        adim("S1 ip kamerası", 60, () -> kamera(server, VITRIN));
         adim("ip karesi", 30, () -> kare("ip"));
         adim("S1 dağılma", 60, () -> ilerletEger(server, k -> k.durum().evre() == KasirgaEvresi.IP));
         adim("doğal bitiş", 30, () -> ilerletEger(server, k -> k.durum().evre() == KasirgaEvresi.DAGILMA));
@@ -303,6 +336,9 @@ public final class KasirgaOtomasyonu {
             }
             return;
         }
+        if (olcum != null && takip != null && ++takipSayac % TAKIP_ARALIGI == 0) {
+            kamera(server, takip);
+        }
         if (sira >= ADIMLAR.size() || istenenKare != null) {
             return;
         }
@@ -332,11 +368,17 @@ public final class KasirgaOtomasyonu {
             return;
         }
         Minecraft mc = Minecraft.getInstance();
+        kareCizim++;
+        boolean akici = kareCizim >= KARE_CIZIM && mc.getFps() >= AKICI_FPS;
+        if (!akici && System.nanoTime() - kareIstek < KARE_BEKLEME_NS) {
+            return;
+        }
         String dosya = "kasirga_" + istenenKare + ".png";
         istenenKare = null;
         Screenshot.grab(mc.gameDirectory, dosya, mc.getMainRenderTarget(), mesaj -> {
         });
-        DogalAfetler.LOGGER.info(ON + "kare {} (FPS {}, kasırga {}, görsel enkaz {})", dosya, mc.getFps(),
-                IstemciKasirga.kasirgaSayisi(), IstemciKasirga.gorselEnkazSayisi());
+        DogalAfetler.LOGGER.info(ON + "kare {} (FPS {}, çizilen kare {}, kapı {}, kasırga {}, görsel enkaz {})", dosya, mc.getFps(),
+                kareCizim, akici ? "açık" : "60 sn doldu, UYARI", IstemciKasirga.kasirgaSayisi(),
+                IstemciKasirga.gorselEnkazSayisi());
     }
 }
