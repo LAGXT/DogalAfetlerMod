@@ -6,6 +6,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.mantik.AfetZamanlayicisi;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.GelisimOlcutu;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.HedefSecici;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.OnUyariPenceresi;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.OyunGunu;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SecimTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SiddetAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SiddetSecici;
@@ -24,6 +25,7 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -43,14 +45,17 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.GameRules;
+import net.minecraft.world.level.Level;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.event.level.SleepFinishedTimeEvent;
 import net.minecraftforge.event.server.ServerStartedEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
@@ -58,10 +63,10 @@ import net.minecraftforge.fml.common.Mod;
  * Afet yöneticisi (madde 3, 4, 10, 11): sunucu tick'inde zamanlayıcıyı çalıştırır, afet seçer, yaşam döngüsünü ilerletir,
  * siren isteklerini ve afet durum paketlerini etkilenebilecek oyunculara gönderir, "sağ çıkan" takibini yapar ve afet
  * bitince {@link AfetBittiEvent} yayınlar. Aynı anda tek afet vardır. Afet yuvası dışında süren dönem süreçleri
- * {@link #donemSureciKaydet} ile katılır; {@code stop} ve gamerule onları da durdurur (madde 11). Karar mantığı
- * {@code core.mantik}'tedir; bu sınıf Minecraft bağlantısıdır. Afet kodunun (alt sınıf) her çağrısı korunur: istisna
- * ERROR log'a düşer, afet {@link BitisNedeni#HATA} ile yumuşak durdurulur. Sunucu başına bir örnek ({@link #al}); yalnız
- * sunucu ana thread'inde kullanılır.
+ * {@link #donemSureciKaydet} ile katılır; {@code stop} ve gamerule onları durdurur, gamerule ile duran süreç kural açılınca
+ * sürer (madde 11, K-C41). Karar mantığı {@code core.mantik}'tedir; bu sınıf Minecraft bağlantısıdır. Afet kodunun
+ * (alt sınıf) her çağrısı korunur: istisna ERROR log'a düşer, afet {@link BitisNedeni#HATA} ile yumuşak durdurulur. Sunucu
+ * başına bir örnek ({@link #al}); yalnız sunucu ana thread'inde kullanılır.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID)
 public final class AfetYoneticisi {
@@ -188,6 +193,23 @@ public final class AfetYoneticisi {
         }
     }
 
+    /**
+     * K-C42: uyku geceyi atlar; üst dünyada atlanan gün saati oyun gününe eklenir (en son öncelikte: diğer modlar uyanış
+     * saatini değiştirdikten sonra).
+     */
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void uykuBitti(SleepFinishedTimeEvent olay) {
+        if (olay.getLevel() instanceof ServerLevel level && level.dimension() == Level.OVERWORLD) {
+            long atlanan = OyunGunu.uykuAtlamasi(olay.getNewTime(), level.getDayTime());
+            if (atlanan > 0) {
+                DunyaDonemi donem = DunyaDonemi.al(level);
+                donem.uykuEkle(atlanan);
+                DogalAfetler.LOGGER.info("Uyku {} tick atladı; uyku birikimi {}, oyun günü {}", atlanan, donem.uykuBirikimi(),
+                        donem.oyunGunu(level.getGameTime()));
+            }
+        }
+    }
+
     @SubscribeEvent
     public static void canliOldu(LivingDeathEvent olay) {
         if (olay.getEntity() instanceof ServerPlayer oyuncu) {
@@ -215,6 +237,19 @@ public final class AfetYoneticisi {
         return Optional.ofNullable(alanOku(afet));
     }
 
+    /**
+     * Afetin geçerli aşamasının kalan ölçekli tick'i, korumalı (AKTIF'te alt sınıfın {@code aktifKalanTick}'i).
+     * Bilinmiyorsa ya da afet kodu hata verirse -1; hata durumunda afet {@link BitisNedeni#HATA} ile yumuşak durur.
+     */
+    public long kalanOku(Afet afet) {
+        try {
+            return afet.asamaKalanTick();
+        } catch (RuntimeException hata) {
+            hataVerdi(afet, "aktifKalanTick", hata);
+            return -1;
+        }
+    }
+
     /** Afet ve dönem zamanlayıcılarının ortak hız çarpanı. */
     public ZamanOlcegi zamanOlcegi() {
         return zamanOlcegi;
@@ -225,7 +260,7 @@ public final class AfetYoneticisi {
         return sonAdim;
     }
 
-    /** Oyun günü (dünya yaşı): üst dünyanın oyun zamanı / 24000 + {@code /dogalafet gun} ofseti. */
+    /** Oyun günü (dünya yaşı): üst dünyanın (oyun zamanı + uyku birikimi) / 24000 + {@code /dogalafet gun} ofseti. */
     public long oyunGunu() {
         return donem().oyunGunu(server.overworld().getGameTime());
     }
@@ -272,16 +307,50 @@ public final class AfetYoneticisi {
         return sonuc;
     }
 
-    /** Şu an süren dönem süreçleri. */
+    /** Süren dönem süreçleri: tamamlanmamış ve durdurulmamış. */
     public List<DonemSureci> aktifDonemSurecleri() {
         ServerLevel ust = server.overworld();
         List<DonemSureci> sonuc = new ArrayList<>();
         for (DonemSureci surec : DONEM_SURECLERI) {
-            if (aktifMi(surec, ust)) {
+            if (!surecDurdu(surec) && aktifMi(surec, ust)) {
                 sonuc.add(surec);
             }
         }
         return sonuc;
+    }
+
+    /** Tamamlanmamış ama durdurulmuş dönem süreçleri ve durdurma nedenleri (kayıt sırasıyla). */
+    public Map<DonemSureci, DonemSureci.DurdurmaNedeni> durdurulmusDonemSurecleri() {
+        ServerLevel ust = server.overworld();
+        Map<DonemSureci, DonemSureci.DurdurmaNedeni> sonuc = new LinkedHashMap<>();
+        for (DonemSureci surec : DONEM_SURECLERI) {
+            Optional<DonemSureci.DurdurmaNedeni> neden = durdurmaNedeni(surec);
+            if (neden.isPresent() && aktifMi(surec, ust)) {
+                sonuc.put(surec, neden.get());
+            }
+        }
+        return sonuc;
+    }
+
+    /** Sürecin çekirdekteki durdurma kaydı (kalıcı, K-C41); yoksa süreç durdurulmamıştır. */
+    public Optional<DonemSureci.DurdurmaNedeni> durdurmaNedeni(DonemSureci surec) {
+        return donem().surecDurdurmasi(surec.kimlik());
+    }
+
+    /** Süreç durduruldu mu; sahibi her ilerlemeden önce sorar, durmuşsa ilerlemez. */
+    public boolean surecDurdu(DonemSureci surec) {
+        return durdurmaNedeni(surec).isPresent();
+    }
+
+    /**
+     * Sürecin sahibi yeni bir döngü başlattı (ör. ikinci güneş patlamasından sonraki süpernova): önceki döngünün durdurma
+     * kaydı silinir (Y4). Kural kapalıysa çekirdek bir sonraki denetimde yeni döngüyü yine durdurur.
+     */
+    public void donemSureciBasladi(DonemSureci surec) {
+        if (surecDurdu(surec)) {
+            donem().surecDurdurmasiAyarla(surec.kimlik(), null);
+            DogalAfetler.LOGGER.info("Dönem süreci yeni döngüde: {} (önceki durdurma kaydı silindi)", surec.kimlik());
+        }
     }
 
     // ---------------------------------------------------------------- komut ve alt sistem API'si
@@ -331,17 +400,27 @@ public final class AfetYoneticisi {
     }
 
     /**
-     * Süren dönem süreçlerini durdurur ({@code /dogalafet stop} aktif afet yokken); durdurulanları döner. Güneş patlamasına
-     * bağlı süreç durunca tamamlanmamış {@code BUYUYEN} evresi {@code NORMAL}'e döner.
+     * {@code /dogalafet stop} aktif afet yokken: süren dönem süreçlerini {@link DonemSureci.DurdurmaNedeni#KOMUT} ile
+     * durdurur, kural ile durmuş olanların kaydını {@code KOMUT}'a çevirir (artık kural açılınca sürmez); bunları döner.
+     * Güneş patlamasına bağlı süreç komutla durunca tamamlanmamış {@code BUYUYEN} evresi {@code NORMAL}'e döner
+     * (K-C26; güneş patlaması afeti sürerken dönmez).
      */
     public List<DonemSureci> donemSurecleriniDurdur() {
         ServerLevel ust = server.overworld();
         List<DonemSureci> durdurulan = new ArrayList<>();
         for (DonemSureci surec : DONEM_SURECLERI) {
-            if (aktifMi(surec, ust)) {
-                surecDurdur(surec, ust, "komut");
-                durdurulan.add(surec);
+            Optional<DonemSureci.DurdurmaNedeni> neden = durdurmaNedeni(surec);
+            if (neden.equals(Optional.of(DonemSureci.DurdurmaNedeni.KOMUT)) || !aktifMi(surec, ust)) {
+                continue;
             }
+            if (neden.isEmpty()) {
+                surecDurdur(surec, ust, DonemSureci.DurdurmaNedeni.KOMUT);
+            } else {
+                donem().surecDurdurmasiAyarla(surec.kimlik(), DonemSureci.DurdurmaNedeni.KOMUT);
+                DogalAfetler.LOGGER.info("Dönem süreci kural yerine komutla durmuş sayılıyor: {}", surec.kimlik());
+                gunesBuyumesiniGeriAl(surec);
+            }
+            durdurulan.add(surec);
         }
         return durdurulan;
     }
@@ -373,14 +452,21 @@ public final class AfetYoneticisi {
         return true;
     }
 
-    /** {@code /dogalafet asama ileri} aktif afet yokken: ilk ilerleyebilen dönem sürecinin komut çıktısı. */
+    /**
+     * {@code /dogalafet asama ileri} aktif afet yokken: önce süren, sonra durdurulmuş dönem süreçlerine sorar; ilk dolu çıktı
+     * döner. Durdurulmuş süreç durmuş kalır, yalnız bir aşama geçer (K-C41); böylece tamamlanırsa kaydı silinir.
+     */
     public Optional<Component> donemAsamaIleri() {
         ServerLevel ust = server.overworld();
-        for (DonemSureci surec : aktifDonemSurecleri()) {
+        List<DonemSureci> sira = new ArrayList<>(aktifDonemSurecleri());
+        sira.addAll(durdurulmusDonemSurecleri().keySet());
+        for (DonemSureci surec : sira) {
             try {
                 Optional<Component> sonuc = surec.asamaIleri(ust);
                 if (sonuc.isPresent()) {
-                    DogalAfetler.LOGGER.info("Dönem süreci aşama ilerledi: {}", surec.kimlik());
+                    DogalAfetler.LOGGER.info("Dönem süreci aşama ilerledi: {}{}", surec.kimlik(),
+                            surecDurdu(surec) ? " (durdurulmuş)" : "");
+                    tamamlandiysaKaydiSil(surec, ust);
                     return sonuc;
                 }
             } catch (RuntimeException hata) {
@@ -392,8 +478,9 @@ public final class AfetYoneticisi {
 
     /**
      * Bir seçim turu (kuru çalışma: afet başlatılmaz). {@code zorla}: olay olasılığı 1 sayılır, bekleme ve sıklık yok
-     * sayılır; kayıt, gamerule, tek seferlik kurallar ve hedef adayı şartı korunur. Çevrim içi oyuncu yoksa ya da
-     * {@code dogalAfetlerAcik=false} ise boş.
+     * sayılır; kayıt, gamerule ve tek seferlik kurallar korunur. Hedef adayı (ayarlı boyutlarda oyuncu) yoksa yalnız sunucu
+     * geneli afetler seçilebilir (K-C30). Çevrim içi (izleyici olmayan) oyuncu yoksa ya da {@code dogalAfetlerAcik=false} ise
+     * boş.
      */
     public Optional<AfetTuru> secimYap(boolean zorla) {
         CekirdekAyarlari ayar = CekirdekAyarlari.al();
@@ -426,18 +513,28 @@ public final class AfetYoneticisi {
     }
 
     /**
-     * Madde 11 (saniyede bir, tick'ten): gamerule'ü ya da {@code dogalAfetlerAcik} kapatılan türe bağlı, süren dönem
-     * süreçlerini durdurur. Durdurulanları döner.
+     * Madde 11, K-C41 (saniyede bir, tick'ten): gamerule'ü ya da {@code dogalAfetlerAcik} kapatılan türe bağlı süren dönem
+     * süreçlerini {@link DonemSureci.DurdurmaNedeni#KURAL} ile durdurur; kuralı yeniden açılan türün kural ile durmuş
+     * süreçlerini sürdürür ({@link DonemSureci#devamEt}); tamamlanmış süreçlerin durdurma kaydını siler. Kural ile
+     * durdurulanları döner.
      */
     public List<DonemSureci> kurallariDenetle() {
         GameRules kurallar = server.getGameRules();
         ServerLevel ust = server.overworld();
         List<DonemSureci> durdurulan = new ArrayList<>();
         for (DonemSureci surec : DONEM_SURECLERI) {
+            tamamlandiysaKaydiSil(surec, ust);
             Optional<AfetTuru> tur = surec.afetTuru();
-            if (tur.isPresent() && !Kurallar.afetSecilebilir(kurallar, tur.get()) && aktifMi(surec, ust)) {
-                surecDurdur(surec, ust, "gamerule");
+            if (tur.isEmpty() || !aktifMi(surec, ust)) {
+                continue;
+            }
+            Optional<DonemSureci.DurdurmaNedeni> neden = durdurmaNedeni(surec);
+            boolean acik = Kurallar.afetSecilebilir(kurallar, tur.get());
+            if (!acik && neden.isEmpty()) {
+                surecDurdur(surec, ust, DonemSureci.DurdurmaNedeni.KURAL);
                 durdurulan.add(surec);
+            } else if (acik && neden.equals(Optional.of(DonemSureci.DurdurmaNedeni.KURAL))) {
+                surecDevamEttir(surec, ust);
             }
         }
         return durdurulan;
@@ -717,6 +814,9 @@ public final class AfetYoneticisi {
             return;
         }
         MinecraftForge.EVENT_BUS.post(new AfetAsamaDegistiEvent(afet, level, eski, yeni, eskiAlt, afet.altAsama()));
+        if (!hala(afet)) {
+            return;
+        }
         paketleriGonder(afet);
     }
 
@@ -731,7 +831,11 @@ public final class AfetYoneticisi {
         if (yeniler.isEmpty()) {
             return;
         }
-        long kalan = zamanOlcegi.gercekTick(afet.asamaKalanTick());
+        long olcekli = kalanOku(afet);
+        if (!hala(afet)) {
+            return;
+        }
+        long kalan = zamanOlcegi.gercekTick(olcekli);
         MinecraftForge.EVENT_BUS.post(new SirenIstegiEvent(afet.tur(), SirenTuru.afetIcin(afet.tur()),
                 (int) Math.max(1, Math.min(Integer.MAX_VALUE, kalan)), yeniler));
     }
@@ -823,7 +927,11 @@ public final class AfetYoneticisi {
             hataVerdi(afet, "istemciVerisiYaz", hata);
             return;
         }
-        AfetDurumPaketi paket = AfetDurumPaketi.den(afet, alan, zamanOlcegi.gercekTick(afet.asamaKalanTick()), ozel);
+        long kalan = kalanOku(afet);
+        if (!hala(afet)) {
+            return;
+        }
+        AfetDurumPaketi paket = AfetDurumPaketi.den(afet, alan, zamanOlcegi.gercekTick(kalan), ozel);
         Set<UUID> yeni = new HashSet<>();
         for (ServerPlayer oyuncu : etkilenebilecekOyuncular(afet)) {
             AgKanali.oyuncuyaGonder(oyuncu, paket);
@@ -885,7 +993,7 @@ public final class AfetYoneticisi {
                 etkilenenler, sagCikanlar, baglam.baslangicSaati(), saat, neden));
     }
 
-    /** Madde 11: güneş patlamasının 5 günlük büyüme evresi tamamlanmamış süreçtir; durdurulunca güneş normale döner. */
+    /** Madde 11, K-C26: güneş patlamasının 5 günlük büyümesi tamamlanmamış süreçtir; durdurulunca güneş normale döner. */
     private void tamamlanmamisGunesSureciniGeriAl(String neden) {
         DunyaDonemi donem = donem();
         if (donem.gunesEvresi() == GunesEvresi.BUYUYEN) {
@@ -903,15 +1011,56 @@ public final class AfetYoneticisi {
         }
     }
 
-    private void surecDurdur(DonemSureci surec, ServerLevel ust, String neden) {
+    /** Süreç tamamlandıysa ({@code aktifMi} false) durdurma kaydını siler; {@code aktifMi} hata verirse kayda dokunmaz. */
+    private void tamamlandiysaKaydiSil(DonemSureci surec, ServerLevel ust) {
+        if (!surecDurdu(surec)) {
+            return;
+        }
+        boolean aktif;
         try {
-            surec.durdur(ust);
+            aktif = surec.aktifMi(ust);
+        } catch (RuntimeException hata) {
+            DogalAfetler.LOGGER.error("Dönem süreci ({}) durumu okunamadı; durdurma kaydı korunuyor", surec.kimlik(), hata);
+            return;
+        }
+        if (!aktif) {
+            donem().surecDurdurmasiAyarla(surec.kimlik(), null);
+            DogalAfetler.LOGGER.info("Dönem süreci tamamlandı; durdurma kaydı silindi: {}", surec.kimlik());
+        }
+    }
+
+    private void surecDurdur(DonemSureci surec, ServerLevel ust, DonemSureci.DurdurmaNedeni neden) {
+        donem().surecDurdurmasiAyarla(surec.kimlik(), neden);
+        try {
+            surec.durdur(ust, neden);
         } catch (RuntimeException hata) {
             DogalAfetler.LOGGER.error("Dönem süreci ({}) durdurulurken hata", surec.kimlik(), hata);
         }
-        DogalAfetler.LOGGER.info("Dönem süreci durduruldu ({}): {}", neden, surec.kimlik());
-        if (surec.afetTuru().filter(tur -> tur == AfetTuru.GUNES_PATLAMASI).isPresent()) {
-            tamamlanmamisGunesSureciniGeriAl(neden);
+        DogalAfetler.LOGGER.info("Dönem süreci durduruldu ({}): {}", neden.name().toLowerCase(Locale.ROOT), surec.kimlik());
+        if (neden == DonemSureci.DurdurmaNedeni.KOMUT) {
+            gunesBuyumesiniGeriAl(surec);
+        }
+    }
+
+    private void surecDevamEttir(DonemSureci surec, ServerLevel ust) {
+        donem().surecDurdurmasiAyarla(surec.kimlik(), null);
+        try {
+            surec.devamEt(ust);
+        } catch (RuntimeException hata) {
+            DogalAfetler.LOGGER.error("Dönem süreci ({}) sürdürülürken hata", surec.kimlik(), hata);
+        }
+        DogalAfetler.LOGGER.info("Dönem süreci kural açılınca sürüyor: {}", surec.kimlik());
+    }
+
+    /**
+     * K-C26, Y5: güneş patlamasına bağlı süreç komutla durunca tamamlanmamış büyüme geri alınır; güneş patlaması afeti
+     * sürerken alınmaz (büyüme o afetindir; afet kendi bitişinde karar verir).
+     */
+    private void gunesBuyumesiniGeriAl(DonemSureci surec) {
+        boolean gunesSureci = surec.afetTuru().filter(tur -> tur == AfetTuru.GUNES_PATLAMASI).isPresent();
+        boolean gunesAfetiSuruyor = aktifAfet().filter(afet -> afet.tur() == AfetTuru.GUNES_PATLAMASI).isPresent();
+        if (gunesSureci && !gunesAfetiSuruyor) {
+            tamamlanmamisGunesSureciniGeriAl("komut");
         }
     }
 

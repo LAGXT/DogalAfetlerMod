@@ -23,6 +23,7 @@ import io.github.kadirberkpolat1.dogalafetler.veri.CeviriYazici;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import net.minecraft.commands.CommandSourceStack;
@@ -35,8 +36,9 @@ import net.minecraft.server.level.ServerPlayer;
 /**
  * Çekirdeğin {@code /dogalafet} alt komutlarının işleri: {@code durum}, {@code start}, {@code stop}, {@code gun}, {@code hiz},
  * {@code sifirla}, {@code asama ileri} (KOMUTLAR, N18). {@code stop} ve {@code asama ileri} aktif afet yokken dönem
- * süreçlerine ({@link DonemSureci}) gider. Çıktılar yalnız komutu yazan OP'ye gider (N6) ve dil anahtarlarıyla
- * yazılır. Başarılı komut 1, reddedilen 0 döner.
+ * süreçlerine ({@link DonemSureci}) gider; {@code stop} afeti durdururken süren süreçleri yalnız hatırlatır (ikinci
+ * {@code stop} onları durdurur). Çıktılar yalnız komutu yazan OP'ye gider (N6) ve dil anahtarlarıyla yazılır. Başarılı
+ * komut 1, reddedilen 0 döner.
  */
 public final class CekirdekKomutlari {
     private static final String ON = "commands.dogalafetler.";
@@ -54,6 +56,9 @@ public final class CekirdekKomutlari {
     public static final String DURUM_DONMA = ON + "durum.donma";
     public static final String DURUM_SON_AFETLER = ON + "durum.son_afetler";
     public static final String DURUM_SURECLER = ON + "durum.surecler";
+    public static final String DURUM_SURECLER_DURAN = ON + "durum.surecler_duran";
+    public static final String SUREC_DURDU_KOMUT = ON + "durum.surec_durdu.komut";
+    public static final String SUREC_DURDU_KURAL = ON + "durum.surec_durdu.kural";
     public static final String START_BASLADI = ON + "start.basladi";
     public static final String START_BILINMEYEN = ON + "start.bilinmeyen";
     public static final String START_KAYITLI_DEGIL = ON + "start.kayitli_degil";
@@ -63,6 +68,7 @@ public final class CekirdekKomutlari {
     public static final String STOP_DURDU = ON + "stop.durdu";
     public static final String STOP_AFET_YOK = ON + "stop.afet_yok";
     public static final String STOP_SURECLER = ON + "stop.surecler";
+    public static final String STOP_SURECLER_SURUYOR = ON + "stop.surecler_suruyor";
     public static final String GUN_AYARLANDI = ON + "gun.ayarlandi";
     public static final String HIZ_AYARLANDI = ON + "hiz.ayarlandi";
     public static final String SIFIRLA_TAMAM = ON + "sifirla.tamam";
@@ -96,7 +102,7 @@ public final class CekirdekKomutlari {
             AfetBaglami afetBaglami = afet.baglam();
             satirlar.add(Component.translatable(DURUM_AFET, afetAdi(afet.tur()), seviyeMetni(afet.seviye()),
                     Component.translatable(afet.asama().ceviriAnahtari()), afet.altAsama(),
-                    sure(yonetici.zamanOlcegi().gercekTick(afet.asamaKalanTick()))));
+                    sure(yonetici.zamanOlcegi().gercekTick(yonetici.kalanOku(afet)))));
             Component yaricap = yonetici.etkiAlani(afet).map(CekirdekKomutlari::yaricap)
                     .orElseGet(() -> Component.translatable(BILINMIYOR));
             satirlar.add(Component.translatable(DURUM_AFET_KONUM, afetBaglami.merkez().toShortString(),
@@ -119,6 +125,7 @@ public final class CekirdekKomutlari {
         satirlar.add(Component.translatable(DURUM_DONMA, sayi(donem.donmaIlerlemesi()),
                 Component.translatable(donem.cozulmeDonemi() ? EVET : HAYIR), sayi(donem.buharlasmaDerinligi())));
         satirlar.add(Component.translatable(DURUM_SURECLER, surecAdlari(yonetici.aktifDonemSurecleri())));
+        satirlar.add(Component.translatable(DURUM_SURECLER_DURAN, duranSurecler(yonetici.durdurulmusDonemSurecleri())));
         satirlar.add(Component.translatable(DURUM_SON_AFETLER, sonAfetler(donem)));
         for (Component satir : satirlar) {
             kaynak.sendSuccess(() -> satir, false);
@@ -144,7 +151,7 @@ public final class CekirdekKomutlari {
                 AfetBaglami afetBaglami = afet.baglam();
                 Component mesaj = Component.translatable(START_BASLADI, afetAdi(tur), seviyeMetni(afet.seviye()),
                         afetBaglami.merkez().toShortString(), oyuncuAdi(kaynak.getServer(), afetBaglami.hedefOyuncu()),
-                        sure(yonetici.zamanOlcegi().gercekTick(afet.asamaKalanTick())));
+                        sure(yonetici.zamanOlcegi().gercekTick(yonetici.kalanOku(afet))));
                 kaynak.sendSuccess(() -> mesaj, false);
                 return 1;
             }
@@ -163,6 +170,11 @@ public final class CekirdekKomutlari {
         Optional<AfetTuru> tur = yonetici.aktifAfet().map(Afet::tur);
         if (tur.isPresent() && yonetici.durdur()) {
             kaynak.sendSuccess(() -> Component.translatable(STOP_DURDU, afetAdi(tur.get())), false);
+            List<DonemSureci> suren = yonetici.aktifDonemSurecleri();
+            if (!suren.isEmpty()) {
+                Component adlar = surecAdlari(suren);
+                kaynak.sendSuccess(() -> Component.translatable(STOP_SURECLER_SURUYOR, adlar), false);
+            }
             return 1;
         }
         List<DonemSureci> durdurulan = yonetici.donemSurecleriniDurdur();
@@ -179,7 +191,8 @@ public final class CekirdekKomutlari {
         CommandSourceStack kaynak = baglam.getSource();
         AfetYoneticisi yonetici = AfetYoneticisi.al(kaynak.getServer());
         int istenen = IntegerArgumentType.getInteger(baglam, "sayi");
-        yonetici.donem().gunOfsetiAyarla(OyunGunu.ofset(istenen, kaynak.getServer().overworld().getGameTime()));
+        DunyaDonemi donem = yonetici.donem();
+        donem.gunOfsetiAyarla(OyunGunu.ofset(istenen, kaynak.getServer().overworld().getGameTime(), donem.uykuBirikimi()));
         long gun = yonetici.oyunGunu();
         Component olasiliklar = seviyeOlasiliklari(yonetici.seviyeOlasiliklari(gun));
         kaynak.sendSuccess(() -> Component.translatable(GUN_AYARLANDI, gun, olasiliklar), false);
@@ -322,6 +335,20 @@ public final class CekirdekKomutlari {
         return ilk ? Component.translatable(YOK) : sonuc;
     }
 
+    private static Component duranSurecler(Map<DonemSureci, DonemSureci.DurdurmaNedeni> surecler) {
+        MutableComponent sonuc = Component.empty();
+        boolean ilk = true;
+        for (Map.Entry<DonemSureci, DonemSureci.DurdurmaNedeni> girdi : surecler.entrySet()) {
+            if (!ilk) {
+                sonuc.append(", ");
+            }
+            String anahtar = girdi.getValue() == DonemSureci.DurdurmaNedeni.KOMUT ? SUREC_DURDU_KOMUT : SUREC_DURDU_KURAL;
+            sonuc.append(Component.translatable(anahtar, girdi.getKey().ad()));
+            ilk = false;
+        }
+        return ilk ? Component.translatable(YOK) : sonuc;
+    }
+
     private static Component kayitliAfetler() {
         MutableComponent sonuc = Component.empty();
         boolean ilk = true;
@@ -368,6 +395,9 @@ public final class CekirdekKomutlari {
         y.ekle(DURUM_DONMA, "Freeze progress: %s%% (thaw era: %s); evaporation depth: %s blocks",
                 "Donma ilerlemesi: %%%s (çözülme dönemi: %s); buharlaşma derinliği: %s blok");
         y.ekle(DURUM_SURECLER, "Running era processes: %s", "Süren dönem süreçleri: %s");
+        y.ekle(DURUM_SURECLER_DURAN, "Stopped era processes: %s", "Durdurulmuş dönem süreçleri: %s");
+        y.ekle(SUREC_DURDU_KOMUT, "%s stopped (stop)", "%s durduruldu (stop)");
+        y.ekle(SUREC_DURDU_KURAL, "%s stopped (rule)", "%s durduruldu (kural)");
         y.ekle(DURUM_SON_AFETLER, "Recent disasters: %s", "Son afetler: %s");
         y.ekle(START_BASLADI, "%s started (%s), centre %s, target %s; siren in %s",
                 "%s başlatıldı (%s), merkez %s, hedef %s; sirene %s");
@@ -380,6 +410,8 @@ public final class CekirdekKomutlari {
         y.ekle(STOP_DURDU, "%s stopped.", "%s durduruldu.");
         y.ekle(STOP_AFET_YOK, "There is no disaster or era process to stop.", "Durdurulacak afet ya da dönem süreci yok.");
         y.ekle(STOP_SURECLER, "Era processes stopped: %s", "Dönem süreçleri durduruldu: %s");
+        y.ekle(STOP_SURECLER_SURUYOR, "Era processes still running: %s; run /dogalafet stop again to stop them.",
+                "Süren dönem süreçleri: %s; durdurmak için yeniden /dogalafet stop.");
         y.ekle(GUN_AYARLANDI, "Game day set to %s. Level weights: %s", "Oyun günü %s olarak ayarlandı. Seviye ağırlıkları: %s");
         y.ekle(HIZ_AYARLANDI, "Disaster and era timers run at x%s.", "Afet ve dönem zamanlayıcıları x%s hızında.");
         y.ekle(SIFIRLA_TAMAM, "The world's disaster and era state was reset.",

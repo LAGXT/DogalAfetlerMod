@@ -4,16 +4,20 @@
 Kendi dünyasını sıfırdan üretir: `run-server/cekirdek-senaryo` silinir, `run-server/server.properties` geçici olarak
 `level-name=cekirdek-senaryo` yapılır ve senaryo bitince özgün içeriğine döner (`test` dünyasına dokunulmaz). Sunucu
 Gradle ile pty'siz, stdin'i boruya bağlı açılır (docs/MAKINE.md, K0-18); `-PoyunTestiAfeti=deprem,gunes_patlamasi` ile bu
-türlere yaşam döngüsü sınama afeti kaydedilir (core.OyunTestiAfeti; güneş türü AKTIF'te güneşi BUYUYEN yapar), kasırga
-kayıtsız kalır.
+türlere yaşam döngüsü sınama afeti kaydedilir (core.OyunTestiAfeti; güneş türü AKTIF'te güneşi BUYUYEN, BITIS'te SUPERNOVA
+yapar) ve güneş türüyle birlikte dönem süreci taklidi `oyuntesti_gunes` (core.OyunTestiSureci: SUPERNOVA/GUNESSIZ'de
+aktif) kaydedilir; kasırga kayıtsız kalır.
 
 Koşu 1: yeni config varsayılanlarla yazılır; durum, gun 90, durum (seviye ağırlıkları), hiz 10, durum, start kasirga 3
 ("henüz kayıtlı değil"), asama ileri (ilerletilecek yok), sifirla, durum, gun 42, time add 72000 + durum (gün 42), time set
 day + durum (gün 42), start gunes_patlamasi, asama ileri x2, durum (güneş büyüyor), stop, durum (güneş normal), stop
-(durdurulacak yok), start deprem 2, ikinci start (reddedilir), asama ileri x2, durum, stop, start deprem 3, asama ileri x2
-(aktif), durum, sunucuya `stop`.
+(durdurulacak yok); K-C41: start gunes_patlamasi, asama ileri x3 (doğal biter, SUPERNOVA), durum (süreç sürüyor),
+gamerule gunesPatlamasiAfeti false + durum (durduruldu (kural)), gamerule true + durum (sürüyor), start deprem 1 + stop
+(Y6: süren süreç hatırlatılır), stop (süreç durur), gamerule true + durum (durduruldu (stop), sürmez), asama ileri
+(güneşsiz) + durum, asama ileri (kızıl cüce, kayıt silinir) + durum; start deprem 2, ikinci start (reddedilir), asama
+ileri x2, durum, stop, start deprem 3, asama ileri x2 (aktif), durum, sunucuya `stop`.
 Koşu 2 (aynı dünya): açılışta dönem okundu (gün ofseti, son afetler, bekleme) ve aktif deprem geri yüklendi; durum
-(gün 42, aktif deprem seviye 3), stop, sifirla, `stop`.
+(gün 42, aktif deprem seviye 3; uyku 0, durdurma kaydı 0), stop, sifirla, `stop`.
 Sonda iki log da denetlenir: `invalid dist` yok, istisna yok, bizim config dosyalarımız için Forge düzeltme WARN'ı yok,
 iki süreç de 0 ile çıktı.
 
@@ -178,6 +182,34 @@ def kosu1(sunucu):
     sunucu.komut("dogalafet stop", r"Solar Flare stopped\.")
     sunucu.komut("dogalafet durum", r"sun: Normal sun", "durum (tamamlanmamış süreç durdu, güneş normal)")
     sunucu.komut("dogalafet stop", r"There is no disaster or era process to stop\.")
+    sunucu.komut("dogalafet start gunes_patlamasi", r"Solar Flare started \(Unleveled\)")
+    sunucu.komut("dogalafet asama ileri", r"Solar Flare phase: Siren")
+    sunucu.komut("dogalafet asama ileri", r"Solar Flare phase: Active")
+    sunucu.komut("dogalafet asama ileri", r"Solar Flare (phase: Ending|has ended)")
+    sunucu.komut("dogalafet durum", r"Running era processes: oyuntesti_gunes", "durum (dönem süreci sürüyor)")
+    isaret = sunucu.isaret()
+    sunucu.komut("gamerule gunesPatlamasiAfeti false", r"gunesPatlamasiAfeti is now set to: false")
+    sunucu.bekle(r"Dönem süreci durduruldu \(kural\): oyuntesti_gunes", isaret, ADIM_SURESI, "kural kapanınca süreç durdu")
+    sunucu.komut("dogalafet durum", r"Stopped era processes: oyuntesti_gunes stopped \(rule\)", "durum (kural ile durdu)")
+    isaret = sunucu.isaret()
+    sunucu.komut("gamerule gunesPatlamasiAfeti true", r"gunesPatlamasiAfeti is now set to: true")
+    sunucu.bekle(r"Dönem süreci kural açılınca sürüyor: oyuntesti_gunes", isaret, ADIM_SURESI, "kural açılınca süreç sürdü")
+    sunucu.komut("dogalafet durum", r"Running era processes: oyuntesti_gunes", "durum (kural açılınca sürüyor)")
+    sunucu.komut("dogalafet start deprem 1", r"Earthquake started \(Level 1 ")
+    sunucu.komut("dogalafet stop", r"Era processes still running: oyuntesti_gunes; run /dogalafet stop again",
+                 "stop afeti durdurur, süren süreci hatırlatır (Y6)")
+    sunucu.komut("dogalafet stop", r"Era processes stopped: oyuntesti_gunes")
+    sunucu.komut("gamerule gunesPatlamasiAfeti true", r"gunesPatlamasiAfeti is now set to: true")
+    time.sleep(2)  # kural denetimi saniyede bir: stop ile duran süreç bu sürede sürmemeli
+    sunucu.komut("dogalafet durum", r"Stopped era processes: oyuntesti_gunes stopped \(stop\)",
+                 "durum (stop ile duran kural açıkken sürmez)")
+    sunucu.komut("dogalafet asama ileri", r"oyuntesti_gunes -> Sunless era")
+    sunucu.komut("dogalafet durum", r"sun: Sunless era", "durum (duran süreç asama ileri ile ilerledi)")
+    isaret = sunucu.isaret()
+    sunucu.komut("dogalafet asama ileri", r"oyuntesti_gunes -> Red dwarf era")
+    sunucu.bekle(r"Dönem süreci tamamlandı; durdurma kaydı silindi: oyuntesti_gunes", isaret, ADIM_SURESI,
+                 "tamamlanan sürecin kaydı silindi")
+    sunucu.komut("dogalafet durum", r"Stopped era processes: none", "durum (duran süreç yok)")
     sunucu.komut("dogalafet start deprem 2", r"Earthquake started \(Level 2 \(Moderate\)\)")
     sunucu.komut("dogalafet start deprem 1", r"A disaster is already active: Earthquake", "ikinci afet reddedilir")
     sunucu.komut("dogalafet asama ileri", r"Earthquake phase: Siren")
@@ -193,8 +225,8 @@ def kosu1(sunucu):
 def kosu2(sunucu):
     sunucu.bekle(r"Done \(", 0, ACILIS_SURESI, "açılış")
     sunucu.bekle(r"Aktif afet geri yüklendi: deprem seviye 3 aşama aktif", 0, 30, "aktif afet geri yüklendi")
-    sunucu.bekle(r"Dünya dönemi okundu \(dogalafetler_donem\): .*gunOfseti=42 .*gecmis=2 genelBekleme=[1-9][0-9]* "
-                 r"sonSeviye=2 aktifAfet=deprem/aktif", 0, 30,
+    sunucu.bekle(r"Dünya dönemi okundu \(dogalafetler_donem\): .*gunOfseti=42 uyku=0 .*gecmis=4 genelBekleme=[1-9][0-9]* "
+                 r"sonSeviye=2 aktifAfet=deprem/aktif durdurulanSurec=0", 0, 30,
                  "dönem kaydı okundu (gün ofseti 42, geçmiş, bekleme, geri yüklenmiş deprem)")
     sunucu.komut("dogalafet durum", r"Game day: 42 \(offset 42\)", "durum (gün 42 korundu)")
     sunucu.komut("dogalafet durum", r"Active disaster: Earthquake, Level 3 \(Severe\); phase: Active",

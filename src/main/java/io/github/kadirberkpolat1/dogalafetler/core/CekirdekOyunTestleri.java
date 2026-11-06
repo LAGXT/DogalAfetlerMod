@@ -9,11 +9,15 @@ import io.github.kadirberkpolat1.dogalafetler.core.mantik.TekSeferlikKurallar;
 import io.github.kadirberkpolat1.dogalafetler.core.olay.AfetBittiEvent;
 import io.github.kadirberkpolat1.dogalafetler.core.olay.SirenIstegiEvent;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
+import io.github.kadirberkpolat1.dogalafetler.network.AfetDurumPaketi;
+import io.github.kadirberkpolat1.dogalafetler.network.AgKanali;
+import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.embedded.EmbeddedChannel;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -25,6 +29,7 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.network.Connection;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -35,10 +40,13 @@ import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
+import net.minecraftforge.network.ICustomPacket;
+import net.minecraftforge.network.NetworkDirection;
 
 /**
- * Çekirdeğin oyun içi testleri: dünya dönemi kaydı, kapalı gamerule'daki afetin seçilmemesi ve afet bitiş olayının sağ
- * çıkanları. Tek aktif afet yuvasını kullanan testler kendi {@code batch}'indedir (batch'ler sırayla koşar).
+ * Çekirdeğin oyun içi testleri: dünya dönemi kaydı, kapalı gamerule'daki afetin seçilmemesi, afet bitiş olayının sağ
+ * çıkanları, dönem süreçlerinin durdurulup sürdürülmesi ve afet kodu hata verince sunucunun sürmesi. Tek aktif afet
+ * yuvasını kullanan testler kendi {@code batch}'indedir (batch'ler sırayla koşar).
  */
 @GameTestHolder(DogalAfetler.MOD_ID)
 @PrefixGameTestTemplate(false)
@@ -92,6 +100,8 @@ public final class CekirdekOyunTestleri {
         donem.gunOfsetiAyarla(90);
         donem.ekVeri("donma").putFloat("maskeOrani", 0.25f);
         donem.ekVeriDegisti("donma");
+        donem.uykuEkle(11_458);
+        donem.surecDurdurmasiAyarla("oyuntesti_kayit", DonemSureci.DurdurmaNedeni.KURAL);
 
         OyunTestiAfeti afet = new OyunTestiAfeti(AfetTuru.SINKHOLE, 16, 500);
         afet.baslat(level, new AfetBaglami(AfetTuru.SINKHOLE, 3, new BlockPos(10, 70, 20), Level.OVERWORLD, hedef,
@@ -140,6 +150,9 @@ public final class CekirdekOyunTestleri {
         yardimci.assertTrue(geri.sonHedef().equals(Optional.of(hedef)), "son hedef");
         yardimci.assertTrue(geri.sonSeviye() == 4, "son seviye");
         yardimci.assertTrue(geri.gunOfseti() == 90, "gün ofseti");
+        yardimci.assertTrue(geri.uykuBirikimi() == 11_458, "uyku birikimi");
+        yardimci.assertTrue(geri.surecDurdurmasi("oyuntesti_kayit").equals(Optional.of(DonemSureci.DurdurmaNedeni.KURAL)),
+                "süreç durdurma kaydı");
         yardimci.assertTrue(geri.ekVeri("donma").getFloat("maskeOrani") == 0.25f, "ek veri");
         yardimci.assertTrue(geri.save(new CompoundTag()).equals(ilkKayit), "ikinci kayıt ilkinin aynısı değil");
 
@@ -290,11 +303,14 @@ public final class CekirdekOyunTestleri {
         yardimci.succeed();
     }
 
-    /** Durdurulması sayılan sahte dönem süreci. */
+    /** Durdurma, sürdürme ve aşama çağrılarını sayan sahte dönem süreci. */
     private static final class SahteSurec implements DonemSureci {
         private final AfetTuru tur;
         private boolean aktif = true;
         private int durdurma;
+        private DurdurmaNedeni sonNeden;
+        private int devam;
+        private int asama;
 
         private SahteSurec(AfetTuru tur) {
             this.tur = tur;
@@ -316,9 +332,24 @@ public final class CekirdekOyunTestleri {
         }
 
         @Override
-        public void durdur(ServerLevel ustDunya) {
-            aktif = false;
+        public void durdur(ServerLevel ustDunya, DurdurmaNedeni neden) {
             durdurma++;
+            sonNeden = neden;
+        }
+
+        @Override
+        public void devamEt(ServerLevel ustDunya) {
+            devam++;
+        }
+
+        @Override
+        public Optional<Component> asamaIleri(ServerLevel ustDunya) {
+            asama++;
+            return Optional.of(Component.literal(kimlik() + " aşama " + asama));
+        }
+
+        private void kaydiSil(DunyaDonemi donem) {
+            donem.surecDurdurmasiAyarla(kimlik(), null);
         }
     }
 
@@ -338,21 +369,84 @@ public final class CekirdekOyunTestleri {
             yardimci.assertTrue(komut(yardimci, "dogalafet durum") == 1, "durum başarısız");
             donem.gunesEvresiAyarla(GunesEvresi.BUYUYEN);
             yardimci.assertTrue(komut(yardimci, "dogalafet stop") == 1, "afet yokken stop süreçleri durdurmalı");
-            yardimci.assertTrue(ay.durdurma == 1 && gunes.durdurma == 1, "durdur() çağrılmadı");
+            yardimci.assertTrue(ay.durdurma == 1 && gunes.durdurma == 1 && ay.sonNeden == DonemSureci.DurdurmaNedeni.KOMUT,
+                    "durdur(KOMUT) çağrılmadı");
             yardimci.assertTrue(donem.gunesEvresi() == GunesEvresi.NORMAL, "güneş süreci durunca BUYUYEN geri alınmalı");
             yardimci.assertTrue(yonetici.aktifDonemSurecleri().isEmpty(), "süreçler aktif kaldı");
+            yardimci.assertTrue(yonetici.durdurulmusDonemSurecleri().size() == 2, "iki süreç durdurulmuş görünmeli");
+            yardimci.assertTrue(komut(yardimci, "dogalafet durum") == 1, "durum (duran süreçler) başarısız");
             yardimci.assertTrue(komut(yardimci, "dogalafet stop") == 0, "durdurulacak bir şey yokken stop 0 dönmeli");
 
-            ay.aktif = true;
-            gunes.aktif = true;
+            yonetici.donemSureciBasladi(ay);
+            yonetici.donemSureciBasladi(gunes);
+            yardimci.assertTrue(yonetici.aktifDonemSurecleri().size() == 2, "yeni döngü eski durdurma kaydını silmeli (Y4)");
             kurallar.getRule(Kurallar.AY_CARPMASI_AFETI).set(true, server);
             yardimci.assertTrue(yonetici.kurallariDenetle().isEmpty(), "kurallar açıkken süreç durmamalı");
             kurallar.getRule(Kurallar.AY_CARPMASI_AFETI).set(false, server);
             yardimci.assertTrue(yonetici.kurallariDenetle().equals(List.of(ay)), "ay çarpması kuralı kapanınca ay süreci durmalı");
-            yardimci.assertTrue(ay.durdurma == 2 && gunes.durdurma == 1, "yalnız kuralı kapanan süreç durmalı");
+            yardimci.assertTrue(ay.durdurma == 2 && gunes.durdurma == 1 && ay.sonNeden == DonemSureci.DurdurmaNedeni.KURAL,
+                    "yalnız kuralı kapanan süreç durmalı");
+            ay.aktif = false;
+            yonetici.kurallariDenetle();
+            yardimci.assertTrue(yonetici.durdurmaNedeni(ay).isEmpty(), "tamamlanan sürecin durdurma kaydı silinmeli");
         } finally {
             kurallar.getRule(Kurallar.AY_CARPMASI_AFETI).set(oncekiAy, server);
             donem.gunesEvresiAyarla(GunesEvresi.NORMAL);
+            ay.kaydiSil(donem);
+            gunes.kaydiSil(donem);
+        }
+        yardimci.succeed();
+    }
+
+    /** K-C41: kural ile duran süreç kural açılınca sürer; stop ile duran sürmez, ama {@code asama ileri} onu ilerletir. */
+    @GameTest(template = "bos", batch = "cekirdek_surec_devam")
+    public static void kuraldanDuranSurecAcilincaSurerKomuttanDuranSurmez(GameTestHelper yardimci) {
+        MinecraftServer server = yardimci.getLevel().getServer();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(server);
+        DunyaDonemi donem = yonetici.donem();
+        GameRules kurallar = server.getGameRules();
+        boolean oncekiAy = kurallar.getBoolean(Kurallar.AY_CARPMASI_AFETI);
+        Optional<DonemSureci.DurdurmaNedeni> kural = Optional.of(DonemSureci.DurdurmaNedeni.KURAL);
+        Optional<DonemSureci.DurdurmaNedeni> komutla = Optional.of(DonemSureci.DurdurmaNedeni.KOMUT);
+        yonetici.durdur();
+        SahteSurec ay = new SahteSurec(AfetTuru.AY_CARPMASI);
+        try (AfetKaydi.GeciciKayit kayit = AfetYoneticisi.geciciDonemSureciKaydet(ay)) {
+            kurallar.getRule(Kurallar.AY_CARPMASI_AFETI).set(false, server);
+            yardimci.assertTrue(yonetici.kurallariDenetle().equals(List.of(ay)), "kural kapanınca süreç durmalı");
+            yardimci.assertTrue(yonetici.durdurmaNedeni(ay).equals(kural) && ay.sonNeden == DonemSureci.DurdurmaNedeni.KURAL,
+                    "durdurma nedeni KURAL olmalı");
+            yardimci.assertTrue(komut(yardimci, "dogalafet durum") == 1, "durum başarısız");
+            kurallar.getRule(Kurallar.AY_CARPMASI_AFETI).set(true, server);
+            yonetici.kurallariDenetle();
+            yardimci.assertTrue(ay.devam == 1 && yonetici.durdurmaNedeni(ay).isEmpty()
+                    && yonetici.aktifDonemSurecleri().contains(ay), "kural açılınca süreç kaldığı yerden sürmeli");
+
+            yardimci.assertTrue(komut(yardimci, "dogalafet stop") == 1, "stop süreci durdurmalı");
+            yardimci.assertTrue(yonetici.durdurmaNedeni(ay).equals(komutla), "durdurma nedeni KOMUT olmalı");
+            kurallar.getRule(Kurallar.AY_CARPMASI_AFETI).set(false, server);
+            yonetici.kurallariDenetle();
+            kurallar.getRule(Kurallar.AY_CARPMASI_AFETI).set(true, server);
+            yonetici.kurallariDenetle();
+            yardimci.assertTrue(ay.devam == 1 && yonetici.durdurmaNedeni(ay).equals(komutla),
+                    "stop ile duran süreç kural açılınca sürmemeli");
+            yardimci.assertTrue(komut(yardimci, "dogalafet asama ileri") == 1 && ay.asama == 1,
+                    "asama ileri duran süreci ilerletmeli");
+            yardimci.assertTrue(yonetici.durdurmaNedeni(ay).equals(komutla), "asama ileri süreci sürdürmemeli");
+            yardimci.assertTrue(DunyaDonemi.yukle(donem.save(new CompoundTag())).surecDurdurmasi(ay.kimlik()).equals(komutla),
+                    "durdurma kaydı kalıcı olmalı");
+
+            yonetici.donemSureciBasladi(ay);
+            kurallar.getRule(Kurallar.AY_CARPMASI_AFETI).set(false, server);
+            yonetici.kurallariDenetle();
+            yardimci.assertTrue(komut(yardimci, "dogalafet stop") == 1 && yonetici.durdurmaNedeni(ay).equals(komutla),
+                    "kural ile durmuş sürece stop KOMUT'a çevirmeli");
+            kurallar.getRule(Kurallar.AY_CARPMASI_AFETI).set(true, server);
+            yonetici.kurallariDenetle();
+            yardimci.assertTrue(ay.devam == 1 && yonetici.durdurmaNedeni(ay).equals(komutla),
+                    "KOMUT'a çevrilen süreç kural açılınca sürmemeli");
+        } finally {
+            kurallar.getRule(Kurallar.AY_CARPMASI_AFETI).set(oncekiAy, server);
+            ay.kaydiSil(donem);
         }
         yardimci.succeed();
     }
@@ -401,5 +495,143 @@ public final class CekirdekOyunTestleri {
             yardimci.assertTrue(son.sureTick() < ilkSure, "ikinci istek kalan süreyle gitmeli: " + son.sureTick());
             temizle.run();
         });
+    }
+
+    /** K-C32 sınamasında istisna atacak kanca. */
+    private enum Kanca {
+        ETKI_ALANI, AKTIF_KALAN, ISTEMCI_VERISI, ASAMA_TICK, TEMIZLE
+    }
+
+    /** Seçilen kancası {@code patlasin} sonrasında istisna atan test afeti. */
+    private static final class HataVerenAfet extends OyunTestiAfeti {
+        private final Kanca kanca;
+        private boolean patlasin;
+
+        private HataVerenAfet(AfetTuru tur, Kanca kanca) {
+            super(tur, 16, 100_000);
+            this.kanca = kanca;
+        }
+
+        private void patla(Kanca cagrilan) {
+            if (patlasin && kanca == cagrilan) {
+                throw new IllegalStateException("oyun testi: kasıtlı hata (" + cagrilan + ")");
+            }
+        }
+
+        @Override
+        public EtkiAlani etkiAlani() {
+            patla(Kanca.ETKI_ALANI);
+            return super.etkiAlani();
+        }
+
+        @Override
+        public long aktifKalanTick() {
+            patla(Kanca.AKTIF_KALAN);
+            return super.aktifKalanTick();
+        }
+
+        @Override
+        protected void istemciVerisiYaz(CompoundTag etiket) {
+            patla(Kanca.ISTEMCI_VERISI);
+        }
+
+        @Override
+        protected void asamaTick(ServerLevel level, AfetAsamasi asama, int adim) {
+            patla(Kanca.ASAMA_TICK);
+            super.asamaTick(level, asama, adim);
+        }
+
+        @Override
+        protected void temizle(ServerLevel level, boolean temiz) {
+            patla(Kanca.TEMIZLE);
+            super.temizle(level, temiz);
+        }
+    }
+
+    /** {@code AfetDurumPaketi.YOK}'un ağdaki vanilla paketi (kanal adı ve ham baytı; ilk bayt paket kimliği). */
+    private static ICustomPacket<?> yokPaketi() {
+        return (ICustomPacket<?>) AgKanali.KANAL.toVanillaPacket(AfetDurumPaketi.YOK, NetworkDirection.PLAY_TO_CLIENT);
+    }
+
+    private static byte[] yokBaytlari() {
+        return ByteBufUtil.getBytes(yokPaketi().getInternalData());
+    }
+
+    /** Sahte oyuncunun gömülü kanalına giden afet durum paketleri (ham, eskiden yeniye); kanalın giden kuyruğu boşalır. */
+    private static List<byte[]> afetDurumPaketleri(ServerPlayer oyuncu) {
+        ICustomPacket<?> yok = yokPaketi();
+        byte kimlik = ByteBufUtil.getBytes(yok.getInternalData())[0];
+        EmbeddedChannel kanal = (EmbeddedChannel) oyuncu.connection.connection.channel();
+        List<byte[]> sonuc = new ArrayList<>();
+        for (Object mesaj = kanal.readOutbound(); mesaj != null; mesaj = kanal.readOutbound()) {
+            if (mesaj instanceof ICustomPacket<?> ozel && ozel.getName().equals(yok.getName())) {
+                byte[] bayt = ByteBufUtil.getBytes(ozel.getInternalData());
+                if (bayt.length > 0 && bayt[0] == kimlik) {
+                    sonuc.add(bayt);
+                }
+            }
+        }
+        return sonuc;
+    }
+
+    /**
+     * K-C32: afet {@code kanca}'sı {@code asama} aşamasında hata verince sunucu tick'i sürer, afet {@link BitisNedeni#HATA}
+     * ile biter ve alandaki oyuncunun istemcisine son giden afet paketi {@code YOK} olur.
+     */
+    private static void afetKancasiHataVerince(GameTestHelper yardimci, Kanca kanca, AfetAsamasi asama) {
+        ServerLevel level = yardimci.getLevel();
+        MinecraftServer server = level.getServer();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(server);
+        yonetici.durdur();
+        BlockPos merkez = yardimci.absolutePos(BlockPos.ZERO);
+        ServerPlayer oyuncu = sahteOyuncu(yardimci, merkez.getX() + 0.5, merkez.getY(), merkez.getZ() + 0.5);
+        List<AfetBittiEvent> olaylar = new ArrayList<>();
+        Consumer<AfetBittiEvent> dinleyici = olaylar::add;
+        MinecraftForge.EVENT_BUS.addListener(EventPriority.NORMAL, false, AfetBittiEvent.class, dinleyici);
+        HataVerenAfet[] olusan = new HataVerenAfet[1];
+        AfetKaydi.GeciciKayit kayit = AfetKaydi.geciciKaydet(AfetTuru.DEPREM, () -> {
+            olusan[0] = new HataVerenAfet(AfetTuru.DEPREM, kanca);
+            return olusan[0];
+        });
+        Runnable temizle = () -> {
+            MinecraftForge.EVENT_BUS.unregister(dinleyici);
+            yonetici.durdur();
+            kayit.close();
+            server.getPlayerList().remove(oyuncu);
+        };
+        byte[] yok = yokBaytlari();
+        try {
+            yardimci.assertTrue(yonetici.elleBaslat(AfetTuru.DEPREM, 1, oyuncu, level, merkez)
+                    == AfetYoneticisi.BaslatmaSonucu.BASLADI, "afet başlamadı");
+            while (olusan[0].asama() != asama) {
+                yardimci.assertTrue(yonetici.asamaIleri(), "aşama ilerlemedi");
+            }
+            List<byte[]> once = afetDurumPaketleri(oyuncu);
+            yardimci.assertTrue(!once.isEmpty() && !Arrays.equals(once.get(once.size() - 1), yok),
+                    "oyuncu önce aktif afet paketi almalı");
+            olusan[0].patlasin = true;
+        } catch (RuntimeException hata) {
+            temizle.run();
+            throw hata;
+        }
+        yardimci.succeedWhen(() -> {
+            yardimci.assertTrue(yonetici.aktifAfet().isEmpty(), "afet hata verince durmadı");
+            yardimci.assertTrue(olaylar.size() == 1 && olaylar.get(0).neden() == BitisNedeni.HATA,
+                    "HATA nedenli tek AfetBittiEvent bekleniyordu: " + olaylar.size());
+            List<byte[]> sonra = afetDurumPaketleri(oyuncu);
+            yardimci.assertTrue(!sonra.isEmpty() && Arrays.equals(sonra.get(sonra.size() - 1), yok),
+                    "istemciye son giden afet paketi YOK olmalı");
+            temizle.run();
+        });
+    }
+
+    @GameTest(template = "bos", batch = "cekirdek_hata_kalan", timeoutTicks = 200)
+    public static void aktifKalanTickHatasindaAfetHataylaBiter(GameTestHelper yardimci) {
+        afetKancasiHataVerince(yardimci, Kanca.AKTIF_KALAN, AfetAsamasi.AKTIF);
+    }
+
+    @GameTest(template = "bos", batch = "cekirdek_hata_alan", timeoutTicks = 200)
+    public static void etkiAlaniHatasindaAfetHataylaBiter(GameTestHelper yardimci) {
+        afetKancasiHataVerince(yardimci, Kanca.ETKI_ALANI, AfetAsamasi.SIREN);
     }
 }

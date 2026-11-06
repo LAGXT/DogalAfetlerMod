@@ -190,8 +190,9 @@ public final class CekirdekAyarlari {
         donemPaketAraligiTick = k.comment("Dönem değişiklikleri bu aralıkta toplanarak gönderilir (evre ve ay değişimi hemen).")
                 .defineInRange("donemPaketAraligiTick", 20, 1, 200);
         donemTazelemeTick = k.comment("Değişiklik olmasa da dönem paketi bu aralıkta yenilenir; istemcinin afet saati sunucu",
-                "saatine hizalanır (20 = 1 Hz).")
-                .defineInRange("donemTazelemeTick", 20, 20, 72_000);
+                "saatine hizalanır (20 = 1 Hz). En çok 60: istemci saati son paketten en çok 60 tick ileri tahmin eder; daha",
+                "seyrek tazelemede gökyüzü geçişleri donar ve sıçrardı (K-C35).")
+                .defineInRange("donemTazelemeTick", 20, 20, 60);
         k.pop();
 
         k.comment("Geçici olasılık çarpanı varsayılanları (madde 4, bölüm H): ay çarpmasından sonra tsunami.").push("carpan");

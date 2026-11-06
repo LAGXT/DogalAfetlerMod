@@ -10,11 +10,12 @@ import net.minecraft.server.level.ServerLevel;
  * Yaşam döngüsünü uçtan uca sınamak için davranışı olmayan afet: bloklara ve varlıklara dokunmaz, AKTIF aşaması
  * {@code aktifSure} ölçekli tick sürer, etki alanı merkez çevresinde sabit yarıçaptır. Güneş patlaması türünde gerçek
  * afetin dönem etkisini taklit eder: AKTIF'e girerken güneş NORMAL ise BUYUYEN, BITIS'e girerken BUYUYEN ise SUPERNOVA olur
- * (madde 11 "tamamlanmamış süreç" sınanabilsin). GameTest'ler {@link AfetKaydi#geciciKaydet} ile kullanır;
- * geliştirme sunucusunda {@code -Ddogalafetler.oyunTestiAfeti=deprem,sinkhole} (Gradle: {@code -PoyunTestiAfeti=...})
- * verilirse o türler için kaydedilir. Üretim kurulumunda kaydedilmez.
+ * (madde 11 "tamamlanmamış süreç" sınanabilsin). GameTest'ler {@link AfetKaydi#geciciKaydet} ile kullanır (hata sınaması
+ * için alt sınıflanır); geliştirme sunucusunda {@code -Ddogalafetler.oyunTestiAfeti=deprem,sinkhole} (Gradle:
+ * {@code -PoyunTestiAfeti=...}) verilirse o türler için kaydedilir, güneş patlaması türüyle birlikte
+ * {@link OyunTestiSureci} de kaydedilir. Üretim kurulumunda kaydedilmez.
  */
-public final class OyunTestiAfeti extends Afet {
+public class OyunTestiAfeti extends Afet {
     public static final String OZELLIK = "dogalafetler.oyunTestiAfeti";
     public static final long VARSAYILAN_AKTIF_SURE = 6000;
 
@@ -39,6 +40,9 @@ public final class OyunTestiAfeti extends Afet {
             AfetTuru.kimlikIle(parca).ifPresent(tur -> {
                 AfetKaydi.kaydet(tur, () -> new OyunTestiAfeti(tur, 32, VARSAYILAN_AKTIF_SURE));
                 DogalAfetler.LOGGER.warn("Oyun testi afeti {} için kaydedildi ({}); gerçek afet değildir", tur.kimlik(), OZELLIK);
+                if (tur == AfetTuru.GUNES_PATLAMASI) {
+                    OyunTestiSureci.kaydet();
+                }
             });
         }
     }

@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.TreeMap;
 import java.util.UUID;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -27,10 +28,11 @@ import net.minecraftforge.common.MinecraftForge;
 /**
  * Dünya dönemi: tek SavedData ({@value #VERI_ADI}, üst dünyanın veri deposunda, boyuttan bağımsız; GOREV §4, madde 3, 9,
  * 11, 16). Gökyüzü (ay, güneş evresi), donma, buharlaşma, deniz seviyesi, geçici çarpanlar, aktif afet, son afetler geçmişi,
- * bekleme sayaçları, oyun günü ofseti ve ölçekli afet saati burada durur. Her alanın okuyucusu vardır; dönem
- * alanlarını sahibi olan alt sistem setter'larla değiştirir: setter {@code setDirty} yapar, {@link DonemDegistiEvent}
- * yayınlar ve istemci senkronunu işaretler. Gamerule kapatılınca ulaşılmış dönemler geri alınmaz (madde 11); yalnız
- * {@link #sifirla()} ilk hâle döndürür. Yalnız sunucu ana thread'inde kullanılır.
+ * bekleme sayaçları, oyun günü ofseti ve uyku birikimi, dönem süreçlerinin durdurma kayıtları ve ölçekli afet saati burada
+ * durur. Her alanın okuyucusu vardır; dönem alanlarını sahibi olan alt sistem setter'larla değiştirir: setter
+ * {@code setDirty} yapar, {@link DonemDegistiEvent} yayınlar ve istemci senkronunu işaretler. Gamerule kapatılınca
+ * ulaşılmış dönemler geri alınmaz (madde 11); yalnız {@link #sifirla()} ilk hâle döndürür. Yalnız sunucu ana thread'inde
+ * kullanılır.
  */
 public final class DunyaDonemi extends SavedData {
     public static final String VERI_ADI = "dogalafetler_donem";
@@ -54,8 +56,10 @@ public final class DunyaDonemi extends SavedData {
     private UUID sonHedef;
     private int sonSeviye;
     private long gunOfseti;
+    private long uykuBirikimi;
     private long saat;
     private final CompoundTag ekVeri = new CompoundTag();
+    private final Map<String, DonemSureci.DurdurmaNedeni> surecDurdurmalari = new TreeMap<>();
     private boolean kayittanOkundu;
 
     private Afet canliAfet;
@@ -256,7 +260,10 @@ public final class DunyaDonemi extends SavedData {
 
     // ---------------------------------------------------------------- gün ve saat
 
-    /** {@code /dogalafet gun} ofseti: oyun günü = oyun zamanı / 24000 + ofset. */
+    /**
+     * {@code /dogalafet gun} ofseti: oyun günü = (oyun zamanı + uyku birikimi) / 24000 + ofset. Ofset "istenen gün − o anki
+     * gün"dür; dünya saatine ({@code getDayTime()}) değil, oyun zamanına ve uyku birikimine göredir (K-C29, K-C42).
+     */
     public long gunOfseti() {
         return gunOfseti;
     }
@@ -268,12 +275,25 @@ public final class DunyaDonemi extends SavedData {
         }
     }
 
+    /** Uykunun atladığı gün saatlerinin toplamı (tick, K-C42); oyun gününe eklenir. */
+    public long uykuBirikimi() {
+        return uykuBirikimi;
+    }
+
+    /** Uyku bitti: atlanan gün saatini biriktirir (yalnız pozitif). */
+    void uykuEkle(long atlanan) {
+        if (atlanan > 0) {
+            uykuBirikimi += atlanan;
+            degisti(DonemAlani.GUN, false);
+        }
+    }
+
     /**
-     * Oyun günü (dünya yaşı, madde 10). {@code oyunZamani} üst dünyanın {@code getGameTime()}'ıdır: {@code /time set} ve
-     * uyku onu değiştirmez ({@link OyunGunu}).
+     * Oyun günü (dünya yaşı, madde 10). {@code oyunZamani} üst dünyanın {@code getGameTime()}'ıdır: {@code /time set} onu
+     * değiştirmez; uykunun atladığı süre {@link #uykuBirikimi()} ile eklenir ({@link OyunGunu}).
      */
     public long oyunGunu(long oyunZamani) {
-        return OyunGunu.gun(oyunZamani, gunOfseti);
+        return OyunGunu.gun(oyunZamani, uykuBirikimi, gunOfseti);
     }
 
     /** Ölçekli afet saati: afet ve dönem zamanlayıcılarının ortak saati ({@code /dogalafet hiz} ile hızlanır). */
@@ -328,11 +348,33 @@ public final class DunyaDonemi extends SavedData {
         MinecraftForge.EVENT_BUS.post(new DonemDegistiEvent(this, DonemAlani.EK_VERI));
     }
 
+    // ---------------------------------------------------------------- dönem süreçlerinin durdurma kayıtları (K-C41)
+
+    /** Sürecin durdurma kaydı (kimliğe göre); yoksa süreç durdurulmamıştır. */
+    public Optional<DonemSureci.DurdurmaNedeni> surecDurdurmasi(String kimlik) {
+        return Optional.ofNullable(surecDurdurmalari.get(kimlik));
+    }
+
+    /** Durdurma kaydını yazar; {@code neden == null} kaydı siler. */
+    void surecDurdurmasiAyarla(String kimlik, DonemSureci.DurdurmaNedeni neden) {
+        DonemSureci.DurdurmaNedeni eski = neden == null ? surecDurdurmalari.remove(kimlik)
+                : surecDurdurmalari.put(kimlik, neden);
+        if (eski != neden) {
+            setDirty();
+        }
+    }
+
+    /** Bütün durdurma kayıtlarının salt okunur kopyası (kimlik → neden). */
+    public Map<String, DonemSureci.DurdurmaNedeni> surecDurdurmalari() {
+        return Map.copyOf(surecDurdurmalari);
+    }
+
     // ---------------------------------------------------------------- sıfırlama ve senkron
 
     /**
-     * {@code /dogalafet sifirla}: ay, güneş, donma, buharlaşma, deniz, çarpanlar, beklemeler, geçmiş, son hedef, gün ofseti
-     * ve ek veri ilk hâline döner. Afet saati monoton kalır; aktif afeti önce yönetici durdurur.
+     * {@code /dogalafet sifirla}: ay, güneş, donma, buharlaşma, deniz, çarpanlar, beklemeler, geçmiş, son hedef, gün ofseti,
+     * uyku birikimi, süreç durdurma kayıtları ve ek veri ilk hâline döner. Afet saati monoton kalır; aktif afeti ve dönem
+     * süreçlerini önce yönetici durdurur.
      */
     public void sifirla() {
         ayVar = true;
@@ -349,6 +391,8 @@ public final class DunyaDonemi extends SavedData {
         sonHedef = null;
         sonSeviye = 0;
         gunOfseti = 0;
+        uykuBirikimi = 0;
+        surecDurdurmalari.clear();
         for (String anahtar : List.copyOf(ekVeri.getAllKeys())) {
             if (ekVeri.get(anahtar) instanceof CompoundTag altSistem) {
                 for (String alan : List.copyOf(altSistem.getAllKeys())) {
@@ -397,13 +441,15 @@ public final class DunyaDonemi extends SavedData {
     /** Log ve komut için tek satırlık özet. */
     public String ozet() {
         return String.format(Locale.ROOT,
-                "saat=%d gunOfseti=%d ay=%s gunes=%s ilerleme=%.3f donma=%.2f cozulme=%s buharlasma=%.2f "
-                        + "deniz=%.2f/%.2f kalici=%s carpan=%d gecmis=%d genelBekleme=%d sonSeviye=%d aktifAfet=%s",
-                saat, gunOfseti, ayVar, gunesEvresi.kimlik(), evreIlerlemesi, donmaIlerlemesi, cozulmeDonemi,
+                "saat=%d gunOfseti=%d uyku=%d ay=%s gunes=%s ilerleme=%.3f donma=%.2f cozulme=%s buharlasma=%.2f "
+                        + "deniz=%.2f/%.2f kalici=%s carpan=%d gecmis=%d genelBekleme=%d sonSeviye=%d aktifAfet=%s "
+                        + "durdurulanSurec=%d",
+                saat, gunOfseti, uykuBirikimi, ayVar, gunesEvresi.kimlik(), evreIlerlemesi, donmaIlerlemesi, cozulmeDonemi,
                 buharlasmaDerinligi, deniz.mevcutArtis(), deniz.hedefArtis(), deniz.kalici(), carpanlar.liste().size(),
                 sonAfetler.size(), bekleme.genelKalan(saat), sonSeviye,
                 canliAfet != null ? canliAfet.tur().kimlik() + "/" + canliAfet.asama().kimlik()
-                        : bekleyenAfet != null ? bekleyenAfet.getString("tur") + "/bekliyor" : "yok");
+                        : bekleyenAfet != null ? bekleyenAfet.getString("tur") + "/bekliyor" : "yok",
+                surecDurdurmalari.size());
     }
 
     // ---------------------------------------------------------------- NBT
@@ -449,6 +495,10 @@ public final class DunyaDonemi extends SavedData {
         }
         etiket.putInt("sonSeviye", sonSeviye);
         etiket.putLong("gunOfseti", gunOfseti);
+        etiket.putLong("uykuBirikimi", uykuBirikimi);
+        CompoundTag durdurmalar = new CompoundTag();
+        surecDurdurmalari.forEach((kimlik, neden) -> durdurmalar.putString(kimlik, neden.name()));
+        etiket.put("surecDurdurmalari", durdurmalar);
         etiket.putLong("saat", saat);
         etiket.put("ekVeri", ekVeri.copy());
         if (canliAfet != null) {
@@ -506,6 +556,16 @@ public final class DunyaDonemi extends SavedData {
         donem.sonHedef = etiket.hasUUID("sonHedef") ? etiket.getUUID("sonHedef") : null;
         donem.sonSeviye = etiket.getInt("sonSeviye");
         donem.gunOfseti = etiket.getLong("gunOfseti");
+        donem.uykuBirikimi = Math.max(0, etiket.getLong("uykuBirikimi"));
+        CompoundTag durdurmalar = etiket.getCompound("surecDurdurmalari");
+        for (String kimlik : durdurmalar.getAllKeys()) {
+            try {
+                donem.surecDurdurmalari.put(kimlik, DonemSureci.DurdurmaNedeni.valueOf(durdurmalar.getString(kimlik)));
+            } catch (IllegalArgumentException hata) {
+                DogalAfetler.LOGGER.warn("Bozuk dönem süreci durdurma kaydı atlandı: {}={}", kimlik,
+                        durdurmalar.getString(kimlik));
+            }
+        }
         donem.saat = Math.max(0, etiket.getLong("saat"));
         donem.ekVeri.merge(etiket.getCompound("ekVeri"));
         if (etiket.contains("aktifAfet", Tag.TAG_COMPOUND)) {

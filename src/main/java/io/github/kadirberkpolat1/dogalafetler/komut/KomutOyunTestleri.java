@@ -17,6 +17,7 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.MinecraftServer;
+import net.minecraftforge.event.ForgeEventFactory;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
 
@@ -109,6 +110,11 @@ public final class KomutOyunTestleri {
         yardimci.assertTrue(yonetici.oyunGunu() == 42, "dünya saati ilerletilince oyun günü değişmemeli: " + yonetici.oyunGunu());
         server.overworld().setDayTime(1_000);
         yardimci.assertTrue(yonetici.oyunGunu() == 42, "/time set day gibi geri alınca oyun günü değişmemeli");
+        long uykuOnce = donem.uykuBirikimi();
+        long gunSaati = server.overworld().getDayTime();
+        ForgeEventFactory.onSleepFinished(server.overworld(), gunSaati + 2 * 24_000L, gunSaati);
+        yardimci.assertTrue(donem.uykuBirikimi() == uykuOnce + 48_000, "uyku birikmedi: " + donem.uykuBirikimi());
+        yardimci.assertTrue(yonetici.oyunGunu() == 44, "iki günlük uyku oyun gününü 2 ilerletmeli: " + yonetici.oyunGunu());
         net.minecraft.nbt.CompoundTag ekVeri = donem.ekVeri("test");
 
         yardimci.assertTrue(calistir(yardimci, "dogalafet sifirla") == 1, "sifirla başarısız");
@@ -119,6 +125,7 @@ public final class KomutOyunTestleri {
         yardimci.assertTrue(donem.deniz().equals(DenizSeviyesi.VARSAYILAN), "deniz");
         yardimci.assertTrue(donem.carpanlar().isEmpty(), "çarpanlar");
         yardimci.assertTrue(donem.gunOfseti() == 0, "gün ofseti");
+        yardimci.assertTrue(donem.uykuBirikimi() == 0, "uyku birikimi");
         yardimci.assertTrue(donem.sonAfetler().isEmpty() && donem.sonHedef().isEmpty() && donem.sonSeviye() == 0,
                 "geçmiş");
         yardimci.assertTrue(donem.genelBeklemeKalan() == 0, "bekleme");

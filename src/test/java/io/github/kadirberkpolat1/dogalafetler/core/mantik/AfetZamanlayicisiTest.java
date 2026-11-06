@@ -240,8 +240,10 @@ class AfetZamanlayicisiTest {
     }
 
     @Test
-    void oyuncuSayisindanBagimsizSiklik() {
-        // Gerçek seçim yolu (SecimTuru: zamanlayıcı + hedef sıralaması + erteleme), 1 ve 10 hedef adayı, 10^6 tick.
+    void secimTuruAdaySayisiniSikligaKatmaz() {
+        // Gerileme bekçisi: SecimTuru (zamanlayıcı + hedef sıralaması) 1 ve 10 hedef adayıyla, her yer uygun, 10^6 tick.
+        // Aday sayısı yalnız hedef kimliğini değiştirir; fark tohum gürültüsüdür. N14 ertelemesinin oyuncu sayısına bağlı
+        // etkisi burada ölçülmez.
         AfetSimulasyonu.Sonuc bir = yogun().gun(1000).oyuncuSayisi(1).kos(1_000_000);
         AfetSimulasyonu.Sonuc on = yogun().gun(1000).oyuncuSayisi(10).kos(1_000_000);
         double beklenen = bir.gunlukOlay();

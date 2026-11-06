@@ -12,15 +12,26 @@ import net.minecraft.server.level.ServerLevel;
  * AfetYoneticisi.donemSureciKaydet(new DonmaSureci());
  * }</pre>
  *
- * Çekirdek: {@code /dogalafet stop} aktif afet yokken {@link #aktifMi} olan süreçleri {@link #durdurur}; {@link #afetTuru()}
- * doluysa ve o türün gamerule'ü (ya da {@code dogalAfetlerAcik}) kapalıysa aynı yol saniyede bir çalışır;
- * {@code /dogalafet durum} süren süreçleri listeler; {@code /dogalafet asama ileri} aktif afet yokken süreçlere
- * {@link #asamaIleri} sorar. Ulaşılmış dönem (aysız gökyüzü, donma ilerlemesi, kızıl cüce güneş) geri alınmaz; yalnız
- * tamamlanmamış süreç durur. {@code afetTuru = GUNES_PATLAMASI} olan süreç durdurulunca çekirdek tamamlanmamış
- * {@code BUYUYEN} evresini {@code NORMAL}'e döndürür. Yalnız sunucu ana thread'inde çağrılır; argüman üst dünyadır.
+ * Durdurma kaydı çekirdektedir ({@link DunyaDonemi}, kalıcı; K-C41): {@code /dogalafet stop} aktif afet yokken süren
+ * süreçleri {@link DurdurmaNedeni#KOMUT} ile durdurur, {@link #afetTuru()} doluysa ve o türün gamerule'ü (ya da
+ * {@code dogalAfetlerAcik}) kapalıysa saniyede bir {@link DurdurmaNedeni#KURAL} ile durdurur. Kural ile duran süreç kural
+ * yeniden açılınca kaldığı yerden sürer ({@link #devamEt}); {@code stop} ile duran kendiliğinden sürmez, ama
+ * {@code /dogalafet asama ileri} durmuş süreci de ilerletir. Sahibi ilerlemeden önce
+ * {@link AfetYoneticisi#surecDurdu} sorar, yeni bir döngü başlatırken {@link AfetYoneticisi#donemSureciBasladi} çağırır
+ * (önceki döngünün kaydı silinir); {@link #aktifMi} false olunca çekirdek kaydı kendisi de siler. Ulaşılmış dönem
+ * (aysız gökyüzü, donma ilerlemesi, kızıl cüce güneş) geri alınmaz. Yalnız sunucu ana thread'inde çağrılır; argüman
+ * üst dünyadır.
  */
 public interface DonemSureci {
-    /** Kısa ASCII kimlik (ör. {@code donma}); log ve komut için. */
+    /** Çekirdeğin süreci durdurma nedeni. */
+    enum DurdurmaNedeni {
+        /** {@code /dogalafet stop} (ya da {@code sifirla}): kendiliğinden sürmez. */
+        KOMUT,
+        /** Bağlı afet türünün gamerule'ü ya da {@code dogalAfetlerAcik} kapandı: kural açılınca sürer. */
+        KURAL
+    }
+
+    /** Kısa ASCII kimlik (ör. {@code donma}); log, komut ve durdurma kaydı için. Benzersiz ve kalıcı olmalı. */
     String kimlik();
 
     /** Komut çıktısındaki ad. */
@@ -31,13 +42,24 @@ public interface DonemSureci {
     /** Bağlı olduğu afet türü (gamerule bağı); yoksa boş (gamerule ile durmaz, yalnız {@code stop} ile). */
     Optional<AfetTuru> afetTuru();
 
-    /** Süreç şu an sürüyor mu. Durdurulmuş süreç (kalıcı olarak, sahibinin verisinde) {@code false} döner. */
+    /**
+     * Süreç başlamış ve tamamlanmamış mı (sahibinin kendi durumu). Çekirdeğin durdurması bunu değiştirmez: durdurulmuş
+     * ama bitmemiş süreç {@code true} döner.
+     */
     boolean aktifMi(ServerLevel ustDunya);
 
-    /** Süreci durdurur; bir sonraki {@link #aktifMi} {@code false} dönmelidir. Ulaşılmış dönem alanlarına dokunmaz. */
-    void durdur(ServerLevel ustDunya);
+    /** Çekirdek süreci durdurdu (kayıt çekirdekte); sahibi geçici etkilerini bırakır. Ulaşılmış dönem alanlarına dokunmaz. */
+    default void durdur(ServerLevel ustDunya, DurdurmaNedeni neden) {
+    }
 
-    /** {@code /dogalafet asama ileri}: süreci bir sonraki aşamaya geçirip komut çıktısını döner; geçemezse boş. */
+    /** Kural yeniden açıldı: kural ile duran süreç kaldığı yerden sürer. */
+    default void devamEt(ServerLevel ustDunya) {
+    }
+
+    /**
+     * {@code /dogalafet asama ileri}: süreci bir sonraki aşamaya geçirip komut çıktısını döner; geçemezse boş. Durdurulmuş
+     * süreçte de çağrılır; süreç durmuş kalır (yalnız bir aşama geçer).
+     */
     default Optional<Component> asamaIleri(ServerLevel ustDunya) {
         return Optional.empty();
     }
