@@ -21,6 +21,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.gametest.GameTestHolder;
@@ -311,6 +312,74 @@ public final class SuOyunTestleri {
                     h.assertTrue(DenizYukselmesiSureci.buharlasmaPayi(server) == 4f, "buharlaşma payı");
                     DogalAfetler.LOGGER.info("Sanal su GameTest: deniz süreci donuk={} buharlaşma artışları={}", donuk[0], artislar);
                     komut(h, "dogalafet sifirla");
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Deniz alanının tazelenmesi (K0-30): kapalı havzada deniz +4 iken kara sütunlarına taş konur. Bayrak-2
+     * ({@code UPDATE_CLIENTS}, blok olayı atmaz) değişikliği periyodik tazeleme, bayrak-3 değişikliği blok olayı, bayrak-2 +
+     * {@link SanalSu#chunkDegisti} değişikliği API yakalar; üçü de 40 tick içinde alana yansır (sütun kurur).
+     */
+    @GameTest(template = "su_alani", batch = "su_tazeleme", timeoutTicks = 400)
+    public static void denizAlaniBlokDegisiminiYakalar(GameTestHelper h) {
+        ServerLevel l = h.getLevel();
+        BlockState tas = Blocks.STONE.defaultBlockState();
+        kutu(h, 0, 0, 0, 15, 0, 15, tas);
+        kutu(h, 0, 1, 0, 15, 9, 0, tas);
+        kutu(h, 0, 1, 15, 15, 9, 15, tas);
+        kutu(h, 0, 1, 1, 0, 9, 14, tas);
+        kutu(h, 15, 1, 1, 15, 9, 14, tas);
+        kutu(h, 1, 1, 1, 6, 2, 14, Blocks.WATER.defaultBlockState());
+        kutu(h, 7, 1, 1, 14, 3, 14, tas);
+        sabitle(h);
+        komut(h, "dogalafet denizseviyesi 4");
+        long[] an = new long[6];
+        h.startSequence()
+                .thenWaitUntil(() -> {
+                    for (int z : new int[] {4, 8, 12}) {
+                        h.assertTrue(araliklar(h, 10, z).adet() == 1, "kara sütunu henüz ıslak değil z=" + z);
+                    }
+                })
+                .thenExecute(() -> {
+                    for (int y = 4; y <= 9; y++) {
+                        l.setBlock(m(h, 10, y, 4), tas, Block.UPDATE_CLIENTS);
+                    }
+                    an[0] = l.getGameTime();
+                })
+                .thenWaitUntil(() -> {
+                    h.assertTrue(araliklar(h, 10, 4).adet() == 0, "bayrak-2 taş sütunu alana yansımadı");
+                    an[1] = l.getGameTime();
+                })
+                .thenExecute(() -> {
+                    for (int y = 4; y <= 9; y++) {
+                        h.setBlock(10, y, 8, Blocks.STONE);
+                    }
+                    an[2] = l.getGameTime();
+                })
+                .thenWaitUntil(() -> {
+                    h.assertTrue(araliklar(h, 10, 8).adet() == 0, "bayrak-3 taş sütunu alana yansımadı");
+                    an[3] = l.getGameTime();
+                })
+                .thenExecute(() -> {
+                    for (int y = 4; y <= 9; y++) {
+                        l.setBlock(m(h, 10, y, 12), tas, Block.UPDATE_CLIENTS);
+                    }
+                    SanalSu.chunkDegisti(l, new ChunkPos(m(h, 10, 0, 12)));
+                    an[4] = l.getGameTime();
+                })
+                .thenWaitUntil(() -> {
+                    h.assertTrue(araliklar(h, 10, 12).adet() == 0, "chunkDegisti sonrası sütun alana yansımadı");
+                    an[5] = l.getGameTime();
+                })
+                .thenExecute(() -> {
+                    DogalAfetler.LOGGER.info("Sanal su GameTest: tazeleme gecikmesi bayrak2={} bayrak3={} chunkDegisti={} tick",
+                            an[1] - an[0], an[3] - an[2], an[5] - an[4]);
+                    h.assertTrue(an[1] - an[0] <= 40, "bayrak-2 " + (an[1] - an[0]) + " tick sürdü (> 40)");
+                    h.assertTrue(an[3] - an[2] <= 40, "bayrak-3 " + (an[3] - an[2]) + " tick sürdü (> 40)");
+                    h.assertTrue(an[5] - an[4] <= 40, "chunkDegisti " + (an[5] - an[4]) + " tick sürdü (> 40)");
+                    komut(h, "dogalafet denizseviyesi 0");
+                    SanalSu.bolgeBirak(l);
                 })
                 .thenSucceed();
     }
