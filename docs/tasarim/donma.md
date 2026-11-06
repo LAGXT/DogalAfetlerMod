@@ -108,3 +108,24 @@ Tablo `.vibe/kararlar/spike-donma.md` "Önerilen config varsayılanları (N17)" 
 - **Teknik risk:** vanilla çimen ve yaprak renklerini tonlamak için `RegisterColorHandlersEvent.Block`'ta vanilla blokların renk işleyicisini sarmak gerekir; başka bir mod da sararsa son kayıt kazanır. Sarıcı önceki işleyiciyi çağırıp yalnız çıktıyı karıştırır (zincirleme), böylece çakışma en aza iner. `kiragili_cimen`'in biyom rengi de bu işte.
 - Tablo veri paketinde (`dogalafetler:donma` JSON + `#dogalafetler:donma/kar_zemini` etiketi); tanınmayan bloklara dokunulmaz (N12). `/reload` ile kaldırılan satırın dönüştürdüğü bloklar donuk kalır (bilinen sınır).
 - `/dogalafet sifirla` blokları çözmeden yalnız veriyi sıfırlar.
+
+## 7. Faz 2 güncellemesi, 2026-11-06
+
+Uygulama `is/donma` dalında; kararlar `.vibe/kararlar/donma.md` (K-D6…K-D19), rapor `.vibe/rapor/donma.md`.
+
+- **İnce buz yapıldı:** su sütununun üst bloğu donarken ilk 6 puan (kıyıda %20–26) `ince_buz`, sonra buz; çözülürken
+  son 6 puan yine `ince_buz` (çürük buz), sonra su (`donma.esikler.inceBuzPayi`). Doku: koyu, ~%70 saydam, beyaz çatlak ağı
+  (`tools/assets/donma_dokular.py`), translucent model. Vitrindeki "kıyıdan merkeze ilerleyen koyu halka" bu evredir.
+- **Yağmur → kar yalnız istemcide:** eşik %40'ta yağmur istemcide bastırılır, yerine iri ve yavaş kar taneleri düşer; biyom,
+  sunucu havası ve kar birikimi değişmez (`renderSnowAndRain` sarmalaması gökyüzü işçisinin kancasıyla çakışmasın diye
+  kullanılmadı).
+- **Parçacıklar:** ayaz kristalleri (ilerlemeyle), kar yağışı, açık su üstünde buhar (buharlaşmada tam, donarken %30–99
+  arasında yarım), 2 sn'de bir nefes buharı (Düşük'te yalnız üçüncü kişi kendi), çözülmede yaprak damlası. Yoğunluk:
+  kalite (Düşük 0,3 / Orta 0,6 / Yüksek 1 / Ultra 1,5) × `donma.parcacikYogunlugu`.
+- **Buharlaşma (N9):** sütun başına yüzeyden en çok derinlik kadar kurur, sığ göl tamamen kurur; kuruyan sütunun
+  orijinal su yüzeyi ve kaldırılan blok sayısı chunk verisinde. Güneş büyümesi bitince (süpernova) derinlik 0'a iner ve su
+  alttan yukarı geri gelir; aynı chunk işinde önce geri dolma sonra donma (N10).
+- **`sifirla`:** veri döngüsü; bloklar çözülmez, kalan kar/buz yabancı sayılır.
+- **Bu turda yapılmayanlar (açık):** vanilla çimen/yaprak biyom rengi tonlaması, kayrağı örtüsü ve sarkit çizimi, rüzgâr ve
+  buz şarkısı sesleri. Blok düzeyindeki adımlar (kırağı, kar katmanları, kıyıdan içeri ince buz → buz → kalınlaşma,
+  çözülme sırası) ve yukarıdaki parçacıklar vitrini taşır.

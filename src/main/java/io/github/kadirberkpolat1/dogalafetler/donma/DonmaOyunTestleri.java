@@ -229,7 +229,9 @@ public final class DonmaOyunTestleri {
         y.assertTrue(kar(y, 8, 5, 8) == 0, "40'ta yaprakta kar kalmamalı; " + sutunTani(y, 8, 8));
         y.assertTrue(is(y, 2, 3, 4, Blocks.WATER) && is(y, 3, 3, 4, Blocks.WATER), "40'ta kıyı halkası açık; "
                 + sutunTani(y, 2, 4) + " | " + sutunTani(y, 3, 4));
-        y.assertTrue(is(y, 4, 3, 4, Blocks.ICE), "40'ta göl ortası buz kalmalı; " + sutunTani(y, 4, 4));
+        y.assertTrue(is(y, 4, 3, 4, Blocks.ICE) || is(y, 4, 3, 4, DonmaBloklari.INCE_BUZ.get()),
+                "40'ta göl ortası donmuş kalmalı (kıyıya 2 blok: çürük ince buz evresi); " + sutunTani(y, 4, 4));
+        y.assertTrue(is(y, 4, 2, 4, Blocks.WATER), "çözülürken göl ortası incelmiş olmalı; " + sutunTani(y, 4, 4));
         y.succeed();
     }
 
