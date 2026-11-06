@@ -84,3 +84,26 @@ Kaynaklar:
 - **Kapandı — siren süresi:** madde 5 ("güneş patlaması hariç 10 sn") ile bölüm H ("siren çaldıktan 60 sn sonra çarpma, siren o anda fade-out") arasında daha özel kural kazandı: ay çarpması sireni 60 sn, standart dosya döngüsü (K0-19; Berk değiştirebilir). "10 sn siren + 50 sn sessiz uğultu" alternatifi reddedildi.
 - Gökyüzü durumu için bool yetmez: `AyDurumu {VAR, YAKLASIYOR, YOK}` + ay olay tick'i (yaklaşma 0–60 sn, parçalanma, 3 günlük enkaz halkası sönümü istemcide bu tick'ten hesaplanır; `gokyuzu.md` §2).
 - Çarpma noktası görseldir; gerçek dünyada dev krater açılmaz (harita korunur, oyun devam eder).
+
+## Faz 4 güncellemesi, 2026-11-06
+
+Kaynak: `.vibe/kararlar/ay-carpmasi.md` AY-01…AY-11, rapor `.vibe/rapor/ay-carpmasi.md`.
+
+**Uygulananlar.**
+- Veri modeli (G8 kapandı): `DunyaDonemi.ayVar` korunur, yanına `ayOlaySaati` (YAKLASIYOR'da siren başı, YOK'ta çarpma anı);
+  `AyDurumu` ikisinden türetilir, `DonemPaketi` son alanı. Sonradan giren oyuncu yaklaşma/mantar/halka karesini aynı saatten görür.
+- Zaman çizelgesi tablodaki gibidir: yaklaşma = SIREN (60 sn, `1 + 13·t³`, 35° → son 10 sn'de 4°), çarpma = AKTIF başı
+  (ay yok, tsunami çarpanı, siren fade-out), 1,5 sn güm, 3–15 sn sarsıntı (2,5°, mesafeden bağımsız, her boyutta), 10. sn'den
+  90 sn ay parçası yağmuru (`MeteorAPI`, ay görünümü), sonra doğal bitiş. Deniz yükselmesi sanal suyun süreci (10 dk + 5 dk).
+- Gökyüzü: ortak çizicinin kancasında yaklaşan ay (yüzey + 3 aşamalı çatlak + kızarma + toz haresi + kalite tablosundaki
+  sayıda parça, yörünge yayı 20° eğik), ufuk parlaması, mantar sütunu (gövde + şapka + iki yana toz duvarı, kızgın çekirdek),
+  3 günlük enkaz halkası (+24 parıltı) ve kayan yıldızlar. Sis son yaklaşmada turuncuya, parlamada sıcak beyaza çekilir.
+- Siren sırasında `stop` ayı yerine getirir (yaklaşma ulaşılmış dönem değildir); çarpmadan sonra ayın yokluğu kalıcıdır.
+
+**Sapmalar.**
+- Sarsıntıda düşen bloklar deprem listesi yerine kendi etiketimiz `#dogalafetler:ay_sarsintisi_duser` (deprem dalı paralel);
+  oyuncu başına tavan Yüksek satırı (35), kalite değil config.
+- Döngülü ay sesleri −30 LUFS (uyarı-ses hedefi −26; alçak uğultuda K ağırlığı nedeniyle, AY-07).
+- "Toz perdesi" parçacıkları ve "plajlarda ıslak kum parlaması" yapılmadı (rapor "yapılmadı"); tsunami çekilmesinin ×1,5'i
+  tsunami işçisinindir (çarpan dönemi `DunyaDonemi.carpan(TSUNAMI) > 1` ile okunur).
+- Meteor sesi perdesi %10 tiz meteor sisteminin görünüm dalındadır (M-10); burada ayrıca yapılmadı.

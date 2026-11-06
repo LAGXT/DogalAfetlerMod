@@ -11,6 +11,8 @@ import com.mojang.blaze3d.vertex.VertexBuffer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.math.Axis;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.client.ay_carpmasi.AyCarpmasiGokyuzu;
+import io.github.kadirberkpolat1.dogalafetler.client.ay_carpmasi.IstemciAy;
 import io.github.kadirberkpolat1.dogalafetler.config.EfektKalitesi;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
@@ -378,10 +380,11 @@ final class GokyuzuCizici {
             sisKur.run();
         }
         gunesEvresi(poz.last().pose(), d, yagmursuz, sn);
-        if (d.ayVar()) {
+        if (d.ayVar() && !IstemciAy.ayiGizle()) {
             ay(poz.last().pose(), level, d, yagmursuz);
         }
         poz.popPose();
+        AyCarpmasiGokyuzu.ciz(poz.last().pose(), level, pt, yagmursuz, sisKur);
 
         RenderSystem.disableBlend();
         RenderSystem.defaultBlendFunc();
@@ -436,6 +439,7 @@ final class GokyuzuCizici {
         derinUzay(m, izdusum, d, GokyuzuRenkleri.uzayAlfa(d, zaman) * (1f - level.getRainLevel(pt)),
                 GokyuzuRenkleri.gunIsigi(zaman), sn);
         poz.popPose();
+        AyCarpmasiGokyuzu.ciz(poz.last().pose(), level, pt, 1f - level.getRainLevel(pt), () -> { });
         RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
         RenderSystem.disableBlend();
         RenderSystem.defaultBlendFunc();

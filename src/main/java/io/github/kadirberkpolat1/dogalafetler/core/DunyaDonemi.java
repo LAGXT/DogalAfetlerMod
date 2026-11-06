@@ -43,6 +43,7 @@ public final class DunyaDonemi extends SavedData {
     public static final float BUHARLASMA_EN_COK = 64f;
 
     private boolean ayVar = true;
+    private long ayOlaySaati = AyDurumu.OLAY_YOK;
     private GunesEvresi gunesEvresi = GunesEvresi.NORMAL;
     private float evreIlerlemesi;
     private long evreBaslangicSaati;
@@ -86,9 +87,34 @@ public final class DunyaDonemi extends SavedData {
         return ayVar;
     }
 
+    /** Elle ay var/yok (test, geliştirme komutu): olay saati silinir, yaklaşma ya da enkaz halkası çizilmez. */
     public void ayVarAyarla(boolean var) {
-        if (ayVar != var) {
+        if (ayVar != var || ayOlaySaati != AyDurumu.OLAY_YOK) {
             ayVar = var;
+            ayOlaySaati = AyDurumu.OLAY_YOK;
+            degisti(DonemAlani.AY, true);
+        }
+    }
+
+    public AyDurumu ayDurumu() {
+        return AyDurumu.den(ayVar, ayOlaySaati);
+    }
+
+    /** YAKLASIYOR'da yaklaşmanın, YOK'ta çarpmanın ölçekli afet saati; yoksa {@link AyDurumu#OLAY_YOK}. */
+    public long ayOlaySaati() {
+        return ayOlaySaati;
+    }
+
+    /**
+     * Ay çarpması (sahibi): {@code YAKLASIYOR} yaklaşmanın başladığı, {@code YOK} çarpmanın saatiyle; {@code VAR} olay
+     * saatini siler (siren sırasında durdurulan yaklaşma). Değişim {@link DonemAlani#AY} olayı ve acil senkrondur.
+     */
+    public void ayDurumuAyarla(AyDurumu durum, long olaySaati) {
+        boolean var = durum != AyDurumu.YOK;
+        long yeniSaat = durum == AyDurumu.VAR ? AyDurumu.OLAY_YOK : Math.max(0L, olaySaati);
+        if (ayVar != var || ayOlaySaati != yeniSaat) {
+            ayVar = var;
+            ayOlaySaati = yeniSaat;
             degisti(DonemAlani.AY, true);
         }
     }
@@ -379,6 +405,7 @@ public final class DunyaDonemi extends SavedData {
      */
     public void sifirla() {
         ayVar = true;
+        ayOlaySaati = AyDurumu.OLAY_YOK;
         gunesEvresi = GunesEvresi.NORMAL;
         evreIlerlemesi = 0f;
         evreBaslangicSaati = saat;
@@ -443,13 +470,13 @@ public final class DunyaDonemi extends SavedData {
         return String.format(Locale.ROOT,
                 "saat=%d gunOfseti=%d uyku=%d ay=%s gunes=%s ilerleme=%.3f donma=%.2f cozulme=%s buharlasma=%.2f "
                         + "deniz=%.2f/%.2f kalici=%s carpan=%d gecmis=%d genelBekleme=%d sonSeviye=%d aktifAfet=%s "
-                        + "durdurulanSurec=%d",
+                        + "durdurulanSurec=%d ayOlay=%d",
                 saat, gunOfseti, uykuBirikimi, ayVar, gunesEvresi.kimlik(), evreIlerlemesi, donmaIlerlemesi, cozulmeDonemi,
                 buharlasmaDerinligi, deniz.mevcutArtis(), deniz.hedefArtis(), deniz.kalici(), carpanlar.liste().size(),
                 sonAfetler.size(), bekleme.genelKalan(saat), sonSeviye,
                 canliAfet != null ? canliAfet.tur().kimlik() + "/" + canliAfet.asama().kimlik()
                         : bekleyenAfet != null ? bekleyenAfet.getString("tur") + "/bekliyor" : "yok",
-                surecDurdurmalari.size());
+                surecDurdurmalari.size(), ayOlaySaati);
     }
 
     // ---------------------------------------------------------------- NBT
@@ -458,6 +485,7 @@ public final class DunyaDonemi extends SavedData {
     public CompoundTag save(CompoundTag etiket) {
         etiket.putInt("surum", BICIM_SURUMU);
         etiket.putBoolean("ayVar", ayVar);
+        etiket.putLong("ayOlay", ayOlaySaati);
         etiket.putString("gunesEvresi", gunesEvresi.kimlik());
         etiket.putFloat("evreIlerlemesi", evreIlerlemesi);
         etiket.putLong("evreBaslangic", evreBaslangicSaati);
@@ -521,6 +549,8 @@ public final class DunyaDonemi extends SavedData {
     public static DunyaDonemi yukle(CompoundTag etiket) {
         DunyaDonemi donem = new DunyaDonemi();
         donem.ayVar = !etiket.contains("ayVar") || etiket.getBoolean("ayVar");
+        donem.ayOlaySaati = etiket.contains("ayOlay") ? Math.max(AyDurumu.OLAY_YOK, etiket.getLong("ayOlay"))
+                : AyDurumu.OLAY_YOK;
         donem.gunesEvresi = GunesEvresi.kimlikIle(etiket.getString("gunesEvresi"));
         donem.evreIlerlemesi = sinirla(etiket.getFloat("evreIlerlemesi"), 0f, 1f);
         donem.evreBaslangicSaati = etiket.getLong("evreBaslangic");

@@ -1,6 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.client.gokyuzu;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import io.github.kadirberkpolat1.dogalafetler.client.ay_carpmasi.IstemciAy;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.GokyuzuEgrileri;
 import javax.annotation.Nullable;
@@ -38,13 +39,14 @@ public final class SarmalayanGokyuzuEfekti extends DimensionSpecialEffects {
 
     /**
      * Normal güneş + ay yok iken tam gündüzde (yıldızlar görünmezken, ay ufkun en az ~22° altında) gök vanilla ile
-     * aynıdır; çizim iç nesneye bırakılır ki başka modun ya da şader paketinin gündüz göğü korunsun.
+     * aynıdır; çizim iç nesneye bırakılır ki başka modun ya da şader paketinin gündüz göğü korunsun. Ay çarpmasının
+     * yaklaşması ve çarpma izleri (mantar sütunu, enkaz halkası) gündüz de bizim çizimimizdir.
      */
     private static boolean bizCiziyoruz(@Nullable ClientLevel level, float zaman, IstemciGokyuzu.Gorunum d) {
         if (IstemciGokyuzu.kanca != IstemciGokyuzu.Kanca.SARMALAYICI || !overworldMu(level) || d.vanillaMi()) {
             return false;
         }
-        return !(d.evre() == GunesEvresi.NORMAL && (d.onceki() == null || d.gecis() >= 1f)
+        return IstemciAy.gokyuzuEtkin() || !(d.evre() == GunesEvresi.NORMAL && (d.onceki() == null || d.gecis() >= 1f)
                 && GokyuzuRenkleri.geceligi(zaman) <= 0f);
     }
 
