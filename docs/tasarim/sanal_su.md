@@ -99,7 +99,7 @@ Kaynaklar:
 
 ## Faz 2 güncellemesi, 2026-11-06
 
-Kaynak: `.vibe/kararlar/sanal-su.md` (§A sözleşme, SU-11…SU-30), rapor `.vibe/rapor/sanal-su.md`.
+Kaynak: `.vibe/kararlar/sanal-su.md` (§A sözleşme, SU-11…SU-37), rapor `.vibe/rapor/sanal-su.md`.
 
 - **Deniz alanı su kütlesi başına (SU-11):** spike'ın "kaynak + artış" BFS'i yerine her durgun su kütlesinden öncelikli
   taşkın; sütun, kütleden ona giden en alçak yolun en yüksek zemini (eşik) yükselen seviyenin altındaysa dolar. Deniz
@@ -120,12 +120,17 @@ Kaynak: `.vibe/kararlar/sanal-su.md` (§A sözleşme, SU-11…SU-30), rapor `.vi
   dalgacık, tavan ışığı parlaması ve duvar kenarında ıslak şerit.
 - **Kalıcılık (SU-24):** dalga, çekilme ve mağara cebi parametreleri dönemin `ekVeri("su")`'sunda; yeniden başlatmada
   mağara suyu kaldığı yerden sürer (hücreler dünyadan yeniden hesaplanır).
-- **Vitrin karesi (koşu 12, K0-21 rev. 2 protokolüyle; `/dogalafet su vitrin` sahnesi, SU-29):**
-  `KÖK/.vibe/kanit/sanal-su/sanal-su-deniz-vitrin.png` (akşam, iskelenin ucundan kıyı köyüne, deniz +4; öncesi
-  `sanal-su-deniz-once.png`, su altı `sanal-su-sualti.png`). Dalga: `sanal-su-dalga-once.png` → `sanal-su-dalga.png`
-  (16 blok, evlerin arkasından alçak açı); mağara: `sanal-su-magara-once.png` → `sanal-su-magara.png` →
-  `sanal-su-magara-kuruyor.png`, su altı `sanal-su-magara-sualti.png`. Gün batımı karesi yalnız tur 1'de
+- **Görünüm, tur 3 (SU-35, SU-37):** mağara suyunda şader'siz tavan yansıması (dalgacıkla titreyen sıcak ışıltaşı/fener
+  parlaması) ve belirgin dalgacık; su altı ışık demetleri yumuşak kenarlı üç bant, mağarada sıcak renk ve amber sis; uzak LOD'da
+  dalga gövdesinin dikey cephesi (uzaktan da duvar okunur).
+- **Vitrin kareleri (tur 3, K0-21 rev. 2 protokolüyle):** koşu 14 → `KOK/.vibe/kanit/sanal-su/sanal-su-deniz-vitrin.png`
+  (akşam, iskelenin ucundan kıyı köyü, deniz +4; öncesi `sanal-su-deniz-once.png`), su altı `sanal-su-sualti.png`, mağara
+  `sanal-su-magara-once.png` → `sanal-su-magara.png` → `sanal-su-magara-kuruyor.png` (seviye ~1,8 blok inmiş), su altı
+  `sanal-su-magara-sualti.png`; koşu 17 (yalnız dalga bölümü) → `sanal-su-dalga-once.png` → `sanal-su-dalga.png` (16 blok,
+  iskele ekseninde ev sırasının arasından alçaktan, duvar kadraj ortasında). Gün batımı karesi yalnız tur 1'de
   (`kosu5/sanal-su-deniz-gunbatimi.png`, eski görünüm).
+- **Ölçülen FPS, tur 3 (koşu 14, afet / afetsiz):** deniz +4 256,1 / 260,6 (%98), dalga 281,3 / 273,0 (%103), mağara 387,2 /
+  421,7 (%92); su CPU'su kare başına 0,13–0,25 ms, yakın halka kurulumu tick başına en çok 2,0–2,1 ms; sunucu TPS 20.
 - **Ölçülen FPS (ortanca kare, aynı kamera, afet / afetsiz):** koşu 12: dalga 212,9 / 221,1 (%96), mağara 120,0 / 231,0
   (%52), deniz çifti geçersiz (afetsiz ölçüm dünya ısınırken: 95 / 225). Su CPU'su kare başına 0,26–0,48 ms; aynı makinede
   başka işçilerin Gradle/istemci süreçleri açıktı, mutlak FPS koşudan koşuya 30–380 arasında oynadı. Sunucu TPS 20
