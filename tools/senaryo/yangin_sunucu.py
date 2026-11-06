@@ -34,7 +34,8 @@ def kosu1(sunucu):
     sunucu.komut("forceload add -16 -16 16 16", r"to be force loaded")
     sunucu.komut("fill -6 199 -6 6 199 6 minecraft:oak_planks", r"Successfully filled 169 block")
     sunucu.komut("fill -6 200 -6 6 200 6 minecraft:oak_leaves[persistent=true]", r"Successfully filled 169 block")
-    sunucu.komut("dogalafet yangin bilgi", rf"Burning cells: 0/{TAVAN}, budget 64/64 per tick", "bilgi (yangın yok)")
+    # Yeni dünyada chunk üretimi TPS'i düşürebilir: bütçe 64, 32 ya da 16 olabilir; burada yalnız aktif 0 aranır.
+    sunucu.komut("dogalafet yangin bilgi", rf"Burning cells: 0/{TAVAN}, budget (64|32|16)/64 per tick", "bilgi (yangın yok)")
     sunucu.komut("execute positioned 0 201 0 run dogalafet yangin tutustur 6", r"Ignited [1-9][0-9]* fire cells")
     sunucu.komut("dogalafet yangin bilgi", rf"Burning cells: [1-9][0-9]*/{TAVAN}", "bilgi (aktif > 0)")
 
