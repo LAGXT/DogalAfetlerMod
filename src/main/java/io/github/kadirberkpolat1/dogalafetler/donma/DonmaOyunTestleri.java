@@ -568,9 +568,10 @@ public final class DonmaOyunTestleri {
 
     /**
      * K-D26 (D5): görüş mesafesinde olup simülasyon mesafesi dışında kalan chunk da donar. Oyuncunun görüş bileti gibi
-     * yalnız yükleme bileti (seviye 31, ticking izleyicisine girmez) 40 chunk ötedeki bir chunk'ı ve komşularını tam yükler;
-     * chunk {@code isPositionTicking} değilken kuyruk onu G=60'a (konulan çimen kırağılanır), sonra 0'a (çimen geri gelir)
-     * yetiştirir.
+     * yalnız yükleme bileti (seviye 31, ticking izleyicisine girmez) uzak bir chunk'ı ve komşularını tam yükler; chunk
+     * {@code isPositionTicking} değilken kuyruk onu G=60'a (konulan çimen kırağılanır), sonra 0'a (çimen geri gelir)
+     * yetiştirir. Hedef z = −40 chunk: GameTest ızgarası x, z ≥ 0'a yerleşir ve sahneleri zorla yüklü, sahte oyuncuları
+     * çevrelerinde 10 chunk ticking'dir; spawn da kuzeyde değil. Köke göre doğu, test sayısı arttıkça ızgaranın içine düşer.
      */
     @GameTest(template = "bos", batch = "donma_zamanlayici_7", timeoutTicks = 3000)
     public static void simulasyonDisiGorunenChunkDonar(GameTestHelper y) {
@@ -580,7 +581,7 @@ public final class DonmaOyunTestleri {
         d.cozulmeDonemiAyarla(false);
         d.buharlasmaDerinligiAyarla(0f);
         BlockPos koken = y.absolutePos(BlockPos.ZERO);
-        ChunkPos hedef = new ChunkPos((koken.getX() >> 4) + 40, koken.getZ() >> 4);
+        ChunkPos hedef = new ChunkPos(koken.getX() >> 4, -40);
         long anahtar = hedef.toLong();
         BlockPos cimen = new BlockPos(hedef.getMinBlockX() + 8, 200, hedef.getMinBlockZ() + 8);
         LongOpenHashSet kapsam = new LongOpenHashSet();
@@ -598,7 +599,8 @@ public final class DonmaOyunTestleri {
             }
             ChunkDonmaVerisi v = ChunkDonmaVerisi.al(chunk);
             if (asama[0] == 0 && DonmaZamanlayici.islenebilir(level, chunk, hedef.x, hedef.z)) {
-                y.assertTrue(!kaynak.isPositionTicking(anahtar), "hedef chunk simülasyon dışında olmalı (sahne geçersiz)");
+                y.assertTrue(!kaynak.isPositionTicking(anahtar), "hedef chunk " + hedef
+                        + " simülasyon dışında olmalı (sahne geçersiz)");
                 level.setBlock(cimen, Blocks.GRASS_BLOCK.defaultBlockState(), 2);
                 DonmaZamanlayici.chunkVerisiniSifirla(chunk, DonmaZamanlayici.dongu(d), 0, false);
                 d.donmaIlerlemesiAyarla(60f);

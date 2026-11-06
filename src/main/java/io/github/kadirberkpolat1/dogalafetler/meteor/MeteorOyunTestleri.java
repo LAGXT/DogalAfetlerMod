@@ -489,15 +489,16 @@ public final class MeteorOyunTestleri {
         int sinirX = merkez.getX() + 3;
         BlockPos magma = y.absolutePos(new BlockPos(1, 6, 1));
         y.setBlock(new BlockPos(1, 6, 1), Blocks.MAGMA_BLOCK);
-        // Aşama 0: x ≥ sınır ve magma yüklü değil; aşama 1: bitiş sırasında merkez chunk'ı yüklü değil.
+        // Aşama 0: x ≥ sınır ve magma yüklü değil; aşama 1: bitiş sırasında merkez chunk'ı yüklü değil, magma hücresi
+        // hariç: sahne kökü batch sayısıyla chunk sınırına göre kayar (K-C24), magma merkezle aynı chunk'a düşebilir.
         int[] asama = {0};
         KraterIsi[] isRef = {null};
         BiPredicate<ServerLevel, BlockPos> onceki = MeteorYoneticisi.yukluKaynagiAyarla((l, p) -> {
             if (asama[0] == 0 && (p.getX() >= sinirX || p.equals(magma))) {
                 return false;
             }
-            if (asama[0] == 1 && isRef[0] != null && isRef[0].bitiste() && p.getX() >> 4 == merkez.getX() >> 4
-                    && p.getZ() >> 4 == merkez.getZ() >> 4) {
+            if (asama[0] == 1 && isRef[0] != null && isRef[0].bitiste() && !p.equals(magma)
+                    && p.getX() >> 4 == merkez.getX() >> 4 && p.getZ() >> 4 == merkez.getZ() >> 4) {
                 return false;
             }
             return l.isLoaded(p);

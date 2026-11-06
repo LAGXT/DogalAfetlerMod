@@ -3,6 +3,8 @@ package io.github.kadirberkpolat1.dogalafetler.yiyecek;
 import com.mojang.authlib.GameProfile;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.core.CekirdekOyunTestleri;
+import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
+import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.SicaklikAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.SicaklikKancalari;
@@ -88,6 +90,28 @@ public final class YiyecekOyunTestleri {
         GameRules.BooleanValue kural = server.getGameRules().getRule(Kurallar.SICAKLIK_SISTEMI);
         kural.set(true, server);
         return kural;
+    }
+
+    /**
+     * Mutlak ortam ölçen test için nötr dönem: donma 0, güneş normal. Dönem globaldir; önceki batch'lerin bıraktığı durum
+     * (ör. balıkçılık testlerinin donma %60'ı) ortamı düşürür. Eski değerleri geri koyan işi döndürür.
+     */
+    private static Runnable notrDonem(MinecraftServer server) {
+        DunyaDonemi d = DunyaDonemi.al(server);
+        float donma = d.donmaIlerlemesi();
+        GunesEvresi evre = d.gunesEvresi();
+        float evreIlerlemesi = d.evreIlerlemesi();
+        d.donmaIlerlemesiAyarla(0f);
+        if (evre != GunesEvresi.NORMAL) {
+            d.gunesEvresiAyarla(GunesEvresi.NORMAL);
+        }
+        return () -> {
+            d.donmaIlerlemesiAyarla(donma);
+            if (evre != GunesEvresi.NORMAL) {
+                d.gunesEvresiAyarla(evre);
+                d.evreIlerlemesiAyarla(evreIlerlemesi);
+            }
+        };
     }
 
     /** Elde {@code adet} kadar yiyecek tutup birini yer; elde kalanı (ya da boş kabı) döndürür. */
@@ -342,6 +366,7 @@ public final class YiyecekOyunTestleri {
     public static void guvecSicaktaAsiriIsinmayaIter(GameTestHelper y) {
         ServerLevel level = y.getLevel();
         kuraliAc(level.getServer());
+        Runnable donemiGeriKoy = notrDonem(level.getServer());
         ServerPlayer kontrol = oyuncu(y, "guvec-kontrol", 0);
         ServerPlayer yiyen = oyuncu(y, "guvec-yiyen", 1);
         try {
@@ -379,6 +404,7 @@ public final class YiyecekOyunTestleri {
             y.succeed();
         } finally {
             cikar(y, List.of(kontrol, yiyen));
+            donemiGeriKoy.run();
         }
     }
 
