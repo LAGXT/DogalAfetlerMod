@@ -210,30 +210,47 @@ public final class SuOtomasyon {
     }
 
     /**
-     * Mağara sahnesi: oyuncunun altında taş bir oda (hava y 10..16), alçak ışıltaşı tavan (su yüzeyinde blok ışığı ~12),
-     * duvarlarda deniz fenerleri, iki sütun ve çakıl zemin; kamera bir köşede, yüzeye eğik bakar.
+     * Mağara sahnesi: oyuncunun altında taş bir oda (hava y 10..16), damlataş tavanda ışıltaşı yamaları, sarkıtlar ve asılı
+     * fenerler, yosunlu duvarlar, bir duvarda deniz fenerleri, iki sütun ve çakıl zemin; kamera bir köşede suya yakın, alçak.
      */
     private static void magara(Minecraft mc, String ne) {
         if ("kur".equals(ne)) {
             ox = mc.player.getBlockX();
             oz = mc.player.getBlockZ();
-            for (String k : List.of("fill %d 8 %d %d 19 %d stone".formatted(ox - 10, oz - 10, ox + 10, oz + 10),
+            List<String> k = new ArrayList<>(List.of("fill %d 8 %d %d 19 %d stone".formatted(ox - 10, oz - 10, ox + 10, oz + 10),
                     "fill %d 10 %d %d 16 %d air".formatted(ox - 8, oz - 8, ox + 8, oz + 8),
-                    "fill %d 17 %d %d 17 %d glowstone".formatted(ox - 8, oz - 8, ox + 8, oz + 8),
-                    "fill %d 13 %d %d 13 %d sea_lantern".formatted(ox - 9, oz - 8, ox - 9, oz + 8),
+                    "fill %d 17 %d %d 17 %d dripstone_block".formatted(ox - 8, oz - 8, ox + 8, oz + 8),
+                    "fill %d 10 %d %d 16 %d mossy_cobblestone".formatted(ox - 9, oz - 9, ox + 9, oz - 9),
+                    "fill %d 10 %d %d 16 %d mossy_cobblestone".formatted(ox - 9, oz - 9, ox - 9, oz + 9),
                     "fill %d 13 %d %d 13 %d sea_lantern".formatted(ox + 9, oz - 8, ox + 9, oz + 8),
-                    "fill %d 10 %d %d 16 %d cobblestone".formatted(ox - 3, oz + 2, ox - 3, oz + 2),
+                    "fill %d 10 %d %d 16 %d deepslate_bricks".formatted(ox - 3, oz + 2, ox - 3, oz + 2),
                     "fill %d 10 %d %d 16 %d mossy_cobblestone".formatted(ox + 3, oz - 1, ox + 3, oz - 1),
-                    "fill %d 10 %d %d 10 %d gravel".formatted(ox - 8, oz - 8, ox + 8, oz - 4),
-                    "time set 6000", "tp @s %d 15.6 %d -45 32".formatted(ox - 7, oz - 7))) {
-                mc.player.connection.sendCommand(k);
+                    "fill %d 10 %d %d 10 %d gravel".formatted(ox - 8, oz - 8, ox + 8, oz - 4)));
+            // Tavanda ışıltaşı yamaları, sarkıtlar ve asılı fenerler: su yüzeyinde sıcak yansıma noktaları (vitrin).
+            int[][] isik = {{-5, -5}, {4, -6}, {-6, 4}, {5, 5}, {0, 0}};
+            for (int[] q : isik) {
+                k.add("fill %d 17 %d %d 17 %d glowstone".formatted(ox + q[0], oz + q[1], ox + q[0] + 1, oz + q[1] + 1));
+            }
+            int[][] sarkit = {{-3, -6}, {2, -3}, {-6, -1}, {6, 1}, {-2, 5}, {3, 6}, {7, -5}, {-7, 6}};
+            for (int[] q : sarkit) {
+                k.add("setblock %d 16 %d pointed_dripstone[vertical_direction=down,thickness=frustum]".formatted(ox + q[0], oz + q[1]));
+                k.add("setblock %d 15 %d pointed_dripstone[vertical_direction=down,thickness=tip]".formatted(ox + q[0], oz + q[1]));
+            }
+            int[][] fener = {{-1, -4}, {4, 2}, {-4, 2}};
+            for (int[] q : fener) {
+                k.add("setblock %d 16 %d lantern[hanging=true]".formatted(ox + q[0], oz + q[1]));
+            }
+            k.add("time set 6000");
+            k.add("tp @s %d 14.8 %d -45 14".formatted(ox - 7, oz - 7));
+            for (String komut : k) {
+                mc.player.connection.sendCommand(komut);
             }
         } else if ("icine".equals(ne)) {
             mc.player.connection.sendCommand("gamemode survival");
             mc.player.connection.sendCommand("tp @s %d.5 10 %d.5 -45 20".formatted(ox, oz));
         } else if ("kamera".equals(ne)) {
             mc.player.connection.sendCommand("gamemode spectator");
-            mc.player.connection.sendCommand("tp @s %d 15.6 %d -45 32".formatted(ox - 7, oz - 7));
+            mc.player.connection.sendCommand("tp @s %d 14.8 %d -45 14".formatted(ox - 7, oz - 7));
         } else {
             mc.player.connection.sendCommand("dogalafet su magara %d 10 %d 900 600".formatted(ox, oz));
         }
