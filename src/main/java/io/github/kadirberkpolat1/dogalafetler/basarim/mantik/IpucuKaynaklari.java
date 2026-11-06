@@ -33,8 +33,11 @@ public final class IpucuKaynaklari {
         return (eski & ipucu.bit()) == 0;
     }
 
-    public synchronized void kaldir(AfetTuru tur, Ipucu ipucu) {
-        yayincilar.computeIfPresent(tur, (k, bitler) -> bitler & ~ipucu.bit());
+    /** Kaydı kaldırır; kayıtlıydıysa true. */
+    public synchronized boolean kaldir(AfetTuru tur, Ipucu ipucu) {
+        int eski = yayincilar.getOrDefault(tur, 0);
+        yayincilar.put(tur, eski & ~ipucu.bit());
+        return (eski & ipucu.bit()) != 0;
     }
 
     public synchronized boolean yayinliyor(AfetTuru tur, Ipucu ipucu) {
