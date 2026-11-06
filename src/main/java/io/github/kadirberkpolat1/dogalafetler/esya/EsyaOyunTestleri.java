@@ -25,6 +25,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Holder;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.FriendlyByteBuf;
@@ -33,10 +35,15 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.inventory.CraftingMenu;
+import net.minecraft.world.inventory.TransientCraftingContainer;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.crafting.CraftingRecipe;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.Recipe;
+import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
 import net.minecraftforge.network.ICustomPacket;
@@ -245,7 +252,10 @@ public final class EsyaOyunTestleri {
         });
     }
 
-    /** Sismograf hotbar'da: deprem ON_UYARI normal penceresinde algılanır (yüzde, yaklaşık merkez; seviye yok). */
+    /**
+     * Sismograf hotbar'da: deprem ON_UYARI normal penceresinde algılanır (yüzde, yaklaşık merkez; seviye yok), SIREN'de öncü
+     * sarsıntı sürer, AKTIF'te ana sarsıntı (istemci "Ana sarsıntı" yazar).
+     */
     @GameTest(template = "bos", batch = "esya_sismograf_deprem", timeoutTicks = 100)
     public static void sismografEnvanterdeDepremOnUyarisindaAlgilar(GameTestHelper yardimci) {
         Sahne sahne = Sahne.kur(yardimci, AfetTuru.DEPREM);
@@ -266,6 +276,16 @@ public final class EsyaOyunTestleri {
                     && p.yuzde() <= 100 && p.seviye() == 0 && p.oncu() > 0 && sapma <= SismografAyarlari.merkezHatasi(false) + 2,
                     "sismograf paketi: " + p + " sapma " + sapma);
             yardimci.assertTrue(radarlar(gelenler(tasiyan)).isEmpty(), "radarsız oyuncuya radar paketi gitti");
+            yardimci.assertTrue(sahne.yonetici().asamaIleri() && afet.asama() == AfetAsamasi.SIREN, "SIREN'e geçmedi");
+            guncelle(tasiyan);
+            SismografPaketi siren = son(yardimci, sismograflar(gelenler(tasiyan)), "SIREN");
+            yardimci.assertTrue(siren.algilandi() && siren.asama() == AfetAsamasi.SIREN && siren.oncu() > 0
+                    && siren.afetNo() == p.afetNo(), "SIREN'de öncü sarsıntı paketi: " + siren);
+            yardimci.assertTrue(sahne.yonetici().asamaIleri() && afet.asama() == AfetAsamasi.AKTIF, "AKTIF'e geçmedi");
+            guncelle(tasiyan);
+            SismografPaketi aktif = son(yardimci, sismograflar(gelenler(tasiyan)), "AKTIF");
+            yardimci.assertTrue(aktif.algilandi() && aktif.asama() == AfetAsamasi.AKTIF && aktif.seviye() == 0,
+                    "AKTIF'te ana sarsıntı paketi: " + aktif);
         });
     }
 
@@ -338,28 +358,104 @@ public final class EsyaOyunTestleri {
         });
     }
 
-    /** Tarif kimlikleri sabit (başarım işçisi); şekilli tarifler madde 13a-b'deki desenle birebir. */
+    /**
+     * Gelişmiş radarın son 5 afeti pakette: iki test afeti (kasırga S2, sinkhole S4) bitince en yenisi başta, yaşı 0 dk; aynı
+     * anda normal radarlı oyuncunun paketinde geçmiş yok (madde 13a). Geçmiş dünya kaydıdır; testten önceki kayıtlar
+     * sayıya katılır (en çok 5).
+     */
+    @GameTest(template = "bos", batch = "esya_radar_gecmis", timeoutTicks = 100)
+    public static void gelismisRadarSonAfetleriPaketteGosterir(GameTestHelper yardimci) {
+        Sahne sahne = Sahne.kur(yardimci, AfetTuru.KASIRGA);
+        sahne.koru(() -> {
+            try (AfetKaydi.GeciciKayit sinkhole = AfetKaydi.geciciKaydet(AfetTuru.SINKHOLE,
+                    () -> new OyunTestiAfeti(AfetTuru.SINKHOLE, 16, 100))) {
+                ServerPlayer gelismis = sahne.oyuncu(0, 0);
+                ServerPlayer normal = sahne.oyuncu(4, 0);
+                radarVer(gelismis, true);
+                radarVer(normal, false);
+                int onceki = sahne.yonetici().donem().sonAfetler().size();
+                for (Object[] afet : new Object[][] {{AfetTuru.KASIRGA, 2}, {AfetTuru.SINKHOLE, 4}}) {
+                    yardimci.assertTrue(sahne.yonetici().elleBaslat((AfetTuru) afet[0], (Integer) afet[1], gelismis,
+                            yardimci.getLevel(), sahne.merkez()) == AfetYoneticisi.BaslatmaSonucu.BASLADI,
+                            "başlamadı: " + afet[0]);
+                    yardimci.assertTrue(sahne.yonetici().durdur(), "durmadı: " + afet[0]);
+                }
+                guncelle(gelismis, normal);
+                RadarPaketi g = son(yardimci, radarlar(gelenler(gelismis)), "gelişmiş radar");
+                List<RadarPaketi.Gecmis> gecmis = g.gecmis();
+                yardimci.assertTrue(g.gelismis() && g.gorunum() == RadarGorunumu.GIZLI
+                        && gecmis.size() == Math.min(RadarPaketi.GECMIS_SINIRI, onceki + 2), "geçmiş boyu: " + gecmis);
+                yardimci.assertTrue(gecmis.get(0).equals(new RadarPaketi.Gecmis(AfetTuru.SINKHOLE, 4, 0))
+                        && gecmis.get(1).equals(new RadarPaketi.Gecmis(AfetTuru.KASIRGA, 2, 0)), "geçmiş sırası: " + gecmis);
+                RadarPaketi n = son(yardimci, radarlar(gelenler(normal)), "normal radar");
+                yardimci.assertTrue(!n.gelismis() && n.gecmis().isEmpty(), "normal radara geçmiş gitti: " + n);
+            }
+        });
+    }
+
+    /**
+     * Tarif kimlikleri sabit (başarım işçisi); şekilli tarifler madde 13a-b'deki desenle dokuz hücrede birebir. Gelişmiş
+     * tarifler {@code forge:not(forge:tag_empty)} koşuluyla yüklenir (R-17): {@code #dogalafetler:kozmik_cekirdek} boşken yoktur
+     * ve "Empty Tag" bariyeri eşleşmez; doluysa (entegrasyon) Kozmik Çekirdekle gerçekten craft edilir.
+     */
     @GameTest(template = "bos")
     public static void tariflerYukluVeDesenlerSartnameyleAyni(GameTestHelper yardimci) {
         MinecraftServer server = yardimci.getLevel().getServer();
-        Ingredient[] radar = desen(yardimci, server, EsyaKayitlari.TARIF_HAVA_RADARI, EsyaKayitlari.HAVA_RADARI.get().asItem());
-        yardimci.assertTrue(radar[0].test(new ItemStack(Items.IRON_INGOT)) && radar[1].test(new ItemStack(Items.GLASS))
-                && radar[3].test(new ItemStack(Items.REDSTONE)) && radar[4].test(new ItemStack(Items.COMPASS))
-                && radar[7].test(new ItemStack(Items.COPPER_INGOT)) && radar[8].test(new ItemStack(Items.IRON_INGOT)),
-                "Hava Radarı deseni");
-        Ingredient[] sismograf = desen(yardimci, server, EsyaKayitlari.TARIF_SISMOGRAF, EsyaKayitlari.SISMOGRAF.get().asItem());
-        yardimci.assertTrue(sismograf[1].test(new ItemStack(Items.PAPER)) && sismograf[3].test(new ItemStack(Items.STICK))
-                && sismograf[4].test(new ItemStack(Items.REDSTONE)) && sismograf[6].test(new ItemStack(Items.STONE))
-                && sismograf[7].test(new ItemStack(Items.COPPER_INGOT)), "Sismograf deseni");
-        for (ResourceLocation kimlik : List.of(EsyaKayitlari.TARIF_GELISMIS_HAVA_RADARI, EsyaKayitlari.TARIF_HASSAS_SISMOGRAF)) {
-            Optional<? extends Recipe<?>> tarif = server.getRecipeManager().byKey(kimlik);
-            yardimci.assertTrue(tarif.isPresent() && tarif.get().getIngredients().size() == 2, "şekilsiz tarif: " + kimlik);
+        hucreler(yardimci, desen(yardimci, server, EsyaKayitlari.TARIF_HAVA_RADARI, EsyaKayitlari.HAVA_RADARI.get()),
+                "Hava Radarı", Items.IRON_INGOT, Items.GLASS, Items.IRON_INGOT, Items.REDSTONE, Items.COMPASS, Items.REDSTONE,
+                Items.IRON_INGOT, Items.COPPER_INGOT, Items.IRON_INGOT);
+        hucreler(yardimci, desen(yardimci, server, EsyaKayitlari.TARIF_SISMOGRAF, EsyaKayitlari.SISMOGRAF.get()), "Sismograf",
+                Items.IRON_INGOT, Items.PAPER, Items.IRON_INGOT, Items.STICK, Items.REDSTONE, Items.STICK, Items.STONE,
+                Items.COPPER_INGOT, Items.STONE);
+        Optional<Item> cekirdek = BuiltInRegistries.ITEM.getTag(EsyaKayitlari.KOZMIK_CEKIRDEK)
+                .flatMap(etiket -> etiket.stream().findFirst()).map(Holder::value);
+        ServerPlayer oyuncu = CekirdekOyunTestleri.sahteOyuncu(yardimci, 0.5, 2, 0.5);
+        try {
+            gelismisTarif(yardimci, oyuncu, EsyaKayitlari.TARIF_GELISMIS_HAVA_RADARI, EsyaKayitlari.HAVA_RADARI.get(),
+                    EsyaKayitlari.GELISMIS_HAVA_RADARI.get(), cekirdek);
+            gelismisTarif(yardimci, oyuncu, EsyaKayitlari.TARIF_HASSAS_SISMOGRAF, EsyaKayitlari.SISMOGRAF.get(),
+                    EsyaKayitlari.HASSAS_SISMOGRAF.get(), cekirdek);
+        } finally {
+            server.getPlayerList().remove(oyuncu);
         }
+        DogalAfetler.LOGGER.info("Eşya GameTest: gelişmiş tarifler {}", cekirdek.isPresent()
+                ? "yüklü, " + cekirdek.get() + " ile craft edildi" : "yok (koşullu, #kozmik_cekirdek boş)");
         yardimci.succeed();
     }
 
-    private static Ingredient[] desen(GameTestHelper yardimci, MinecraftServer server, ResourceLocation kimlik,
-            net.minecraft.world.item.Item sonuc) {
+    private static void hucreler(GameTestHelper yardimci, Ingredient[] desen, String ad, Item... beklenen) {
+        for (int i = 0; i < 9; i++) {
+            yardimci.assertTrue(desen[i].test(new ItemStack(beklenen[i])), ad + " hücre " + i + ": " + beklenen[i]);
+            yardimci.assertTrue(!desen[i].test(new ItemStack(Items.DIRT)), ad + " hücre " + i + " toprak kabul ediyor");
+        }
+    }
+
+    private static void gelismisTarif(GameTestHelper yardimci, ServerPlayer oyuncu, ResourceLocation kimlik, Item temel,
+            Item sonuc, Optional<Item> cekirdek) {
+        ServerLevel level = yardimci.getLevel();
+        Optional<? extends Recipe<?>> tarif = level.getRecipeManager().byKey(kimlik);
+        if (cekirdek.isEmpty()) {
+            yardimci.assertTrue(tarif.isEmpty(), "etiket boşken yüklenmemeli: " + kimlik);
+            yardimci.assertTrue(level.getRecipeManager().getRecipeFor(RecipeType.CRAFTING, tezgah(oyuncu, temel,
+                    Items.BARRIER), level).isEmpty(), "bariyerle eşleşti: " + kimlik);
+            return;
+        }
+        yardimci.assertTrue(tarif.isPresent() && tarif.get().getIngredients().size() == 2, "şekilsiz tarif: " + kimlik);
+        TransientCraftingContainer tezgah = tezgah(oyuncu, temel, cekirdek.get());
+        Optional<CraftingRecipe> eslesen = level.getRecipeManager().getRecipeFor(RecipeType.CRAFTING, tezgah, level);
+        yardimci.assertTrue(eslesen.isPresent() && eslesen.get().assemble(tezgah, level.registryAccess()).is(sonuc),
+                "Kozmik Çekirdekle craft edilmedi: " + kimlik);
+    }
+
+    private static TransientCraftingContainer tezgah(ServerPlayer oyuncu, Item... girdi) {
+        TransientCraftingContainer tezgah = new TransientCraftingContainer(new CraftingMenu(0, oyuncu.getInventory()), 3, 3);
+        for (int i = 0; i < girdi.length; i++) {
+            tezgah.setItem(i, new ItemStack(girdi[i]));
+        }
+        return tezgah;
+    }
+
+    private static Ingredient[] desen(GameTestHelper yardimci, MinecraftServer server, ResourceLocation kimlik, Item sonuc) {
         Optional<? extends Recipe<?>> tarif = server.getRecipeManager().byKey(kimlik);
         yardimci.assertTrue(tarif.isPresent(), "tarif yok: " + kimlik);
         yardimci.assertTrue(tarif.get().getResultItem(server.registryAccess()).is(sonuc), "tarif sonucu: " + kimlik);

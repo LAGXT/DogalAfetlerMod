@@ -9,7 +9,6 @@ public final class SismografAyarlari {
 
     private final ForgeConfigSpec.IntValue menzil;
     private final ForgeConfigSpec.IntValue hassasMenzil;
-    private final ForgeConfigSpec.DoubleValue hassasErkenOran;
     private final ForgeConfigSpec.IntValue merkezHatasi;
     private final ForgeConfigSpec.IntValue hassasMerkezHatasi;
     private final ForgeConfigSpec.IntValue titremeSiddeti;
@@ -20,9 +19,6 @@ public final class SismografAyarlari {
         menzil = k.comment("Sismografın algılama menzili (blok; afet merkezine yatay mesafe).").defineInRange("menzil", 300, 16,
                 4096);
         hassasMenzil = k.comment("Hassas Sismografın algılama menzili (blok).").defineInRange("hassasMenzil", 800, 16, 8192);
-        hassasErkenOran = k.comment("Hassas Sismograf ON_UYARI'nın erken bölümünün (cekirdek.onUyari.erkenBildirimTick) ne"
-                + " kadarını görsün: 1 = başından, 0 = normal sismografla aynı anda.").defineInRange("hassasErkenOran", 1.0, 0.0,
-                1.0);
         merkezHatasi = k.comment("Sismografın gösterdiği merkezin gerçek merkezden en büyük sapması (blok).")
                 .defineInRange("merkezHatasi", 40, 0, 512);
         hassasMerkezHatasi = k.comment("Hassas Sismografın merkez sapması (blok).").defineInRange("hassasMerkezHatasi", 6, 0,
@@ -40,10 +36,6 @@ public final class SismografAyarlari {
 
     public static int menzil(boolean hassas) {
         return hassas ? bolum.get().hassasMenzil.get() : bolum.get().menzil.get();
-    }
-
-    public static double hassasErkenOran() {
-        return bolum.get().hassasErkenOran.get();
     }
 
     public static int merkezHatasi(boolean hassas) {

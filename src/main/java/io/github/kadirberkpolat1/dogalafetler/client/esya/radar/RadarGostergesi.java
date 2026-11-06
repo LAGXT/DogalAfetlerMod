@@ -21,27 +21,34 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RegisterGuiOverlaysEvent;
+import net.minecraftforge.client.extensions.common.IClientMobEffectExtensions;
 import net.minecraftforge.client.gui.overlay.ForgeGui;
 import net.minecraftforge.client.gui.overlay.VanillaGuiOverlay;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 /**
- * Hava Radarı göstergesi (madde 13a; N6'nın istisnası: yalnız radar elde tutulurken). Küçük bir CRT paneli: solda dönen
- * taramalı radar kapı (afet merkezi bakış yönüne göre bir nokta olarak), sağda afetin adı, yön oku ve mesafe, varış ya da
- * kalan süre. Güneş patlaması ve ay çarpması sirenden sonra mor bir "gökyüzü anomalisi" ve geri sayım olarak görünür
- * (N7). Gelişmiş radar mor-mavi çerçevelidir ve altına şiddet seviyesi, hareket yönü/hızı ve son 5 afeti ekler. Yer
- * CLIENT config'tedir; alt köşelerde hotbar, kalpler, sıcaklık barı ve sismograf action bar'ıyla çakışmaz
- * ({@link GostergeYerlesimi}; yükseklikler Forge'un {@code leftHeight/rightHeight}'ından, katman bunlar dolduktan sonra çizilir).
+ * Hava Radarı göstergesi (madde 13a; N6'nın istisnası: yalnız radar elde tutulurken). Küçük bir CRT paneli: solda saniyede
+ * bir tur atan taramalı radar kapı (afet merkezi bakış yönüne göre bir nokta olarak), sağda afetin adı, yön oku ve mesafe,
+ * varış ya da kalan süre. Güneş patlaması ve ay çarpması sirenden sonra mor bir "gökyüzü anomalisi" ve geri sayım olarak
+ * görünür (N7). Gelişmiş radar mor-mavi çerçevelidir ve altına kısa satırlarla şiddet seviyesi + hareket oku/hız ve son 5
+ * afeti ("Kasırga S2 3dk") ekler; yükseklik {@link GostergeYerlesimi#panelYuksekligi} ile sınırlıdır (R-18). Bütün panel tek
+ * {@code drawManaged} toplu çizimidir (R-19). Yer CLIENT config'tedir; alt köşelerde hotbar, kalpler, sıcaklık barı ve
+ * sismograf action bar'ıyla, sağ üstte efekt ikonlarıyla çakışmaz ({@link GostergeYerlesimi}; yükseklikler Forge'un
+ * {@code leftHeight/rightHeight}'ından, katman bunlar dolduktan sonra çizilir).
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
 public final class RadarGostergesi {
-    private static final int R = 16;
-    private static final int KAP = 2 * R + 1;
-    private static final int IC = 4;
+    private static final int R = GostergeYerlesimi.KAP_YARICAP;
+    private static final int KAP = GostergeYerlesimi.KAP;
+    private static final int IC = GostergeYerlesimi.IC;
     private static final int SATIR = 10;
+    private static final int ALT_SATIR = GostergeYerlesimi.ALT_SATIR;
+    /** Tarama açısı (derece/tick): 20 tick'te bir tur. */
+    private static final double TARAMA_HIZI = 18.0;
 
     private static final int ZEMIN = 0xD80A140D;
     private static final int KAP_ZEMIN = 0xFF04120A;
@@ -49,10 +56,12 @@ public final class RadarGostergesi {
     private static final int TARAMA = 0xFF63FF86;
     private static final int YAZI = 0xFFC6FFD2;
     private static final int SOLUK = 0xFF7FAF8A;
+    private static final int SONUK = 0xFF5E8A69;
     private static final int CERCEVE = 0xFF2F7A45;
     private static final int CERCEVE_GELISMIS = 0xFF7A63E0;
     private static final int VURGU_GELISMIS = 0xFF4FA3FF;
     private static final int ANOMALI = 0xFFD7A6FF;
+    private static final int ANOMALI_SOLUK = 0xFFB79BD6;
     private static final int[] SEVIYE_RENGI = {0xFFB0B0B0, 0xFF9BE15D, 0xFFF2D04B, 0xFFF29B38, 0xFFF25C38, 0xFFE8303A};
 
     /** Son çizilen panel (GUI pikseli) ve ekran boyutu: görsel kanıt otomasyonu çakışma denetimini log'a yazar. */
@@ -63,6 +72,31 @@ public final class RadarGostergesi {
     static int sonEkranG;
     static int sonEkranY;
     static GostergeYerlesimi.Alt sonAlt = GostergeYerlesimi.VARSAYILAN;
+    /** Log'a yazılan son panel boyutu (yükseklik ya da ekran değişince bir satır). */
+    private static long sonLoglanan = -1;
+
+    /** Bir metin satırı; {@code okAcisi} NaN değilse metnin solunda o açıyla dönmüş ok çizilir. */
+    private record Satir(Component metin, int renk, double okAcisi, int okRengi) {
+        static Satir duz(Component metin, int renk) {
+            return new Satir(metin, renk, Double.NaN, 0);
+        }
+
+        boolean oklu() {
+            return !Double.isNaN(okAcisi);
+        }
+
+        int genislik(Font font) {
+            return font.width(metin) + (oklu() ? 12 : 0);
+        }
+    }
+
+    /** Gelişmiş alt satırı: önde renkli bir parça (şiddet seviyesi), ardından isteğe bağlı ok ve metin. */
+    private record AltSatir(Component on, int onRenk, double okAcisi, Component metin, int renk) {
+        int genislik(Font font) {
+            int g = on == null ? 0 : font.width(on) + 4;
+            return g + (Double.isNaN(okAcisi) ? 0 : 12) + (metin == null ? 0 : font.width(metin));
+        }
+    }
 
     private RadarGostergesi() {
     }
@@ -83,79 +117,102 @@ public final class RadarGostergesi {
         }
         Font font = mc.font;
         float zaman = IstemciRadar.tick() + pt;
-        List<Component> satirlar = new ArrayList<>();
-        List<Integer> renkler = new ArrayList<>();
         double goreli = 0;
         double mesafe = 0;
+        List<Satir> ust = new ArrayList<>();
         if (d.gorunum() == RadarGorunumu.AFET) {
             double mx = d.merkezX() + 0.5;
             double mz = d.merkezZ() + 0.5;
             mesafe = YonMesafe.mesafe(oyuncu.getX(), oyuncu.getZ(), mx, mz);
             goreli = YonMesafe.goreliAci(YonMesafe.pusulaAcisi(oyuncu.getX(), oyuncu.getZ(), mx, mz), oyuncu.getYRot());
-            ekle(satirlar, renkler, Component.translatable(d.tur().ceviriAnahtari()), YAZI);
-            ekle(satirlar, renkler, Component.translatable(RadarCevirileri.ON + "mesafe", Math.round(mesafe)), YAZI);
-            ekle(satirlar, renkler, sure(d), SOLUK);
+            ust.add(Satir.duz(Component.translatable(d.tur().ceviriAnahtari()), YAZI));
+            ust.add(new Satir(Component.translatable(RadarCevirileri.ON + "mesafe", Math.round(mesafe)), YAZI, goreli, YAZI));
+            ust.add(Satir.duz(sure(d), SOLUK));
         } else if (d.gorunum() == RadarGorunumu.ANOMALI) {
-            ekle(satirlar, renkler, Component.translatable(RadarCevirileri.ON + "anomali"), ANOMALI);
-            ekle(satirlar, renkler, Component.translatable(d.tur().ceviriAnahtari()), 0xFFB79BD6);
-            ekle(satirlar, renkler, sure(d), ANOMALI);
+            ust.add(Satir.duz(Component.translatable(RadarCevirileri.ON + "anomali"), ANOMALI));
+            ust.add(Satir.duz(Component.translatable(d.tur().ceviriAnahtari()), ANOMALI_SOLUK));
+            ust.add(Satir.duz(sure(d), ANOMALI));
         } else {
-            ekle(satirlar, renkler, Component.translatable(RadarCevirileri.ON + "sakin"), SOLUK);
-            ekle(satirlar, renkler, Component.translatable(RadarCevirileri.ON + "menzil", d.menzil()), 0xFF5E8A69);
+            ust.add(Satir.duz(Component.translatable(RadarCevirileri.ON + "sakin"), SOLUK));
+            ust.add(Satir.duz(Component.translatable(RadarCevirileri.ON + "menzil", d.menzil()), SONUK));
         }
-        List<Component> alt = new ArrayList<>();
-        List<Integer> altRenk = new ArrayList<>();
-        boolean okluHareket = false;
-        if (d.gelismis()) {
-            if (d.gorunum() == RadarGorunumu.AFET && d.seviye() > 0) {
-                ekle(alt, altRenk, Component.translatable(RadarCevirileri.ON + "seviye",
-                        Component.translatable("seviye.dogalafetler." + d.seviye())), SEVIYE_RENGI[Math.min(5, d.seviye())]);
-            }
-            if (d.gorunum() == RadarGorunumu.AFET) {
-                okluHareket = !Float.isNaN(d.hareketYonu());
-                ekle(alt, altRenk, okluHareket ? Component.translatable(RadarCevirileri.ON + "hiz",
-                        String.format(Locale.ROOT, "%.1f", d.hiz())) : Component.translatable(RadarCevirileri.ON + "durgun"),
-                        SOLUK);
-            }
-            ekle(alt, altRenk, Component.translatable(RadarCevirileri.ON + "gecmis"), VURGU_GELISMIS);
-            if (d.gecmis().isEmpty()) {
-                ekle(alt, altRenk, Component.translatable(RadarCevirileri.ON + "gecmis_bos"), 0xFF5E8A69);
-            }
-            for (RadarPaketi.Gecmis kayit : d.gecmis()) {
-                Component ad = Component.translatable(kayit.tur().ceviriAnahtari());
-                Component satir = kayit.seviye() > 0
-                        ? Component.empty().append(ad).append(" · ").append(Component.translatable("seviye.dogalafetler."
-                                + kayit.seviye())).append(" · ").append(yas(kayit.yasDakika()))
-                        : Component.empty().append(ad).append(" · ").append(yas(kayit.yasDakika()));
-                ekle(alt, altRenk, satir, kayit.seviye() > 0 ? SEVIYE_RENGI[Math.min(5, kayit.seviye())] : 0xFFB79BD6);
-            }
-        }
+        List<AltSatir> alt = d.gelismis() ? altSatirlar(d, oyuncu.getYRot()) : List.of();
 
         int yaziX = IC + KAP + 6;
-        int okPay = d.gorunum() == RadarGorunumu.AFET ? 12 : 0;
-        int enGenis = 0;
-        for (int i = 0; i < satirlar.size(); i++) {
-            enGenis = Math.max(enGenis, font.width(satirlar.get(i)) + (i == 1 ? okPay : 0));
+        int pw = 104;
+        for (Satir satir : ust) {
+            pw = Math.max(pw, yaziX + satir.genislik(font) + IC + 2);
         }
-        int pw = Math.max(yaziX + enGenis + IC + 2, 104);
-        for (int i = 0; i < alt.size(); i++) {
-            pw = Math.max(pw, IC + font.width(alt.get(i)) + (i == (d.seviye() > 0 ? 1 : 0) && okluHareket ? 12 : 0) + IC + 2);
+        for (AltSatir satir : alt) {
+            pw = Math.max(pw, IC + satir.genislik(font) + IC + 2);
         }
-        int ph = IC + KAP + IC + (alt.isEmpty() ? 0 : 3 + alt.size() * SATIR);
+        int ph = GostergeYerlesimi.panelYuksekligi(alt.size());
+        boolean yararli = false;
+        boolean zararli = false;
+        for (MobEffectInstance etki : oyuncu.getActiveEffects()) {
+            if (etki.showIcon() && IClientMobEffectExtensions.of(etki).isVisibleInGui(etki)) {
+                yararli |= etki.getEffect().isBeneficial();
+                zararli |= !etki.getEffect().isBeneficial();
+            }
+        }
         GostergeYerlesimi.Alt altBolge = GostergeYerlesimi.forgeAlt(gui.leftHeight, gui.rightHeight,
                 IstemciSismograf.actionBarGenisligi(font));
         GostergeYerlesimi.Konum k = GostergeYerlesimi.konum(w, h, pw, ph, RadarIstemciAyarlari.kose(),
-                RadarIstemciAyarlari.xOfset(), RadarIstemciAyarlari.yOfset(), altBolge);
-        int x = k.x();
-        int y = k.y();
-        sonX = x;
-        sonY = y;
+                RadarIstemciAyarlari.xOfset(), RadarIstemciAyarlari.yOfset(), altBolge,
+                GostergeYerlesimi.efektAlti(yararli, zararli));
+        sonX = k.x();
+        sonY = k.y();
         sonG = pw;
         sonY2 = ph;
         sonEkranG = w;
         sonEkranY = h;
         sonAlt = altBolge;
+        long boyut = ((long) ph << 32) | ((long) h << 16) | (d.gelismis() ? 1 : 0);
+        if (boyut != sonLoglanan) {
+            sonLoglanan = boyut;
+            DogalAfetler.LOGGER.info("[radar] panel {}x{} GUI px ({}), ekran {}x{}: yükseklik %{}", pw, ph,
+                    d.gelismis() ? "Gelişmiş, " + alt.size() + " alt satır" : "normal", w, h, Math.round(100.0 * ph / h));
+        }
+        double taramaAcisi = (zaman * TARAMA_HIZI) % 360.0;
+        double noktaAcisi = goreli;
+        double noktaMesafe = mesafe;
+        int genislik = pw;
+        g.drawManaged(() -> panel(g, font, d, k.x(), k.y(), genislik, ph, ust, alt, taramaAcisi, zaman, noktaAcisi,
+                noktaMesafe));
+    }
 
+    /** Gelişmiş radarın kısa alt satırları (en çok {@link GostergeYerlesimi#EN_COK_ALT_SATIR}). */
+    private static List<AltSatir> altSatirlar(RadarPaketi d, float yaw) {
+        List<AltSatir> alt = new ArrayList<>();
+        if (d.gorunum() == RadarGorunumu.AFET) {
+            Component seviye = d.seviye() > 0 ? Component.translatable("seviye.dogalafetler." + d.seviye()) : null;
+            int renk = SEVIYE_RENGI[Math.max(0, Math.min(5, d.seviye()))];
+            if (Float.isNaN(d.hareketYonu())) {
+                alt.add(new AltSatir(seviye, renk, Double.NaN, Component.translatable(RadarCevirileri.ON + "durgun"), SOLUK));
+            } else {
+                alt.add(new AltSatir(seviye, renk, YonMesafe.goreliAci(d.hareketYonu(), yaw), Component.translatable(
+                        RadarCevirileri.ON + "hiz", String.format(Locale.ROOT, "%.1f", d.hiz())), VURGU_GELISMIS));
+            }
+        }
+        alt.add(new AltSatir(null, 0, Double.NaN, Component.translatable(RadarCevirileri.ON + "gecmis"), VURGU_GELISMIS));
+        if (d.gecmis().isEmpty()) {
+            alt.add(new AltSatir(null, 0, Double.NaN, Component.translatable(RadarCevirileri.ON + "gecmis_bos"), SONUK));
+        }
+        for (RadarPaketi.Gecmis kayit : d.gecmis()) {
+            Component satir = Component.translatable(kayit.tur().ceviriAnahtari());
+            if (kayit.seviye() > 0) {
+                satir = Component.empty().append(satir).append(" ")
+                        .append(Component.translatable(RadarCevirileri.ON + "seviye_kisa", kayit.seviye()));
+            }
+            satir = Component.empty().append(satir).append(" ").append(yas(kayit.yasDakika()));
+            alt.add(new AltSatir(null, 0, Double.NaN, satir,
+                    kayit.seviye() > 0 ? SEVIYE_RENGI[Math.min(5, kayit.seviye())] : ANOMALI_SOLUK));
+        }
+        return alt;
+    }
+
+    private static void panel(GuiGraphics g, Font font, RadarPaketi d, int x, int y, int pw, int ph, List<Satir> ust,
+            List<AltSatir> alt, double taramaAcisi, float zaman, double goreli, double mesafe) {
         int cerceve = d.gelismis() ? CERCEVE_GELISMIS : CERCEVE;
         g.fill(x, y, x + pw, y + ph, ZEMIN);
         g.fill(x, y, x + pw, y + 1, cerceve);
@@ -165,39 +222,39 @@ public final class RadarGostergesi {
         if (d.gelismis()) {
             g.fill(x + 1, y + 1, x + pw - 1, y + 2, VURGU_GELISMIS & 0x80FFFFFF);
         }
+        kap(g, x + IC + R, y + IC + R, d, taramaAcisi, zaman, goreli, mesafe);
 
-        int cx = x + IC + R;
-        int cy = y + IC + R;
-        kap(g, cx, cy, d, zaman, goreli, mesafe);
-
-        int ty = y + IC + 1 + (KAP - satirlar.size() * SATIR) / 2;
-        for (int i = 0; i < satirlar.size(); i++) {
-            int sx = x + yaziX;
-            if (i == 1 && okPay > 0) {
-                ok(g, sx + 4, ty + i * SATIR + 4, goreli, YAZI);
-                sx += okPay;
+        int ty = y + IC + 1 + (KAP - ust.size() * SATIR) / 2;
+        for (int i = 0; i < ust.size(); i++) {
+            Satir satir = ust.get(i);
+            int sx = x + IC + KAP + 6;
+            if (satir.oklu()) {
+                ok(g, sx + 4, ty + i * SATIR + 4, satir.okAcisi(), satir.okRengi());
+                sx += 12;
             }
-            g.drawString(font, satirlar.get(i), sx, ty + i * SATIR, renkler.get(i), true);
+            g.drawString(font, satir.metin(), sx, ty + i * SATIR, satir.renk(), true);
         }
-        if (!alt.isEmpty()) {
-            int ay = y + IC + KAP + IC;
-            g.fill(x + IC, ay, x + pw - IC, ay + 1, (d.gelismis() ? VURGU_GELISMIS : HALKA) & 0x90FFFFFF);
-            ay += 3;
-            for (int i = 0; i < alt.size(); i++) {
-                int sx = x + IC;
-                if (okluHareket && i == (d.seviye() > 0 ? 1 : 0)) {
-                    double hareketGoreli = YonMesafe.goreliAci(d.hareketYonu(), oyuncu.getYRot());
-                    ok(g, sx + 4, ay + i * SATIR + 4, hareketGoreli, VURGU_GELISMIS);
-                    sx += 12;
-                }
-                g.drawString(font, alt.get(i), sx, ay + i * SATIR, altRenk.get(i), true);
+        if (alt.isEmpty()) {
+            return;
+        }
+        int ay = y + IC + KAP + IC;
+        g.fill(x + IC, ay, x + pw - IC, ay + 1, VURGU_GELISMIS & 0x90FFFFFF);
+        ay += GostergeYerlesimi.AYIRAC;
+        for (AltSatir satir : alt) {
+            int sx = x + IC;
+            if (satir.on() != null) {
+                g.drawString(font, satir.on(), sx, ay, satir.onRenk(), true);
+                sx += font.width(satir.on()) + 4;
             }
+            if (!Double.isNaN(satir.okAcisi())) {
+                ok(g, sx + 4, ay + 4, satir.okAcisi(), VURGU_GELISMIS);
+                sx += 12;
+            }
+            if (satir.metin() != null) {
+                g.drawString(font, satir.metin(), sx, ay, satir.renk(), true);
+            }
+            ay += ALT_SATIR;
         }
-    }
-
-    private static void ekle(List<Component> satirlar, List<Integer> renkler, Component satir, int renk) {
-        satirlar.add(satir);
-        renkler.add(renk);
     }
 
     private static Component sure(RadarPaketi d) {
@@ -211,6 +268,7 @@ public final class RadarGostergesi {
         return Component.translatable(RadarCevirileri.ON + anahtar, metin);
     }
 
+    /** Geçmiş satırının kısa yaşı: "şimdi", "3dk", "2sa", "1g". */
     private static Component yas(int dakika) {
         if (dakika < 1) {
             return Component.translatable(RadarCevirileri.ON + "yas.simdi");
@@ -225,7 +283,8 @@ public final class RadarGostergesi {
     }
 
     /** Dönen taramalı radar kapı. Afet noktası bakışa göre (yukarı = ön) ve menzile oranla yerleşir. */
-    private static void kap(GuiGraphics g, int cx, int cy, RadarPaketi d, float zaman, double goreli, double mesafe) {
+    private static void kap(GuiGraphics g, int cx, int cy, RadarPaketi d, double aci, float zaman, double goreli,
+            double mesafe) {
         boolean anomali = d.gorunum() == RadarGorunumu.ANOMALI;
         int tarama = anomali ? 0xFFC58BFF : TARAMA;
         int halka = anomali ? 0xFF4B2C73 : HALKA;
@@ -246,7 +305,6 @@ public final class RadarGostergesi {
         halkaCiz(g, cx, cy, R * 0.5f, halka & 0xB0FFFFFF);
         g.fill(cx, cy - R + 1, cx + 1, cy + R, halka & 0x60FFFFFF);
         g.fill(cx - R + 1, cy, cx + R, cy + 1, halka & 0x60FFFFFF);
-        double aci = (zaman * 6.0) % 360.0;
         for (int iz = 5; iz >= 0; iz--) {
             int alfa = 255 - iz * 42;
             double a = Math.toRadians(aci - iz * 6);

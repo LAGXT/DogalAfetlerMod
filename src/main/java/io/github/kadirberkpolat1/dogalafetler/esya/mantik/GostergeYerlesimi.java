@@ -5,8 +5,9 @@ package io.github.kadirberkpolat1.dogalafetler.esya.mantik;
  * barının (XP barının üstü, sıcaklık §A, S-10) ve action bar'ın (sismograf metni) üstüne binmez: panel yatayda hotbar ve yan el
  * yuvasıyla örtüşürse hotbar'ın, orta durum sütunuyla (kalp, zırh, açlık, hava, sıcaklık barı, XP) örtüşürse onların, ortalanmış
  * action bar satırıyla örtüşürse o satırın üstüne kalkar. Forge action bar'ı durum sütununun hemen üstüne çizer
- * ({@code h - max(max(leftHeight, rightHeight) + 9, 68)}); bu yüksekliklerle genişlik {@link Alt} ile verilir. Sonuç her zaman ekranın
- * içindedir.
+ * ({@code h - max(max(leftHeight, rightHeight) + 9, 68)}); bu yüksekliklerle genişlik {@link Alt} ile verilir. Sağ üst köşede
+ * vanilla durum efekti ikonlarının ({@link #efektAlti}) altına iner. Sonuç her zaman ekranın içindedir. Panelin yüksekliği
+ * de buradadır ({@link #panelYuksekligi}): madde 13a "küçük, ekranı kaplamayan".
  */
 public final class GostergeYerlesimi {
     public enum Kose {
@@ -38,14 +39,39 @@ public final class GostergeYerlesimi {
     public static final int ALT_YAZI_UST = 72;
     /** Orta durum sütununun üstü: iki kalp satırı + zırh/hava + sıcaklık barı + XP (ekranın altından). */
     public static final int DURUM_UST = 86;
+    /** Panel: kenar iç boşluğu, radar kapının yarıçapı ve çapı (normal ve Gelişmiş aynı). */
+    public static final int IC = 4;
+    public static final int KAP_YARICAP = 16;
+    public static final int KAP = 2 * KAP_YARICAP + 1;
+    /** Gelişmiş radarın alt bölümü: ayıraç ve satır adımı (8 px yazı + 1 px gölge). */
+    public static final int AYIRAC = 2;
+    public static final int ALT_SATIR = 9;
+    /** Gelişmiş radarın en çok alt satırı: şiddet + hareket, "Son afetler", 5 geçmiş. */
+    public static final int EN_COK_ALT_SATIR = 7;
+    /** Panel yüksekliğinin ekran yüksekliğine oranı üst sınırı (GUI ölçeği 2'de; R-18). */
+    public static final double EN_COK_EKRAN_ORANI = 0.30;
     /** Forge yükseklikleri bilinmezken varsayılan alt bölgeler. */
     public static final Alt VARSAYILAN = new Alt(DURUM_UST, ALT_YAZI_UST, HOTBAR_YARI + HOTBAR_YAN);
 
     private GostergeYerlesimi() {
     }
 
+    /** Panelin yüksekliği: üstte kap ve yanındaki üç satır, altında {@code altSatir} kısa satır (yalnız Gelişmiş). */
+    public static int panelYuksekligi(int altSatir) {
+        int alt = Math.max(0, altSatir);
+        return IC + KAP + IC + (alt == 0 ? 0 : AYIRAC + alt * ALT_SATIR + 2);
+    }
+
+    /**
+     * Vanilla durum efekti ikonlarının alt kenarı (ekranın üstünden): yararlılar y 1'de, zararlılar y 27'de, ikonlar 24 px
+     * ({@code Gui.renderEffects}). İkon yoksa 0.
+     */
+    public static int efektAlti(boolean yararli, boolean zararli) {
+        return zararli ? 27 + 24 : yararli ? 1 + 24 : 0;
+    }
+
     public static Konum konum(int w, int h, int pw, int ph, Kose kose, int ofsetX, int ofsetY) {
-        return konum(w, h, pw, ph, kose, ofsetX, ofsetY, VARSAYILAN);
+        return konum(w, h, pw, ph, kose, ofsetX, ofsetY, VARSAYILAN, 0);
     }
 
     /**
@@ -57,7 +83,8 @@ public final class GostergeYerlesimi {
         return new Alt(durum + 2, Math.max(durum + 9, 68) + 8, Math.max(HOTBAR_YARI + HOTBAR_YAN, altYaziGenisligi / 2 + 4));
     }
 
-    public static Konum konum(int w, int h, int pw, int ph, Kose kose, int ofsetX, int ofsetY, Alt alt) {
+    /** @param efektAlti sağ üstteki efekt ikonlarının alt kenarı ({@link #efektAlti}); yalnız {@code SAG_UST}'te kullanılır */
+    public static Konum konum(int w, int h, int pw, int ph, Kose kose, int ofsetX, int ofsetY, Alt alt, int efektAlti) {
         boolean sag = kose == Kose.SAG_ALT || kose == Kose.SAG_UST;
         boolean altta = kose == Kose.SAG_ALT || kose == Kose.SOL_ALT;
         int x = sag ? w - pw - PAY - ofsetX : PAY + ofsetX;
@@ -73,6 +100,8 @@ public final class GostergeYerlesimi {
             if (ortusur(x, pw, orta - alt.altYaziYari(), orta + alt.altYaziYari())) {
                 y = Math.min(y, h - alt.altYaziUst() - ph);
             }
+        } else if (kose == Kose.SAG_UST && efektAlti > 0) {
+            y = Math.max(y, efektAlti + 2);
         }
         x = Math.max(0, Math.min(x, w - pw));
         y = Math.max(0, Math.min(y, h - ph));

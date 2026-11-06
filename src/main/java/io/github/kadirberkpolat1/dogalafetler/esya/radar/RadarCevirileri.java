@@ -36,10 +36,11 @@ public final class RadarCevirileri {
         y.ekle(ON + "hiz", "Moving %s m/s", "Hareket %s m/sn");
         y.ekle(ON + "gecmis", "Recent disasters", "Son afetler");
         y.ekle(ON + "gecmis_bos", "None yet", "Henüz yok");
-        y.ekle(ON + "yas.simdi", "just now", "az önce");
-        y.ekle(ON + "yas.dk", "%s min ago", "%s dk önce");
-        y.ekle(ON + "yas.sa", "%s h ago", "%s sa önce");
-        y.ekle(ON + "yas.gun", "%s d ago", "%s gün önce");
+        y.ekle(ON + "seviye_kisa", "L%s", "S%s");
+        y.ekle(ON + "yas.simdi", "now", "şimdi");
+        y.ekle(ON + "yas.dk", "%sm", "%sdk");
+        y.ekle(ON + "yas.sa", "%sh", "%ssa");
+        y.ekle(ON + "yas.gun", "%sd", "%sg");
         for (int i = 0; i < YONLER.length; i++) {
             y.ekle(yonAnahtari(i), YONLER[i][0], YONLER[i][1]);
         }

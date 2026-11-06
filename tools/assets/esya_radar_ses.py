@@ -7,7 +7,8 @@ Hedef −27 LUFS, gerçek tepe ≤ −6 dBTP (tek seferlik darbe kuralı, uyarı
 yalnız sismografı taşıyan oyuncunun istemcisinde çalar.
 
 Üretim, ölçüm ve Ogg yazımı `ses_uret.py`'nin yardımcılarıyla yapılır (aynı deterministik ayarlar). Ölçüm metni ve
-spektrogram `docs/` yerine `KOK/.vibe/kanit/radar-sismograf/ses/` altına yazılır.
+spektrogram siren ve ortam sesleri gibi `docs/kanit/ses/` altına yazılır (GOREV §6 #11); kopyası
+`KOK/.vibe/kanit/radar-sismograf/ses/` altında.
 
 Kullanım (worktree kökünden):
     ../../.venv/bin/python tools/assets/esya_radar_ses.py
@@ -17,6 +18,7 @@ Kullanım (worktree kökünden):
 
 from __future__ import annotations
 
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -58,11 +60,15 @@ TANIM = su.SesTanimi(oncu_sarsinti, -27.0, -6.0, (25.0, 120.0), 2500.0, -30.0)
 
 
 def main() -> int:
-    su.KANIT_KLASORU = KOK / ".vibe/kanit/radar-sismograf/ses"
+    # Ölçüm ve spektrogram siren ve ortam sesleriyle aynı yerde: docs/kanit/ses/ (GOREV §6 #11); kopyası .vibe/kanit'te.
     su.SES_KLASORU.mkdir(parents=True, exist_ok=True)
     su.KANIT_KLASORU.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as gecici:
         hatalar = su.uret(AD, TANIM, Path(gecici))
+    kopya = KOK / ".vibe/kanit/radar-sismograf/ses"
+    kopya.mkdir(parents=True, exist_ok=True)
+    for dosya in su.KANIT_KLASORU.glob(f"{AD}_*"):
+        shutil.copy2(dosya, kopya / dosya.name)
     if hatalar:
         raise SystemExit("hedef dışında:\n" + "\n".join(hatalar))
     return 0

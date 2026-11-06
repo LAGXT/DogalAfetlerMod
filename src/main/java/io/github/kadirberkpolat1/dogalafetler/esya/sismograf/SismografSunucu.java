@@ -27,7 +27,7 @@ import net.minecraftforge.fml.common.Mod;
  * Sismografın sunucu tarafı (madde 3, 4, 13b). Her {@code esya.sismograf.paketAraligiTick}'te (1 Hz) sismografı hotbar'da
  * ya da yan elde taşıyan oyuncular için algılamayı hesaplar ve değişince yalnız o oyuncuya gönderir; bırakana tek
  * {@link SismografPaketi#YOK}. Yalnız deprem ve sinkhole; ON_UYARI'da normal sismograf {@code normalOnUyariBasladi()}
- * sonrası, Hassas Sismograf erken bölümden ({@code esya.sismograf.hassasErkenOran}) itibaren algılar. Şiddet yüzdesi ve
+ * sonrası, Hassas Sismograf ON_UYARI'nın başından (çekirdeğin erken bölümü dahil) algılar. Şiddet yüzdesi ve
  * merkez afet başına sabit bir hatayla tahmin edilir (Hassas'ta dar).
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID)
@@ -98,8 +98,8 @@ public final class SismografSunucu {
         EtkiAlani alan = okunan.get();
         boolean ayniBoyut = oyuncu.level().dimension().equals(afet.baglam().boyut());
         double mesafe = YonMesafe.mesafe(oyuncu.getX(), oyuncu.getZ(), alan.x(), alan.z());
-        if (!Gorunurluk.sismograf(afet.tur(), afet.asama(), afet.asamaGecenTick(), afet.baglam().erkenBildirimSuresi(),
-                hassas, SismografAyarlari.hassasErkenOran(), ayniBoyut, mesafe, SismografAyarlari.menzil(hassas))) {
+        if (!Gorunurluk.sismograf(afet.tur(), afet.asama(), afet.normalOnUyariBasladi(), hassas, ayniBoyut, mesafe,
+                SismografAyarlari.menzil(hassas))) {
             return SismografPaketi.sakin(hassas, titreme);
         }
         double ilerleme = afet.asama() == AfetAsamasi.ON_UYARI

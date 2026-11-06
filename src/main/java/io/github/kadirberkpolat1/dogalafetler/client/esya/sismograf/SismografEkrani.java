@@ -10,7 +10,7 @@ import net.minecraft.network.chat.Component;
 /**
  * Sismografın sağ tık ekranı (madde 13b): son 60 saniyenin sismik dalga grafiği. Krem renkli kayıt kağıdı tamburdan sola
  * akar (ızgara ve dalga aynı hızla kayar), sağ kenarda kalem kolu şimdiki örneği mürekkeple yazar (Hassas'ta mor). Her piksel sütunu 6
- * örneğin en küçük–en büyük aralığıdır (200 dolgu/kare; performansı etkilemez). Oyunu duraklatmaz: dalga açıkken de
+ * örneğin en küçük–en büyük aralığıdır; ~250 dolgu tek {@code drawManaged} toplu çizimidir (R-19). Oyunu duraklatmaz: dalga açıkken de
  * akmaya devam eder.
  */
 public final class SismografEkrani extends Screen {
@@ -36,6 +36,12 @@ public final class SismografEkrani extends Screen {
     @Override
     public void render(GuiGraphics g, int fareX, int fareY, float pt) {
         renderBackground(g);
+        g.drawManaged(() -> kayit(g, pt));
+        super.render(g, fareX, fareY, pt);
+    }
+
+    /** Kasa, kâğıt, dalga ve kalem: tek toplu çizim ({@code drawManaged}, R-19). */
+    private void kayit(GuiGraphics g, float pt) {
         int x = (width - GENISLIK) / 2;
         int y = (height - YUKSEKLIK) / 2;
         g.fill(x - 1, y - 1, x + GENISLIK + 1, y + YUKSEKLIK + 1, 0xFF15171B);
@@ -110,6 +116,5 @@ public final class SismografEkrani extends Screen {
                 ? IstemciSismograf.metin(minecraft.player, d)
                 : Component.translatable(SismografCevirileri.ON + "sakin");
         g.drawCenteredString(font, durumMetni, x + GENISLIK / 2, ky + KAGIT_Y + 16, 0xFFD8D2C0);
-        super.render(g, fareX, fareY, pt);
     }
 }

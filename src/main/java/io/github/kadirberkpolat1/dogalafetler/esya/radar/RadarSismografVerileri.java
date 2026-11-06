@@ -16,7 +16,7 @@ import net.minecraftforge.data.event.GatherDataEvent;
 
 /**
  * Radar ve sismografın datagen dosyaları: dört tarif (madde 13a-b birebir; gelişmişler şekilsiz +1
- * {@code #dogalafetler:kozmik_cekirdek}) ve dört eşya modeli. Tarif kimlikleri {@link EsyaKayitlari}'ndaki sabitlerdir.
+ * {@code #dogalafetler:kozmik_cekirdek}, etiket boşken yüklenmez: {@code forge:not(forge:tag_empty)}) ve dört eşya modeli. Tarif kimlikleri {@link EsyaKayitlari}'ndaki sabitlerdir.
  * Benzersiz sağlayıcı adı (K-E5).
  */
 public final class RadarSismografVerileri implements DataProvider {
@@ -88,6 +88,16 @@ public final class RadarSismografVerileri implements DataProvider {
         JsonObject j = new JsonObject();
         j.addProperty("type", "minecraft:crafting_shapeless");
         j.addProperty("category", "equipment");
+        // R-17: boş etiketin malzemesi Forge'da "Empty Tag" bariyeridir; etiket dolana kadar tarif hiç yüklenmez.
+        JsonObject bos = new JsonObject();
+        bos.addProperty("type", "forge:tag_empty");
+        bos.addProperty("tag", EsyaKayitlari.KOZMIK_CEKIRDEK.location().toString());
+        JsonObject degil = new JsonObject();
+        degil.addProperty("type", "forge:not");
+        degil.add("value", bos);
+        JsonArray kosullar = new JsonArray();
+        kosullar.add(degil);
+        j.add("conditions", kosullar);
         JsonArray malzemeler = new JsonArray();
         JsonObject esya = new JsonObject();
         esya.addProperty("item", DogalAfetler.MOD_ID + ":" + temel);

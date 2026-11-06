@@ -37,20 +37,21 @@ class GorunurlukTest {
     void sismografYalnizDepremVeSinkhole() {
         for (AfetTuru tur : AfetTuru.values()) {
             boolean beklenen = tur == AfetTuru.DEPREM || tur == AfetTuru.SINKHOLE;
-            assertEquals(beklenen, Gorunurluk.sismograf(tur, AfetAsamasi.SIREN, 0, 600, false, 1, true, 0, 300), tur.kimlik());
+            assertEquals(beklenen, Gorunurluk.sismograf(tur, AfetAsamasi.SIREN, true, false, true, 0, 300), tur.kimlik());
         }
     }
 
     @Test
-    void hassasSismografErkenBaslar() {
-        assertFalse(Gorunurluk.sismograf(AfetTuru.DEPREM, AfetAsamasi.ON_UYARI, 0, 600, false, 1, true, 0, 300));
-        assertFalse(Gorunurluk.sismograf(AfetTuru.DEPREM, AfetAsamasi.ON_UYARI, 599, 600, false, 1, true, 0, 300));
-        assertTrue(Gorunurluk.sismograf(AfetTuru.DEPREM, AfetAsamasi.ON_UYARI, 600, 600, false, 1, true, 0, 300));
-        assertTrue(Gorunurluk.sismograf(AfetTuru.DEPREM, AfetAsamasi.ON_UYARI, 0, 600, true, 1, true, 0, 300));
-        // Oran 0,5: erken bölümün ikinci yarısından.
-        assertFalse(Gorunurluk.sismograf(AfetTuru.SINKHOLE, AfetAsamasi.ON_UYARI, 299, 600, true, 0.5, true, 0, 300));
-        assertTrue(Gorunurluk.sismograf(AfetTuru.SINKHOLE, AfetAsamasi.ON_UYARI, 300, 600, true, 0.5, true, 0, 300));
-        assertFalse(Gorunurluk.sismograf(AfetTuru.DEPREM, AfetAsamasi.BITIS, 0, 600, true, 1, true, 0, 300));
-        assertFalse(Gorunurluk.sismograf(AfetTuru.DEPREM, AfetAsamasi.SIREN, 0, 600, true, 1, true, 801, 800));
+    void sismografPencereyiCekirdektenAlirHassasBastanGorur() {
+        // Normal sismograf radarla aynı kaynaktan: Afet.normalOnUyariBasladi().
+        assertFalse(Gorunurluk.sismograf(AfetTuru.DEPREM, AfetAsamasi.ON_UYARI, false, false, true, 0, 300));
+        assertTrue(Gorunurluk.sismograf(AfetTuru.DEPREM, AfetAsamasi.ON_UYARI, true, false, true, 0, 300));
+        // Hassas ON_UYARI'nın başından (erken bölüm dahil).
+        assertTrue(Gorunurluk.sismograf(AfetTuru.SINKHOLE, AfetAsamasi.ON_UYARI, false, true, true, 0, 300));
+        assertTrue(Gorunurluk.sismograf(AfetTuru.DEPREM, AfetAsamasi.SIREN, true, false, true, 0, 300));
+        assertTrue(Gorunurluk.sismograf(AfetTuru.DEPREM, AfetAsamasi.AKTIF, true, false, true, 0, 300));
+        assertFalse(Gorunurluk.sismograf(AfetTuru.DEPREM, AfetAsamasi.BITIS, true, true, true, 0, 300));
+        assertFalse(Gorunurluk.sismograf(AfetTuru.DEPREM, AfetAsamasi.SIREN, true, true, true, 801, 800));
+        assertFalse(Gorunurluk.sismograf(AfetTuru.DEPREM, AfetAsamasi.SIREN, true, true, false, 0, 800));
     }
 }
