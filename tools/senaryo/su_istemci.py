@@ -118,6 +118,13 @@ def main():
     if not kapi(log):
         log("kapı 10 dk açılmadı; koşu yapılmadı")
         return 1
+    # Her koşu ana test dünyasının temiz kopyasıyla başlar (vitrin sahnesi gerçek blok kurar; sahne belirlenimci kalır).
+    hedef = RUN / "saves" / "test"
+    if hedef.exists():
+        shutil.rmtree(hedef)
+    shutil.copytree(KOK.parents[1] / "run" / "saves" / "test", hedef, ignore=shutil.ignore_patterns("session.lock"))
+    (hedef / "serverconfig" / "dogalafetler-server.toml").unlink(missing_ok=True)
+    log(f"test dünyası temiz kopyalandı: {hedef}")
     sahip = hypr_json("activewindow") or {}
     sahip_adres = sahip.get("address")
     log(f"sahibin etkin penceresi: {sahip_adres} {sahip.get('class')} ws={sahip.get('workspace', {}).get('id')}")

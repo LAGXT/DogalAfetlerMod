@@ -1,5 +1,6 @@
 package io.github.kadirberkpolat1.dogalafetler.client.su;
 
+import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
@@ -9,6 +10,8 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciDonem;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
+import io.github.kadirberkpolat1.dogalafetler.su.Cekilme;
+import io.github.kadirberkpolat1.dogalafetler.su.Dalga;
 import io.github.kadirberkpolat1.dogalafetler.su.SuAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.su.DenizAlani;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
@@ -50,17 +53,28 @@ public final class SuRenderer {
     static final int LOD = 4;
     static final int UZAK_YENILEME = 10;
     private static final ResourceLocation SU = ResourceLocation.fromNamespaceAndPath("minecraft", "block/water_still");
+    /** Kendi köpük dokumuz (animasyonlu, {@code tools/assets/su_kopuk.py}); blok atlası {@code block/} klasöründen toplar. */
+    private static final ResourceLocation KOPUK = DogalAfetler.konum("block/su_kopuk");
+    /** Işık demetleri: tepe rengi ve en çok sayısı (kalite). */
+    private static final int ISIK_RENGI = 0xBFE6FF;
     private static final int N = 2 * YAKIN + 1;
     private static final float[] UST = new float[N * N];
     private static final float[] ALT = new float[N * N];
-    /** 0 yok, 1 sanal (dalgalı), 2 sanal (sakin, mağara), 3 gerçek su (yalnız yan yüz komşusu). */
+    /** 0 yok, 1 sanal (dalgalı), 2 sanal (sakin, mağara), 3 gerçek su (yalnız yan yüz komşusu), 4 çekilmede açığa çıkan dip. */
     private static final byte[] TUR = new byte[N * N];
+    /** Köşe ızgarası ({@code (N+1)²}): dalgacık yüksekliği ve çok oktavlı yüzey eğimi (SU-28). */
+    private static final float[] VH = new float[(N + 1) * (N + 1)];
+    private static final float[] VSX = new float[(N + 1) * (N + 1)];
+    private static final float[] VSZ = new float[(N + 1) * (N + 1)];
     private static final SuAraliklari A = new SuAraliklari();
     private static final BufferBuilder BB = new BufferBuilder(1 << 21);
     /** Yakın halkanın kendi kurucusu: yapım birkaç tick'e yayılırken uzak LOD kurulumu araya girebilir. */
     private static final BufferBuilder BB_YAKIN = new BufferBuilder(1 << 21);
+    /** Su altı ışık demetleri (her kare, birkaç dörtgen). */
+    private static final BufferBuilder BB_ISIK = new BufferBuilder(1 << 16);
     /** Köşelerin yazıldığı kurucu. */
     private static BufferBuilder bb = BB;
+    private static VertexBuffer vbIsik;
     private static final BlockPos.MutableBlockPos P = new BlockPos.MutableBlockPos();
     private static final BlockPos.MutableBlockPos P2 = new BlockPos.MutableBlockPos();
     private static final Map<Long, int[]> RENK = new HashMap<>();
@@ -87,6 +101,24 @@ public final class SuRenderer {
     private static float u1;
     private static float v0;
     private static float v1;
+    private static float ku0;
+    private static float ku1;
+    private static float kv0;
+    private static float kv1;
+    /** Ufka yakın gök rengi (yansıma), gün doğumu/batımı rengiyle; normal eğimi oktav sayısı (kalite). */
+    private static int ufukRengi = 0xA0C0E0;
+    private static int oktav = 2;
+    /** Kurulan su dünyası (dalga tepesi köpüğü ve dudak için). */
+    private static SanalSuDunyasi aktifDunya;
+    /** {@link #golgele} çıktısı (tahsissiz). */
+    private static int gRenk;
+    private static float gAlfa;
+    private static int gIsik;
+    private static float esX;
+    private static float esZ;
+    private static final int[] QC = new int[4];
+    private static final float[] QA = new float[4];
+    private static final int[] QI = new int[4];
     private static int dortgen;
     private static int yakinDortgen;
     private static int uzakDortgen;
@@ -198,6 +230,9 @@ public final class SuRenderer {
         };
         Vec3 cam = e.getCamera().getPosition();
         gunesHazirla(l, e.getPartialTick(), cam);
+        ufukHazirla(l, e.getPartialTick(), cam);
+        oktav = bilesen - 1;
+        aktifDunya = d;
         if (tick != kurulanTick) {
             kurulanTick = tick;
             spriteGuncelle(mc);
@@ -248,6 +283,9 @@ public final class SuRenderer {
             vbYakin.bind();
             vbYakin.drawWithShader(mv, proj, sh);
         }
+        if (bilesen > 1 && IstemciSu.kameraSuda(e.getCamera())) {
+            isinlariCiz(d, cam, mv, proj, sh);
+        }
         ofset(sh, 0, 0, 0);
         VertexBuffer.unbind();
         mc.gameRenderer.lightTexture().turnOffLightLayer();
@@ -267,6 +305,11 @@ public final class SuRenderer {
         u1 = sp.getU1();
         v0 = sp.getV0();
         v1 = sp.getV1();
+        TextureAtlasSprite kp = mc.getTextureAtlas(InventoryMenu.BLOCK_ATLAS).apply(KOPUK);
+        ku0 = kp.getU0();
+        ku1 = kp.getU1();
+        kv0 = kp.getV0();
+        kv1 = kp.getV1();
     }
 
     /** Uzak LOD mesafesi (chunk): görüş mesafesi, kalite (Düşük 8, Orta 12) ve config üst sınırının en küçüğü. */
@@ -291,6 +334,115 @@ public final class SuRenderer {
             h += 0.015 * Math.sin(1.7 * x - 1.3 * z + 0.19 * t);
         }
         return h;
+    }
+
+    /**
+     * Yüzey eğimi {@link #esX}, {@link #esZ}: dalgacığın analitik türevi + yalnız normale giren kısa dalga oktavları
+     * (kalite: Düşük 0, Orta 1, Yüksek 2, Ultra 3). Yüzey düz levha gibi değil, kırışıklı ışık yansıtır.
+     */
+    private static void egim(double x, double z, double t, double carpan) {
+        double sx = 0.033 * Math.cos(0.55 * x + 0.08 * t);
+        double sz = 0;
+        if (bilesen > 1) {
+            sz += 0.0148 * Math.cos(0.37 * z - 0.06 * t + 1.3);
+        }
+        if (bilesen > 2) {
+            double c = 0.027 * Math.cos(0.9 * (x + z) + 0.11 * t);
+            sx += c;
+            sz += c;
+        }
+        if (bilesen > 3) {
+            double c = Math.cos(1.7 * x - 1.3 * z + 0.19 * t);
+            sx += 0.0255 * c;
+            sz -= 0.0195 * c;
+        }
+        if (oktav > 0) {
+            double c = 0.11 * Math.cos(1.9 * (0.765 * x + 0.644 * z) + 0.21 * t);
+            sx += c * 0.765;
+            sz += c * 0.644;
+        }
+        if (oktav > 1) {
+            double c = 0.08 * Math.cos(3.7 * (-0.666 * x + 0.746 * z) + 0.33 * t + 0.9);
+            sx -= c * 0.666;
+            sz += c * 0.746;
+        }
+        if (oktav > 2) {
+            double c = 0.055 * Math.cos(6.1 * (-0.575 * x - 0.818 * z) + 0.47 * t + 2.1);
+            sx -= c * 0.575;
+            sz -= c * 0.818;
+        }
+        esX = (float) (sx * carpan);
+        esZ = (float) (sz * carpan);
+    }
+
+    /** Gökün ufka yakın rengi: vanilla gök rengi açılmış, gün doğumu/batımı rengine kaydırılmış (yüzey yansıması). */
+    private static void ufukHazirla(ClientLevel l, float kismi, Vec3 cam) {
+        Vec3 g = l.getSkyColor(cam, kismi);
+        int gok = rgb(g.x, g.y, g.z);
+        int u = parlat(gok, 1.2f);
+        float[] sr = l.effects().getSunriseColor(l.getTimeOfDay(kismi), kismi);
+        if (sr != null) {
+            u = karistir(u, rgb(sr[0], sr[1], sr[2]), Math.min(0.9f, sr[3] * 0.9f));
+        }
+        ufukRengi = u;
+    }
+
+    private static int rgb(double r, double g, double b) {
+        return ((int) (Math.max(0, Math.min(1, r)) * 255) << 16) | ((int) (Math.max(0, Math.min(1, g)) * 255) << 8)
+                | (int) (Math.max(0, Math.min(1, b)) * 255);
+    }
+
+    private static int parlat(int c, float f) {
+        return (Math.min(255, (int) ((c >> 16 & 255) * f)) << 16) | (Math.min(255, (int) ((c >> 8 & 255) * f)) << 8)
+                | Math.min(255, (int) ((c & 255) * f));
+    }
+
+    /**
+     * Köşe başına şader'siz su gölgelemesi (SU-28): dağınık ışık (normal · güneş), Fresnel (Schlick) ile ufuk rengi
+     * yansıması ve alfa artışı, güneş parıltısı (^64). Kamera yüzeyin altındaysa yansıma yok, yüzey koyu turkuaz.
+     */
+    private static void golgele(int taban, float alfa, double px, double py, double pz, double sx, double sz, int isik) {
+        double nl = Math.sqrt(sx * sx + 1 + sz * sz);
+        double nx = -sx / nl;
+        double ny = 1 / nl;
+        double nz = -sz / nl;
+        double vx = kamX - px;
+        double vy = kamY - py;
+        double vz = kamZ - pz;
+        double vl = Math.sqrt(vx * vx + vy * vy + vz * vz);
+        if (vl < 1e-6) {
+            gRenk = taban;
+            gAlfa = alfa;
+            gIsik = isik;
+            return;
+        }
+        vx /= vl;
+        vy /= vl;
+        vz /= vl;
+        boolean alttan = vy < 0;
+        double f = alttan ? 0 : 0.02 + 0.98 * Math.pow(1 - Math.max(0, nx * vx + ny * vy + nz * vz), 5);
+        double dif = 0.86 + 0.32 * Math.max(0, nx * gunesX + ny * gunesY) * Math.max(0.3, parlamaSoluk);
+        int c = parlat(taban, (float) dif);
+        if (alttan) {
+            c = karistir(c, 0x0E3A4A, 0.35f);
+        }
+        c = karistir(c, ufukRengi, (float) Math.min(0.8, f));
+        float spec = 0;
+        if (parlamaSoluk > 0 && !alttan) {
+            double hx = vx + gunesX;
+            double hy = vy + gunesY;
+            double hz = vz;
+            double d = (nx * hx + ny * hy + nz * hz) / Math.sqrt(hx * hx + hy * hy + hz * hz);
+            if (d > 0) {
+                spec = (float) (Math.pow(d, 64) * parlamaSoluk * 1.6);
+            }
+        }
+        if (spec > 0.02f) {
+            c = karistir(c, gunesRengi, Math.min(1f, spec));
+        }
+        gRenk = c;
+        gAlfa = (float) Math.min(0.95, Math.max(alfa + (0.92 - alfa) * f, Math.min(0.95f, spec)));
+        gIsik = spec > 0.02f ? parlakIsik(isik, spec) : isik;
     }
 
     private static long chunkAnahtari(int x, int z) {
@@ -428,6 +580,18 @@ public final class SuRenderer {
     /** Halkanın {@code i}. sütun sırasının su aralıkları ({@link #UST}, {@link #ALT}, {@link #TUR}). */
     private static void sorguSatiri(SanalSuDunyasi d, int i) {
         DenizAlani alan = d.alan();
+        for (int satir = i; satir <= (i == N - 1 ? N : i); satir++) {
+            for (int j = 0; j <= N; j++) {
+                int x = yapOx - YAKIN + satir;
+                int z = yapOz - YAKIN + j;
+                int v = satir * (N + 1) + j;
+                VH[v] = (float) dalgacik(x, z, yapT);
+                egim(x, z, yapT, 1);
+                VSX[v] = esX;
+                VSZ[v] = esZ;
+            }
+        }
+        Cekilme[] cekilmeler = d.cekilmeDizisi();
         for (int j = 0; j < N; j++) {
             int x = yapOx - YAKIN + i;
             int z = yapOz - YAKIN + j;
@@ -443,6 +607,15 @@ public final class SuRenderer {
                 UST[k] = alan.zemin(x, z);
                 ALT[k] = alan.taban(x, z);
                 TUR[k] = 3;
+                for (Cekilme c : cekilmeler) {
+                    if (c.icinde(x + 0.5, z + 0.5)) {
+                        // Sanal yüzey dibin altına indi: gerçek su gizli, ıslak dip açıkta (koyu, parlak).
+                        UST[k] = alan.taban(x, z);
+                        TUR[k] = 4;
+                        yapVar = true;
+                        break;
+                    }
+                }
             } else {
                 TUR[k] = 0;
             }
@@ -497,16 +670,16 @@ public final class SuRenderer {
                     continue;
                 }
                 float y = (float) A.ust(A.adet() - 1) - 0.16f;
-                int c = renk(l, gx, gz);
-                float alfa = 0.72f;
-                int isik = tamIsik;
-                float p = A.sakin(A.adet() - 1) ? 0 : parlama(gx + LOD / 2.0, y, gz + LOD / 2.0, saat, 2.5);
-                if (p > 0.02f) {
-                    c = karistir(c, gunesRengi, Math.min(1f, p));
-                    alfa = Math.max(alfa, Math.min(0.95f, p));
-                    isik = parlakIsik(isik, p);
+                double mx = gx + LOD / 2.0;
+                double mz = gz + LOD / 2.0;
+                if (A.sakin(A.adet() - 1)) {
+                    esX = 0;
+                    esZ = 0;
+                } else {
+                    egim(mx, mz, saat, 2.5);
                 }
-                dortgenUst(gx - uzakOx, gz - uzakOz, LOD, y, y, y, y, c, alfa, isik);
+                golgele(renk(l, gx, gz), 0.72f, mx, y, mz, esX, esZ, tamIsik);
+                dortgenUst(gx - uzakOx, gz - uzakOz, LOD, y, y, y, y, gRenk, gAlfa, gIsik);
             }
         }
         uzakDortgen = dortgen;
@@ -558,30 +731,6 @@ public final class SuRenderer {
         kamZ = cam.z;
     }
 
-    /**
-     * Sahte güneş yansıması (tasarım notu "parlama"): dalgacık normali ile göz-güneş yarım vektörünün açısı, ^48; 0..1.
-     * {@code egim} normal sapmasını büyütür (düz LOD karolarında yansıma şeridi dağılsın).
-     */
-    private static float parlama(double x, double y, double z, double t, double egim) {
-        if (parlamaSoluk <= 0) {
-            return 0;
-        }
-        double nx = -(dalgacik(x + 0.5, z, t) - dalgacik(x - 0.5, z, t)) * egim;
-        double nz = -(dalgacik(x, z + 0.5, t) - dalgacik(x, z - 0.5, t)) * egim;
-        double vx = kamX - x;
-        double vy = kamY - y;
-        double vz = kamZ - z;
-        double vl = Math.sqrt(vx * vx + vy * vy + vz * vz);
-        if (vl < 1e-6) {
-            return 0;
-        }
-        double hx = vx / vl + gunesX;
-        double hy = vy / vl + gunesY;
-        double hz = vz / vl;
-        double d = (nx * hx + hy + nz * hz) / (Math.sqrt(nx * nx + 1 + nz * nz) * Math.sqrt(hx * hx + hy * hy + hz * hz));
-        return d <= 0 ? 0 : (float) (Math.pow(d, 48) * parlamaSoluk);
-    }
-
     /** Yansıyan sütunun ışığı: blok ışığı yansıma gücüyle yükselir (gün batımında da parlak kalsın). */
     private static int parlakIsik(int isik, float p) {
         return LightTexture.pack(Math.max(LightTexture.block(isik), Math.round(15 * Math.min(1f, p))), LightTexture.sky(isik));
@@ -594,44 +743,87 @@ public final class SuRenderer {
     private static void sutun(ClientLevel l, DenizAlani alan, int x, int z, int i, int j, double t, long tick) {
         int k = i * N + j;
         byte tur = TUR[k];
+        float rx = x - yapOx;
+        float rz = z - yapOz;
+        int isik = isik(l, x, (int) Math.floor(UST[k]), z, tick);
+        if (tur == 4) {
+            float y = UST[k] + 0.02f;
+            dortgenUst(rx, rz, 1, y, y, y, y, 0x2E2B22, 0.45f, isik);
+            return;
+        }
         float yu = UST[k] - 0.11f;
         float alt = ALT[k];
-        int isik = isik(l, x, (int) Math.floor(UST[k]), z, tick);
         int renk = renk(l, x, z);
-        float egim = 0;
+        float egimH = 0;
         for (int q = 0; q < 4; q++) {
             int n = komsu(i + DI[q], j + DJ[q]);
             if (n >= 0 && TUR[n] != 0) {
-                egim = Math.max(egim, Math.abs(UST[k] - UST[n]));
+                egimH = Math.max(egimH, Math.abs(UST[k] - UST[n]));
             }
         }
-        float kopuk = tur == 1 && bilesen > 1 ? Math.max(0, Math.min(0.85f, (egim - 0.6f) / 2.5f)) : 0;
+        float kopuk = tur == 1 && bilesen > 1 ? Math.max(0, Math.min(0.85f, (egimH - 0.6f) / 2.5f)) : 0;
         float derin = UST[k] - alt;
-        if (tur == 1 && (derin < 1.5f || kuruKomsu(i, j))) {
+        boolean kiyi = kuruKomsu(i, j);
+        if (tur == 1 && (derin < 1.5f || kiyi)) {
             // Kıyı şeridi: kuru karaya değen ya da çok sığ sütunda 2 sn periyotla ileri geri "yalayan" köpük bandı.
             float yalama = 0.55f + 0.45f * (float) Math.sin(t * 0.157 + (x + z) * 0.35);
-            kopuk = Math.max(kopuk, (kuruKomsu(i, j) ? 0.75f : 0.4f) * yalama);
+            kopuk = Math.max(kopuk, (kiyi ? 0.85f : 0.45f) * yalama);
         }
-        float a = Math.max(kopuk, derin < 1 ? 0.25f + 0.15f * derin : Math.min(0.85f, 0.4f + 0.06f * derin));
-        int c = karistir(renk, 0xFFFFFF, kopuk);
-        int ustIsik = isik;
-        if (tur == 1) {
-            float p = parlama(x + 0.5, UST[k], z + 0.5, t, 1);
-            if (p > 0.02f) {
-                c = karistir(c, gunesRengi, Math.min(1f, p));
-                a = Math.max(a, Math.min(0.95f, p));
-                ustIsik = parlakIsik(isik, p);
+        Dalga dalga = null;
+        double dalgaH = 0;
+        double dalgaS = 0;
+        if (tur == 1 && aktifDunya != null) {
+            for (Dalga w : aktifDunya.dalgaDizisi()) {
+                double y = w.yuzey(x + 0.5, z + 0.5, t);
+                if (!Double.isNaN(y) && y - w.taban() > dalgaH) {
+                    dalgaH = y - w.taban();
+                    dalga = w;
+                    dalgaS = w.cepheyeUzaklik(x + 0.5, z + 0.5, t);
+                }
             }
         }
-        float rx = x - yapOx;
-        float rz = z - yapOz;
-        if (tur == 3) {
-            // Gerçek su: üstünü vanilla çizer; yalnız alçalmış sanal komşuya bakan "duvar" aşağıda çizilir.
-        } else if (tur == 1) {
-            dortgenUst(rx, rz, 1, yu + (float) dalgacik(x, z, t), yu + (float) dalgacik(x, z + 1, t),
-                    yu + (float) dalgacik(x + 1, z + 1, t), yu + (float) dalgacik(x + 1, z, t), c, a, ustIsik);
-        } else {
-            dortgenUst(rx, rz, 1, yu, yu, yu, yu, c, a, isik);
+        if (dalga != null && dalgaH > 1) {
+            // Dalga gövdesi turkuaza kayar; tepede beyaz köpük bandı, arkasında yanal köpük çizgileri (tsunami.md).
+            renk = karistir(renk, 0x3E8F94, (float) Math.min(0.7, dalgaH / 8));
+            if (dalgaS < 5) {
+                kopuk = Math.max(kopuk, (float) Math.max(0, 0.95 * (1 - Math.abs(dalgaS - 2.5) / 2.5)));
+            } else if (dalgaS < 14) {
+                double u = -(x + 0.5 - dalga.x0()) * dalga.yonZ() + (z + 0.5 - dalga.z0()) * dalga.yonX();
+                double serit = 0.5 + 0.5 * Math.sin(u * 0.9 + dalgaS * 0.35);
+                kopuk = Math.max(kopuk, (float) (0.45 * serit * (1 - (dalgaS - 5) / 9)));
+            }
+        }
+        float a = Math.max(kopuk * 0.6f, derin < 1 ? 0.25f + 0.15f * derin : Math.min(0.85f, 0.4f + 0.06f * derin));
+        int tabanRenk = karistir(renk, 0xFFFFFF, kopuk * 0.5f);
+        if (tur == 1) {
+            int v00 = i * (N + 1) + j;
+            int v01 = v00 + 1;
+            int v10 = v00 + N + 1;
+            int v11 = v10 + 1;
+            float y00 = yu + VH[v00];
+            float y01 = yu + VH[v01];
+            float y11 = yu + VH[v11];
+            float y10 = yu + VH[v10];
+            kosegolge(0, tabanRenk, a, x, y00, z, v00, isik);
+            kosegolge(1, tabanRenk, a, x, y01, z + 1, v01, isik);
+            kosegolge(2, tabanRenk, a, x + 1, y11, z + 1, v11, isik);
+            kosegolge(3, tabanRenk, a, x + 1, y10, z, v10, isik);
+            dortgenSerbest(rx, y00, rz, rx, y01, rz + 1, rx + 1, y11, rz + 1, rx + 1, y10, rz, false, x, z);
+            if (kopuk > 0.08f) {
+                for (int q = 0; q < 4; q++) {
+                    QC[q] = 0xFFFFFF;
+                    QA[q] = Math.min(1f, kopuk * 1.1f);
+                    QI[q] = isik;
+                }
+                dortgenSerbest(rx, y00 + 0.015f, rz, rx, y01 + 0.015f, rz + 1, rx + 1, y11 + 0.015f, rz + 1, rx + 1,
+                        y10 + 0.015f, rz, true, x, z);
+            }
+            if (dalga != null && bilesen > 1 && dalgaH > 3 && dalgaS > 1.8 && dalgaS < 3.2) {
+                dudak(dalga, rx, rz, dalga.taban() + dalgaH, dalgaH, isik);
+            }
+        } else if (tur == 2) {
+            golgele(tabanRenk, a, x + 0.5, yu, z + 0.5, 0, 0, isik);
+            dortgenUst(rx, rz, 1, yu, yu, yu, yu, gRenk, gAlfa, isik);
         }
         for (int q = 0; q < 4; q++) {
             int n = komsu(i + DI[q], j + DJ[q]);
@@ -685,6 +877,151 @@ public final class SuRenderer {
             }
             dikey(ex0, ez0, ex1, ez1, taban, yu, cy, ay, isik);
         }
+    }
+
+    private static void kosegolge(int q, int taban, float alfa, double x, double y, double z, int v, int isik) {
+        golgele(taban, alfa, x, y, z, VSX[v], VSZ[v], isik);
+        QC[q] = gRenk;
+        QA[q] = gAlfa;
+        QI[q] = gIsik;
+    }
+
+    /**
+     * Kırılan dudak (tsunami.md "köpüklü yıkılan tepe", yalnız görsel ağ): tepeden ilerleme yönüne çıkan ve aşağı kıvrılan
+     * iki şerit, turkuaz gövde üstüne köpük dokusu. Fizik sütun aralığıyla yetinir.
+     */
+    private static void dudak(Dalga w, float rx, float rz, double tepe, double h, int isik) {
+        double boy = Math.min(3.0, 0.28 * h);
+        float ex = (float) (-w.yonZ() * 0.55);
+        float ez = (float) (w.yonX() * 0.55);
+        float cx = rx + 0.5f;
+        float cz = rz + 0.5f;
+        float px = (float) (w.yonX() * boy);
+        float pz = (float) (w.yonZ() * boy);
+        float qx = px * 1.35f;
+        float qz = pz * 1.35f;
+        float y0 = (float) tepe;
+        float y1 = (float) (tepe - 0.25 * boy);
+        float y2 = (float) (tepe - 0.85 * boy);
+        for (int kat = 0; kat < 2; kat++) {
+            boolean doku = kat == 1;
+            float ek = doku ? 0.02f : 0f;
+            for (int q = 0; q < 4; q++) {
+                QC[q] = doku ? 0xFFFFFF : 0x6FC2BC;
+                QA[q] = doku ? 0.9f : 0.85f;
+                QI[q] = isik;
+            }
+            dortgenSerbest(cx - ex, y0 + ek, cz - ez, cx + ex, y0 + ek, cz + ez, cx + ex + px, y1 + ek, cz + ez + pz,
+                    cx - ex + px, y1 + ek, cz - ez + pz, doku, 0, 0);
+            for (int q = 0; q < 4; q++) {
+                QC[q] = doku ? 0xFFFFFF : 0xD8F0F0;
+                QA[q] = doku ? 0.95f : 0.8f;
+            }
+            dortgenSerbest(cx - ex + px, y1 + ek, cz - ez + pz, cx + ex + px, y1 + ek, cz + ez + pz, cx + ex + qx, y2,
+                    cz + ez + qz, cx - ex + qx, y2, cz - ez + qz, doku, 0, 0);
+        }
+    }
+
+    /**
+     * Serbest dörtgen; köşe renk/alfa/ışığı {@link #QC}, {@link #QA}, {@link #QI}. {@code kopukDoku} ise köpük dokusunun
+     * {@code (bx, bz)} hücresine düşen yarısı (2 blokta bir tekrar), değilse su dokusu.
+     */
+    private static void dortgenSerbest(float x0, float y0, float z0, float x1, float y1, float z1, float x2, float y2, float z2,
+            float x3, float y3, float z3, boolean kopukDoku, int bx, int bz) {
+        float ua;
+        float ub;
+        float va;
+        float vb;
+        if (kopukDoku) {
+            float du = (ku1 - ku0) * 0.5f;
+            float dv = (kv1 - kv0) * 0.5f;
+            ua = ku0 + du * (bx & 1);
+            ub = ua + du;
+            va = kv0 + dv * (bz & 1);
+            vb = va + dv;
+        } else {
+            ua = u0;
+            ub = u1;
+            va = v0;
+            vb = v1;
+        }
+        kose(x0, y0, z0, QC[0], QA[0], ua, va, QI[0], 1);
+        kose(x1, y1, z1, QC[1], QA[1], ua, vb, QI[1], 1);
+        kose(x2, y2, z2, QC[2], QA[2], ub, vb, QI[2], 1);
+        kose(x3, y3, z3, QC[3], QA[3], ub, va, QI[3], 1);
+        dortgen++;
+    }
+
+    /**
+     * Su altı ışık demetleri (SU-28): kamera sanal suyun içindeyken yüzeyden aşağı inen, kameraya dönük, alt ucu güneşten
+     * uzağa kayan, yavaşça salınan saydam dörtgenler; toplamalı karışım, derinlik yazılmaz. Kalite: Orta 14, Yüksek 26, Ultra 40.
+     */
+    private static void isinlariCiz(SanalSuDunyasi d, Vec3 cam, Matrix4f mv, Matrix4f proj, ShaderInstance sh) {
+        double yuzey = d.ustu(cam.x, cam.y, cam.z, saat);
+        if (Double.isNaN(yuzey)) {
+            return;
+        }
+        int enCok = bilesen >= 4 ? 40 : bilesen == 3 ? 26 : 14;
+        int ox = (int) Math.floor(cam.x);
+        int oy = (int) Math.floor(cam.y);
+        int oz = (int) Math.floor(cam.z);
+        bb = BB_ISIK;
+        oyAktif = oy;
+        BB_ISIK.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
+        dortgen = 0;
+        int tam = LightTexture.pack(15, 15);
+        float du = (u1 - u0) * 0.12f;
+        for (int gx = Math.floorDiv(ox - 15, 3); gx * 3 <= ox + 15 && dortgen < enCok; gx++) {
+            for (int gz = Math.floorDiv(oz - 15, 3); gz * 3 <= oz + 15 && dortgen < enCok; gz++) {
+                int h = (gx * 73856093) ^ (gz * 19349663);
+                h ^= h >>> 13;
+                h *= 0x5bd1e995;
+                h ^= h >>> 15;
+                if ((h & 3) == 0) {
+                    continue;
+                }
+                double px = gx * 3 + ((h >>> 4) & 255) / 255.0 * 3;
+                double pz = gz * 3 + ((h >>> 12) & 255) / 255.0 * 3;
+                double dx = px - cam.x;
+                double dz = pz - cam.z;
+                double dl = Math.sqrt(dx * dx + dz * dz);
+                if (dl > 15 || dl < 0.8) {
+                    continue;
+                }
+                double gen = 0.35 + ((h >>> 20) & 15) / 15.0 * 0.55;
+                double wx = -dz / dl * gen;
+                double wz = dx / dl * gen;
+                double ust = yuzey - 0.15;
+                double boy = 9 + ((h >>> 24) & 7);
+                double kx = -gunesX * boy * 0.25 + 0.4 * Math.sin(saat * 0.02 + (h & 255));
+                double kz = 0.3 * Math.cos(saat * 0.017 + (h & 127));
+                float a = (float) (0.16 * (0.6 + 0.4 * Math.sin(saat * 0.05 + (h & 63))));
+                float sx = (float) (px - ox);
+                float sz = (float) (pz - oz);
+                float ua = u0 + du * ((h >>> 8) & 7);
+                kose(sx - (float) wx, (float) ust, sz - (float) wz, ISIK_RENGI, a, ua, v0, tam, 0);
+                kose(sx + (float) wx, (float) ust, sz + (float) wz, ISIK_RENGI, a, ua + du, v0, tam, 0);
+                kose(sx + (float) (wx + kx), (float) (ust - boy), sz + (float) (wz + kz), ISIK_RENGI, 0f, ua + du, v1, tam, 0);
+                kose(sx - (float) (wx - kx), (float) (ust - boy), sz - (float) (wz - kz), ISIK_RENGI, 0f, ua, v1, tam, 0);
+                dortgen++;
+            }
+        }
+        bb = BB;
+        if (dortgen == 0) {
+            BB_ISIK.end().release();
+            return;
+        }
+        if (vbIsik == null) {
+            vbIsik = new VertexBuffer(VertexBuffer.Usage.DYNAMIC);
+        }
+        vbIsik.bind();
+        vbIsik.upload(BB_ISIK.end());
+        RenderSystem.depthMask(false);
+        RenderSystem.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE);
+        ofset(sh, ox - cam.x, oy - cam.y, oz - cam.z);
+        vbIsik.drawWithShader(mv, proj, sh);
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.depthMask(true);
     }
 
     private static int carp(int c, float f) {

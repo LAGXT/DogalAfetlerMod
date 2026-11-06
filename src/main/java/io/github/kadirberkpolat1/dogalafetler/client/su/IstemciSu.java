@@ -5,6 +5,7 @@ import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciDonem;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.su.Cekilme;
+import io.github.kadirberkpolat1.dogalafetler.su.Dalga;
 import io.github.kadirberkpolat1.dogalafetler.su.DenizAlani;
 import io.github.kadirberkpolat1.dogalafetler.su.MagaraZamani;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
@@ -104,6 +105,50 @@ public final class IstemciSu {
             dunya.dalgaKaldir(id);
         }
         buhar(l, t);
+        serpinti(mc, l, t);
+    }
+
+    /**
+     * Dalga tepesi sıçrantısı (SU-28): tepe hattı boyunca beyaz serpinti bulutu (dalga yönünde savrulur), sıçrama damlaları
+     * ve kıvrılan dudağın ucundan düşen su; yalnız oyuncuya 96 blok yakın tepe noktaları, kalite çarpanıyla.
+     */
+    private static void serpinti(Minecraft mc, ClientLevel l, double t) {
+        double carpan = parcacikCarpani();
+        if (carpan <= 0) {
+            return;
+        }
+        RandomSource r = l.random;
+        for (Dalga w : dunya.dalgaDizisi()) {
+            if (w.bitti(t) || w.yukseklik() < 2) {
+                continue;
+            }
+            double c = w.cephe(t) - 2.5;
+            double mx = w.x0() + w.yonX() * c;
+            double mz = w.z0() + w.yonZ() * c;
+            int adet = (int) Math.ceil(14 * carpan);
+            for (int i = 0; i < adet; i++) {
+                double u = (r.nextDouble() - 0.5) * w.genislik() * 0.9;
+                double px = mx - w.yonZ() * u;
+                double pz = mz + w.yonX() * u;
+                if (mc.player.distanceToSqr(px, mc.player.getY(), pz) > 96 * 96) {
+                    continue;
+                }
+                double y = w.yuzey(px, pz, t);
+                if (Double.isNaN(y) || y - w.taban() < 1.5) {
+                    continue;
+                }
+                l.addParticle(ParticleTypes.CLOUD, px + r.nextGaussian() * 0.3, y + 0.1, pz + r.nextGaussian() * 0.3,
+                        w.yonX() * w.hiz() * 0.6 + r.nextGaussian() * 0.03, 0.05 + r.nextDouble() * 0.12,
+                        w.yonZ() * w.hiz() * 0.6 + r.nextGaussian() * 0.03);
+                if (r.nextInt(2) == 0) {
+                    l.addParticle(ParticleTypes.SPLASH, px, y + 0.2, pz, w.yonX() * 0.3, 0.2, w.yonZ() * 0.3);
+                }
+                if (r.nextInt(3) == 0) {
+                    double boy = Math.min(3.0, 0.28 * (y - w.taban()));
+                    l.addParticle(ParticleTypes.FALLING_WATER, px + w.yonX() * boy, y - 0.3 * boy, pz + w.yonZ() * boy, 0, 0, 0);
+                }
+            }
+        }
     }
 
     /** Kalite ve config çarpanıyla parçacık yoğunluğu. */

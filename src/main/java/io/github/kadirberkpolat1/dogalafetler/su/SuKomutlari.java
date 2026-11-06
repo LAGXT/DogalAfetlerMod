@@ -42,6 +42,11 @@ public final class SuKomutlari {
     static final String ASAMA_HEDEF = ON + "asama.hedef";
     static final String ASAMA_GERI = ON + "asama.geri";
     static final String ASAMA_MAGARA = ON + "asama.magara";
+    static final String VITRIN = ON + "vitrin";
+    static final String VITRIN_YOK = ON + "vitrin_yok";
+    static final String VITRIN_KAMERA = ON + "vitrin_kamera";
+    static final String VITRIN_DALGA = ON + "vitrin_dalga";
+    static final String AY = ON + "ay";
 
     private SuKomutlari() {
     }
@@ -70,7 +75,17 @@ public final class SuKomutlari {
                                         .executes(k -> cekilme(k, IntegerArgumentType.getInteger(k, "yaricap"),
                                                 IntegerArgumentType.getInteger(k, "derinlik"))))))
                 .then(Commands.literal("temizle").executes(SuKomutlari::temizle))
-                .then(Commands.literal("kiyi").executes(SuKomutlari::kiyi)));
+                .then(Commands.literal("kiyi").executes(SuKomutlari::kiyi))
+                .then(Commands.literal("vitrin").executes(SuKomutlari::vitrin)
+                        .then(Commands.literal("kamera")
+                                .then(Commands.literal("iskele").executes(k -> vitrinKamera(k, SuVitrin.Kamera.ISKELE)))
+                                .then(Commands.literal("sualti").executes(k -> vitrinKamera(k, SuVitrin.Kamera.SUALTI)))
+                                .then(Commands.literal("tepe").executes(k -> vitrinKamera(k, SuVitrin.Kamera.TEPE))))
+                        .then(Commands.literal("dalga").then(Commands.argument("yukseklik", IntegerArgumentType.integer(1, 30))
+                                .executes(k -> vitrinDalga(k, IntegerArgumentType.getInteger(k, "yukseklik"))))))
+                .then(Commands.literal("ay")
+                        .then(Commands.literal("var").executes(k -> ay(k, true)))
+                        .then(Commands.literal("yok").executes(k -> ay(k, false)))));
         DataGenerators.ceviriEkle(SuKomutlari::cevirileriYaz);
     }
 
@@ -171,8 +186,23 @@ public final class SuKomutlari {
         ServerPlayer p = k.getSource().getPlayerOrException();
         ServerLevel l = p.serverLevel();
         int deniz = l.getSeaLevel();
-        int px = p.getBlockX();
-        int pz = p.getBlockZ();
+        int[] en = kumsalBul(l, p.getBlockX(), p.getBlockZ());
+        if (en == null) {
+            k.getSource().sendFailure(Component.translatable(KIYI_YOK));
+            return 0;
+        }
+        double x = en[0] + 0.5 - en[2] * 16;
+        double z = en[1] + 0.5 - en[3] * 16;
+        float yaw = (float) Math.toDegrees(Math.atan2(-en[2], en[3]));
+        p.setGameMode(GameType.SPECTATOR);
+        p.teleportTo(l, x, deniz + 7, z, yaw, 14f);
+        yaz(k, Component.translatable(KIYI, en[0], deniz, en[1]));
+        return 1;
+    }
+
+    /** En iyi kumsal {@code {x, z, karaX, karaZ}} (kara yönü birim eksen) ya da {@code null}; yalnız yüklü chunk'lar. */
+    static int[] kumsalBul(ServerLevel l, int px, int pz) {
+        int deniz = l.getSeaLevel();
         int[][] yonler = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
         int enPuan = 0;
         int[] en = null;
@@ -194,16 +224,45 @@ public final class SuKomutlari {
                 }
             }
         }
-        if (en == null) {
+        return en;
+    }
+
+    /** Vitrin sahnesi (SU-29): kumsala iskele ve kıyı köyü kurar, kamera iskelenin ucunda. */
+    private static int vitrin(CommandContext<CommandSourceStack> k) throws CommandSyntaxException {
+        ServerPlayer p = k.getSource().getPlayerOrException();
+        SuVitrin.Sahne s = SuVitrin.kur(p.serverLevel(), p.getBlockX(), p.getBlockZ());
+        if (s == null) {
             k.getSource().sendFailure(Component.translatable(KIYI_YOK));
             return 0;
         }
-        double x = en[0] + 0.5 - en[2] * 16;
-        double z = en[1] + 0.5 - en[3] * 16;
-        float yaw = (float) Math.toDegrees(Math.atan2(-en[2], en[3]));
-        p.setGameMode(GameType.SPECTATOR);
-        p.teleportTo(l, x, deniz + 7, z, yaw, 14f);
-        yaz(k, Component.translatable(KIYI, en[0], deniz, en[1]));
+        SuVitrin.kamera(p, SuVitrin.Kamera.ISKELE);
+        yaz(k, Component.translatable(VITRIN, s.x(), s.deniz(), s.z()));
+        return 1;
+    }
+
+    private static int vitrinKamera(CommandContext<CommandSourceStack> k, SuVitrin.Kamera ne) throws CommandSyntaxException {
+        if (!SuVitrin.kamera(k.getSource().getPlayerOrException(), ne)) {
+            k.getSource().sendFailure(Component.translatable(VITRIN_YOK));
+            return 0;
+        }
+        yaz(k, Component.translatable(VITRIN_KAMERA, ne.name().toLowerCase(Locale.ROOT)));
+        return 1;
+    }
+
+    private static int vitrinDalga(CommandContext<CommandSourceStack> k, int yukseklik) {
+        int id = SuVitrin.dalga(k.getSource().getLevel(), yukseklik);
+        if (id < 0) {
+            k.getSource().sendFailure(Component.translatable(VITRIN_YOK));
+            return 0;
+        }
+        yaz(k, Component.translatable(VITRIN_DALGA, id, yukseklik));
+        return id;
+    }
+
+    /** Test: ayı kaldırır/geri koyar ({@code DunyaDonemi.ayVarAyarla}); ay yok olunca deniz süreci beklemeye girer. */
+    private static int ay(CommandContext<CommandSourceStack> k, boolean var) {
+        io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi.al(k.getSource().getServer()).ayVarAyarla(var);
+        yaz(k, Component.translatable(AY, var ? "+" : "-"));
         return 1;
     }
 
@@ -226,7 +285,7 @@ public final class SuKomutlari {
     }
 
     /** Yalnız yüklü chunk'lar (arama chunk üretmez); yüklü değilse {@link Integer#MIN_VALUE}. */
-    private static int yuzey(ServerLevel l, int x, int z) {
+    static int yuzey(ServerLevel l, int x, int z) {
         if (!l.hasChunk(x >> 4, z >> 4)) {
             return Integer.MIN_VALUE;
         }
@@ -271,6 +330,11 @@ public final class SuKomutlari {
         y.ekle(ASAMA_BASLADI, "Sea level rise: waiting skipped, rising", "Deniz yükselmesi: bekleme atlandı, yükseliyor");
         y.ekle(ASAMA_HEDEF, "Sea level rise: reached +%s blocks", "Deniz yükselmesi: +%s bloka ulaştı");
         y.ekle(ASAMA_GERI, "Sea level rise: receding begins", "Deniz yükselmesi: geri çekilme başlıyor");
+        y.ekle(VITRIN, "Showcase scene: beach at %s %s %s, pier and village built", "Vitrin sahnesi: kumsal %s %s %s, iskele ve köy kuruldu");
+        y.ekle(VITRIN_YOK, "No showcase scene yet (run /dogalafet su vitrin)", "Henüz vitrin sahnesi yok (/dogalafet su vitrin)");
+        y.ekle(VITRIN_KAMERA, "Showcase camera: %s", "Vitrin kamerası: %s");
+        y.ekle(VITRIN_DALGA, "Showcase wave #%s (height %s) with drawdown", "Vitrin dalgası #%s (yükseklik %s), çekilmeyle");
+        y.ekle(AY, "Moon: %s", "Ay: %s");
         y.ekle(ASAMA_MAGARA, "Cave water: %s pockets moved to the next stage", "Mağara suyu: %s cep bir sonraki aşamaya geçti");
     }
 }
