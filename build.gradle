@@ -33,6 +33,12 @@ minecraft {
             workingDirectory project.file('run')
             property 'forge.logging.markers', 'REGISTRIES'
             property 'forge.logging.console.level', 'info'
+            // Uyumluluk modlarının mixin refmap'i SRG adlıdır; geliştirme ortamında resmi adlara çevrilmezse hedefler
+            // kayar (Cold Sweat 2.4.5'in required_mods filtresi çalışmaz, dünya kayıt hatasıyla açılmaz).
+            if (uyum != 'yok') {
+                property 'mixin.env.remapRefMap', 'true'
+                property 'mixin.env.refMapRemappingFile', "${projectDir}/build/createSrgToMcp/output.srg"
+            }
 
             mods {
                 "${mod_id}" {
