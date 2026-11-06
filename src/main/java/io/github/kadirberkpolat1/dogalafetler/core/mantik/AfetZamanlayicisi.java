@@ -37,6 +37,11 @@ public final class AfetZamanlayicisi {
             Objects.requireNonNull(uygunTurler, "uygunTurler");
             Objects.requireNonNull(carpan, "carpan");
         }
+
+        /** Aynı girdi, başka uygun tür kümesi ve zorlama ile. */
+        public Girdi ile(Set<AfetTuru> turler, boolean zorlama) {
+            return new Girdi(afetAktif, saat, adimTick, bekleme, turler, carpan, siklik, zorlama);
+        }
     }
 
     private AfetZamanlayicisi() {

@@ -7,8 +7,10 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 
 /**
- * Yaşam döngüsünü uçtan uca sınamak için davranışı olmayan afet: dünyaya dokunmaz, AKTIF aşaması {@code aktifSure} ölçekli
- * tick sürer, etki alanı merkez çevresinde sabit yarıçaptır. GameTest'ler {@link AfetKaydi#geciciKaydet} ile kullanır;
+ * Yaşam döngüsünü uçtan uca sınamak için davranışı olmayan afet: bloklara ve varlıklara dokunmaz, AKTIF aşaması
+ * {@code aktifSure} ölçekli tick sürer, etki alanı merkez çevresinde sabit yarıçaptır. Güneş patlaması türünde gerçek
+ * afetin dönem etkisini taklit eder: AKTIF'e girerken güneş NORMAL ise BUYUYEN, BITIS'e girerken BUYUYEN ise SUPERNOVA olur
+ * (madde 11 "tamamlanmamış süreç" sınanabilsin). GameTest'ler {@link AfetKaydi#geciciKaydet} ile kullanır;
  * geliştirme sunucusunda {@code -Ddogalafetler.oyunTestiAfeti=deprem,sinkhole} (Gradle: {@code -PoyunTestiAfeti=...})
  * verilirse o türler için kaydedilir. Üretim kurulumunda kaydedilmez.
  */
@@ -58,6 +60,19 @@ public final class OyunTestiAfeti extends Afet {
     protected void asamaTick(ServerLevel level, AfetAsamasi asama, int adim) {
         if (asama == AfetAsamasi.AKTIF) {
             aktifGecen += adim;
+        }
+    }
+
+    @Override
+    protected void asamaDegisti(ServerLevel level, AfetAsamasi eski, AfetAsamasi yeni) {
+        if (tur() != AfetTuru.GUNES_PATLAMASI) {
+            return;
+        }
+        DunyaDonemi donem = DunyaDonemi.al(level);
+        if (yeni == AfetAsamasi.AKTIF && donem.gunesEvresi() == GunesEvresi.NORMAL) {
+            donem.gunesEvresiAyarla(GunesEvresi.BUYUYEN);
+        } else if (yeni == AfetAsamasi.BITIS && donem.gunesEvresi() == GunesEvresi.BUYUYEN) {
+            donem.gunesEvresiAyarla(GunesEvresi.SUPERNOVA);
         }
     }
 

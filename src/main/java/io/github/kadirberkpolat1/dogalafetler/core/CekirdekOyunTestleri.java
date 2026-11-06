@@ -4,7 +4,10 @@ import com.mojang.authlib.GameProfile;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SonumTipi;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.ZamanlayiciAyarlari;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.TekSeferlikAyarlari;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.TekSeferlikKurallar;
 import io.github.kadirberkpolat1.dogalafetler.core.olay.AfetBittiEvent;
+import io.github.kadirberkpolat1.dogalafetler.core.olay.SirenIstegiEvent;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import io.netty.channel.embedded.EmbeddedChannel;
 import java.io.File;
@@ -49,9 +52,13 @@ public final class CekirdekOyunTestleri {
      * {@code channel().pipeline()} çağrısında NPE verir; burada bağlantı bir {@link EmbeddedChannel}'a bağlanır.
      */
     public static ServerPlayer sahteOyuncu(GameTestHelper yardimci, double x, double y, double z) {
+        return sahteOyuncu(yardimci, new GameProfile(UUID.randomUUID(), "cekirdek-test"), x, y, z);
+    }
+
+    /** Verilen profille sahte oyuncu (aynı profil = aynı oyuncunun yeniden girişi). */
+    public static ServerPlayer sahteOyuncu(GameTestHelper yardimci, GameProfile profil, double x, double y, double z) {
         ServerLevel level = yardimci.getLevel();
-        ServerPlayer oyuncu = new ServerPlayer(level.getServer(), level,
-                new GameProfile(UUID.randomUUID(), "cekirdek-test"));
+        ServerPlayer oyuncu = new ServerPlayer(level.getServer(), level, profil);
         Connection baglanti = new Connection(PacketFlow.SERVERBOUND);
         new EmbeddedChannel(baglanti);
         level.getServer().getPlayerList().placeNewPlayer(baglanti, oyuncu);
@@ -233,5 +240,166 @@ public final class CekirdekOyunTestleri {
             server.getPlayerList().remove(olen);
         }
         yardimci.succeed();
+    }
+
+    private static int komut(GameTestHelper yardimci, String komut) {
+        MinecraftServer server = yardimci.getLevel().getServer();
+        try {
+            return server.getCommands().getDispatcher().execute(komut,
+                    server.createCommandSourceStack().withSuppressedOutput().withPermission(2));
+        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException hata) {
+            yardimci.fail("/" + komut + " çalışmadı: " + hata.getMessage());
+            return -1;
+        }
+    }
+
+    @GameTest(template = "bos", batch = "cekirdek_gunes")
+    public static void gunesSureciStopIleNormaleDonerUlasilmisDonemKalir(GameTestHelper yardimci) {
+        ServerLevel level = yardimci.getLevel();
+        MinecraftServer server = level.getServer();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(server);
+        DunyaDonemi donem = yonetici.donem();
+        yonetici.durdur();
+        donem.gunesEvresiAyarla(GunesEvresi.NORMAL);
+        BlockPos konum = yardimci.absolutePos(BlockPos.ZERO);
+        try (AfetKaydi.GeciciKayit kayit = AfetKaydi.geciciKaydet(AfetTuru.GUNES_PATLAMASI,
+                () -> new OyunTestiAfeti(AfetTuru.GUNES_PATLAMASI, 0, 10_000))) {
+            yardimci.assertTrue(yonetici.elleBaslat(AfetTuru.GUNES_PATLAMASI, null, null, level, konum)
+                    == AfetYoneticisi.BaslatmaSonucu.BASLADI, "güneş patlaması başlamadı");
+            yonetici.asamaIleri();
+            yonetici.asamaIleri();
+            yardimci.assertTrue(donem.gunesEvresi() == GunesEvresi.BUYUYEN, "AKTIF'te güneş büyümeli");
+            yardimci.assertTrue(komut(yardimci, "dogalafet stop") == 1, "stop başarısız");
+            yardimci.assertTrue(yonetici.aktifAfet().isEmpty(), "afet durmadı");
+            yardimci.assertTrue(donem.gunesEvresi() == GunesEvresi.NORMAL,
+                    "tamamlanmamış büyüme durdurulunca güneş NORMAL olmalı: " + donem.gunesEvresi());
+            yardimci.assertTrue(TekSeferlikKurallar.uygunMu(AfetTuru.GUNES_PATLAMASI, donem.ayVar(), donem.gunesEvresi(),
+                    1000, 1000, TekSeferlikAyarlari.VARSAYILAN), "güneş patlaması yeniden seçilebilir kalmalı");
+
+            yardimci.assertTrue(yonetici.elleBaslat(AfetTuru.GUNES_PATLAMASI, null, null, level, konum)
+                    == AfetYoneticisi.BaslatmaSonucu.BASLADI, "ikinci güneş patlaması başlamadı");
+            yonetici.asamaIleri();
+            yonetici.asamaIleri();
+            donem.gunesEvresiAyarla(GunesEvresi.SUPERNOVA);
+            yardimci.assertTrue(komut(yardimci, "dogalafet stop") == 1, "ikinci stop başarısız");
+            yardimci.assertTrue(donem.gunesEvresi() == GunesEvresi.SUPERNOVA, "ulaşılmış süpernova geri alınmamalı");
+        } finally {
+            yonetici.durdur();
+            donem.gunesEvresiAyarla(GunesEvresi.NORMAL);
+        }
+        yardimci.succeed();
+    }
+
+    /** Durdurulması sayılan sahte dönem süreci. */
+    private static final class SahteSurec implements DonemSureci {
+        private final AfetTuru tur;
+        private boolean aktif = true;
+        private int durdurma;
+
+        private SahteSurec(AfetTuru tur) {
+            this.tur = tur;
+        }
+
+        @Override
+        public String kimlik() {
+            return "oyuntesti_" + tur.kimlik();
+        }
+
+        @Override
+        public Optional<AfetTuru> afetTuru() {
+            return Optional.of(tur);
+        }
+
+        @Override
+        public boolean aktifMi(ServerLevel ustDunya) {
+            return aktif;
+        }
+
+        @Override
+        public void durdur(ServerLevel ustDunya) {
+            aktif = false;
+            durdurma++;
+        }
+    }
+
+    @GameTest(template = "bos", batch = "cekirdek_surec")
+    public static void donemSureciStopVeGameruleIleDurur(GameTestHelper yardimci) {
+        MinecraftServer server = yardimci.getLevel().getServer();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(server);
+        DunyaDonemi donem = yonetici.donem();
+        GameRules kurallar = server.getGameRules();
+        boolean oncekiAy = kurallar.getBoolean(Kurallar.AY_CARPMASI_AFETI);
+        yonetici.durdur();
+        SahteSurec ay = new SahteSurec(AfetTuru.AY_CARPMASI);
+        SahteSurec gunes = new SahteSurec(AfetTuru.GUNES_PATLAMASI);
+        try (AfetKaydi.GeciciKayit k1 = AfetYoneticisi.geciciDonemSureciKaydet(ay);
+                AfetKaydi.GeciciKayit k2 = AfetYoneticisi.geciciDonemSureciKaydet(gunes)) {
+            yardimci.assertTrue(yonetici.aktifDonemSurecleri().size() == 2, "iki süreç aktif olmalı");
+            yardimci.assertTrue(komut(yardimci, "dogalafet durum") == 1, "durum başarısız");
+            donem.gunesEvresiAyarla(GunesEvresi.BUYUYEN);
+            yardimci.assertTrue(komut(yardimci, "dogalafet stop") == 1, "afet yokken stop süreçleri durdurmalı");
+            yardimci.assertTrue(ay.durdurma == 1 && gunes.durdurma == 1, "durdur() çağrılmadı");
+            yardimci.assertTrue(donem.gunesEvresi() == GunesEvresi.NORMAL, "güneş süreci durunca BUYUYEN geri alınmalı");
+            yardimci.assertTrue(yonetici.aktifDonemSurecleri().isEmpty(), "süreçler aktif kaldı");
+            yardimci.assertTrue(komut(yardimci, "dogalafet stop") == 0, "durdurulacak bir şey yokken stop 0 dönmeli");
+
+            ay.aktif = true;
+            gunes.aktif = true;
+            kurallar.getRule(Kurallar.AY_CARPMASI_AFETI).set(true, server);
+            yardimci.assertTrue(yonetici.kurallariDenetle().isEmpty(), "kurallar açıkken süreç durmamalı");
+            kurallar.getRule(Kurallar.AY_CARPMASI_AFETI).set(false, server);
+            yardimci.assertTrue(yonetici.kurallariDenetle().equals(List.of(ay)), "ay çarpması kuralı kapanınca ay süreci durmalı");
+            yardimci.assertTrue(ay.durdurma == 2 && gunes.durdurma == 1, "yalnız kuralı kapanan süreç durmalı");
+        } finally {
+            kurallar.getRule(Kurallar.AY_CARPMASI_AFETI).set(oncekiAy, server);
+            donem.gunesEvresiAyarla(GunesEvresi.NORMAL);
+        }
+        yardimci.succeed();
+    }
+
+    @GameTest(template = "bos", batch = "cekirdek_siren", timeoutTicks = 200)
+    public static void sirenSirasindaCikipGireneKalanSureyleYenidenGider(GameTestHelper yardimci) {
+        ServerLevel level = yardimci.getLevel();
+        MinecraftServer server = level.getServer();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(server);
+        yonetici.durdur();
+        BlockPos merkez = yardimci.absolutePos(BlockPos.ZERO);
+        GameProfile profil = new GameProfile(UUID.randomUUID(), "siren-test");
+        ServerPlayer ilk = sahteOyuncu(yardimci, profil, merkez.getX() + 0.5, merkez.getY(), merkez.getZ() + 0.5);
+        List<SirenIstegiEvent> istekler = new ArrayList<>();
+        Consumer<SirenIstegiEvent> dinleyici = istekler::add;
+        MinecraftForge.EVENT_BUS.addListener(EventPriority.NORMAL, false, SirenIstegiEvent.class, dinleyici);
+        AfetKaydi.GeciciKayit kayit = AfetKaydi.geciciKaydet(AfetTuru.DEPREM,
+                () -> new OyunTestiAfeti(AfetTuru.DEPREM, 16, 100));
+        ServerPlayer[] ikinci = new ServerPlayer[1];
+        Runnable temizle = () -> {
+            MinecraftForge.EVENT_BUS.unregister(dinleyici);
+            yonetici.durdur();
+            kayit.close();
+            if (ikinci[0] != null) {
+                server.getPlayerList().remove(ikinci[0]);
+            }
+        };
+        try {
+            yardimci.assertTrue(yonetici.elleBaslat(AfetTuru.DEPREM, 1, ilk, level, merkez)
+                    == AfetYoneticisi.BaslatmaSonucu.BASLADI, "afet başlamadı");
+            yonetici.asamaIleri();
+            yardimci.assertTrue(istekler.size() == 1 && istekler.get(0).oyuncular().contains(ilk),
+                    "SIREN başlarken oyuncuya siren gitmeli");
+            server.getPlayerList().remove(ilk);
+            ikinci[0] = sahteOyuncu(yardimci, profil, merkez.getX() + 0.5, merkez.getY(), merkez.getZ() + 0.5);
+        } catch (RuntimeException hata) {
+            temizle.run();
+            throw hata;
+        }
+        int ilkSure = istekler.get(0).sureTick();
+        yardimci.succeedWhen(() -> {
+            yardimci.assertTrue(istekler.size() >= 2, "yeniden giren oyuncuya siren isteği henüz gitmedi");
+            SirenIstegiEvent son = istekler.get(istekler.size() - 1);
+            yardimci.assertTrue(son.oyuncular().stream().anyMatch(o -> o.getUUID().equals(profil.getId())),
+                    "ikinci istek yeniden giren oyuncuya değil");
+            yardimci.assertTrue(son.sureTick() < ilkSure, "ikinci istek kalan süreyle gitmeli: " + son.sureTick());
+            temizle.run();
+        });
     }
 }

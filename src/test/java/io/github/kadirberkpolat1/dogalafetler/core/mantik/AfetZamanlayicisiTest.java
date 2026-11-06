@@ -4,9 +4,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
+import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.OptionalDouble;
 import java.util.Set;
 import java.util.SplittableRandom;
 import org.junit.jupiter.api.Test;
@@ -14,20 +19,23 @@ import org.junit.jupiter.api.Test;
 class AfetZamanlayicisiTest {
     private static final List<AfetTuru> SIK_ALTI = List.of(AfetTuru.KASIRGA, AfetTuru.TSUNAMI, AfetTuru.DEPREM,
             AfetTuru.ASIT_YAGMURU, AfetTuru.SINKHOLE, AfetTuru.ORMAN_YANGINI);
+    /** Bekleme yok, günde 240 olay oranı: 10^6 tick'te ~9 000 afet; sıra istatistiksel olarak sağlam. */
+    private static final ZamanlayiciAyarlari YOGUN = ZamanlayiciAyarlari.VARSAYILAN.gunlukOranIle(240).genelBeklemeIle(0)
+            .turBeklemeleriIle(0).baslangicBeklemeIle(0);
 
     private static AfetZamanlayicisi.Girdi girdi(boolean aktif, long saat, BeklemeDurumu bekleme,
             Set<AfetTuru> uygun, double carpan, boolean zorla) {
-        return new AfetZamanlayicisi.Girdi(aktif, saat, AfetSimulasyonu.ADIM, bekleme, uygun, tur -> carpan, 1.0,
-                zorla);
+        return new AfetZamanlayicisi.Girdi(aktif, saat, 20, bekleme, uygun, tur -> carpan, 1.0, zorla);
+    }
+
+    private static AfetSimulasyonu yogun() {
+        return new AfetSimulasyonu().zamanlayici(YOGUN).afetSuresi(20);
     }
 
     @Test
     void dagilimNadirlikSirasiniKorurVeHicbirAfetSifirKalmaz() {
-        // Yoğun ayar: bekleme yok, günde 240 olay oranı. 10^6 tick'te ~7 700 afet; sıra istatistiksel olarak sağlam.
-        ZamanlayiciAyarlari yogun = ZamanlayiciAyarlari.VARSAYILAN.gunlukOranIle(240).genelBeklemeIle(0)
-                .turBeklemeleriIle(0).baslangicBeklemeIle(0);
-        AfetSimulasyonu.Sonuc sonuc = new AfetSimulasyonu().zamanlayici(yogun).afetSuresi(20).kos(1_000_000);
-
+        // Gün 1000: gün kapıları açık, ay var, güneş normal (dönem geçişi kapalı: tek seferlikler tekrar çıkabilir).
+        AfetSimulasyonu.Sonuc sonuc = yogun().gun(1000).kos(1_000_000);
         int ay = sonuc.sayi(AfetTuru.AY_CARPMASI);
         int gunes = sonuc.sayi(AfetTuru.GUNES_PATLAMASI);
         double sikOrtalama = SIK_ALTI.stream().mapToInt(sonuc::sayi).average().orElseThrow();
@@ -44,19 +52,93 @@ class AfetZamanlayicisiTest {
     }
 
     @Test
+    void gunSifirdaGunesPatlamasiVeAyCarpmasiCikmaz() {
+        AfetSimulasyonu.Sonuc sonuc = yogun().gunSabit(0).kos(1_000_000);
+        assertEquals(0, sonuc.sayi(AfetTuru.GUNES_PATLAMASI), sonuc.sayilar().toString());
+        assertEquals(0, sonuc.sayi(AfetTuru.AY_CARPMASI), sonuc.sayilar().toString());
+        for (AfetTuru tur : SIK_ALTI) {
+            assertTrue(sonuc.sayi(tur) > 0, tur + " gün 0'da da çıkmalı");
+        }
+    }
+
+    @Test
+    void ayYokkenAyCarpmasiKizilCucedeGunesPatlamasiCikmaz() {
+        AfetSimulasyonu.Sonuc aysiz = yogun().gun(1000).ayVar(false).kos(1_000_000);
+        assertEquals(0, aysiz.sayi(AfetTuru.AY_CARPMASI));
+        assertTrue(aysiz.sayi(AfetTuru.GUNES_PATLAMASI) > 0);
+        AfetSimulasyonu.Sonuc kizilCuce = yogun().gun(1000).evre(GunesEvresi.KIZIL_CUCE).kos(1_000_000);
+        assertEquals(0, kizilCuce.sayi(AfetTuru.GUNES_PATLAMASI));
+        assertTrue(kizilCuce.sayi(AfetTuru.AY_CARPMASI) > 0);
+    }
+
+    @Test
+    void puanKriterindeGelismemisOyuncuyaTekSeferlikAfetGelmez() {
+        TekSeferlikAyarlari puanli = TekSeferlikAyarlari.VARSAYILAN.kriterlerIle(GelisimKriteri.PUAN,
+                GelisimKriteri.PUAN);
+        AfetSimulasyonu.Sonuc dusuk = yogun().gun(1000).tekSeferlik(puanli).puan(10).kos(1_000_000);
+        assertEquals(0, dusuk.sayi(AfetTuru.GUNES_PATLAMASI));
+        assertEquals(0, dusuk.sayi(AfetTuru.AY_CARPMASI));
+        AfetSimulasyonu.Sonuc yuksek = yogun().gunSabit(0).tekSeferlik(puanli).puan(100).kos(1_000_000);
+        assertTrue(yuksek.sayi(AfetTuru.GUNES_PATLAMASI) > 0, "puan kriteri güne bakmaz");
+        assertTrue(yuksek.sayi(AfetTuru.AY_CARPMASI) > 0);
+    }
+
+    @Test
+    void tekSeferlikOlaylarGerceklesinceBirDahaSecilmez() {
+        AfetSimulasyonu.Sonuc sonuc = yogun().gun(1000).donemGecisleri(true).kos(1_000_000);
+        assertEquals(1, sonuc.sayi(AfetTuru.AY_CARPMASI), sonuc.sayilar().toString());
+        assertEquals(1, sonuc.sayi(AfetTuru.GUNES_PATLAMASI), sonuc.sayilar().toString());
+        for (AfetTuru tur : SIK_ALTI) {
+            assertTrue(sonuc.sayi(tur) > 0, tur + " her dönemde devam etmeli");
+        }
+    }
+
+    @Test
     void varsayilanAyarlarlaSiklikMakulVeHerAfetGorulur() {
-        AfetSimulasyonu.Sonuc sonuc = new AfetSimulasyonu().afetSuresi(6000).kos(10_000_000);
+        AfetSimulasyonu.Sonuc sonuc = new AfetSimulasyonu().afetSuresi(6000).donemGecisleri(true).kos(10_000_000);
         double gunluk = sonuc.gunlukOlay();
         assertTrue(gunluk > 0.25 && gunluk < 1.0, "günlük afet sayısı makul aralıkta değil: " + gunluk);
         for (AfetTuru tur : AfetTuru.values()) {
             assertTrue(sonuc.sayi(tur) > 0, tur + " 417 günde hiç çıkmadı: " + sonuc.sayilar());
         }
-        // İlk afetten sonraki her afet en az genel bekleme kadar sonra başlar.
+        assertEquals(1, sonuc.sayi(AfetTuru.AY_CARPMASI));
+        assertEquals(1, sonuc.sayi(AfetTuru.GUNES_PATLAMASI));
         List<AfetSimulasyonu.Olay> olaylar = sonuc.olaylar();
         for (int i = 1; i < olaylar.size(); i++) {
             long ara = olaylar.get(i).baslangic() - olaylar.get(i - 1).bitis();
             assertTrue(ara >= ZamanlayiciAyarlari.VARSAYILAN.genelBeklemeTick(), "bekleme bozuldu: " + ara);
         }
+    }
+
+    @Test
+    void ilkGunesPatlamasiOrtancasiAltmisIleYuzYirmiArasiVeAydanSonra() {
+        int dunya = 400;
+        long sinir = 400L * AfetZamanlayicisi.GUN_TICK;
+        List<Double> gunes = new ArrayList<>();
+        List<Double> ay = new ArrayList<>();
+        int gunesli = 0;
+        for (int i = 0; i < dunya; i++) {
+            AfetSimulasyonu.Sonuc sonuc = new AfetSimulasyonu().tohum(1000 + i).adim(100).afetSuresi(8000)
+                    .donemGecisleri(true).ilkOlaylardaDur(EnumSet.of(AfetTuru.GUNES_PATLAMASI, AfetTuru.AY_CARPMASI))
+                    .kos(sinir);
+            OptionalDouble g = sonuc.ilkGun(AfetTuru.GUNES_PATLAMASI);
+            OptionalDouble a = sonuc.ilkGun(AfetTuru.AY_CARPMASI);
+            gunes.add(g.orElse(Double.POSITIVE_INFINITY));
+            ay.add(a.orElse(Double.POSITIVE_INFINITY));
+            if (g.isPresent()) {
+                gunesli++;
+            }
+        }
+        Collections.sort(gunes);
+        Collections.sort(ay);
+        double gunesOrtanca = gunes.get(dunya / 2);
+        double ayOrtanca = ay.get(dunya / 2);
+        double oran = gunesli / (double) dunya;
+        System.out.printf(Locale.ROOT, "ilk güneş patlaması ortanca gün %.1f, 400 günde görülme %.4f; ilk ay çarpması ortanca gün %.1f%n",
+                gunesOrtanca, oran, ayOrtanca);
+        assertTrue(gunesOrtanca >= 60 && gunesOrtanca <= 120, "ilk güneş patlaması ortancası: " + gunesOrtanca);
+        assertTrue(oran >= 0.99, "400 günde en az bir güneş patlaması oranı: " + oran);
+        assertTrue(ayOrtanca < gunesOrtanca, "ay çarpması ortancası " + ayOrtanca + " güneşten önce olmalı");
     }
 
     @Test
@@ -67,8 +149,8 @@ class AfetZamanlayicisiTest {
         long bitis = 1000 + ayarlar.genelBeklemeTick();
         SplittableRandom rastgele = new SplittableRandom(1);
         Set<AfetTuru> hepsi = EnumSet.allOf(AfetTuru.class);
-        for (long saat = 1000; saat < bitis; saat += AfetSimulasyonu.ADIM) {
-            assertTrue(AfetZamanlayicisi.sec(ayarlar, girdi(false, saat, bekleme, hepsi, 1000, false), rastgele)
+        for (long saat = 1000; saat < bitis; saat += 20) {
+            assertTrue(AfetZamanlayicisi.sec(ayarlar, girdi(false, saat, bekleme, hepsi, 100, false), rastgele)
                     .isEmpty(), "genel bekleme içinde seçim yapıldı: saat " + saat);
         }
         Optional<AfetTuru> sonra = AfetZamanlayicisi.sec(ayarlar, girdi(false, bitis, bekleme, hepsi, 1, false),
@@ -132,11 +214,8 @@ class AfetZamanlayicisiTest {
     void carpanTurunPayiniArttirir() {
         CarpanListesi carpanlar = new CarpanListesi();
         carpanlar.ekle(new GeciciCarpan(AfetTuru.TSUNAMI, 4, 0, 10_000_000, 1, SonumTipi.DOGRUSAL));
-        ZamanlayiciAyarlari yogun = ZamanlayiciAyarlari.VARSAYILAN.gunlukOranIle(240).genelBeklemeIle(0)
-                .turBeklemeleriIle(0).baslangicBeklemeIle(0);
-        AfetSimulasyonu.Sonuc normal = new AfetSimulasyonu().zamanlayici(yogun).afetSuresi(20).kos(1_000_000);
-        AfetSimulasyonu.Sonuc artmis = new AfetSimulasyonu().zamanlayici(yogun).carpanlar(carpanlar).afetSuresi(20)
-                .kos(1_000_000);
+        AfetSimulasyonu.Sonuc normal = yogun().gun(1000).kos(1_000_000);
+        AfetSimulasyonu.Sonuc artmis = yogun().gun(1000).carpanlar(carpanlar).kos(1_000_000);
         double payNormal = normal.sayi(AfetTuru.TSUNAMI) / (double) normal.toplam();
         double payArtmis = artmis.sayi(AfetTuru.TSUNAMI) / (double) artmis.toplam();
         assertTrue(payArtmis > payNormal * 2.5, "çarpan 4 tsunami payını belirgin artırmalı: " + payNormal + " -> "
@@ -149,25 +228,28 @@ class AfetZamanlayicisiTest {
         SplittableRandom rastgele = new SplittableRandom(3);
         Set<AfetTuru> hepsi = EnumSet.allOf(AfetTuru.class);
         for (int i = 0; i < 1000; i++) {
-            assertTrue(AfetZamanlayicisi.sec(ayarlar, girdi(true, 100_000, new BeklemeDurumu(), hepsi, 1000, false),
+            assertTrue(AfetZamanlayicisi.sec(ayarlar, girdi(true, 100_000, new BeklemeDurumu(), hepsi, 100, false),
                     rastgele).isEmpty());
-            assertTrue(AfetZamanlayicisi.sec(ayarlar, girdi(true, 100_000, new BeklemeDurumu(), hepsi, 1000, true),
+            assertTrue(AfetZamanlayicisi.sec(ayarlar, girdi(true, 100_000, new BeklemeDurumu(), hepsi, 100, true),
                     rastgele).isEmpty());
         }
-        AfetSimulasyonu.Sonuc sonuc = new AfetSimulasyonu().zamanlayici(ayarlar.genelBeklemeIle(0).turBeklemeleriIle(0))
-                .afetSuresi(2000).kos(2_000_000);
+        AfetSimulasyonu.Sonuc sonuc = new AfetSimulasyonu().gun(1000)
+                .zamanlayici(ayarlar.genelBeklemeIle(0).turBeklemeleriIle(0)).afetSuresi(2000).kos(2_000_000);
         assertEquals(0, sonuc.ayniAnIhlali());
+        assertTrue(sonuc.toplam() > 100);
     }
 
     @Test
     void oyuncuSayisindanBagimsizSiklik() {
-        ZamanlayiciAyarlari ayarlar = ZamanlayiciAyarlari.VARSAYILAN.baslangicBeklemeIle(0);
-        AfetSimulasyonu.Sonuc bir = new AfetSimulasyonu().zamanlayici(ayarlar).oyuncuSayisi(1).tohum(11).kos(100_000_000);
-        AfetSimulasyonu.Sonuc on = new AfetSimulasyonu().zamanlayici(ayarlar).oyuncuSayisi(10).tohum(12).kos(100_000_000);
+        // Gerçek seçim yolu (SecimTuru: zamanlayıcı + hedef sıralaması + erteleme), 1 ve 10 hedef adayı, 10^6 tick.
+        AfetSimulasyonu.Sonuc bir = yogun().gun(1000).oyuncuSayisi(1).kos(1_000_000);
+        AfetSimulasyonu.Sonuc on = yogun().gun(1000).oyuncuSayisi(10).kos(1_000_000);
         double beklenen = bir.gunlukOlay();
-        assertTrue(bir.toplam() > 1000, "örnek çok küçük: " + bir.toplam());
+        assertTrue(bir.toplam() > 5000, "örnek çok küçük: " + bir.toplam());
         assertEquals(beklenen, on.gunlukOlay(), beklenen * 0.10,
                 "1 ve 10 oyuncuda günlük afet: " + bir.gunlukOlay() + " / " + on.gunlukOlay());
+        System.out.printf(Locale.ROOT, "1 oyuncu %d afet (%.2f/gün), 10 oyuncu %d afet (%.2f/gün)%n", bir.toplam(),
+                bir.gunlukOlay(), on.toplam(), on.gunlukOlay());
     }
 
     @Test
@@ -192,7 +274,7 @@ class AfetZamanlayicisiTest {
     @Test
     void afetSikligiSifirsaSecimYok() {
         ZamanlayiciAyarlari ayarlar = ZamanlayiciAyarlari.VARSAYILAN.baslangicBeklemeIle(0);
-        AfetSimulasyonu.Sonuc sonuc = new AfetSimulasyonu().zamanlayici(ayarlar).siklik(0).kos(5_000_000);
+        AfetSimulasyonu.Sonuc sonuc = new AfetSimulasyonu().zamanlayici(ayarlar).gun(1000).siklik(0).kos(5_000_000);
         assertEquals(0, sonuc.toplam());
     }
 
@@ -207,27 +289,5 @@ class AfetZamanlayicisiTest {
             toplam += AfetZamanlayicisi.turOrani(ayarlar, tur, 1, 1);
         }
         assertEquals(ayarlar.gunlukAfetOrani(), toplam, 1e-9, "tüm türler uygunken toplam oran günlük orana eşit");
-    }
-
-    @Test
-    void tekSeferlikOlaylarGerceklesinceBirDahaSecilmez() {
-        ZamanlayiciAyarlari yogun = ZamanlayiciAyarlari.VARSAYILAN.gunlukOranIle(240).genelBeklemeIle(0)
-                .turBeklemeleriIle(0).baslangicBeklemeIle(0);
-        TekSeferlikAyarlari tek = TekSeferlikAyarlari.VARSAYILAN;
-        Set<AfetTuru> uygun = EnumSet.noneOf(AfetTuru.class);
-        for (AfetTuru tur : AfetTuru.values()) {
-            // Ay yok ve kızıl cüce dönemine ulaşılmış; gün ve gelişim eşikleri aşılmış.
-            if (TekSeferlikKurallar.uygunMu(tur, false, io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi.KIZIL_CUCE,
-                    500, 100, tek)) {
-                uygun.add(tur);
-            }
-        }
-        AfetSimulasyonu.Sonuc sonuc = new AfetSimulasyonu().zamanlayici(yogun).uygunTurler(uygun).afetSuresi(20)
-                .kos(1_000_000);
-        assertEquals(0, sonuc.sayi(AfetTuru.AY_CARPMASI));
-        assertEquals(0, sonuc.sayi(AfetTuru.GUNES_PATLAMASI));
-        for (AfetTuru tur : SIK_ALTI) {
-            assertTrue(sonuc.sayi(tur) > 0, tur + " her dönemde devam etmeli");
-        }
     }
 }

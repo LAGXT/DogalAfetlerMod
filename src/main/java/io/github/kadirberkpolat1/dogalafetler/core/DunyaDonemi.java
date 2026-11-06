@@ -4,6 +4,7 @@ import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.BeklemeDurumu;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.CarpanListesi;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.GeciciCarpan;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.OyunGunu;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SonumTipi;
 import io.github.kadirberkpolat1.dogalafetler.core.olay.DonemDegistiEvent;
 import java.util.ArrayDeque;
@@ -54,7 +55,8 @@ public final class DunyaDonemi extends SavedData {
     private int sonSeviye;
     private long gunOfseti;
     private long saat;
-    private CompoundTag ekVeri = new CompoundTag();
+    private final CompoundTag ekVeri = new CompoundTag();
+    private boolean kayittanOkundu;
 
     private Afet canliAfet;
     private CompoundTag bekleyenAfet;
@@ -254,7 +256,7 @@ public final class DunyaDonemi extends SavedData {
 
     // ---------------------------------------------------------------- gün ve saat
 
-    /** {@code /dogalafet gun} ofseti: oyun günü = dünya zamanı / 24000 + ofset. */
+    /** {@code /dogalafet gun} ofseti: oyun günü = oyun zamanı / 24000 + ofset. */
     public long gunOfseti() {
         return gunOfseti;
     }
@@ -266,9 +268,12 @@ public final class DunyaDonemi extends SavedData {
         }
     }
 
-    /** Oyun günü (dünya yaşı, madde 10). */
-    public long oyunGunu(long dunyaZamani) {
-        return Math.max(0, dunyaZamani / 24_000L + gunOfseti);
+    /**
+     * Oyun günü (dünya yaşı, madde 10). {@code oyunZamani} üst dünyanın {@code getGameTime()}'ıdır: {@code /time set} ve
+     * uyku onu değiştirmez ({@link OyunGunu}).
+     */
+    public long oyunGunu(long oyunZamani) {
+        return OyunGunu.gun(oyunZamani, gunOfseti);
     }
 
     /** Ölçekli afet saati: afet ve dönem zamanlayıcılarının ortak saati ({@code /dogalafet hiz} ile hızlanır). */
@@ -307,7 +312,9 @@ public final class DunyaDonemi extends SavedData {
 
     /**
      * Alt sistemin dönemle birlikte saklanan kendi verisi (ör. {@code donma} kış maskesi parametreleri). Dönen etiket
-     * değiştirilebilir; değişiklikten sonra {@link #ekVeriDegisti} çağrılır. İstemciye gitmez.
+     * değiştirilebilir; değişiklikten sonra {@link #ekVeriDegisti} çağrılır. İstemciye gitmez. Aynı alt sistem için
+     * dönen nesne {@link #sifirla()} sonrasında da aynıdır (içi boşaltılır); yine de küçük tutulmalıdır (büyük veri chunk
+     * capability'de).
      */
     public CompoundTag ekVeri(String altSistem) {
         if (!ekVeri.contains(altSistem, Tag.TAG_COMPOUND)) {
@@ -342,8 +349,21 @@ public final class DunyaDonemi extends SavedData {
         sonHedef = null;
         sonSeviye = 0;
         gunOfseti = 0;
-        ekVeri = new CompoundTag();
+        for (String anahtar : List.copyOf(ekVeri.getAllKeys())) {
+            if (ekVeri.get(anahtar) instanceof CompoundTag altSistem) {
+                for (String alan : List.copyOf(altSistem.getAllKeys())) {
+                    altSistem.remove(alan);
+                }
+            } else {
+                ekVeri.remove(anahtar);
+            }
+        }
         degisti(DonemAlani.SIFIRLAMA, true);
+    }
+
+    /** Bu nesne kayıttan mı okundu (yoksa yeni dünya). */
+    boolean kayittanOkundu() {
+        return kayittanOkundu;
     }
 
     boolean senkronGerekli() {
@@ -444,7 +464,10 @@ public final class DunyaDonemi extends SavedData {
         return etiket;
     }
 
-    /** Kayıttan okur; bilinmeyen ya da bozuk alanlar varsayılana düşer (dünya açılışı durmaz). */
+    /**
+     * Kayıttan okur; bilinmeyen ya da bozuk alanlar varsayılana düşer (dünya açılışı durmaz). Özet log satırını aktif afet geri
+     * yüklendikten sonra {@code AfetYoneticisi} yazar.
+     */
     public static DunyaDonemi yukle(CompoundTag etiket) {
         DunyaDonemi donem = new DunyaDonemi();
         donem.ayVar = !etiket.contains("ayVar") || etiket.getBoolean("ayVar");
@@ -484,11 +507,11 @@ public final class DunyaDonemi extends SavedData {
         donem.sonSeviye = etiket.getInt("sonSeviye");
         donem.gunOfseti = etiket.getLong("gunOfseti");
         donem.saat = Math.max(0, etiket.getLong("saat"));
-        donem.ekVeri = etiket.getCompound("ekVeri").copy();
+        donem.ekVeri.merge(etiket.getCompound("ekVeri"));
         if (etiket.contains("aktifAfet", Tag.TAG_COMPOUND)) {
             donem.bekleyenAfet = etiket.getCompound("aktifAfet").copy();
         }
-        DogalAfetler.LOGGER.info("Dünya dönemi okundu ({}): {}", VERI_ADI, donem.ozet());
+        donem.kayittanOkundu = true;
         return donem;
     }
 }

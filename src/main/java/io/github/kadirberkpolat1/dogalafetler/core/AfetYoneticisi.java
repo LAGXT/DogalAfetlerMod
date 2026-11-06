@@ -6,6 +6,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.mantik.AfetZamanlayicisi;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.GelisimOlcutu;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.HedefSecici;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.OnUyariPenceresi;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.SecimTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SiddetAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SiddetSecici;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.TekSeferlikKurallar;
@@ -20,17 +21,23 @@ import io.github.kadirberkpolat1.dogalafetler.network.AfetDurumPaketi;
 import io.github.kadirberkpolat1.dogalafetler.network.AgKanali;
 import io.github.kadirberkpolat1.dogalafetler.network.DonemPaketi;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SplittableRandom;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestServer;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -50,8 +57,11 @@ import net.minecraftforge.fml.common.Mod;
 /**
  * Afet yöneticisi (madde 3, 4, 10, 11): sunucu tick'inde zamanlayıcıyı çalıştırır, afet seçer, yaşam döngüsünü ilerletir,
  * siren isteklerini ve afet durum paketlerini etkilenebilecek oyunculara gönderir, "sağ çıkan" takibini yapar ve afet
- * bitince {@link AfetBittiEvent} yayınlar. Aynı anda tek afet vardır. Karar mantığı {@code core.mantik}'tedir; bu sınıf
- * Minecraft bağlantısıdır. Sunucu başına bir örnek ({@link #al}); yalnız sunucu ana thread'inde kullanılır.
+ * bitince {@link AfetBittiEvent} yayınlar. Aynı anda tek afet vardır. Afet yuvası dışında süren dönem süreçleri
+ * {@link #donemSureciKaydet} ile katılır; {@code stop} ve gamerule onları da durdurur (madde 11). Karar mantığı
+ * {@code core.mantik}'tedir; bu sınıf Minecraft bağlantısıdır. Afet kodunun (alt sınıf) her çağrısı korunur: istisna
+ * ERROR log'a düşer, afet {@link BitisNedeni#HATA} ile yumuşak durdurulur. Sunucu başına bir örnek ({@link #al}); yalnız
+ * sunucu ana thread'inde kullanılır.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID)
 public final class AfetYoneticisi {
@@ -65,6 +75,7 @@ public final class AfetYoneticisi {
         HATA
     }
 
+    private static final List<DonemSureci> DONEM_SURECLERI = new CopyOnWriteArrayList<>();
     private static AfetYoneticisi ornek;
 
     private final MinecraftServer server;
@@ -93,6 +104,29 @@ public final class AfetYoneticisi {
             ornek = yonetici;
         }
         return yonetici;
+    }
+
+    // ---------------------------------------------------------------- dönem süreçleri kaydı
+
+    /** Afet yuvası dışında süren bir dönem sürecini kaydeder; yalnız mod kurucusunda. Kimlik benzersiz olmalı. */
+    public static void donemSureciKaydet(DonemSureci surec) {
+        Objects.requireNonNull(surec, "surec");
+        for (DonemSureci kayitli : DONEM_SURECLERI) {
+            if (kayitli.kimlik().equals(surec.kimlik())) {
+                throw new IllegalStateException("Aynı kimlikli iki dönem süreci: " + surec.kimlik());
+            }
+        }
+        DONEM_SURECLERI.add(surec);
+    }
+
+    /** Yalnız GameTest'ler için: süreci geçici olarak kaydeder; {@code close()} kaydı kaldırır. */
+    public static AfetKaydi.GeciciKayit geciciDonemSureciKaydet(DonemSureci surec) {
+        donemSureciKaydet(surec);
+        return () -> DONEM_SURECLERI.remove(surec);
+    }
+
+    public static List<DonemSureci> donemSurecleri() {
+        return List.copyOf(DONEM_SURECLERI);
     }
 
     // ---------------------------------------------------------------- Forge olayları
@@ -137,6 +171,16 @@ public final class AfetYoneticisi {
         }
     }
 
+    /** Çıkan oyuncu siren ve paket alıcılarından düşer: geri girince 1 Hz denetimde kalan süreyle siren alır (K0-27). */
+    @SubscribeEvent
+    public static void oyuncuCikti(PlayerEvent.PlayerLoggedOutEvent olay) {
+        if (olay.getEntity() instanceof ServerPlayer oyuncu) {
+            AfetYoneticisi yonetici = al(oyuncu.server);
+            yonetici.sirenAlicilari.remove(oyuncu.getUUID());
+            yonetici.paketAlicilari.remove(oyuncu.getUUID());
+        }
+    }
+
     @SubscribeEvent
     public static void boyutDegisti(PlayerEvent.PlayerChangedDimensionEvent olay) {
         if (olay.getEntity() instanceof ServerPlayer oyuncu) {
@@ -166,6 +210,11 @@ public final class AfetYoneticisi {
         return donem().aktifAfet();
     }
 
+    /** Afetin güncel etki alanı; afet kodu hata verirse boş (afet yumuşak durdurulur). */
+    public Optional<EtkiAlani> etkiAlani(Afet afet) {
+        return Optional.ofNullable(alanOku(afet));
+    }
+
     /** Afet ve dönem zamanlayıcılarının ortak hız çarpanı. */
     public ZamanOlcegi zamanOlcegi() {
         return zamanOlcegi;
@@ -176,9 +225,9 @@ public final class AfetYoneticisi {
         return sonAdim;
     }
 
-    /** Oyun günü: üst dünyanın zamanı / 24000 + {@code /dogalafet gun} ofseti. */
+    /** Oyun günü (dünya yaşı): üst dünyanın oyun zamanı / 24000 + {@code /dogalafet gun} ofseti. */
     public long oyunGunu() {
-        return donem().oyunGunu(server.overworld().getDayTime());
+        return donem().oyunGunu(server.overworld().getGameTime());
     }
 
     /** Çevrim içi oyuncuların gelişim puanı (config ölçütüne göre ortalama ya da en gelişmiş). */
@@ -197,11 +246,15 @@ public final class AfetYoneticisi {
     }
 
     /**
-     * Afetten etkilenebilecek oyuncular: etki alanı + {@code cekirdek.hedef.etkilenmeEkMesafesi} içinde, afetin boyutunda;
-     * sunucu geneli afette bütün çevrim içi oyuncular (N11). Siren ve afet durum paketi bunlara gider.
+     * Afetten etkilenebilecek oyuncular (N11): bölgesel afette afetin boyutunda, etki alanı +
+     * {@code cekirdek.hedef.sirenEkYaricap} içinde olanlar; sunucu geneli afette her boyuttaki bütün çevrim içi oyuncular.
+     * Siren ve afet durum paketi bunlara gider.
      */
     public List<ServerPlayer> etkilenebilecekOyuncular(Afet afet) {
-        EtkiAlani alan = afet.etkiAlani();
+        EtkiAlani alan = alanOku(afet);
+        if (alan == null) {
+            return List.of();
+        }
         if (afet.tur().sunucuGeneli() || alan.global()) {
             return List.copyOf(server.getPlayerList().getPlayers());
         }
@@ -209,11 +262,23 @@ public final class AfetYoneticisi {
         if (level == null) {
             return List.of();
         }
-        double ek = CekirdekAyarlari.al().etkilenmeEkMesafesi();
+        double ek = CekirdekAyarlari.al().sirenEkYaricap();
         List<ServerPlayer> sonuc = new ArrayList<>();
         for (ServerPlayer oyuncu : level.players()) {
             if (alan.iceriyor(oyuncu.getX(), oyuncu.getY(), oyuncu.getZ(), ek)) {
                 sonuc.add(oyuncu);
+            }
+        }
+        return sonuc;
+    }
+
+    /** Şu an süren dönem süreçleri. */
+    public List<DonemSureci> aktifDonemSurecleri() {
+        ServerLevel ust = server.overworld();
+        List<DonemSureci> sonuc = new ArrayList<>();
+        for (DonemSureci surec : DONEM_SURECLERI) {
+            if (aktifMi(surec, ust)) {
+                sonuc.add(surec);
             }
         }
         return sonuc;
@@ -237,19 +302,25 @@ public final class AfetYoneticisi {
         int etkinSeviye = !tur.seviyeli() ? 0
                 : seviye != null ? Math.max(AfetTuru.EN_DUSUK_SEVIYE, Math.min(AfetTuru.EN_YUKSEK_SEVIYE, seviye))
                         : seviyeSec(tur);
-        if (hedef != null || tur.sunucuGeneli()) {
-            return baslat(tur, etkinSeviye, hedef, null, null, true);
+        if (tur.sunucuGeneli()) {
+            return sunucuGeneliBaslat(tur, true);
         }
-        if (!hedefAdaylari(CekirdekAyarlari.al()).isEmpty()) {
-            BaslatmaSonucu sonuc = baslat(tur, etkinSeviye, null, null, null, true);
+        if (hedef != null) {
+            return oyuncuyaBaslat(tur, etkinSeviye, hedef, true);
+        }
+        List<ServerPlayer> adaylar = hedefAdaylari(CekirdekAyarlari.al());
+        for (UUID kimlik : HedefSecici.sirala(adayListesi(adaylar), donem().sonHedef().orElse(null), rastgele)) {
+            ServerPlayer oyuncu = server.getPlayerList().getPlayer(kimlik);
+            BaslatmaSonucu sonuc = oyuncu == null ? BaslatmaSonucu.YER_UYGUN_DEGIL
+                    : oyuncuyaBaslat(tur, etkinSeviye, oyuncu, true);
             if (sonuc != BaslatmaSonucu.YER_UYGUN_DEGIL) {
                 return sonuc;
             }
         }
-        return baslat(tur, etkinSeviye, null, konumLevel, konum, true);
+        return konumaBaslat(tur, etkinSeviye, konumLevel, konum);
     }
 
-    /** {@code /dogalafet stop}: aktif afeti temizce durdurur; afet yoksa {@code false}. */
+    /** Aktif afeti temizce durdurur ({@code /dogalafet stop}); afet yoksa {@code false}. */
     public boolean durdur() {
         Optional<Afet> afet = aktifAfet();
         if (afet.isEmpty()) {
@@ -257,6 +328,22 @@ public final class AfetYoneticisi {
         }
         sonlandir(afet.get(), server.getLevel(afet.get().baglam().boyut()), BitisNedeni.KOMUT, true);
         return true;
+    }
+
+    /**
+     * Süren dönem süreçlerini durdurur ({@code /dogalafet stop} aktif afet yokken); durdurulanları döner. Güneş patlamasına
+     * bağlı süreç durunca tamamlanmamış {@code BUYUYEN} evresi {@code NORMAL}'e döner.
+     */
+    public List<DonemSureci> donemSurecleriniDurdur() {
+        ServerLevel ust = server.overworld();
+        List<DonemSureci> durdurulan = new ArrayList<>();
+        for (DonemSureci surec : DONEM_SURECLERI) {
+            if (aktifMi(surec, ust)) {
+                surecDurdur(surec, ust, "komut");
+                durdurulan.add(surec);
+            }
+        }
+        return durdurulan;
     }
 
     /** {@code /dogalafet asama ileri} aktif afet için: bir sonraki aşama; afet yoksa {@code false}. */
@@ -276,23 +363,41 @@ public final class AfetYoneticisi {
         try {
             afet.asamaIleri(level);
         } catch (RuntimeException hata) {
-            DogalAfetler.LOGGER.error("Afet aşama geçişi hata verdi: {}", afet.tur().kimlik(), hata);
-            sonlandir(afet, level, BitisNedeni.HATA, false);
+            hataVerdi(afet, "asamaIleri", hata);
             return true;
         }
         gecisleriIsle(afet, level, once, altOnce);
-        if (afet.sonlandi()) {
+        if (hala(afet) && afet.sonlandi()) {
             sonlandir(afet, level, BitisNedeni.DOGAL, true);
         }
         return true;
     }
 
+    /** {@code /dogalafet asama ileri} aktif afet yokken: ilk ilerleyebilen dönem sürecinin komut çıktısı. */
+    public Optional<Component> donemAsamaIleri() {
+        ServerLevel ust = server.overworld();
+        for (DonemSureci surec : aktifDonemSurecleri()) {
+            try {
+                Optional<Component> sonuc = surec.asamaIleri(ust);
+                if (sonuc.isPresent()) {
+                    DogalAfetler.LOGGER.info("Dönem süreci aşama ilerledi: {}", surec.kimlik());
+                    return sonuc;
+                }
+            } catch (RuntimeException hata) {
+                DogalAfetler.LOGGER.error("Dönem süreci ({}) aşama geçişinde hata verdi", surec.kimlik(), hata);
+            }
+        }
+        return Optional.empty();
+    }
+
     /**
      * Bir seçim turu (kuru çalışma: afet başlatılmaz). {@code zorla}: olay olasılığı 1 sayılır, bekleme ve sıklık yok
-     * sayılır; kayıt, gamerule ve tek seferlik kurallar korunur. Oyuncu yoksa ya da {@code dogalAfetlerAcik=false} ise boş.
+     * sayılır; kayıt, gamerule, tek seferlik kurallar ve hedef adayı şartı korunur. Çevrim içi oyuncu yoksa ya da
+     * {@code dogalAfetlerAcik=false} ise boş.
      */
     public Optional<AfetTuru> secimYap(boolean zorla) {
-        return secimYap(zorla, CekirdekAyarlari.al().kontrolAraligiTick(), EnumSet.noneOf(AfetTuru.class));
+        CekirdekAyarlari ayar = CekirdekAyarlari.al();
+        return turuIsle(zorla, ayar.kontrolAraligiTick(), (tur, hedef) -> true).map(SecimTuru.Sonuc::tur);
     }
 
     /** {@code /dogalafet hiz}. */
@@ -302,9 +407,10 @@ public final class AfetYoneticisi {
         DogalAfetler.LOGGER.info("Afet ve dönem zamanlayıcıları x{}", zamanOlcegi.carpan());
     }
 
-    /** {@code /dogalafet sifirla}: aktif afet temizce durur, dönem ilk hâline ve hız 1'e döner. */
+    /** {@code /dogalafet sifirla}: aktif afet ve dönem süreçleri durur, dönem ilk hâline ve hız 1'e döner. */
     public void sifirla() {
         durdur();
+        donemSurecleriniDurdur();
         zamanOlcegi.sifirla();
         sonKontrolSaati = Long.MIN_VALUE;
         DunyaDonemi donem = donem();
@@ -319,6 +425,24 @@ public final class AfetYoneticisi {
                 ayar.tsunamiSonumTipi());
     }
 
+    /**
+     * Madde 11 (saniyede bir, tick'ten): gamerule'ü ya da {@code dogalAfetlerAcik} kapatılan türe bağlı, süren dönem
+     * süreçlerini durdurur. Durdurulanları döner.
+     */
+    public List<DonemSureci> kurallariDenetle() {
+        GameRules kurallar = server.getGameRules();
+        ServerLevel ust = server.overworld();
+        List<DonemSureci> durdurulan = new ArrayList<>();
+        for (DonemSureci surec : DONEM_SURECLERI) {
+            Optional<AfetTuru> tur = surec.afetTuru();
+            if (tur.isPresent() && !Kurallar.afetSecilebilir(kurallar, tur.get()) && aktifMi(surec, ust)) {
+                surecDurdur(surec, ust, "gamerule");
+                durdurulan.add(surec);
+            }
+        }
+        return durdurulan;
+    }
+
     // ---------------------------------------------------------------- tick
 
     private void tick() {
@@ -327,7 +451,7 @@ public final class AfetYoneticisi {
         }
         tickSayaci++;
         CekirdekAyarlari ayar = CekirdekAyarlari.al();
-        TpsOlcer.guncelle(server, ayar.tpsEsigi(), ayar.tpsKritikEsigi());
+        TpsOlcer.guncelle(server, ayar.tpsEsikleri());
         DunyaDonemi donem = donem();
         int adim = zamanOlcegi.ilerle();
         sonAdim = adim;
@@ -340,6 +464,7 @@ public final class AfetYoneticisi {
         }
         if (tickSayaci % ayar.afetPaketAraligiTick() == 0) {
             saniyelikIsler();
+            kurallariDenetle();
         }
         donemSenkronu(donem, ayar);
     }
@@ -356,25 +481,44 @@ public final class AfetYoneticisi {
         }
         sonKontrolSaati = saat;
         donem.bitmisCarpanlariTemizle();
-        Optional<AfetTuru> secim = secimYap(false, gecen, EnumSet.noneOf(AfetTuru.class));
-        secim.ifPresent(this::otomatikBaslat);
+        Map<AfetTuru, Integer> seviyeler = new EnumMap<>(AfetTuru.class);
+        Optional<SecimTuru.Sonuc<UUID>> sonuc = turuIsle(false, gecen, (tur, hedef) -> {
+            int seviye = seviyeler.computeIfAbsent(tur, this::seviyeSec);
+            if (tur.sunucuGeneli()) {
+                return sunucuGeneliBaslat(tur, false) == BaslatmaSonucu.BASLADI;
+            }
+            ServerPlayer oyuncu = server.getPlayerList().getPlayer(hedef);
+            return oyuncu != null && oyuncuyaBaslat(tur, seviye, oyuncu, false) == BaslatmaSonucu.BASLADI;
+        });
+        sonuc.ifPresent(tur -> {
+            for (AfetTuru ertelenen : tur.ertelenenler()) {
+                DogalAfetler.LOGGER.info("{} için uygun yer bulunamadı; ertelendi", ertelenen.kimlik());
+            }
+            if (!tur.ertelenenler().isEmpty()) {
+                donem.setDirty();
+            }
+        });
     }
 
-    private Optional<AfetTuru> secimYap(boolean zorla, long adim, Set<AfetTuru> haric) {
+    /**
+     * Bir seçim turunu sunucu durumuyla kurar ve {@link SecimTuru} ile işler. Çevrim içi (izleyici olmayan) oyuncu yoksa ya da
+     * {@code dogalAfetlerAcik=false} ise boş; hedef adayı (ayarlı boyutlarda oyuncu) yoksa yalnız sunucu geneli afetler (N11).
+     */
+    private Optional<SecimTuru.Sonuc<UUID>> turuIsle(boolean zorla, long adim, SecimTuru.Baslatici<UUID> baslatici) {
         GameRules kurallar = server.getGameRules();
         if (!kurallar.getBoolean(Kurallar.DOGAL_AFETLER_ACIK)) {
             return Optional.empty();
         }
-        CekirdekAyarlari ayar = CekirdekAyarlari.al();
-        if (hedefAdaylari(ayar).isEmpty()) {
+        if (server.getPlayerList().getPlayers().stream().allMatch(ServerPlayer::isSpectator)) {
             return Optional.empty();
         }
+        CekirdekAyarlari ayar = CekirdekAyarlari.al();
         DunyaDonemi donem = donem();
-        Set<AfetTuru> uygun = uygunTurler(kurallar, ayar);
-        uygun.removeAll(haric);
         AfetZamanlayicisi.Girdi girdi = new AfetZamanlayicisi.Girdi(donem.aktifAfet().isPresent(), donem.saat(), adim,
-                donem.bekleme(), uygun, donem::carpan, Kurallar.siklikCarpani(kurallar), zorla);
-        return AfetZamanlayicisi.sec(ayar.zamanlayici(), girdi, rastgele);
+                donem.bekleme(), uygunTurler(kurallar, ayar), donem::carpan, Kurallar.siklikCarpani(kurallar), zorla);
+        SecimTuru.Sonuc<UUID> sonuc = SecimTuru.isle(ayar.zamanlayici(), girdi, adayListesi(hedefAdaylari(ayar)),
+                donem.sonHedef().orElse(null), baslatici, rastgele);
+        return sonuc.basladi() || !sonuc.ertelenenler().isEmpty() ? Optional.of(sonuc) : Optional.empty();
     }
 
     /** Kayıtlı, gamerule'ü açık ve tek seferlik kuralları geçen türler. */
@@ -392,31 +536,6 @@ public final class AfetYoneticisi {
         return uygun;
     }
 
-    /** Seçilen türü başlatır; uygun yer yoksa tür ertelenir ve sıradaki afet seçilir (N14). */
-    private void otomatikBaslat(AfetTuru ilk) {
-        CekirdekAyarlari ayar = CekirdekAyarlari.al();
-        DunyaDonemi donem = donem();
-        Set<AfetTuru> denenen = EnumSet.noneOf(AfetTuru.class);
-        AfetTuru tur = ilk;
-        while (tur != null) {
-            denenen.add(tur);
-            BaslatmaSonucu sonuc = baslat(tur, seviyeSec(tur), null, null, null, false);
-            if (sonuc == BaslatmaSonucu.BASLADI || sonuc == BaslatmaSonucu.ZATEN_AKTIF) {
-                return;
-            }
-            donem.bekleme().ertele(tur, donem.saat(), ayar.zamanlayici().ertelemeTick());
-            donem.setDirty();
-            DogalAfetler.LOGGER.info("{} başlatılamadı ({}); ertelendi, sıradaki afet seçiliyor", tur.kimlik(), sonuc);
-            Set<AfetTuru> haric = EnumSet.copyOf(denenen);
-            for (AfetTuru aday : AfetTuru.values()) {
-                if (donem.bekleme().turBeklemede(aday, donem.saat())) {
-                    haric.add(aday);
-                }
-            }
-            tur = secimYap(true, ayar.kontrolAraligiTick(), haric).orElse(null);
-        }
-    }
-
     private int seviyeSec(AfetTuru tur) {
         if (!tur.seviyeli()) {
             return 0;
@@ -427,7 +546,7 @@ public final class AfetYoneticisi {
                 SiddetSecici.yuksek(donem().sonSeviye()), rastgele);
     }
 
-    /** Afetin boyutlarındaki (N11), izleyici olmayan çevrim içi oyuncular. */
+    /** Ayarlı boyutlardaki (N11), izleyici olmayan, canlı çevrim içi oyuncular. */
     private List<ServerPlayer> hedefAdaylari(CekirdekAyarlari ayar) {
         Set<ResourceLocation> boyutlar = ayar.boyutlar();
         List<ServerPlayer> sonuc = new ArrayList<>();
@@ -439,70 +558,79 @@ public final class AfetYoneticisi {
         return sonuc;
     }
 
-    private BaslatmaSonucu baslat(AfetTuru tur, int seviye, ServerPlayer zorunluHedef, ServerLevel konumLevel,
-            BlockPos konum, boolean elle) {
+    /** Hedef adayları; son afet merkezine {@code ardisikAfetMesafesi}'nden yakın olanlar işaretlenir (sırada sona). */
+    private List<HedefSecici.Aday<UUID>> adayListesi(List<ServerPlayer> oyuncular) {
+        List<GecmisKaydi> gecmis = donem().sonAfetler();
+        GecmisKaydi son = gecmis.isEmpty() ? null : gecmis.get(0);
+        double mesafe = CekirdekAyarlari.al().ardisikAfetMesafesi();
+        List<HedefSecici.Aday<UUID>> liste = new ArrayList<>();
+        for (ServerPlayer oyuncu : oyuncular) {
+            boolean yakin = false;
+            if (son != null && son.boyut().equals(oyuncu.level().dimension())) {
+                double dx = oyuncu.getX() - (son.merkez().getX() + 0.5);
+                double dz = oyuncu.getZ() - (son.merkez().getZ() + 0.5);
+                yakin = dx * dx + dz * dz <= mesafe * mesafe;
+            }
+            liste.add(new HedefSecici.Aday<>(oyuncu.getUUID(), yakin));
+        }
+        return liste;
+    }
+
+    /** Sunucu geneli afet: hedef oyuncusu yoktur, merkez üst dünyanın doğma noktasıdır. */
+    private BaslatmaSonucu sunucuGeneliBaslat(AfetTuru tur, boolean elle) {
+        ServerLevel level = server.overworld();
+        return konumdaBaslat(tur, 0, level, level.getSharedSpawnPos(), null, elle);
+    }
+
+    private BaslatmaSonucu konumaBaslat(AfetTuru tur, int seviye, ServerLevel level, BlockPos konum) {
+        if (level == null || konum == null) {
+            return BaslatmaSonucu.HEDEF_YOK;
+        }
+        return konumdaBaslat(tur, seviye, level, konum, null, true);
+    }
+
+    private BaslatmaSonucu oyuncuyaBaslat(AfetTuru tur, int seviye, ServerPlayer hedef, boolean elle) {
         if (aktifAfet().isPresent()) {
             return BaslatmaSonucu.ZATEN_AKTIF;
         }
-        if (!AfetKaydi.kayitliMi(tur)) {
-            return BaslatmaSonucu.KAYITLI_DEGIL;
-        }
+        ServerLevel level = hedef.serverLevel();
+        Afet afet;
+        BlockPos merkez;
         try {
-            if (tur.sunucuGeneli()) {
-                ServerLevel level = server.overworld();
-                Afet afet = AfetKaydi.olustur(tur).orElseThrow();
-                BlockPos merkez = level.getSharedSpawnPos();
-                return afet.yerUygunMu(level, merkez, seviye) ? afetiBaslat(afet, level, merkez, seviye, null, elle)
-                        : BaslatmaSonucu.YER_UYGUN_DEGIL;
+            afet = AfetKaydi.olustur(tur).orElse(null);
+            if (afet == null) {
+                return BaslatmaSonucu.KAYITLI_DEGIL;
             }
-            if (zorunluHedef != null) {
-                return oyuncuyaBaslat(tur, seviye, zorunluHedef, elle) ? BaslatmaSonucu.BASLADI
-                        : BaslatmaSonucu.YER_UYGUN_DEGIL;
+            merkez = afet.merkezSec(level, hedef, seviye, level.getRandom());
+            if (!afet.yerUygunMu(level, merkez, seviye)) {
+                return BaslatmaSonucu.YER_UYGUN_DEGIL;
             }
-            if (konum != null && konumLevel != null) {
-                Afet afet = AfetKaydi.olustur(tur).orElseThrow();
-                return afet.yerUygunMu(konumLevel, konum, seviye)
-                        ? afetiBaslat(afet, konumLevel, konum, seviye, null, elle) : BaslatmaSonucu.YER_UYGUN_DEGIL;
-            }
-            CekirdekAyarlari ayar = CekirdekAyarlari.al();
-            List<ServerPlayer> adaylar = hedefAdaylari(ayar);
-            if (adaylar.isEmpty()) {
-                return BaslatmaSonucu.HEDEF_YOK;
-            }
-            List<GecmisKaydi> gecmis = donem().sonAfetler();
-            GecmisKaydi son = gecmis.isEmpty() ? null : gecmis.get(0);
-            double mesafe = ayar.ardisikAfetMesafesi();
-            List<HedefSecici.Aday<UUID>> liste = new ArrayList<>();
-            for (ServerPlayer oyuncu : adaylar) {
-                boolean yakin = false;
-                if (son != null && son.boyut().equals(oyuncu.level().dimension())) {
-                    double dx = oyuncu.getX() - (son.merkez().getX() + 0.5);
-                    double dz = oyuncu.getZ() - (son.merkez().getZ() + 0.5);
-                    yakin = dx * dx + dz * dz <= mesafe * mesafe;
-                }
-                liste.add(new HedefSecici.Aday<>(oyuncu.getUUID(), yakin));
-            }
-            for (UUID kimlik : HedefSecici.sirala(liste, donem().sonHedef().orElse(null), rastgele)) {
-                ServerPlayer oyuncu = server.getPlayerList().getPlayer(kimlik);
-                if (oyuncu != null && oyuncuyaBaslat(tur, seviye, oyuncu, elle)) {
-                    return BaslatmaSonucu.BASLADI;
-                }
-            }
-            return BaslatmaSonucu.YER_UYGUN_DEGIL;
         } catch (RuntimeException hata) {
-            DogalAfetler.LOGGER.error("{} başlatılırken hata", tur.kimlik(), hata);
+            DogalAfetler.LOGGER.error("{} için yer seçilirken hata", tur.kimlik(), hata);
             return BaslatmaSonucu.HATA;
         }
+        return afetiBaslat(afet, level, merkez, seviye, hedef.getUUID(), elle);
     }
 
-    private boolean oyuncuyaBaslat(AfetTuru tur, int seviye, ServerPlayer hedef, boolean elle) {
-        ServerLevel level = hedef.serverLevel();
-        Afet afet = AfetKaydi.olustur(tur).orElseThrow();
-        BlockPos merkez = afet.merkezSec(level, hedef, seviye, level.getRandom());
-        if (!afet.yerUygunMu(level, merkez, seviye)) {
-            return false;
+    private BaslatmaSonucu konumdaBaslat(AfetTuru tur, int seviye, ServerLevel level, BlockPos merkez, UUID hedef,
+            boolean elle) {
+        if (aktifAfet().isPresent()) {
+            return BaslatmaSonucu.ZATEN_AKTIF;
         }
-        return afetiBaslat(afet, level, merkez, seviye, hedef.getUUID(), elle) == BaslatmaSonucu.BASLADI;
+        Afet afet;
+        try {
+            afet = AfetKaydi.olustur(tur).orElse(null);
+            if (afet == null) {
+                return BaslatmaSonucu.KAYITLI_DEGIL;
+            }
+            if (!afet.yerUygunMu(level, merkez, seviye)) {
+                return BaslatmaSonucu.YER_UYGUN_DEGIL;
+            }
+        } catch (RuntimeException hata) {
+            DogalAfetler.LOGGER.error("{} için yer denetlenirken hata", tur.kimlik(), hata);
+            return BaslatmaSonucu.HATA;
+        }
+        return afetiBaslat(afet, level, merkez, seviye, hedef, elle);
     }
 
     private BaslatmaSonucu afetiBaslat(Afet afet, ServerLevel level, BlockPos merkez, int seviye, UUID hedef,
@@ -513,7 +641,17 @@ public final class AfetYoneticisi {
         long pencere = OnUyariPenceresi.sure(ayar.onUyariEnAzTick(), ayar.onUyariEnCokTick(), rastgele);
         AfetBaglami baglam = new AfetBaglami(afet.tur(), seviye, merkez, level.dimension(), hedef, donem.saat(),
                 erken + pencere, erken, elle);
-        afet.baslat(level, baglam);
+        try {
+            afet.baslat(level, baglam);
+        } catch (RuntimeException hata) {
+            DogalAfetler.LOGGER.error("{} başlatılırken hata; afet yumuşak durduruluyor", afet.tur().kimlik(), hata);
+            try {
+                afet.durdur(level, false);
+            } catch (RuntimeException ikinci) {
+                DogalAfetler.LOGGER.error("{} durdurulurken hata", afet.tur().kimlik(), ikinci);
+            }
+            return BaslatmaSonucu.HATA;
+        }
         donem.aktifAfetAyarla(afet);
         if (hedef != null) {
             donem.sonHedefAyarla(hedef);
@@ -549,12 +687,11 @@ public final class AfetYoneticisi {
         try {
             afet.tick(level, adim);
         } catch (RuntimeException hata) {
-            DogalAfetler.LOGGER.error("Afet tick'i hata verdi: {}; afet yumuşak durduruluyor", afet.tur().kimlik(), hata);
-            sonlandir(afet, level, BitisNedeni.HATA, false);
+            hataVerdi(afet, "tick", hata);
             return;
         }
         gecisleriIsle(afet, level, once, altOnce);
-        if (afet.sonlandi()) {
+        if (hala(afet) && afet.sonlandi()) {
             sonlandir(afet, level, BitisNedeni.DOGAL, true);
         }
     }
@@ -576,11 +713,14 @@ public final class AfetYoneticisi {
                 takipGuncelle(afet, level);
             }
         }
+        if (!hala(afet)) {
+            return;
+        }
         MinecraftForge.EVENT_BUS.post(new AfetAsamaDegistiEvent(afet, level, eski, yeni, eskiAlt, afet.altAsama()));
         paketleriGonder(afet);
     }
 
-    /** Sirenin henüz gitmediği etkilenebilecek oyunculara kalan süreyle siren isteği. */
+    /** Sirenin henüz gitmediği (ya da çıkıp geri giren) etkilenebilecek oyunculara kalan süreyle siren isteği. */
     private void sirenIstegiGonder(Afet afet) {
         List<ServerPlayer> yeniler = new ArrayList<>();
         for (ServerPlayer oyuncu : etkilenebilecekOyuncular(afet)) {
@@ -610,7 +750,10 @@ public final class AfetYoneticisi {
         if (afet.asama() != AfetAsamasi.AKTIF) {
             return;
         }
-        EtkiAlani alan = afet.etkiAlani();
+        EtkiAlani alan = alanOku(afet);
+        if (alan == null) {
+            return;
+        }
         boolean herkes = afet.tur().sunucuGeneli() || alan.global();
         for (ServerPlayer oyuncu : herkes ? server.getPlayerList().getPlayers() : level.players()) {
             if (!oyuncu.isSpectator() && oyuncu.isAlive()
@@ -627,7 +770,10 @@ public final class AfetYoneticisi {
         }
         Afet afet = secili.get();
         if (afet.asama() == AfetAsamasi.AKTIF) {
-            EtkiAlani alan = afet.etkiAlani();
+            EtkiAlani alan = alanOku(afet);
+            if (alan == null) {
+                return;
+            }
             boolean alanda = afet.tur().sunucuGeneli() || alan.global()
                     || (oyuncu.level().dimension().equals(afet.baglam().boyut())
                             && alan.iceriyor(oyuncu.getX(), oyuncu.getY(), oyuncu.getZ(), 0));
@@ -653,8 +799,12 @@ public final class AfetYoneticisi {
         if (afet.asama() == AfetAsamasi.SIREN) {
             sirenIstegiGonder(afet);
         }
-        takipGuncelle(afet, level);
-        paketleriGonder(afet);
+        if (hala(afet)) {
+            takipGuncelle(afet, level);
+        }
+        if (hala(afet)) {
+            paketleriGonder(afet);
+        }
     }
 
     /** Afet durum paketi etkilenebilecek oyunculara; alandan çıkanlara bir kez "afet yok". ON_UYARI gizlidir. */
@@ -662,9 +812,18 @@ public final class AfetYoneticisi {
         if (afet.asama() == AfetAsamasi.ON_UYARI) {
             return;
         }
+        EtkiAlani alan = alanOku(afet);
+        if (alan == null) {
+            return;
+        }
         CompoundTag ozel = new CompoundTag();
-        afet.istemciVerisiYaz(ozel);
-        AfetDurumPaketi paket = AfetDurumPaketi.den(afet, zamanOlcegi.gercekTick(afet.asamaKalanTick()), ozel);
+        try {
+            afet.istemciVerisiYaz(ozel);
+        } catch (RuntimeException hata) {
+            hataVerdi(afet, "istemciVerisiYaz", hata);
+            return;
+        }
+        AfetDurumPaketi paket = AfetDurumPaketi.den(afet, alan, zamanOlcegi.gercekTick(afet.asamaKalanTick()), ozel);
         Set<UUID> yeni = new HashSet<>();
         for (ServerPlayer oyuncu : etkilenebilecekOyuncular(afet)) {
             AgKanali.oyuncuyaGonder(oyuncu, paket);
@@ -682,6 +841,9 @@ public final class AfetYoneticisi {
     }
 
     private void sonlandir(Afet afet, ServerLevel level, BitisNedeni neden, boolean temiz) {
+        if (!hala(afet)) {
+            return;
+        }
         DunyaDonemi donem = donem();
         long saat = donem.saat();
         sirenDurdur(afet);
@@ -714,10 +876,67 @@ public final class AfetYoneticisi {
             }
             donem.setDirty();
         }
+        if (afet.tur() == AfetTuru.GUNES_PATLAMASI && neden != BitisNedeni.DOGAL) {
+            tamamlanmamisGunesSureciniGeriAl(neden.name().toLowerCase(Locale.ROOT));
+        }
         DogalAfetler.LOGGER.info("Afet bitti: {} seviye {} neden {} etkilenen {} sağ çıkan {}", afet.tur().kimlik(),
                 baglam.seviye(), neden, etkilenenler.size(), sagCikanlar.size());
         MinecraftForge.EVENT_BUS.post(new AfetBittiEvent(afet.tur(), baglam.seviye(), baglam.merkez(), baglam.boyut(),
                 etkilenenler, sagCikanlar, baglam.baslangicSaati(), saat, neden));
+    }
+
+    /** Madde 11: güneş patlamasının 5 günlük büyüme evresi tamamlanmamış süreçtir; durdurulunca güneş normale döner. */
+    private void tamamlanmamisGunesSureciniGeriAl(String neden) {
+        DunyaDonemi donem = donem();
+        if (donem.gunesEvresi() == GunesEvresi.BUYUYEN) {
+            donem.gunesEvresiAyarla(GunesEvresi.NORMAL);
+            DogalAfetler.LOGGER.info("Güneş patlaması tamamlanmadan durdu ({}): güneş evresi NORMAL'e döndü", neden);
+        }
+    }
+
+    private boolean aktifMi(DonemSureci surec, ServerLevel ust) {
+        try {
+            return surec.aktifMi(ust);
+        } catch (RuntimeException hata) {
+            DogalAfetler.LOGGER.error("Dönem süreci ({}) durumu okunamadı", surec.kimlik(), hata);
+            return false;
+        }
+    }
+
+    private void surecDurdur(DonemSureci surec, ServerLevel ust, String neden) {
+        try {
+            surec.durdur(ust);
+        } catch (RuntimeException hata) {
+            DogalAfetler.LOGGER.error("Dönem süreci ({}) durdurulurken hata", surec.kimlik(), hata);
+        }
+        DogalAfetler.LOGGER.info("Dönem süreci durduruldu ({}): {}", neden, surec.kimlik());
+        if (surec.afetTuru().filter(tur -> tur == AfetTuru.GUNES_PATLAMASI).isPresent()) {
+            tamamlanmamisGunesSureciniGeriAl(neden);
+        }
+    }
+
+    /** Afet hâlâ aktif afet mi (hata ya da durdurma onu kaldırmış olabilir). */
+    private boolean hala(Afet afet) {
+        return donem().aktifAfet().orElse(null) == afet;
+    }
+
+    /** Afetin etki alanını korumalı okur; hata verirse afet yumuşak durur ve {@code null} döner. */
+    private EtkiAlani alanOku(Afet afet) {
+        try {
+            return Objects.requireNonNull(afet.etkiAlani(), "etkiAlani() null döndü");
+        } catch (RuntimeException hata) {
+            hataVerdi(afet, "etkiAlani", hata);
+            return null;
+        }
+    }
+
+    /** K-C23: afet kodu hata verdi; ERROR log, aktif afetse {@link BitisNedeni#HATA} ile yumuşak durdurma. */
+    private void hataVerdi(Afet afet, String metot, RuntimeException hata) {
+        DogalAfetler.LOGGER.error("Afet kodu hata verdi ({}.{}); afet yumuşak durduruluyor", afet.tur().kimlik(), metot,
+                hata);
+        if (hala(afet)) {
+            sonlandir(afet, server.getLevel(afet.baglam().boyut()), BitisNedeni.HATA, false);
+        }
     }
 
     private List<ServerPlayer> cevrimIcindekiler(Set<UUID> kimlikler) {
@@ -739,18 +958,24 @@ public final class AfetYoneticisi {
         }
         geriYuklendi = true;
         DunyaDonemi donem = donem();
+        afetiGeriYukle(donem);
+        DogalAfetler.LOGGER.info("Dünya dönemi {} ({}): {}", donem.kayittanOkundu() ? "okundu" : "oluşturuldu",
+                DunyaDonemi.VERI_ADI, donem.ozet());
+    }
+
+    private void afetiGeriYukle(DunyaDonemi donem) {
         CompoundTag kayit = donem.bekleyenAfetiAl();
         if (kayit == null) {
             return;
         }
-        Optional<AfetTuru> tur = Afet.turOku(kayit);
-        Optional<Afet> afet = tur.flatMap(AfetKaydi::olustur);
-        if (afet.isEmpty()) {
-            DogalAfetler.LOGGER.warn("Kayıttaki aktif afet ({}) kayıtlı değil; atıldı", kayit.getString("tur"));
-            donem.setDirty();
-            return;
-        }
+        Optional<Afet> afet;
         try {
+            afet = Afet.turOku(kayit).flatMap(AfetKaydi::olustur);
+            if (afet.isEmpty()) {
+                DogalAfetler.LOGGER.warn("Kayıttaki aktif afet ({}) kayıtlı değil; atıldı", kayit.getString("tur"));
+                donem.setDirty();
+                return;
+            }
             afet.get().durumOku(kayit);
         } catch (RuntimeException hata) {
             DogalAfetler.LOGGER.warn("Kayıttaki aktif afet okunamadı; atıldı: {}", kayit, hata);
@@ -764,7 +989,12 @@ public final class AfetYoneticisi {
             return;
         }
         donem.aktifAfetAyarla(afet.get());
-        afet.get().yuklendi(level);
+        try {
+            afet.get().yuklendi(level);
+        } catch (RuntimeException hata) {
+            hataVerdi(afet.get(), "yuklendi", hata);
+            return;
+        }
         DogalAfetler.LOGGER.info("Aktif afet geri yüklendi: {} seviye {} aşama {} (aşamada {} tick)",
                 afet.get().tur().kimlik(), afet.get().seviye(), afet.get().asama().kimlik(), afet.get().asamaGecenTick());
     }
@@ -773,8 +1003,13 @@ public final class AfetYoneticisi {
         DunyaDonemi donem = donem();
         donem.aktifAfet().ifPresent(afet -> {
             ServerLevel level = server.getLevel(afet.baglam().boyut());
-            if (level != null) {
+            if (level == null) {
+                return;
+            }
+            try {
                 afet.kapanirken(level);
+            } catch (RuntimeException hata) {
+                hataVerdi(afet, "kapanirken", hata);
             }
         });
         DogalAfetler.LOGGER.info("Dünya dönemi (kapanış): {}", donem.ozet());

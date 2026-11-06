@@ -19,6 +19,7 @@ import net.minecraftforge.network.NetworkEvent;
  * Aktif afetin istemciye giden durumu (madde 3: herkes aynı afeti aynı yerde, aynı aşamada görür). Aşama değişiminde ve
  * {@code cekirdek.ag.afetPaketAraligiTick} aralığında (1 Hz) yalnız etki alanı + ek mesafe içindeki oyunculara, sunucu
  * geneli afette herkese gider; ON_UYARI gizlidir (madde 4). Alandan çıkan ve afet biten oyunculara {@link #YOK} gider.
+ * {@code merkez} etki alanının güncel merkezidir (hareketli afette yürür; sunucu geneli afette başlangıç merkezi);
  * {@code kalanTick} gerçek tick'tir (-1 bilinmiyor); {@code afetNo} afetin başlangıç saati (yeni afeti ayırmak için);
  * {@code ozel} afetin kendi görüntü parametreleri.
  */
@@ -27,12 +28,13 @@ public record AfetDurumPaketi(boolean aktif, AfetTuru tur, int seviye, BlockPos 
     public static final AfetDurumPaketi YOK = new AfetDurumPaketi(false, AfetTuru.KASIRGA, 0, BlockPos.ZERO,
             Level.OVERWORLD.location(), 0f, false, AfetAsamasi.BITIS, 0, -1L, 0L, new CompoundTag());
 
-    public static AfetDurumPaketi den(Afet afet, long kalanGercekTick, CompoundTag ozel) {
-        EtkiAlani alan = afet.etkiAlani();
-        return new AfetDurumPaketi(true, afet.tur(), afet.seviye(), afet.baglam().merkez(),
-                afet.baglam().boyut().location(), alan.global() ? Float.POSITIVE_INFINITY : (float) alan.yaricap(),
-                alan.global() || afet.tur().sunucuGeneli(), afet.asama(), afet.altAsama(), kalanGercekTick,
-                afet.baglam().baslangicSaati(), ozel);
+    /** {@code alan}: afetin bu tick'teki etki alanı (yönetici hatasız okuduğunu doğrular). */
+    public static AfetDurumPaketi den(Afet afet, EtkiAlani alan, long kalanGercekTick, CompoundTag ozel) {
+        boolean global = alan.global() || afet.tur().sunucuGeneli();
+        BlockPos merkez = global ? afet.baglam().merkez() : BlockPos.containing(alan.x(), alan.y(), alan.z());
+        return new AfetDurumPaketi(true, afet.tur(), afet.seviye(), merkez, afet.baglam().boyut().location(),
+                alan.global() ? Float.POSITIVE_INFINITY : (float) alan.yaricap(), global, afet.asama(), afet.altAsama(),
+                kalanGercekTick, afet.baglam().baslangicSaati(), ozel);
     }
 
     public void yaz(FriendlyByteBuf tampon) {

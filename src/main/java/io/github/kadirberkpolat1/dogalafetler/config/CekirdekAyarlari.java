@@ -1,10 +1,12 @@
 package io.github.kadirberkpolat1.dogalafetler.config;
 
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.GelisimKriteri;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.GelisimOlcutu;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SiddetAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SonumTipi;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.TekSeferlikAyarlari;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.TpsKismasi;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.ZamanlayiciAyarlari;
 import java.util.EnumMap;
 import java.util.HashSet;
@@ -49,17 +51,21 @@ public final class CekirdekAyarlari {
 
     private final ForgeConfigSpec.EnumValue<GelisimOlcutu> gelisimOlcutu;
     private final ForgeConfigSpec.BooleanValue gunesPatlamasiTekrarlanabilir;
-    private final ForgeConfigSpec.IntValue gunesPatlamasiEnErkenGun;
+    private final ForgeConfigSpec.EnumValue<GelisimKriteri> gunesPatlamasiKriteri;
+    private final ForgeConfigSpec.IntValue gunesPatlamasiMinGun;
     private final ForgeConfigSpec.DoubleValue gunesPatlamasiPuanEsigi;
-    private final ForgeConfigSpec.IntValue ayCarpmasiEnErkenGun;
+    private final ForgeConfigSpec.EnumValue<GelisimKriteri> ayCarpmasiKriteri;
+    private final ForgeConfigSpec.IntValue ayCarpmasiMinGun;
     private final ForgeConfigSpec.DoubleValue ayCarpmasiPuanEsigi;
 
     private final ForgeConfigSpec.ConfigValue<List<? extends String>> boyutlar;
-    private final ForgeConfigSpec.IntValue etkilenmeEkMesafesi;
+    private final ForgeConfigSpec.IntValue sirenEkYaricap;
     private final ForgeConfigSpec.IntValue ardisikAfetMesafesi;
 
     private final ForgeConfigSpec.DoubleValue tpsEsigi;
     private final ForgeConfigSpec.DoubleValue tpsKritikEsigi;
+    private final ForgeConfigSpec.DoubleValue tpsToparlanmaEsigi;
+    private final ForgeConfigSpec.DoubleValue tpsKritikToparlanmaEsigi;
 
     private final ForgeConfigSpec.IntValue afetPaketAraligiTick;
     private final ForgeConfigSpec.IntValue donemPaketAraligiTick;
@@ -136,17 +142,22 @@ public final class CekirdekAyarlari {
 
         TekSeferlikAyarlari t = TekSeferlikAyarlari.VARSAYILAN;
         k.comment("Tek seferlik ve geç oyun afetleri (madde 3, 4, bölüm D ve H).").push("tekSeferlik");
-        gelisimOlcutu = k.comment("Oyuncu gelişimi ölçütü: ORTALAMA (çevrim içi oyuncuların ortalaması) ya da EN_GELISMIS.",
-                "Oyuncu puanı = XP seviyesi + zırh puanı (tam demir zırh 15, elmas 20).")
+        gelisimOlcutu = k.comment("Gelişim puanının oyunculardan nasıl toplandığı: ORTALAMA (çevrim içi oyuncuların ortalaması)",
+                "ya da EN_GELISMIS. Oyuncu puanı = XP seviyesi + zırh puanı (tam demir zırh 15, elmas 20).")
                 .defineEnum("gelisimOlcutu", GelisimOlcutu.ORTALAMA);
         gunesPatlamasiTekrarlanabilir = k.comment("Kızıl cüce dönemine ulaşıldıktan sonra güneş patlaması yeniden seçilebilir mi.")
                 .define("gunesPatlamasiTekrarlanabilir", t.gunesPatlamasiTekrarlanabilir());
-        gunesPatlamasiEnErkenGun = k.comment("Güneş patlamasının seçilebildiği en erken oyun günü.")
-                .defineInRange("gunesPatlamasiEnErkenGun", t.gunesPatlamasiEnErkenGun(), 0, 1_000_000);
-        gunesPatlamasiPuanEsigi = k.comment("Güneş patlaması için gereken gelişim puanı.")
+        gunesPatlamasiKriteri = k.comment("Güneş patlamasının kapısı: GUN (oyun günü ≥ gunesPatlamasiMinGun), PUAN (gelişim puanı ≥",
+                "gunesPatlamasiPuanEsigi), IKISI_DE ya da HERHANGI.")
+                .defineEnum("gunesPatlamasiKriteri", t.gunesPatlamasiKriteri());
+        gunesPatlamasiMinGun = k.comment("Güneş patlaması için gereken oyun günü (GUN, IKISI_DE, HERHANGI).")
+                .defineInRange("gunesPatlamasiMinGun", t.gunesPatlamasiMinGun(), 0, 1_000_000);
+        gunesPatlamasiPuanEsigi = k.comment("Güneş patlaması için gereken gelişim puanı (PUAN, IKISI_DE, HERHANGI).")
                 .defineInRange("gunesPatlamasiPuanEsigi", t.gunesPatlamasiPuanEsigi(), 0.0, 10_000.0);
-        ayCarpmasiEnErkenGun = k.comment("Ay çarpmasının seçilebildiği en erken oyun günü.")
-                .defineInRange("ayCarpmasiEnErkenGun", t.ayCarpmasiEnErkenGun(), 0, 1_000_000);
+        ayCarpmasiKriteri = k.comment("Ay çarpmasının kapısı: GUN, PUAN, IKISI_DE ya da HERHANGI (güneş patlamasındaki gibi).")
+                .defineEnum("ayCarpmasiKriteri", t.ayCarpmasiKriteri());
+        ayCarpmasiMinGun = k.comment("Ay çarpması için gereken oyun günü.")
+                .defineInRange("ayCarpmasiMinGun", t.ayCarpmasiMinGun(), 0, 1_000_000);
         ayCarpmasiPuanEsigi = k.comment("Ay çarpması için gereken gelişim puanı.")
                 .defineInRange("ayCarpmasiPuanEsigi", t.ayCarpmasiPuanEsigi(), 0.0, 10_000.0);
         k.pop();
@@ -155,15 +166,22 @@ public final class CekirdekAyarlari {
         boyutlar = k.comment("Afetlerin oluşabildiği boyutlar. Başka boyuttaki oyuncular siren ve gökyüzü durumunu yine alır.")
                 .defineListAllowEmpty(List.of("boyutlar"), () -> List.of("minecraft:overworld"),
                         o -> o instanceof String metin && ResourceLocation.tryParse(metin) != null);
-        etkilenmeEkMesafesi = k.comment("Etki alanının bu kadar blok dışındaki oyuncular da sireni duyar ve afet durumunu alır.")
-                .defineInRange("etkilenmeEkMesafesi", 64, 0, 4096);
+        sirenEkYaricap = k.comment("Bölgesel afette etki alanının bu kadar blok dışındaki oyuncular da (afetin boyutunda) sireni",
+                "duyar ve afet durumunu alır. Sunucu geneli afette siren her boyuttaki oyuncuya gider (N11).")
+                .defineInRange("sirenEkYaricap", 64, 0, 4096);
         ardisikAfetMesafesi = k.comment("Son afetin merkezine bu kadar yakın oyuncular hedef seçiminde sona bırakılır.")
                 .defineInRange("ardisikAfetMesafesi", 128, 0, 100_000);
         k.pop();
 
         k.comment("TPS kısması (madde 3): tüm sistemler tek ölçerden okur.").push("tps");
-        tpsEsigi = k.comment("Bu TPS'in altında ağır işlerin bütçesi yarıya iner.").defineInRange("esik", 18.0, 1.0, 20.0);
-        tpsKritikEsigi = k.comment("Bu TPS'in altında bütçe çeyreğe iner.").defineInRange("kritikEsik", 15.0, 1.0, 20.0);
+        TpsKismasi.Esikler e = TpsKismasi.Esikler.VARSAYILAN;
+        tpsEsigi = k.comment("Bu TPS'in altında ağır işlerin bütçesi yarıya iner.").defineInRange("esik", e.esik(), 1.0, 20.0);
+        tpsKritikEsigi = k.comment("Bu TPS'in altında bütçe çeyreğe iner.")
+                .defineInRange("kritikEsik", e.kritikEsik(), 1.0, 20.0);
+        tpsToparlanmaEsigi = k.comment("Kısılmış bütçe TPS bu değere çıkınca tama döner (histerezis).")
+                .defineInRange("toparlanmaEsigi", e.toparlanma(), 1.0, 20.0);
+        tpsKritikToparlanmaEsigi = k.comment("Çeyrek bütçe TPS bu değere çıkınca yarıya döner (histerezis).")
+                .defineInRange("kritikToparlanmaEsigi", e.kritikToparlanma(), 1.0, 20.0);
         k.pop();
 
         k.comment("Ağ sıklığı (madde 3: durum değişiminde ve düşük sıklıkta paket).").push("ag");
@@ -171,8 +189,9 @@ public final class CekirdekAyarlari {
                 .defineInRange("afetPaketAraligiTick", 20, 1, 200);
         donemPaketAraligiTick = k.comment("Dönem değişiklikleri bu aralıkta toplanarak gönderilir (evre ve ay değişimi hemen).")
                 .defineInRange("donemPaketAraligiTick", 20, 1, 200);
-        donemTazelemeTick = k.comment("Değişiklik olmasa da dönem paketi bu aralıkta yenilenir (istemci saati kaymasın).")
-                .defineInRange("donemTazelemeTick", 600, 20, 72_000);
+        donemTazelemeTick = k.comment("Değişiklik olmasa da dönem paketi bu aralıkta yenilenir; istemcinin afet saati sunucu",
+                "saatine hizalanır (20 = 1 Hz).")
+                .defineInRange("donemTazelemeTick", 20, 20, 72_000);
         k.pop();
 
         k.comment("Geçici olasılık çarpanı varsayılanları (madde 4, bölüm H): ay çarpmasından sonra tsunami.").push("carpan");
@@ -216,8 +235,9 @@ public final class CekirdekAyarlari {
     }
 
     public TekSeferlikAyarlari tekSeferlik() {
-        return new TekSeferlikAyarlari(gunesPatlamasiTekrarlanabilir.get(), gunesPatlamasiEnErkenGun.get(),
-                gunesPatlamasiPuanEsigi.get(), ayCarpmasiEnErkenGun.get(), ayCarpmasiPuanEsigi.get());
+        return new TekSeferlikAyarlari(gunesPatlamasiTekrarlanabilir.get(), gunesPatlamasiKriteri.get(),
+                gunesPatlamasiMinGun.get(), gunesPatlamasiPuanEsigi.get(), ayCarpmasiKriteri.get(), ayCarpmasiMinGun.get(),
+                ayCarpmasiPuanEsigi.get());
     }
 
     public GelisimOlcutu gelisimOlcutu() {
@@ -252,20 +272,17 @@ public final class CekirdekAyarlari {
         return sonuc;
     }
 
-    public double etkilenmeEkMesafesi() {
-        return etkilenmeEkMesafesi.get();
+    public double sirenEkYaricap() {
+        return sirenEkYaricap.get();
     }
 
     public double ardisikAfetMesafesi() {
         return ardisikAfetMesafesi.get();
     }
 
-    public double tpsEsigi() {
-        return tpsEsigi.get();
-    }
-
-    public double tpsKritikEsigi() {
-        return Math.min(tpsKritikEsigi.get(), tpsEsigi.get());
+    public TpsKismasi.Esikler tpsEsikleri() {
+        return new TpsKismasi.Esikler(tpsEsigi.get(), tpsKritikEsigi.get(), tpsToparlanmaEsigi.get(),
+                tpsKritikToparlanmaEsigi.get());
     }
 
     public int afetPaketAraligiTick() {

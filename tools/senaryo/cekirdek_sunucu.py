@@ -3,15 +3,19 @@
 
 Kendi dünyasını sıfırdan üretir: `run-server/cekirdek-senaryo` silinir, `run-server/server.properties` geçici olarak
 `level-name=cekirdek-senaryo` yapılır ve senaryo bitince özgün içeriğine döner (`test` dünyasına dokunulmaz). Sunucu
-Gradle ile pty'siz, stdin'i boruya bağlı açılır (docs/MAKINE.md, K0-18); `-PoyunTestiAfeti=deprem` ile deprem türüne
-yaşam döngüsü sınama afeti kaydedilir (core.OyunTestiAfeti), kasırga kayıtsız kalır.
+Gradle ile pty'siz, stdin'i boruya bağlı açılır (docs/MAKINE.md, K0-18); `-PoyunTestiAfeti=deprem,gunes_patlamasi` ile bu
+türlere yaşam döngüsü sınama afeti kaydedilir (core.OyunTestiAfeti; güneş türü AKTIF'te güneşi BUYUYEN yapar), kasırga
+kayıtsız kalır.
 
-Koşu 1: durum, gun 90, durum (seviye ağırlıkları), hiz 10, durum, start kasirga 3 ("henüz kayıtlı değil"), asama
-ileri (ilerletilecek yok), sifirla, durum, gun 42, start deprem 2, ikinci start (reddedilir), asama ileri x2, durum,
-stop, start deprem 3, asama ileri x2 (aktif), durum, sunucuya `stop`.
+Koşu 1: yeni config varsayılanlarla yazılır; durum, gun 90, durum (seviye ağırlıkları), hiz 10, durum, start kasirga 3
+("henüz kayıtlı değil"), asama ileri (ilerletilecek yok), sifirla, durum, gun 42, time add 72000 + durum (gün 42), time set
+day + durum (gün 42), start gunes_patlamasi, asama ileri x2, durum (güneş büyüyor), stop, durum (güneş normal), stop
+(durdurulacak yok), start deprem 2, ikinci start (reddedilir), asama ileri x2, durum, stop, start deprem 3, asama ileri x2
+(aktif), durum, sunucuya `stop`.
 Koşu 2 (aynı dünya): açılışta dönem okundu (gün ofseti, son afetler, bekleme) ve aktif deprem geri yüklendi; durum
 (gün 42, aktif deprem seviye 3), stop, sifirla, `stop`.
-Sonda iki log da denetlenir: `invalid dist` yok, istisna yok, iki süreç de 0 ile çıktı.
+Sonda iki log da denetlenir: `invalid dist` yok, istisna yok, bizim config dosyalarımız için Forge düzeltme WARN'ı yok,
+iki süreç de 0 ile çıktı.
 
 Kullanım (worktree kökünden): python3 tools/senaryo/cekirdek_sunucu.py <log klasörü>
 Çıkış: 0 geçti, 1 senaryo/denetim hatası, 2 sunucu süreci sıfır dışı kodla çıktı.
@@ -51,7 +55,7 @@ class Sunucu:
         self.log = log_yolu.open("w", encoding="utf-8")
         ortam = dict(os.environ, JAVA_HOME=JAVA_HOME)
         self.surec = subprocess.Popen(
-            ["./gradlew", "runServer", "--console=plain", "--offline", "-PoyunTestiAfeti=deprem"], cwd=KOK, env=ortam,
+            ["./gradlew", "runServer", "--console=plain", "--offline", "-PoyunTestiAfeti=deprem,gunes_patlamasi"], cwd=KOK, env=ortam,
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8",
             errors="replace", bufsize=1, start_new_session=True)
         threading.Thread(target=self._oku, daemon=True).start()
@@ -150,6 +154,8 @@ def senaryo_dunyasini_sil():
 
 def kosu1(sunucu):
     sunucu.bekle(r"Done \(", 0, ACILIS_SURESI, "açılış")
+    sunucu.bekle(r"Config dosyası varsayılanlarla oluşturuldu: .*dogalafetler-server\.toml", 0, 5,
+                 "yeni dünyada config varsayılanlarla yazıldı")
     sunucu.komut("dogalafet durum", r"Level weights \(day 0, max level 5\): S1 100\.0%", "durum (gün 0: yalnız S1)")
     sunucu.komut("dogalafet gun 90", r"Game day set to 90\. Level weights: S1 ")
     sunucu.komut("dogalafet durum", r"Level weights \(day 90, max level 5\): S1 [0-9.]+%, S2 [0-9.]+%, S3 [0-9.]+%, "
@@ -161,6 +167,17 @@ def kosu1(sunucu):
     sunucu.komut("dogalafet sifirla", r"disaster and era state was reset")
     sunucu.komut("dogalafet durum", r"Game day: 0 \(offset 0\), speed: x1\.00", "durum (sıfırlandı)")
     sunucu.komut("dogalafet gun 42", r"Game day set to 42\.")
+    sunucu.komut("time add 72000", r"Set the time to")
+    sunucu.komut("dogalafet durum", r"Game day: 42 \(offset", "durum (time add sonrası gün 42)")
+    sunucu.komut("time set day", r"Set the time to 1000")
+    sunucu.komut("dogalafet durum", r"Game day: 42 \(offset", "durum (time set day sonrası gün 42)")
+    sunucu.komut("dogalafet start gunes_patlamasi", r"Solar Flare started \(Unleveled\)")
+    sunucu.komut("dogalafet asama ileri", r"Solar Flare phase: Siren")
+    sunucu.komut("dogalafet asama ileri", r"Solar Flare phase: Active")
+    sunucu.komut("dogalafet durum", r"sun: Swelling sun", "durum (güneş büyüyor)")
+    sunucu.komut("dogalafet stop", r"Solar Flare stopped\.")
+    sunucu.komut("dogalafet durum", r"sun: Normal sun", "durum (tamamlanmamış süreç durdu, güneş normal)")
+    sunucu.komut("dogalafet stop", r"There is no disaster or era process to stop\.")
     sunucu.komut("dogalafet start deprem 2", r"Earthquake started \(Level 2 \(Moderate\)\)")
     sunucu.komut("dogalafet start deprem 1", r"A disaster is already active: Earthquake", "ikinci afet reddedilir")
     sunucu.komut("dogalafet asama ileri", r"Earthquake phase: Siren")
@@ -175,10 +192,10 @@ def kosu1(sunucu):
 
 def kosu2(sunucu):
     sunucu.bekle(r"Done \(", 0, ACILIS_SURESI, "açılış")
-    sunucu.bekle(r"Dünya dönemi okundu \(dogalafetler_donem\): .*gunOfseti=42 .*gecmis=1 genelBekleme=[1-9][0-9]* "
-                 r"sonSeviye=2 aktifAfet=deprem/bekliyor", 0, 30,
-                 "dönem kaydı okundu (gün ofseti 42, geçmiş, bekleme, bekleyen deprem)")
     sunucu.bekle(r"Aktif afet geri yüklendi: deprem seviye 3 aşama aktif", 0, 30, "aktif afet geri yüklendi")
+    sunucu.bekle(r"Dünya dönemi okundu \(dogalafetler_donem\): .*gunOfseti=42 .*gecmis=2 genelBekleme=[1-9][0-9]* "
+                 r"sonSeviye=2 aktifAfet=deprem/aktif", 0, 30,
+                 "dönem kaydı okundu (gün ofseti 42, geçmiş, bekleme, geri yüklenmiş deprem)")
     sunucu.komut("dogalafet durum", r"Game day: 42 \(offset 42\)", "durum (gün 42 korundu)")
     sunucu.komut("dogalafet durum", r"Active disaster: Earthquake, Level 3 \(Severe\); phase: Active",
                  "durum (deprem korundu)")
@@ -195,6 +212,10 @@ def log_denetimi(yol):
     istisnalar = [s for s in metin.splitlines() if re.search(r"Exception|	at [a-z]", s)]
     if istisnalar:
         hatalar.append(f"{len(istisnalar)} istisna satırı, ilki: {istisnalar[0]}")
+    config_uyarilari = [s for s in metin.splitlines()
+                        if re.search(r"dogalafetler-(server|client)\.toml is not correct|Incorrect key (cekirdek|sicaklik|gorsel)\b", s)]
+    if config_uyarilari:
+        hatalar.append(f"{len(config_uyarilari)} config düzeltme satırı, ilki: {config_uyarilari[0]}")
     if "Stopping the server" not in metin:
         hatalar.append("'Stopping the server' yok")
     return hatalar

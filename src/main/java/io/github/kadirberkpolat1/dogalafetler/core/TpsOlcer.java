@@ -8,8 +8,8 @@ import net.minecraft.server.MinecraftServer;
 /**
  * Tek TPS ölçer (madde 3, spike-donma K-D2): yıkım, yangın, donma/çözülme ve efekt bütçeleri {@link #kismaCarpani()}'nı
  * okur ve işlerini bununla çarpar (1, 1/2, 1/4). Ölçüm saniyede bir {@code MinecraftServer.tickTimes}'ın dolu
- * girdilerinden alınır; eşikler config'tedir ({@code cekirdek.tps}). Kademe değişince tek satır log yazılır; ms/tick ve TPS
- * aynı ortalamadandır.
+ * girdilerinden alınır; eşikler ve histerezisli toparlanma eşikleri config'tedir ({@code cekirdek.tps}). Kademe değişince
+ * tek satır log yazılır; ms/tick ve TPS aynı ortalamadandır.
  */
 public final class TpsOlcer {
     private static final int OLCUM_ARALIGI = 20;
@@ -35,13 +35,13 @@ public final class TpsOlcer {
         return ortalamaMs;
     }
 
-    static void guncelle(MinecraftServer server, double esik, double kritikEsik) {
+    static void guncelle(MinecraftServer server, TpsKismasi.Esikler esikler) {
         if (++sayac % OLCUM_ARALIGI != 0) {
             return;
         }
         double ms = TpsKismasi.ortalamaMs(server.tickTimes);
         double yeniTps = TpsKismasi.tps(ms);
-        double yeniCarpan = TpsKismasi.carpan(yeniTps, esik, kritikEsik);
+        double yeniCarpan = TpsKismasi.carpan(yeniTps, kismaCarpani, esikler);
         ortalamaMs = ms;
         tps = yeniTps;
         if (yeniCarpan != kismaCarpani) {

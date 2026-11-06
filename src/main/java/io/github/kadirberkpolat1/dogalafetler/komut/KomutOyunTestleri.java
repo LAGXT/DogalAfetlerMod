@@ -105,6 +105,11 @@ public final class KomutOyunTestleri {
         yardimci.assertTrue(calistir(yardimci, "dogalafet hiz 5") == 1, "hiz başarısız");
         yardimci.assertTrue(calistir(yardimci, "dogalafet gun 42") == 1, "gun başarısız");
         yardimci.assertTrue(yonetici.oyunGunu() == 42, "gun 42 ayarlanmadı: " + yonetici.oyunGunu());
+        server.overworld().setDayTime(server.overworld().getDayTime() + 72_000);
+        yardimci.assertTrue(yonetici.oyunGunu() == 42, "dünya saati ilerletilince oyun günü değişmemeli: " + yonetici.oyunGunu());
+        server.overworld().setDayTime(1_000);
+        yardimci.assertTrue(yonetici.oyunGunu() == 42, "/time set day gibi geri alınca oyun günü değişmemeli");
+        net.minecraft.nbt.CompoundTag ekVeri = donem.ekVeri("test");
 
         yardimci.assertTrue(calistir(yardimci, "dogalafet sifirla") == 1, "sifirla başarısız");
         yardimci.assertTrue(donem.ayVar(), "ay geri gelmedi");
@@ -118,6 +123,7 @@ public final class KomutOyunTestleri {
                 "geçmiş");
         yardimci.assertTrue(donem.genelBeklemeKalan() == 0, "bekleme");
         yardimci.assertTrue(donem.ekVeri("test").isEmpty(), "ek veri");
+        yardimci.assertTrue(donem.ekVeri("test") == ekVeri && ekVeri.isEmpty(), "ek veri referansı sıfırlamada kopmamalı");
         yardimci.assertTrue(yonetici.zamanOlcegi().carpan() == 1.0, "hız 1'e dönmedi");
         yardimci.assertTrue(yonetici.aktifAfet().isEmpty(), "aktif afet kaldı");
         yardimci.succeed();

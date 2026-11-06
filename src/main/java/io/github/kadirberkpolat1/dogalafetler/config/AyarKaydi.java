@@ -9,23 +9,32 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import net.minecraftforge.common.ForgeConfigSpec;
+import net.minecraftforge.fml.ModContainer;
 import net.minecraftforge.fml.ModLoadingContext;
+import net.minecraftforge.fml.config.ConfigFileTypeHandler;
 import net.minecraftforge.fml.config.ModConfig;
 
 /**
  * Config kayıt kancası (K0-08). Tek SERVER spec ({@value #SUNUCU_DOSYASI}, dünya başına, istemciye senkron) ve tek CLIENT
- * spec ({@value #ISTEMCI_DOSYASI}) vardır; alt sistemler mod kurucusunda kendi bölümlerini ekler:
+ * spec ({@value #ISTEMCI_DOSYASI}) vardır; alt sistemler kendi bölümlerini <b>yalnız {@code DogalAfetler} kurucusundan
+ * çağrılan açık bir {@code kaydet()} metoduyla</b>, koşulsuz ekler (statik başlatıcı ya da {@code static final} alanı kullanılmaz:
+ * sınıf spec kurulduktan sonra yüklenirse ekleme reddedilir):
  *
  * <pre>{@code
- * private static final AyarKaydi.Bolum<SicaklikAyarlari> AYAR =
- *         AyarKaydi.sunucuBolumu("sicaklik", "Sıcaklık sistemi (madde 7)", SicaklikAyarlari::new);
- * // SicaklikAyarlari(ForgeConfigSpec.Builder k) { esik = k.comment("...").defineInRange("esik", 10, 0, 50); }
- * double esik = AYAR.get().esik.get();
+ * public final class SicaklikAyarlari {
+ *     private static AyarKaydi.Bolum<SicaklikAyarlari> bolum;
+ *     private final ForgeConfigSpec.IntValue esik;
+ *     private SicaklikAyarlari(ForgeConfigSpec.Builder k) { esik = k.comment("...").defineInRange("esik", 10, 0, 50); }
+ *     public static void kaydet() { bolum = AyarKaydi.sunucuBolumu("sicaklik", "Sıcaklık (madde 7)", SicaklikAyarlari::new); }
+ *     public static int esik() { return bolum.get().esik.get(); }
+ * }
+ * // DogalAfetler kurucusunda, AyarKaydi.kaydet(baglam) satırından önce: SicaklikAyarlari.kaydet();
  * }</pre>
  *
  * Kurucu, bölüm adıyla {@code push} edilmiş builder'ı alır ve ittiği alt bölümleri kendisi kapatır. Aynı bölüme birden
  * çok katkı eklenebilir (anahtarlar farklı olmalı). Spec'ler {@link #kaydet} ile mod kurucusunun sonunda kurulur; ondan
- * sonra eklenen bölüm reddedilir. Değerler config yüklendikten sonra (sunucu açılışı) okunur.
+ * sonra eklenen bölüm reddedilir. Değerler config yüklendikten sonra (sunucu açılışı) okunur. Yeni dosyalar varsayılanlarla
+ * yazılır ({@link VarsayilanYazanIsleyici}).
  */
 public final class AyarKaydi {
     public static final String SUNUCU_DOSYASI = "dogalafetler-server.toml";
@@ -97,8 +106,21 @@ public final class AyarKaydi {
             throw new IllegalStateException("Config spec'leri zaten kuruldu");
         }
         kuruldu = true;
-        baglam.registerConfig(ModConfig.Type.SERVER, kur(SUNUCU), SUNUCU_DOSYASI);
-        baglam.registerConfig(ModConfig.Type.CLIENT, kur(ISTEMCI), ISTEMCI_DOSYASI);
+        ModContainer kapsayici = baglam.getContainer();
+        kapsayici.addConfig(new VarsayilanliConfig(ModConfig.Type.SERVER, kur(SUNUCU), kapsayici, SUNUCU_DOSYASI));
+        kapsayici.addConfig(new VarsayilanliConfig(ModConfig.Type.CLIENT, kur(ISTEMCI), kapsayici, ISTEMCI_DOSYASI));
+    }
+
+    /** Forge'un {@code registerConfig}'iyle aynı kayıt; yalnız dosya işleyicisi yeni dosyayı varsayılanlarla yazar. */
+    private static final class VarsayilanliConfig extends ModConfig {
+        private VarsayilanliConfig(Type tur, ForgeConfigSpec spec, ModContainer kapsayici, String dosya) {
+            super(tur, spec, kapsayici, dosya);
+        }
+
+        @Override
+        public ConfigFileTypeHandler getHandler() {
+            return VarsayilanYazanIsleyici.ORNEK;
+        }
     }
 
     private static ForgeConfigSpec kur(List<Katki> katkilar) {
