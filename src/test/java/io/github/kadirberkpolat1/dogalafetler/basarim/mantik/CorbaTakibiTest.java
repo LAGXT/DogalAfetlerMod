@@ -1,13 +1,16 @@
 package io.github.kadirberkpolat1.dogalafetler.basarim.mantik;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Esikler;
+import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Kademe;
 import org.junit.jupiter.api.Test;
 
 class CorbaTakibiTest {
     @Test
-    void soguktaSicakYiyecekVeNotreDonusBirKezSayilir() {
+    void donarkenSicakYiyecekVeNotreDonusBirKezSayilir() {
         CorbaTakibi t = new CorbaTakibi();
         t.yedi(100, true, true, 1800);
         assertFalse(t.kontrol(120, false), "henüz nötr değil");
@@ -16,10 +19,34 @@ class CorbaTakibiTest {
     }
 
     @Test
-    void sogukDegilkenYenenSayilmaz() {
+    void donmuyorkenYenenSayilmaz() {
         CorbaTakibi t = new CorbaTakibi();
         t.yedi(100, false, true, 1800);
         assertFalse(t.kontrol(120, true), "N16: donma eşiğinin altındayken yemek gerekir");
+    }
+
+    @Test
+    void donmaDurumuYalnizDonmaHasariKademesi() {
+        for (Kademe k : Kademe.values()) {
+            assertEquals(k == Kademe.DONUYOR, CorbaTakibi.donmaDurumunda(k), k.name());
+        }
+        Esikler e = Esikler.VARSAYILAN;
+        assertFalse(CorbaTakibi.donmaDurumunda(e.kademe(-31)), "−31 soğuk: yavaşlama, donma değil");
+        assertFalse(CorbaTakibi.donmaDurumunda(e.kademe(-60)), "−60 çok soğuk: buz kenarı, donma değil");
+        assertTrue(CorbaTakibi.donmaDurumunda(e.kademe(-76)), "−76 donma hasarı kademesi");
+    }
+
+    @Test
+    void soguktaKizarmisPatatesAlinmazDonarkenAlinir() {
+        Esikler e = Esikler.VARSAYILAN;
+        CorbaTakibi t = new CorbaTakibi();
+        // −31'de vanilla pişmiş yiyecek (küçük, 30 sn ısınma): nötre hemen dönse de sayılmaz (inceleme A1).
+        t.yedi(100, CorbaTakibi.donmaDurumunda(e.kademe(-31)), false, 600);
+        assertFalse(t.teyitBekliyor(101), "donmuyorken aday bile olmaz");
+        assertFalse(t.kontrol(120, true));
+        t.yedi(200, CorbaTakibi.donmaDurumunda(e.kademe(-80)), true, 3600);
+        assertFalse(t.kontrol(220, false));
+        assertTrue(t.kontrol(3000, true), "donarken sıcak yiyecek, etkisi sürerken nötr");
     }
 
     @Test

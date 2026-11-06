@@ -1,9 +1,12 @@
 package io.github.kadirberkpolat1.dogalafetler.basarim.mantik;
 
+import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Kademe;
+
 /**
- * #19 "Çorba İçer Isınır" (N16): donma eşiğinin altındayken sıcak bir yiyecek yemek ve etkisi sürerken vücudun nötr
- * bölgeye dönmesi. Yiyecek sıcak sayılır: tanınan sıcak yiyecekse (etiket) ya da yedikten sonra
- * {@value #ADAY_PENCERESI} tick içinde vücuda taze bir ısınma etkisi eklendiyse. Zaman sunucu oyun tick'idir.
+ * #19 "Çorba İçer Isınır" (madde 12 "donma durumundayken", N16 "donma eşiğinin altındayken"): vücut donma kademesindeyken
+ * ({@link #donmaDurumunda}) sıcak bir yiyecek yemek ve etkisi sürerken vücudun nötr bölgeye dönmesi. Yiyecek sıcak
+ * sayılır: tanınan sıcak yiyecekse (etiket) ya da yedikten sonra {@value #ADAY_PENCERESI} tick içinde vücuda taze bir
+ * ısınma etkisi eklendiyse. Zaman sunucu oyun tick'idir.
  */
 public final class CorbaTakibi {
     /** Tanınmayan yiyecekten sonra ısınmanın gözlenebileceği süre (tick). */
@@ -16,14 +19,22 @@ public final class CorbaTakibi {
     private long bitis = YOK;
 
     /**
+     * "Donma durumu": sıcaklığın donma hasarı kademesi ({@code Esikler.donmaHasari}, vars. ≤ −75; yiyecek sözleşmesi §A3 ile
+     * aynı, A-29). Soğuk ve çok soğuk kademeleri (yavaşlama, buz kenarı) sayılmaz.
+     */
+    public static boolean donmaDurumunda(Kademe kademe) {
+        return kademe == Kademe.DONUYOR;
+    }
+
+    /**
      * Oyuncu bir yiyeceği bitirdi.
      *
-     * @param soguk        yerken vücut donma eşiğinin altında mıydı
+     * @param donuyor      yemeye başlarken vücut donma durumunda mıydı ({@link #donmaDurumunda})
      * @param sicakYiyecek yiyecek tanınan bir sıcak yiyecek mi
      * @param etkiSuresi   eklenen ısınma etkisinin süresi (tick; bilinmiyorsa 0)
      */
-    public void yedi(long simdi, boolean soguk, boolean sicakYiyecek, int etkiSuresi) {
-        if (!soguk) {
+    public void yedi(long simdi, boolean donuyor, boolean sicakYiyecek, int etkiSuresi) {
+        if (!donuyor) {
             aday = YOK;
             return;
         }

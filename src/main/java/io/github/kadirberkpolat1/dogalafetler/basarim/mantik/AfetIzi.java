@@ -4,23 +4,30 @@ import java.util.EnumSet;
 import java.util.Set;
 
 /**
- * Bir oyuncunun süren afetteki izi: o afete özgü koşullar (sürüklendi, çukura düştü, yangın alanında geçen saniye,
- * hasar aldı) ve etki alanı payı için kendi "alanda bulundu / öldü" takibi. Afet numarası ({@code AfetBaglami}
- * başlangıç saati) değişince sıfırlanır. Oyuncu verisinde saklanır; sunucu yeniden açılınca süren afetle birlikte
- * sürer.
+ * Bir oyuncunun süren afetteki izi: etki alanı payı için kendi "alanda bulundu / öldü" takibi ve o afete özgü ipuçları
+ * ({@link Ipucu}). Her ipucu iki ayrı kaynakta tutulur: afetin olayı ({@code olay*}) ve başarımın yedek denetiminin tahmini
+ * ({@code tahmin*}); afet bitince her ipucu için tek kaynak seçilir ({@link #kosullar}, A-31), iki kaynak toplanmaz. Afet
+ * numarası ({@code AfetBaglami} başlangıç saati) değişince sıfırlanır. Oyuncu verisinde saklanır.
  */
 public final class AfetIzi {
     /** Madde 12 #5: orman yangını alanının içinde en az 30 saniye. */
     public static final int YANGIN_SANIYESI = 30;
     public static final long AFET_YOK = Long.MIN_VALUE;
+    public static final long SANIYE_YOK = Long.MIN_VALUE;
 
     private long no = AFET_YOK;
     public boolean alanda;
     public boolean oldu;
-    public boolean suruklendi;
-    public boolean cukuraDustu;
-    public int yanginSaniye;
-    public boolean hasarAldi;
+    /** Afetin olayıyla gelen ipuçları ({@link Ipucu#bit()} maskesi). */
+    public int olayBitleri;
+    /** Yedek denetimin tahmin ettiği ipuçları. */
+    public int tahminBitleri;
+    /** Yangın alanında sayılan saniyeler, kaynak başına. */
+    public int yanginOlay;
+    public int yanginTahmin;
+    /** Kaynağın son saydığı saniye (aynı saniye ikinci kez sayılmaz). */
+    public long yanginOlaySon = SANIYE_YOK;
+    public long yanginTahminSon = SANIYE_YOK;
 
     public long no() {
         return no;
@@ -34,10 +41,12 @@ public final class AfetIzi {
         no = afetNo;
         alanda = false;
         oldu = false;
-        suruklendi = false;
-        cukuraDustu = false;
-        yanginSaniye = 0;
-        hasarAldi = false;
+        olayBitleri = 0;
+        tahminBitleri = 0;
+        yanginOlay = 0;
+        yanginTahmin = 0;
+        yanginOlaySon = SANIYE_YOK;
+        yanginTahminSon = SANIYE_YOK;
         return true;
     }
 
@@ -46,19 +55,59 @@ public final class AfetIzi {
         no = afetNo;
     }
 
-    /** Bu afette sağlanan koşullar. */
-    public Set<SagCikmaKosulu> kosullar() {
+    /**
+     * Bir ipucunu kaynağına yazar; iz değiştiyse true. {@link Ipucu#YANGIN_ALANINDA} saniye sayar: {@code saniye} (oyun
+     * saniyesi) kaynağın son saydığı saniyeyse sayılmaz.
+     */
+    public boolean isaretle(Ipucu ipucu, boolean olaydan, long saniye) {
+        if (ipucu == Ipucu.YANGIN_ALANINDA) {
+            if (olaydan) {
+                if (yanginOlaySon == saniye) {
+                    return false;
+                }
+                yanginOlaySon = saniye;
+                yanginOlay++;
+            } else {
+                if (yanginTahminSon == saniye) {
+                    return false;
+                }
+                yanginTahminSon = saniye;
+                yanginTahmin++;
+            }
+            return true;
+        }
+        int eski = olaydan ? olayBitleri : tahminBitleri;
+        if ((eski & ipucu.bit()) != 0) {
+            return false;
+        }
+        if (olaydan) {
+            olayBitleri |= ipucu.bit();
+        } else {
+            tahminBitleri |= ipucu.bit();
+        }
+        return true;
+    }
+
+    /** {@code ipucu} seçilen kaynakta var mı ({@code olayli} ise olay, değilse tahmin). */
+    private boolean var(Ipucu ipucu, Set<Ipucu> olayli) {
+        int bitler = olayli.contains(ipucu) ? olayBitleri : tahminBitleri;
+        return (bitler & ipucu.bit()) != 0;
+    }
+
+    /** Bu afette sağlanan koşullar; {@code olayli}: tek kaynağı afetin olayı olan ipuçları ({@link IpucuKaynaklari}). */
+    public Set<SagCikmaKosulu> kosullar(Set<Ipucu> olayli) {
         Set<SagCikmaKosulu> sonuc = EnumSet.noneOf(SagCikmaKosulu.class);
-        if (suruklendi) {
+        if (var(Ipucu.SURUKLENDI, olayli)) {
             sonuc.add(SagCikmaKosulu.SURUKLENDI);
         }
-        if (cukuraDustu) {
+        if (var(Ipucu.CUKURA_DUSTU, olayli)) {
             sonuc.add(SagCikmaKosulu.CUKURA_DUSTU);
         }
-        if (yanginSaniye >= YANGIN_SANIYESI) {
+        int yangin = olayli.contains(Ipucu.YANGIN_ALANINDA) ? yanginOlay : yanginTahmin;
+        if (yangin >= YANGIN_SANIYESI) {
             sonuc.add(SagCikmaKosulu.YANGIN_ALANINDA);
         }
-        if (!hasarAldi) {
+        if (!var(Ipucu.HASAR_ALDI, olayli)) {
             sonuc.add(SagCikmaKosulu.HASARSIZ);
         }
         return sonuc;

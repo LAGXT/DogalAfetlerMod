@@ -13,6 +13,7 @@ import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.advancements.AdvancementsScreen;
 import net.minecraft.client.multiplayer.ClientAdvancements;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -25,9 +26,11 @@ import net.minecraftforge.fml.common.Mod;
 /**
  * Başarım görsel kanıt otomasyonu (K0-21 rev. 2). Yalnız {@code -Ddogalafetler.otomasyon=basarim} ile, tek oyunculu
  * Quick Play dünyasında ve {@code -PoyunTestiAfeti=kasirga} ile çalışır; üretimde etkisizdir. Sırayla: seviye 5 sınama
- * kasırgasının sireniyle kök toast'ı, doğal bitişte üç başarımın toast'ı ve sohbet duyurusu, ünvanlı sohbet satırı,
- * ünvanlı tab listesi, başarım sekmesinin erken hali (kök + iki kat), gizliler dışındaki bütün başarımlar açıkken
- * sekmenin dört kaydırma konumu (gizli iki başarım görünmez) ve gizliler açılınca son hali. Klavye, fare ve tekerlek
+ * kasırgasının sireniyle kök toast'ı, doğal bitişte üç başarımın toast'ı ve sohbet duyurusu (meydan okumada ünvanın
+ * kendisiyle), ünvanlı sohbet satırı, ünvanlı tab listesi, başarım sekmesinin erken hali (kök + iki kat), gizliler
+ * dışındaki bütün başarımlar açıkken sekmenin dört kaydırma konumu (gizli iki başarım görünmez) ve gizliler açılınca
+ * üç konum (gizliler ortada tam görünür). Sahne komutları entegre sunucunun konsol kaynağından çıktısız verilir:
+ * sohbete komut satırı (başarı ya da hata) düşmez; sohbet kareden önce temizlenir (A-33). Klavye, fare ve tekerlek
  * girdileri kapanışa kadar sayılır; kendi açmadığı duraklatma ekranını kapatır.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
@@ -125,9 +128,31 @@ public final class BasarimOtomasyonu {
         ADIMLAR.add(new Adim(ad, is, hazir, enCokTick));
     }
 
+    /**
+     * Sahne komutu: entegre sunucunun konsol kaynağından (yetki 4), çıktısız; {@code @s} oyuncunun adına çevrilir.
+     * Başarı ya da hata satırı sohbete düşmez (inceleme A4).
+     */
     private static void komut(Minecraft mc, String k) {
-        DogalAfetler.LOGGER.info(ON + "komut /{}", k);
-        mc.player.connection.sendCommand(k);
+        sunucuKomutu(mc, k, true);
+    }
+
+    /** Kanıt komutu: çıktısı sunucu log'una gider (sohbete değil). */
+    private static void logKomutu(Minecraft mc, String k) {
+        sunucuKomutu(mc, k, false);
+    }
+
+    private static void sunucuKomutu(Minecraft mc, String k, boolean sessiz) {
+        MinecraftServer server = mc.getSingleplayerServer();
+        String satir = k.replace("@s", mc.player.getGameProfile().getName());
+        DogalAfetler.LOGGER.info(ON + "komut /{}", satir);
+        server.execute(() -> {
+            CommandSourceStack kaynak = server.createCommandSourceStack();
+            server.getCommands().performPrefixedCommand(sessiz ? kaynak.withSuppressedOutput() : kaynak, satir);
+        });
+    }
+
+    private static void sohbetiTemizle(Minecraft mc) {
+        mc.gui.getChat().clearMessages(false);
     }
 
     private static BooleanSupplier bekle(int tick) {
@@ -151,23 +176,21 @@ public final class BasarimOtomasyonu {
     private static void plan(Minecraft mc) {
         ekle("kurulum", () -> {
             mc.options.hideGui = false;
-            // Komut çıktıları sohbet karesini kirletmesin; duyuru ve ünvanlı sohbet satırı kalsın (kapanışta geri açılır).
-            for (String k : new String[] {"gamerule sendCommandFeedback false", "gamemode survival",
-                    "difficulty peaceful", "gamerule doDaylightCycle false",
-                    "time set 6000", "weather clear 100000", "gamerule doWeatherCycle false",
-                    "gamerule announceAdvancements true", "advancement revoke @s from dogalafetler:dogalafetler/root",
-                    "dogalafet unvan @s yok", "dogalafet stop", "scoreboard objectives add basarim_kanit dummy",
-                    "scoreboard objectives setdisplay list basarim_kanit", "xp set @s 0 levels",
-                    "xp set @s 0 points"}) {
+            for (String k : new String[] {"gamemode survival @s", "difficulty peaceful",
+                    "gamerule doDaylightCycle false", "time set 6000", "weather clear 100000",
+                    "gamerule doWeatherCycle false",
+                    "gamerule announceAdvancements true", "advancement revoke @s everything", "dogalafet unvan @s yok",
+                    "dogalafet stop", "xp set @s 0 levels", "xp set @s 0 points"}) {
                 komut(mc, k);
             }
         }, bekle(60), 80);
+        ekle("sohbeti temizle", () -> sohbetiTemizle(mc), bekle(5), 10);
         ekle("kasırga S5", () -> komut(mc, "dogalafet start kasirga 5 @s"), bekle(40), 60);
         ekle("siren", () -> komut(mc, "dogalafet asama ileri"), kazanildi(mc, Basarimlar.KOK), 200);
         ekle("kök toast", () -> { }, bekle(30), 40);
         ekle("kök toast kare", () -> kare(mc, "toast_kok"), bekle(10), 20);
         ekle("aktif", () -> komut(mc, "dogalafet asama ileri"), bekle(60), 80);
-        ekle("bitiş", () -> komut(mc, "dogalafet asama ileri"), bekle(40), 60);
+        // AKTIF → BITIS: sınama afetinin sönümü hemen biter, afet doğal sonlanır (dördüncü "asama ileri" yok).
         ekle("doğal son", () -> komut(mc, "dogalafet asama ileri"), kazanildi(mc, Basarimlar.FELAKET_USTASI), 200);
         ekle("toast'lar", () -> { }, bekle(25), 30);
         ekle("toast kare", () -> kare(mc, "toast_felaket_ustasi"), bekle(10), 20);
@@ -182,6 +205,7 @@ public final class BasarimOtomasyonu {
         ekle("sekme erken", () -> {
             mc.options.keyPlayerList.setDown(false);
             mc.getToasts().clear();
+            sohbetiTemizle(mc);
             sekmeyiAc(mc);
         }, bekle(40), 60);
         ekle("sekme erken kare", () -> kare(mc, "sekme_erken"), bekle(10), 20);
@@ -194,9 +218,10 @@ public final class BasarimOtomasyonu {
                 }
             }
         }, kazanildi(mc, Basarimlar.KUTUP_USTASI), 200);
-        ekle("toast temizliği", () -> mc.getToasts().clear(), bekle(20), 30);
+        ekle("toast'lar gelsin", () -> { }, bekle(30), 40);
         ekle("sekme tam", () -> {
             mc.getToasts().clear();
+            sohbetiTemizle(mc);
             sekmeyiAc(mc);
         }, bekle(40), 60);
         ekle("en üste kaydır", () -> kaydir(mc, 1000), bekle(10), 20);
@@ -212,19 +237,23 @@ public final class BasarimOtomasyonu {
             komut(mc, "advancement grant @s only dogalafetler:dogalafetler/" + Basarimlar.BIRLIKTE_HAYATTA.yol());
             komut(mc, "advancement grant @s only dogalafetler:dogalafetler/" + Basarimlar.HEPSINI_ATLATTIM.yol());
         }, kazanildi(mc, Basarimlar.HEPSINI_ATLATTIM), 200);
+        ekle("gizli toast'lar gelsin", () -> { }, bekle(30), 40);
         ekle("sekme gizliler açık", () -> {
             mc.getToasts().clear();
+            sohbetiTemizle(mc);
             sekmeyiAc(mc);
         }, bekle(40), 60);
         ekle("en üste kaydır 2", () -> kaydir(mc, 1000), bekle(10), 20);
         ekle("gizliler kare 1", () -> kare(mc, "sekme_gizliler_acik_ust"), bekle(10), 20);
+        // Felaket Ustası kolu (#23 → #24 → #25, #23 → #26) pencerenin ortasına: #25 üst kenarda kırpılmasın (A6).
+        ekle("gizlileri ortala", () -> kaydir(mc, -170), bekle(10), 20);
+        ekle("gizliler kare 2", () -> kare(mc, "sekme_gizliler_acik_orta"), bekle(10), 20);
         ekle("kaydır 4", () -> kaydir(mc, -1000), bekle(10), 20);
-        ekle("gizliler kare 2", () -> kare(mc, "sekme_gizliler_acik_alt"), bekle(10), 20);
+        ekle("gizliler kare 3", () -> kare(mc, "sekme_gizliler_acik_alt"), bekle(10), 20);
         ekle("kapanış", () -> {
             mc.setScreen(null);
             komut(mc, "gamerule announceAdvancements true");
-            komut(mc, "gamerule sendCommandFeedback true");
-            komut(mc, "dogalafet basarim bilgi @s");
+            logKomutu(mc, "dogalafet basarim bilgi @s");
             DogalAfetler.LOGGER.info(ON + "bitti; FPS {}", mc.getFps());
         }, bekle(40), 60);
         ekle("çıkış", () -> {

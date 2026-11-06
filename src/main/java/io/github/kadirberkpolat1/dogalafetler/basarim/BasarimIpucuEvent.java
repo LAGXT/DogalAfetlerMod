@@ -1,31 +1,27 @@
 package io.github.kadirberkpolat1.dogalafetler.basarim;
 
+import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.Ipucu;
+import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.IpucuKaynaklari;
+import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import java.util.Objects;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.eventbus.api.Event;
 
 /**
  * Faz 4 afetlerinin başarımlara verdiği ipucu ({@code MinecraftForge.EVENT_BUS}, sunucu ana thread'i). Yalnız afetin
- * kendisinin bildiği "o afette ayrıca" koşullar içindir; ipucu oyuncunun süren (AKTIF) afetteki izine yazılır ve afet
- * doğal bitince {@code afetten_sag_cikti} ölçütünün {@code kosul} alanına döner. Sözleşme
- * {@code .vibe/kararlar/basarim.md} §A.
+ * kendisinin bildiği "o afette ayrıca" koşullar içindir (madde 12 #2, #4, #5, #6); ipucu oyuncunun süren (AKTIF) afetteki
+ * izine yazılır ve afet doğal bitince {@code afetten_sag_cikti} ölçütünün {@code kosul} alanına döner. Sözleşme
+ * {@code .vibe/kararlar/basarim.md} §A.3: ipucunun ait olduğu afet türü onu yayınladığını mod kurucusunda
+ * {@link #yayinciKaydet} ile bildirir; o türde başarımın yedek denetimi çalışmaz, tek kaynak bu olaydır (A-31).
  *
  * <pre>{@code
- * MinecraftForge.EVENT_BUS.post(new BasarimIpucuEvent(oyuncu, BasarimIpucuEvent.Ipucu.CUKURA_DUSTU));
+ * BasarimIpucuEvent.yayinciKaydet(AfetTuru.SINKHOLE, Ipucu.CUKURA_DUSTU);            // mod kurucusunda
+ * MinecraftForge.EVENT_BUS.post(new BasarimIpucuEvent(oyuncu, Ipucu.CUKURA_DUSTU));  // oyuncu çukura düştüğünde
  * }</pre>
  */
 public class BasarimIpucuEvent extends Event {
-    /** İpucu türleri. */
-    public enum Ipucu {
-        /** Tsunami: oyuncu dalga tarafından sürüklendi (#2). */
-        SURUKLENDI,
-        /** Sinkhole: oyuncu çökme sırasında çukura düştü (#4). */
-        CUKURA_DUSTU,
-        /** Orman yangını: oyuncu bu saniye yanan alanın içinde (saniyede en çok bir kez sayılır; 30'da #5). */
-        YANGIN_ALANINDA,
-        /** Asit yağmuru (ya da başka afet): oyuncu afetten hasar aldı (#6'yı bozar). */
-        HASAR_ALDI
-    }
+    /** Hangi afet türü hangi ipucunu kendisi yayınlıyor. */
+    static final IpucuKaynaklari YAYINCILAR = new IpucuKaynaklari();
 
     private final ServerPlayer oyuncu;
     private final Ipucu ipucu;
@@ -41,5 +37,27 @@ public class BasarimIpucuEvent extends Event {
 
     public Ipucu ipucu() {
         return ipucu;
+    }
+
+    /** Afet türü bu ipuçlarını kendisi yayınlar: başarımın yedek denetimi o türde kapanır. Mod kurucusunda bir kez. */
+    public static void yayinciKaydet(AfetTuru tur, Ipucu... ipuclari) {
+        for (Ipucu ipucu : ipuclari) {
+            YAYINCILAR.kaydet(tur, ipucu);
+        }
+    }
+
+    /** Yalnız GameTest: kaydı {@code try}-with-resources sonunda geri alır (önceden kayıtlıysa dokunmaz). */
+    public static GeciciYayinci geciciYayinci(AfetTuru tur, Ipucu ipucu) {
+        return new GeciciYayinci(tur, ipucu, YAYINCILAR.kaydet(tur, ipucu));
+    }
+
+    /** {@link #geciciYayinci} kaydı. */
+    public record GeciciYayinci(AfetTuru tur, Ipucu ipucu, boolean yeni) implements AutoCloseable {
+        @Override
+        public void close() {
+            if (yeni) {
+                YAYINCILAR.kaldir(tur, ipucu);
+            }
+        }
     }
 }

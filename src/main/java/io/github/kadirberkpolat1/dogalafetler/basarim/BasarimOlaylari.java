@@ -1,13 +1,13 @@
 package io.github.kadirberkpolat1.dogalafetler.basarim;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
-import io.github.kadirberkpolat1.dogalafetler.basarim.BasarimIpucuEvent.Ipucu;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.AfetIzi;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.AfetKumesi;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.ArdisikSayac;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.Basarimlar;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.CorbaTakibi;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.DenizTakibi;
+import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.Ipucu;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.KutupSayaci;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.OdulTablosu;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.SagCikanTuretimi;
@@ -38,6 +38,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import net.minecraft.advancements.Advancement;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -70,8 +71,10 @@ import net.minecraftforge.server.ServerLifecycleHooks;
  * Başarım ölçütlerini tetikleyen olay dinleyicileri (madde 12, N16; tablo {@code .vibe/kararlar/basarim.md} §A). Hepsi
  * sunucu ana thread'inde ve oyuncu başınadır. Afet sonuçları çekirdeğin {@link AfetBittiEvent}'inden (yalnız doğal
  * bitiş), ilk siren {@link SirenIstegiEvent}'ten (sireni gerçekten alan oyuncular), dönem eşikleri
- * {@link DonemDegistiEvent}'ten ve saniyelik denetimden gelir. Sahte oyuncular (GameTest) tick almadığı için
- * {@link #saniyelikDenetim} ve {@link #tickDenetimi} testten doğrudan çağrılabilir.
+ * {@link DonemDegistiEvent}'ten ve saniyelik denetimden gelir. Afete özgü koşulların kaynağı afetin
+ * {@link BasarimIpucuEvent}'idir; başarımın yedek denetimi yalnız o ipucunun olayı yokken sayılır (A-31). Sahte
+ * oyuncular (GameTest) tick almadığı için {@link #saniyelikDenetim} ve {@link #tickDenetimi} testten doğrudan
+ * çağrılabilir.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID)
 public final class BasarimOlaylari {
@@ -90,8 +93,7 @@ public final class BasarimOlaylari {
     private static final class Gecici {
         private final ArdisikSayac yildizli = new ArdisikSayac();
         private final CorbaTakibi corba = new CorbaTakibi();
-        private boolean yemeBasindaSoguk;
-        private long yanginSaniyesi = Long.MIN_VALUE;
+        private boolean yemeBasindaDonuyor;
     }
 
     private BasarimOlaylari() {
@@ -142,13 +144,14 @@ public final class BasarimOlaylari {
         }
         Set<UUID> sagCikanlar = SagCikanTuretimi.sagCikanlar(olay.dogalBitti(), olay.etkilenenler(), olay.sagCikanlar(),
                 payliAlanda, payliOlenler, cevrimici);
+        Set<Ipucu> olayli = BasarimIpucuEvent.YAYINCILAR.olayli(olay.tur(), BasarimVerisi.gelenIpuclari(server, no));
         for (UUID kimlik : sagCikanlar) {
             ServerPlayer oyuncu = server.getPlayerList().getPlayer(kimlik);
             if (oyuncu == null) {
                 continue;
             }
             AfetIzi iz = izler.get(kimlik);
-            Set<SagCikmaKosulu> kosullar = iz != null ? iz.kosullar() : EnumSet.of(SagCikmaKosulu.HASARSIZ);
+            Set<SagCikmaKosulu> kosullar = iz != null ? iz.kosullar(olayli) : EnumSet.of(SagCikmaKosulu.HASARSIZ);
             BasarimOlcutleri.AFETTEN_SAG_CIKTI.tetikle(oyuncu, olay.tur(), olay.seviye(), kosullar);
             AfetKumesi kume = BasarimVerisi.atlatilanlar(oyuncu);
             if (kume.ekle(olay.tur())) {
@@ -161,18 +164,26 @@ public final class BasarimOlaylari {
         }
     }
 
-    /** Faz 4 afetlerinin ipucu: süren afetteki ize yazılır. */
+    /**
+     * Faz 4 afetinin ipucu (§A.3): oyuncunun izine olay kaynağı olarak yazılır ve bu afette o ipucunun tek kaynağı
+     * artık olaydır (yedek tahminler sayılmaz, A-31). Yalnız AKTIF aşamada.
+     */
     @SubscribeEvent
     public static void ipucuGeldi(BasarimIpucuEvent olay) {
         ServerPlayer oyuncu = olay.oyuncu();
-        aktifAsamadakiAfet(oyuncu.server).ifPresent(afet -> isaretle(oyuncu, afet, olay.ipucu()));
+        aktifAsamadakiAfet(oyuncu.server).ifPresent(afet -> {
+            BasarimVerisi.ipucuGeldi(oyuncu.server, afetNo(afet), olay.ipucu());
+            isaretle(oyuncu, afet, olay.ipucu(), true);
+        });
     }
 
+    /** Çatı Altı yedeği (A-10): afet {@code HASAR_ALDI} yayınlamıyorsa AKTIF afette alandayken her hasar. */
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void hasarAldi(LivingDamageEvent olay) {
         if (olay.getEntity() instanceof ServerPlayer oyuncu && olay.getAmount() > 0) {
-            aktifAsamadakiAfet(oyuncu.server).filter(afet -> alanda(oyuncu, afet))
-                    .ifPresent(afet -> isaretle(oyuncu, afet, Ipucu.HASAR_ALDI));
+            aktifAsamadakiAfet(oyuncu.server)
+                    .filter(afet -> yedekAcik(afet, Ipucu.HASAR_ALDI) && alanda(oyuncu, afet))
+                    .ifPresent(afet -> isaretle(oyuncu, afet, Ipucu.HASAR_ALDI, false));
         }
     }
 
@@ -213,7 +224,10 @@ public final class BasarimOlaylari {
         }
     }
 
-    /** Her tick: tsunami sürüklemesi ve sinkhole düşüşü (kısa süren olaylar; yalnız o afet AKTIF iken). */
+    /**
+     * Her tick, yedek denetim (A-11, A-12; afet o ipucunu yayınlamıyorsa): tsunami sürüklemesi ve sinkhole düşüşü
+     * (kısa süren olaylar; yalnız o afet AKTIF iken).
+     */
     public static void tickDenetimi(ServerPlayer oyuncu) {
         if (!oyuncu.isAlive()) {
             return;
@@ -223,12 +237,13 @@ public final class BasarimOlaylari {
             return;
         }
         Afet afet = aktif.get();
-        if (afet.tur() == AfetTuru.TSUNAMI) {
+        if (afet.tur() == AfetTuru.TSUNAMI && yedekAcik(afet, Ipucu.SURUKLENDI)) {
             if (SanalSu.itmeHesapla(oyuncu, ITME) != null && alanda(oyuncu, afet)) {
-                isaretle(oyuncu, afet, Ipucu.SURUKLENDI);
+                isaretle(oyuncu, afet, Ipucu.SURUKLENDI, false);
             }
-        } else if (afet.tur() == AfetTuru.SINKHOLE && oyuncu.fallDistance >= CUKUR_DUSUSU && alanda(oyuncu, afet)) {
-            isaretle(oyuncu, afet, Ipucu.CUKURA_DUSTU);
+        } else if (afet.tur() == AfetTuru.SINKHOLE && yedekAcik(afet, Ipucu.CUKURA_DUSTU)
+                && oyuncu.fallDistance >= CUKUR_DUSUSU && alanda(oyuncu, afet)) {
+            isaretle(oyuncu, afet, Ipucu.CUKURA_DUSTU, false);
         }
     }
 
@@ -275,9 +290,10 @@ public final class BasarimOlaylari {
         if (degisti) {
             BasarimVerisi.afetIziYaz(oyuncu, iz);
         }
-        if (afet.tur() == AfetTuru.ORMAN_YANGINI && oyuncu.level() instanceof ServerLevel level
+        if (afet.tur() == AfetTuru.ORMAN_YANGINI && yedekAcik(afet, Ipucu.YANGIN_ALANINDA)
+                && oyuncu.level() instanceof ServerLevel level
                 && YanginYoneticisi.aktifSayi(level, new AABB(oyuncu.blockPosition()).inflate(YANGIN_YAKINLIGI)) > 0) {
-            isaretle(oyuncu, afet, Ipucu.YANGIN_ALANINDA);
+            isaretle(oyuncu, afet, Ipucu.YANGIN_ALANINDA, false);
         }
     }
 
@@ -298,13 +314,13 @@ public final class BasarimOlaylari {
     @SubscribeEvent
     public static void kullanimBasladi(LivingEntityUseItemEvent.Start olay) {
         if (olay.getEntity() instanceof ServerPlayer oyuncu) {
-            gecici(oyuncu).yemeBasindaSoguk = sogukMu(oyuncu);
+            gecici(oyuncu).yemeBasindaDonuyor = donuyorMu(oyuncu);
         }
     }
 
     /**
-     * Yiyecek/içecek bitti: yerken (anlık ısınma eklenmeden önce) donma eşiğinin altındaysa ve yiyecek sıcaksa
-     * (etiket ya da taze ısınma etkisi) çorba takibi başlar.
+     * Yiyecek/içecek bitti: yemeye başlarken (anlık ısınma eklenmeden önce) donma durumundaysa ve yiyecek sıcaksa
+     * (etiket ya da taze ısınma etkisi) çorba takibi başlar (A-14, A-29).
      */
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void kullanimBitti(LivingEntityUseItemEvent.Finish olay) {
@@ -312,11 +328,11 @@ public final class BasarimOlaylari {
             return;
         }
         Gecici gecici = gecici(oyuncu);
-        boolean soguk = gecici.yemeBasindaSoguk || sogukMu(oyuncu);
-        gecici.yemeBasindaSoguk = false;
+        boolean donuyor = gecici.yemeBasindaDonuyor || donuyorMu(oyuncu);
+        gecici.yemeBasindaDonuyor = false;
         int sure = tazeIsinmaSuresi(oyuncu, 1);
         boolean taninan = olay.getItem().is(BasarimKimlikleri.SICAK_YIYECEK);
-        gecici.corba.yedi(oyuncu.level().getGameTime(), soguk, taninan || sure > 0, sure);
+        gecici.corba.yedi(oyuncu.level().getGameTime(), donuyor, taninan || sure > 0, sure);
     }
 
     private static void corbaDenetimi(ServerPlayer oyuncu, Gecici gecici) {
@@ -336,10 +352,9 @@ public final class BasarimOlaylari {
         return SicaklikAyarlari.al().esikler().kademe(VucutSicakligi.al(oyuncu));
     }
 
-    /** N16 "donma eşiğinin altında": soğuk kademesi ya da daha aşağısı (yavaşlamanın başladığı eşik). */
-    private static boolean sogukMu(ServerPlayer oyuncu) {
-        Kademe k = kademe(oyuncu);
-        return k == Kademe.SOGUK || k == Kademe.COK_SOGUK || k == Kademe.DONUYOR;
+    /** Madde 12 #19 "donma durumundayken", N16 "donma eşiğinin altındayken": donma hasarı kademesi (A-29). */
+    private static boolean donuyorMu(ServerPlayer oyuncu) {
+        return CorbaTakibi.donmaDurumunda(kademe(oyuncu));
     }
 
     /** En çok {@code enCokGecen} tick önce eklenmiş ısınma etkilerinin en uzun kalan süresi; yoksa 0. */
@@ -371,8 +386,13 @@ public final class BasarimOlaylari {
     @SubscribeEvent
     public static void esyaToplandi(PlayerEvent.ItemPickupEvent olay) {
         if (olay.getEntity() instanceof ServerPlayer oyuncu) {
-            BasarimOlcutleri.ESYA_TOPLANDI.tetikle(oyuncu, BasarimKimlikleri.esya(olay.getStack()));
+            esyaToplandi(oyuncu, BasarimKimlikleri.esya(olay.getStack()));
         }
+    }
+
+    /** #7, #22: yerden alınan eşyanın kimliği. */
+    public static void esyaToplandi(ServerPlayer oyuncu, ResourceLocation esya) {
+        BasarimOlcutleri.ESYA_TOPLANDI.tetikle(oyuncu, esya);
     }
 
     /** #17: Tüy Upgrade'i sağ tıkı işlendikten sonra (sıcaklığın {@code TuyUpgrade}'i olayı iptal eder). */
@@ -495,25 +515,38 @@ public final class BasarimOlaylari {
 
     // ---------------------------------------------------------------- ödül ve ünvan
 
-    /** Config XP farkı (JSON varsayılanı verdi) ve meydan okuma ünvanı. */
+    /**
+     * Meydan okuma ünvanı (A-22, A-32): ilerleme olayı ödül ve sohbet duyurusundan önce gelir; ünvan burada verilince
+     * başarımın kendi duyurusu da önekli adı taşır.
+     */
+    @SubscribeEvent
+    public static void ilerledi(AdvancementEvent.AdvancementProgressEvent olay) {
+        if (olay.getProgressType() == AdvancementEvent.AdvancementProgressEvent.ProgressType.GRANT
+                && olay.getAdvancementProgress().isDone() && olay.getEntity() instanceof ServerPlayer oyuncu) {
+            bizimBasarim(olay.getAdvancement()).filter(basarim -> basarim.unvan() != null)
+                    .ifPresent(basarim -> Unvanlar.ayarla(oyuncu, Optional.of(basarim.unvan())));
+        }
+    }
+
+    /** Config XP farkı (JSON varsayılanı verdi). */
     @SubscribeEvent
     public static void kazanildi(AdvancementEvent.AdvancementEarnEvent olay) {
-        if (!(olay.getEntity() instanceof ServerPlayer oyuncu)) {
-            return;
+        if (olay.getEntity() instanceof ServerPlayer oyuncu) {
+            bizimBasarim(olay.getAdvancement()).ifPresent(basarim -> {
+                int fark = OdulTablosu.xpFarki(basarim.tur(), BasarimAyarlari.xp(basarim.tur()));
+                if (fark != 0) {
+                    oyuncu.giveExperiencePoints(fark);
+                }
+            });
         }
-        ResourceLocation kimlik = olay.getAdvancement().getId();
+    }
+
+    private static Optional<Basarimlar> bizimBasarim(Advancement advancement) {
+        ResourceLocation kimlik = advancement.getId();
         if (!DogalAfetler.MOD_ID.equals(kimlik.getNamespace()) || !kimlik.getPath().startsWith("dogalafetler/")) {
-            return;
+            return Optional.empty();
         }
-        Basarimlar.yoldan(kimlik.getPath()).ifPresent(basarim -> {
-            int fark = OdulTablosu.xpFarki(basarim.tur(), BasarimAyarlari.xp(basarim.tur()));
-            if (fark != 0) {
-                oyuncu.giveExperiencePoints(fark);
-            }
-            if (basarim.unvan() != null) {
-                Unvanlar.ayarla(oyuncu, Optional.of(basarim.unvan()));
-            }
-        });
+        return Basarimlar.yoldan(kimlik.getPath());
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)
@@ -595,32 +628,16 @@ public final class BasarimOlaylari {
                 && alan.get().iceriyor(oyuncu.getX(), oyuncu.getY(), oyuncu.getZ(), BasarimAyarlari.etkiAlaniPayi());
     }
 
-    private static void isaretle(ServerPlayer oyuncu, Afet afet, Ipucu ipucu) {
+    /** Yedek denetim bu afet türünde çalışır mı: tür o ipucunu kendisi yayınlıyorsa hayır (A-31). */
+    private static boolean yedekAcik(Afet afet, Ipucu ipucu) {
+        return !BasarimIpucuEvent.YAYINCILAR.yayinliyor(afet.tur(), ipucu);
+    }
+
+    /** İpucunu oyuncunun bu afetteki izine kaynağıyla yazar ({@code olaydan}: afetin olayı; değilse yedek tahmin). */
+    private static void isaretle(ServerPlayer oyuncu, Afet afet, Ipucu ipucu, boolean olaydan) {
         AfetIzi iz = BasarimVerisi.afetIzi(oyuncu);
         boolean degisti = iz.afeteBagla(afetNo(afet));
-        switch (ipucu) {
-            case SURUKLENDI -> {
-                degisti |= !iz.suruklendi;
-                iz.suruklendi = true;
-            }
-            case CUKURA_DUSTU -> {
-                degisti |= !iz.cukuraDustu;
-                iz.cukuraDustu = true;
-            }
-            case HASAR_ALDI -> {
-                degisti |= !iz.hasarAldi;
-                iz.hasarAldi = true;
-            }
-            case YANGIN_ALANINDA -> {
-                Gecici gecici = gecici(oyuncu);
-                long saniye = oyuncu.level().getGameTime() / 20;
-                if (gecici.yanginSaniyesi != saniye) {
-                    gecici.yanginSaniyesi = saniye;
-                    iz.yanginSaniye++;
-                    degisti = true;
-                }
-            }
-        }
+        degisti |= iz.isaretle(ipucu, olaydan, oyuncu.level().getGameTime() / 20);
         if (degisti) {
             BasarimVerisi.afetIziYaz(oyuncu, iz);
         }
