@@ -69,8 +69,11 @@ public final class SanalSuSunucu {
         SanalSuDunyasi d = b.dunya;
         d.denizArtisiAyarla(artis);
         long t = l.getGameTime();
-        if (t % 10 == 0 && d.alanGerekli()) {
-            alanIsle(l, t, b);
+        if (d.alanGerekli()) {
+            if (t % 10 == 0) {
+                alanIsle(l, t, b);
+            }
+            d.alan().isle(SanalSu.okuyucu(l), b.tickButcesi);
         }
         double saat = SanalSu.sunucuSaati;
         boolean degisti = false;
@@ -94,7 +97,10 @@ public final class SanalSuSunucu {
         }
     }
 
-    /** İstenen chunk'lar: oyuncuların simülasyon mesafesi + 1 ve sabitlenmiş bölge; okuma bütçesi TPS ile kısılır. */
+    /**
+     * İstenen chunk'lar (oyuncuların simülasyon mesafesi + 1 ve sabitlenmiş bölge), tazeleme planı ve tick başına okuma
+     * bütçesi (oyuncu sayısı ve TPS kısmasıyla); okumanın kendisi her tick {@code seviyeTick}'te.
+     */
     private static void alanIsle(ServerLevel l, long t, SanalSu.Boyut b) {
         DenizAlani alan = b.dunya.alan();
         int r = l.getServer().getPlayerList().getSimulationDistance() + 1;
@@ -123,8 +129,7 @@ public final class SanalSuSunucu {
         for (long k : b.plan.sec(t, odak.stream().mapToLong(Long::longValue).toArray(), alan.istenenler())) {
             alan.gecersizKil((int) (k >> 32), (int) k);
         }
-        int butce = Math.max(4, (int) (a.alanOkumaButcesi.get() * TpsOlcer.kismaCarpani()));
-        alan.isle(SanalSu.okuyucu(l), butce);
+        b.tickButcesi = TazelemePlani.tickButcesi(a.alanOkumaButcesi.get(), l.players().size(), TpsOlcer.kismaCarpani());
     }
 
     /** Dalganın içindeki canlılar: saniyede {@code hasar}, sürüklenirken engele çarpan {@code (hız - 0,2) * 10} hasar. */

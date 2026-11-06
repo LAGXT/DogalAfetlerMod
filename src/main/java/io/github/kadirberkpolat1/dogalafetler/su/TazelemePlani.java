@@ -27,6 +27,15 @@ public final class TazelemePlani {
         this.uzakButce = uzakButce;
     }
 
+    /**
+     * 10 tick'lik okuma bütçesini tick'lere yayar (SU-20): tick başına {@code ceil(onTick * max(1, ceil(oyuncu / 2)) * kisma
+     * / 10)}, en az 1. Oyuncu sayısıyla ölçeklenir: her oyuncunun yakın halkası (±2 chunk, 25 chunk/sn) ayrı okunur.
+     */
+    public static int tickButcesi(int onTick, int oyuncu, double kisma) {
+        double carpan = Math.max(1, Math.ceil(oyuncu / 2.0));
+        return Math.max(1, (int) Math.ceil(onTick * carpan * kisma / 10.0));
+    }
+
     /** Uzak chunk bütçesini değiştirir (config). */
     public void uzakButce(int butce) {
         uzakButce = Math.max(0, butce);

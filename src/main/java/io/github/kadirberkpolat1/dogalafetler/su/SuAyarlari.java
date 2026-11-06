@@ -66,7 +66,7 @@ public final class SuAyarlari {
             magaraMaksHacim = k.comment("Bir mağara cebinin en çok hücresi.").defineInRange("magaraMaksHacim", 4000, 1, 20000);
             magaraMaksKesif = k.comment("Mağara keşfinin en çok hücresi (aşılırsa en alçak sızıntı seviyesi).")
                     .defineInRange("magaraMaksKesif", 20000, 100, 100000);
-            alanOkumaButcesi = k.comment("Deniz alanı: 10 tick'te okunan en çok chunk (TPS kısmasıyla çarpılır).")
+            alanOkumaButcesi = k.comment("Deniz alanı: 10 tick'te okunan en çok chunk; tick'lere yayılır, her 2 oyuncuda bir katlanır, TPS kısmasıyla çarpılır.")
                     .defineInRange("alanOkumaButcesi", 32, 1, 256);
             tazelemeUzakButce = k.comment("Deniz alanı tazelemesi: saniyede yeniden okunan uzak chunk.")
                     .defineInRange("tazelemeUzakButce", 16, 0, 256);
@@ -88,7 +88,7 @@ public final class SuAyarlari {
                     .defineInRange("lodMesafeChunk", 16, 4, 32);
             parcacikYogunlugu = k.comment("Buhar ve köpük parçacığı çarpanı (kalite çarpanının üstüne).")
                     .defineInRange("parcacikYogunlugu", 1.0, 0.0, 4.0);
-            okumaButcesi = k.comment("İstemci deniz alanı: 10 tick'te okunan en çok chunk.")
+            okumaButcesi = k.comment("İstemci deniz alanı: 10 tick'te okunan en çok chunk (tick'lere yayılır).")
                     .defineInRange("okumaButcesi", 64, 1, 512);
         }
     }

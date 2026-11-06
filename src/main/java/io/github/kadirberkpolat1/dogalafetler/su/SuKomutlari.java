@@ -164,7 +164,7 @@ public final class SuKomutlari {
 
     /**
      * Vitrin için yüklü chunk'larda en iyi kumsalı bulur (deniz seviyesindeki kara, denize doğru en az 6 su sütunu, karaya
-     * doğru deniz + 1..5 arası en az 8 alçak sütun; puan = ikisinin toplamı, batıya bakan kıyıya +8) ve oyuncuyu izleyici olarak 16 blok açığa,
+     * doğru deniz + 1..5 arası en az 8 alçak sütun, hepsi yaprak örtüsüz; puan = ikisinin toplamı, karası batıda olana +8) ve oyuncuyu izleyici olarak 16 blok açığa,
      * deniz + 7 yükseklikte kıyıya bakacak şekilde taşır (+4 yükselmeden sonra da kamera 3 blok suyun üstünde).
      */
     private static int kiyi(CommandContext<CommandSourceStack> k) throws CommandSyntaxException {
@@ -182,7 +182,7 @@ public final class SuKomutlari {
                     continue;
                 }
                 for (int[] d : yonler) {
-                    // Batıya bakan kıyı öncelikli: gün batımında kamera güneşe ve yansımasına bakar (vitrin anı).
+                    // Karası batıda olan kıyı öncelikli: kamera batıya, gün batımında güneşe ve yansımasına bakar (vitrin).
                     int puan = kumsalPuani(l, x, z, d, deniz);
                     if (puan > 0 && d[0] < 0) {
                         puan += 8;
@@ -235,12 +235,17 @@ public final class SuKomutlari {
 
     private static boolean su(ServerLevel l, int x, int z, int deniz) {
         int y = yuzey(l, x, z);
-        return y == deniz && l.getFluidState(new BlockPos(x, y - 1, z)).is(FluidTags.WATER);
+        return y == deniz && acik(l, x, z, y) && l.getFluidState(new BlockPos(x, y - 1, z)).is(FluidTags.WATER);
     }
 
     private static boolean kara(ServerLevel l, int x, int z, int enAz, int enCok) {
         int y = yuzey(l, x, z);
-        return y >= enAz && y <= enCok && l.getFluidState(new BlockPos(x, y - 1, z)).isEmpty();
+        return y >= enAz && y <= enCok && acik(l, x, z, y) && l.getFluidState(new BlockPos(x, y - 1, z)).isEmpty();
+    }
+
+    /** Sütunun üstünde yaprak örtüsü yok: kamera ve oyuncu ağaç tacına takılmaz. */
+    private static boolean acik(ServerLevel l, int x, int z, int y) {
+        return l.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z) == y;
     }
 
     static void cevirileriYaz(CeviriYazici y) {

@@ -43,6 +43,8 @@ public final class SanalSu {
         final Set<Long> sabit = new HashSet<>();
         /** Mağara kimliği -> cep kutusu {x0, y0, z0, x1, y1, z1} ve başlangıç hash'i (harita bütünlüğü kanıtı). */
         final Map<Integer, long[]> magaraKutusu = new HashMap<>();
+        /** Deniz alanının tick başına okuma bütçesi (her 10 tick'te yeniden hesaplanır). */
+        int tickButcesi = 1;
 
         Boyut(int denizSeviyesi) {
             dunya = yeniDunya(denizSeviyesi, sunucuYurutucu());

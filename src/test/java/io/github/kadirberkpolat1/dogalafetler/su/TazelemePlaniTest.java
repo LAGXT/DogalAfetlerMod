@@ -96,4 +96,13 @@ class TazelemePlaniTest {
         assertTrue(secilen.contains(a(-4, -1)));
         assertTrue(secilen.contains(a(4, 1)));
     }
+
+    @Test
+    void okumaButcesiTicklereYayilirVeOyuncuyaGoreOlceklenir() {
+        assertEquals(4, TazelemePlani.tickButcesi(32, 1, 1.0), "32 chunk / 10 tick -> tick başına 4");
+        assertEquals(4, TazelemePlani.tickButcesi(32, 2, 1.0), "iki oyuncu aynı bütçe");
+        assertEquals(16, TazelemePlani.tickButcesi(32, 10, 1.0), "10 oyuncu: x5");
+        assertEquals(2, TazelemePlani.tickButcesi(32, 1, 0.5), "TPS kısması yarıya indirir");
+        assertEquals(1, TazelemePlani.tickButcesi(1, 0, 0.25), "en az 1");
+    }
 }

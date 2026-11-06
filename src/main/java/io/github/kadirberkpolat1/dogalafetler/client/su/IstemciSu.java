@@ -92,8 +92,11 @@ public final class IstemciSu {
         }
         dunya.denizArtisiAyarla(l.dimension() == Level.OVERWORLD ? IstemciDonem.durum().deniz().mevcutArtis() : 0);
         double t = IstemciDonem.saat(0f);
-        if (dunya.alanGerekli() && ++sayac % 10 == 0) {
-            alanGuncelle(mc, l, dunya.alan());
+        if (dunya.alanGerekli()) {
+            if (++sayac % 10 == 0) {
+                alanGuncelle(mc, l, dunya.alan());
+            }
+            dunya.alan().isle(SanalSu.okuyucu(l), TazelemePlani.tickButcesi(SuAyarlari.istemci().okumaButcesi.get(), 1, 1.0));
         }
         cekilmeGuncelle(mc, l, t);
         for (int id : dunya.bitenDalgalar(t)) {
@@ -153,7 +156,6 @@ public final class IstemciSu {
         for (long k : PLAN.sec(l.getGameTime(), new long[] {DenizAlani.anahtar(pcx, pcz)}, alan.istenenler())) {
             alan.gecersizKil((int) (k >> 32), (int) k);
         }
-        alan.isle(SanalSu.okuyucu(l), SuAyarlari.istemci().okumaButcesi.get());
     }
 
     /** Uzaktan yeniden yüklenen chunk hemen okunur. */

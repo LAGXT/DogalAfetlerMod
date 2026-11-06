@@ -95,21 +95,21 @@ public final class SuOtomasyon {
                     "k:dogalafet denizseviyesi 0", "b:100", "f:deniz-afetsiz-2", "k:dogalafet denizseviyesi 4",
                     "k:time set 12500", "b:100", "s:sanal-su-deniz-gunbatimi", "k:time set 6000",
                     "k:execute as @s at @s rotated ~ 0 run tp @s ^ ^ ^16", "k:gamemode survival", "b:100", "o:kumsal",
-                    "b:100", "o:batik", "s:sanal-su-sualti", "k:effect give @s minecraft:water_breathing 90 0 true",
-                    "k:effect give @s minecraft:resistance 90 4 true", "k:execute as @s at @s run tp @s ~ ~ ~ ~180 0", "b:10",
-                    "o:bas", "k:dogalafet su dalga 6", "b:250", "o:dalga-icinde", "b:60", "o:dalga-sonrasi",
-                    "k:dogalafet su temizle", "k:gamemode spectator", "k:dogalafet denizseviyesi 0", "k:dogalafet su kiyi",
-                    "b:60"));
+                    "b:100", "o:kumsal-batik", "s:sanal-su-sualti", "k:gamemode spectator", "k:dogalafet denizseviyesi 0",
+                    "k:dogalafet su kiyi", "b:60"));
         }
         if (hepsi || BOLUM.contains("dalga")) {
             a.addAll(List.of("k:time set 5000", "k:execute as @s at @s run tp @s ^ ^3 ^28 ~180 4", "b:200", "f:dalga-afetsiz",
                     "s:sanal-su-dalga-once", "k:dogalafet su dalga 14", "b:50", "f:dalga-afet", "s:sanal-su-dalga",
-                    "k:dogalafet su temizle", "b:40"));
+                    "k:dogalafet su temizle", "k:gamemode survival", "k:effect give @s minecraft:resistance 120 4 true",
+                    "b:60", "o:bas", "k:dogalafet su dalga 8", "b:240", "o:dalga-1", "b:30", "o:dalga-2", "b:40",
+                    "o:dalga-3", "b:60", "o:dalga-4", "k:dogalafet su temizle", "k:gamemode spectator", "b:40"));
         }
         if (hepsi || BOLUM.contains("magara")) {
-            a.addAll(List.of("m:kur", "b:200", "f:magara-afetsiz", "s:sanal-su-magara-once", "m:doldur", "b:160", "f:magara-afet", "s:sanal-su-magara",
-                    "k:dogalafet asama ileri", "k:dogalafet hiz 8", "b:50", "s:sanal-su-magara-kuruyor", "k:dogalafet hiz 1",
-                    "k:dogalafet su temizle"));
+            a.addAll(List.of("m:kur", "b:200", "f:magara-afetsiz", "s:sanal-su-magara-once", "m:doldur", "b:160",
+                    "f:magara-afet", "s:sanal-su-magara", "m:icine", "b:100", "o:magara", "s:sanal-su-magara-sualti",
+                    "m:kamera", "b:20", "k:dogalafet asama ileri", "k:dogalafet hiz 8", "b:50", "s:sanal-su-magara-kuruyor",
+                    "k:dogalafet hiz 1", "k:dogalafet su temizle"));
         }
         a.add("x:son");
         ADIMLAR.addAll(a);
@@ -145,9 +145,12 @@ public final class SuOtomasyon {
                 List<Long> s = new ArrayList<>(KARELER);
                 Collections.sort(s);
                 double ortanca = s.isEmpty() ? Double.NaN : s.get(s.size() / 2) / 1e6;
-                log("FPS {} ortanca_kare_ms={} fps_ortanca={} kare={} mc_fps={} su={}", olcum,
+                var sunucu = mc.getSingleplayerServer();
+                float mspt = sunucu == null ? Float.NaN : sunucu.getAverageTickTime();
+                log("FPS {} ortanca_kare_ms={} fps_ortanca={} kare={} mc_fps={} sunucu_mspt={} tps={} su={}", olcum,
                         String.format(Locale.ROOT, "%.2f", ortanca), String.format(Locale.ROOT, "%.1f", 1000 / ortanca),
-                        s.size(), mc.getFps(), SuRenderer.olcumOzeti());
+                        s.size(), mc.getFps(), String.format(Locale.ROOT, "%.2f", mspt),
+                        String.format(Locale.ROOT, "%.1f", Math.min(20, 1000 / mspt)), SuRenderer.olcumOzeti());
                 olcum = null;
             }
             return;
@@ -200,7 +203,10 @@ public final class SuOtomasyon {
             yonZ = -bak.z / boy;
         }
         double kayma = (p.getX() - basX) * yonX + (p.getZ() - basZ) * yonZ;
-        log("OYUNCU {} suda={} gozSuda={} hava={} can={} dy={} poz={} sanalBatiklik={} sanalSuda={} dalgaYonundeKayma={}", etiket,
+        log("OYUNCU {} konum=({} {} {}) suSeviyesi={} suda={} gozSuda={} hava={} can={} dy={} poz={} sanalBatiklik={} "
+                + "sanalSuda={} dalgaYonundeKayma={}", etiket, String.format(Locale.ROOT, "%.2f", p.getX()),
+                String.format(Locale.ROOT, "%.2f", p.getY()), String.format(Locale.ROOT, "%.2f", p.getZ()),
+                String.format(Locale.ROOT, "%.2f", SanalSu.suSeviyesi(p.level(), p.getBlockX(), p.getBlockZ())),
                 p.isInWater(), p.isUnderWater(), p.getAirSupply(), String.format(Locale.ROOT, "%.1f", p.getHealth()),
                 String.format(Locale.ROOT, "%.3f", p.getDeltaMovement().y), p.getPose(),
                 String.format(Locale.ROOT, "%.2f", SanalSu.batiklikOrani(p)),
@@ -226,6 +232,12 @@ public final class SuOtomasyon {
                     "time set 6000", "tp @s %d 15.6 %d -45 32".formatted(ox - 7, oz - 7))) {
                 mc.player.connection.sendCommand(k);
             }
+        } else if ("icine".equals(ne)) {
+            mc.player.connection.sendCommand("gamemode survival");
+            mc.player.connection.sendCommand("tp @s %d.5 10 %d.5 -45 20".formatted(ox, oz));
+        } else if ("kamera".equals(ne)) {
+            mc.player.connection.sendCommand("gamemode spectator");
+            mc.player.connection.sendCommand("tp @s %d 15.6 %d -45 32".formatted(ox - 7, oz - 7));
         } else {
             mc.player.connection.sendCommand("dogalafet su magara %d 10 %d 900 600".formatted(ox, oz));
         }
