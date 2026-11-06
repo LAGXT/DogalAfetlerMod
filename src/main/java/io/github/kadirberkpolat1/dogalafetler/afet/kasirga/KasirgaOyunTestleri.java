@@ -116,7 +116,7 @@ public final class KasirgaOyunTestleri {
                 y.absolutePos(MERKEZ));
         dogrula(y, sonuc == AfetYoneticisi.BaslatmaSonucu.BASLADI, "kasırga başlamadı: " + sonuc);
         if (!(yonetici.aktifAfet().orElse(null) instanceof Kasirga kasirga)) {
-            throw new IllegalStateException("aktif afet Kasirga değil (oyun testi afeti kayıtlı mı?)");
+            throw new IllegalStateException("aktif afet Kasirga değil");
         }
         kasirga.konumAyarla(Vec3.atBottomCenterOf(y.absolutePos(MERKEZ)));
         if (!hareket) {
