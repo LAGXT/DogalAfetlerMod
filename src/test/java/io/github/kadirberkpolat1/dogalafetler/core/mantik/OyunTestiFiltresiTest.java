@@ -43,4 +43,13 @@ class OyunTestiFiltresiTest {
         assertTrue(hata.getMessage().contains(OyunTestiFiltresi.OZELLIK), hata.getMessage());
         assertTrue(hata.getMessage().contains("'Meteor('"), hata.getMessage());
     }
+
+    @Test
+    void bekciDisindaHicTesteUymayanFiltreAcikHataVerir() {
+        OyunTestiFiltresi f = filtre("yokboyletest");
+        IllegalStateException hata = assertThrows(IllegalStateException.class, () -> f.bosSecimiReddet(0));
+        assertTrue(hata.getMessage().contains("'yokboyletest'"), hata.getMessage());
+        assertTrue(hata.getMessage().contains("hiçbir teste uymadı"), hata.getMessage());
+        f.bosSecimiReddet(1);
+    }
 }

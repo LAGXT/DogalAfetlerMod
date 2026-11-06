@@ -54,6 +54,7 @@ public final class OyunTestiSecimi {
         Method bekci = bekciMetodu();
         List<GameTestBatch> kalan = new ArrayList<>();
         int secilen = 0;
+        int bekciDisi = 0;
         for (GameTestBatch batch : batchler) {
             List<TestFunction> testler = batch.getTestFunctions().stream()
                     .filter(test -> kalir(test, kaynaklar.getOrDefault(anahtar(test.getBatchName(), test.getTestName()),
@@ -63,9 +64,12 @@ public final class OyunTestiSecimi {
                 continue;
             }
             secilen += testler.size();
+            bekciDisi += (int) testler.stream().filter(test -> !kaynaklar.getOrDefault(anahtar(test.getBatchName(),
+                    test.getTestName()), List.of()).contains(bekci)).count();
             kalan.add(testler.size() == batch.getTestFunctions().size() ? batch : new GameTestBatch(batch.getName(), testler,
                     batch::runBeforeBatchFunction, batch::runAfterBatchFunction));
         }
+        filtre.get().bosSecimiReddet(bekciDisi);
         batchler.clear();
         batchler.addAll(kalan);
         DogalAfetler.LOGGER.info("[dogalafetler] GameTest filtresi '{}': {}/{} test", filtre.get().desen(), secilen, toplam);

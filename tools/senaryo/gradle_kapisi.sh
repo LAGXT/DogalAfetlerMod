@@ -2,11 +2,16 @@
 # Ağır süreç kapısı (GOREV §2): çalışan Gradle sayısı < 2 ve boş RAM >= 4 GB olana kadar 60 sn'de bir bekler (en çok
 # 20 dk), sonra verilen görevi JDK 17 ile çalıştırır. Kullanım: tools/senaryo/gradle_kapisi.sh <log> <gradle argümanları...>
 # KAPI_PORT verilirse o portu dinleyen süreç kalmamasını da bekler (runServer; K-E13).
-# TEST_FILTRE verilirse -Ptest_filtre=<regex> olarak geçer: runGameTestServer yalnız uyan testleri koşar (K-E20).
+# TEST_FILTRE verilirse -Ptest_filtre=<regex> olarak geçer: runGameTestServer yalnız uyan testleri koşar (K-E20). Log'un ilk
+# satırı FILTRE=<regex> (kabul için geçersiz koşu) ya da FILTRE=yok; kabul loglarında FILTRE=yok aranır (Gf4).
+# Gradle LC_ALL=C.UTF-8 ile başlar: tr_TR altında sonuç satırı "BUİLD" yazılır ve BUILD grep'leri kaçırır (K-E13).
 log="$1"
 shift
 if [ -n "$TEST_FILTRE" ]; then
     set -- "$@" "-Ptest_filtre=$TEST_FILTRE"
+    filtre_satiri="FILTRE=$TEST_FILTRE (kabul için geçersiz koşu)"
+else
+    filtre_satiri="FILTRE=yok"
 fi
 i=0
 while [ $i -lt 20 ]; do
@@ -23,7 +28,8 @@ while [ $i -lt 20 ]; do
     sleep 60
     i=$((i + 1))
 done
-JAVA_HOME=/home/lagxt/.jdks/jdk-17.0.21+9 timeout 1500 ./gradlew "$@" --offline --console=plain > "$log" 2>&1
+echo "$filtre_satiri" > "$log"
+LC_ALL=C.UTF-8 JAVA_HOME=/home/lagxt/.jdks/jdk-17.0.21+9 timeout 1500 ./gradlew "$@" --offline --console=plain >> "$log" 2>&1
 kod=$?
 echo "çıkış=$kod"
 exit $kod

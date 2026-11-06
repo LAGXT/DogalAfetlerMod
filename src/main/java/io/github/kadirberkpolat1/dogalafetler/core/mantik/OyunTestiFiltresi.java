@@ -41,4 +41,14 @@ public final class OyunTestiFiltresi {
     public boolean uyar(String sinifAdi, String batchAdi, String testAdi) {
         return desen.matcher(sinifAdi).find() || desen.matcher(batchAdi).find() || desen.matcher(testAdi).find();
     }
+
+    /**
+     * Bekçi dışında hiçbir teste uymayan filtre açık hata verir (Gf2): yanlış yazılan regex yalnız bekçiyi koşup yeşil
+     * bitmesin.
+     */
+    public void bosSecimiReddet(int bekciDisiSecilen) {
+        if (bekciDisiSecilen == 0) {
+            throw new IllegalStateException(OZELLIK + " '" + desen() + "' bekçi dışında hiçbir teste uymadı");
+        }
+    }
 }
