@@ -126,7 +126,7 @@ Uygulama `is/donma` dalında; kararlar `.vibe/kararlar/donma.md` (K-D6…K-D21),
   orijinal su yüzeyi ve kaldırılan blok sayısı chunk verisinde. Güneş büyümesi bitince (süpernova) derinlik 0'a iner ve su
   alttan yukarı geri gelir; aynı chunk işinde önce geri dolma sonra donma (N10).
 - **Kıyı uzaklığı chunk'tan bağımsız:** BFS chunk'ın çevresinde 15 blok hale okur; göl chunk sınırını kesse de halka
-  kıyıyı izler (spike'taki 1 blokluk halede chunk hizalı düz buz kenarı çıkıyordu).
+  kıyıyı izler (spike'taki 1 blokluk halede chunk kenarındaki sütunlar fazla uzaklık alıp geç donuyordu).
 - **Vitrin yüzdesi:** §2 eşiklerine göre kıyıdan 15 blok içerisi 50'de buzlanır; %55'te yarıçapı ≤ 15 blok gölün
   çoğu buzdur, orta yalnız titreşimle ince buz ve açık su beneklidir. Kıyıdan içeri ilerleyen halka %35–45'te en
   belirgin; görsel tur %35, %45 ve %55 karelerini birlikte alır (§3'teki "%55'te gölün yarısı buz" eşik tablosuyla
