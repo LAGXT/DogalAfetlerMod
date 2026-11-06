@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """runclient_kilit.py sınaması: python3 tools/senaryo/test_runclient_kilit.py"""
 import os
+import signal
 import subprocess
 import sys
 import tempfile
@@ -15,6 +16,20 @@ import runclient_kilit as rk  # noqa: E402
 
 def sessiz(_):
     pass
+
+
+def olu_mu(pid, sure=10):
+    """pid {@code sure} sn içinde yok ya da zombi olursa True."""
+    son = time.monotonic() + sure
+    while time.monotonic() < son:
+        try:
+            metin = Path(f"/proc/{pid}/stat").read_text()
+        except (FileNotFoundError, ProcessLookupError):
+            return True
+        if metin[metin.rindex(")") + 2] == "Z":
+            return True
+        time.sleep(0.05)
+    return False
 
 
 class KilitTest(unittest.TestCase):
@@ -89,6 +104,32 @@ class KilitTest(unittest.TestCase):
         self.assertEqual(cikti.returncode, 0, cikti.stderr)
         self.assertIn("'worktree': 't'", cikti.stdout)
         self.assertIsNone(rk.oku())
+
+
+    def test_kos_sinyalde_cocugu_oldurur_kilidi_birakir(self):
+        betik = Path(__file__).resolve().parent / "runclient_kilit.py"
+        for sinyal in (signal.SIGTERM, signal.SIGINT):
+            with self.subTest(sinyal=sinyal.name):
+                pidler = Path(self.klasor.name) / f"pidler-{sinyal.name}"
+                kos = subprocess.Popen([sys.executable, str(betik), "kos", "t", "--bekle", "0", "--", "sh", "-c",
+                                        f"sleep 60 & echo $$ $! > {pidler}.tmp && mv {pidler}.tmp {pidler}; wait"],
+                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                son = time.monotonic() + 10
+                while not pidler.exists() and time.monotonic() < son:
+                    time.sleep(0.05)
+                try:
+                    cocuklar = [int(p) for p in pidler.read_text().split()]
+                    self.assertEqual(rk.oku()["pid"], kos.pid)
+                    kos.send_signal(sinyal)
+                    self.assertEqual(kos.wait(15), 128 + sinyal)
+                    self.assertIsNone(rk.oku(), "sinyalde kilit bırakılır")
+                    for pid in cocuklar:
+                        self.assertTrue(olu_mu(pid), f"çocuk/torun {pid} sinyalden sonra yaşıyor")
+                finally:
+                    if kos.poll() is None:
+                        kos.kill()
+                        kos.wait()
+                    rk.kilit_yolu().unlink(missing_ok=True)
 
 
 if __name__ == "__main__":

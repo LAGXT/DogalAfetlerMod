@@ -14,6 +14,10 @@ Kullanım (worktree kökünden ya da KÖK'ten):
     python3 tools/senaryo/runclient_kilit.py durum
 Python'dan: `al(worktree, pid)` / `birak(pid)` ya da `with kilit(worktree): ...`.
 
+`kos` komutu kendi oturumunda (`start_new_session`) başlatır; `kos` SIGTERM/SIGINT/SIGHUP alırsa çocuğun süreç
+grubuna SIGTERM gönderir (30 sn içinde ölmezse SIGKILL), bekler, kilidi bırakır ve 128 + sinyal koduyla çıkar. Böylece
+öldürülen `kos`'un çocuğu kilitsiz yaşamaz.
+
 `al` ile kaydedilen pid, runClient boyunca yaşayan süreç olmalı (ör. koşu betiğinin `$$`'ı); kısa ömürlü bir pid ile alınan
 kilidi bir sonraki bekleyen "sahibi ölü" diye devralır. Çıkış kodları: 0 tamam, 3 bekleme süresi doldu, 4 kilit başkasının.
 Yol `DOGALAFETLER_RUNCLIENT_KILIT` ortam değişkeniyle değiştirilebilir (testler).
@@ -23,12 +27,15 @@ import contextlib
 import fcntl
 import json
 import os
+import signal
 import subprocess
 import sys
 import time
 from pathlib import Path
 
 YENIDEN_DENEME_SN = 60
+SINYALLER = (signal.SIGTERM, signal.SIGINT, signal.SIGHUP)
+OLDURME_BEKLEME_SN = 30
 
 
 def kok():
@@ -143,6 +150,54 @@ def kilit(worktree, bekle_sn=1800, log=print):
         birak(os.getpid(), log=log)
 
 
+def kos(worktree, satir, bekle_sn=1800, log=print):
+    """Kilidi alır, komutu kendi süreç grubunda çalıştırır, bırakır; çıkış kodu komutunki (sinyalde 128 + sinyal)."""
+    if not al(worktree, os.getpid(), bekle_sn, log=log):
+        return 3
+    cocuk = None
+    gelen = []
+
+    def durdur(signum, _cerceve):
+        # İşleyici beklemez: dıştaki wait() Popen'in waitpid kilidini tutuyor olabilir.
+        if not gelen:
+            log(f"kos: sinyal {signal.Signals(signum).name}, çocuk süreç grubu durduruluyor")
+            gelen.append((signum, time.monotonic() + OLDURME_BEKLEME_SN))
+            if cocuk is not None:
+                with contextlib.suppress(ProcessLookupError):
+                    os.killpg(cocuk.pid, signal.SIGTERM)
+
+    eski = {s: signal.signal(s, durdur) for s in SINYALLER}
+    try:
+        signal.pthread_sigmask(signal.SIG_BLOCK, SINYALLER)
+        try:
+            cocuk = subprocess.Popen(satir, start_new_session=True,
+                                     preexec_fn=lambda: signal.pthread_sigmask(signal.SIG_UNBLOCK, SINYALLER))
+        finally:
+            signal.pthread_sigmask(signal.SIG_UNBLOCK, SINYALLER)
+        if gelen:
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(cocuk.pid, signal.SIGTERM)
+        oldurulen = False
+        while True:
+            try:
+                kod = cocuk.wait(0.5)
+                break
+            except subprocess.TimeoutExpired:
+                if gelen and not oldurulen and time.monotonic() >= gelen[0][1]:
+                    with contextlib.suppress(ProcessLookupError):
+                        os.killpg(cocuk.pid, signal.SIGKILL)
+                    oldurulen = True
+        if gelen:
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(cocuk.pid, signal.SIGKILL)
+            return 128 + gelen[0][0]
+        return 128 - kod if kod < 0 else kod
+    finally:
+        for s, h in eski.items():
+            signal.signal(s, h)
+        birak(os.getpid(), log=log)
+
+
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     satir = []
@@ -172,12 +227,7 @@ def main(argv=None):
         return 0
     if not satir:
         ayr.error("kos: komut satırı gerekli (-- sonrası)")
-    if not al(arg.worktree, os.getpid(), arg.bekle):
-        return 3
-    try:
-        return subprocess.call(satir)
-    finally:
-        birak(os.getpid())
+    return kos(arg.worktree, satir, arg.bekle)
 
 
 if __name__ == "__main__":
