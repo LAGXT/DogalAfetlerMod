@@ -227,7 +227,9 @@ def main():
     latest = W / "run/logs/latest.log"
     if latest.exists():
         shutil.copy2(latest, KANIT / f"latest-{no}.log")
-    taban_rengi(no)
+    renk = taban_rengi(no)
+    if not renk:
+        log(f"koşu {no} GEÇERSİZ: taban rengi (K-17) tutmadı ya da kare eksik")
     sayim = girdi_sayilari(istemci_log)
     if sayim is None:
         log(f"koşu {no} GEÇERSİZ: girdi sayıları satırı yok")
@@ -235,7 +237,7 @@ def main():
     kaynak, satir_no, sayilar = sayim
     sifir = sayilar == "tuş=0 fare=0 tekerlek=0"
     log(f"koşu {no} girdi sayıları: {sayilar} ({kaynak.name}:{satir_no})" + ("" if sifir else " → GEÇERSİZ"))
-    return 0 if sifir and not alarm else 1
+    return 0 if sifir and not alarm and renk else 1
 
 
 if __name__ == "__main__":

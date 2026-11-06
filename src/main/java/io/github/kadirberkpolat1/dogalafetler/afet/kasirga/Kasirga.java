@@ -168,7 +168,10 @@ public final class Kasirga extends Afet {
         return EtkiAlani.daire(k.x, k.y, k.z, seviyeBilgisi().cekimYaricapi());
     }
 
-    /** Hedefin {@link Yonelim#dogusMesafesi} kadar uzağında doğar; hedef oyuncunun konumu yürüyüşün hedefidir. */
+    /**
+     * Hedefin {@link Yonelim#dogusMesafesi} kadar uzağında doğar; hedef oyuncunun konumu yürüyüşün hedefidir. Doğuş chunk'ı
+     * yüklü değilse yükseklik hedefin Y'sinden alınır: yükseklik okuması chunk'ı eşzamanlı üretmesin (inceleme Kn3).
+     */
     @Override
     public BlockPos merkezSec(ServerLevel level, ServerPlayer hedef, int seviye, RandomSource r) {
         KasirgaSeviyesi s = KasirgaSeviyesi.icin(seviye, KasirgaAyarlari.carpanlar());
@@ -178,7 +181,9 @@ public final class Kasirga extends Afet {
         double[] ofset = Yonelim.dogusOfseti(s.cekimYaricapi(), r.nextDouble(), r.nextDouble() * TAM_TUR);
         int x = Mth.floor(hedefX + ofset[0]);
         int z = Mth.floor(hedefZ + ofset[1]);
-        return new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z), z);
+        int yukseklik = level.hasChunk(x >> 4, z >> 4) ? level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z)
+                : Mth.floor(hedef.getY());
+        return new BlockPos(x, yukseklik, z);
     }
 
     @Override
