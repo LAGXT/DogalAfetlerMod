@@ -227,9 +227,13 @@ public final class SuOtomasyon {
                     "fill %d 10 %d %d 16 %d mossy_cobblestone".formatted(ox + 3, oz - 1, ox + 3, oz - 1),
                     "fill %d 10 %d %d 10 %d gravel".formatted(ox - 8, oz - 8, ox + 8, oz - 4)));
             // Tavanda ışıltaşı yamaları, sarkıtlar ve asılı fenerler: su yüzeyinde sıcak yansıma noktaları (vitrin).
-            int[][] isik = {{-5, -5}, {4, -6}, {-6, 4}, {5, 5}, {0, 0}};
+            int[][] isik = {{-6, -6}, {-1, -6}, {4, -6}, {-6, -1}, {-1, -1}, {4, -1}, {-6, 4}, {-1, 4}, {4, 4}};
             for (int[] q : isik) {
-                k.add("fill %d 17 %d %d 17 %d glowstone".formatted(ox + q[0], oz + q[1], ox + q[0] + 1, oz + q[1] + 1));
+                k.add("fill %d 17 %d %d 17 %d glowstone".formatted(ox + q[0], oz + q[1], ox + q[0] + 2, oz + q[1] + 2));
+            }
+            for (int d = -7; d <= 7; d += 3) {
+                k.add("setblock %d 13 %d sea_lantern".formatted(ox - 9, oz + d));
+                k.add("setblock %d 13 %d sea_lantern".formatted(ox + d, oz - 9));
             }
             int[][] sarkit = {{-3, -6}, {2, -3}, {-6, -1}, {6, 1}, {-2, 5}, {3, 6}, {7, -5}, {-7, 6}};
             for (int[] q : sarkit) {
