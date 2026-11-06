@@ -32,7 +32,8 @@ import net.minecraftforge.fml.common.Mod;
  * Deprem ve sinkhole ekran sarsıntısı (madde 3: oyuncu başına; bölüm C "yakındakinde daha şiddetli"). Sunucudan ek paket
  * gelmez: {@code AfetDurumPaketi} (aşama/alt aşama değişiminde hemen, sonra 1 Hz) merkez, seviye ve afetin {@code ozel}
  * verisini (geçen süre, süre, genlik, yarıçap, yarık doğrultusu) taşır; aradaki tick'ler yerel saatle tahmin edilir.
- * Deprem: {@link SarsintiZarfi#deprem} zarfı × mesafe çarpanı, 8–14 Hz iki kanallı titreme + 1,2–2 Hz yuvarlanma, el ±2 piksel.
+ * Deprem: {@link SarsintiZarfi#deprem} zarfı × mesafe çarpanı, 8–14 Hz iki kanallı titreme + 1,2–2 Hz yuvarlanma, el ±2 piksel;
+ * artçı sürerken ({@code altAsama} &gt; 0) ana genliğin {@code af} kesri kadar {@link SarsintiZarfi#artci} zarfı.
  * Sinkhole: çatlama/sarkmada 0,2° titreme, çekirdek çöküşünde 32 blok içinde tek sert sarsma ve aşağı kısa bakış çekimi.
  * Yarığın açık bölümünden ve oyuncunun çevresindeki zeminden toz ve çakıl sıçramaları (efekt kalitesiyle, 96 blok ötesi yok).
  */
@@ -103,7 +104,12 @@ public final class IstemciSarsinti {
         double d = Math.hypot(oyuncu.getX() - p.merkez().getX() - 0.5, oyuncu.getZ() - p.merkez().getZ() - 0.5);
         if (p.tur() == AfetTuru.DEPREM) {
             double r = p.ozel().getFloat("r");
-            double z = SarsintiZarfi.deprem(gecen(kismi), p.ozel().getInt("s"));
+            double g = gecen(kismi);
+            double z = SarsintiZarfi.deprem(g, p.ozel().getInt("s"));
+            if (p.altAsama() > 0 && p.ozel().contains("ab")) {
+                int ab = p.ozel().getInt("ab");
+                z = Math.max(z, p.ozel().getFloat("af") * SarsintiZarfi.artci(g - ab, p.ozel().getInt("ae") - ab));
+            }
             return new double[] {p.ozel().getFloat("a") * z * SarsintiZarfi.mesafeCarpani(d, r, r + 64) * carpan, 0};
         }
         if (p.tur() == AfetTuru.SINKHOLE) {

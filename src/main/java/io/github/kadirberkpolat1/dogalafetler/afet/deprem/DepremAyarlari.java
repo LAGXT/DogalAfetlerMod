@@ -1,5 +1,6 @@
 package io.github.kadirberkpolat1.dogalafetler.afet.deprem;
 
+import io.github.kadirberkpolat1.dogalafetler.afet.deprem.mantik.ArtciPlani;
 import io.github.kadirberkpolat1.dogalafetler.afet.deprem.mantik.DepremSeviyesi;
 import io.github.kadirberkpolat1.dogalafetler.config.AyarKaydi;
 import java.util.List;
@@ -23,6 +24,10 @@ public final class DepremAyarlari {
     private final ForgeConfigSpec.ConfigValue<List<? extends Integer>> blokButcesi;
     private final ForgeConfigSpec.IntValue dusenBlokTavani;
     private final ForgeConfigSpec.IntValue enAltY;
+    private final ForgeConfigSpec.ConfigValue<List<? extends Integer>> artciSayisi;
+    private final ForgeConfigSpec.IntValue artciEnAzAralik;
+    private final ForgeConfigSpec.IntValue artciEnCokAralik;
+    private final ForgeConfigSpec.DoubleValue artciSiddeti;
     private static volatile Integer testEnAltY;
 
     private DepremAyarlari(ForgeConfigSpec.Builder k) {
@@ -43,6 +48,14 @@ public final class DepremAyarlari {
                 .defineInRange("dusenBlokTavani", 60, 0, 400);
         enAltY = k.comment("Deprem yarığının ve sinkhole çukurunun inebileceği en alt Y (ana kaya ve deepslate tabanı korunur)")
                 .defineInRange("enAltY", -50, -64, 320);
+        artciSayisi = tamsayilar(k, "artciSayisi", "Ana sarsıntıdan sonraki artçı sarsıntı sayısı (blok yıkmaz), S1…S5", 0, 0,
+                1, 2, 3);
+        artciEnAzAralik = k.comment("Bir artçının bir öncekinin (ya da ana sarsıntının) bitişinden en erken başlaması (saniye)")
+                .defineInRange("artciEnAzAralik", 20, 1, 600);
+        artciEnCokAralik = k.comment("Bir artçının bir öncekinin (ya da ana sarsıntının) bitişinden en geç başlaması (saniye)")
+                .defineInRange("artciEnCokAralik", 60, 1, 600);
+        artciSiddeti = k.comment("İlk artçının ana sarsıntıya göre genliği (sonrakiler 0,8 kat zayıflar)")
+                .defineInRange("artciSiddeti", 0.15, 0.0, 1.0);
     }
 
     public static void kaydet() {
@@ -61,6 +74,14 @@ public final class DepremAyarlari {
 
     public static int blokButcesi(int seviye) {
         return Math.max(1, al(bolum.get().blokButcesi, Math.max(1, Math.min(5, seviye)) - 1, 64));
+    }
+
+    /** Bu seviyenin artçı planı (tohum depremin kendi tohumu: kayıttan dönüşte aynı plan). */
+    public static List<ArtciPlani.Artci> artciPlani(DepremSeviyesi s, long tohum) {
+        DepremAyarlari a = bolum.get();
+        int sayi = Math.max(0, al(a.artciSayisi, s.seviye() - 1, 0));
+        return ArtciPlani.olustur(s.sureTick(), sayi, a.artciEnAzAralik.get() * 20, a.artciEnCokAralik.get() * 20,
+                a.artciSiddeti.get(), tohum);
     }
 
     /** Beş elemandan kısa listede eksik seviye varsayılana düşer. */

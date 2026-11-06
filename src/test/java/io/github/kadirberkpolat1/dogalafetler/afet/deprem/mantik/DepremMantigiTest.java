@@ -75,4 +75,41 @@ class DepremMantigiTest {
         assertEquals(0.15, SarsintiZarfi.mesafeCarpani(120, 100, 164), 1e-12, "alan dışında hafif titreme");
         assertEquals(0.0, SarsintiZarfi.mesafeCarpani(170, 100, 164), 1e-12);
     }
+
+    @Test
+    void artciPlaniAralikSureVeZayiflama() {
+        int ana = 1200;
+        java.util.List<ArtciPlani.Artci> plan = ArtciPlani.olustur(ana, 3, 400, 1200, 0.15, 11L);
+        assertEquals(plan, ArtciPlani.olustur(ana, 3, 400, 1200, 0.15, 11L), "aynı tohum aynı plan");
+        assertEquals(3, plan.size());
+        long onceki = ana;
+        double kesir = 0.15;
+        for (ArtciPlani.Artci a : plan) {
+            long ara = a.baslangic() - onceki;
+            assertTrue(ara >= 400 && ara <= 1200, "aralık " + ara);
+            assertTrue(a.sure() >= ArtciPlani.EN_KISA_SURE && a.sure() <= ArtciPlani.EN_UZUN_SURE, "süre " + a.sure());
+            assertEquals(kesir, a.kesir(), 1e-12, "ilk %15, sonra 0,8 kat");
+            onceki = a.bitis();
+            kesir *= 0.8;
+        }
+        ArtciPlani.Artci ikinci = plan.get(1);
+        assertEquals(2, ArtciPlani.suren(plan, ikinci.baslangic()));
+        assertEquals(2, ArtciPlani.suren(plan, ikinci.bitis() - 1));
+        assertEquals(0, ArtciPlani.suren(plan, ikinci.bitis()), "artçılar arasında süren yok");
+        assertEquals(0, ArtciPlani.suren(plan, ana - 1), "ana sarsıntıda artçı yok");
+        assertEquals(plan.get(2).bitis(), ArtciPlani.son(plan, ana));
+    }
+
+    @Test
+    void artcisizPlanAnaSarsintidaBiterZarfSinirli() {
+        assertTrue(ArtciPlani.olustur(300, 0, 400, 1200, 0.15, 1L).isEmpty());
+        assertEquals(300, ArtciPlani.son(java.util.List.of(), 300));
+        java.util.List<ArtciPlani.Artci> ters = ArtciPlani.olustur(0, 2, 50, 10, 0.2, 3L);
+        assertTrue(ters.get(0).baslangic() >= 10 && ters.get(0).baslangic() <= 50, "ters verilen aralık düzeltilir");
+        assertEquals(0.0, SarsintiZarfi.artci(-1, 80), 1e-12);
+        assertEquals(0.0, SarsintiZarfi.artci(80, 80), 1e-12);
+        assertEquals(1.0, SarsintiZarfi.artci(40, 80), 1e-12, "ortada tam");
+        assertEquals(0.5, SarsintiZarfi.artci(5, 80), 1e-12, "girişin yarısı");
+        assertEquals(0.5, SarsintiZarfi.artci(65, 80), 1e-12, "sönümün yarısı");
+    }
 }

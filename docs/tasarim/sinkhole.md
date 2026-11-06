@@ -83,5 +83,8 @@ mağara ağzı), dibe moloz, kenar çatlak halkası (çimen → kaba toprak), ar
 (`sinkhole_cokus.ogg`) ve toz patlaması, istemcide 0,2° titreme + tek sert sarsma + aşağı bakış çekimi + düşen oyuncuda 6° FOV,
 "Delikten Dönüş" ipucu. Sapma (`.vibe/kararlar/deprem-sinkhole.md` DS-02): tek "çöken kütle" varlığı yerine halkanın içi önce
 görünmeden boşaltılır, sonra yüzey ve üstündekiler aynı tick'te tavanlı `FallingBlockEntity` olarak düşer (tavanı aşan
-bloklar parçacıkla kalkar); eğilen ağaç görseli yok, ağaçlar dik düşer. Bu turda yapılmayanlar (DS-14): dipte nem buharı, ayrı
-`sinkhole_catlama.ogg` (vanilla çıtırtı + ortak gürleme döngüsü kullanılıyor).
+bloklar parçacıkla kalkar); eğilen ağaç görseli yok, ağaçlar dik düşer. **Çöken kütle varlığı ve eğilen ağaç: Faz 5 cilası,
+performans gerekçesi (şef kararı, tur 2).** Derlenmiş `VertexBuffer`'lı özel varlık, istemcide blokları gizleyen eğik kopya ve
+dilimli düşüş, S5 çukurunda (~29 000 blok) ağ ve bellek maliyetini ölçülmeden taşıyamaz; tavanlı `FallingBlockEntity` yolu
+TPS ve FPS ölçüsüyle sınanmıştır (rapor). Bu turda yapılmayanlar (DS-14): dipte nem buharı, ayrı `sinkhole_catlama.ogg`
+(vanilla çıtırtı + ortak gürleme döngüsü kullanılıyor).

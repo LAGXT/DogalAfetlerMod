@@ -41,6 +41,16 @@ public final class SarsintiZarfi {
         return kalan < SONUM_TICK ? z * kalan / SONUM_TICK : z;
     }
 
+    /** Artçı zarfı: 0,5 sn'de tam güce çıkış, sonda 1,5 sn doğrusal sönüm (kısa artçıda ikisi de kısalır). */
+    public static double artci(double gecen, double sure) {
+        if (gecen < 0 || gecen >= sure || sure <= 0) {
+            return 0;
+        }
+        double giris = Math.min(10, sure / 3);
+        double sonum = Math.min(30, sure / 2);
+        return Math.min(1, Math.min(gecen / giris, (sure - gecen) / sonum));
+    }
+
     /** Sert sarsma: {@code (1 − t/12)²}. */
     public static double darbe(double gecen) {
         if (gecen < 0 || gecen >= DARBE_TICK) {

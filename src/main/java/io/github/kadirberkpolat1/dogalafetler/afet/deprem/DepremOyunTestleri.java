@@ -1,15 +1,21 @@
 package io.github.kadirberkpolat1.dogalafetler.afet.deprem;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.afet.deprem.mantik.ArtciPlani;
 import io.github.kadirberkpolat1.dogalafetler.afet.deprem.mantik.FayHatti;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetAsamasi;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetKaydi;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
 import io.github.kadirberkpolat1.dogalafetler.core.CekirdekOyunTestleri;
+import io.github.kadirberkpolat1.dogalafetler.core.olay.AfetAsamaDegistiEvent;
+import io.github.kadirberkpolat1.dogalafetler.core.olay.AfetBittiEvent;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
 import io.github.kadirberkpolat1.dogalafetler.uyari.OrtamSesi;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -21,6 +27,8 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
+import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
 
@@ -243,6 +251,56 @@ public final class DepremOyunTestleri {
             blokHasari(y, eski);
             sahneyiTemizle(y);
             y.succeed();
+        });
+    }
+
+    /**
+     * DS-14: seviye 3'te ana sarsıntıdan 20–60 sn sonra bir artçı (config 0, 0, 1, 2, 3): sürerken {@code altAsama} 1 ve
+     * {@code deprem/artci} katmanı açık; deprem son artçı bitmeden doğal bitmez. Blok hasarı kapalı (S3 yarığı 96 blok,
+     * komşu test alanlarına taşmasın): kutunun hash'i ve değişen blok sayısı artçı boyunca da değişmez.
+     */
+    @GameTest(template = SAHNE, batch = "deprem_artci", timeoutTicks = 2400)
+    public static void depremArtciSarsintilariPlanlaBlokYikmaz(GameTestHelper y) {
+        zemin(y, YUZEY);
+        yapilar(y);
+        boolean eski = blokHasari(y, false);
+        long once = kutuHash(y);
+        List<Integer> artcilar = new ArrayList<>();
+        List<Boolean> katmanAcik = new ArrayList<>();
+        List<AfetBittiEvent> bitisler = new ArrayList<>();
+        Consumer<AfetAsamaDegistiEvent> asama = olay -> {
+            if (olay.afet().tur() == AfetTuru.DEPREM && olay.yeniAltAsama() > 0) {
+                artcilar.add(olay.yeniAltAsama());
+                katmanAcik.add(OrtamSesi.aktifMi(Deprem.ARTCI_KATMANI));
+            }
+        };
+        Consumer<AfetBittiEvent> bitis = olay -> {
+            if (olay.tur() == AfetTuru.DEPREM) {
+                bitisler.add(olay);
+            }
+        };
+        MinecraftForge.EVENT_BUS.addListener(EventPriority.NORMAL, false, AfetAsamaDegistiEvent.class, asama);
+        MinecraftForge.EVENT_BUS.addListener(EventPriority.NORMAL, false, AfetBittiEvent.class, bitis);
+        Deprem deprem = baslat(y, 3);
+        AfetYoneticisi yonetici = AfetYoneticisi.al(y.getLevel().getServer());
+        int sure = deprem.seviyeBilgisi().sureTick();
+        List<ArtciPlani.Artci> plan = deprem.artcilar();
+        y.assertTrue(plan.size() == 1, "S3 artçı sayısı " + plan.size());
+        long ilk = plan.get(0).baslangic() - sure;
+        y.assertTrue(ilk >= 400 && ilk <= 1200, "ilk artçı ana sarsıntıdan " + ilk + " tick sonra");
+        y.assertTrue(deprem.aktifKalanTick() >= plan.get(0).bitis() - 1, "kalan süre artçıyı kapsamalı");
+        y.succeedWhen(() -> {
+            y.assertTrue(yonetici.aktifAfet().isEmpty(), "deprem sürüyor");
+            MinecraftForge.EVENT_BUS.unregister(asama);
+            MinecraftForge.EVENT_BUS.unregister(bitis);
+            y.assertTrue(artcilar.equals(List.of(1)), "artçı alt aşamaları " + artcilar);
+            y.assertTrue(katmanAcik.equals(List.of(true)), "artçı gürleme katmanı açılmadı");
+            y.assertTrue(bitisler.size() == 1 && bitisler.get(0).dogalBitti(), "doğal bitiş yok");
+            y.assertTrue(!OrtamSesi.aktifMi(Deprem.ARTCI_KATMANI) && !OrtamSesi.aktifMi(Deprem.SES_KATMANI),
+                    "ortam katmanı kaldı");
+            y.assertTrue(kutuHash(y) == once && deprem.isler().degisenBlok() == 0, "artçılı depremde blok değişti");
+            blokHasari(y, eski);
+            sahneyiTemizle(y);
         });
     }
 }

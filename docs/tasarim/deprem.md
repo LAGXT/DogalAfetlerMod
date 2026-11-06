@@ -76,5 +76,8 @@ S2+ yan çatlaklar, S4–5 fay basamağı), merkezden iki uca 6 + 1,2·seviye bl
 yarığa düşmesi (dipteki moloz), `deprem_kirilgan` yıkımı, S4–5 heyelan ve yakın hasar, istemcide zarf + iki kanallı titreme +
 yuvarlanma + el sallanması + yarık tozu, CLIENT config sarsıntı çarpanı, döngülü gürleme (`deprem_gurleme.ogg`). Ayrıntı ve
 sapmalar `.vibe/kararlar/deprem-sinkhole.md` §B: yeni ağ paketi yok, sarsıntı durum paketinden (DS-01); taban `deprem.enAltY`
-(DS-06); yüklü olmayan chunk kazılmaz (DS-07). Bu turda yapılmayanlar (DS-14): artçı sarsıntılar, 2 dk süzülen toz, kendi toz
-sprite dokusu (vanilla duman/toz parçacıkları kullanılıyor), ayrı öncü gürleme dosyası (ana döngünün 1,5 sn'lik girişi).
+(DS-06); yüklü olmayan chunk kazılmaz (DS-07). Artçı sarsıntılar (DS-14, tur 2): S1…S5 0, 0, 1, 2, 3 artçı, her biri bir
+öncekinin bitişinden 20–60 sn sonra, 3–5 sn, ilki ana sarsıntının %15'i, sonrakiler 0,8 kat; blok yıkmaz, kısa gürleme
+katmanı ve yarıktan toz; ana sarsıntı bitince yıkım, heyelan ve yakın hasar durur (`afet.deprem.mantik.ArtciPlani`, config
+`deprem.artci*`). Yapılmayanlar: kendi toz sprite dokusu (vanilla duman/toz parçacıkları kullanılıyor; artçı bitene kadar
+yarıktan istemci tozu süzlür), ayrı öncü gürleme dosyası (ana döngünün 1,5 sn'lik girişi).

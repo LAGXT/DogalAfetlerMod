@@ -8,9 +8,12 @@ sinkhole'lar yarığın üstüne düşmesin diye `execute positioned` ile doğu�
 
 Koşu 1: `start deprem 2`, `asama ileri` x2 (AKTIF) → `[deprem] yarık tamam` (değişen blok > 0) ve doğal bitiş;
 `start sinkhole 3`, `asama ileri` x2 → `[sinkhole] çukur tamam` (değişen blok > 0) ve doğal bitiş; `start deprem 5`, AKTIF,
-3 sn sonra `stop` (neden KOMUT); `gamerule afetBlokHasari false` + `start sinkhole 1`, `asama ileri` x2 → çukur tamam
+15 sn sonra `stop` (neden KOMUT); `gamerule afetBlokHasari false` + `start sinkhole 1`, `asama ileri` x2 → çukur tamam
 değişen blok 0, doğal bitiş, `gamerule afetBlokHasari true`; `start deprem 3`, AKTIF'te sunucuya `stop` (afet sürerken
-kayıt). Koşu 2 (aynı dünya): `Aktif afet geri yüklendi: deprem seviye 3 aşama aktif`, yarık tamam ve doğal bitiş, `stop`.
+kayıt). Koşu 2 (aynı dünya): `Aktif afet geri yüklendi: deprem seviye 3 aşama aktif`, yarık tamam, artçı sarsıntı
+(`[deprem] artçı sarsıntı 1/1`, DS-14) ve doğal bitiş, `stop`.
+Tepe TPS: S2 yarığı, S3 çukurun çöküşü ve S5 deprem sırasında `forge tps` (Forge'un 100 tick'lik ortalaması) örneklenir;
+örnekler ve en düşük TPS `<kanıt>/tps.txt`'ye yazılır.
 Sonda iki log da denetlenir: `invalid dist` yok, istisna yok, deprem/sinkhole config düzeltme WARN'ı yok,
 `[basarim] ... yayıncı olarak kayıtlı değil` yok, süreçler 0 ile çıktı.
 
@@ -59,10 +62,22 @@ def degisen(satir):
     return int(re.search(r"değişen blok (\d+)", satir).group(1))
 
 
+TPS = []
+
+
+def tps_ornegi(sunucu, etiket):
+    satir = sunucu.komut("forge tps", r"Overall: Mean tick time: [\d.]+ ms\. Mean TPS: [\d.]+")
+    eslesme = re.search(r"Mean tick time: ([\d.]+) ms\. Mean TPS: ([\d.]+)", satir)
+    TPS.append((etiket, float(eslesme.group(1)), float(eslesme.group(2))))
+
+
 def kosu1(sunucu):
     sunucu.bekle(r"Done \(", 0, cs.ACILIS_SURESI, "açılış")
+    tps_ornegi(sunucu, "boşta")
     sunucu.komut("dogalafet start deprem 2", r"Afet başladı: deprem seviye 2")
     aktife(sunucu, "deprem")
+    time.sleep(4)
+    tps_ornegi(sunucu, "deprem S2 yarık açılıyor (+4 sn)")
     satir = sunucu.bekle(r"\[deprem\] yarık tamam: seviye 2", 0, 90, "seviye 2 yarık")
     if degisen(satir) <= 0:
         raise cs.SenaryoHatasi(f"yarık blok değiştirmedi: {satir.strip()}")
@@ -70,6 +85,10 @@ def kosu1(sunucu):
 
     sunucu.komut("execute positioned ~48 ~ ~48 run dogalafet start sinkhole 3", r"Afet başladı: sinkhole seviye 3")
     aktife(sunucu, "sinkhole")
+    time.sleep(9)
+    tps_ornegi(sunucu, "sinkhole S3 çöküş (+9 sn)")
+    time.sleep(4)
+    tps_ornegi(sunucu, "sinkhole S3 geri çekilme (+13 sn)")
     satir = sunucu.bekle(r"\[sinkhole\] çukur tamam: seviye 3", 0, 60, "seviye 3 çukur")
     if degisen(satir) <= 0:
         raise cs.SenaryoHatasi(f"çukur blok değiştirmedi: {satir.strip()}")
@@ -77,7 +96,9 @@ def kosu1(sunucu):
 
     sunucu.komut("dogalafet start deprem 5", r"Afet başladı: deprem seviye 5")
     aktife(sunucu, "deprem")
-    time.sleep(3)
+    for saniye in (5, 10, 15):
+        time.sleep(5)
+        tps_ornegi(sunucu, f"deprem S5 (+{saniye} sn)")
     sunucu.komut("dogalafet stop", r"Afet bitti: deprem seviye 5 neden KOMUT")
 
     sunucu.komut("gamerule afetBlokHasari false", r"afetBlokHasari is now set to: false")
@@ -99,7 +120,8 @@ def kosu2(sunucu):
     sunucu.yaz(f"### {satir.strip()}")
     sunucu.bekle(r"Done \(", 0, cs.ACILIS_SURESI, "açılış")
     sunucu.bekle(r"\[deprem\] yarık tamam: seviye 3", 0, 90, "yeniden açılışta yarık sürdü")
-    sunucu.bekle(r"Afet bitti: deprem seviye 3 neden DOGAL", 0, 90, "deprem doğal bitiş")
+    sunucu.bekle(r"\[deprem\] artçı sarsıntı 1/1", 0, 150, "S3 artçı sarsıntı (DS-14)")
+    sunucu.bekle(r"Afet bitti: deprem seviye 3 neden DOGAL", 0, 30, "deprem doğal bitiş")
 
 
 def log_denetimi(yol):
@@ -138,6 +160,13 @@ def main():
                 break
     finally:
         cs.ozellikleri_geri_al(ozgun)
+    if TPS:
+        satirlar = [f"{etiket}: mean tick {ms:.2f} ms, TPS {tps:.2f}" for etiket, ms, tps in TPS]
+        en_kotu = min(TPS, key=lambda o: o[2])
+        satirlar.append(f"tepe yük: en düşük TPS {en_kotu[2]:.2f} ({en_kotu[0]}), en uzun mean tick "
+                        f"{max(o[1] for o in TPS):.2f} ms")
+        (klasor / "tps.txt").write_text("\n".join(satirlar) + "\n", encoding="utf-8")
+        print("\n".join(satirlar))
     for ad in ("kosu", "kosu2"):
         yol = klasor / f"{ad}.log"
         if yol.exists():
