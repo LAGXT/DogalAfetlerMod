@@ -1,0 +1,9 @@
+{
+  "values": [
+    "#minecraft:leaves",
+    "#forge:glass",
+    "#forge:glass_panes",
+    "minecraft:lantern",
+    "minecraft:soul_lantern"
+  ]
+}

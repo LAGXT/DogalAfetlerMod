@@ -1,4 +1,31 @@
 {
+  "ay_carpmasi_carpma": {
+    "sounds": [
+      {
+        "name": "dogalafetler:ay_carpmasi_carpma",
+        "stream": true
+      }
+    ],
+    "subtitle": "subtitles.dogalafetler.ay_carpmasi_carpma"
+  },
+  "ay_carpmasi_citirti": {
+    "sounds": [
+      {
+        "name": "dogalafetler:ay_carpmasi_citirti",
+        "stream": true
+      }
+    ],
+    "subtitle": "subtitles.dogalafetler.ay_carpmasi_citirti"
+  },
+  "ay_carpmasi_yaklasma": {
+    "sounds": [
+      {
+        "name": "dogalafetler:ay_carpmasi_yaklasma",
+        "stream": true
+      }
+    ],
+    "subtitle": "subtitles.dogalafetler.ay_carpmasi_yaklasma"
+  },
   "esya.oncu_sarsinti": {
     "sounds": [
       "dogalafetler:esya_oncu_sarsinti"

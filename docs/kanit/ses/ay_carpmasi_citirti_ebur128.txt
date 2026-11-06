@@ -1,0 +1,24 @@
+Dosya: src/main/resources/assets/dogalafetler/sounds/ay_carpmasi_citirti.ogg (48793 bayt, 6.0 sn, mono, 48000 Hz, Vorbis q5)
+Hedef (docs/tasarim/ses.md §4): -30.0 LUFS ±1, gerçek tepe <= -6.0 dBTP, baskın frekans 60–1500 Hz, 2500 Hz üstü <= -24 dB
+Ölçülen (ogg): I = -30.0 LUFS, gerçek tepe = -11.4 dBTP
+Baskın frekanslar (20 Hz kümeleri, güçlüden zayıfa): 100 Hz, 140 Hz, 120 Hz
+Perde izi (0,5 sn pencerelerde en güçlü frekans, ilk 20): 72, 88, 114, 134, 140, 122, 100, 96, 90, 82, 76, 70 Hz
+Bant enerjisi / toplam: 60–1500 Hz -0.0 dB; 300–3400 Hz (konuşma) -7.7 dB; >2500 Hz -58.5 dB; >8000 Hz -73.3 dB
+Döngü dikişi: |ilk - son| / en büyük iç adım = 0.193 (<= 1 ise süreksizlik yok); ilk örnek = +0.00107
+Hedefle karşılaştırma: UYGUN
+
+ffmpeg -i ay_carpmasi_citirti.ogg -af ebur128=peak=true -f null -
+Summary:
+
+  Integrated loudness:
+    I:         -30.0 LUFS
+    Threshold: -40.0 LUFS
+
+  Loudness range:
+    LRA:         0.9 LU
+    Threshold: -50.0 LUFS
+    LRA low:   -30.6 LUFS
+    LRA high:  -29.6 LUFS
+
+  True peak:
+    Peak:      -11.4 dBFS
