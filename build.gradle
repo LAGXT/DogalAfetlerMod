@@ -47,6 +47,13 @@ minecraft {
             if (project.hasProperty('quickPlay')) {
                 args '--quickPlaySingleplayer', project.property('quickPlay').toString()
             }
+            // Çok oyunculu/ekran otomasyonu: -PkullaniciAdi=A (oyuncu adı), -PquickPlaySunucu=localhost:25565 (doğrudan giriş).
+            if (project.hasProperty('kullaniciAdi')) {
+                args '--username', project.property('kullaniciAdi').toString()
+            }
+            if (project.hasProperty('quickPlaySunucu')) {
+                args '--quickPlayMultiplayer', project.property('quickPlaySunucu').toString()
+            }
         }
 
         server {
