@@ -44,4 +44,5 @@ Kozmik Kâşif, Felaket Ustası, Her Şeyi Atlatan; en son kazanılan geçerli. 
 dilinde görür. `basarim.unvanGoster=false` öneki kapatır; `/dogalafet unvan <oyuncu> [ad|yok]` OP'nin elidir.
 
 **Vitrin anı.** Seviye 5 bir afetin doğal bitişinde üç toast'ın üst üste akması (İlk Rüzgâr → Fırtınaya Meydan Oku → mor
-çerçeveli Felaket Ustası), sohbetteki mor duyuru ve hemen ardından oyuncunun adının önünde beliren altın `[Felaket Ustası]`.
+çerçeveli Felaket Ustası) ve sohbetteki mor duyurunun kendisinde oyuncunun adının önünde beliren altın `[Felaket Ustası]`
+(ünvan duyurudan önce verilir).
