@@ -131,7 +131,7 @@ final class GokyuzuRenkleri {
         return g.onceki() == null || g.gecis() >= 1f ? yeni : Mth.lerp(g.gecis(), tekKalinti(g.onceki(), 1f), yeni);
     }
 
-    private static float[] isikTonu(GunesEvresi evre, float p) {
+    private static float[] tekIsik(GunesEvresi evre, float p) {
         return switch (evre) {
             case GUNESSIZ -> new float[] {0.35f, 0.75f, 0.85f, 1.15f};
             case SUPERNOVA -> new float[] {Mth.lerp(GokyuzuEgrileri.supernovaParlaklik(p), 0.4f, 1.1f), 0.9f, 0.95f, 1.1f};
@@ -140,23 +140,29 @@ final class GokyuzuRenkleri {
         };
     }
 
+    /** Işık haritası tonu {ölçek, kırmızı, yeşil, mavi}; görünüm başına bir kez hesaplanır. */
+    static float[] isikTonu(GunesEvresi evre, GunesEvresi onceki, float gecis, float ilerleme, float renkGucu) {
+        float[] t = tekIsik(evre, ilerleme);
+        if (onceki != null && gecis < 1f) {
+            float[] e = tekIsik(onceki, 1f);
+            for (int i = 0; i < 4; i++) {
+                t[i] = Mth.lerp(gecis, e[i], t[i]);
+            }
+        }
+        if (evre == GunesEvresi.KIZIL_CUCE) {
+            for (int i = 0; i < 4; i++) {
+                t[i] = Mth.lerp(renkGucu, 1f, t[i]);
+            }
+        }
+        return t;
+    }
+
     /**
      * Işık haritası dokusunda yalnız gökyüzü ışığının RENK katkısını tonlar (G5). Işık seviyeleri, mob spawn ve vanilla
      * mantığı bu dokuyu okumaz.
      */
     static void isikHaritasi(IstemciGokyuzu.Gorunum g, float gokKararmasi, float gokIsigi, Vector3f renk) {
-        float[] t = isikTonu(g.evre(), g.ilerleme());
-        if (g.onceki() != null && g.gecis() < 1f) {
-            float[] e = isikTonu(g.onceki(), 1f);
-            for (int i = 0; i < 4; i++) {
-                t[i] = Mth.lerp(g.gecis(), e[i], t[i]);
-            }
-        }
-        if (g.evre() == GunesEvresi.KIZIL_CUCE) {
-            for (int i = 0; i < 4; i++) {
-                t[i] = Mth.lerp(g.renkGucu(), 1f, t[i]);
-            }
-        }
+        float[] t = g.isik();
         float s = gokKararmasi + (1f - gokKararmasi) * 0.35f;
         float gr = s * gokIsigi;
         float gb = gokIsigi;

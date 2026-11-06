@@ -74,7 +74,7 @@ public final class GokyuzuIstemciKurulumu {
         DogalAfetler.LOGGER.warn("[gokyuzu] ezildi: overworld efekti bizim sarmalayıcımız değil ({}); kazanan sarılacak",
                 son.getClass().getName());
         try {
-            Field alan = DimensionSpecialEffectsManager.class.getDeclaredField("EFFECTS");
+            Field alan = DimensionSpecialEffectsManager.class.getDeclaredField(SahteGokyuzuModu.efektAlaniAdi());
             alan.setAccessible(true);
             @SuppressWarnings("unchecked")
             Map<ResourceLocation, DimensionSpecialEffects> eski =

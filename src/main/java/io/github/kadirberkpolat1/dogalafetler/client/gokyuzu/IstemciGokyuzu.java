@@ -20,7 +20,7 @@ public final class IstemciGokyuzu {
 
     /** Bir karenin gökyüzü durumu. {@code onceki} null ise geçiş yoktur. */
     record Gorunum(GunesEvresi evre, GunesEvresi onceki, float gecis, float ilerleme, float saniye, boolean ayVar,
-            float boyutOrani, float renkGucu) {
+            float boyutOrani, float renkGucu, float[] isik) {
         boolean vanillaMi() {
             return evre == GunesEvresi.NORMAL && ayVar && (onceki == null || gecis >= 1f);
         }
@@ -35,6 +35,10 @@ public final class IstemciGokyuzu {
     static volatile Kanca kanca = Kanca.SARMALAYICI;
     private static final MonotonIlerleme ILERLEME = new MonotonIlerleme();
     private static long sonGuncelleme = Util.getMillis();
+    private static Gorunum son;
+    private static long sonMs = Long.MIN_VALUE;
+    private static float sonKismi = Float.NaN;
+    private static int sonSurum = -1;
 
     private IstemciGokyuzu() {
     }
@@ -50,9 +54,16 @@ public final class IstemciGokyuzu {
         };
     }
 
+    /**
+     * Karenin görünümü; aynı milisaniye, aynı {@code kismiTick} ve aynı paket için önbellekten döner (ışık haritası bunu
+     * piksel başına çağırır).
+     */
     static Gorunum gorunum(float kismiTick) {
-        DonemPaketi d = IstemciDonem.durum();
         long simdi = Util.getMillis();
+        if (son != null && simdi == sonMs && kismiTick == sonKismi && IstemciDonem.surum() == sonSurum) {
+            return son;
+        }
+        DonemPaketi d = IstemciDonem.durum();
         float gecenTick = (simdi - sonGuncelleme) / 50f;
         sonGuncelleme = simdi;
         long anahtar = d.evreBaslangicSaati() * 8 + d.gunesEvresi().ordinal();
@@ -66,7 +77,13 @@ public final class IstemciGokyuzu {
         } catch (IllegalStateException yuklenmedi) {
             // Sunucu config'i dünyaya girmeden eşitlenmez; o ana kadar varsayılan görünüm.
         }
-        return new Gorunum(d.gunesEvresi(), oncekiEvre(d.gunesEvresi()), GokyuzuEgrileri.gecis(gecen), ilerleme,
-                (float) (gecen / 20.0), d.ayVar(), boyut, renk);
+        GunesEvresi onceki = oncekiEvre(d.gunesEvresi());
+        float gecis = GokyuzuEgrileri.gecis(gecen);
+        son = new Gorunum(d.gunesEvresi(), onceki, gecis, ilerleme, (float) (gecen / 20.0), d.ayVar(), boyut, renk,
+                GokyuzuRenkleri.isikTonu(d.gunesEvresi(), onceki, gecis, ilerleme, renk));
+        sonMs = simdi;
+        sonKismi = kismiTick;
+        sonSurum = IstemciDonem.surum();
+        return son;
     }
 }

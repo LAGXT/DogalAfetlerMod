@@ -3,7 +3,9 @@ package io.github.kadirberkpolat1.dogalafetler.client.gokyuzu;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciDonem;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
+import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Locale;
@@ -29,8 +31,8 @@ import net.minecraftforge.fml.loading.FMLPaths;
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class GokyuzuOtomasyonu {
     static final String BAYRAK = "dogalafetler-gokyuzu-otomasyon";
-    private static final boolean ACIK = !FMLEnvironment.production
-            && Files.exists(FMLPaths.GAMEDIR.get().resolve(BAYRAK));
+    private static final String MOD = modOku();
+    private static final boolean ACIK = !MOD.isEmpty();
     private static final Deque<Predicate<Minecraft>> KUYRUK = new ArrayDeque<>();
     private static int tus;
     private static int dugme;
@@ -41,6 +43,24 @@ public final class GokyuzuOtomasyonu {
     private static float egim = -40f;
 
     private GokyuzuOtomasyonu() {
+    }
+
+    private static String modOku() {
+        Path bayrak = FMLPaths.GAMEDIR.get().resolve(BAYRAK);
+        if (FMLEnvironment.production || !Files.exists(bayrak)) {
+            return "";
+        }
+        try {
+            String icerik = Files.readString(bayrak).trim();
+            return icerik.isEmpty() ? "tam" : icerik;
+        } catch (IOException hata) {
+            return "tam";
+        }
+    }
+
+    /** Etkin otomasyon planı ({@code tam}, {@code ezilme}, {@code ezilme-yansimasiz}); kapalıysa boş. */
+    static String mod() {
+        return MOD;
     }
 
     @SubscribeEvent
@@ -71,8 +91,18 @@ public final class GokyuzuOtomasyonu {
         }
         basladi = true;
         bekleme = 200;
-        plan();
-        DogalAfetler.LOGGER.info("[gokyuzu-oto] başladı, adım={}", KUYRUK.size());
+        if (MOD.startsWith("ezilme")) {
+            ezilmePlani();
+        } else {
+            plan();
+        }
+        KUYRUK.add(mc -> {
+            mc.player.connection.sendCommand("dogalafet kizilcuce bilgi");
+            DogalAfetler.LOGGER.info("[gokyuzu-oto] BİTTİ girdi: tuş={} düğme={} teker={}", tus, dugme, teker);
+            mc.stop();
+            return true;
+        });
+        DogalAfetler.LOGGER.info("[gokyuzu-oto] başladı: mod={}, adım={}", MOD, KUYRUK.size());
     }
 
     @SubscribeEvent
@@ -143,7 +173,7 @@ public final class GokyuzuOtomasyonu {
             return true;
         });
         KUYRUK.add(mc -> {
-            Screenshot.grab(mc.gameDirectory, "gokyuzu-" + ad + ".png", mc.getMainRenderTarget(), m -> {
+            Screenshot.grab(mc.gameDirectory, "gokyuzu-" + (MOD.equals("tam") ? "" : MOD + "-") + ad + ".png", mc.getMainRenderTarget(), m -> {
             });
             DogalAfetler.LOGGER.info(String.format(Locale.ROOT,
                     "[gokyuzu-oto] ÇEKİM %s fps=%d kalite=%s görünüm=[%s] saat=%.0f günSaati=%d kanca=%s tuş=%d düğme=%d teker=%d",
@@ -153,61 +183,98 @@ public final class GokyuzuOtomasyonu {
         });
     }
 
-    private static void plan() {
+    private static void evre(String evre, float ilerleme) {
+        komut(String.format(Locale.ROOT, "dogalafet gokyuzutest evre %s %.3f", evre, ilerleme));
+    }
+
+    private static void ay(boolean var) {
+        komut("dogalafet gokyuzutest ay " + (var ? "var" : "yok"));
+    }
+
+    /** Gün saati ve bakış (doğu, {@code egim} derece yukarı), bekleme, kare. */
+    private static void an(long saat, float egim, int tik, String ad) {
+        komut("time set " + saat);
+        bakis(-90f, egim);
+        bekle(tik);
+        cek(ad);
+    }
+
+    /** Gözlemci kipinde Y=150: ağaçlar ve tepeler ufku kapatmaz (spike G2 kamerası). */
+    private static void hazirlik() {
         komut("dogalafet sifirla");
+        komut("gamemode spectator");
         komut("gamerule doDaylightCycle false");
         komut("gamerule doWeatherCycle false");
         komut("weather clear");
-        komut("time set 3000");
-        bakis(-90f, -40f);
+        komut("tp @s ~ 150 ~ -90 -35");
         bekle(100);
-        cek("01-normal-gunduz");
-        komut("dogalafet gokyuzutest evre buyuyen 0.85");
-        bekle(60);
-        cek("02-buyuyen");
-        komut("dogalafet gokyuzutest evre supernova 0.06");
-        bekle(4 * 20);
-        cek("03a-supernova-cokme");
-        bekle(6 * 20);
-        cek("03b-supernova-parlama");
-        bekle(30 * 20);
-        cek("03c-supernova-vitrin");
-        komut("dogalafet asama ileri");
-        bekle(25 * 20);
-        cek("04-gunessiz-gunduz");
-        komut("time set 18000");
-        bakis(-90f, -75f);
-        bekle(60);
-        cek("05-gunessiz-gece-ayli");
-        komut("dogalafet gokyuzutest ay yok");
-        bekle(60);
-        cek("06-gunessiz-gece-aysiz");
-        komut("time set 23300");
-        bakis(-90f, -12f);
-        komut("dogalafet kizilcuce baslat");
-        bekle(45 * 20);
-        cek("07-kizilcuce-dogus");
-        komut("dogalafet asama ileri");
+    }
+
+    private static void plan() {
+        int gecis = 22 * 20;
+        hazirlik();
+        an(3000, -35f, 40, "01-normal-gunduz");
+        evre("buyuyen", 0.3f);
+        an(3000, -35f, gecis, "02a-buyuyen-baslangic");
+        evre("buyuyen", 0.85f);
+        an(3000, -35f, 60, "02b-buyuyen-son");
+        ay(false);
+        an(18000, -70f, 40, "02c-buyuyen-gece-aysiz");
+        ay(true);
         komut("time set 3000");
-        bakis(-90f, -40f);
-        bekle(60);
-        cek("08-kizilcuce-gunduz");
-        komut("time set 18000");
-        bakis(-90f, -75f);
-        bekle(60);
-        cek("09-kizilcuce-gece-aysiz");
+        bakis(-90f, -35f);
+        bekle(40);
+        evre("supernova", 0.08f);
+        bekle(5 * 20);
+        cek("03a-supernova-cokme");
+        bekle(4 * 20);
+        cek("03b-supernova-parlama");
+        bekle(20 * 20);
+        cek("03c-supernova-vitrin");
+        an(6000, -70f, 40, "03d-supernova-ogle-tepe");
+        evre("supernova", 0.45f);
+        ay(false);
+        an(18000, -70f, 60, "03e-supernova-gece-aysiz");
+        ay(true);
+        komut("dogalafet asama ileri");
+        an(6000, -70f, 30 * 20, "04a-gunessiz-ogle-tepe");
+        an(3000, -35f, 40, "04b-gunessiz-sabah-ufuk");
+        an(18000, -70f, 40, "05-gunessiz-gece-ayli");
+        ay(false);
+        an(18000, -70f, 40, "06a-gunessiz-gece-aysiz-vitrin");
+        an(18000, -30f, 40, "06b-gunessiz-gece-aysiz-ufuk");
+        komut("dogalafet gokyuzutest donma 100");
+        komut("time set 23000");
+        bakis(-90f, -10f);
+        komut("dogalafet kizilcuce baslat");
+        bekle(gecis);
+        cek("07a-kizilcuce-dogus-ilk-isik");
+        evre("kizil_cuce", 0.25f);
+        an(23600, -10f, 60, "07b-kizilcuce-yukselis");
+        komut("dogalafet asama ileri");
+        an(3000, -35f, 60, "08a-kizilcuce-sabah-aysiz");
+        an(6000, -70f, 40, "08b-kizilcuce-ogle-tepe-aysiz");
+        an(18000, -70f, 40, "09a-kizilcuce-gece-aysiz");
+        ay(true);
+        an(18000, -70f, 40, "09b-kizilcuce-gece-ayli");
+        an(3000, -35f, 40, "09c-kizilcuce-sabah-ayli");
         komut("dogalafet sifirla");
-        komut("dogalafet gokyuzutest ay yok");
-        bekle(60);
-        cek("10-normal-gece-aysiz");
-        komut("dogalafet gokyuzutest ay var");
-        bekle(60);
-        cek("11-normal-gece-ayli");
-        komut("dogalafet kizilcuce bilgi");
-        KUYRUK.add(mc -> {
-            DogalAfetler.LOGGER.info("[gokyuzu-oto] BİTTİ girdi: tuş={} düğme={} teker={}", tus, dugme, teker);
-            mc.stop();
-            return true;
-        });
+        ay(false);
+        an(18000, -70f, 60, "10-normal-gece-aysiz");
+        an(6000, -70f, 40, "12-normal-gunduz-aysiz");
+        ay(true);
+        an(18000, -70f, 40, "11-normal-gece-ayli");
+    }
+
+    /** K0-26 ezilme denemesi: normal durumda kazananın göğü, aysız + güneşsiz durumda bizim göğümüz. */
+    private static void ezilmePlani() {
+        hazirlik();
+        an(6000, -70f, 40, "e1-normal-ayli-ogle");
+        ay(false);
+        an(6000, -70f, 40, "e2-normal-aysiz-ogle");
+        an(18000, -70f, 40, "e3-normal-aysiz-gece");
+        evre("gunessiz", 0.5f);
+        an(6000, -70f, 22 * 20, "e4-gunessiz-aysiz-ogle");
+        an(18000, -70f, 40, "e5-gunessiz-aysiz-gece");
     }
 }
