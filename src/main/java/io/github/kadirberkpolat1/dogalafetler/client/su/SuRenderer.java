@@ -390,6 +390,17 @@ public final class SuRenderer {
         return true;
     }
 
+    /** Halkadaki dört komşudan biri kuru (ne sanal ne gerçek su) mı: sütun yeni kıyı çizgisinde. */
+    private static boolean kuruKomsu(int i, int j) {
+        for (int q = 0; q < 4; q++) {
+            int n = komsu(i + DI[q], j + DJ[q]);
+            if (n >= 0 && TUR[n] == 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static int komsu(int i, int j) {
         return i < 0 || j < 0 || i >= N || j >= N ? -1 : i * N + j;
     }
@@ -410,10 +421,10 @@ public final class SuRenderer {
         }
         float kopuk = tur == 1 && bilesen > 1 ? Math.max(0, Math.min(0.85f, (egim - 0.6f) / 2.5f)) : 0;
         float derin = UST[k] - alt;
-        if (tur != 3 && derin < 0.8f) {
-            // Kıyı şeridi: sığ kenarda 2 sn periyotla ileri geri "yalayan" köpük bandı.
+        if (tur == 1 && (derin < 1.5f || kuruKomsu(i, j))) {
+            // Kıyı şeridi: kuru karaya değen ya da çok sığ sütunda 2 sn periyotla ileri geri "yalayan" köpük bandı.
             float yalama = 0.55f + 0.45f * (float) Math.sin(t * 0.157 + (x + z) * 0.35);
-            kopuk = Math.max(kopuk, 0.7f * (0.8f - derin) / 0.8f * yalama);
+            kopuk = Math.max(kopuk, (kuruKomsu(i, j) ? 0.75f : 0.4f) * yalama);
         }
         float a = Math.max(kopuk, derin < 1 ? 0.25f + 0.15f * derin : Math.min(0.85f, 0.4f + 0.06f * derin));
         int c = karistir(renk, 0xFFFFFF, kopuk);

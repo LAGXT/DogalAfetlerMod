@@ -96,3 +96,23 @@ Kaynaklar:
 - **Kapandı — bindirme:** gerçek suyla birleşimde 0,02 blok bindirme ve `AFTER_TRANSLUCENT_BLOCKS` ile aynı derinlik tamponu yeterli oldu; sis için `CHUNK_OFFSET` düzeltmesi.
 - Mixin yapılandırması: `dogalafetler.su.mixins.json` (ortak) ve `dogalafetler.client.su.mixins.json` (yalnız istemci); üretim jar'ında refmap ve `MixinConfigs` manifest girdisi.
 - **Açık:** Embeddium/Rubidium gibi sıvı render'ını değiştiren modlar yüklüyken tesselasyon mixin'i çalışmayabilir; yedek "ıslak dip" yüzeyi bu durum için saklanır.
+
+## Faz 2 güncellemesi, 2026-11-06
+
+Kaynak: `.vibe/kararlar/sanal-su.md` (§A sözleşme, SU-11…SU-19), rapor `.vibe/rapor/sanal-su.md`.
+
+- **Deniz alanı su kütlesi başına (SU-11):** spike'ın "kaynak + artış" BFS'i yerine her durgun su kütlesinden öncelikli
+  taşkın; sütun, kütleden ona giden en alçak yolun en yüksek zemini (eşik) yükselen seviyenin altındaysa dolar. Deniz
+  (yüzey ≤ deniz seviyesi) sınırsız yükselir, göl taşma ağzında durur, kıyı kumulunun arkasındaki çukur ancak su kumulu
+  aşınca dolar, 96 adım sınırı yok. Havada asılı su duvarı oluşmaz (rastgele arazi testi). §6'daki "gerçek su yüzeyinden en
+  çok 96 blok" satırı bununla geçersiz: sınır yüklü alandır.
+- **Deniz yükselmesi dönem süreci:** ay yok olunca 10 gerçek dakika (config) bekler, 5 dk'da +4 bloka (üst sınır 6, en
+  çok 8) doğrusal yükselir, kalıcıdır; `/dogalafet denizseviyesi`, `/dogalafet aysonrasi atla`; buharlaşma (N10) artışı
+  kademeli sıfıra indirir. Artış çekirdeğin `DunyaDonemi.deniz()` alanında kalıcı ve senkron.
+- **Mağara suyu:** `SanalSu.magaraDoldur(merkez, hacim, kalış)`; kalış 600 sn, kuruma 0,25 blok / 6 sn, yüzeyden buhar
+  (kalite çarpanlı), bitişte cep kutusu hash'i eşit. `asama ileri` kurumayı beklemeden ilerletir.
+- **Görünüm:** kıyı şeridinde 2 sn periyotla yalayan köpük bandı, sığda alfa 0,25 → derinde 0,85; dalgacık bileşeni ve
+  LOD mesafesi efekt kalitesine bağlı (Düşük 1 bileşen / 8 chunk … Ultra 4 bileşen).
+- **Vitrin karesi:** `KÖK/.vibe/kanit/sanal-su/sanal-su-deniz-vitrin.png` (gün batımı, kumsal, deniz +4; öncesi
+  `sanal-su-deniz-once.png`). Dalga: `sanal-su-dalga.png`; mağara: `sanal-su-magara.png`, `sanal-su-magara-kuruyor.png`.
+
