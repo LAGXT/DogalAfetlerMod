@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.UUID;
 import net.minecraft.advancements.Advancement;
 import net.minecraft.core.BlockPos;
+import net.minecraft.gametest.framework.AfterBatch;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestAssertException;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -52,7 +53,22 @@ import net.minecraftforge.network.NetworkDirection;
 @GameTestHolder(DogalAfetler.MOD_ID)
 @PrefixGameTestTemplate(false)
 public final class AyCarpmasiOyunTestleri {
+    /** Hız testinin değiştirdiği meteor sıklığının eski değeri; geri konunca null. */
+    private static Double oncekiMeteorSikligi;
+
     private AyCarpmasiOyunTestleri() {
+    }
+
+    /** Hız testi başarısız bitse de meteor sıklığı ve dönem batch sonunda geri döner (K-E15). */
+    @AfterBatch(batch = "ay_carpmasi_hiz")
+    public static void hizSonrasi(ServerLevel level) {
+        AfetYoneticisi yonetici = AfetYoneticisi.al(level.getServer());
+        yonetici.durdur();
+        yonetici.sifirla();
+        if (oncekiMeteorSikligi != null) {
+            AyCarpmasiAyarlari.meteorDakikaBasinaAyarla(oncekiMeteorSikligi);
+            oncekiMeteorSikligi = null;
+        }
     }
 
     private static int komut(GameTestHelper y, String komut) {
@@ -175,17 +191,10 @@ public final class AyCarpmasiOyunTestleri {
         BlockPos tavanSon = new BlockPos(m.getX() + 8, ustY + 10, m.getZ() + 8);
         BlockPos yaprakBas = new BlockPos(m.getX() - 3, ustY, m.getZ() - 3);
         BlockPos yaprakSon = new BlockPos(m.getX() + 3, ustY, m.getZ() + 3);
-        // Bariyer tavanı yüzeyi sahneye sabitler: tarama tavandan 12 blok iner, alttaki başka sahnelere ulaşmaz. Tam pakette
-        // önceki batch'lerin yüksekte bıraktığı bloklar ve düşen bloklar yarıçap içinde kalırsa aday olur: hacim önce boşaltılır.
         AABB alan = new AABB(tavanBas.offset(-1, -24, -1), tavanSon.offset(2, 15, 2));
-        BlockPos.betweenClosed(tavanBas.offset(-1, -24, -1), tavanSon.offset(1, 14, 1))
-                .forEach(p -> level.setBlock(p, Blocks.AIR.defaultBlockState(), 2));
-        level.getEntitiesOfClass(FallingBlockEntity.class, alan).forEach(FallingBlockEntity::discard);
-        BlockPos.betweenClosed(tavanBas, tavanSon).forEach(p -> level.setBlockAndUpdate(p, Blocks.BARRIER.defaultBlockState()));
-        BlockPos.betweenClosed(yaprakBas, yaprakSon).forEach(p -> level.setBlockAndUpdate(p,
-                Blocks.OAK_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true)));
-        // Sahnenin zorlanmış chunk'ları (z < 0 yanı) ilk tick'te henüz varlık işlemeyebilir; sarsıntı bütün tarama alanı varlık
-        // işleyince bir kez koşar (AY-12). Başarısız doğrulama sonraki denemelerde de hata olarak kalır.
+        // Sahnenin zorlanmış chunk'ları (z < 0 yanı) ilk tick'te henüz varlık işlemeyebilir: gizli bölümdeki düşen blok ne
+        // silinir ne sayılır. Kurulum ve sarsıntı bütün tarama alanı varlık işleyince bir kez koşar (AY-12). Başarısız
+        // doğrulama ya da beklenmeyen istisna sonraki denemelerde de hata olarak kalır (sunucu tick'ine kaçmaz).
         boolean[] kosuldu = {false};
         String[] hata = {null};
         y.succeedWhen(() -> {
@@ -196,6 +205,8 @@ public final class AyCarpmasiOyunTestleri {
                     sarsintiSahnesi(y, level, m, ustY, alan, tavanBas, tavanSon, yaprakBas, yaprakSon);
                 } catch (GameTestAssertException e) {
                     hata[0] = e.getMessage();
+                } catch (RuntimeException e) {
+                    hata[0] = e.toString();
                 }
             }
             if (hata[0] != null) {
@@ -217,6 +228,14 @@ public final class AyCarpmasiOyunTestleri {
 
     private static void sarsintiSahnesi(GameTestHelper y, ServerLevel level, BlockPos m, int ustY, AABB alan, BlockPos tavanBas,
             BlockPos tavanSon, BlockPos yaprakBas, BlockPos yaprakSon) {
+        // Bariyer tavanı yüzeyi sahneye sabitler: tarama tavandan 12 blok iner, alttaki başka sahnelere ulaşmaz. Tam pakette
+        // önceki batch'lerin yüksekte bıraktığı bloklar ve düşen bloklar yarıçap içinde kalırsa aday olur: hacim önce boşaltılır.
+        BlockPos.betweenClosed(tavanBas.offset(-1, -24, -1), tavanSon.offset(1, 14, 1))
+                .forEach(p -> level.setBlock(p, Blocks.AIR.defaultBlockState(), 2));
+        level.getEntitiesOfClass(FallingBlockEntity.class, alan).forEach(FallingBlockEntity::discard);
+        BlockPos.betweenClosed(tavanBas, tavanSon).forEach(p -> level.setBlockAndUpdate(p, Blocks.BARRIER.defaultBlockState()));
+        BlockPos.betweenClosed(yaprakBas, yaprakSon).forEach(p -> level.setBlockAndUpdate(p,
+                Blocks.OAK_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true)));
         ServerPlayer oyuncu = CekirdekOyunTestleri.sahteOyuncu(y, m.getX() + 0.5, ustY - 6, m.getZ() + 0.5);
         GameRules.BooleanValue kural = level.getGameRules().getRule(Kurallar.AFET_BLOK_HASARI);
         boolean oncekiKural = kural.get();
@@ -333,6 +352,7 @@ public final class AyCarpmasiOyunTestleri {
         AfetYoneticisi yonetici = temizBasla(y);
         DunyaDonemi donem = yonetici.donem();
         double oncekiSiklik = AyCarpmasiAyarlari.meteorDakikaBasinaAyarla(0);
+        oncekiMeteorSikligi = oncekiSiklik;
         Afet afet = baslat(y, yonetici);
         sirenden(y, yonetici, afet);
         yonetici.hizAyarla(60);
@@ -341,6 +361,7 @@ public final class AyCarpmasiOyunTestleri {
                     "hızlı akışta siren → çarpma → sarsıntı → yağmur kendiliğinden bitmeli: " + afet.asama());
             y.assertTrue(donem.ayDurumu() == AyDurumu.YOK && donem.carpan(AfetTuru.TSUNAMI) > 1.0, "çarpma oldu");
             AyCarpmasiAyarlari.meteorDakikaBasinaAyarla(oncekiSiklik);
+            oncekiMeteorSikligi = null;
             yonetici.sifirla();
         });
     }
