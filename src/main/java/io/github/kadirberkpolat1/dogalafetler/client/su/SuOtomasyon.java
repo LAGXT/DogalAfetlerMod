@@ -1,6 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.client.su;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -38,6 +39,10 @@ public final class SuOtomasyon {
     private static int olcumTick;
     private static int ox;
     private static int oz;
+    private static double basX;
+    private static double basZ;
+    private static double yonX;
+    private static double yonZ;
 
     private SuOtomasyon() {
     }
@@ -86,7 +91,12 @@ public final class SuOtomasyon {
                 "k:dogalafet denizseviyesi 0", "k:dogalafet su kiyi", "b:300"));
         if (hepsi || BOLUM.contains("deniz")) {
             a.addAll(List.of("k:time set 11900", "b:200", "f:deniz-afetsiz", "s:sanal-su-deniz-once", "k:dogalafet denizseviyesi 4",
-                    "b:300", "f:deniz-afet", "s:sanal-su-deniz-vitrin", "k:dogalafet denizseviyesi 0", "b:60"));
+                    "b:300", "f:deniz-afet", "s:sanal-su-deniz-vitrin", "k:time set 12500", "b:40",
+                    "s:sanal-su-deniz-gunbatimi", "k:time set 6000", "k:gamemode survival", "b:80", "o:suya-dustu", "b:120",
+                    "o:batik", "k:effect give @s minecraft:water_breathing 60 0 true",
+                    "k:effect give @s minecraft:resistance 60 4 true", "k:execute as @s at @s run tp @s ~ ~ ~ ~180 0", "b:10", "o:bas",
+                    "k:dogalafet su dalga 6", "b:300", "o:dalga-sonrasi", "k:dogalafet su temizle", "k:gamemode spectator",
+                    "k:dogalafet denizseviyesi 0", "k:dogalafet su kiyi", "b:60"));
         }
         if (hepsi || BOLUM.contains("dalga")) {
             a.addAll(List.of("k:time set 5000", "k:execute as @s at @s run tp @s ^ ^3 ^28 ~180 4", "b:200", "f:dalga-afetsiz",
@@ -162,12 +172,36 @@ public final class SuOtomasyon {
             case 's' -> Screenshot.grab(mc.gameDirectory, deger + ".png", mc.getMainRenderTarget(),
                     m -> log("FOTO {} {}", deger, m.getString()));
             case 'm' -> magara(mc, deger);
+            case 'o' -> oyuncu(mc, deger);
             case 'x' -> {
                 log("BITTI girdi tus={} fare={} teker={}", tus, fare, teker);
                 mc.stop();
             }
             default -> log("bilinmeyen adım {}", adim);
         }
+    }
+
+    /**
+     * Yerel oyuncunun sanal sudaki durumu (§6 #15, istemcide): su ve göz suda mı, hava, can, dikey hız, sanal batıklık;
+     * {@code bas} konumu ve bakışın tersini (dalga oyuncuya doğru gelir) kaydeder, sonraki ölçümler dalga yönündeki kaymayı
+     * yazar. Oyuncuyu dalgada kendi istemcisi iter (SU-03); kayma bu yolun kanıtıdır.
+     */
+    private static void oyuncu(Minecraft mc, String etiket) {
+        var p = mc.player;
+        if ("bas".equals(etiket)) {
+            basX = p.getX();
+            basZ = p.getZ();
+            var bak = p.getLookAngle();
+            double boy = Math.max(1e-6, Math.hypot(bak.x, bak.z));
+            yonX = -bak.x / boy;
+            yonZ = -bak.z / boy;
+        }
+        double kayma = (p.getX() - basX) * yonX + (p.getZ() - basZ) * yonZ;
+        log("OYUNCU {} suda={} gozSuda={} hava={} can={} dy={} poz={} sanalBatiklik={} sanalSuda={} dalgaYonundeKayma={}", etiket,
+                p.isInWater(), p.isUnderWater(), p.getAirSupply(), String.format(Locale.ROOT, "%.1f", p.getHealth()),
+                String.format(Locale.ROOT, "%.3f", p.getDeltaMovement().y), p.getPose(),
+                String.format(Locale.ROOT, "%.2f", SanalSu.batiklikOrani(p)),
+                SanalSu.icindeMi(p), String.format(Locale.ROOT, "%.2f", kayma));
     }
 
     /**

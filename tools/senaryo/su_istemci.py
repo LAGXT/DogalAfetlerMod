@@ -205,7 +205,7 @@ def main():
     cikis = re.search(r"cikis=(\d+)", metin)
     log(f"bitti: yoklama={yoklama} ALARM={alarm} girdi_satiri={girdi} "
         f"otomasyon_ozeti={bitti.groups() if bitti else None} gradle_{cikis.group(0) if cikis else 'cikis=?'}")
-    for satir in re.findall(r".*SU-OTOMASYON (?:FPS|FOTO).*", metin):
+    for satir in re.findall(r".*SU-OTOMASYON (?:FPS|FOTO|OYUNCU).*", metin):
         log("  " + satir.split("SU-OTOMASYON ", 1)[1])
     for png in (RUN / "screenshots").glob("sanal-su-*.png"):
         if png.stat().st_mtime > time.time() - 3600:
