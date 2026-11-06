@@ -11,6 +11,7 @@ import io.github.kadirberkpolat1.dogalafetler.komut.CekirdekKomutlari;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import io.github.kadirberkpolat1.dogalafetler.network.AgKanali;
 import io.github.kadirberkpolat1.dogalafetler.veri.DataGenerators;
+import io.github.kadirberkpolat1.dogalafetler.yangin.YanginSistemi;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.common.Mod;
@@ -38,6 +39,7 @@ public final class DogalAfetler {
         SunucuAyarlari.kaydet();
         IstemciAyarlari.kaydet();
         OyunTestiAfeti.ozelliktenKaydet();
+        YanginSistemi.kaydet(modBus);
 
         DataGenerators.ceviriEkle(CekirdekCevirileri::yaz);
         DataGenerators.ceviriEkle(Kurallar::cevirileriYaz);

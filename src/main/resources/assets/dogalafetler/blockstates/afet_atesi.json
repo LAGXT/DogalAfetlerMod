@@ -1,0 +1,12 @@
+{
+  "variants": {
+    "": [
+      {
+        "model": "dogalafetler:block/afet_atesi_0"
+      },
+      {
+        "model": "dogalafetler:block/afet_atesi_1"
+      }
+    ]
+  }
+}
