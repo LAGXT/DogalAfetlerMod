@@ -18,6 +18,7 @@ import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorAPI;
 import net.minecraft.advancements.Advancement;
 import net.minecraft.core.BlockPos;
+import net.minecraft.gametest.framework.AfterBatch;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
@@ -34,14 +35,38 @@ import net.minecraftforge.gametest.PrefixGameTestTemplate;
  * test global dönemi değiştirdiği için kendi {@code batch}'indedir; başta ve sonda dönem {@code sifirla} ile boş dünyanın
  * ilk hâline döner (K-E15; her koşu boş dünyayla başlar, K-E16) ve değiştirilen gamerule eski değerine döner. Meteor
  * yağdıran testlerde {@code afetBlokHasari} kapalıdır (krater ve ateş komşu sahnelere dokunmaz) ve afet aynı testte
- * {@code stop} ile temizce biter (uçan meteorlar kalkar).
+ * {@code stop} ile temizce biter (uçan meteorlar kalkar). {@code succeedWhen} kullanan testler başarısız bitse de batch
+ * sonunda afet durur, dönem ve hız sıfırlanır, {@code afetBlokHasari} eski değerine döner ({@link AfterBatch}, K-E15).
  */
 @GameTestHolder(DogalAfetler.MOD_ID)
 @PrefixGameTestTemplate(false)
 public final class GunesPatlamasiOyunTestleri {
     private static final float EPS = 1e-4f;
+    /** Siren testinin değiştirdiği {@code afetBlokHasari}'nın eski değeri; geri konunca null. */
+    private static Boolean eskiBlokHasari;
 
     private GunesPatlamasiOyunTestleri() {
+    }
+
+    @AfterBatch(batch = "gunes_patlamasi_siren")
+    public static void sirenSonrasi(ServerLevel level) {
+        batchSonuTemizligi(level);
+    }
+
+    @AfterBatch(batch = "gunes_patlamasi_zincir")
+    public static void zincirSonrasi(ServerLevel level) {
+        batchSonuTemizligi(level);
+    }
+
+    private static void batchSonuTemizligi(ServerLevel level) {
+        MinecraftServer server = level.getServer();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(server);
+        yonetici.durdur();
+        yonetici.sifirla();
+        if (eskiBlokHasari != null) {
+            server.getGameRules().getRule(Kurallar.AFET_BLOK_HASARI).set(eskiBlokHasari, server);
+            eskiBlokHasari = null;
+        }
     }
 
     private static AfetYoneticisi temizBasla(GameTestHelper y) {
@@ -82,11 +107,13 @@ public final class GunesPatlamasiOyunTestleri {
         DunyaDonemi donem = yonetici.donem();
         GameRules.BooleanValue hasar = blokHasari(y);
         boolean eskiHasar = hasar.get();
+        eskiBlokHasari = eskiHasar;
         hasar.set(false, server);
         Runnable bitir = () -> {
             yonetici.durdur();
             yonetici.sifirla();
             hasar.set(eskiHasar, server);
+            eskiBlokHasari = null;
         };
         GunesPatlamasi afet = baslat(y, yonetici);
         y.assertTrue(donem.gunesEvresi() == GunesEvresi.NORMAL, "ön-uyarıda gök değişmez (N7): " + donem.ozet());
