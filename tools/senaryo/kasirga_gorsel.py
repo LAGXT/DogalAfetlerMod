@@ -177,6 +177,10 @@ def main():
             dogrulandi = True
         etkin = hypr_json("activewindow")
         yoklama += 1
+        if yoklama % 6 == 0:
+            # K0-21 rev. 2 (i): FPS yalnız Gradle sayacı 1 iken (yalnız bu koşu) geçerli; ölçüm anıyla eşleştirilir.
+            gradle = subprocess.run(["pgrep", "-fc", "GradleWrapperMain"], capture_output=True, text=True).stdout.strip()
+            log(f"gradle sayacı={gradle}")
         if isinstance(etkin, dict) and etkin.get("pid") == pid:
             alarm = True
             log("ALARM: etkin pencere bizim istemci")

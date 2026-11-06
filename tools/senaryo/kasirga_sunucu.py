@@ -42,8 +42,13 @@ def kosu(sunucu):
     sunucu.yaz(f"### S5 15 sn: uçan {ucan.group(1)}/{ucan.group(2)}, kaldırılan {ucan.group(3)}" if ucan else "### uçan yok")
     if ucan and int(ucan.group(1)) > int(ucan.group(2)):
         raise cs.SenaryoHatasi(f"uçan blok tavanı aşıldı: {satir}")
-    tps = sunucu.komut("forge tps", r"Overall\s*:.*Mean TPS: [0-9.]+", "tepe anı TPS")
+    tps = sunucu.komut("forge tps", r"Overall\s*:.*Mean TPS: [0-9.,]+", "tepe anı TPS")
     sunucu.yaz(f"### tepe anı (S5): {tps.strip()}")
+    olcum = re.search(r"Mean tick time: ([0-9.,]+) ms\. Mean TPS: ([0-9.,]+)", tps)
+    if olcum and float(olcum.group(2).replace(",", ".")) < 18:
+        raise cs.SenaryoHatasi(f"tepe anında TPS 18'in altında: {tps.strip()}")
+    esya = sunucu.komut("execute if entity @e[type=minecraft:item]", r"Test (passed|failed)", "eşya varlığı sayısı")
+    sunucu.yaz(f"### tepe anı eşya varlığı: {esya.strip()}")
     sunucu.komut("dogalafet stop", r"Tornado stopped\.")
     time.sleep(1)
     sunucu.komut("dogalafet kasirga bilgi", r"No active tornado; " + SIFIR, "stop sonrası varlık 0")

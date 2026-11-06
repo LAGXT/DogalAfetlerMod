@@ -64,6 +64,8 @@ import net.minecraft.world.phys.Vec3;
 public final class Kasirga extends Afet {
     static final String UGULTU_KIMLIK = "kasirga/ugultu";
     static final String RUZGAR_KIMLIK = "kasirga/ruzgar";
+    /** Uçan blok tavanı doluyken parçalanan bloğun eşya düşürme olasılığı (patlamadaki gibi kayıp; eşya varlığı TPS'i yer). */
+    static final double PARCA_ESYA_PAYI = 1.0 / 16;
     private static final SoundEvent[] ENKAZ_SESLERI = {SoundEvents.WOOD_BREAK, SoundEvents.GRAVEL_BREAK,
         SoundEvents.GLASS_BREAK, SoundEvents.GRASS_BREAK, SoundEvents.WOOD_BREAK};
     private static final double TAM_TUR = Math.PI * 2;
@@ -410,7 +412,9 @@ public final class Kasirga extends Afet {
 
     /**
      * Tick başına seviye tablosundaki sayı kadar deneme (evre payı × TPS kısması): çekim yarıçapının %60'ı içinde, merkeze
-     * yoğun rastgele sütunun en üst bloğu. Tavan doluysa koparılan blok eşya olarak düşer (tasarım notu §5).
+     * yoğun rastgele sütunun en üst bloğu. Uçan blok tavanı doluysa blok parçalanır (kırılma parçacığı ve sesi): tick başına
+     * en çok denemenin dörtte biri, yalnız {@link #PARCA_ESYA_PAYI}'nda eşya düşer. Her kırılan blok eşya düşürseydi S5'te
+     * 15 sn'de ~3800 eşya varlığı oluşuyor ve tick 40 ms'ye çıkıyordu (K-04).
      */
     private void bloklariKaldir(ServerLevel level) {
         double pay = KasirgaEvresi.kaldirmaPayi(durum);
@@ -420,6 +424,8 @@ public final class Kasirga extends Afet {
         }
         int deneme = Math.max(1, (int) Math.round(s.blokKaldirmaTick() * pay * TpsOlcer.kismaCarpani()));
         int tavan = KasirgaAyarlari.ucanBlokTavani();
+        int parcalanabilir = Math.max(1, deneme / 4);
+        int parcalanan = 0;
         Vec3 k = konum();
         LongSet degisen = new LongOpenHashSet();
         for (int i = 0; i < deneme; i++) {
@@ -435,10 +441,14 @@ public final class Kasirga extends Afet {
             if (!kaldirilabilir(level, yer, blok, s)) {
                 continue;
             }
-            level.removeBlock(yer, false);
+            boolean ucabilir = ucanlar.size() < tavan && level.isPositionEntityTicking(yer);
+            if (!ucabilir && parcalanan >= parcalanabilir) {
+                continue;
+            }
             degisen.add(ChunkPos.asLong(x >> 4, z >> 4));
             toplamKaldirilan++;
-            if (ucanlar.size() < tavan && level.isPositionEntityTicking(yer)) {
+            if (ucabilir) {
+                level.removeBlock(yer, false);
                 double yaricap = Math.hypot(x + 0.5 - k.x, z + 0.5 - k.z);
                 double baslangic = Math.atan2(z + 0.5 - k.z, x + 0.5 - k.x);
                 UcanBlokVarligi ucan = UcanBlokVarligi.olustur(level, blok, this, varlik != null ? varlik.getId() : -1,
@@ -446,7 +456,11 @@ public final class Kasirga extends Afet {
                 level.addFreshEntity(ucan);
                 ucanlar.add(ucan);
             } else {
-                Block.dropResources(blok, level, yer);
+                parcalanan++;
+                level.destroyBlock(yer, false);
+                if (rastgele.nextDouble() < PARCA_ESYA_PAYI) {
+                    Block.dropResources(blok, level, yer);
+                }
             }
         }
         degisen.forEach((long c) -> SanalSu.chunkDegisti(level, new ChunkPos(c)));

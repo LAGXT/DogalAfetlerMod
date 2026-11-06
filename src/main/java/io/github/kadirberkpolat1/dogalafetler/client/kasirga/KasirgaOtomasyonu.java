@@ -4,15 +4,19 @@ import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.Kasirga;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.KasirgaKayitlari;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.UcanBlokVarligi;
+import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.KasirgaEvresi;
 import io.github.kadirberkpolat1.dogalafetler.config.EfektKalitesi;
 import io.github.kadirberkpolat1.dogalafetler.core.Afet;
+import io.github.kadirberkpolat1.dogalafetler.core.AfetAsamasi;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
 import io.github.kadirberkpolat1.dogalafetler.core.TpsOlcer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.screens.PauseScreen;
@@ -61,8 +65,9 @@ public final class KasirgaOtomasyonu {
     private static int teker;
     private static String istenenKare;
     private static String olcum;
-    private static int olcumKare;
-    private static long olcumBas;
+    private static long[] kareSureleri = new long[4096];
+    private static int kareSayisi;
+    private static long sonKare;
     private static volatile boolean kosulSunucu;
 
     private KasirgaOtomasyonu() {
@@ -145,19 +150,32 @@ public final class KasirgaOtomasyonu {
         IstemciKasirga.zorlananKalite = kalite;
         IstemciKasirga.gizli = gizli;
         olcum = etiket;
-        olcumKare = 0;
-        olcumBas = System.nanoTime();
+        kareSayisi = 0;
+        sonKare = 0;
     }
 
+    /** FPS ortanca kare süresinden (K0-21 rev. 2 (i)); geçerliliği koşu betiğinin Gradle sayacı günlüğü belirler. */
     private static void olcBitir(IntegratedServer server) {
-        double sn = (System.nanoTime() - olcumBas) / 1e9;
-        DogalAfetler.LOGGER.info(ON + "FPS {} = {} ({} kare / {} sn), sunucu TPS {} ort {} ms, görsel enkaz {}", olcum,
-                String.format(Locale.ROOT, "%.1f", olcumKare / sn), olcumKare,
-                String.format(Locale.ROOT, "%.1f", sn), String.format(Locale.ROOT, "%.2f", TpsOlcer.tps()),
+        long[] sureler = Arrays.copyOf(kareSureleri, kareSayisi);
+        Arrays.sort(sureler);
+        double ortanca = sureler.length == 0 ? Double.NaN : sureler[sureler.length / 2] / 1e6;
+        DogalAfetler.LOGGER.info(ON + "FPS {} = {} (ortanca kare {} ms, {} kare), sunucu TPS {} ort {} ms, görsel enkaz {}",
+                olcum, String.format(Locale.ROOT, "%.1f", 1000 / ortanca), String.format(Locale.ROOT, "%.2f", ortanca),
+                sureler.length, String.format(Locale.ROOT, "%.2f", TpsOlcer.tps()),
                 String.format(Locale.ROOT, "%.2f", server.getAverageTickTime()), IstemciKasirga.gorselEnkazSayisi());
         olcum = null;
         IstemciKasirga.zorlananKalite = null;
         IstemciKasirga.gizli = false;
+    }
+
+    /** Akış kendiliğinden ilerlemişse (gizli workspace'te kare beklenirken) aşama atlanmasın: yalnız koşul tutarsa ilerletir. */
+    private static void ilerletEger(IntegratedServer server, Predicate<Kasirga> kosul) {
+        server.execute(() -> {
+            Kasirga k = kasirga(server);
+            if (k != null && kosul.test(k)) {
+                AfetYoneticisi.al(server).asamaIleri();
+            }
+        });
     }
 
     private static void senaryo(Minecraft mc, IntegratedServer server) {
@@ -177,7 +195,7 @@ public final class KasirgaOtomasyonu {
         });
         adim("S5 başlat", 60, () -> {
             komut(server, "dogalafet start kasirga 5 " + mc.player.getGameProfile().getName());
-            komut(server, "dogalafet hiz 20");
+            komut(server, "dogalafet hiz 5");
         });
         kosullu("ön-uyarı normal pencere", 20, () -> {
             sunucuda(server, level -> {
@@ -188,7 +206,7 @@ public final class KasirgaOtomasyonu {
         }, 1200, () -> komut(server, "dogalafet hiz 1"));
         adim("ön-uyarı karesi", 60, () -> kare("on_uyari_radar"));
         adim("siren", 10, () -> {
-            komut(server, "dogalafet asama ileri");
+            ilerletEger(server, k -> k.asama() == AfetAsamasi.ON_UYARI);
             sunucuda(server, level -> {
                 ServerPlayer o = oyuncu(server);
                 o.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
@@ -198,10 +216,10 @@ public final class KasirgaOtomasyonu {
         });
         adim("siren kamerası", 20, () -> kamera(server, 70, 12, -12));
         adim("siren karesi", 140, () -> kare("siren"));
-        adim("aktif", 30, () -> komut(server, "dogalafet asama ileri"));
+        adim("aktif", 30, () -> ilerletEger(server, k -> k.asama() == AfetAsamasi.SIREN));
         adim("aktif kamerası", 60, () -> kamera(server, 60, 10, -10));
         adim("aktif doğuş karesi", 40, () -> kare("aktif_dogus"));
-        adim("olgun", 20, () -> komut(server, "dogalafet asama ileri"));
+        adim("olgun", 20, () -> ilerletEger(server, k -> k.durum().evre() == KasirgaEvresi.DOGUS));
         adim("vitrin kamerası", 100, () -> kamera(server, 55, 10, -8));
         adim("vitrin karesi", 30, () -> kare("vitrin"));
         adim("kontrol", 5, () -> IstemciKasirga.gizli = true);
@@ -238,17 +256,17 @@ public final class KasirgaOtomasyonu {
         adim("afetsiz FPS son", 100, () -> olcBitir(server));
         adim("S1 başlat", 40, () -> {
             komut(server, "dogalafet start kasirga 1 " + mc.player.getGameProfile().getName());
-            komut(server, "dogalafet asama ileri");
-            komut(server, "dogalafet asama ileri");
-            komut(server, "dogalafet asama ileri");
+            ilerletEger(server, k -> k.asama() == AfetAsamasi.ON_UYARI);
+            ilerletEger(server, k -> k.asama() == AfetAsamasi.SIREN);
+            ilerletEger(server, k -> k.durum().evre() == KasirgaEvresi.DOGUS);
         });
         adim("S1 kamerası", 80, () -> kamera(server, 40, 6, -10));
         adim("S1 karesi", 40, () -> kare("s1_vitrin"));
-        adim("S1 ip", 10, () -> komut(server, "dogalafet asama ileri"));
+        adim("S1 ip", 10, () -> ilerletEger(server, k -> k.durum().evre() == KasirgaEvresi.OLGUN));
         adim("S1 ip kamerası", 60, () -> kamera(server, 40, 6, -10));
         adim("ip karesi", 30, () -> kare("ip"));
-        adim("S1 dağılma", 60, () -> komut(server, "dogalafet asama ileri"));
-        adim("doğal bitiş", 30, () -> komut(server, "dogalafet asama ileri"));
+        adim("S1 dağılma", 60, () -> ilerletEger(server, k -> k.durum().evre() == KasirgaEvresi.IP));
+        adim("doğal bitiş", 30, () -> ilerletEger(server, k -> k.durum().evre() == KasirgaEvresi.DAGILMA));
         adim("bitiş kamerası", 30, () -> sunucuda(server, level -> {
             ServerPlayer o = oyuncu(server);
             o.teleportTo(level, o.getX(), o.getY() + 14, o.getZ(), o.getYRot(), 50);
@@ -304,7 +322,11 @@ public final class KasirgaOtomasyonu {
             return;
         }
         if (olcum != null) {
-            olcumKare++;
+            long simdi = System.nanoTime();
+            if (sonKare != 0 && kareSayisi < kareSureleri.length) {
+                kareSureleri[kareSayisi++] = simdi - sonKare;
+            }
+            sonKare = simdi;
         }
         if (istenenKare == null) {
             return;
