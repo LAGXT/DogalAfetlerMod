@@ -2795,6 +2795,173 @@ Faz 5 görünür koşuda yeniden ölçülür. Görsel otomasyon A-34 kare kapıs
 - **Aşınma için kendi parcacık paketi:** 1 Hz `AfetDurumPaketi.ozel.a` (en çok 32 konum, ~260 B) ve vanilla kırılma örtüsü
   yeterli; protokol değişmedi.
 
+## Faz 4 — Kasırga
+
+Parça `kasirga` (dal `is/kasirga`, son commit `0ff6922`; `main`'e birleştirme `7224965`, kod `3e4f999`, entegrasyon 4 5/6). Kaynak
+`.vibe/kararlar/kasirga.md` §B/§C/§D; sözleşmeler (§A) ve entegratör notları (§E) o dosyada kalır. Şef kararları (K-17 taban rengi,
+performans kabulü koşu 3, `-PoyunTestiAfeti=kasirga`) "Şef kararları (Faz 4)" bölümündedir; N17 satırları sondaki tablodadır.
+Rapor `.vibe/rapor/kasirga.md`, inceleme `.vibe/rapor/inceleme-kasirga.md`, `-2.md`, `-3.md` (son: kabul, P0/P1 = 0), doğrulama
+`.vibe/rapor/dogrulama-kasirga.md`, `-2.md`, `-3.md`, birleştirme `.vibe/rapor/entegrasyon-4.md`.
+
+**K-01 Durum afette, varlık yalnız görüntü taşıyıcısı (spike B8).** Konum, yön, hedef, AKTIF'te geçen süre ve kaldırılan
+blok sayısı `Kasirga` afetinin NBT'sindedir (`DunyaDonemi` üzerinden çekirdek kaydeder); `KasirgaVarligi` `noSave` ve sahibi
+olmadan kendini atar. Varlık yalnız kasırga konumu entity-ticking iken vardır; yüklü alan dışına çıkan kasırga soyut ilerler
+(zemin yüksekliği yüklü değilse son yükseklikte), oyuncu gelince varlık yeniden doğar. Spike'ta varlık yaşam döngüsünü kendi
+tutuyordu; Faz 4'te tek kaynak afettir (yeniden başlatmada devam, çekirdek §1).
+
+**K-02 Evreler aşamalara oturtuldu.** SIREN = oluşum (huni yok; duvar bulutu 8 bloktan alçalıp koyulaşır, tabanda kısa huni
+bulutu belirir, uzak uğultu 10 sn'de açılır). AKTIF = doğuş 8 sn → olgun (S1 60 … S5 180 sn, `sureCarpani`) → ip 10 sn →
+dağılma 2 sn; sonra BITIS (hemen). Süreler ölçekli afet tick'idir (`/dogalafet hiz` hızlandırır). Gerekçe: madde 5 "afet aslı
+etkisine geçtiği anda siren söner" → huni AKTIF ile iner; siren sırasında gökyüzünde beliren duvar bulutu gerçek olayın sırasıdır.
+
+**K-03 Doğuş noktası siren menzilinde.** Tasarım notu §6 "hedef oyuncudan 80–140 blok uzakta doğar" diyordu; siren yalnız etki
+alanı + 64 blok içindekilere gider (çekirdek §4, N11) ve etki alanı çekim yarıçapıdır (S1 9). 80–140 blokta S1-S3 hedefi
+sireni duymazdı (madde 5 ihlali). Doğuş mesafesi `[0,5·(R + 56), R + 56]` (S1 32–65, S5 54–107 blok; `Yonelim.dogusMesafesi`, JUnit
+`dogusMesafesiSirenMenzilindeVeSapmaSinirli`). Kasırga hedefin başlangıç konumuna doğru 2 sn'de bir yeniden çekilen ±35° sapmayla
+yollanır (yön tick başına en çok 1,5° döner), hedefin 12 bloğuna girince ana yönü donar ve uzaklaşır. Konuma başlatılan
+kasırga (hedef oyuncu yok) rastgele bir yöne yürür. Tasarım notu §6 buna göre güncellendi.
+
+**K-04 Blok kaldırma.** Tick başına seviye tablosundaki sayı × evre payı (doğuşun ikinci yarısı 0,5, olgun 1, ip 0,5→0) ×
+`blokCarpani` × `TpsOlcer.kismaCarpani()` (çekirdek §8; spike'ın kendi `getAverageTickTime` ölçeri atıldı) deneme; çekim
+yarıçapının %60'ında merkeze yoğun rastgele sütunun en üst bloğu. Kaldırılamaz: hava, sıvı, blok varlıklı (sandık vb.; içerik
+kaybı), `#dogalafetler:kasirga_dayanikli`, çift blok (`DOUBLE_BLOCK_HALF`, `BED_PART`; tek yarı taşınırsa geçersiz yarım blok
+kalır), sertliği seviye sınırını aşan. **Zemin (toprak/kum/çakıl/taş/kar/kil) yalnız S4–5'te kalkar** (EF4–5 zemini sıyırır);
+S1–3 yalnız üstteki bitki/yaprak/ahşap/camı alır, zemin çukurlaşmaz (spike S5 kendi kazdığı çukurdaydı, SK-10; S1'in çimen
+kaldırması tasarım notunun "S1: yaprak, çimen, çiçek" maddesinde çimen bitkisi demekti). Uçan blok tavanı (`ucanBlokTavani`
+40, K0-33) doluysa ya da konum entity-ticking değilse blok **parçalanır** (`destroyBlock`, vanilla kırılma parçacığı ve sesi):
+tick başına en çok denemenin dörtte biri, yalnız 1/16'sı eşya düşürür (patlamadaki gibi kayıp). İlk sürümde tavan doluyken
+her blok eşya düşürüyordu: dedicated S5'te 15 sn'de 3333 blok kalktı, ~3860 eşya varlığı oluştu ve ortalama tick 40,3 ms'ye
+çıktı (spike 1,3 ms; `.vibe/kanit/kasirga/sunucu-1/kosu.log`). Değişen her chunk için
+`SanalSu.chunkDegisti` (Faz 4 kuralı; uçan bloğun konduğu chunk dahil). `afetBlokHasari=false` iken hiçbir blok değişmez
+(GameTest `blokHasariKapaliykenBlokDegismez`).
+
+**K-05 Afet sonrası iz.** Olgun ve ip evresinde tick başına `seviye × kısma` rastgele nokta (huni tabanı + 1,5 blok içinde):
+üstteki bitki kırılır, çimen/podzol/miselyum toprağa döner (sıyırılmış şerit); S4–5'te alt girdapların yörüngesinde toprak
+kaba toprağa döner (sikloidal halka izi). Yere düşen kütükler yatay konur (devrik kütük).
+
+**K-06 Çekim, kaldırma, hasar (spike B3).** `Cekim.ivme`: çekim yarıçapında içe ivme + siklonik teğet sürükleme (×1,3), huni
+çekirdeğinde yukarı kaldırma; ölçek `0,6 + 0,4·seviye` × evre gücü × `cekimCarpani`. S1 kaldırma ivmesi yerçekiminin (0,08)
+altında: F1 canlıları havaya kaldırmaz, iter (JUnit); S2 ve üstü çekirdekte kaldırır (S2: 0,07 · 1,4 = 0,098 > 0,08). Kaldırma `kaldirmaTavani` (25 blok, tasarım notu §6) üstünde durur; düşme
+hasarı vanilla. Mob/eşya/araç: hız her tick eklenir (`hasImpulse`). Oyuncu: hareketi istemci işler, sunucudaki hız güncel
+değildir; iki tick'te bir son tick'in yer değiştirmesi + 2·ivme `hurtMarked` ile gönderilir (oyuncu başına 10 Hz hız paketi,
+yalnız çekim yarıçapındakilere). Yaratıcı/izleyici, binekteki, asılı (tablo, çerçeve) varlık çekilmez. Çekirdek hasarı saniyede
+bir, huni taban yarıçapı + 1,5 blok içinde ve gövdenin alt yarısında: seviye tablosu (1–4 can/sn) × evre gücü ×
+`hasarCarpani`. Uçan blok çarptığı canlıya bir kez `2 + 0,5·seviye` hasar verir. Hasar tipi `dogalafetler:kasirga`.
+
+**K-07 Ses (tasarım notu §4, uyarı §3–§4).** İki döngülü katman `OrtamSesi` ile, WEATHER: `kasirga/ugultu` (uzak "yük treni",
+16 sn döngü, 40–120 Hz baskın, menzil 160, siren başında 10 sn'de açılır) ve `kasirga/ruzgar` (yakın kükreme + 2 Hz basınç pompası,
+12 sn döngü, menzil 64, AKTIF'te doğuş boyunca açılır). Konum 4 Hz `konumGuncelle`. İp evresinde 10 sn'de söner; stop/bitişte
+2 sn. Dosyalar `tools/assets/ses_uret.py`'de (`SesTanimi`; −26 LUFS, ≤ −6 dBTP, konuşma çentiği, tam sayı tur döngü); ölçüm
+`docs/kanit/ses/kasirga_*_ebur128.txt` + spektrogram (konuşma bandı −28,6 / −20,7 dB). Tek seferlik enkaz çarpmaları vanilla
+(`block.wood/gravel/glass/grass.break`, BLOCKS, 0,5–2 sn aralıkla, kasırga içinde rastgele nokta). Tasarım notundaki elytra
+rüzgâr ıslığı (300–3400 Hz) konuşma bandını doldurduğu için yazılmadı; yerine yakın katmanın düşük düzeyli 500–1500 Hz
+rüzgâr uğultusu (ses.md "konuşma bandı boş").
+
+**K-08 Şimşek.** Olgun evrede 20–40 sn'de bir kasırganın 40–90 blok uzağına vanilla `LightningBolt#setVisualOnly(true)` (sunucu,
+herkes aynı şimşeği görür; ateş/hasar yok). Tasarım notu istemci taraflı diyordu; istemci varlığı eklemek vanilla'da yok
+(paket kimliği), sunucu yolu madde 3 "herkes aynı afeti görsün"e de uyar.
+
+**K-09 İstemci (spike SK-01/02/10/11 temiz yeniden yazım).** `client.kasirga.KasirgaRenderer`: iki katmanlı prosedürel huni,
+alt girdaplar, kubbe etek + toz/yaprak sprite'ları, duvar bulutu + RFD yarığı, görsel enkaz kopyaları; tek render tipi, tek
+tampon, `AFTER_PARTICLES`'ta tek çizim. Spike'tan **aynen alınan:** `KasirgaDokusu` (bellekte 256×256 fBm atlası; yalnız paket
+adı ve log satırı değişti) ve `KasirgaRenderTipi`: görüntü kararı bunlarla ölçüldü ve incelemeden geçti, yeniden yazmak SK-01
+kararını değiştirirdi. Spike'tan **atılan:** huni kipleri (sprite/karma), katman anahtarları, istatistik/ağ sayacı, spike komutu ve
+otomasyonu, `TozParcacigiDeneyi`. **Yeni:** (a) siren evresi (oluşum) biçimi; (b) sprite yarı boyutu kameraya uzaklığın %36'sıyla
+sınırlı (spike B9 "ekran kaplama oranına göre"; uzaktan görüntü değişmez); (c) kamera huninin/eteğin içindeyken iç katmanlar
+atlanır (dış katman görünür kalır); (d) duvar bulutu alfası 0,88 → 0,74 (en pahalı katman doldurma oranıydı, SK-05; sprite
+sayısı aynı); (e) LOD eşikleri CLIENT config'te; (f) huniye bakarken görüş açısı en çok −4° (tasarım notu "Kamera");
+(g) sis/sarsıntı evre gücüyle ölçekli ve config'le kapatılabilir. Kopyalar `renderSingleBlock` ile kalır: `BlockRenderDispatcher`
+zaten önbellekli `BakedModel` dörtgenlerini yazar (SK-03 ölçümü kopya başına ~5 µs); ayrı önbellek ölçülebilir kazanç vermezdi.
+
+**K-10 Kayıt sırası (K-E22).** `KasirgaSistemi.kaydet(modBus)` mod kurucusunda `OyunTestiAfeti.ozelliktenKaydet()`'in üstündeki
+işaretli yerde: gerçek kasırga önce kaydolur, `-PoyunTestiAfeti=kasirga` (başarım ve radar görsel betikleri) WARN ile atlanır.
+İlk sürümde `KasirgaSistemi` tür zaten kayıtlıysa kendi kaydını atlıyordu (test afeti öncelikli); K-E22 (main `86224a2`)
+bunun tersini karar aldığı için o dal kaldırıldı. Sonuç: bu betikler artık gerçek kasırgayı açar (`BasarimOtomasyonu`'nun "kasırga
+S5" adımı hızlı yaşam döngüsünü bekler); K-E22 bunları Faz 5 temizliğine bıraktı.
+
+**K-11 Sunucu kapanışı ve stop.** `temizle` (stop, doğal bitiş, sıfırla, hata): ortam sesleri 2 sn'de söner, havadaki her uçan blok
+altındaki zemine konur (olmuyorsa eşyası düşer), bütün boyutlarda bu afete bağlı ya da sahipsiz `ucan_blok` ve `kasirga`
+varlıkları atılır; log `[kasirga] temizlendi (temiz=…)`. `kapanirken`: uçan bloklar yere konur, varlık atılır (kayıtlı değiller).
+
+**K-12 GameTest.** 7 test, her biri kendi batch'inde (tek afet yuvası, çekirdek §13; K-E16 ≤ 7): blok sınıfları, stop temizliği,
+`afetBlokHasari=false`, mob çekimi/hasarı, doğal bitişte İlk Rüzgâr, hareketli etki alanı, NBT devamı. Kasırga test sahnesinin
+ortasına taşınır (`konumAyarla`, paket içi): başka testin sahte oyuncusu çevrim içiyse `elleBaslat` onu hedef alıp uzakta
+doğururdu. Kural değiştiren test eski değeri geri koyar (K-E15). Uzak chunk gerekmez (K-E21).
+
+**K-13 Görsel tur otomasyonu (tur 2).** `KasirgaOtomasyonu` kareleri A-34 kapısıyla alır: istekten sonra en az 20 kare çizilmiş
+ve `getFps() ≥ 15` olmalı, en çok 60 sn beklenir (log'da `kapı açık` ya da `60 sn doldu, UYARI`). S1 ve S5 vitrin kareleri aynı
+kameradan (kasırganın hareket yönünde 55 blok önü, zemin +10, eğim −8°). FPS ölçümü süresince kamera 10 tick'te bir yeniden
+kurulur (kasırga S5'te ~4 blok/sn yürür; mesafe sabit kalır). Ölçümler: 55 blokta Düşük/Yüksek/Ultra/çizimsiz, LOD kademesi
+için 120 ve 180 blok, K0-33 için 52/36/20/5 blok Yüksek ve 5 blokta çizimsiz; `stop` sonrası aynı 5 blok noktasında afetsiz
+taban. Her ölçüm satırı renderer'ın son kare bütçesini (`KasirgaRenderer.lodOzeti`: kamera mesafesi, taban/duvar sprite, alt
+girdap) ve istemcideki uçan blok sayısını yazar. K0-33 ölçüsü: 5 blok Yüksek ortanca kare süresi ≤ 2 × afetsiz taban.
+Görsel koşu 1 (`75e9110`/`7774ed0`) protokol olarak temizdi ama ölçüm geçersizdi: ön-uyarı/siren/aktif kareleri FPS 1'de
+kapı dolarak (60 sn) alındı; kapı beklerken sunucu yaşam döngüsü ilerlediği için S5 olgun evresi vitrinde %87'ye gelmişti ve
+kasırga 55 blok ölçümlerinden sonra bitti (LOD 120/180, 52/36/20/5 blok "LOD çizilmedi"); afetsiz taban da FPS 1 (bayat).
+Düzeltme: siren başından `stop`'a kadar `dogalafet hiz 0.2` (kasırga her tick hareket eder ve çizilir, yalnız evre süreleri
+uzar), siren/aktif geçişinden ve her ölçümden önce FPS ≥ 15 kapısı (en çok 60 sn), ortanca kare > 200 ms olan ölçüm bir kez
+yinelenir (`BAYAT`), `options.txt` `enableVsync:false`, `maxFps:120` (gizli workspace'te vsync takası kare geri çağrısını
+bekliyordu [çıkarım]). Koşu 2 (tek tekrar hakkı) bu düzeltmeyle.
+
+**K-16 Yakın LOD kademesi (görsel koşu 2 ölçümü, K0-33).** Koşu 2'de (`abb39ea`) afetsiz taban 37,8 ms; S5 Yüksek ortanca kare
+55 blok 84,4, 52 blok 69,7, 36 blok 106,0, 20 blok 130,3, 5 blok 71,4 ms. Ölçü (≤ 2 × taban = 75,6 ms) 52 ve 5 blokta tuttu,
+36 ve 20 blokta tutmadı (tabana oran %36 ve %29). Kamera eteğin (S5 yarıçap ~30) içinde ya da kenarındayken yakındaki her taban
+sprite'ı ekran kaplama sınırına (`EKRAN_ORANI` 0,36 × uzaklık) takılır; 700 sprite'ın üst üste binmesi kare süresini belirler
+(5 blokta kamera huni çekirdeğinde, sprite halkası uzakta). Yeni CLIENT `kasirga.lodYakin` (48 blok; 52/55 blok vitrin
+kalitesini etkilemez): içeride taban sprite'ları ¼, sprite ekran oranı 0,18. Saf mantık `KasirgaKaliteButcesi.Lod.yakinda`,
+JUnit `kaliteButcesiVeLod`. Koşu 3 (`d690ac3`): taban 33,8 ms; Yüksek 52/36/20/5 blok 46,6/48,7/50,9/52,7 ms (tabana oran
+%73/%69/%66/%64, ölçü tuttu); 55 blok Düşük/Yüksek/Ultra 61,4/57,5/56,2 ms (vitrin kalitesi değişmedi, yakın eşiğin dışında).
+
+**K-17 Taban rengi ve S1 kareleri (inceleme-kasirga-2 Kv2-1, P1; şef: gri taban kabul edilmez).** (a) Taban rengi: koşu 3 vitrininde
+fark maskesinin alt üçte biri R 56,8 / G 56,5 / B 61,2. Koşu 2 ve 3'te vitrin ↔ kontrol pikselleri arasındaki doğruların kesişiminden
+(v = a·D + (1−a)·k) çizilen katmanın ekrandaki rengi D ≈ 62/63/64 ve 57/65/78, alfa medyanı ~1,2 (katman opak) çıktı: gri,
+sisle karışmış yarı saydam bir toz değil, kendisi koyu ve mavimsi. Kasırga sisi bu mesafede tabana uygulanmıyor
+[çıkarım: vanilla kara sisi uzaklığın %90'ında (~173 blok) başlar, `KasirgaOrtami` yalnız uzak düzlemi kısaltır]; gerçek neden
+fırtına ışığı (yağmurda gök ışığı çarpanı ~0,65, mavimsi ışık haritası), gri doku ve öndeki yağmur çizgileri: TOZ
+0,52/0,42/0,31 ekranda ~0,24 çarpanla kararmış, üstüne mavimsi yağmur eklenmiş. Karar: sis rengi değişmez (tasarım notu
+`#5E6B5A`, uzaktaki gök/arazi için); toz ve etek paleti doygun ve açık: `TOZ` 0,80/0,56/0,30, `ETEK_ALT` 0,62/0,42/0,22,
+`ETEK_UST` 0,78/0,60/0,40 (huni taban bandı `TOZ`'a kaydığı için o da ısınır). Kanıt: `kasirga_gorsel.py` her koşuda vitrin ve
+sis dışı (huni kenarına ~73 blok, `UZAK` 90 blok) taban karesi için `taban rengi …: R G B, R>G>B payı, tuttu/TUTMADI` satırı
+yazar (aynı yöntem: vitrin ↔ kontrol farkı > 60, alt üçte bir). (b) S1: önceki koşularda S1 S5'in soyduğu şeritte başlıyordu
+(kaldırılan 0, görsel enkaz 0). Otomasyon S5 izinin başı/sonunu kaydeder, oyuncuyu izin orta noktasından 220 blok dik yöne
+(yükseklik 140, chunk'lar yüklensin diye 200 tick) taşır, S1'i orada başlatır; S1 karesi `kaldırılan > 0` ve `görsel enkaz > 0`
+iken (en çok 60 sn) aynı göreli vitrin kamerasından alınır. Bitiş izi kamera S1'in dağılma noktasının 10 blok önünden, 28 blok
+yukarıdan, 25 blok geride kalan yoluna bakar. S1 başından doğal bitişe kadar `hiz 0.2` (bekleme olgun evreyi tüketmesin).
+
+**K-14 `kasirga_dayanikli` K0-33 listesine tamamlandı (inceleme Kn1, P1).** Etikete deepslate cevherleri (kömür, demir, bakır,
+altın, kızıltaş, zümrüt, lapis, elmas; sertlik 4,5) ve cobbled/polished/brick/tile deepslate merdiven, basamak ve duvar
+varyantları (3,5) eklendi; önceden S4-5 varyantları, S5 cevherleri kaldırıyordu ve aynı yapıda tuğla duvar kalırken merdiveni
+uçuyordu. Yalnız kendi `dogalafetler:kasirga_dayanikli` etiketi (`replace: false`) yazılır, vanilla etikete katkı yok (K-E12).
+GameTest `kaldirilabilirBloklarSeviyeyeVeEtiketeGore` `DEEPSLATE_DIAMOND_ORE` ve `DEEPSLATE_BRICK_STAIRS`'i S1/S2/S5'te
+kaldırılamaz sınar (yeni test yok, batch sayısı aynı). Aynı turda `ucanBlokTavani` aralığı 0–40'a indi (Kn2): 40'ın üstü
+K0-33/SK-03 ölçümünün dışında.
+
+**K-15 Kayıttan dönüş evresi (inceleme Kn5, dedicated senaryo bulgusu).** Senaryoya eklenen yeniden açılış adımı gösterdi:
+`ozelDurumOku` `aktifGecen`'i okuyordu ama evre (`durum`) ilk tick'e kadar varsayılan `OLUSUM` kalıyordu; açılıştan hemen sonraki
+`kasirga bilgi` `phase OLUSUM (0.00)` ve `tornado=0` verdi, ilk tick sahte bir "evre OLUSUM → OLGUN" satırı yazdı.
+`Kasirga.yuklendi` artık evreyi aşamaya göre (`AKTIF`: `aktifte(aktifGecen)`, `SIREN`: oluşum ilerlemesi) kurar, alt aşamayı
+ayarlar, görüntü varlığını hemen doğurur ve `[kasirga] kayıttan dönüş: evre …` loglar. Senaryo bu satırı, aynı evreyi
+(OLGUN/IP), seviye 3'ü, `tornado=1`'i ve `stop` sonrası varlık 0'ı denetler (`kosu2.log`).
+
+**K-18 Birleştirme düzeltmeleri (entegrasyon 4, inceleme-3 P2).** (a) `Kasirga.merkezSec` doğuş chunk'ı yüklü değilse
+yüksekliği hedefin Y'sinden alır; yükseklik okuması chunk'ı eşzamanlı üretmez (Kn3; deprem DS-19 b, ay AY-12 ailesi). (b)
+Kasırga GameTest'leri kurulumda (`baslat` doğrulaması) düşse de batch sonunda afet durur, `afetBlokHasari` batch başındaki
+değerine döner (`@AfterBatch` → `OyunTestiTemizligi.batchSonu`, K-E15, GP18; Kn6). (c) `kasirga_gorsel.py` taban rengi (K-17
+R>G>B) tutmazsa ya da kare eksikse koşu geçersiz, çıkış 1 (Kv3-1).
+
+Seviye tablosunun kendisi (çap, yükseklik, hız, süre, çekim yarıçapı, blok/tick, sertlik, hasar) tasarım notu §6'dadır ve
+`KasirgaSeviyesi` tablosundadır; config yalnız çarpanları verir (altı parametre × beş seviye = 30 anahtar yerine 6).
+
+### Reddedilen yollar
+
+- **Varlığın kendi yaşam döngüsü (spike):** yeniden başlatmada kasırga kaybolurdu; durum afette (K-01).
+- **80–140 blok doğuş:** S1–S3'te hedef sireni duymazdı (K-03).
+- **S1–3'ün zemini kazması:** çimen bloğu sertliği 0,6 → S1 bile zemini çukurlaştırırdı; madde 4 "oyunun gidişatını bozmasın".
+- **İstemci taraflı şimşek / yoğunlaşan yağmur:** şimşek sunucuda (K-08); yağmur yoğunluğu dünya havasını değiştirmeden istemcide
+  artırılamaz (`ClientLevel.setRainLevel` sunucu paketiyle ezilir), dünya havasını değiştirmek genel yan etki: yapılmadı.
+- **Elytra ıslığı:** konuşma bandı (K-07).
+- **Kaldırılan oyuncuya her tick hız paketi:** ağ; 10 Hz + istemci fiziği yeterli.
+
 ## Şef kararları (Faz 0–1)
 
 **K0-19 Ay çarpması siren süresi: 60 sn.** Madde 5 "Güneş Patlaması hariç 10 sn" der; bölüm H "siren çaldıktan 60 saniye
@@ -3661,6 +3828,16 @@ başlığındadır.
 - **E.1 dumanlanma zayıf (P2):** Faz 5 görünür koşu yer seviyesi karesiyle yeniden puanlanır.
 - **K-E25 parçacık datagen:** birleştirmede yapıldı.
 
+### Kasırga
+
+- **Gri taban kabul edilmez (inceleme-kasirga-2 Kv2-1, P1):** K0-33'ün "kahverengi taban (R>G>B, sıcak ton)" şartı için K-17 sıcak
+  toz/etek paleti; görsel koşu taban rengini kare farkından ölçer ve tutmazsa koşuyu geçersiz sayıyor (K-18 c).
+- **Performans kabulü koşu 3:** K0-33 "Yüksek ≥ tabanın %50'si" 52/36/20/5 blokta %73/%69/%66/%64 tuttu; koşu 4'ün 5 blokta %47'si
+  (Gradle yükü altında, render bütçesi değişmedi) gürültü sayıldı, Faz 5 görünür koşuda yeniden ölçülür.
+- **`-PoyunTestiAfeti=kasirga` artık gerçek kasırga açar (K-E22):** taklidin hızlı yaşam döngüsüne dayanan betikler
+  `!kasirga`'ya geçti (K-E23 etki listesi: `basarim_gorsel.py`, `radar_gorsel.py`); `cekirdek_sunucu.py` kasırga adımı gerçek
+  kasırgayı başlatıp durdurur.
+
 ## Açık noktalar (Faz 2b)
 
 Entegratöre bırakılan notlardan işlenenler: kancalar (K-E1), protokol (K-C47), `asama ileri [süreç]` (K-C48), sanal su §3a istisnası
@@ -3754,6 +3931,12 @@ Birleşen parçalardan kalanlar (her birleştirmede güncellenir; plan `.vibe/ra
   çalışmalı.
 - **Orman — kayıttan dönüş adımı (AOi-8)** `asit_orman_yangini_sunucu.py`'de yok; "Yanmadan Çıktım" uçtan uca GameTest'i yok
   (AOi-4'ün orman yarısı; 12–16 blok uzak oyuncu 0 ipucu sahnesi dahil).
+
+- **Kasırga — yüklü alandan çıkan uçan blok (Kn4):** varlık işlemeyen konumdaki uçan bloklar ve yüklü alandan çıkan kasırganın
+  taşıdıkları `noSave` varlıkla kayboluyor; `yereBirak()` ile bırakılmalı (`afet/kasirga/Kasirga.java:220, 404-406`).
+- **Kasırga — S1 izi kısa (Kv3-2):** S1 olgun evresi ilerletilmeden sürsün, bitiş kamerası 18–20 blok yükseklikten; Faz 5 görsel koşu.
+- **Kasırga — tepe yük ölçümü (Kv2-2):** K0-33 mesafe ölçümleri uçan blok ≥ 30 iken alınmalı; koşu 4'te 36/20 blokta %56 / %58,
+  5 blokta %47 (gürültü). Faz 5 görünür koşuda yeniden ölçülür.
 
 ## N17 — Sayısal varsayılanlar
 
@@ -4067,6 +4250,25 @@ Birleşen parçalardan kalanlar (her birleştirmede güncellenir; plan `.vibe/ra
 | orman yangını | `orman_yangini.aramaEnAz` / `aramaEnCok` | 40 / 90 | blok | tasarım §2: yangın uzaktan görülür, oyuncu kaçabilir |
 | orman yangını | `orman_yangini.yanikIziButcesi` | 8 | sütun/tick | sıcak karelerden örnekleme; 8 okuma × 3 blok, TPS kısmasıyla |
 | orman yangını | `orman_yangini.erkenBitisSaniye` | 15 | sn | yangın söndüyse (yağmur, seyrek yakıt) afet boşta beklemez; başlangıç alan işi bitmeden saymaz |
+| kasırga | `kasirga.ucanBlokTavani` | 40 (0–40) | varlık / kasırga | K0-33 (spike SK-03: 40 varlıkta TPS 20, 6–10 KB/sn) |
+| kasırga | `kasirga.kaldirmaTavani` | 25 | blok | tasarım notu §6 "kaldırılan oyuncu en çok 25 blok"; düşme vanilla, öldürücü olabilir |
+| kasırga | `kasirga.boyutCarpani` | 1,0 (0,25–3) | oran | madde 10 "config'den ayarlanabilir": huni, etek, çekim yarıçapı |
+| kasırga | `kasirga.hizCarpani` | 1,0 (0–4) | oran | S1 2,0 → S5 4,4 blok/sn (gerçek kasırga 10–20 m/sn; oyunda kaçılabilir olsun) |
+| kasırga | `kasirga.sureCarpani` | 1,0 (0,1–10) | oran | olgun evre S1 60 → S5 180 sn |
+| kasırga | `kasirga.cekimCarpani` | 1,0 (0–4) | oran | içe ivme 0,012 blok/tick² × (0,6 + 0,4·seviye); S1 kaldırmaz, S2+ kaldırır (çekirdekte S2 0,098 > 0,08) |
+| kasırga | `kasirga.blokCarpani` | 1,0 (0–4) | oran | S1 2 → S5 20 deneme/tick × TPS kısması |
+| kasırga | `kasirga.hasarCarpani` | 1,0 (0–10) | oran | çekirdek S1 1 → S5 4 can/sn; enkaz çarpması 2 + 0,5·seviye |
+| kasırga (kod) | doğuş mesafesi | [0,5·(R+56), R+56] | blok | siren menzili (etki + 64) içinde (K-03) |
+| kasırga (kod) | yön sapması | ±35° / 2 sn, dönüş 1,5°/tick | — | tasarım notu §6 |
+| kasırga (kod) | evre süreleri | doğuş 160, ip 200, dağılma 40 | ölçekli tick | tasarım notu §6 (8 sn / 10 sn) |
+| kasırga (kod) | şimşek | 400–800 tick, 40–90 blok | — | tasarım notu §2 katman 6 |
+| kasırga (istemci) | `kasirga.lodYakin` | 48 (0–512) | blok | K-16: içeride taban sprite ¼, ekran oranı 0,36 → 0,18 (K0-33 yakın kare süresi) |
+| kasırga (istemci) | `kasirga.lodTabanYari` | 96 | blok | tasarım notu §5 LOD (sprite yarıya) |
+| kasırga (istemci) | `kasirga.lodEnkazYok` | 160 | blok | §5: görsel enkaz durur |
+| kasırga (istemci) | `kasirga.lodYalnizHuni` | 256 | blok | §5: yalnız huni + duvar bulutu (yarı sprite) |
+| kasırga (istemci) | `kasirga.gorselKopyaTavani` | 240 | kopya / kasırga | SK-03 (Ultra 6 × 40) |
+| kasırga (istemci) | `kasirga.kameraSarsintisi` | 1,0 (0–2) | oran | 40 blok içinde ±0,4°·seviye yuvarlanma |
+| kasırga (istemci) | `kasirga.sisEtkisi` | true | — | 64 blok içinde #5E6B5A sis, görüş %60 |
 
 Config dışı sabitler (oynanış değeri değil, sınır/biçim): siren 200/1200 tick (şartname, K0-19); son afet geçmişi 5
 (madde 13a); tek çarpan ≤ 100, toplam ≤ 1000 (K-C22); hız 0,1–1000; TPS ölçüm aralığı 20 tick; dönem kaydı sınırları
