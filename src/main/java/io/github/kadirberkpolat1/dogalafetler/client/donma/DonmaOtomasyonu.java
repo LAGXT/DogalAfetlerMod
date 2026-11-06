@@ -280,8 +280,12 @@ public final class DonmaOtomasyonu {
             return;
         }
         double m = gol[4] + 24;
-        ev = new int[] {(int) Math.round(gol[0] - m * 0.7071), 0, (int) Math.round(gol[1] + m * 0.7071)};
-        ev[1] = mc.level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, ev[0], ev[2]);
+        int ex = (int) Math.round(gol[0] - m * 0.7071);
+        int ez = (int) Math.round(gol[1] + m * 0.7071);
+        // İstemci chunk'ı MOTION_BLOCKING_NO_LEAVES yüksekliğini tutmaz (dünya tabanını döner): sunucudan okunur.
+        MinecraftServer server = mc.getSingleplayerServer();
+        int ey = server.submit(() -> server.overworld().getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, ex, ez)).join();
+        ev = new int[] {ex, ey, ez};
         int x = ev[0];
         int y = ev[1];
         int z = ev[2];
