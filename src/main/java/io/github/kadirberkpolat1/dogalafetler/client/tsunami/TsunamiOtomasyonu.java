@@ -1,7 +1,12 @@
 package io.github.kadirberkpolat1.dogalafetler.client.tsunami;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciAfetDurumu;
 import io.github.kadirberkpolat1.dogalafetler.client.su.SuRenderer;
+import io.github.kadirberkpolat1.dogalafetler.config.EfektKalitesi;
+import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
+import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
+import io.github.kadirberkpolat1.dogalafetler.network.AfetDurumPaketi;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -11,12 +16,18 @@ import java.util.Locale;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.screens.PauseScreen;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.util.Mth;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraftforge.common.ForgeConfigSpec;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.client.event.InputEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.config.ConfigTracker;
+import net.minecraftforge.fml.config.ModConfig;
 
 /**
  * Tsunami görsel kanıt otomasyonu (K0-21 rev. 2): yalnız {@code -Potomasyon=tsunami}. Sanal suyun vitrin sahnesinde (kıyı köyü,
@@ -86,17 +97,33 @@ public final class TsunamiOtomasyonu {
     }
 
     /**
-     * Kök neden ayrıştırması (S5 karada FPS): aynı sahne ve zamanlamayla yalnız karadaki kare süresi; {@code ayar} adımları
-     * (ör. blok hasarı kapalı, yağmur kapalı) afetten önce uygulanır, sonra geri alınır.
+     * FPS kabulü (TS-12, K0-33 ölçüsü): aynı vitrin kamerasından, verilen efekt kalitesiyle önce afetsiz taban, sonra S5'in
+     * karadaki penceresi (AKTİF'in 620. tick'i, normal koşudaki "karada" penceresiyle aynı). {@code ayar} adımları (blok hasarı
+     * kapalı, yağmur kapalı) kök neden ayrıştırması içindir; afetten önce uygulanır, sonra geri alınır.
      */
-    private static List<String> olcum(String ad, List<String> ayar, List<String> geri) {
-        List<String> a = new ArrayList<>(List.of("k:dogalafet su vitrin", "b:300", "k:time set 10500",
-                "k:dogalafet su vitrin kamera tepe", "b:200"));
+    private static List<String> olcum(String ad, EfektKalitesi kalite, List<String> ayar, List<String> geri) {
+        List<String> a = new ArrayList<>(List.of("q:" + kalite.name(), "k:dogalafet su vitrin", "b:300", "k:time set 10500",
+                "k:dogalafet su vitrin kamera tepe", "b:200", "f:" + ad + "-afetsiz"));
         a.addAll(ayar);
         a.addAll(List.of("k:dogalafet start tsunami 5", "b:20", "k:dogalafet asama ileri", "b:20",
-                "k:dogalafet asama ileri", "b:720", "f:" + ad, "k:dogalafet stop", "b:60", "k:dogalafet su temizle", "b:40"));
+                "k:dogalafet asama ileri", "b:620", "f:" + ad + "-karada", "s:" + ad + "-karada", "k:dogalafet stop", "b:60",
+                "k:dogalafet su temizle", "b:40"));
         a.addAll(geri);
         return a;
+    }
+
+    /**
+     * #2 Dalga Avcısı uçtan uca (GOREV §6 #16): hayatta kalma modundaki oyuncu S1 tsunamisinde kıyının 6 blok içinde dalganın
+     * yolunda durur; dalga onu sürükler (sunucu log'unda {@code SURUKLENDI}), afet hızlandırılmış saatle doğal biter ve sunucuya
+     * başarımın verilip verilmediği sorulur ("Test passed").
+     */
+    private static List<String> avci() {
+        return List.of("k:dogalafet su vitrin", "b:300", "k:time set 6000", "k:dogalafet su vitrin kamera tepe", "b:100",
+                "k:gamemode survival", "k:dogalafet start tsunami 1", "b:20", "k:dogalafet asama ileri", "b:20",
+                "k:dogalafet asama ileri", "b:30", "a:yerles", "b:60", "s:tsunami-avci-once", "b:480",
+                "s:tsunami-avci-dalga", "b:80", "a:durum", "k:dogalafet hiz 6", "b:400", "k:dogalafet hiz 1", "b:40",
+                "a:durum", "k:execute if entity @s[advancements={dogalafetler:dogalafetler/dalga_avcisi=true}]", "b:20",
+                "k:gamemode spectator", "k:dogalafet su temizle", "b:40");
     }
 
     @SubscribeEvent
@@ -124,11 +151,16 @@ public final class TsunamiOtomasyonu {
                     "m:icine", "b:100", "s:tsunami-magara-sualti", "k:dogalafet su temizle", "b:40"));
         }
         if (BOLUM.contains("olc")) {
-            a.addAll(olcum("olc-s5-yikimsiz", List.of("k:gamerule afetBlokHasari false"),
+            for (EfektKalitesi k : new EfektKalitesi[] {EfektKalitesi.DUSUK, EfektKalitesi.YUKSEK, EfektKalitesi.ULTRA}) {
+                a.addAll(olcum("tsunami-olc-" + k.name().toLowerCase(Locale.ROOT), k, List.of(), List.of()));
+            }
+            a.addAll(olcum("tsunami-olc-yuksek-yikimsiz", EfektKalitesi.YUKSEK, List.of("k:gamerule afetBlokHasari false"),
                     List.of("k:gamerule afetBlokHasari true")));
-            a.addAll(olcum("olc-s5-yagmursuz", List.of("y:0"), List.of("y:1")));
-            a.addAll(olcum("olc-s5-yikimsiz-yagmursuz", List.of("k:gamerule afetBlokHasari false", "y:0"),
-                    List.of("k:gamerule afetBlokHasari true", "y:1")));
+            a.addAll(olcum("tsunami-olc-yuksek-yagmursuz", EfektKalitesi.YUKSEK, List.of("y:0"), List.of("y:1")));
+            a.add("q:YUKSEK");
+        }
+        if (hepsi || BOLUM.contains("avci")) {
+            a.addAll(avci());
         }
         a.add("x:son");
         ADIMLAR.addAll(a);
@@ -204,12 +236,55 @@ public final class TsunamiOtomasyonu {
             }
             case 'm' -> magara(mc, deger);
             case 'y' -> TsunamiYagmuru.kapali = "0".equals(deger);
+            case 'q' -> kalite(EfektKalitesi.valueOf(deger));
+            case 'a' -> avciAdimi(mc, deger);
             case 'x' -> {
                 log("BITTI girdi tus={} fare={} teker={}", tus, fare, teker);
                 mc.stop();
             }
             default -> log("bilinmeyen adım {}", adim);
         }
+    }
+
+    /** Efekt kalitesini (CLIENT {@code gorsel.efektKalitesi}) çalışma anında değiştirir; dosyaya yazılmaz. */
+    @SuppressWarnings("unchecked")
+    private static void kalite(EfektKalitesi k) {
+        for (ModConfig c : ConfigTracker.INSTANCE.configSets().get(ModConfig.Type.CLIENT)) {
+            if (DogalAfetler.MOD_ID.equals(c.getModId()) && c.getSpec() instanceof ForgeConfigSpec spec
+                    && spec.getValues().get("gorsel.efektKalitesi") instanceof ForgeConfigSpec.EnumValue<?> deger) {
+                ((ForgeConfigSpec.EnumValue<EfektKalitesi>) deger).set(k);
+            }
+        }
+        log("KALITE istenen={} etkin={}", k, IstemciAyarlari.efektKalitesi());
+    }
+
+    /**
+     * Dalga Avcısı adımları: {@code yerles} oyuncuyu tsunaminin kıyı noktasından dalga yönünde 6 blok içeri, zemine, denize
+     * bakar koyar; {@code durum} oyuncunun canını, oyun modunu ve afet aşamasını yazar.
+     */
+    private static void avciAdimi(Minecraft mc, String ne) {
+        AfetDurumPaketi p = IstemciAfetDurumu.aktif().filter(d -> d.tur() == AfetTuru.TSUNAMI).orElse(null);
+        if ("durum".equals(ne)) {
+            log("AVCI durum can={} mod={} konum=({} {} {}) afet={}", String.format(Locale.ROOT, "%.1f", mc.player.getHealth()),
+                    mc.gameMode == null ? "?" : mc.gameMode.getPlayerMode(), String.format(Locale.ROOT, "%.1f", mc.player.getX()),
+                    String.format(Locale.ROOT, "%.1f", mc.player.getY()), String.format(Locale.ROOT, "%.1f", mc.player.getZ()),
+                    p == null ? "yok" : p.asama() + "/" + p.altAsama());
+            return;
+        }
+        CompoundTag o = p == null ? null : p.ozel();
+        if (o == null || !o.contains("kx")) {
+            log("AVCI tsunami verisi yok; oyuncu yerleştirilmedi");
+            return;
+        }
+        float yx = o.getFloat("yx");
+        float yz = o.getFloat("yz");
+        double x = o.getFloat("kx") + yx * 6;
+        double z = o.getFloat("kz") + yz * 6;
+        int y = mc.level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, Mth.floor(x), Mth.floor(z));
+        float yaw = (float) Math.toDegrees(Math.atan2(yx, -yz));
+        String komut = String.format(Locale.ROOT, "tp @s %.2f %d %.2f %.1f 5", x, y, z, yaw);
+        mc.player.connection.sendCommand(komut);
+        log("AVCI yerlesti {} (kıyı {} {}, yön {} {})", komut, o.getFloat("kx"), o.getFloat("kz"), yx, yz);
     }
 
     /**

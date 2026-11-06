@@ -55,7 +55,7 @@ class Kayit:
 
 
 def kapi(log):
-    for _ in range(11):
+    for _ in range(31):
         istemci = [s for s in sh("pgrep -fa runClient").splitlines() if s.strip() and "pgrep" not in s]
         gradle = int(sh("pgrep -c -f GradleWrapperMain") or 0)
         bos = int(next(s for s in sh("free -g").splitlines() if s.startswith("Mem")).split()[6])
@@ -117,7 +117,7 @@ def main():
     kanit.mkdir(parents=True, exist_ok=True)
     log = Kayit(kanit / "pencere.log")
     if not kapi(log):
-        log("kapı 10 dk açılmadı; koşu yapılmadı")
+        log("kapı 30 dk açılmadı; koşu yapılmadı")
         return 1
     # Her koşu ana test dünyasının temiz kopyasıyla başlar (vitrin sahnesi gerçek blok kurar; sahne belirlenimci kalır).
     hedef = RUN / "saves" / "test"
@@ -215,8 +215,9 @@ def main():
     cikis = re.search(r"cikis=(\d+)", metin)
     log(f"bitti: yoklama={yoklama} ALARM={alarm} girdi_satiri={girdi} "
         f"otomasyon_ozeti={bitti.groups() if bitti else None} gradle_{cikis.group(0) if cikis else 'cikis=?'}")
-    for satir in re.findall(r".*(?:TSUNAMI-OTOMASYON (?:FPS|FOTO|KARE)|Tsunami: ).*", metin):
-        log("  " + re.split(r"TSUNAMI-OTOMASYON |DogalAfetler/\]: ", satir, maxsplit=1)[-1])
+    desen = r".*(?:TSUNAMI-OTOMASYON (?:FPS|FOTO|KARE|KALITE|AVCI)|Tsunami: |\[CHAT\]|has (?:made|reached|completed) the).*"
+    for satir in re.findall(desen, metin):
+        log("  " + re.split(r"TSUNAMI-OTOMASYON |DogalAfetler/\]: |\]: ", satir, maxsplit=1)[-1])
     for png in (RUN / "screenshots").glob("tsunami-*.png"):
         if png.stat().st_mtime > duvar_baslangic:
             shutil.copy2(png, kanit / png.name)

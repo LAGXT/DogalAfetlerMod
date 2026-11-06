@@ -11,6 +11,8 @@ Sahnede `start tsunami 3`, `asama ileri` x2 → çekilme ve dalga, kıyıya vuru
 çekilme ve mağara kalmaz, yıkılan blok > 0. Sonra `start tsunami 1` AKTIF'e ilerletilir ve sunucu kapatılır (kalıcılık).
 Koşu 2 (aynı dünya): afet kayıttan yüklenir, dalga aynı kimlikle sürüyor, kendiliğinden biter (doğal bitiş), `su bilgi`
 (dalga 0), `sifirla`, `su bilgi` (dalga 0, mağara 0).
+Her iki koşu `-PoyunTestiAfeti=tsunami,deprem` ile açılır (K-E22): gerçek tsunami kayıtlı olduğu için test afeti tsunamiyi
+atlar (WARN), deprem test afeti olarak kaydedilir, mod yüklenir. Koşu 1'de dalga doğduğunda uğultu ortam katmanı başlar.
 Sonda iki log da denetlenir: `invalid dist` yok, istisna yok, config düzeltme uyarısı yok, `[basarim] ... yayıncı olarak
 kayıtlı değil` yok, iki süreç de 0 ile çıktı.
 
@@ -49,7 +51,7 @@ SAHNE = [
 
 
 class TsunamiSunucu(c.Sunucu):
-    """Çekirdeğin `Sunucu`'su; oyun testi afeti olmadan açılır."""
+    """Çekirdeğin `Sunucu`'su; `-PoyunTestiAfeti=tsunami,deprem` ile açılır (K-E22 kayıt sırası kanıtı)."""
 
     def __init__(self, ad, log_yolu):
         import os
@@ -63,7 +65,8 @@ class TsunamiSunucu(c.Sunucu):
         self.log = log_yolu.open("w", encoding="utf-8")
         ortam = dict(os.environ, JAVA_HOME=c.JAVA_HOME)
         self.surec = subprocess.Popen(
-            ["timeout", "1500", "./gradlew", "runServer", "--console=plain", "--offline"], cwd=c.KOK, env=ortam,
+            ["timeout", "1500", "./gradlew", "runServer", "--console=plain", "--offline", "-PoyunTestiAfeti=tsunami,deprem"],
+            cwd=c.KOK, env=ortam,
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8",
             errors="replace", bufsize=1, start_new_session=True)
         threading.Thread(target=self._oku, daemon=True).start()
@@ -71,6 +74,8 @@ class TsunamiSunucu(c.Sunucu):
 
 def kosu1(s):
     s.bekle(r"Done \(", 0, c.ACILIS_SURESI, "açılış")
+    s.bekle(r"Oyun testi afeti tsunami atlandı .*gerçek afet kayıtlı \(K-E22\)", 0, 5, "K-E22: test afeti tsunamiyi atladı")
+    s.bekle(r"Oyun testi afeti deprem için kaydedildi", 0, 5, "K-E22: deprem test afeti kayıtlı")
     s.komut("execute positioned ~3000 100 ~3000 run dogalafet start tsunami 3", r"No suitable place found for Tsunami",
             "denizsiz yerde başlamaz (N14)")
     for komut in SAHNE:
@@ -80,6 +85,7 @@ def kosu1(s):
     isaret = s.isaret()
     s.komut("dogalafet asama ileri", r"Tsunami phase: Active")
     s.bekle(r"Tsunami: çekilme #\d+ .*dalga #\d+", isaret, 30, "çekilme ve dalga")
+    s.bekle(r"ortam katmanı başladı: tsunami/ugultu \(dogalafetler:tsunami_ugultu, weather", isaret, 60, "uğultu katmanı")
     s.bekle(r"Tsunami: dalga kıyıya vurdu", isaret, 90, "dalga kıyıya vurdu")
     s.bekle(r"Tsunami: mağara #\d+ dolduruldu", isaret, 60, "mağara doldu")
     s.komut("dogalafet su bilgi", r"waves [12], caves [1-9]", "su bilgi (dalga ve mağara var)")
