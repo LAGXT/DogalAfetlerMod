@@ -457,10 +457,17 @@ public final class Sinkhole extends Afet {
                 }
                 double uz = Math.max(1, Math.hypot(c.dx(), c.dz()));
                 Vec3 hiz = h == 0 ? new Vec3(0, -0.2, 0) : new Vec3(-c.dx() / uz * 0.12, -0.05, -c.dz() / uz * 0.12);
-                if (g - 1 >= taban(c) && rastgele.nextInt(2) == 0) {
+                int bosluk = g - taban(c);
+                if (bosluk >= 2 && rastgele.nextInt(2) == 0) {
                     isler.koy(new BlockPos(x, taban(c), z), moloz(taban(c)));
                 }
-                for (int y = g; y <= ust; y++) {
+                // Altında boşluk yoksa yüzey düşse yerine konar: kaldırılır, üstündekiler onun yerine iner.
+                int ilk = g;
+                if (bosluk == 0) {
+                    isler.kaldir(new BlockPos(x, g, z), true);
+                    ilk = g + 1;
+                }
+                for (int y = ilk; y <= ust; y++) {
                     isler.dusur(new BlockPos(x, y, z), hiz, tavan);
                 }
             }

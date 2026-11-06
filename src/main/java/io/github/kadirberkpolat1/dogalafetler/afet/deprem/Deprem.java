@@ -361,7 +361,8 @@ public final class Deprem extends Afet {
             return;
         }
         int taban = Math.max(isler.enAltY(), zemin - h.derinlik() + 1);
-        boolean dusur = is.tur() == TUR_YARIK && rastgele.nextInt(5) == 0;
+        // Tek blok derin sütunda yüzeyin altı boşaltılmaz: düşen blok hemen yerine konar, yarık açılmamış görünür.
+        boolean dusur = is.tur() == TUR_YARIK && taban < zemin && rastgele.nextInt(5) == 0;
         aktif.add(new Sutun(i, h.x(), h.z(), isler.ust(h.x(), h.z()), zemin, taban, dusur));
     }
 
