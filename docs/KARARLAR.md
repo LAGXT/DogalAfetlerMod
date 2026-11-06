@@ -1452,6 +1452,843 @@ dosyalarının sha256'i öncekiyle aynı (`fire.json` farkı boş; `.vibe/kanit/
 `no_knockback`) blok/eşya etiketi değil ve bugün tek yazarı sıcaklık; ikinci bir yazar gelirse aynı desenle ortak sağlayıcıya
 taşınır. Eşya etiketi kancası ilk ihtiyaçta aynı şekilde eklenir (Faz 3/4 işçileri için kural çekirdek sözleşmesi §12'de).
 
+## Faz 3 — Yiyecek
+
+Parça `yiyecek` (dal `is/yiyecek`, son commit `d6f74f1`; `main`'e birleştirme `4b725ec`). Kaynak `.vibe/kararlar/yiyecek.md` §B/§C/§D;
+diğer işçilerin kullandığı arayüz sözleşmeleri (§A) ve entegratöre notlar (§E) o dosyada kalır; metindeki §A/§E göndermeleri o dosyaya aittir.
+Şef kararları (F-17, F-18) "Şef kararları (Faz 3)" bölümündedir; N17 satırları sondaki tablodadır. Rapor `.vibe/rapor/yiyecek.md`.
+
+**F-01 Etki = kademe toplamı; %25 anında, kalanı süre boyunca azalan hızla.** Madde 14: "anında bir miktar etki + belirli bir
+süre boyunca yavaş yavaş devam eden, giderek azalan". Kademe miktarı (ölçeğin yüzdesi) etkinin tamamıdır; `anlikOran`
+(0,25) kadarı hemen eklenir, kalanı sıcaklığın `SureliEtki`'siyle (doğrusal azalan hız, toplam tam) süre boyunca. Sıcaklık
+§A1 örneği (Güveç 8 + 32) ile aynı oran (%20–25). Pay config'tedir.
+
+**F-02 Kademe varsayılanları: çok küçük 3, küçük 8, orta 20, büyük 35, çok büyük 45 birim.** Şartname aralıklarının (%5–10,
+15–25, 30–40) ortasına yakın; çok büyük (yalnız Ateşli Güveç, "en güçlü soğuk savar") büyüğün üst sınırı 40'ın üstünde.
+Çok küçük vanilla pişmiş yiyecekler içindir ("çok küçük ve kısa"). Doğrulama: kademeler sıralı olmalı, değilse ERROR log
++ varsayılanlar. Sıcaklık eşikleriyle ölçü (ortam soğuması hariç): Salep (anında 5, 90 sn'de +15) donma eşiğindeki (−75)
+oyuncuyu çok soğuk sınırına (−55), Tavuk Çorbası + Salep birlikte nötr banda (−20) taşır; tek yiyecek ölçeği çevirmez.
+
+**F-03 Azalan verim: tür = eşya kimliği, pencere son yemeden, oyun saati, oyuncu verisinde.** Aynı tür son yemeden
+60 sn içinde (`0 ≤ geçen < 1200 tick`) tekrar yenirse anında ve süreli kısım ×0,5 (süre kısalmaz). Pencere son yemeden
+sayılır: sürekli spam sürekli yarım etki verir (şartname "spam engeli"); ilk yemeden saymak her 60 sn'de bir tam etki
+kapısı açardı. Saat `ServerLevel.getGameTime()` (monoton, boyutlar ortak, `/time set` değiştirmez); geri gitmiş saat
+(dünya kopyası) ceza vermez. Kayıt `PersistentData` `dogalafetler_yiyecek` (tür → tick), penceresi dolan kayıtlar her
+yemede atılır; çıkış/girişte kalır, ölümde yeni hayat temiz başlar, End dönüşünde (`Clone`, ölümsüz) taşınır. Kapı kapalıyken
+kayıt yazılmaz (kapalı dünyada gizli durum birikmez, sıcaklık T6 ile aynı). Vanilla yiyecekler ve balıklar da aynı kurala
+tabidir. JUnit `YemeGecmisiTest` (7), GameTest `ikinciSalepYariEtkiFarkliTurBagimsiz`, `gecmisKopyadaTasinirOlumdeSifirlanir`.
+
+**F-04 Ateşli Güveç yan etkisi: sıcakta ×1,5; diğer yiyecekler toplanarak "zamanında yenmeli".** Madde 14 genel kuralı
+("sıcak yiyecek, ortam zaten sıcakken/oyuncu aşırı ısınmışken ısınmayı artırır... zamanında yenmesi gerekir") toplamalı
+uygulanarak sağlanır: etki vücudun durumuna bakılmadan eklenir, sınır ya da bağışıklık yoktur (sıcakken içilen salep aşırı
+ısınmaya iter, donarken içilen ayran donmayı hızlandırır). Güveç'in özel "yan etki"si ("sıcak ortamda aşırı ısınmaya kolay
+iter") çarpandır: vücut ya da ortam (vücut birimi) `yanEtkiEsigi` (20 birim; ortamda 28 °C) ve üstündeyse etki
+`yanEtkiCarpani` (1,5) ile büyür. GameTest `guvecSicaktaAsiriIsinmayaIter`, tek kaynak `kanit/yiyecek/yiyecek-t2-gametest-1.log`
+(tur 2, koşu 1): ortam 71,8 birimde vücut 50'den anında +16,88 (= 45 · 1,5 · 0,25, ortamdan bağımsız), 30 sn sonra 80,6 —
+YANIYOR kademesi `esikler.yanmaHasari` 75'te başlar, pay +5,6 birim; yemeyen kontrol 52,4 (SICAK). Ortam kalıcı GameTest
+dünyasının durumuyla koşudan koşuya kayar (inceleme Yi5; tur 1 koşu 1'de 66,6 / 79,8 / 51,5, pay +4,8); test bu yüzden
+eşiğe değil kademeye bakar ve sahnenin yan etki eşiğini (20) geçtiğini ayrıca doğrular.
+
+**F-05 Durum efekti yalnız gösterge; süt silmez; nötr.** "İçten Isınma"/"Serinlik" `MobEffect`'i sıcaklık uygulamaz: sayısal
+etkinin tek kaynağı `VucutSicakligi`'nın süreli etkisidir (config, azalan verim, yan etki orada hesaplanır, kalıcıdır, kapıya
+uyar). Efekti `applyEffectTick` ile ısıtan yapmak ikinci bir kaynak (çift etki, başka modun verdiği efekt de ısıtırdı) ve süt
+ile silinebilen ısınma yaratırdı. Efekt ikon ve kalan süreyi gösterir: amplifier = kademe seviyesi (küçük/çok küçük I, orta
+II, büyük III, çok büyük IV), süre = etkinin süresi, ikonlu, parçacıksız (`visible=false`). `getCurativeItems()` boş: süt
+sıcaklık etkisini silmediği için ikonu da silmez. Kategori `NEUTRAL` (soğukta kurtarır, sıcakta pişirir). Ölümde vanilla gibi
+silinir (sıcaklık etkisi de respawn'da silinir). **Kabul edilen ayrışma (şef kararı, inceleme Yi6):** ölümsüzlük totemi
+(`removeAllEffects`) ve `/effect clear` ikonu siler, sıcaklık etkisi kalan süresince sürer; ikon aynı yöndeki en yüksek
+kademeyi gösterir (vanilla `MobEffectInstance.update` düşük amplifier'ı yok sayar) ve azalan verimin yarı etkisini ayrıca
+göstermez. `MobEffectEvent.Remove`'u iptal etmek reddedildi: totem ve OP komutunun vanilla anlamını değiştirir. Javadoc
+`SicaklikEtkisi`, §A1.
+
+**F-06 Sıcaklık yiyecekleri tok da yenir (`alwaysEat`).** Sıcaklık aracıdır ve "zamanında yenmesi gerekir"; tok oyuncunun donarken
+salep içememesi kuralı bozardı. Vanilla pişmiş yiyecekler vanilla kuralında kalır (açlık gerekir).
+
+**F-07 Kap.** Yeme 32 tick, yığın 16 (madde 14). Son yiyecekte el yığını boş kaba döner; yığın sürerken kap envantere,
+sığmazsa yere düşer; yaratıcıda yığın azalmadığı için kap verilmez (vanilla). Şişeler içme animasyonu ve sesiyle, kaseler ve
+karpuz yeme animasyonuyla. Buzlu Karpuz Dilimi'nin kabı yoktur.
+
+**F-08 Tarifler birebir; kalanlar vanilla, bal şişesi yalnız çayda bastırılır.** Hepsi vanilla `crafting_shapeless` (tarif
+kitabı açma başarımlarıyla). "Kova geri verilir": süt kovasının vanilla `craftRemainder`'ı (kova) zaten döner; GameTest
+Salep/Çikolata/Ayran'da kalanın kova olduğunu doğrular. Bal şişesinin vanilla kalanı (boş şişe) Salep'te korunur: 3 cam
+şişe + bal şişesi = 4 cam → 3 salep + 1 boş şişe, denge tutar. Isıtıcı Çay'da (1 cam şişe + bal şişesi → 2 çay) bal şişesi
+ikinci çayın şişesidir; vanilla kalan 2 camdan 3 cam çıkarıp şişe çoğalttırırdı. Bu yüzden çay
+`dogalafetler:kalan_secimli_sekilsiz` tipindedir (`kalan_birakmayan: [honey_bottle]`; GameTest: çayın kalanı boş).
+Ateşli Güveç tek tarif, et malzemesi dizi malzeme `[cooked_beef | cooked_porkchop]` ("sığır veya domuz"; GameTest ikisini de
+pişirir). Tarifler `data/dogalafetler/recipes/<eşya>.json`.
+
+**F-09 Kutup Balığı Çorbası etiketle; etiket dosyası balıkçılığın.** Balıklar balıkçılık işçisinin eşyalarıdır; tarif eşya
+etiketine bağlanır. Bu dal boş etiket dosyası da üretmez: balıkçılığın etiket sağlayıcısı aynı yolu yazacağı için iki sağlayıcı
+çakışırdı. Etiket boşken koşulsuz tarif yüklenir ve **bariyerle eşleşir**: Forge 47 `Ingredient$TagValue.getItems()` boş
+etikete "Empty Tag" adlı bir bariyer koyar (kase + bariyer + patates → çorba; JEI/tarif ekranı malzemeyi bariyer gösterir).
+Bu yüzden tarif koşulludur (F-17). İlk sürümdeki "hiç eşleşmez" cümlesi yanlıştı (inceleme Yi1).
+
+**F-10 Datagen kendi adlı sağlayıcılarla.** Vanilla `RecipeProvider.getName()` `final` ve "Recipes"tir: mod genelinde tek
+`RecipeProvider` olabilirdi (K-E5); `YiyecekVerileri.Tarifler` ("Doğal Afetler yiyecek tarifleri") `ShapelessRecipeBuilder`
+çıktısını (tarif + tarif kitabı başarımı) kendisi yazar. Eşya modelleri düz JSON ("Doğal Afetler yiyecek modelleri"):
+`client.model.generators` import'u olmadığı için K-E9 istisnasına gerek yoktur.
+
+**F-11 Vanilla pişmiş yiyecekler: `LivingEntityUseItemEvent.Finish`, config listesi.** Kendi eşyalarımız hariç (onlar kendi
+`finishUsingItem`'larında uygular, çift etki olmaz). Liste `eşya=saniye` (başka modların yiyecekleri eklenebilir), miktar
+çok küçük kademe (3 birim), efekt "İçten Isınma I". Varsayılan: kızarmış patates, pişmiş sığır/domuz/tavuk/koyun/tavşan/morina/
+somon 30 sn; mantar/tavşan/pancar çorbası 45 sn. Çiğ yiyecekler listede yok. `vanillaIsinma=false` kapatır (GameTest
+`ConfigValue.set` ile sınar ve geri alır). Kayıtlı olmayan kimlik WARN ile atlanır.
+
+**F-12 Olay kapı kapalıyken de gelir.** Başarım ve ileride başka dinleyiciler "yendi"yi bilir; `uygulandi()` ayırır. Kademeler
+aynıdır (sıcaklık değişmedi).
+
+**F-13 Tooltip istemcide `ItemTooltipEvent` ile (`client.yiyecek.YiyecekIpuclari`).** Sıcaklık `SicaklikIpuclari` deseni; N6
+kapsamı dışı eşya bilgisi. Satır "İçten Isınma: orta, 90 sn" (altın) / "Serinlik: hafif, 60 sn" (su mavisi); Güveç'te kırmızı
+"Sıcakta hızla aşırı ısıtır". Kademe adları şartnamenin ürün dilinden: "hafif" (küçük), orta, büyük, çok büyük, çok hafif.
+Vanilla yiyeceklerde satır yalnız SERVER config yüklüyse (senkronlu) ve açıksa.
+
+**F-14 Balık süreleri config'te (N17).** Şartname pişmiş balık için "orta ısınma", çiğ için "hafif soğutur" der, süre vermez:
+`yiyecek.balik.pismisSaniye` 90 (Salep gibi orta), `cigSaniye` 60 (Buzlu Karpuz gibi hafif). Balıkçılık `YiyecekAPI` fabrikalarıyla
+alır.
+
+**F-15 Görsel kanıt gerçek yeme yoluyla.** `client.yiyecek.YiyecekOtomasyonu` (`-Potomasyon=yiyecek`) kullan tuşunun *oyun içi*
+durumunu (`KeyMapping.setDown`) basılı tutar: istemci → sunucu eşya kullanma paketi, 32 tick, sunucuda `finishUsingItem`;
+fiziksel girdi olayı üretmez (girdi sayacı 0). Tooltip için yalnız `MouseHandler`'ın iç konumu ayarlanır (SRG `f_91507_`,
+`f_91508_`), işletim sistemi imleci oynatılmaz. K0-21 rev. 2 + (k) kilit, ws 93, dil tr_tr.
+
+**F-16 Komut `/dogalafet yiyecek bilgi [oyuncu]`.** Dedicated sunucuda config'le kurulmuş tabloyu okunur kılar (kabul
+senaryosu `tools/senaryo/yiyecek_sunucu.py`); oyuncuda azalan verim penceresini gösterir.
+
+**F-17 Kutup Balığı Çorbası koşullu tarif (şef kararı, inceleme Yi1).** → Şef kararları (Faz 3).
+
+**F-18 Cold Sweat yüklüyken yiyecekler yalnız yemek değeri verir (bilinen sınır, şef kararı; inceleme Yi3).** → Şef kararları (Faz 3).
+
+**F-19 Ağır süreç kapısı iki koşuda çiğnendi (inceleme Yi2).** Tur 1'de ilk `runGameTestServer` (14:20) ve son `build` + `runData`
+(14:32) `pgrep -fc GradleWrapperMain` = 2 iken başladı (GOREV §2 ihlali; boş RAM 5 GB, OOM yok, sonuçlar etkilenmedi: aynı
+kod sonraki kapılı koşularda aynı sonucu verdi). Tur 2'de bütün Gradle koşuları `/tmp/yiyecek_gradle.sh` kapısından geçti
+(sayaç ≥ 2 ya da boş RAM < 4 GB iken 60 sn bekle, en çok 20 dk); kapı satırları (`KAPI n: gradle=… bos=…`) her log'un başında
+(`kanit/yiyecek/yiyecek-t2-*.log`; ör. `compileJava runData` 8 tur, kesilen build 11 tur bekledi). İlk build bekleme sırasında oturum
+yeniden başlayınca kesildi ve hiç koşmadı; yeniden kapıdan geçirildi. Dedicated senaryo ve runClient da aynı kapı döngüsünden
+geçti (`protokol.log`, senaryo çıktısı).
+
+### Reddedilen yollar
+
+- **Efektin sıcaklığı uygulaması (`applyEffectTick`):** iki kaynak, sütle silinen ısınma, başka modun verdiği efektle ısınma (F-05).
+- **Bütün sıcak yiyecekleri sıcakta güçlendirmek:** şartname çarpanı yalnız Güveç'in "yan etki"si olarak verir; genel kural
+  toplamalı uygulamayla sağlanır (F-04).
+- **Azalan verim penceresini ilk yemeden saymak:** her 60 sn'de bir tam etki, spam engelini zayıflatır (F-03).
+- **Gerçek saat (`System.currentTimeMillis`):** tek oyunculuda duraklatmada ve sunucu gecikip yetişirken oyun süresinden kopar;
+  oyun saati monoton.
+- **Capability ile geçmiş:** küçük oyuncu verisi için kayıt/klonlama kodu; `PersistentData` yeter (sıcaklık S-06 ile aynı).
+- **Vanilla `RecipeProvider` alt sınıfı ve `ItemModelProvider`:** sabit ad çakışması (K-E5) ve istemci paketi import'u (K-E9) (F-10).
+- **Boş `#pismis_kutup_baligi` etiket dosyasını bu dalda üretmek:** balıkçılığın sağlayıcısıyla aynı yol (F-09).
+- **Isıtıcı Çay'da vanilla kalan:** cam şişe çoğaltır (F-08).
+- **Tok oyuncuya sıcaklık yiyeceği yasağı (vanilla `canEat`):** "zamanında yenmesi" kuralını bozar (F-06).
+
+
+## Faz 3 — Radar ve sismograf
+
+Parça `radar-sismograf` (dal `is/radar-sismograf`, son commit `ffcd8bd`; `main`'e birleştirme `e8d04f2`). Kaynak `.vibe/kararlar/radar-sismograf.md` §B/§C/§D;
+diğer işçilerin kullandığı arayüz sözleşmeleri (§A) ve entegratöre notlar (§E) o dosyada kalır; metindeki §A/§E göndermeleri o dosyaya aittir.
+Şef kararları (R-17, R-18) "Şef kararları (Faz 3)" bölümündedir; N17 satırları sondaki tablodadır. Rapor `.vibe/rapor/radar-sismograf.md`.
+
+**R-01 Görünürlük kuralı tek saf fonksiyonda, pencere tanımı çekirdekte.** `Gorunurluk.radar(asama, normalOnUyariBasladi,
+global, ayniBoyut, mesafe, menzil)`: BITIS gizli; ON_UYARI'da global afet her zaman gizli (N7), bölgesel afet yalnız
+`normalOnUyariBasladi()` sonrası; SIREN/AKTIF'te global afet `ANOMALI` (boyut ve menzil aranmaz: güneş ve ay her yerdedir),
+bölgesel afet aynı boyut + menzil içinde `AFET`. `Gorunurluk.sismograf(tur, asama, normalOnUyariBasladi, hassas, ayniBoyut,
+mesafe, menzil)`: yalnız deprem/sinkhole, aynı boyut, menzil içi, BITIS hariç; ON_UYARI'da normal sismograf
+`normalOnUyariBasladi()` sonrası, Hassas ON_UYARI'nın başından (R-20).
+
+**R-02 Sismografın menzili var.** Şartname sismograf menzili vermiyor. Menzilsiz sismograf haritanın öbür ucundaki depremi
+de "öncü sarsıntı" diye gösterirdi; gerçek sismograflar uzak depremi de kaydeder ama oyunda bu, eşyayı her oyuncu için
+anlamsız bir alarma çevirirdi. Radarla aynı 300/800 seçildi (normal/Hassas; config).
+
+**R-03 Yön ve mesafe istemcide, merkez sunucudan.** Paket merkezi (radarda gerçek, sismografta tahmini) blok
+koordinatı olarak taşır; ok ve mesafe istemcide her karede oyuncunun güncel konumu ve bakışıyla hesaplanır. Böylece ok
+dönerken akıcıdır ve oyuncu yürüdükçe paket gerekmez (paket yalnız durum değişince gider, madde 3).
+
+**R-04 "Değişince" = alan eşitliği.** Sunucu son gönderilen paketi oyuncu başına tutar; yeni durum `equals` ise göndermez.
+Kalan süre saniye çözünürlükte olduğundan aktif afette radar paketi saniyede bir gider (üst sınır 1 Hz); sakin
+radarda tek paket. Geçmişin yaşı dakika çözünürlükte, Gelişmiş radarın hareket yönü 5°'ye ve hızı 0,5 blok/sn'ye,
+öncü şiddeti 0,02'ye yuvarlanır: titreşen sayılar paket üretmez. Bırakınca tek `YOK`; radarı hiç tutmamış oyuncu için
+harita girdisi yoktur ve paket gitmez.
+
+**R-05 Normal radar seviyeyi hiç almaz.** Madde 13a "normal radar seviyesini göstermesin": seviye, hareket ve geçmiş
+normal radarda pakete hiç konmaz (yalnız çizimde gizlemek değil). Sismografta seviye yalnız Hassas'ta gönderilir.
+
+**R-06 Şiddet yüzdesi ve merkez afet başına sabit hatayla tahmin.** Gerçek şiddet S1 %20 … S5 %100. Tahmin
+`gerçek ± pay`, pay normalde 24 puandan başlayıp afet yaklaştıkça (ON_UYARI ilerlemesi) 7,2'ye iner; Hassas'ta 6 → 1,8.
+Sapmanın yönü afet başına sabittir (tohum = `afetNo`; Hassas ayrı tohum): değer saniyeden saniyeye zıplamaz, gerçeğe doğru
+kayar. Merkez de aynı tohumla en çok 40 blok (Hassas 6) sapar; Hassas'ta mesafe 1 m, normalde 10 m'ye yuvarlı yazılır.
+
+**R-07 Öncü sarsıntı darbelidir, sürekli değil.** Gerçek öncü depremler aralıklı küçük sarsıntılardır. Şiddet
+`(0,35 + 0,13·seviye)·(0,2 + 0,8·ilerleme^1,5)`; darbe aralığı 12 sn'den 3 sn'ye iner, her darbe 2 sn'lik `sin²` zarfı. Her
+darbede kısık ses (0,08–0,30 hacım, `AMBIENT`, yalnız bu istemcide; konuşma bandı −40 dB) ve en çok 0,6° × sunucu
+titreme çarpanı (vars. %50 → 0,3°) kamera titremesi; titreme CLIENT config ile kapatılabilir. SIREN boyunca da sürer
+(öncü sarsıntı ana sarsıntıya kadar).
+
+**R-08 Sismik grafik istemcide üretilir.** 60 sn × 20 Hz = 1200 örnekli halka tampon her istemci tick'inde, yalnız sismograf
+taşınırken dolar: deterministik taşıyıcı (üç sinüs + yumuşak gürültü) × genlik (sakin zemin 0,04; öncüde darbe zarfıyla
+büyüyen tepe; AKTIF'te 0,55–1). Sunucu örnek göndermez (madde 3: 20 Hz paket yerine durum paketi). Ekran 200 piksel
+sütunu, sütun başına 6 örneğin min–max'ı olarak çizer (kare başına ~200 dolgu); oyunu duraklatmaz.
+
+**R-09 Gösterge yerleşimi: Forge'un gerçek yükseklikleriyle.** Varsayılan sağ alt köşe. Alt köşelerde panel hotbar + yan el
+yuvası sütunuyla (orta ±121 px) örtüşürse hotbar'ın (alttan 26), orta durum sütunuyla (±91) örtüşürse `D + 2`'nin
+(`D = max(leftHeight, rightHeight)`), ortalanmış action bar satırıyla örtüşürse `max(D + 9, 68) + 8`'in üstüne kalkar.
+Forge 1.20.1 `ForgeGui.renderRecordOverlay` action bar'ı vanilla'nın `h - 68`'i yerine `h - max(D + 9, 68)`'e taşır (metin
+4 px yukarıdan, aksan 2 px); sıcaklık barı `leftHeight`'ı 74'e çıkardığı için satır alttan ~89 px'e kadar çıkar. Action bar
+genişliği, sismograf metni son 80 tick içinde yazıldıysa onun piksel genişliği (Hassas metni seviyeyle ~274 px), değilse
+±121. Katman `CHAT_PANEL`'in altında, yani durum satırları ve action bar çizildikten sonra: `leftHeight/rightHeight` o anda
+kesindir. **Kanıt bulgusu (iki koşu):** ilk sürüm sabit vanilla yüksekliğini (72) kullandı — Hassas metni (x 97–371, y 154–164)
+radar panelinin (x 331–464, y 77–171) altında kaldı (`gorsel-kosu1/`); ikinci sürüm `D + 11` ile panel altı y 158'de kaldı
+(`gorsel-kosu2/`, metin 154'ten başlıyor). Üçüncü sürüm Forge kaynağındaki formülü kullanır; JUnit
+`GostergeYerlesimiTest#uzunActionBarSatiriPaneliYukariItar` ölçülen pikselleri sabitler, kanıt `gorsel/` piksel taramasıyla
+dikey ayrıklığı doğrular. Köşe ve kaydırma CLIENT config'te.
+
+**R-10 Kozmik Çekirdek etiketle.** Eşya meteor işçisinindir; tarif `#dogalafetler:kozmik_cekirdek` ister. Etiketi bu dal
+üretmez (meteor işçisinin `ItemTagsProvider`'ı yazar), aksi hâlde iki dal aynı etiket dosyasını üretip birleştirmede
+çakışırdı. Boş etiketin malzemesi Forge 47'de "Empty Tag" adlı bir bariyerle eşleşir (inceleme R1); bu yüzden tarifler
+koşulludur (R-17). (İlk sürümdeki "boş etiketle craft edilemez" ifadesi yanlıştı.)
+
+**R-11 Hassas öncelikli.** Oyuncu iki radar tutuyorsa (ana + yan el) Gelişmiş olan, iki sismograf taşıyorsa Hassas olan
+geçerlidir. "Envanterde" = hotbar (9 yuva) ya da yan el (madde 13b "hotbar veya yan el"); ana envanterin geri kalanı sayılmaz.
+
+**R-12 `RadarOlaylari` yazılmadı.** Görev metninde isteğe bağlıydı; başarımlar (#15, #16) craft ile açılır ve vanilla
+tetikleyicisi yeterlidir. Dinleyicisi olmayan olay ölü kod olurdu.
+
+**R-13 Güneş/ay anomalisinde yön ve mesafe yok.** N7 "gökyüzü anomalisi" ve geri sayım diyor; global afetin merkezi
+(doğma noktası) anlamsız olduğu için pakete konmaz, kapı mor nabız ve halka çizer. Geri sayım SIREN'de AKTIF'in
+başlamasına ("Başlamasına m:ss"), AKTIF'te afetin kalanına ("Kalan").
+
+**R-14 Yazı yalnız N6 istisnalarında.** Radar paneli yalnız radar elde iken (sunucudan `elde` ve istemcide eldeki eşya
+birlikte doğrulanır), action bar yalnız sismografı taşıyan oyuncunun kendi istemcisinde (vanilla `displayClientMessage(…,
+true)`, sunucudan sohbet/action bar paketi gitmez).
+
+**R-15 Otomasyon gömülü sunucu komut kaynağıyla.** Görsel kanıt `RadarOtomasyonu` tek oyunculu dünyada komutları
+`server.createCommandSourceStack().withSuppressedOutput()` ile verir (oyuncu tuşu, OP ya da hile ayarı gerekmez; sohbet
+kirlenmez). Yalnız `-Potomasyon=radar` ile etkin.
+
+**R-16 K-E12 ve K-E11 uyumu (main `254fe2d` kural eki).** Kendi sağlayıcım (`RadarSismografVerileri`) yalnız
+`dogalafetler:*` tarif ve eşya modeli yazar; hiçbir vanilla (`minecraft:*`) blok/eşya etiketine katkı yoktur, bu yüzden
+`DataGenerators.vanillaBlokEtiketiEkle` kancasına bağlanacak bir şey yoktur. `#dogalafetler:kozmik_cekirdek` etiketini de bu
+dal yazmaz (R-10). K-E11: radar ve sismograf kalıcı durum tutmaz (yalnız oyuncu başına son gönderilen paket ve hareket izi,
+bellekte); `/dogalafet sifirla` aktif afeti durdurduğunda sonraki 1 Hz denetim "sakin" paketi gönderir, iz yeni afet
+numarasıyla sıfırlanır. `DonemDegistiEvent(SIFIRLAMA)` aboneliği gerekmez. Geçmiş (`sonAfetler`) çekirdeğindir ve `sifirla`
+onu temizler; Gelişmiş radar bir sonraki pakette boş listeyi gösterir.
+
+**R-17 Gelişmiş tarifler koşullu (inceleme R1, şef kararı).** → Şef kararları (Faz 3).
+
+**R-18 Gelişmiş panel ekranın en çok %30'u (inceleme R2, şef kararı).** → Şef kararları (Faz 3).
+
+**R-19 Toplu çizim, sağ üst efekt ikonları, 1 sn tarama (inceleme R3, R7).** Forge 47.4.28 `GuiGraphics.fill` yönetilmeyen
+modda her çağrıdan sonra boşaltır (ayrı çizim). Radar paneli (~280 dolgu + metin) ve sismograf grafiği (~250 dolgu) artık
+`g.drawManaged(...)` içinde: aynı `RenderType`'taki ardışık dolgular tek çizime toplanır, tipler arası geçiş önceki
+topluğu boşalttığı için sıra (zemin → kap → yazı) korunur. FPS ölçümü Faz 5 tablosunda (radar elde ve grafik ekranı açık).
+`SAG_UST` köşesinde panel vanilla efekt ikonlarının altına iner (`GostergeYerlesimi.efektAlti`: yararlı satır y 1–25, zararlı
+y 27–51; `showIcon` ve Forge `isVisibleInGui` olan efektler). Tarama 18°/tick = saniyede bir tur (tasarım notu).
+
+**R-20 Sismograf penceresi çekirdekten; ses ölçümü `docs/kanit/ses/` (inceleme R4, R5).** Sismograf kendi
+`asamaGecen >= erken × (1 − oran)` formülünü bıraktı: normal sismograf radar gibi `afet.normalOnUyariBasladi()`, Hassas
+ON_UYARI'nın başından (erken bölümü çekirdeğin `cekirdek.onUyari.erkenBildirimTick`'i belirler). `esya.sismograf.hassasErkenOran`
+config'i kaldırıldı; pencere tanımı tek kaynaktır. Öncü sarsıntı sesinin `ebur128` ölçümü ve spektrogramı siren ve ortam
+sesleriyle aynı yerde: `docs/kanit/ses/esya_oncu_sarsinti_{ebur128.txt,spektrogram.png}` (GOREV §6 #11); `.vibe/kanit/` kopyası
+kalır. Oyun içi Wave kaydının ölçümü bir sonraki görsel koşuya (runClient bu turda yok).
+
+### Reddedilen yollar
+
+- **Sunucudan sismik örnek akışı (20 Hz):** grafik gerçek zamanlı olurdu ama oyuncu başına 20 paket/sn madde 3'e aykırı;
+  dalga istemcide durum paketinden deterministik üretilir (R-08).
+- **Yönü ve mesafeyi sunucuda hesaplayıp göndermek:** oyuncu her dönüşte paket ister ya da ok saniyede bir zıplar (R-03).
+- **Radarı yalnız istemcide `IstemciAfetDurumu`'ndan çizmek:** `AfetDurumPaketi` ON_UYARI'da gitmez ve yalnız etki alanı +
+  64 blok içindekilere gider; 300/800 menzil ve ön-uyarı için ayrı, oyuncuya özel paket gerekir.
+- **Doku tabanlı HUD paneli:** pikselli CRT çerçevesi `fill` ile çizildi; boyut içeriğe (dil, geçmiş satırı) göre değişir,
+  sabit dokuyla güzel uzamazdı.
+- **Sismograf grafiği için `AbstractContainerMenu`:** sunucu tarafı menü gerekmez, salt istemci `Screen` yeterli.
+- **Kozmik Çekirdek etiketini bu dalda üretmek:** R-10.
+
+
+## Faz 3 — Meteor ve termostat
+
+Parça `meteor-termostat` (dal `is/meteor-termostat`, son commit `1748441`; `main`'e birleştirme `6ab6357`). Kaynak `.vibe/kararlar/meteor-termostat.md` §B/§C/§D;
+diğer işçilerin kullandığı arayüz sözleşmeleri (§A) ve entegratöre notlar (§E) o dosyada kalır; metindeki §A/§E göndermeleri o dosyaya aittir.
+Şef kararları (M-22) "Şef kararları (Faz 3)" bölümündedir; N17 satırları sondaki tablodadır. Rapor `.vibe/rapor/meteor-termostat.md`.
+
+**M-01 Meteor düz çizgide sabit hızla iner; çarpışma sunucuda blok örneklemesiyle.** Varlık `noPhysics`; sunucu her tick
+yolunu 0,4 blok adımla örnekler, ilk çarpışmalı bloka (yaprak ve çarpışmasız bitkiler geçilir: krater ağaç tepesinde
+değil yerde açılır) ya da suya (gerçek ya da `SanalSu.suSeviyesi`) çarpar. Hız 3 blok/tick (eksen başına paket sınırı 3,9),
+140 blok yükseklikten 40–70°'de ~2,5–3 sn uçuş. İstemci aynı hızla ilerletir (2 tick'te bir düzeltme), iniş noktasını
+`clip` ile tahmin eder. Gerekçe: yerçekimli yayın çarpışma tahmini ve senkronu daha pahalı, görsel farkı yok.
+
+**M-02 Suya düşen meteor buhar çıkarır; krater, ateş ve ödül yok.** Sanal su dahil (madde 8: gerçek suya
+dokunulmaz). Sarsıntı yarı şiddette.
+
+**M-03 Krater: paraboloit çanak, magma astar, enkaz halkası; sert bloklar ve sıvılar korunur.** Küçük r 2,5 / d 2,
+büyük r 5,5 / d 4 (tasarım "çap 0,6–3 blok" meteor → ~5–11 blok krater; derinlik/çap ~0,35, basit krater). Yüzeyün
+2 blok üstü de boşaltılır (bitki, kar). Sert = `dogalafetler:deprem_dayanikli` ∪ `dogalafetler:yanmaz` ∪ kırılmaz ∪ blok
+varlıklı (sandık içeriği kaybolmasın). `UPDATE_SUPPRESS_DROPS`: krater eşya düşürmez (yüzlerce toprak eşyası ve ödül
+"yalnız meteordan" kuralı). Taban ortası (r ≤ 0,4R) magma: tasarımın "kraterde 20 sn magma parıltısı" ile sıcak süresi
+aynı config'ten; sonra karataş (ayda pürüzsüz bazalt) olur. İşlem tick başına ortak bütçeyle (`kraterBlokButcesi` 512 ×
+`TpsOlcer.kismaCarpani()`); büyük krater ~700 işlem ≈ 2 tick.
+
+**M-04 `afetBlokHasari=false` → krater planı boş; ateş ve ödül sürer.** Ateş ortak yangına gider, kuralı yangın kendisi
+uygular (blok değişmez). Ödül blok değil eşya olduğu için verilir (zemine bırakılır). GameTest: bölge hash'i aynı.
+
+**M-05 Meteor durumu kaydedilmez (karar: uçan meteor atılır).** Varlık `noSave`, yağmur ve krater işleri bellekte.
+Yeniden açılışta uçan meteor (≤ 3 sn uçuş) ve yarım krater işi (≤ birkaç tick) kaybolur; yağmuru afet `yuklendi`'de
+yeniden başlatır. Gerekçe: kaybolan oynanış birkaç saniye; varlığı kaydetmek yarım çarpma ve çift yağmur riskini getirir.
+Chunk'ı boşalan meteor da atılır; hedefine 600 tick'te ulaşamayan meteor atılır.
+
+**M-06 Dağıtım: round-robin + halka ofseti.** Oyuncular UUID sırasıyla, her meteor sıradakine; fark en çok 1 (JUnit:
+1–10 oyuncu, oyuncu sayısı değişince varyans). Ofset 32–160 blok halkasında alana göre düzgün (tasarım §2). Oyuncusuz
+sunucuda doğuş noktası.
+
+**M-07 Ödül ömrü `Item#getEntityLifespan` ile 10 dk.** Forge'un eşya ömrü kancası vanilla 6000 tick yerine
+`meteor.odulOmruSaniye` (600) × 20 verir; `setUnlimitedLifetime` + kendi sayacımız reddedildi (§D). Aynı kural Kozmik
+Çekirdek için de geçerli.
+
+**M-08 Sıcak parça: NBT bitiş tick'i; alan ya da yanına gelen oyuncu yanar; su/kar/buz üstünde hemen soğur.** Alınca
+(`EntityItemPickupEvent`) sıcaksa `meteor.yanmaSaniye` (3) sn yanma, etiket her durumda silinir (soğuk parçalar yığılır).
+Yerde 5 tick'te bir: süre dolduysa ya da suda/karın/buzun üstündeyse etiket silinir (cız sesi + buhar), değilse 0,6
+blok içindeki oyuncular yanar.
+
+**M-09 Ödül zarı tohumlu ve çarpma başına bir kez.** İki bağımsız atış (parça %3 / büyükte %5; çekirdek yalnız
+büyükte %0,3). Çekirdek krater ortasına, parça 0,6R içinde rastgele bir sütuna, tabanın ilk boş noktasına bırakılır.
+Loot table/GLM yok (madde 13c "yalnız meteordan").
+
+**M-10 Görünüm kaynaktan.** `AY_CARPMASI` kaynağı ay görünümü (tasarım: gri-beyaz kaya, mavi-beyaz iz, ay sesi %10 tiz),
+diğerleri güneş. Komutta `ay` dalı.
+
+**M-11 Sarsıntı ve parlama istemcide, oyuncuya özgü.** Sunucu şiddeti mesafeyle hesaplar (`temel · (1 − d/menzil)²`;
+küçük 0,35 / 48 blok, büyük 0,8 / 112 blok); istemci `ViewportEvent.ComputeCameraAngles` ile yaw/pitch/roll titreşimi
+(şiddet × 3,5° × `meteor.sarsintiOlcegi`), süre 8–40 tick. Parlama GUI katmanı (`registerAboveAll`), F1 (GUI gizli)
+karelerinde görünmez.
+
+**M-12 Sesler vanilla.** Uçuş: `item.elytra.flying` döngüsü meteoru izler, Doppler perde 1,2 → 0,8; çarpma
+`entity.generic.explode` alçak perde (hacim 10 / 5 → 160 / 80 blok); suda sıçrama + lav sönmesi. Kendi sentezimiz
+(tasarım "30–80 Hz güm + çakıl") bu parçada yok: açık nokta (Faz 4 afet ses tasarımıyla).
+
+**M-13 Eşya kaydı ayrı `DeferredRegister`.** Radar/sismograf işçisinin `esya/EsyaKayitlari.java`'sıyla çakışmamak için
+`esya/MeteorEsyaKayitlari.java`; kayıt `Meteor.kaydet(modBus)` içinden (K-C33).
+
+**M-14 Tarif malzemeleri Forge etiketleri.** Demir/altın/kızıltaş `#forge:ingots/iron`, `#forge:ingots/gold`,
+`#forge:dusts/redstone` (madde 2 uyumluluk: başka modların eşdeğer külçeleri de kabul).
+
+**M-15 Varlık tavanı 48/boyut; dolunca meteor atılmaz.** 10 oyuncu × tasarımın "oyuncu başına 4 eşzamanlı" (Yüksek) +
+pay. Kuyruğa alınmaz: yağmur zaten süreklidir.
+
+**M-16 Datagen tek sınıf, iki sağlayıcı adı (K-E5).** `MeteorVerileri` sunucu (tarifler, etiket) ve istemci (eşya
+modelleri) için ayrı adlı iki örnek.
+
+**M-17 GameTest yolları.** Krater/ödül/yangın testleri `MeteorCarpmasi.carp`'ı doğrudan çağırır (uçuş süresinden
+bağımsız), biri gerçek uçuşla (`dusur`, 90°): meteor varlığı doğar, iner, krater açar. Zar paket içi
+`dusur(..., Sanslar)` ile sabitlenir. Şablon `dogalafetler:meteor_sahne` (15x12x15 hava, `tools/assets/meteor_sahne.py`).
+
+
+**M-18 Sıfırlama temizliği (K-E11).** `DonemDegistiEvent(SIFIRLAMA)` (`/dogalafet sifirla`) gelince `MeteorYoneticisi`
+bütün boyutlarda yağmurları durdurur, uçan meteorları kaldırır (yeni krater yok), sıcak ödül parçalarının sıcak etiketini
+siler ve bekleyen magma astarını hemen soğumuş kayaya çevirir. Açılmış kraterler ve yerdeki ödüller kalır (dünyadaki
+kalıcı iz; sıfırlama dönem durumudur, harita değil). Ateşleri yangın kendisi söndürür (K-E11). GameTest
+`sifirlamaUcanMeteorVeSicakParcayiTemizler` (yalnız meteor dinleyicisini çağırır; donma/su sıfırlanmaz).
+
+**M-19 Etiketler (K-E12).** Bu parça vanilla (`minecraft:*`) blok/eşya etiketine katkı yapmaz; kendi sağlayıcısı yalnız
+`#dogalafetler:kozmik_cekirdek` eşya etiketini yazar. Sert blok okuması yangının `dogalafetler:deprem_dayanikli` ve
+`dogalafetler:yanmaz` etiketlerinden. Entegratörün K-E12 kancasına bağlayacağı satır yok.
+
+**M-20 Görsel otomasyonun yavaş çekimi.** Gizli workspace'te istemci ~1–10 FPS çizer; 3 blok/tick meteor bir çizilmiş
+karede ekrandan geçer (koşu 1'de iz ve çarpma kareleri aynı karede kaldı, `carpma`/`carpma_b` md5 eşit). Otomasyon
+vitrinde `meteor.dusmeHizi`'ni 0,6'ya indirir (yalnız `-Potomasyon=meteor`; sonra eski değere döner) ve kareyi istenen
+tick'te değil sonraki çizilmiş karenin sonunda (`RenderTickEvent` END) alır. Oyun davranışı değişmez.
+
+
+**M-21 Meteor GameTest'leri kutudan taşmaz ve geçince sahnesini boşaltır.** İlk sürümde yangın testi tahta halkasını
+krater merkezinden 9 bloka kadar (15x15 kutunun 2 blok dışına) koyuyordu. GameTest dünyası koşular arasında saklanır
+(K-C24) ve batch'ler x boyunca dizildiği için test eklenince konumlar kayar (`meteor_sifirla` eklenince krater merkezleri
+318 → 337); ikinci ve üçüncü koşuda yangının Y-01 deneyi (`afetAtesiKendiBasinaYayilmaz`, doFireTick açık) önceki
+koşudan kalan tahtanın yanına düştü ve "afet ateşi 25 blok" ile düştü (`build-gametest-2.log`, `-3.log`; ilk koşu
+93/93). Tahta artık kutu içinde (r 5,6–7,0, yüzeyde) ve her sahne testi geçince `sahneyiTemizle`: ateş (kutu + 4),
+ödül eşyaları, kutudaki bloklar hava. Bu worktree'nin kirlenmiş GameTest dünyası kenara alındı (`/tmp`); `main`'in
+dünyası eski sürümü hiç görmedi. Üretim kodu değişmedi.
+
+
+### Tur 2 (inceleme-meteor-termostat M1…M6, şef kararları)
+
+**M-22 Vitrin Faz 4'te puanlanır (şef, M2).** → Şef kararları (Faz 3).
+
+**M-23 Çarpma parlaması dünya çiziminin sonunda (M3).** GUI katmanı (`registerAboveAll`) kaldırıldı;
+`RenderLevelStageEvent.Stage.AFTER_LEVEL`'da birim izdüşümle tam ekran `POSITION_COLOR` quad (derinlik/sis yok, sıcaklığın
+ekran efektleriyle aynı karışım kurulumu). F1 (`hideGui`) iken de görünür; dünyanın üstünde, elin ve GUI'nin altında
+çizilir (Forge `renderLevel` sırası: `AFTER_LEVEL` → `renderItemInHand` → GUI; HUD parlamanın üstünde okunur kalır). Güç,
+süre ve `parlamaOlcegi` (0 kapalı) değişmedi.
+
+**M-24 İz, plazma kabuğu ve yer diski sissiz (M4).** `client.meteor.MeteorIsikTipi`: `RenderType.eyes` ile aynı gölgelendirici,
+doku, toplamalı karışım ve yalnız renk yazımı; katman parçası çizim sırasında `setShaderFogStart(MAX)` yapıp eski değeri
+geri koyar (eyes parça gölgelendiricisi rengi `linear_fog_fade` ile çarpıyordu). LOD değişmedi (parçacık 192 blok, çizim
+512); ayrıca blok kümesi gövde 96 bloktan uzakta çizilmez (uzaktan kare leke gibi okunuyordu; plazma panosu kalır).
+Estetik ayar (genişlik/parlaklık) Faz 4 vitrininde.
+
+**M-25 Krater işi ve magma soğuması kalıcı ve yüklü olmayan chunk'ta bekler (M1).** Boyut başına SavedData
+`dogalafetler_meteor` (`MeteorVerisi`): bitmemiş krater işleri (merkez, boyut, görünüm, kaynak, ödül sonucu, evre/sıra,
+sayaçlar, tohum; plan tohumdan yeniden üretilir) ve magma soğumaları (konum, mutlak oyun tick'i, yeni blok). Sıradaki
+hücrenin chunk'ı yüklü değilse iş orada durur (yangın Y-19 "bekleyen" deseni), diğer işleri tıkamaz, her tick bir
+`isLoaded` ile yeniden dener; chunk yüklenince (yeniden açılıştan sonra da) kaldığı yerden tamamlanır, yangın/ödül o
+zaman gelir. Zamanı gelmiş soğuma chunk yüklü değilse kayıtta kalır. Magma süresi yeni `meteor.magmaSogumaSaniye`
+(20, tasarımın "20 sn magma parıltısı"; yangının `afetSonrasiSonumSaniye`'sinden ayrı, çünkü o yangının sönümüdür). `sifirla`
+(M-18): yüklü magma hemen, yüklü olmayan yüklenince soğur; süren kraterler sürer. `meteor bilgi` bekleyen sayısını yazar.
+M-05'in "yarım krater kaybolur" cümlesi geçersiz; uçan meteor ve yağmur yine kaydedilmez.
+
+**M-26 Sıcak parça takibi NBT'den (M6).** `dogalafetler_sicak_bitis` zaten mutlak oyun tick'idir (`getGameTime`, kayıtla
+korunur). Bellekteki liste artık yalnız bir önbellek: `EntityJoinLevelEvent` (bırakılış, yeniden açılış, chunk yüklenmesi)
+etiketli eşyayı süresi sürüyorsa takibe alır, dolmuşsa hemen soğutur. Yeniden açılıştan sonra "yanına gelen yanar" ve
+"suda soğur" sürer.
+
+**M-27 Tur 2 testleri (M5).** GameTest: gerçek alma yolu (`ItemEntity.playerTouch` → olay → envanter, etiketsiz yığılır) ve
+yakınlık yanması; NBT kaydet/oku taklidi (sıcak kalır ve takibe girer / süresi dolmuş kayıt soğur); suya düşen gerçek
+uçuş (krater, ateş, ödül yok, bölge hash'i aynı, olay `suya`); yağmur iki oyuncuya dengeli (fark ≤ 1) ve uçan tavan 48
+(paket içi yağmur aşırı yüklemesi: halka 0–2 blok, dik giriş); `afetBlokHasari=false` iken ateş yanar, yakıt ve bölge
+değişmez, ödüller düşer; krater işi yüklü olmayan hücrede bekler, kayıttan aynen okunur, sonra tamamlanır, magma
+soğuması bekler; termostat + yün + 30 tüy birlikte (yalıtım girdisi üçünü sayar, sıcakta çekim fizikle aynı, tam koruma yok).
+Buharın kendisi görseldir (sunucu `sendParticles` + istemci); dedicated log'unda "buhar, krater yok".
+
+
+**M-28 `meteor dusur` anında çarpma bildirimi (dedicated bulgusu).** Komut, çağrıdan önce hedef chunk yüklü ve tavan boş
+mu bakar; API boş döndüyse ve bunlar sağlanıyorduysa çarpma hemen olmuştur ("struck ... at once"), suya düşüş de dahil.
+Önce "bekleyen krater artışı" bakılıyordu: varlık işlemeyen chunk'ta suya düşen meteor "No meteor" yazıyordu.
+
+
+### Tur 3 (inceleme-meteor-termostat-2 Md1…Md3)
+
+**M-29 Krater bitişi de yüklü chunk bekler (Md1).** Kenar bitince bitiş (yangın, ödül bırakma, `MeteorCarptiEvent`) önce
+ödül karesinin (merkez sütunu; parça varsa merkezden ±⌈0,6 r⌉) değdiği bütün chunk'ları `MeteorYoneticisi.yuklu` ile sorar;
+biri yüklü değilse iş bekleyende kalır (`bekliyor`), chunk yüklenince biter. `tabanNoktasi`'nın `getBlockState`'i artık
+senkron chunk yüklemez. Yangın alanı kendi `isLoaded` denetimini zaten yapıyor. GameTest: bekleyen krater testine bitiş
+aşaması eklendi (merkez chunk'ı yüklü değilken ödül düşmez, yüklenince çekirdek + parça düşer); test sayısı değişmedi.
+
+**M-30 GameTest'ler yalnız kendi sahnelerinin krater işlerini sayar (Md2).** Krater işleri kalıcı olduğu için (M-25,
+K-C24) boyut geneli `bekleyenKraterSayisi == 0` yerine merkezi sahne kutusu (+4) içindeki işler sayılır; sahne kurulurken
+(`zemin`) aynı kutudaki eski işler atılır (`MeteorYoneticisi.kraterleriUnut`). Üretim yolu değişmedi.
+
+**M-23 metni düzeltildi (Md3):** parlama dünyanın üstünde, elin ve GUI'nin altında.
+
+
+### Tur 4 (doğrulama-2: aralıklı GameTest)
+
+**M-31 Sıcak parçanın su/kar/buz soğuması her tick denetlenir; yakınlık yakması 5 tick'te bir kalır.** Kök neden:
+`sicakParcaYakarYirmiSaniyeSonraYakmaz`'da su hücresinin ortasında (y +0,5) 0,25 yukarı hızla doğan parça vanilla
+`ItemEntity` fiziğiyle yalnız ilk iki tick suya değer (`wasTouchingWater` `baseTick`'te güncellenir; y 5,5 → 5,75 → 5,99,
+su yüzeyi 5,889), sonra ~0,6 blok seker; rastgele yatay hızıyla (±0,04) ~%31 olasılıkla 1×1 havuzun taş kenarına düşer ve
+bir daha suya değmez. Denetim `gameTime % 5 == 0` tick'lerinde çalıştığı için iki tick'lik pencereyi 5'te 3 kaçırıyordu:
+başarısızlık ≈ 0,31 × 0,6 ≈ %19, evre testin başladığı oyun tick'ine (batch sırasına) bağlı (benzetim: 200 000 atış).
+Test hatası değil, üretim açığıydı: suya kısa değip kıyıya seken parça sıcak kalıyordu (tasarım "su üstünde hemen
+soğur"). Düzeltme: `sicaklariIsle` her tick (süre, su, kar/buz; takip listesi küçük, tick başına liste boyu kadar
+`isInWater` + iki blok okuması), oyuncu taraması (`getEntitiesOfClass`) yine 5 tick'te bir. Test güçlendi: "suya düşen parça
+hemen soğumalı" denetimi 40. tick'ten 5. tick'e çekildi (eski kod bu sınırda %60 düşerdi; yeni kod belirlenimci).
+Reddedilen: testte parçayı ortalamak/hızı sıfırlamak ya da `succeedWhen` ile beklemek (üretim açığını gizler).
+
+### Reddedilen yollar
+
+- **Meteoru kaydetmek (`shouldBeSaved`)**: yarım çarpma ve afet `yuklendi`'de ikinci yağmurla çift meteor riski (M-05).
+- **Fizikli (yerçekimli) düşüş**: istemci tahmini ve iniş diski hesabı karmaşıklaşır; 3 sn'lik uçuşta fark görünmez.
+- **`ItemEntity.setUnlimitedLifetime` + kendi ömür sayacımız**: Forge'un `getEntityLifespan` kancası aynı işi kayıt
+  biçimiyle birlikte (yeniden açılışta yaş korunur) yapıyor.
+- **Özel `ItemEntity` alt sınıfı (MeteoritParcasi varlığı)**: başka modların eşya mıknatısı/sıralayıcısı vanilla
+  `ItemEntity` bekler; davranış NBT + olay + yönetici listesiyle yeterli.
+- **Krateri `Explosion` ile açmak**: eşya düşürür, sert blok etiketini tanımaz, şekli kontrol edilemez, tek tick'te.
+- **Loot table / Global Loot Modifier ile ödül**: madde 13c ödülü meteora bağlar; tablo veri paketiyle başka kaynaklara
+  sızabilir.
+
+
+## Faz 3 — Balıkçılık
+
+Parça `balikcilik` (dal `is/balikcilik`, son commit `03e30aa`; `main`'e birleştirme `5f98daf`). Kaynak `.vibe/kararlar/balikcilik.md` §B/§C/§D;
+diğer işçilerin kullandığı arayüz sözleşmeleri (§A) ve entegratöre notlar (§E) o dosyada kalır; metindeki §A/§E göndermeleri o dosyaya aittir.
+Şef kararları (B-19, B-20) "Şef kararları (Faz 3)" bölümündedir; N17 satırları sondaki tablodadır. Rapor `.vibe/rapor/balikcilik.md`.
+
+**B-01 Kod düzeni.** Saf mantık `balikcilik.mantik` (JUnit, 5 sınıf 27 test): `Aktiflik`, `DelikOmru` (ömür, aşama
+ gecikmesi, chunk sınırı), `IsirmaSuresi`, `LootAgirliklari`, `HareketsizlikSogumasi`. Minecraft tarafı: blok, açma,
+olta/soğuma izleyicisi, GLM, loot girdisi, eşya, config, çeviriler, datagen, GameTest.
+
+**B-02 Aktiflik.** `buzYuzeyi && (G >= eşik || kızılCüce)` (tur 2, Ba7: önceki sürümdeki kış ağırlığı dalı sonucu hiç
+ değiştirmiyordu, kaldırıldı; `DonmaApi.kisAgirligi` artık sorulmaz). `buzYuzeyi` =
+`DonmaApi.buzYuzeyiMi` (buz ya da ince buz, altında su; donma §A.1). Kızıl cüce = `cozulmeDonemi()` ya da evre
+`KIZIL_CUCE`. Madde 15 "kızıl cüce döneminde global ilerleme düşse bile kalıcı kış bölgelerinde ve hâlâ donmuş su
+yüzeylerinde": iki sayım aynı koşula iner (kış bölgesinde de delik için su üstü buz gerekir, buz varsa yeter). Süpernovadan
+önce (G < eşik, kızıl cüce yok) doğal buz bile açılmaz ("süpernova sonrası"). G global değerdir (madde 15 "donma
+ilerlemesi eşiği"); sütun hedefi kullanılmaz. Delik var olduğu sürece balık tutulur (aktiflik yalnız açmada sorulur).
+
+**B-03 Isırma süresi: vanilla `FishingHook` + olay + yansıma.** Delikte olta vanilla gibi yüzer (bloğun su sıvı durumu).
+`EntityJoinLevelEvent` ile oltalar izlenir; sunucu tick sonunda olta delikteyse vanilla `timeUntilLured` her tick bizim
+kalan beklememize yazılır; bekleme bitince `timeUntilLured = 0`, `timeUntilHooked = 40` (`IsirmaSuresi.YAKLASMA_TICK`) ve
+balık açısı yazılır: vanilla yaklaşma, şapırtı, ısırma ve çekme aynen çalışır. Isırma kaçırılırsa (vanilla iki sayacı
+0'lar) yeni bekleme çekilir. Toplam süre `uniform[30, 60] sn − Lure × 5 sn`, taban 10 sn; Lure seviyesi oltanın kendi
+`lureSpeed` alanından. Alanlar Forge `ObfuscationReflectionHelper` ile SRG adlarıyla (`f_37089_` nibble, `f_37090_`
+timeUntilLured, `f_37091_` timeUntilHooked, `f_37092_` fishAngle, `f_37097_` lureSpeed; `mcp_config 1.20.1-20230612`):
+geliştirmede resmî ada çevrilir, üretimde SRG'dir. Görev metnindeki sıra (önce olay/tick, sonra alt sınıf, en son mixin) izlendi:
+`ItemFishedEvent` ısırma süresini değiştiremez (yalnız çekmede gelir), `RightClickItem` atanı değil yeri bilir; alt sınıf
+(§D) gereksiz çıktı; mixin gerekmedi. `build.gradle` (çekirdeğin) erişim dönüştürücü satırı istemedi.
+
+**B-04 Loot: GLM + kendi tablolar + kategori girdisi.** Forge `ItemFishedEvent.getDrops()` "loot'u değiştirmek için
+LootTables kullanın" der ve vanilla yalnız kendi listesini doğurur; GLM vanilla tablonun sonucunu değiştirir, vanilla
+eşya varlığını, XP'yi, istatistiği ve ölçütü bizim eşyalarımızla üretir. Koşul: `loot_table_id = minecraft:gameplay/fishing`
++ kod içinde `THIS_ENTITY` olta ve `delikteMi`. "Oranlar config" (görev metni, N17) ile "veri paketiyle genişler" (N12)
+bir arada olsun diye tablo tek özel girdidir (`balikcilik_kategorisi`): kategori config ağırlığından, içerik kategori
+tablosundan. Şans vanilla "quality" gibi: seviye başına çöp −2, hazine +1. Varsayılan balık %92 / çöp %7 / hazine %1
+(vanilla 85/10/5): madde 15 "kayıp/çöp şansı düşük, ödül iyi", "hazine çok nadir". Meteor eşyası hiçbir tabloda yok
+(madde 13c); GameTest 1000 çekilişte denetler. Vanilla açık su balıkçılığı değişmez.
+
+**B-05 Delik bloğu: sıvı durumu ve çarpışma.** Blok `getFluidState` ile kaynak su döner ama `LiquidBlockContainer` /
+`BucketPickup` değildir: su yayılmaz (sıvı tick'i zamanlanmaz, komşu su bu bloka akamaz), kova ve sünger alamaz, vanilla
+sıvı çizicisi biyom renkli su yüzeyini çizer, olta yüzer (vanilla "su" denetimi). Su modelde çizilmez. Waterlogged
+(`SimpleWaterloggedBlock`) reddedildi: kova suyu alır ve blok buz gibi kalırdı. Çarpışma: oyuncuya tam blok (üstünde
+yürünür, buzun altına düşülmez), diğer varlıklara boş (olta 1×1 açıklığa düşer ve komşu buz blokları onu sütunda
+tutar; 4 piksellik çerçeve çarpışması oltanın 0,5 bloklu delikten geçmesini zorlaştırıyordu). Kar katmanı deliğin
+üstünde duramaz (desteği boş). Görüntü şekli boş, gölgelendirme 1.
+
+**B-06 Yeniden donma: zamanlanmış blok tick'i, BlockEntity yok.** Açılışta ömür `uniform[240, 300] sn`; ilk tick
+`ömür − 3 × aşama`, sonra 3 aşama × 15 sn (en kısa ömrün dörtte birini aşmaz; deliğin kendi ömrüne bağlı değil, blok
+ömrü saklamaz). Zamanlanmış tick chunk'la kaydedilir: sunucu kapanıp açılınca da donar; yüklü olmayan chunk'ta
+bekler. Son aşamadan sonra **eski buz** (`ince` → donmanın ince buzu, yoksa vanilla buz) gelir; donma tablosuna girmez
+(donma §A.5). **Donma biti korunur:** delik donmanın sütun bitine dokunmaz; donma süreci üstü su ya da buz olmayan
+sütunu kara sayar ve `buz_deligi` kar zemini etiketinde olmadığı için bir şey yapmaz; delik donunca aynı blok (ve bit)
+geri gelir. Delik açıkken o sütunda çözülme/donma adımı atlanır (bilinen sınır: atlama serbestken donma bir sonraki
+eşik geçişinde yetişir, K-D8). Yeniden donma `afetBlokHasari`'na bağlı değildir: oyuncunun açtığı deliğin kapanmasıdır.
+
+**B-07 Chunk sınırı: palet taraması, sayaç yok.** Açma anında chunk bölümlerinden yalnız paletinde `buz_deligi`
+olabilecekler (`maybeHas`) taranır. Delik açma nadir bir oyuncu eylemi; SavedData/capability sayacı kayıt, senkron
+ve kaçak (kırılan, patlayan, `/setblock`) delik muhasebesi isterdi. Varsayılan sınır 4.
+
+**B-08 Açma koşulları.** `PlayerInteractEvent.RightClickBlock`, yalnız sunucuda: `isSecondaryUseActive` (eğilme), alet
+(`ToolActions` kazma/balta: modlu aletler de), blok vanilla buz ya da donmanın ince buzu, üstü boş, `aktifMi`. İstemci
+paketi her durumda yollar; kol sallama sunucunun `SUCCESS` sonucundan gelir (istemcide tahmin edilmez: eşik/su bilgisi
+yalnız sunucuda). Paketlenmiş/mavi buz kabul edilmez (madde 15 "suyun üstündeki buz"; donmanın tablosu da su → buz).
+Alet `hurtAndBreak(5)` (Unbreaking ve yaratıcı vanilla kuralıyla). Yalnız chunk sınırında eylem çubuğuna tek satır
+("Bu bölgede çok fazla açık buz deliği var"): afet uyarısı değil, oyuncunun kendi eyleminin geri bildirimi (N6). Eşik
+altında sessizce bir şey olmaz.
+
+**B-09 Hareketsizlik soğuması: `ortamKaynagiEkle`.** Sıcaklık `Etkinlik.DURMA` zaten metabolizmayı düşürür; madde 15
+"daha hızlı soğutsun" için ek: oltası delikte, buz (vanilla `#ice`, ince buz dahil) ya da delik üstünde ve saniyede
+0,25 bloktan az yatay hareket eden oyuncunun sayaç saniyesi artar; güç `−min(1, s/20) × 8 °C`. Kaynak saniyede bir, gövde
+merkezinde (ayak + 1; sıcaklık kaynakları orada ölçer), yarıçap 1,5, süre 21 tick. 40 tick'ten uzun ara sayacı
+sıfırlar. `VucutSicakligi.etkiEkle` reddedildi: doğrudan vücuda yazar, yalıtımdan geçmez; madde 15 "kalın giyinmek
+zorunda kalsın" ortam kaynağıyla sağlanır. Bilinen sınır: bir blok yanındaki başka oyuncu ~%11 pay alır. Hareketsizlik
+sıcaklık §A'da ayrı bir kanca olarak yok; ek öneri gerekmedi.
+
+**B-10 Datagen: benzersiz sağlayıcı adları, vanilla blok etiketine yazılmaz.** Vanilla `LootTableProvider` ve
+`RecipeProvider`'ın `getName()`'i final ve aynı adlı ikinci sağlayıcıyı `DataGenerator` reddeder (K-E5): `Adli` sarıcısı
+ad verir ("Balıkçılık loot tabloları", "Balıkçılık tarifleri"); diğerleri `getName()` üzerine yazar. İlk denemede
+`mineable/pickaxe`'e deliği yazan ikinci blok etiketi sağlayıcısı donmanın aynı dosyadaki `ince_buz` satırını sildi (aynı
+yola yazan son sağlayıcı kazanır); sağlayıcı kaldırıldı, dosya geri yüklendi (delik buz kadar kırılgan, etiket
+gerekmez). Bu bulgu K-E12'nin (main `254fe2d`) gerekçesiyle aynıdır: kendi sağlayıcımız yalnız `dogalafetler:*` etiketlerini
+(`cig_kutup_baligi`, `pismis_kutup_baligi`) yazar; `#minecraft:fishes` ilk sürümde yazılıyordu, K-E12 gelince kaldırıldı
+(§A.2). `data/forge/loot_modifiers/global_loot_modifiers.json`'u yazan tek sağlayıcı bizimki (`replace: false`); başka
+bir dal GLM eklerse entegratör tek sağlayıcıda birleştirmeli (aynı dosya, aynı sorun).
+
+**B-11 Yiyecek değerleri.** Sıcaklık sayıları B-19 ile değişti (tur 1'in −18/+18/+25 config anahtarları kaldırıldı).
+Doyuruculuk kod sabiti (kayıt anında config yüklü değil): çiğ 2/0,1 (ringa 3/0,2), pişmiş 5/0,6 … 7/0,9 (vanilla
+pişmiş morina 5/0,6, somon 6/0,8). Yığın 16, yeme 32 tick (madde 14). Tooltip'ler `appendHoverText`.
+
+**B-12 Buz Parçası.** Madde 15 çöpü "Buz Parçası" vanilla'da yok: `dogalafetler:buz_parcasi` eşyası; 4 tane → 1 buz
+(şekilsiz) ile çöp bir işe yarar.
+
+**B-13 Pişirme tarifleri.** Vanilla balıklarıyla aynı: ocak 200 tick, tütsüleme 100, kamp ateşi 600, XP 0,35.
+
+**B-14 Yaratıcı sekmeler vanilla.** Balıklar "Yiyecek ve İçecekler", buz parçası "Malzemeler"; modun kendi sekmesi yok.
+
+**B-15 Görsel.** Model: 3 pikselik buz halka (`buz_deligi_kenar`, ~%85 opak), dış yüzler komşu buza karşı cullface;
+aşama 1–3'te 10×10 açıklığın üstünde (y 14,6; su yüzeyi 14,2) buz zarı. Parçacıklar sunucunun yolladığı vanilla
+parçacıklar (açılış: buz kırıntısı, sıçrama, kar tanesi; aşamalar: kar tanesi; kapanış: buz kırıntısı) ve bloğun
+`animateTick`'i (açıkken kabarcık patlaması, donarken kar tanesi). Yeni parçacık tipi ve istemci kaydı gerekmedi; istemci
+paketi yalnız otomasyondur. Dokular `tools/assets/balikcilik_dokular.py` (Pillow, sabit tohum).
+
+**B-16 Görsel kanıt otomasyonu.** `client.balikcilik.BalikcilikOtomasyonu` (`-Ddogalafetler.otomasyon=balikcilik`), betik
+`tools/senaryo/balikcilik_gorsel.py` (K0-21 rev. 2, ws 94, (k) kilit). Sahne komutla kurulur (G 60, 7×7 donmuş gölet);
+delik gerçek Forge olayıyla açılır, olta sunucuda oluşturulup deliğe bırakılır (fare/klavye yok), gerçek ısırma beklenir,
+`retrieve` ile çekilir. Tooltip karesi otomasyonun çizdiği katmanda gerçek `GuiGraphics.renderTooltip` ile (imleç oynatılamaz).
+
+
+**B-17 `sifirla` (K-E11).** Bağımlı kalıcı durum yok: açık delikler blok durumu + zamanlanmış tick, chunk sayacı yok
+(B-07), oltaların beklemesi ve hareketsizlik sayaçları bellekte. `DonemDegistiEvent(SIFIRLAMA)` dinleyicisi
+(`BuzBalikciligi.donemDegisti`) hareketsizlik sayaçlarını siler ve delikteki oltalara yeni bekleme çektirir. Açık
+delikler sıfırlamada silinmez: oyuncunun dünyasındaki bir blok değişikliğidir ve en çok 5 dk içinde kendiliğinden
+donar (eski buz geri gelir; donma `sifirla` sonrası kendi buzunu bitle çözer, K-D11).
+
+
+**B-18 Görsel koşu 1 bulgusu: çekilen eşya delikte kalıyordu.** Koşu 1'de gerçek ısırma 46,8 sn'de geldi, çekme olta
+hasarı 1 verdi ama `BalikTutulduEvent` yayınlanmadı ve eşya envantere gelmedi. Kök neden: vanilla ısırmada şamandırayı aşağı
+çeker, olta deliğin altındaki su bloğuna iner (`delikteMi` yalnız oltanın bloğuna bakıyordu); ayrıca vanilla eşyayı olta
+konumunda doğurup oyuncuya fırlatır, deliğin komşuları buz olduğu için eşya duvara çarpıp suda kalır. Düzeltme:
+`delikKonumu` oltanın bloğundan yukarı en çok iki su bloğu boyunca deliği arar (GLM ve olay aynı sorguyu kullanır);
+`ItemFishedEvent`'ten hemen sonra aynı tick'te doğan, delik sütunundaki `ItemEntity` deliğin üstüne alınır ve vanilla
+formülüyle oyuncuya yeniden fırlatılır. GameTest `deligeAtilanOltaBuzDeligiLootunuVerir` iki durumu da denetler; koşu 2'de
+olay `[1 buz_alabaligi] (balık 1)` ve eşya elde.
+
+**B-19 Balık sıcaklığı = yiyecek kademeleri (tur 2, Ba5, şef kararı).** → Şef kararları (Faz 3).
+
+**B-20 Yeniden donan delik ve donma biti (tur 2, Ba2; tur 3, Bc2, şef kararı).** → Şef kararları (Faz 3).
+
+**B-21 Pişmiş dokular türün rengini ve siluetini korur (tur 2, Ba6).** Pişmişler artık ortak kahveye karışmaz: her
+türün kendi et rengi (alabalık pembe-turuncu + koyu benek, morina krem beyaz pul pul, somon koyu turuncu + açık yağ
+çizgileri, kefal gri-kahve çizgili, ringa altın), ızgara izi hafifletildi (%35, dört adımda bir). Siluet türe göre:
+kuyruk (alabalık ve morina düz, kefal yuvarlak, ringa çatal, somon derin çatal), sırt yüzgeci, gövde genişliği (2,2–3,3),
+morinada çene bıyığı. Ölçüm (`balikcilik_dokular.py` sonunda yazdırır; ortak opak piksellerde ortalama |dR|+|dG|+|dB|):
+pişmiş çiftler 76,5–215,2 (tur 1: 16,9–47), siluet farkı 9–30 px (tur 1: 1–15). Görüntü değerlendiricisi pişmiş ayırtı
+3/4 (tur 1: 2/4). Karşılaştırma kâğıdı `.vibe/kanit/balikcilik/baliklar-tur2.png`.
+
+**B-22 Testler güçlendirildi (tur 2, Ba3, Ba4, Ba7) ve vitrin notu (Ba8).**
+- Ba3: `delikGercekZamanlanmisTickleYenidenDonar` aşama 1'de konan deliği gerçek zamanlanmış tick'lerle 1 → 2 → 3 → buz
+  izler; her geçişte yeniden zamanlanmış tick ve aralık = aşama süresi (300 ± 2 tick) denetlenir ve log'lanır
+  (`[balikcilik] test: delik aşaması ...`). Açılıştan aşama 1'e ilk gecikme ≥ 3900 tick olduğu ve config değiştirmek kalıcı
+  GameTest dünyasının config dosyasına yazılacağı için 0 → 1 adımı (aynı `tick` kodu) burada koşulmaz; doğrudan `tick`
+  çağıran test de kalır.
+- Ba4: `acikSudaVanillaLootDegismez`: buzsuz havuzda zorlanmış ısırma; `ItemFishedEvent` sonucunda `dogalafetler:` eşyası yok,
+  `BalikTutulduEvent` yok. Kendi batch'inde (`balikcilik_acik_su`) donma 0: ilk iki koşuda `balikcilik` batch'inin donma
+  %50'si gökyüzüne açık havuz yüzeyini buza çevirdi, şamandıra buzun içinde kaldı (log: `sıvı=EmptyFluid`). GLM'nin
+  kararı donmaya bağlı değil (`delikteMi`), test kapsamı değişmez.
+- Ba7: meteor totolojisi yerine varsayılan oranların tam değerleri ve şans 3 oranları (JUnit); `Aktiflik`'in ölü kış dalı
+  kaldırıldı (B-02); GameTest bekleme alt sınırı config'ten: `kalan >= enAz − (atıştan geçen tick) − 1` (önce 200 tick pay).
+- Ba8: kareler işlev kanıtı olarak kabul (şef); vitrin anı (gün batımı, alçak açı ve ısırma anı, elde Donmuş Ringa) Faz 5
+  görsel turunda çekilir. Tur 2'de runClient koşulmadı.
+
+### Reddedilen yollar
+
+- **Kendi `FishingHook` alt sınıfı:** atarken deliğe gideceği bilinmez; tüm olta kullanımlarını (`RightClickItem`) ele
+  geçirip alt sınıf doğurmak başka modların oltalarını/büyülerini ve vanilla istemci tahminini bozar.
+- **Mixin (`catchingFish`):** olay + tick + yansıma yettiği için gerekmedi (GÖREV §3 "mixin yalnız event yetmiyorsa").
+- **`ItemFishedEvent`'i iptal edip kendi eşyalarını doğurmak:** istatistik, XP ve `fishing_rod_hooked` ölçütünü elle
+  tekrarlamak gerekirdi; Forge belgesi GLM'yi önerir.
+- **Sabit ağırlıklı tek loot tablosu:** oranlar config'ten gelemezdi. **Kategori seçimini GLM içinde yapmak:** tablo veri
+  paketinde görünmez olurdu.
+- **Waterlogged buz bloğu:** kova suyu alır, blok buz gibi kalır, sıvı tick'leri başlar.
+- **4 piksellik çerçeve çarpışması herkes için:** olta 0,5 bloklu açıklığa zor girer; 3 piksel oyuncuyu (0,6) düşürür.
+- **SavedData delik sayacı:** kırılan/patlayan/`setblock` deliklerde sapar; palet taraması durumsuz.
+- **BlockEntity ile ömür:** zamanlanmış tick aynı işi kayıtlı ve ucuz yapar.
+- **`VucutSicakligi.etkiEkle` ile hareketsizlik soğuması:** yalıtımı atlar (B-09).
+- **`mineable/pickaxe`'e delik:** donmanın satırını siliyordu (B-10).
+
+
+## Faz 3 — Başarımlar
+
+Parça `basarim` (dal `is/basarim`, son commit `85b77e2`; `main`'e birleştirme `d23653b`). Kaynak `.vibe/kararlar/basarim.md` §B/§C/§D;
+diğer işçilerin kullandığı arayüz sözleşmeleri (§A) ve entegratöre notlar (§E) o dosyada kalır; metindeki §A/§E göndermeleri o dosyaya aittir.
+Şef kararları (A-29, A-30, A-31, A-35) "Şef kararları (Faz 3)" bölümündedir; N17 satırları sondaki tablodadır. Rapor `.vibe/rapor/basarim.md`.
+
+**A-01 Dört genel ölçüt sınıfı, kayıt ortak kurulumda.** 15 tetikleyici `BasitOlcut` (alansız), `EsikOlcutu` (sayısal eşik,
+`kesin` bayrağı), `EsyaOlcutu` (`ResourceLocation`) ve `AfetOlcutu` ile; hepsi `SimpleCriterionTrigger` (oyuncu başına dinleyici).
+Nesneler `BasarimOlcutleri`'nde `static final` (yan etkisiz); vanilla `CriteriaTriggers.register` `FMLCommonSetupEvent.enqueueWork`
+içinde (kayıt haritası düz `HashMap`, mod kurucuları paralel). Datagen yalnız örneği serileştirir, kayıt gerekmez.
+
+**A-02 Şartnamenin sayıları JSON'da.** 5 tüy, 4 yünlü, 25 balık, 3 oyuncu, %50 donma, 3 gün, 10 sn ve seviye 3/5 advancement
+JSON'unun ölçüt alanlarındadır (veri paketiyle değişir, N12 ruhu). Kodda yalnız tanımı gereği sabit olanlar kaldı:
+`AfetIzi.YANGIN_SANIYESI = 30` (madde 12 #5), sinkhole düşüşü 4 blok ve yangın yakınlığı 8 blok (yedek denetim, §C).
+
+**A-03 Oyuncu verisi `getPersistentData()` + `PlayerEvent.Clone`.** `dogalafetler_basarim` bileşiği (sıcaklığın `VucutSicakligi`
+deseni): atlatılan türler, balık toplamı, ünvan, kutup sayacı, deniz ölüm döngüsü, süren afetin izi. Capability yerine: veri yalnız
+sunucuda okunur, istemciye gitmez, &lt; 200 bayttır, oyuncu dosyasıyla kaydedilir; ölümde ve End dönüşünde `Clone` ile kopyalanır.
+Kısa ömürlü durum (yıldızlı gece sayacı, çorba takibi, yangın saniyesi tekilliği) bellekte, çıkışta silinir.
+
+**A-04 "Sağ çıkan" türetimi.** `SagCikanTuretimi`: doğal olmayan bitişte boş; olaydaki `sagCikanlar ∩ etkilenenler`;
+`basarim.etkiAlaniPayi` (vars. 0) > 0 ise başarım kendisi de izler: AKTIF aşamada saniyede bir etki alanı + pay içindeki oyuncu
+izine `alanda`, afet sürerken ölünce `oldu` yazılır; bitişte `alanda ∧ ¬oldu ∧ çevrim içi` olanlar da sağ çıkandır. Madde 12'deki
+"afet yarıçapında, config'den ayarlanabilir" yarıçapın kendisi afetin seviye tablosundadır (Faz 4); pay başarıma özgü ek alandır.
+
+**A-05 XP: JSON varsayılanı + config farkı.** `rewards.experience` görev 15, hedef 40, meydan okuma 100 (madde 12 "küçük"; 100 XP
+≈ 7 seviye). Config `basarim.odul.*Xp` farklıysa fark `AdvancementEarnEvent`'te `giveExperiencePoints` ile eklenir (negatifse geri
+alınır; config en az 0 olduğu için net XP ≥ 0). Böylece toast/ödül vanilla kalır, config yine etkilidir. Veri paketi JSON XP'sini
+değiştirirse fark kod varsayılanına göre hesaplanır (bilinen sınır).
+
+**A-06 Hedef ödülü loot tablosu, yiyecek datagen anında çözülür.** `dogalafetler:rewards/hedef`: 1 havuz, 1–2 adet
+(`set_count` uniform). Yiyecek `dogalafetler:sicak_salep` datagen anında kayıtlıysa o, değilse `minecraft:baked_potato` (vanilla
+pişmiş yiyecek, madde 14'e göre hafif ısıtır). Kayıtsız eşya adı loot tablosunu yüklenemez yapar; bu dalda yiyecek dalı yok.
+Yiyecek dalı birleşince `runData` Sıcak Salep'i yazar.
+
+**A-07 Mod eşyası ikonları için vanilla yedek.** İkon kayıtsız eşyaysa advancement yüklenmez; datagen anında kayıtlı değilse
+yedek yazılır (Meteorit Parçası → ateş topu, Kozmik Çekirdek → End kristali, Hava Radarı → pusula, Sismograf → sculk sensörü,
+Sıcak Tavuk Çorbası → mantar çorbası). Birleşmeden sonra `runData` gerçek ikonları yazar.
+
+**A-08 Kutup Sığınağı sayacı.** Saat oyun gününün tabanı `getGameTime() + uykuBirikimi` (K-C42: uyku sayılır, `/time set`
+saymaz). Saniyede bir, oyuncu canlıyken ve dünya donma %100'ü görmüşken (G ≥ %100 ya da evre KIZIL_CUCE, "ulaştıktan sonra")
+birikir; tek adımda en çok 1 gün + 200 tick (uyku atlaması). Ölüm sıfırlar; girişte son gözlem unutulur: çevrim dışı süre "hayatta
+kalma" sayılmaz (yalnız oyunda geçirilen süre). Kızıl cüce gecikmesi ≥ 3 gün (gökyüzü G-kuralı) olduğundan doğuş sayacı bozmaz.
+`sifirla` sonrası sıfırdan başlar (A-27).
+
+**A-09 Kök: `SirenIstegiEvent`.** Görev metni `AfetAsamaDegistiEvent` SIREN'i öneriyordu; o olayda alıcı listesi yok. Siren isteği
+tam alıcıları taşır (etki alanı + `sirenEkYaricap`, global afette herkes) ve siren sürerken alana giren/bağlanan oyuncuya yeniden
+gelir: "ilk afet sirenini duymak" birebir.
+
+**A-10 Çatı Altı "hiç hasar".** Tek kaynak asit yağmurunun `HASAR_ALDI` ipucudur (A-30, A-31, A-35): asit işçisi kayıt yaptıysa
+yalnız asidin verdiği hasar bozar (zombi vuruşu bozmaz). Kayıt yoksa olay yok sayılır ve yedek
+denetim: AKTIF afette etki alanındayken alınan her hasar (`LivingDamageEvent`, miktar > 0, LOWEST); bu yedekte çatı altındaki
+oyuncu düşme hasarı alırsa da kaybeder (inceleme A3'ün yanlış negatifi; Faz 4 kaydıyla kapanır).
+
+**A-11 Dalga Avcısı:** `SURUKLENDI` ipucu; yedek (A-31): AKTIF tsunamide etki alanında, her tick `SanalSu.itmeHesapla(o, …) != null`.
+**A-12 Delikten Dönüş:** `CUKURA_DUSTU` ipucu; yedek: AKTIF sinkhole etki alanında `fallDistance ≥ 4` (ağaçtan atlayanı da
+sayar, inceleme A3; Faz 4 kaydıyla kapanır). **A-13 Yanmadan Çıktım:** `YANGIN_ALANINDA` ipucunun her oyun saniyesi (saniyede en çok
+bir) sayılır, toplam ≥ 30 (kesintisizlik şart değil: "en az 30 saniye kalıp"); yedek: AKTIF orman yangınında etki alanında ve 8
+blok içinde yanan hücre olan her saniye, kendi sayacında (olay ve yedek saniyeleri toplanmaz).
+
+**A-14 Çorba İçer Isınır (N16).** Başlangıç kademesi yemeye başlarken (`LivingEntityUseItemEvent.Start`) ölçülür: anında
+ısınma `Finish`'ten önce eklenir ve oyuncuyu eşiğin üstüne çıkarabilir. "Donma durumu" = yalnız `Kademe.DONUYOR` (≤ −75, A-29;
+`CorbaTakibi.donmaDurumunda`). Sıcak yiyecek = etiket `dogalafetler:basarim/sicak_yiyecek` ya da yedikten sonra taze pozitif
+`SureliEtki` (`Finish`'te geçen ≤ 1 tick, saniyelik denetimde ≤ 60 tick: durum efekti ilk tick'inde ekliyorsa da yakalanır). "Etkisi
+sürerken" = o etkinin süresi (etiketle tanınıp süresi görülmeyende 180 sn); bu sürede `Kademe.NOTR` görülünce bir kez tetiklenir.
+Sıcaklık kapısı kapalıyken vücut hep nötr okunur: başarım alınamaz (bilinen sınır). Tur 1'deki `SOGUK` ve altı seçimi
+(inceleme A1, P1) kaldırıldı: −31'de bir kızarmış patatesle alınabiliyordu.
+
+**A-15 Buz deliği balığı.** `ItemFishedEvent` LOWEST (iptal edilmemiş): kancanın bloğundan bir aşağı ile üç yukarı arasında
+`dogalafetler:buz_deligi` varsa (balıkçılık işçisi: ısırmada olta deliğin altındaki suya 1–2 blok iner, kanca bloğu o zaman su olur)
+düşen eşyalardan yenebilir olanların adedi "balık" sayılır. Balıkçılığın kendi sayımı `#dogalafetler:cig_kutup_baligi` etiketidir; o
+dalda yakalanan yenebilir eşyalar yalnız bu çiğ balıklardır (çöp: buz parçası, kar topu; hazine: kitap yenmez), sonuç aynıdır.
+Toplam oyuncu verisinde; #20 `min 1`, #21 `min 25`. Balıkçılığın `BalikTutulduEvent`'i bu dalda yok (main'de de henüz yok),
+derlenemez; birleşmede olay yolu tercih edilir (§E.3).
+
+**A-16 Yerden alma `PlayerEvent.ItemPickupEvent`.** `EntityItemPickupEvent` envantere girmeden ve iptal edilebilir hâlde gelir; dolu
+envanterde alınamayan eşya da sayılırdı. Pickup olayı eşya envantere girdikten sonra, alınan adetle gelir.
+
+**A-17 Üretim `ItemCraftedEvent`** (sunucu tarafı, `ServerPlayer`); kimlik birebir: Gelişmiş Hava Radarı ve Hassas Sismograf ayrı
+kimliktir, saymaz ("İlk Sismograf'ı craft et").
+
+**A-18 Tüy upgrade'i:** sıcaklığın `TuyUpgrade`'i (NORMAL) sağ tık olayını iptal edip uygular; başarım dinleyicisi LOWEST ve
+`receiveCanceled` ile sonra gelir ve yardımcı eldeki zırhın tüy sayısını verir. Son tüy harcanınca ana el boşalsa da sayılır.
+
+**A-19 Buzul Çağı "geçsin" = kesin büyük** (`esik: 50`, > 50). Saniyelik denetim süreçteki küçük adımları, `DonemDegistiEvent(DONMA)`
+komutla gelen ≥ 1 puanlık sıçramayı hemen yakalar (süreç her tick yazdığı için olay yolu daraltıldı). Canlı oyuncu şartı ("sen hayatta ol").
+
+**A-20 Yükselen Sular:** tamamlanma anı `DenizSeviyesi.mevcutArtis ≥ hedefArtis − 0,001` (hedef > 0). Yükseliş sürerken
+(0 < mevcut < hedef) ölen oyuncu o döngüde (`baslangicSaati`) hak kazanmaz; tamamlanma anında çevrim içi ve canlı olanlar kazanır.
+Bekleme süresindeki (mevcut = 0) ölüm sayılmaz: yükseliş henüz yaşanmıyor.
+
+**A-21 Süpernova Tanığı / Yıldızlı Gece:** tanımlar gökyüzünün (`Gokyuzu.supernovayiGoruyorMu`, `yildizliGeceMi`, N16). Yıldızlı gece
+sayacı kesintisiz saniyedir (`ArdisikSayac`); koşul bozulunca, ölünce ve çıkınca sıfırlanır; eşik JSON'da `saniye: 10`.
+
+**A-22 Kozmetik ünvan (N16).** Her meydan okumanın kendi ünvanı: Kutup Sığınağı → "Kutup Sakini", Kozmik Şans → "Kozmik Kâşif",
+Felaket Ustası → "Felaket Ustası", Hepsini Atlattım → "Her Şeyi Atlatan"; en son kazanılan geçerlidir (OP komutla değiştirir).
+`PlayerEvent.NameFormat` ve `TabListNameFormat` (LOW, yalnız `ServerPlayer`) altın `[ünvan] ` öneki ekler; ad bileşeni çevrilebilir,
+her istemci kendi dilinde görür. Sohbet satırı, ölüm ve başarım duyuruları sunucunun görünen adını kullanır. `unvanGoster=false`
+iken önek yok, veri korunur. Giriş, yeniden doğuş, ünvan değişimi ve config yeniden yüklemesinde `refreshDisplayName` +
+`refreshTabListName`. Ünvan, başarımın ilerleme olayında verilir (A-32): meydan okumanın kendi sohbet duyurusu da önekli adı
+taşır. İstemcideki baş üstü ad etiketi değişmez (N16 sohbet ve tab der).
+
+**A-23 Sekme ağacı.** Ebeveynler yerleşimdir, ön koşul değildir (vanilla): bölgesel afetler (1–6), meteor (7 → 22), güneş zinciri
+(8 → 9 → 10 → 11; 10 → 20 → 21), ay (12 → 13, 14), aletler (16 → 15), giyim (17 → 18 → 19), şiddet (23 → 24 → 25, 23 → 26).
+Görünürlük vanilla: kazanılmış atadan en çok iki kat aşağısı görünür; #25 ve #26 `hidden=true` (açılana kadar görünmez).
+Kök arka planı `textures/gui/advancements/backgrounds/felaket.png` (16×16, `tools/assets/basarim_ikon.py`).
+
+**A-24 Tek veri sağlayıcısı.** Vanilla `AdvancementProvider.getName()` `final` "Advancements"; başka bir alt sistemin sağlayıcısıyla
+`Duplicate provider` olurdu (K-E5). `BasarimVerileri` tek `DataProvider` ("Doğal Afetler başarımları"); JSON vanilla kurucularıyla
+(`Advancement.Builder.serializeToJson`, `LootDataType.TABLE`) üretilir.
+
+**A-25 Hepsini Atlattım / Birlikte Hayatta.** Küme sekiz türün hepsidir (seviyesiz güneş ve ay dahil), oyuncu başına kalıcı;
+"Birlikte Hayatta" aynı afetin türetilmiş sağ çıkan sayısıdır (pay dahil), eşiği geçince bütün sağ çıkanlara.
+
+**A-26 Doğrulama komutu `/dogalafet basarim bilgi [oyuncu]`** (N18 ruhunda, OP): yüklenen sekme başarımı sayısı (27/27), oyuncunun
+kazandığı, atlattığı türler, balık toplamı, kutup günü, ünvan. Dedicated senaryo bununla advancement'ların yüklendiğini görür.
+
+**A-27 `/dogalafet sifirla` (K-E11).** `DonemDegistiEvent(SIFIRLAMA)` geldiğinde başarım `DunyaDonemi.ekVeri("basarim")`'e yeni bir
+döngü işareti yazar (`sifirlama` = `max(üst dünya getGameTime() + 1, önceki işaret + 1)`: sıfırlama ek veriyi boşaltır; işaret
+sıfırdan farklı ve oturumda kesin artan, aynı tick'teki iki `sifirla` de ayrılır — ilk GameTest koşusu tam bu durumda düştü) ve
+`ekVeriDegisti` çağırır. **Sıfırlanmayanlar** (oyuncu verisi, kalıcı ilerleme): kazanılmış advancement'lar,
+"Hepsini Atlattım" kümesi, buz deliği balık toplamı, ünvan; Yıldızlı Gece 10 sn sayacı zaten bellektedir ve ay geri gelince
+kendiliğinden kesilir. **Sıfırlananlar** (döneme bağlı ara sayaçlar): Kutup Sığınağı'nın "donma %100'den beri gün" birikimi
+(oyuncu verisinde `kutupDongu` işaretle eşleşmezse 0 okunur; çevrim dışı oyuncu da ilk okumada sıfırlanır) ve `sonDonma`. Deniz
+ölüm döngüsü (`DenizSeviyesi.baslangicSaati`) ve afet izi (afet numarası) zaten kendi döngü anahtarlarıyla ayrılır. GameTest
+`kutupSiginagiUcGunSifirlaYalnizAraSayaciSifirlar` gerçek `AfetYoneticisi.sifirla()` ile sınar.
+
+**A-28 Etiketler (K-E12).** Başarım vanilla (`minecraft:*`) etikete katkı vermez; tek etiketi `dogalafetler:basarim/sicak_yiyecek`
+(eşya) kendi `DataProvider`'ında yazılır. `DataGenerators.vanillaBlokEtiketiEkle` kancası gerekmedi.
+
+**A-29 Çorba başlangıcı `DONUYOR` (şef kararı, inceleme A1).** → Şef kararları (Faz 3).
+
+**A-30 §6 #16: 27 başarımın her biri GameTest'te kazanılır (şef kararı, inceleme A2).** → Şef kararları (Faz 3).
+
+**A-31 Tek kaynak: olay varsa yedek sayılmaz (şef kararı, inceleme A3; A-35 ile daraltıldı).** → Şef kararları (Faz 3).
+
+**A-32 Ünvan ilerleme olayında (inceleme A6).** Forge `PlayerAdvancements.award` sırası: `AdvancementProgressEvent` → ödül →
+sohbet duyurusu (`getDisplayName()`) → `AdvancementEarnEvent` (javap ile doğrulandı). Ünvan `AdvancementProgressEvent` (`GRANT`,
+ilerleme tamam) dinleyicisinde verilir; meydan okumanın kendi duyurusu da `[Ünvan] Ad` gösterir. Config XP farkı
+`AdvancementEarnEvent`'te kalır. GameTest seviye 5: kazanım olayındaki (duyurudan hemen sonra) ad önekli.
+
+**A-33 Görsel otomasyon komutları (inceleme A4, A6).** Sahne komutları entegre sunucunun konsol kaynağından `withSuppressedOutput()`
+ile verilir (`@s` oyuncu adına çevrilir): başarı ya da hata satırı sohbete düşmez; dördüncü `asama ileri` (afet zaten bitmişken)
+kaldırıldı; kareden önce sohbet (`ChatComponent.clearMessages`, yiyecek Yi4) ve toast'lar temizlenir. Gizliler açıkken Felaket
+Ustası kolu ortalanmış ek kare (`sekme_gizliler_acik_orta`): #25 üst kenarda kırpılmaz. Son `basarim bilgi` çıktısı sunucu log'una.
+
+**A-34 Görsel otomasyonda kare kapısı ve iç imleç (koşu 2 → koşu 3; `bda69e0`, `3181496`).** Koşu 2'de iki toast karesi boş
+çıktı: istemci o anlarda FPS 1 çiziyordu (görünmeyen workspace), `Screenshot.grab` bayat framebuffer'ı aldı; toast'lar sonraki
+karede yarı kaymış görünüyordu. Toast üreten komuttan önce istemci en az 20 FPS çizmeli (şef alt sınırı 15; en çok 60 sn
+beklenir, sonra uyarıyla devam) ve toast karesi adım başından beri en az 20 kare çizilip (`RenderTickEvent` sayacı) 25 tick geçince
+alınır (toast kayması 600 ms, görünürlük 5 sn). Kurulumdaki `advancement revoke` yalnız kendi sekmemize (`from
+dogalafetler:dogalafetler/root`) iner. **Koşu 3 (şefin onayladığı tek ek koşu) toast'ları doğruladı:** iki toast karesi FPS 57/60
+ile alındı, kök toast'ı ve üç toast birlikte görünür. Sabit iç imleç bir widget'ın üstünde kalınca vanilla ipucu kutusu sekmeyi
+karartıyordu (`sekme_erken`, `sekme_gizliler_acik_orta`); `bda69e0` `MouseHandler` konumunu (`f_91507_`/`f_91508_`,
+`ObfuscationReflectionHelper`) sekme açılmadan sıfırlıyordu ve koşu 3'te ipucu kutusu kaldı: `Minecraft.setScreen` fare tutuluysa
+`MouseHandler.releaseMouse` çağırır, o da konumu pencere ortasına geri yazar (javap ile doğrulandı). `3181496` konumu ekran açıldıktan
+sonra sıfırlar; gerçek imlece ve sahibin oturumuna dokunulmaz, girdi sayıları etkilenmez. Üçüncü koşu yok (şef): `3181496` yalnız
+`compileJava` ile denendi, ipucusuz sekme karesi Faz 5 görünür koşusuna kalır. Kare log'u artık önceki adımda çizilen kareyi yazar
+(koşu 3'te adım başında sıfırlanmış sayacı yazıp hep 0 gösteriyordu).
+
+**A-35 İnceleme-basarim-2 P2'leri (Bs1…Bs3, şef kararları).** → Şef kararları (Faz 3).
+
+### Reddedilen yollar
+
+- **Vanilla `inventory_changed` / `recipe_crafted` ölçütleri:** eşya yüklemi kayıtsız eşyada advancement'ı yüklenemez yapar
+  (Faz 3 eşyaları paralel dallarda); kendi `esya_*` ölçütü kimliği yalnız karşılaştırır.
+- **Capability:** istemci eşitlemesi ve kayıt kodu gerekmiyor; kalıcı veri küçük (A-03).
+- **`ForgeAdvancementProvider` / `LootTableProvider`:** adları `final`, başka sağlayıcıyla çakışır (A-24).
+- **Loot tablosunda sabit `sicak_salep`:** bu dalda eşya yok, tablo yüklenemezdi (A-06).
+- **Ünvanı `rewards.function` ile vermek:** mcfunction oyuncu kalıcı verisine yazamaz, ad olaylarını tetikleyemez; olay yolu (A-22).
+- **XP'yi tamamen koddan vermek (JSON 0):** advancement ekranındaki ödül bilgisini ve veri paketi düzenlenebilirliğini kaybettirir (A-05).
+- **`AfetAsamaDegistiEvent` SIREN ile kök:** alıcı listesi yok, sonradan bağlanan oyuncu kaçar (A-09).
+- **Çatı Altı için `dogalafetler:asit` hasar tipini beklemek:** Faz 4'e bağımlılık; "hiç hasar" harfiyen daha basit ve doğru (A-10).
+- **Yünlü Kahraman için `LivingEquipmentChangeEvent`:** sahte oyuncu tick almadığı için olay gelmez, sınanamaz; saniyelik denetim
+  hem gerçek hem sahte oyuncuda çalışır.
+
+## Faz 3 — Entegrasyon
+
+Entegratör (`entegrator` oturumu): `main` `254fe2d` üstüne beş dal `merge --no-ff` ile, sırayla yiyecek `4b725ec`, radar-sismograf
+`e8d04f2`, meteor-termostat `6ab6357`, balıkçılık `5f98daf`, başarım `d23653b` (çakışmalar yalnız `DogalAfetler.java` kayıt satırı, iki
+lang dosyası ve `docs/tasarim/esyalar.md` başlığı; lang `runData` ile doğrulandı). K-E13 ve K-E14 şefçe istendi ("Şef kararları
+(Faz 3)"). Rapor `.vibe/rapor/entegrasyon-3.md`, kanıt `.vibe/kanit/entegrasyon-3/`.
+
+**K-E15 Birleşik GameTest: üç test batch sırasından ve sahne yerleşiminden bağımsız.** Dört dalın birleştiği `main`'in ilk
+koşusu 131'den 3 düştü (`.vibe/kanit/entegrasyon-3/gametest-1.log`); üçü de dalında geçiyordu. GameTest sunucusu batch'leri sırayla
+koşar; sıra ve ızgara yerleşimi test kümesiyle değişir. Üç düzeltme denetimi koruyup testi sıradan ve yerleşimden bağımsız kılar:
+(a) meteor `kraterIsiYukluDegilkenBeklerSonraTamamlanir` ("Expected Blackstone, got Magma Block"): aşama 1'in bitiş taklidi merkez
+chunk'ının tamamını yüklü değil sayıyordu; sahne kökü kayınca magma hücresi merkezle aynı chunk'a düştü ve soğuması da
+bloke oldu. Taklit magma hücresini dışarıda bırakır. (b) yiyecek `guvecSicaktaAsiriIsinmayaIter` ("sahne sıcak olmalı: ortam 5.79",
+dalında 66–72): dönem global; iki batch önce `balikcilik_sinir` donmayı %60'ta bırakıyordu. Mutlak ortam ölçen test nötr
+dönemi (donma 0, güneş normal) kendisi kurar, sonda eskisini geri koyar. (c) donma `simulasyonDisiGorunenChunkDonar` ("hedef chunk
+simülasyon dışında olmalı"): hedef köke göre 40 chunk doğudaydı ve ızgara oraya uzanıyordu; hedef z = −40 chunk, ileti hedefi
+yazar. Beklentiler ve üretim kodu değişmedi (`9389461`).
+
+**K-E16 GameTest yerleşimi tek satırda; her koşu boş dünyayla başlar.** Başarım birleşince 156 testle iki test her koşuda düştü
+(`gametest-5..7.log`): su `denizYukselmesiBolgeyiDegistirmezSifirIzBirakmaz` ("0 aralık", deniz +4) ve yangın
+`blokHasariKapaliykenBlokDegismez` (sahneye doğudan akan gerçek su). Tanı iletileri ve dünya taraması
+(`.vibe/kanit/entegrasyon-3/gametest-dunya-su-taramasi.txt`) iki kök neden verdi. (1) Vanilla `GameTestBatchRunner` satırı yalnız bir
+batch'in 8. testinde kırar (sayaç batch'e yerel; `javap`) ve yeni satırın derinliğini yalnız o batch'in şablonlarından alır:
+`balikcilik` (9 test, 1×1×1 `bos`) satırı kırınca ikinci satır z = 7'de başladı; aynı satırdaki `donma_alan` (9 derin) ve `donma_gol`
+(32) sahnelerini ikinci satırın alan temizliği kesti ve donma gölünün suyu su sahnesinin kuzey duvarına aktı. `defaultBatch` (31) ve
+`yangin_genel` (8) de satır kırıyordu. (2) Saklanan dünyada (K-C24) eski yerleşimlerin kutu dışında kalan donma gölleri (y −58…−56,
+3113 kaynak blok) yeni yerleşimin kenar temizliğiyle açılıp yangın sahnesine akıyordu: K-E6'nın "kaynağı bulunmadı" suyu. Karar:
+hiçbir batch 8 test taşımaz (balıkçılık 7 + 2, `yangin_genel` 7 + 1, `basarim_genel` 5 + 4, `donma_alan` 3 × 5, `defaultBatch` 7);
+bekçi GameTest `CekirdekOyunTestleri.hicBirBatchSatirKirmaz` 8 ve üstü testli batch'i adıyla düşürür. `runGameTestServer` her
+koşuda `run-gametest/oyuntesti-duz`'u siler (`build.gradle`; Gradle çıktısında satır). İki test tanı iletisi kazandı (yangın:
+değişen bloklar ve köşe; su: aralık, köşe, deniz, alan kuyruğu, oyuncu); beklentiler değişmedi. Kanıt: `gametest-12/13/14.log`
+"All 157 required tests passed" (`58251f3`). Reddedilen: düşen iki testi kendi kutusuna daraltmak (K-E6 gibi; sızıntıyı gizler,
+kök neden kalır); GameTest yerleşimine mixin (üretim jar'ına test çatısı yaması); dünyayı saklayıp her test sonunda sahne
+temizliği (satır çakışması koşu içinde de olur).
+
+**K-E17 Faz 3 kancaları ve başarımın tek kaynakları.** (a) Balıklar `YiyecekAPI.uygula` ile (balıkçılık §E, inceleme Bc3):
+azalan verim türü eşyanın kayıt kimliği (her balığın çiği ve pişmişi ayrı tür), çiğ `cigBalik` (küçük serinlik,
+`yiyecek.balik.cigSaniye`), pişmiş `pismisBalik` (orta, `pismisSaniye`), pişmiş Donmuş Ringa `new YiyecekTanimi(kimlik, ISINMA,
+BUYUK, 120, false)` (B-19'un 120 sn'si korunur); `mantik.BalikSicakligi` ve JUnit'i silindi. Balıklar artık durum efekti ve 60 sn
+azalan verim alır. (b) K-E12'nin eşya sürümü: `DataGenerators.vanillaEsyaEtiketiEkle` + tek sağlayıcı `veri.OrtakEsyaEtiketleri`
+("Ortak vanilla eşya etiketleri"); balıkçılık on balığı `#minecraft:fishes`'e ekler. (c) `#dogalafetler:kozmik_cekirdek` tek sabit
+`MeteorEsyaKayitlari.KOZMIK_CEKIRDEK_ETIKETI` (radarın kopyası silindi); radar tarif testi etiketin Kozmik Çekirdeği içermesini
+şart koşar ve onunla gerçekten craft eder (boş etiket dalı artık regresyon). (d) Protokol `"5"` (K-C47, bir kez; radar iki, meteor
+bir paket). (e) Başarım: balık sayımı tek kaynak `BalikTutulduEvent` (başarım §E.3; `ItemFishedEvent` kanca yolu, `DELIK_YUKARI`,
+`BasarimKimlikleri.BUZ_DELIGI` silindi; `balikSayisi()` yalnız `#cig_kutup_baligi` sayar, A-15 ile aynı sonuç). `YiyecekYendiEvent`
+dinlenmez: başarımın `Start`/`Finish` + taze ısınma etkisi yolu aynı yemeyi tanır (§E.4), ikinci abonelik aynı yemeğe ikinci
+kaynak olurdu. Zincir GameTest `corbaGercekYiyecekZinciriyleAcilir`: gerçek Ateşli Güveç `YiyecekAPI`'den yenir, yiyecek olayı bir kez
+ve `oncekiKademe() == DONUYOR` gelir (yiyecek §A3 = A-29), #19 nötrde açılır. `MeteorCarptiEvent` istatistik ve afet koreografisi
+içindir (meteor §A.2); #7 ve #22 eşya alımından, başarım dinlemez. `yayinciKaydet` Faz 3'te gerekmez: dört ipucu Faz 4
+afetlerinindir (§A.3). (f) `runData`: #7, #15, #16, #19, #22 ikonları mod eşyaları, `rewards/hedef` Sıcak Salep (A-06, A-07).
+(g) `DogalAfetler` kaydı `DonmaSistemi.kaydet`'ten sonra: `Yiyecek`, `EsyaKayitlari`, `Meteor`, `Balikcilik`, `Basarim`, sonra
+`Kancalar.bagla()` (`68577b1`, `1e70a46`).
+
 ## Şef kararları (Faz 0–1)
 
 **K0-19 Ay çarpması siren süresi: 60 sn.** Madde 5 "Güneş Patlaması hariç 10 sn" der; bölüm H "siren çaldıktan 60 saniye
@@ -1942,6 +2779,171 @@ Kamera y 14'e alındı. Mağara-sualtı: amber sis rengi uygulanıyordu ama sis 
 ~%30'dan az giriyordu. Gökyüzü görmeyen, blok ışığı alan suda sis yakına çekilir (56 → en yakın 24 blok, sıcak payla
 ölçekli). Görsel doğrulama ve yeniden puanlama Faz 4 tsunami vitrininde (§A2 notu, hedef ≥ 3/4).
 
+## Şef kararları (Faz 3)
+
+Faz 3 parçalarında şefin verdiği ya da kabul ettiği kararlar (kaynak `.vibe/kararlar/<parça>.md` §B; parça bölümlerinde aynı
+kimliklerle atıf vardır) ve entegrasyon görevinde şefin istediği K-E13, K-E14. Başlığında "şef kararı" ya da "(şef, …)" geçen
+kararlar buradadır.
+
+### Entegrasyon
+
+**K-E11 `/dogalafet sifirla` yangın hücrelerini söndürür (şef kararı).** → Faz 2b — Entegrasyon. Faz 3 parçaları `SIFIRLAMA`'yı
+uygular: meteor M-18, balıkçılık `BuzBalikciligi::donemDegisti`, başarım A-27; radar ve yiyecek kalıcı durum tutmaz.
+
+**K-E12 Etiket sağlayıcı sahipliği (şef kararı).** → Faz 2b — Entegrasyon; eşya sürümü K-E17 (b).
+
+**K-E13 Dedicated senaryolar ayrı portla koşabilir; ağır süreç kapısı portu da bekler.** Kök neden: `tools/senaryo/*_sunucu.py`
+betiklerinin çoğu `run-server/server.properties`'in varsayılan 25565 portunu kullanıyordu. Her worktree'nin `run-server/`
+klasörü ayrı olduğu için paralel işçilerin tek ortak kaynağı port; ikinci sunucu bağlanamayıp düşüyordu. Karar: ortak
+yardımcı `cekirdek_sunucu.py`:
+
+- `argumanlar()`: konumsal `<log klasörü>` ya da `--kanit <dizin>` (ikisi farklıysa hata), `--port <n>` (varsayılan 25565,
+  davranış değişmez). Port senaryo süresince `server-port` olarak yazılır; sonda `server.properties` özgün içeriğine döner.
+- `port_bos()`: `SO_REUSEADDR` ile bind denemesi; dinleyen soket (IPv6 çift yığın dahil) dolu, TIME_WAIT boş sayılır.
+- `agir_surec_kapisi(port)`: Gradle < 2, boş RAM ≥ 4 GB ve port boş olana dek 60 sn'de bir, en çok 20 dk; açılmazsa çıkış 3.
+
+Ortak yardımcıyı kullanan meteor/yangın/yiyecek/su/uyarı/gökyüzü aynı argümanları ve kapıyı alır (uyarı `--istemci`
+quickPlay adresine portu geçirir; istemcili kapı RAM ≥ 10 GiB + port). Kendi portu olan donma (25593), balıkçılık (25596),
+eşya (25591) varsayılanlarını ve kanıt klasörlerini korur, `--port`/`--kanit` ve ortak kapıyı alır; bu üçü portu önceki gibi
+`server.properties`'te kalıcı bırakır (izlenmeyen dosya; sonraki senaryo kendi portunu yazar) (eşyanın çıktıyı işçinin
+klasörüne yazması, doğrulama-radar-sismograf-2 (c), böylece kapandı). `gradle_kapisi.sh`: `KAPI_PORT` verilirse portu dinleyen
+süreç kalmamasını da bekler (`ss -Hltn`). Sınır: aynı worktree'de `run-server/` (server.properties, senaryo dünyaları)
+paylaşıldığı için senaryolar yine sırayla koşar. Kanıt: duman testi (`--help` 10/10; port dinlenirken `port_bos` False,
+kapanınca True; `server.properties` yaz/geri al), entegrasyon 3 senaryoları 25611–25621'de (`.vibe/rapor/entegrasyon-3.md`).
+
+**K-E14 Donma test sahnesi kurulumu zamanlayıcının yarım işini atar.** Belirti: `kiyiUzakligiChunkSinirindanBagimsiz` (batch
+`donma_zamanlayici_5`) balıkçılık doğrulamasında 3 koşudan 1'inde "113 sütun … beklenen ice gerçek water" ile düştü
+(`.vibe/kanit/balikcilik-dogrulama/gametest-1.log`). Kök neden: `DonmaZamanlayici.ISLER` (yarım chunk işleri) statik; yalnız
+sunucu açılışında, chunk boşalınca ya da iş bitince temizlenir. Önceki testlerin genel G evresinde (kapsam yok: balıkçılık
+`donma(y, 50)`, gökyüzü G=100) her zaman yüklü spawn chunk'larında yarım kalan işler, sonraki test kapsamı daraltınca da
+`ISLER`'de kalıyordu. Test kurulumu `donguyeGec` ile chunk'ın `sonG`/bit/yarım verisini sıfırlıyor ama işi atmıyordu; kıyı
+sahnesindeki chunk'ın eski işi (ör. 95→100; (95, 100] aralığında eşik yok, K-D8) bitince `sonG=100` yazılıyor, sonraki adımlar
+100→35 çözülme yönünde koşuyor ve su donmuyordu. Kanıt: üç balıkçılık log'unda `donma_zamanlayici_5`'e girerken
+`[donma] özet` `süren=1..2`. Aralıklılık, iş ilerlemesinin nanoTime bütçesine bağlı olmasından. Üretim tutarlı: yarım iş
+bitince yazdığı `sonG` kendi işlediği bloklarla uyumlu; tutarsızlığı yalnız veriyi dışarıdan sıfırlayan test kurulumu
+yaratıyordu. Düzeltme: yalnız GameTest için `DonmaZamanlayici.chunkVerisiniSifirla(chunk, dongu, g, cozulme)` veriyi
+sıfırlar, yarım işi atar (log `[donma] test sahnesi: chunk x,z yarım işi atıldı (G a -> b, n/256 sütun)`), chunk yüklüyse
+yeniden kuyruğa alır; `zamanlayiciHazirla` ve `simulasyonDisiGorunenChunkDonar` bunu kullanır. Test beklentileri değişmedi.
+Kanıt: birleşik koşu 2'de `chunk 4,4 yarım işi atıldı (G 10 -> 5, 6/256 sütun)` (eski iş gerçekten vardı), üç koşu 131/131.
+Reddedilen: testte bekleme/yeniden deneme (kök nedeni gizler); `kapsamAyarla`'da tüm işleri atmak (kapsam dışı chunk'ların
+geçerli işini de silerdi).
+
+### Yiyecek
+
+**F-17 Kutup Balığı Çorbası koşullu tarif (şef kararı, inceleme Yi1).** Tarif ve tarif kitabı başarımı Forge'un üst düzey
+`conditions` dizisini taşır: `[{"type": "forge:not", "value": {"type": "forge:tag_empty", "tag":
+"dogalafetler:pismis_kutup_baligi"}}]` (datagen `YiyecekVerileri.KosulluKayit`, `CraftingHelper.serialize`). Forge 47.4.28
+`RecipeManager.apply` ve `ServerAdvancementManager.apply` bu diziyi yüklemede `ICondition.IContext` etiketleriyle denetler
+(javap: "Skipping loading recipe {} as it's conditions were not met"); `TagEmptyCondition` aynı yeniden yüklemenin
+etiketlerini okur. Etiket boşken tarif yoktur, balıkçılık etiketi doldurunca ek iş gerekmeden yüklenir: entegratörün
+birleştirme sırası fark etmez. Reddedilen: Forge `ConditionalRecipe` (`forge:conditional` sarmalı; aynı sonuç, ekstra iç içe
+biçim), balıkçılığın önce birleşmesini şart koşmak (sıraya bağımlı). Kanıt: GameTest `tariflerMadde14IleBirebir` (boş
+etikette tarif yok, bariyer eşleşmez), dedicated log "8 … yüklendi; koşullu atlanan 1 [kutup_baligi_corbasi]".
+
+**F-18 Cold Sweat yüklüyken yiyecekler yalnız yemek değeri verir (bilinen sınır, şef kararı; inceleme Yi3).** OTOMATIK kipte
+Cold Sweat yüklüyse sıcaklık kapısı kapalıdır (sıcaklık §A4); `YiyecekAPI.uygula` kapı kapalıyken sıcaklık ve efekt vermez
+(F-12), tooltip yine "İçten Isınma: …" yazar. Sıcaklığın S-13 köprüsü yalnız dünya/dönem sıcaklığını Cold Sweat'e taşır,
+yiyecekleri taşımaz. Madde 2'ye aykırı değil (çift etki yok). Faz 5'e: S-18 reçetesine ek olarak Cold Sweat yüklüyken yiyecek
+etkisinin Cold Sweat vücut sıcaklığına köprülenip köprülenemeyeceği (S-13 deseni, Cold Sweat API'si) araştırılacak; karar
+o zamana dek kod değişmez. README "bilinen sınırlar"a girer.
+
+### Radar ve sismograf
+
+**R-17 Gelişmiş tarifler koşullu (inceleme R1, şef kararı).** İki şekilsiz tarif `"conditions": [{"type": "forge:not",
+"value": {"type": "forge:tag_empty", "tag": "dogalafetler:kozmik_cekirdek"}}]` ile üretilir (yiyecek Yi1/F-17 deseni). Etiket
+boşken `RecipeManager`'da yoktur; tarif kitabı ve JEI "Empty Tag" bariyeri göstermez, Hava Radarı + bariyer bir şey vermez.
+Meteor dalı etiketi doldurunca koşul kendiliğinden geçer. GameTest iki durumu da kapsar.
+
+**R-18 Gelişmiş panel ekranın en çok %30'u (inceleme R2, şef kararı).** Madde 13a "küçük, ekranı kaplamayan". Eski Gelişmiş
+panel 150×124 GUI px'ti (468×243'te yüksekliğin %51'i). Yeni düzen: üst bölüm normal radarla aynı (yarıçap 16 kap +
+üç satır, 41 px); altında 9 px'lik kısa satırlar: şiddet adı + hareket oku + hız ya da "Durağan" aynı satırda, "Son afetler",
+5 geçmiş tek sütunda kısa biçimde (`Kasırga S2 3dk`, EN `Tornado L2 3m`). Yükseklik `GostergeYerlesimi.panelYuksekligi(n) =
+41 + 2 + 9n + 2`; en çok 7 satırda **108 px**. Referans GUI ölçeği 2: 1280×720 → 360 px (%30,0), kanıt penceresi 1870×969 →
+484 px (%22,3), 1920×1080 → 540 px (%20,0). JUnit `gelismisPanelGuiOlcegi2deEkranYuksekligininYuzdeOtuzunuGecmez` sınar;
+istemci panel boyutu ve ekran yüzdesi değişince `[radar] panel WxH GUI px (...), ekran WxH: yükseklik %N` satırını log'a yazar.
+GUI ölçeği 4'te (kanıt karelerinin otomatik ölçeği, 243 px) oran %44'e çıkar; oyuncu ölçeği ya da köşesini seçer.
+
+### Meteor ve termostat
+
+**M-22 Vitrin Faz 4'te puanlanır (şef, M2).** Meteor izi ve çarpma vitrini güneş patlaması/ay çarpması vitrininde (yoğunluk,
+kamera ve koreografi afetin). Bu parça yalnız M3/M4 kod düzeltmelerini yapar; tek ek protokol koşusu yalnız ödül ve ipucu
+kareleri (`tools/senaryo/meteor_gorsel.py odul` → `-PotomasyonBolum=odul`): öğlen ışığı + dört deniz feneri, kamera ~1,6 blok;
+her ipucu kendi karesinde, satırlar ekran genişliğine göre sarılır (tooltip'ler üst üste binmez).
+
+### Balıkçılık
+
+**B-19 Balık sıcaklığı = yiyecek kademeleri (tur 2, Ba5, şef kararı).** Tek kaynak yiyeceğin kademeleri: çiğ balık küçük
+serinlik (−8, 60 sn), pişmiş balık orta ısınma (+20, 90 sn), pişmiş Donmuş Ringa büyük ısınma (+35, 120 sn; madde 15
+"daha çok ısınma"). Yiyecek F-01 biçimi: %25 anında, kalan süre boyunca azalan hızla (`VucutSicakligi.etkiEkle(o, toplam·0,25,
+süre, toplam·0,75)`). Balıkçılığın dokuz `cig*/pismis*/ringa*` anahtarı silindi; sayılar `mantik.BalikSicakligi`'nde, dalda
+`YiyecekAPI` olmadığı için yiyeceğin varsayılanlarıyla aynı sabitler (JUnit `BalikSicakligiTest`; GameTest anında −2 / +5 /
++8,75). Geçiş §E.
+
+**B-20 Yeniden donan delik ve donma biti (tur 2, Ba2; tur 3, Bc2, şef kararı).** Delik açılırken kökeni blok durumuna
+yazılır: `buz_deligi[donma=true]` yalnız sütunun donma buz biti (donma §A.6, `ChunkDonmaVerisi.buz(i)`) işaretliyse
+(`BuzDeligiAcma.donmaBuzuMu`). Son aşamada delik **yalnız `donma=true` ve global donma ilerlemesi 0 ise** (`DelikOmru.suyaDonerMi(G,
+donmaBuzu)`: `/dogalafet sifirla` ya da tamamen çözülmüş dünya) **su** olur; vanilla ve oyuncu buzundan açılan delik her
+zaman eski buza döner (madde 15 "eski buz haline dönsün"; `aktiflikEsigi = 0` config'inde de). Aksi hâlde eski buz ve
+sütunun değişmeyen donma biti. Gerekçe: donma süreci açık deliğin sütununu atlar (üst blok su/buz değil); chunk hedefe
+vardıktan sonra donan delik bir daha işlenmez, `sifirla` sonrası "ilk hâl" (N18) bozulurdu. `ince` köken sayılmaz: oyuncu
+ince buz bloğunu da koyabilir, tek doğru kaynak bit. **Bilinen sınır:** kızıl cüce tabanında (G 40) çözülmesi gereken bir
+sütunda donan delik buz kalır (G > 0). Tam çözüm donmadan bir sütun hedefi sorgusu ister (§E). JUnit
+`sifirDonmadaSuyaAksiHaldeBuzaDoner` (bit yoksa donma 0'da da buz), GameTest `sifirDonmadaYalnizDonmaBuzundakiDelikSuyaDoner`
+(bitli ve bitsiz sütunda gerçek açma yolu: `donma` true/false; donma 0'da bitli → su, bitsiz → buz) ve
+`kazmaylaEgilerekDelikAcilirAletBesHasarAlir` (bitsiz buzda `donma=false`). Dedicated senaryo donma 50 adımında `donma=false`
+(→ buz), donma 0 adımında `buz_deligi[asama=3,donma=true]` (→ su) koyar. Senaryoda sıra önemli: donma 50 açıkken açık su
+yüzeyi kalırsa donma süreci sütunu kalın buzla dondurur (doğru davranış; ilk tur 2 koşusunda alttaki su da buz oldu).
+
+### Başarımlar
+
+**A-29 Çorba başlangıcı `DONUYOR` (şef kararı, inceleme A1).** Madde 12 #19 "donma durumundayken", N16 "donma eşiğinin
+altındayken"; sıcaklığın eşiklerinde "donma" donma hasarı kademesidir (`Esikler.donmaHasari`, vars. −75), yiyecek sözleşmesi §A3
+de `oncekiKademe() == DONUYOR` der. `SOGUK` (yavaşlama) ve `COK_SOGUK` (buz kenarı) sayılmaz. Başarım zor ama alınabilir: N16
+"etkisi sürerken nötre dönme" başka ısı kaynaklarını yasaklamaz (Ateşli Güveç + kamp ateşi ya da ılık iç mekan). JUnit
+`CorbaTakibiTest.donmaDurumuYalnizDonmaHasariKademesi`, `soguktaKizarmisPatatesAlinmazDonarkenAlinir`; GameTest
+`corbaIcerIsinirYalnizDonarkenSicakYiyecekle` (−31'de kızarmış patates alınmaz, −80'de Güveç ısınması + nötr alınır, −80'de
+ısıtmayan yiyecek alınmaz).
+
+**A-30 §6 #16: 27 başarımın her biri GameTest'te kazanılır (şef kararı, inceleme A2).** Faz 4'e bağlı olmayanlar gerçek
+yollarla: #8 Güneşi Atlattım ve #9 Süpernova Tanığı sunucu geneli `OyunTestiAfeti(GUNES_PATLAMASI)` yaşam döngüsüyle (doğal bitişte
+evre SUPERNOVA, göğü gören tanık; süreçte ölen ikisini de almaz); #12 Ay Düştü `OyunTestiAfeti(AY_CARPMASI)` ile; #13 Yıldızlı Gece
+`ayVarAyarla(false)` + gece + kesintisiz 10 saniyelik denetim (gündüzle kesilen 9 + 9 yetmez); #14 Yükselen Sular `denizAyarla`
+ile (yükselişte ölen almaz); #7/#22 `ItemPickupEvent` (başka eşya sayılmaz; eşya kardeş dalda kayıtsızken dinleyicinin kimlik yolu)
++ Kozmik Şans ünvanı; #15 Yer Dinleyici üretim yolu; #19 A-29 testi. Faz 4 iç davranışına bağlı #2, #4, #5, #6 afetin
+`BasarimIpucuEvent`'i testten yayınlanarak sınanır (`ipucuOlayiTekKaynakDalgaCukurYanginAsit`); §A.3'te kayıt ve olay Faz 4 afet
+işçisine **zorunludur**. Tablo: rapor §6 #16.
+
+**A-31 Tek kaynak: olay varsa yedek sayılmaz (şef kararı, inceleme A3; A-35 ile daraltıldı).** İz her ipucunu iki kaynakta tutar
+(afet olayı / yedek tahmin; `AfetIzi.olayBitleri`, `tahminBitleri`, yangın için iki ayrı saniye sayacı). Kaynak tür başına
+seçilir: tür o ipucunun yayıncısı olarak kayıtlıysa (`BasarimIpucuEvent.yayinciKaydet`) yalnız olay, aksi hâlde yalnız yedek;
+iki kaynak toplanmaz (çift sayım yok). Kayıtlı yayıncıda yedek denetim hiç çalışmaz (iz yazmaz). Tur 2'deki "o afette herhangi bir
+oyuncu için olay geldiyse de yalnız olay" kuralı (dünya verisi `ipucuAfet`/`ipucuBitleri`) A-35 ile kaldırıldı. Saf mantık
+`AfetIzi.kosullar(olayli)`, `IpucuKaynaklari` (JUnit `AfetIziTest`, `IpucuKaynaklariTest`); GameTest kayıtlı türde ağaçtan
+düşüşün, 30 yedek yangın saniyesinin ve zombi hasarının sayılmadığını, kayıtsız türde yedeğin sayıldığını sınar.
+
+**A-35 İnceleme-basarim-2 P2'leri (Bs1…Bs3, şef kararları).**
+- **Bs1 tab listesi.** Vanilla `Gui` tek oyunculu dünyada tek oyuncuyla tab listesini ancak bir liste hedefi varken çizer; 42ec26f
+  kurulumdan `scoreboard` satırlarını kaldırınca koşu 2/3 `tab_unvan` karesinde liste yoktu (altın önek sohbetteydi). Tab ünvanı
+  kanıtı: koşu 1 `basarim_tab_unvan-1.png` + GameTest `seviyeBesFelaketUstasiUnvanVeXp` (`getTabListDisplayName()` öneki). Otomasyon
+  kurulumu `scoreboard objectives add basarim_kanit dummy` + `setdisplay list` satırlarını yine çıktısız (konsol kaynağı,
+  `withSuppressedOutput`, A-33) verir, kapanış hedefi siler: Faz 5 görünür koşusunda tab listesi çizilir. Ek runClient yok.
+- **Bs2 yayıncı kaydı çalışma anında.** `IpucuKaynaklari.olayGeldi(tür, ipucu)`: kayıtlı yayıncıdan `KABUL`; kayıtsız kaynaktan
+  tür + ipucu başına ilk olayda `UYAR_YOK_SAY` (`LOGGER.warn "[basarim] ... yayıncı olarak kayıtlı değil"`), sonra `YOK_SAY`. Kaydı
+  unutan Faz 4 işçisi ilk olayında uyarı görür; olay yok sayıldığı için sonuç başka oyuncuların olaylarına bağlı değildir (tek
+  kaynak tür başına: kayıtlı = olay, kayıtsız = yedek). Bu yüzden A-31'in "o afette olay geldiyse" yolu ölü kod oldu ve
+  kaldırıldı (`BasarimVerisi.gelenIpuclari/ipucuGeldi`, dünya verisi `ipucuAfet`/`ipucuBitleri`; eski kayıtlardaki bu anahtarlar
+  okunmaz, zararsız). JUnit `IpucuKaynaklariTest` iki durum (kayıtlı: her olay kabul, yedek kapalı; kayıtsız: ilk olay uyarır,
+  tekrar uyarmaz, tür/ipucu başına, kayıttan sonra kabul). GameTest: dört ipucu testi dört türü geçici yayıncı yapar (Faz 4
+  davranışı); kayıtsız sinkhole'da gelen olay ize yazılmaz (`olayBitleri == 0`). Kayıt unutulur ve hiç olay gelmezse uyarı
+  yoktur; o durumda davranış yedek denetimdir (belirlenimci) ve §A.3 kaydı zorunlu tutar.
+- **Bs3 vitrin sırası.** Doğal bitişte İlk Rüzgâr, Fırtınaya Meydan Oku ve Felaket Ustası aynı `afetten_sag_cikti`
+  tetikleyicisinin dinleyicileri; sıraları garanti değil (koşu 2: Fırtınaya → Felaket Ustası → İlk Rüzgâr; koşu 3: Felaket
+  Ustası → İlk Rüzgâr → Fırtınaya). Oyun mantığı değişmedi. Yalnız otomasyon: AKTIF aşamada İlk Rüzgâr ve Fırtınaya ayrı
+  adımlarda (her biri kazanıldığı görülmeden sonraki verilmez) `advancement grant` ile verilir, doğal bitiş yalnız Felaket
+  Ustası'nı (ünvanla) açar: toast ve duyuru sırası İlk Rüzgâr → Fırtınaya → Felaket Ustası. Doğal bitişin üçünü birden
+  verdiği GameTest'lerde sınanır (`dogalBitenKasirga…`, `seviyeUc…`, `seviyeBes…`). Tasarım notu "Vitrin anı" sıranın oyunda garanti
+  olmadığını yazar.
+
 ## Açık noktalar (Faz 2b)
 
 Entegratöre bırakılan notlardan işlenenler: kancalar (K-E1), protokol (K-C47), `asama ileri [süreç]` (K-C48), sanal su §3a istisnası
@@ -1963,7 +2965,32 @@ worktree kaldırıldı, beş spike kalır). Açık kalanlar:
   şablonunun x/z 14–15 kenarına gerçek akıcı su (`water[level=3..6]`) aktı; kaynağı bulunmadı. Aday: kalıcı K-C24 dünyasında
   komuşu bir donma/buharlaşma sahnesinin (geri dolma) ya da zaman aşımıyla temizlenmeden biten bir testin bıraktığı su. Kaynak bir
   test sahnesiyse o test kendi kutusunu kapatır/temizler; üretim kodundaysa (geri dolmada akıcı su) donma işçisine gider. Faz 4
-  tsunami işçisi mağara testinde (batch yerleşimi ve komşu sahneler) araştırır.
+  tsunami işçisi mağara testinde (batch yerleşimi ve komşu sahneler) araştırır. **Faz 3'te bulundu (K-E16):** vanilla
+  yerleşiminin satır kırması ve saklanan dünyadaki eski donma gölleri; GameTest tek satırda ve her koşu boş dünyayla.
+
+## Açık noktalar (Faz 3)
+
+Entegratöre bırakılan notlardan işlenenler: balık ↔ yiyecek (K-E17 a), `#minecraft:fishes` (K-E17 b), `kozmik_cekirdek` ve gelişmiş
+tarifler (K-E17 c), protokol (K-E17 d), başarımın tek kaynakları (K-E17 e), `runData` ikon ve ödül (K-E17 f), `docs/tasarim/esyalar.md`
+tek başlık (beş bölüm), dedicated port (K-E13), aralıklı donma testi (K-E14), GameTest yerleşimi ve Faz 2b'nin sızan suyu (K-E16),
+birleşmiş beş worktree kaldırıldı (`.vibe/diff/<parça>.patch` kalır). Açık kalanlar:
+
+- **Faz 5 görünür koşusu (runClient kareleri):** başarım sekme ipucu kutusu (A-34; `3181496` yalnız derlendi), tab listesi ünvan
+  karesi (Bs1, A-33) ve vitrin anı sırası (Bs3); radar Gelişmiş panel karesi (R-18), öncü sarsıntının oyun içi Wave ölçümü (R4) ve
+  radar elde / ekran açıkken FPS (R3, R-19); balıkçılık vitrini (Ba8, B-22).
+- **Meteor vitrini Faz 4'te (M-22):** meteor izi ve çarpma vitrini güneş patlaması / ay çarpması vitrininde puanlanır.
+- **Meteor çarpma sesi (M-12):** şimdilik vanilla patlama (alçak perde); tasarımın "30–80 Hz güm + çakıl" sentezi Faz 4 afet ses
+  tasarımıyla.
+- **Kızıl cüce tabanında yeniden donan delik (B-20):** delik yalnız global donma 0 iken suya döner; kızıl cüce tabanında donma buzunda
+  açılmış delik eski buza döner (bilinen sınır). Donmaya `hedefDonmusMu` sorgusu önerisi (balıkçılık §E) Faz 5.
+- **Cold Sweat (S-18, F-18):** Cold Sweat yüklüyken yiyecekler (balıklar dahil) yalnız yemek değeri verir; yiyecek etkisinin Cold
+  Sweat vücut sıcaklığına köprüsü Faz 5'te S-18 reçetesiyle araştırılır; README "bilinen sınırlar".
+- **GameTest hijyeni:** balıkçılık testleri global donmayı 50/60'ta bırakıyor (`BalikcilikOyunTestleri.donma()`); mutlak ortam ölçen
+  testler kendi dönemini kurar (K-E15 b). Öneri: `donma()` test sonunda eski değeri geri koysun.
+- **Faz 4 görev metinlerine girecek kurallar:** her batch en çok 7 test (K-E16; bekçi `hicBirBatchSatirKirmaz`); dedicated
+  senaryolar `cekirdek_sunucu.argumanlar` / `agir_surec_kapisi` ile `--port` / `--kanit` alır (K-E13); tsunami, sinkhole, orman
+  yangını ve asit yağmuru mod kurucusunda `BasarimIpucuEvent.yayinciKaydet`, koşulda `BasarimIpucuEvent` yayınlar (başarım §A.3,
+  A-30, A-31; Faz 4 log'unda "yayıncı olarak kayıtlı değil" satırı 0); kodla blok değiştiren afet `SanalSu.chunkDegisti` çağırır.
 
 ## N17 — Sayısal varsayılanlar
 
@@ -2128,6 +3155,91 @@ worktree kaldırıldı, beş spike kalır). Açık kalanlar:
 | su (CLIENT) | `su.okumaButcesi` | 64 | chunk / 10 tick | spike (istemci); tick'lere yayılır |
 | su (CLIENT) | `su.yakinKurulumButcesiMs` (yakın + uzak LOD ortak, SU-38) | 2,0 (0,25–50) | ms / tick | 60 FPS kare bütçesinin ~%12'si; deniz +4 halkası ~6 tick'te biter, eski tampon arada çizilir (SU-26) |
 | su (kod) | dalga hasarı / su gölgesi / girdi sönümü | Faz 4 tablosu / ×0,6 / ×0,88 | — | tsunami.md §2 |
+| yiyecek | `yiyecek.kademe.cokKucuk` | 3 | vücut birimi | vanilla pişmiş yiyecek "çok küçük": küçük kademenin alt sınırı 5'in altı (F-02) |
+| yiyecek | `yiyecek.kademe.kucuk` | 8 | vücut birimi | madde 14 "küçük %5–10" ortası (Isıtıcı Çay, Buzlu Karpuz, çiğ balık) |
+| yiyecek | `yiyecek.kademe.orta` | 20 | vücut birimi | "orta %15–25" ortası (Salep, Çikolata, Ayran, pişmiş balık) |
+| yiyecek | `yiyecek.kademe.buyuk` | 35 | vücut birimi | "büyük %30–40" ortası (Tavuk Çorbası, Kutup Balığı Çorbası, Şerbet) |
+| yiyecek | `yiyecek.kademe.cokBuyuk` | 45 | vücut birimi | Ateşli Güveç "çok büyük": büyüğün üst sınırı 40'ın üstü, en güçlü soğuk savar |
+| yiyecek | `yiyecek.anlikOran` | 0,25 | oran | "anında bir miktar" + giderek azalan süreli kısım; sıcaklık §A1 örneğiyle aynı oran (F-01) |
+| yiyecek | `yiyecek.azalanVerimPenceresiSaniye` | 60 | sn | madde 14 "60 saniye içinde" (şartname sayısı; config) |
+| yiyecek | `yiyecek.azalanVerimOrani` | 0,5 | çarpan | madde 14 "%50 azalsın" (şartname sayısı; config) |
+| yiyecek | `yiyecek.yanEtkiCarpani` | 1,5 | çarpan | Ateşli Güveç sıcakta: 45 → 67,5 birim; vücut 50'de 30 sn'de yanma kademesine iter (GameTest), soğukta etkisiz (F-04) |
+| yiyecek | `yiyecek.yanEtkiEsigi` | 20 | vücut birimi | 28 °C ortam ya da ılık vücut: ılıman ova (~22 °C) tetiklemez; çöl öğleni, Nether, yangın ya da lav yakını tetikler |
+| yiyecek | `yiyecek.vanillaIsinma` | true | aç/kapa | madde 14 "opsiyonel, config'den kapatılabilir" |
+| yiyecek | `yiyecek.vanillaYiyecekler` | 8 pişmiş yiyecek =30, 3 çorba =45 | eşya=sn | "çok küçük ve kısa"; çorbalar sıcak servis edildiği için biraz uzun (F-11) |
+| yiyecek | `yiyecek.balik.pismisSaniye` | 90 | sn | pişmiş buz balığı orta ısınma: Salep/Çikolata/Ayran'la aynı orta süre (F-14) |
+| yiyecek | `yiyecek.balik.cigSaniye` | 60 | sn | çiğ buz balığı hafif serinlik: Buzlu Karpuz'la aynı hafif süre (F-14) |
+| yiyecek | (tablo, kod) besin/doygunluk | Salep 4/0,6, Çikolata 5/0,6, Tavuk Çorbası 10/0,9, Güveç 8/0,8, Çay 2/0,3, Ayran 4/0,5, Karpuz 3/0,4, Şerbet 4/0,4, Kutup Balığı Çorbası 9/0,9 | açlık / doygunluk çarpanı | içecekler bal şişesi/karpuz ölçeğinde; çorbalar vanilla tavşan yahnisi (10/0,6) çevresinde, Tavuk Çorbası "yüksek doyuruculuk" en yüksek |
+| radar | `esya.radar.menzil` | 300 | blok | madde 13a |
+| radar | `esya.radar.gelismisMenzil` | 800 | blok | madde 13a |
+| radar | `esya.radar.paketAraligiTick` | 20 (20–200) | tick | madde 3 "düşük sıklık"; geri sayım saniyelik |
+| sismograf | `esya.sismograf.menzil` | 300 | blok | R-02; radarla aynı ölçek |
+| sismograf | `esya.sismograf.hassasMenzil` | 800 | blok | R-02; Gelişmiş radarla aynı |
+| sismograf | `esya.sismograf.merkezHatasi` | 40 | blok | 300 blok menzilde yönü doğru, yeri kaba |
+| sismograf | `esya.sismograf.hassasMerkezHatasi` | 6 | blok | "daha doğru merkez": bir oda boyu |
+| sismograf | `esya.sismograf.titremeSiddeti` | 50 | % | 100 = 0,6°; "çok hafif" titreme 0,3° |
+| sismograf | `esya.sismograf.paketAraligiTick` | 20 (20–200) | tick | madde 3 |
+| sismograf (sabit) | şiddet tahmini payı | 24 → 7,2 / Hassas 6 → 1,8 | % puan | R-06 |
+| sismograf (sabit) | öncü darbe aralığı / süresi | 240 → 60 / 40 | tick | R-07 |
+| sismograf (sabit) | öncü ses hacmi | 0,08–0,30 | çarpan | madde 5 kısık |
+| radar (sabit) | hareket izi penceresi | 6 örnek (5 sn) | — | yön kararlı, 1 bloktan az = durağan |
+| radar (sabit) | tarama hızı | 18 | °/tick | saniyede bir tur (R-19) |
+| radar (sabit) | Gelişmiş panel yüksekliği | ≤ 108 (7 alt satır × 9) | GUI px | GUI ölçeği 2'de ekranın ≤ %30'u (R-18) |
+| CLIENT | `esya.radar.gostergeGorunur` | true | — | |
+| CLIENT | `esya.radar.gostergeKosesi` | `SAG_ALT` | — | sohbet solda, efekt ikonları sağ üstte; R-09 |
+| CLIENT | `esya.radar.gostergeXOfset`, `gostergeYOfset` | 0 | GUI px | |
+| CLIENT | `esya.sismograf.titreme` | true | — | |
+| CLIENT | `esya.sismograf.ses` | true | — | |
+| CLIENT | `esya.sismograf.grafik` | true | — | madde 13b "opsiyonel" ekran |
+| meteor | `meteor.parcaSansi` | 0,03 | olasılık | madde 13c |
+| meteor | `meteor.buyukParcaSansi` | 0,05 | olasılık | madde 13c |
+| meteor | `meteor.cekirdekSansi` | 0,003 | olasılık | madde 13c |
+| meteor | `meteor.sicakSaniye` | 20 | sn | madde 13c; kraterin magma parıltısı da bu süre |
+| meteor | `meteor.odulOmruSaniye` | 600 | sn | madde 13c (10 dk) |
+| meteor | `meteor.yanmaSaniye` | 3 | sn | "kısa süre yanma": 3 sn ≈ 3–4 can, öldürmez |
+| meteor | `meteor.kucukKraterYaricapi` / `meteor.kucukKraterDerinligi` | 2,5 / 2 | blok | 1 blokluk meteor → 5 blok çap |
+| meteor | `meteor.buyukKraterYaricapi` / `meteor.buyukKraterDerinligi` | 5,5 / 4 | blok | 3 blokluk meteor → 11 blok çap, derinlik/çap 0,36 |
+| meteor | `meteor.magmaSogumaSaniye` | 20 | sn | M-25; tasarım "kraterde 20 sn magma parıltısı" |
+| meteor | `meteor.kraterBlokButcesi` | 512 | blok işlemi / tick | büyük krater ~2 tick; TPS kısmasıyla çarpılır |
+| meteor | `meteor.varlikTavani` | 48 | varlık | M-15 |
+| meteor | `meteor.dagitimIcYaricap` / `meteor.dagitimDisYaricap` | 32 / 160 | blok | tasarım §2 "32–160 blok çevresinde" |
+| meteor | `meteor.girisYuksekligi` | 140 | blok | izin gökyüzünde görünmesi, uçuş ~3 sn (tepki süresi) |
+| meteor | `meteor.dusmeHizi` | 3,0 | blok / tick | blok/tick; paket sınırı 3,9 |
+| meteor | `meteor.girisAcisiEnAz` / `meteor.girisAcisiEnCok` | 40 / 70 | — | tasarım "40–70°" |
+| meteor | `meteor.sarsintiMenziliKucuk` / `meteor.sarsintiMenziliBuyuk` | 48 / 112 | — | M-11 |
+| meteor | `meteor.kucukYanginYogunlugu` / `meteor.buyukYanginYogunlugu` | 0,45 / 0,85 | alan oranı | yangın §1: alan oranı %62 / %90 |
+| meteor | `meteor.yanginYaricapEki` | 3 | blok | krater kenarı + enkaz halkası ötesi |
+| meteor | `meteor.kucukKraterSicakligi` / `meteor.buyukKraterSicakligi` | 14 / 24 | °C | yangın ısı kaynağı 18 °C ile aynı ölçek |
+| meteor | `meteor.kraterSicaklikSaniye` | 30 | sn | magma soğuduktan bir süre sonra ortam normale döner |
+| meteor | `meteor.yagmurBuyukOrani` | 0,05 | oran | tasarım §6 "%5 büyük" (yalnız komut; afetler kendi oranını verir) |
+| meteor (istemci) | `meteor.izYogunlugu` | 1,0 | çarpan | parçacık çarpanı (× kalite 0,25 / 0,5 / 1 / 1,75) |
+| meteor (istemci) | `meteor.sarsintiOlcegi` | 1,0 | çarpan | 0 kapalı |
+| meteor (istemci) | `meteor.parlamaOlcegi` | 1,0 | çarpan | 0 kapalı (ışığa duyarlı oyuncular) |
+| balıkçılık | `balikcilik.aktiflikEsigi` | 30 | % (G) | madde 15 varsayılanı |
+| balıkçılık | `balikcilik.delikOmruEnAzSn` / `delikOmruEnCokSn` | 240 / 300 | sn | madde 15 "4–5 dakika"; her delik aralıktan rastgele |
+| balıkçılık | `balikcilik.donmaAsamasiSn` | 15 | sn (× 3 aşama) | "yavaşça yeniden donarak": son 45 sn görünür zar; oyuncu kapanacağını görür |
+| balıkçılık | `balikcilik.chunkBasinaDelik` | 4 | delik | 5–10 oyuncu bir gölde yan yana tutabilir; chunk başına zamanlanmış tick ve palet taraması küçük kalır |
+| balıkçılık | `balikcilik.aletHasari` | 5 | dayanıklılık | madde 15 |
+| balıkçılık | `balikcilik.isirmaEnAzSn` / `isirmaEnCokSn` | 30 / 60 | sn | madde 15 (vanilla 5–30 sn + 1–4 sn yaklaşma) |
+| balıkçılık | `balikcilik.lureKisaltmaSn` | 5 | sn / seviye | vanilla Lure ile aynı adım |
+| balıkçılık | `balikcilik.isirmaTabanSn` | 10 | sn | Lure III'te 15–45 sn; hızlı ama vanilla'dan yavaş kalır |
+| balıkçılık | `balikcilik.agirlikYaygin` / `Orta` / `Nadir` / `Cop` / `Hazine` | 56 / 28 / 8 / 7 / 1 | ağırlık | balık %92 (vanilla 85), çöp %7 (10), hazine %1 (5): "kayıp düşük, ödül iyi, hazine çok nadir"; 30–60 sn ısırmayla saatte ~70 balık, bolluğu bekleme sınırlar |
+| balıkçılık | `balikcilik.sansCopAzalmasi` / `sansHazineArtisi` | 2 / 1 | ağırlık / seviye | vanilla quality gibi (çöp −2); hazine +1 (Luck III'te %4, vanilla'nın altında) |
+| balıkçılık | `balikcilik.sogutmaEnCokC` | 8 | °C | buz kaynağı büyüklüğünde; G 60 soğuğunda yalıtımsız oyuncu birkaç dakikada "soğuk" kademesine iner |
+| balıkçılık | `balikcilik.sogutmaTamSureSn` | 20 | sn | kısa bekleyiş cezasız, uzun hareketsizlik tam ceza |
+| balıkçılık (kod) | balık sıcaklığı (`mantik.BalikSicakligi`) | çiğ −8 / 60 sn, pişmiş +20 / 90 sn, pişmiş ringa +35 / 120 sn; %25 anında | vücut birimi / sn | yiyecek `kademe.kucuk/orta/buyuk` ve `anlikOran` ile aynı (B-19); config yiyeceğindir, balıkçılıkta anahtar yok |
+| balıkçılık (kod) | hareket eşiği / kaynak yarıçapı / yaklaşma | 0,25 blok/sn / 1,5 blok / 40 tick | — | B-03, B-09 |
+| balıkçılık (kod) | doyuruculuk, yığın | çiğ 2/0,1 (ringa 3/0,2), pişmiş 5/0,6–7/0,9; 16 | — | B-11 |
+| başarım | `basarim.etkiAlaniPayi` | 0 | blok | madde 12 "afet yarıçapında, config'den ayarlanabilir": 0 = çekirdeğin etkilenen tanımı; kenarda duranları da saymak isteyen sunucu açar |
+| başarım | `basarim.odul.gorevXp` | 15 | XP | madde 12 "XP versin", küçük (vanilla görevleri 0) |
+| başarım | `basarim.odul.hedefXp` | 40 | XP | görevden büyük; ayrıca 1–2 sıcak yiyecek |
+| başarım | `basarim.odul.meydanOkumaXp` | 100 | XP | "daha büyük XP", ≈ 7 seviye; oyunu bozmaz |
+| başarım | `basarim.unvanGoster` | true | — | N16: ünvan config ile kapatılabilir |
+| başarım (JSON) | hedef ödülü | 1–2 | adet | madde 12 "1–2 sıcak yiyecek" |
+| başarım (kod) | sinkhole düşüşü | 4 | blok | ipucu gelmezse "çukura düştü": vanilla düşme hasarının başladığı 3 bloğun hemen üstü |
+| başarım (kod) | yangın yakınlığı | 8 | blok | ipucu gelmezse "yangın alanında": yangın ısısının etkili olduğu yakınlık (yangın 6 + √n) |
+| başarım (kod) | çorba aday penceresi | 60 | tick | yedikten sonra ısınmanın görülmesi için 3 sn |
+| başarım (kod) | çorba varsayılan etki süresi | 180 | sn | madde 14'ün en uzun sıcak yiyeceği |
 
 Config dışı sabitler (oynanış değeri değil, sınır/biçim): siren 200/1200 tick (şartname, K0-19); son afet geçmişi 5
 (madde 13a); tek çarpan ≤ 100, toplam ≤ 1000 (K-C22); hız 0,1–1000; TPS ölçüm aralığı 20 tick; dönem kaydı sınırları
