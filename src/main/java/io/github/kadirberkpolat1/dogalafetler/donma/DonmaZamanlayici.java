@@ -1,0 +1,442 @@
+package io.github.kadirberkpolat1.dogalafetler.donma;
+
+import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
+import io.github.kadirberkpolat1.dogalafetler.core.TpsOlcer;
+import io.github.kadirberkpolat1.dogalafetler.donma.DonmaTablosuYukleyici.Tablo;
+import io.github.kadirberkpolat1.dogalafetler.donma.mantik.BuharlasmaHedefi;
+import io.github.kadirberkpolat1.dogalafetler.donma.mantik.ChunkOnceligi;
+import io.github.kadirberkpolat1.dogalafetler.donma.mantik.DonmaEsikleri;
+import io.github.kadirberkpolat1.dogalafetler.donma.mantik.DonmaHedefi;
+import io.github.kadirberkpolat1.dogalafetler.donma.mantik.EsikKumesi;
+import io.github.kadirberkpolat1.dogalafetler.donma.mantik.KisKaynagi;
+import io.github.kadirberkpolat1.dogalafetler.donma.mantik.YetismeButcesi;
+import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import it.unimi.dsi.fastutil.longs.LongSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Random;
+import javax.annotation.Nullable;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.level.ChunkEvent;
+import net.minecraftforge.event.server.ServerAboutToStartEvent;
+
+/**
+ * Chunk'ları güncel global ilerlemeye (G), döneme ve buharlaşma derinliğine yetiştiren kuyruk (madde 9 YENİ YÜKLENEN
+ * CHUNK'LAR, ÖNCELİK; madde 3 TPS; N9; K-D2).
+ *
+ * <ul>
+ * <li>{@code ChunkEvent.Load} (ana thread) chunk'ı yüklü kümeye ve bekleyenlere ekler; {@code Unload} çıkarır. G, dönem,
+ * etkin buharlaşma derinliği ya da sıfırlama döngüsü değişince bütün yüklü chunk'lar yeniden kuyruğa girer.</li>
+ * <li>Bir iş chunk'ın G'sini en çok {@code seviyeAdimi} ilerletir, dönemi ve buharlaşmayı günceller; 256 sütun sabit
+ * karışık sırayla. Süren adımın bitişi capability'ye yazılır (yarım adım); chunk hedefe ulaşana kadar sıradakine
+ * geçilmez. Bekleyenler en yakın oyuncuya uzaklığa göre sıralı (20 tick'te bir yeniden).</li>
+ * <li>Bütçe {@link YetismeButcesi}: tick başına en çok {@code tickBasinaMaksBlok · TpsOlcer.kismaCarpani()} blok, bir
+ * sütun ancak en kötü durumunu karşılayan birim kaldıysa işlenir; ayrıca süre tavanı (aşım sonraki tick'ten düşülür).</li>
+ * <li>Yalnız {@code ServerChunkCache.isPositionTicking} chunk'lar işlenir (komşu chunk senkron yüklenmesin, değişim
+ * istemciye gitsin). {@code afetBlokHasari} kapalıyken kuyruk durur; açılınca kaldığı yerden sürer.</li>
+ * <li>{@code /dogalafet sifirla} sonrası (yeni döngü) chunk blokları çözmeden yeni ilerlemeyi benimser.</li>
+ * </ul>
+ */
+public final class DonmaZamanlayici {
+    /** Bir blok değişiminin bütçe birimi (sütun taraması 1). */
+    public static final int BLOK_MALIYETI = 8;
+    private static final int BFS_MALIYETI = 64;
+    private static final int[] SUTUN_SIRASI = sutunSirasi();
+
+    private static final LongOpenHashSet YUKLU = new LongOpenHashSet();
+    private static final LongLinkedOpenHashSet BEKLEYEN = new LongLinkedOpenHashSet();
+    private static final Long2ObjectOpenHashMap<ChunkIsi> ISLER = new Long2ObjectOpenHashMap<>();
+    private static long[] sira = new long[0];
+    private static int siraBasi;
+    private static boolean siraKirli = true;
+    @Nullable
+    private static LongSet kapsam;
+    private static EsikKumesi esikKumesi;
+    private static DonmaEsikleri esikKumesiEsikleri;
+    private static Tablo esikKumesiTablosu;
+
+    private static int sonG = -1;
+    private static boolean sonCozulme;
+    private static int sonBuhar = -1;
+    private static long sonDongu = Long.MIN_VALUE;
+    private static long oncekiAsimNs;
+    private static volatile boolean kuyrukBos = true;
+
+    private static long tamamlananAdim;
+    private static long hedefeUlasan;
+    private static long toplamDegisen;
+    private static int sonTickDegisen;
+    private static int enCokTickDegisen;
+    private static int sonBlokSiniri = 256;
+    private static double sonKisma = 1.0;
+    private static long ozetAdim;
+    private static long ozetDegisen;
+    private static long ozetSutun;
+    private static long ozetNs;
+    private static long ozetEnUzunNs;
+    private static int ozetSureSiniri;
+
+    private DonmaZamanlayici() {
+    }
+
+    private static final class ChunkIsi {
+        final DonmaIsleyici.Gecis gecis;
+        final int hedefG;
+        final long baslangicTick;
+        final KisKaynagi kis;
+        final DonmaIsleyici.Sayac sayac = new DonmaIsleyici.Sayac();
+        int[] kiyi;
+        boolean bfsYeni;
+        int sutun;
+
+        ChunkIsi(DonmaIsleyici.Gecis gecis, int hedefG, long baslangicTick, KisKaynagi kis) {
+            this.gecis = gecis;
+            this.hedefG = hedefG;
+            this.baslangicTick = baslangicTick;
+            this.kis = kis;
+        }
+    }
+
+    static String donemAdi(boolean cozulme) {
+        return cozulme ? "çözülme" : "donma";
+    }
+
+    /** {@code loadLevel}'dan önce: spawn chunk'larının yükleme olayları bu temizlikten sonra gelir. */
+    static void sunucuBasliyor(ServerAboutToStartEvent olay) {
+        YUKLU.clear();
+        BEKLEYEN.clear();
+        ISLER.clear();
+        sira = new long[0];
+        siraKirli = true;
+        kapsam = null;
+        sonG = -1;
+        sonBuhar = -1;
+        sonDongu = Long.MIN_VALUE;
+        oncekiAsimNs = 0;
+        istatistikSifirla();
+        KisBolgesi.sifirla();
+    }
+
+    private static boolean ustDunya(Object level) {
+        return level instanceof ServerLevel sl && sl.dimension() == Level.OVERWORLD;
+    }
+
+    static void chunkYuklendi(ChunkEvent.Load olay) {
+        if (ustDunya(olay.getLevel()) && olay.getChunk() instanceof LevelChunk chunk) {
+            long anahtar = chunk.getPos().toLong();
+            YUKLU.add(anahtar);
+            BEKLEYEN.add(anahtar);
+            siraKirli = true;
+        }
+    }
+
+    static void chunkBosaltildi(ChunkEvent.Unload olay) {
+        if (ustDunya(olay.getLevel()) && olay.getChunk() instanceof LevelChunk chunk) {
+            long anahtar = chunk.getPos().toLong();
+            YUKLU.remove(anahtar);
+            BEKLEYEN.remove(anahtar);
+            ISLER.remove(anahtar);
+        }
+    }
+
+    /** Veri paketi tablosu değişti: eşik kümesi yeniden kurulur, yüklü chunk'lar denetlenir. */
+    static void tabloDegisti() {
+        esikKumesi = null;
+        BEKLEYEN.addAll(YUKLU);
+        siraKirli = true;
+    }
+
+    static void hepsiniKuyrugaAl() {
+        BEKLEYEN.addAll(YUKLU);
+        siraKirli = true;
+    }
+
+    /** Yalnız GameTest: işlenecek chunk'ları sınırlar ({@code null} tümü); diğer testlerin ve spawn'ın chunk'larına dokunulmaz. */
+    public static void kapsamAyarla(@Nullable LongSet chunklar) {
+        kapsam = chunklar == null ? null : new LongOpenHashSet(chunklar);
+        siraKirli = true;
+    }
+
+    public static void istatistikSifirla() {
+        tamamlananAdim = hedefeUlasan = toplamDegisen = 0;
+        sonTickDegisen = enCokTickDegisen = 0;
+        ozetAdim = ozetDegisen = ozetSutun = ozetNs = ozetEnUzunNs = 0;
+        ozetSureSiniri = 0;
+    }
+
+    static void tick(TickEvent.LevelTickEvent olay) {
+        if (olay.phase != TickEvent.Phase.END || !ustDunya(olay.level)) {
+            return;
+        }
+        ServerLevel level = (ServerLevel) olay.level;
+        MinecraftServer server = level.getServer();
+        DunyaDonemi donem = DunyaDonemi.al(server);
+        int g = hedefG(donem);
+        boolean cozulme = donem.cozulmeDonemi();
+        int buhar = etkinBuhar(server, donem);
+        long dongu = dongu(donem);
+        if (g != sonG || cozulme != sonCozulme || buhar != sonBuhar || dongu != sonDongu) {
+            sonG = g;
+            sonCozulme = cozulme;
+            sonBuhar = buhar;
+            sonDongu = dongu;
+            hepsiniKuyrugaAl();
+        }
+        int tick = server.getTickCount();
+        if (tick % 20 == 0) {
+            siraKirli = true;
+        }
+        sonTickDegisen = 0;
+        boolean calisti = false;
+        if (!BEKLEYEN.isEmpty() && Kurallar.blokHasariAcik(level.getGameRules())) {
+            calisti = isle(level, tick, g, cozulme, buhar, dongu);
+        }
+        kuyrukBos = !calisti;
+        if (tick % 100 == 0) {
+            ozet(donem);
+        }
+    }
+
+    static int hedefG(DunyaDonemi donem) {
+        return Math.max(0, Math.min(100, (int) Math.floor(donem.donmaIlerlemesi() + 1e-4)));
+    }
+
+    static int etkinBuhar(MinecraftServer server, DunyaDonemi donem) {
+        return BuharlasmaHedefi.etkinDerinlik(donem.buharlasmaDerinligi(), DisKancalar.al().buharlasmaPayi(server));
+    }
+
+    static long dongu(DunyaDonemi donem) {
+        return donem.ekVeri(KisBolgesi.ALT_SISTEM).getLong("dongu");
+    }
+
+    private static EsikKumesi esikKumesi(DonmaEsikleri e, Tablo tablo) {
+        if (esikKumesi == null || esikKumesiEsikleri != e || esikKumesiTablosu != tablo) {
+            esikKumesi = EsikKumesi.kur(e, tablo.esikDonma(), tablo.esikCozulme());
+            esikKumesiEsikleri = e;
+            esikKumesiTablosu = tablo;
+        }
+        return esikKumesi;
+    }
+
+    /** Bir tick'lik iş; işlenebilir (ticking) chunk'ta sütun işlendiyse {@code true}. */
+    private static boolean isle(ServerLevel level, long tick, int g, boolean cozulme, int buhar, long dongu) {
+        if (siraKirli) {
+            siraYenile(level);
+        }
+        YetismeButcesi butce = DonmaAyarlari.butce();
+        double kisma = TpsOlcer.kismaCarpani();
+        sonKisma = kisma;
+        sonBlokSiniri = butce.blokSiniri(kisma);
+        int kalan = butce.birim(kisma);
+        DonmaEsikleri e = DonmaAyarlari.esikler();
+        int rezerv = Math.min(kalan, butce.rezerv(Math.max(e.maksBuzKalinligi() + 1, 2)
+                + (int) Math.ceil(DonmaAyarlari.buharlasmaEnCok())));
+        long basla = System.nanoTime();
+        long sinir = basla + butce.sureSiniriNs(oncekiAsimNs);
+        Tablo tablo = DonmaTablosuYukleyici.etkin();
+        EsikKumesi esikler = esikKumesi(e, tablo);
+        int adim = DonmaAyarlari.seviyeAdimi();
+        BlockPos.MutableBlockPos konum = new BlockPos.MutableBlockPos();
+        int bakilan = 0;
+        boolean sureDoldu = false;
+        while (!sureDoldu && butce.sutunSigar(kalan, rezerv) && siraBasi < sira.length) {
+            long anahtar = sira[siraBasi];
+            if (!BEKLEYEN.contains(anahtar) || kapsam != null && !kapsam.contains(anahtar)) {
+                siraBasi++;
+                continue;
+            }
+            int cx = ChunkPos.getX(anahtar);
+            int cz = ChunkPos.getZ(anahtar);
+            LevelChunk chunk = level.getChunkSource().getChunkNow(cx, cz);
+            ChunkDonmaVerisi durum = chunk == null ? null : ChunkDonmaVerisi.al(chunk);
+            if (durum == null) {
+                BEKLEYEN.remove(anahtar);
+                ISLER.remove(anahtar);
+                siraBasi++;
+                continue;
+            }
+            if (!level.getChunkSource().isPositionTicking(anahtar)) {
+                siraBasi++;
+                continue;
+            }
+            ChunkIsi is = ISLER.get(anahtar);
+            if (is == null) {
+                if (durum.dongu() != dongu) {
+                    durum.donguyeGec(dongu, g, cozulme);
+                    chunk.setUnsaved(true);
+                }
+                if (durum.sonG() == g && durum.cozulme() == cozulme && durum.sonBuhar() == buhar && !durum.yarimVar()) {
+                    BEKLEYEN.remove(anahtar);
+                    siraBasi++;
+                    continue;
+                }
+                boolean yarim = durum.yarimVar();
+                int eskiG = yarim ? durum.yarimG() : durum.sonG();
+                boolean eskiCozulme = yarim ? durum.yarimCozulme() : durum.cozulme();
+                int bitisG = DonmaHedefi.siradakiSeviye(eskiG, g, adim);
+                DonmaIsleyici.Gecis gecis = new DonmaIsleyici.Gecis(eskiG, eskiCozulme, bitisG, cozulme, buhar,
+                        durum.sonBuhar() != buhar, !yarim);
+                KisKaynagi kis = eskiCozulme || cozulme ? KisBolgesi.alan(level).chunk(cx, cz) : KisKaynagi.YOK;
+                is = new ChunkIsi(gecis, g, tick, kis);
+                ISLER.put(anahtar, is);
+                durum.yarimAdim(bitisG, cozulme);
+            }
+            ChunkIsi suren = is;
+            ChunkPos p = chunk.getPos();
+            DonmaIsleyici.Kiyi kiyi = (x, z) -> {
+                if (suren.kiyi == null) {
+                    suren.kiyi = DonmaIsleyici.kiyiUzakliklari(level, p.getMinBlockX(), p.getMinBlockZ(), 16, 16,
+                            DonmaIsleyici.SINIRSIZ, tablo, e);
+                    suren.bfsYeni = true;
+                }
+                return suren.kiyi[ChunkDonmaVerisi.indeks(x, z)];
+            };
+            while (is.sutun < 256 && butce.sutunSigar(kalan, rezerv)) {
+                if ((is.sutun & 3) == 0 && System.nanoTime() >= sinir) {
+                    ozetSureSiniri++;
+                    sureDoldu = true;
+                    break;
+                }
+                int i = SUTUN_SIRASI[is.sutun++];
+                int once = is.sayac.degisen;
+                DonmaIsleyici.sutunuIsle(level, chunk, durum, p.getMinBlockX() + (i & 15), p.getMinBlockZ() + (i >> 4),
+                        DonmaIsleyici.SINIRSIZ, is.gecis, is.kis, kiyi, tablo, e, esikler, konum, is.sayac);
+                int degisen = is.sayac.degisen - once;
+                kalan -= butce.sutunMaliyeti(degisen);
+                sonTickDegisen += degisen;
+                if (is.bfsYeni) {
+                    kalan -= BFS_MALIYETI;
+                    is.bfsYeni = false;
+                }
+                bakilan++;
+            }
+            if (is.sutun >= 256) {
+                bitir(level, chunk, durum, anahtar, is);
+            }
+        }
+        long gecen = System.nanoTime() - basla;
+        oncekiAsimNs = Math.max(0L, gecen - butce.tavanNs());
+        enCokTickDegisen = Math.max(enCokTickDegisen, sonTickDegisen);
+        ozetSutun += bakilan;
+        ozetNs += gecen;
+        ozetEnUzunNs = Math.max(ozetEnUzunNs, gecen);
+        return bakilan > 0;
+    }
+
+    private static void bitir(ServerLevel level, LevelChunk chunk, ChunkDonmaVerisi durum, long anahtar, ChunkIsi is) {
+        durum.durum(is.gecis.yeniG(), is.gecis.yeniCozulme());
+        durum.sonBuhar(is.gecis.buhar());
+        chunk.setUnsaved(true);
+        ISLER.remove(anahtar);
+        tamamlananAdim++;
+        ozetAdim++;
+        toplamDegisen += is.sayac.degisen;
+        ozetDegisen += is.sayac.degisen;
+        if (is.gecis.yeniG() == is.hedefG) {
+            hedefeUlasan++;
+        }
+        if (is.sayac.suDegisti) {
+            DisKancalar.al().suYuzeyiDegisti(level, chunk.getPos());
+        }
+    }
+
+    private static void siraYenile(ServerLevel level) {
+        List<ServerPlayer> oyuncular = level.players();
+        int[] px = new int[oyuncular.size()];
+        int[] pz = new int[oyuncular.size()];
+        for (int i = 0; i < px.length; i++) {
+            ChunkPos p = oyuncular.get(i).chunkPosition();
+            px[i] = p.x;
+            pz[i] = p.z;
+        }
+        sira = ChunkOnceligi.sirala(BEKLEYEN.toLongArray(), px, pz);
+        siraBasi = 0;
+        siraKirli = false;
+    }
+
+    private static void ozet(DunyaDonemi donem) {
+        if (ozetAdim == 0 && ozetSutun == 0) {
+            return;
+        }
+        DogalAfetler.LOGGER.info(String.format(Locale.ROOT, "[donma] özet: G=%.2f %s buhar=%.2f | yüklü=%d bekleyen=%d süren=%d"
+                        + " | son 100 tick: %d adım, %d blok, %d sütun, işçi ort %.2f ms/tick en çok %.2f ms, süre sınırı %d kez"
+                        + " | bütçe %d blok/tick (kısma %.2f, TPS %.1f), tick başına en çok %d blok | toplam %d adım, %d blok",
+                donem.donmaIlerlemesi(), donemAdi(donem.cozulmeDonemi()), donem.buharlasmaDerinligi(), YUKLU.size(),
+                BEKLEYEN.size(), ISLER.size(), ozetAdim, ozetDegisen, ozetSutun, ozetNs / 100.0 / 1e6,
+                ozetEnUzunNs / 1e6, ozetSureSiniri, sonBlokSiniri, sonKisma, TpsOlcer.tps(), enCokTickDegisen,
+                tamamlananAdim, toplamDegisen));
+        ozetAdim = ozetDegisen = ozetSutun = ozetNs = ozetEnUzunNs = 0;
+        ozetSureSiniri = 0;
+    }
+
+    private static int[] sutunSirasi() {
+        int[] s = new int[256];
+        for (int i = 0; i < 256; i++) {
+            s[i] = i;
+        }
+        Random r = new Random(0x5D0E1L);
+        for (int i = 255; i > 0; i--) {
+            int j = r.nextInt(i + 1);
+            int t = s[i];
+            s[i] = s[j];
+            s[j] = t;
+        }
+        return s;
+    }
+
+    /** Kuyrukta iş yok mu (her tick yazılır; tek oyunculu otomasyon istemci thread'inden okur). */
+    public static boolean kuyrukBos() {
+        return kuyrukBos;
+    }
+
+    static int yukluSayisi() {
+        return YUKLU.size();
+    }
+
+    static int bekleyenSayisi() {
+        return BEKLEYEN.size();
+    }
+
+    static int surenIsSayisi() {
+        return ISLER.size();
+    }
+
+    static long tamamlananAdim() {
+        return tamamlananAdim;
+    }
+
+    static long toplamDegisen() {
+        return toplamDegisen;
+    }
+
+    public static int sonTickDegisen() {
+        return sonTickDegisen;
+    }
+
+    public static int enCokTickDegisen() {
+        return enCokTickDegisen;
+    }
+
+    static int sonBlokSiniri() {
+        return sonBlokSiniri;
+    }
+
+    static double sonKisma() {
+        return sonKisma;
+    }
+
+    static long hedefeUlasan() {
+        return hedefeUlasan;
+    }
+}
