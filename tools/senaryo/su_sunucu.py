@@ -6,8 +6,10 @@ Kendi dünyasını sıfırdan üretir: `run-server/su-senaryo` silinir, `run-ser
 açılır (K0-18).
 
 Koşu 1: durum (deniz +0), denizseviyesi 3, durum (deniz +3), su bilgi, aysonrasi atla (ay var: reddedilir), denizseviyesi 8
-(üst sınır 6'ya kırpılır), denizseviyesi 2 kademeli + asama ileri (hedefe ulaşır), denizseviyesi 3, `stop`.
-Koşu 2 (aynı dünya): durum (deniz +3 korundu), sifirla, durum (deniz +0), `stop`.
+(üst sınır 6'ya kırpılır), denizseviyesi 2 kademeli + asama ileri (hedefe ulaşır), denizseviyesi 3, spawn altında kapalı
+oda + su magara (294 hücre, 1 saat kalış), su bilgi (mağara 1), `stop`.
+Koşu 2 (aynı dünya): mağara kayıttan kuruldu log'u, durum (deniz +3 korundu), su bilgi (mağara 1 korundu), sifirla, durum
+(deniz +0), su bilgi (mağara 0), `stop`.
 Sonda iki log da denetlenir: `invalid dist` yok, istisna yok, config düzeltme uyarısı yok, iki süreç de 0 ile çıktı.
 
 Kullanım (worktree kökünden): python3 tools/senaryo/su_sunucu.py <log klasörü>
@@ -61,13 +63,21 @@ def kosu1(s):
     s.komut("dogalafet asama ileri", r"Sea level rise: reached \+2\.00 blocks")
     s.komut("dogalafet denizseviyesi 3", r"Sea level set to \+3\.00 blocks")
     s.komut("dogalafet durum", r"Sea level: \+3[.,]0+ blocks \(target \+3", "durum (deniz +3, kapanış öncesi)")
+    # Mağara suyu (SU-24): spawn chunk'larında kapalı taş oda (konsol konumu = dünya doğuş noktası), 1 saat kalış.
+    s.komut("fill ~ -40 ~ ~10 -30 ~10 stone", r"Successfully filled \d+ block")
+    s.komut("fill ~2 -38 ~2 ~8 -33 ~8 air", r"Successfully filled \d+ block")
+    s.komut("dogalafet su magara ~4 -38 ~4 4000 3600", r"Cave water #\d+: 294 cells, surface y=-32")
+    s.komut("dogalafet su bilgi", r"sea \+3\.00, waves 0, caves 1,", "su bilgi (mağara 1)")
 
 
 def kosu2(s):
     s.bekle(r"Done \(", 0, c.ACILIS_SURESI, "açılış")
+    s.bekle(r"Sanal su: kayıttan yeniden kuruldu: 0 dalga, 0 çekilme, 1 mağara", 0, 30, "mağara suyu kayıttan kuruldu")
     s.komut("dogalafet durum", r"Sea level: \+3[.,]0+ blocks \(target \+3", "durum (deniz +3 yeniden başlatmada korundu)")
+    s.komut("dogalafet su bilgi", r"sea \+3\.00, waves 0, caves 1,", "su bilgi (mağara suyu yeniden başlatmada korundu)")
     s.komut("dogalafet sifirla", r"disaster and era state was reset")
     s.komut("dogalafet durum", r"Sea level: \+0[.,]0+ blocks \(target \+0", "durum (sıfırlandı)")
+    s.komut("dogalafet su bilgi", r"sea \+0\.00, waves 0, caves 0,", "su bilgi (sıfırla mağarayı kaldırdı)")
 
 
 def main():

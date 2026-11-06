@@ -261,7 +261,8 @@ public final class SuOyunTestleri {
     /**
      * Deniz yükselmesi süreci (bölüm H, N10, N18, §3a): ay yok olunca bekleme kurulur; {@code aysonrasi atla} yükselmeyi
      * başlatır (hedef 4, kalıcı); artış monoton yükselir; {@code stop} süreci dondurur (KOMUT); {@code asama ileri} durmuş
-     * süreci hedefe ulaştırır; buharlaşma artışı derinlik kadar kademeli 0'a indirir ve geri getirmez.
+     * süreci hedefe ulaştırır; durmuş süreçte buharlaşma da indirmez (SU-25); süreç sürdürülünce buharlaşma artışı
+     * derinlik kadar kademeli 0'a indirir ve geri getirmez.
      */
     @GameTest(template = "bos", batch = "su_surec", timeoutTicks = 400)
     public static void denizSureciAyYokOluncaBaslarDururBuharlasmaSifirlar(GameTestHelper h) {
@@ -296,9 +297,17 @@ public final class SuOyunTestleri {
                     d.buharlasmaDerinligiAyarla(1.5f);
                 })
                 .thenExecuteAfter(2, () -> {
+                    // Hedefe ulaşan süreç tamamlandı (aktifMi false), çekirdek durdurma kaydını sildi: buharlaşma sürer.
                     artislar.add(d.deniz().mevcutArtis());
                     h.assertTrue(Math.abs(d.deniz().mevcutArtis() - 2.5f) < 1e-4, "buharlaşma 1,5: artış " + d.deniz().mevcutArtis());
+                    komut(h, "dogalafet stop");
+                    h.assertTrue(y.surecDurdu(DenizYukselmesiSureci.ORNEK), "iniş sırasında stop süreci durdurmadı");
                     d.buharlasmaDerinligiAyarla(5f);
+                })
+                .thenExecuteAfter(2, () -> {
+                    h.assertTrue(Math.abs(d.deniz().mevcutArtis() - 2.5f) < 1e-4,
+                            "durmuş süreçte buharlaşma artışı indirdi (SU-25): " + d.deniz().mevcutArtis());
+                    y.donemSureciBasladi(DenizYukselmesiSureci.ORNEK);
                 })
                 .thenExecuteAfter(2, () -> {
                     artislar.add(d.deniz().mevcutArtis());
@@ -380,6 +389,55 @@ public final class SuOyunTestleri {
                     h.assertTrue(an[5] - an[4] <= 40, "chunkDegisti " + (an[5] - an[4]) + " tick sürdü (> 40)");
                     komut(h, "dogalafet denizseviyesi 0");
                     SanalSu.bolgeBirak(l);
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Kalıcılık (madde 3, SU-24): kapalı odada mağara suyu ve bir dalga sürerken dönem kaydedilip okunur ({@code DunyaDonemi}
+     * yaz/oku), bellekteki su silinir (yeniden başlatma) ve kayıttan kurulur: cep aynı hacim, yüzey ve hücrelerle, aynı
+     * seviyede sürer; dalga aynı parametrelerle; {@code ekVeri("su")} 16 KB'ın altında.
+     */
+    @GameTest(template = "su_alani", batch = "su_kalicilik", timeoutTicks = 300)
+    public static void magaraVeDalgaKayittanYenidenKurulur(GameTestHelper h) {
+        ServerLevel l = h.getLevel();
+        MinecraftServer server = l.getServer();
+        oda(h, false);
+        int id = SanalSu.magaraDoldur(l, m(h, 4, 2, 4), 4000, 6000);
+        h.assertTrue(id > 0, "oda dolmadı");
+        BlockPos koken = m(h, -20, 1, 8);
+        Dalga dalga = new Dalga(koken.getX(), koken.getZ(), 1, 0, SanalSu.sunucuSaati, 0.05, 6, 60, 60, koken.getY(), 400, 0.07, 1);
+        int dalgaId = SanalSu.dalgaBaslat(l, dalga);
+        SanalSu.Boyut b = SanalSu.boyut(l);
+        h.startSequence()
+                .thenExecuteAfter(10, () -> {
+                    SanalSuDunyasi.Magara once = b.dunya.magaralar().get(id);
+                    double seviye = once.seviye(SanalSu.sunucuSaati);
+                    net.minecraft.nbt.CompoundTag kayit = DunyaDonemi.al(server).save(new net.minecraft.nbt.CompoundTag());
+                    DunyaDonemi geri = DunyaDonemi.yukle(kayit);
+                    net.minecraft.nbt.CompoundTag su = geri.ekVeri(DenizYukselmesiSureci.VERI);
+                    int boyutBayt = su.toString().length();
+                    h.assertTrue(boyutBayt < 16_000, "ekVeri(su) çok büyük: " + boyutBayt);
+                    b.dunya.magaraKaldir(id);
+                    b.magaraKutusu.remove(id);
+                    b.dunya.dalgaKaldir(dalgaId);
+                    h.assertTrue(b.dunya.magaralar().isEmpty() && b.dunya.dalgalar().isEmpty(), "bellek temizlenmedi");
+                    int[] sayi = SuKalicilik.kur(server, su);
+                    SanalSuDunyasi.Magara sonra = b.dunya.magaralar().get(id);
+                    h.assertTrue(sayi[2] >= 1 && sonra != null, "mağara kurulmadı");
+                    h.assertTrue(sonra.cep().hacim() == once.cep().hacim() && sonra.cep().ustY() == once.cep().ustY()
+                            && sonra.cep().sutunlar().keySet().equals(once.cep().sutunlar().keySet()), "cep farklı");
+                    h.assertTrue(Math.abs(sonra.seviye(SanalSu.sunucuSaati) - seviye) < 1e-9, "seviye kaldığı yerden sürmedi");
+                    h.assertTrue(dalga.equals(b.dunya.dalgalar().get(dalgaId)), "dalga farklı");
+                    DogalAfetler.LOGGER.info("Sanal su GameTest: kalıcılık ekVeri={} karakter, cep {} hücre, seviye {}", boyutBayt,
+                            sonra.cep().hacim(), seviye);
+                })
+                .thenExecuteAfter(20, () -> {
+                    SanalSuDunyasi.Magara g = b.dunya.magaralar().get(id);
+                    h.assertTrue(g != null && g.asama(SanalSu.sunucuSaati) != MagaraZamani.Asama.BITTI, "mağara suyu sürmüyor");
+                    h.assertTrue(araliklar(h, 4, 4).adet() == 1, "yeniden kurulan su sorguda yok");
+                    SanalSu.magaraBitir(l, id);
+                    SanalSu.dalgaBitir(l, dalgaId);
                 })
                 .thenSucceed();
     }

@@ -95,6 +95,18 @@ public final class MagaraCebi {
         return Collections.unmodifiableMap(sutunlar);
     }
 
+    /** En alçak dolu hücre {@code {x, minY, z}} (sütunlar sıralı, deterministik); boş cepte {@code null}. */
+    public int[] enAlcak() {
+        long[] s = sutunAnahtarlari();
+        java.util.Arrays.sort(s);
+        for (long k : s) {
+            if (sutunlar.get(k)[0] == minY) {
+                return new int[] {(int) (k >> 32), minY, (int) k};
+            }
+        }
+        return null;
+    }
+
     public long[] sutunAnahtarlari() {
         long[] s = new long[sutunlar.size()];
         int i = 0;

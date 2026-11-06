@@ -19,7 +19,7 @@ import net.minecraft.server.level.ServerLevel;
  * doğrusal yükselir ve kalıcı kalır (config ile zirvede bekleyip geri dönebilir). Bekleme ve yükselme
  * {@link AfetYoneticisi#zamanAdimi()} ile birikir: durdurulunca ilerlemez, kural açılınca kaldığı yerden sürer. Döngü
  * kimliği {@code deniz().baslangicSaati()}. Buharlaşma (N10) başlayınca artış derinlik kadar kademeli sıfıra iner ve bir
- * daha gelmez. Çalışma verisi dönemin {@code ekVeri("su")} etiketindedir.
+ * daha gelmez; durdurulmuş süreçte bu iniş de durur, süreç sürdürülünce devam eder (SU-25). Çalışma verisi dönemin {@code ekVeri("su")} etiketindedir.
  */
 public final class DenizYukselmesiSureci implements DonemSureci {
     public static final String KIMLIK = "deniz_yukselmesi";
@@ -86,6 +86,9 @@ public final class DenizYukselmesiSureci implements DonemSureci {
                 v.putFloat("buharTaban", s.mevcutArtis());
                 v.remove("bekleme");
                 d.ekVeriDegisti(VERI);
+            }
+            if (y.surecDurdu(this)) {
+                return;
             }
             if (s.mevcutArtis() > 0 || s.hedefArtis() > 0) {
                 d.denizAyarla(new DenizSeviyesi(0f, DenizAdimi.buharlasmaSonrasi(s.mevcutArtis(), v.getFloat("buharTaban"), buhar),

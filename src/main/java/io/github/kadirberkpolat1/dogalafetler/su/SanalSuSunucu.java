@@ -25,6 +25,7 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.level.BlockEvent;
+import net.minecraftforge.event.server.ServerStartedEvent;
 import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.LogicalSide;
@@ -221,6 +222,14 @@ public final class SanalSuSunucu {
                 SanalSu.yayinla(l);
             }
         }
+    }
+
+    /** Kayıtlı dalga, çekilme ve mağara suyu yeniden kurulur (madde 3: sunucu yeniden açılınca kaybolmasın). */
+    @SubscribeEvent
+    public static void sunucuBasladi(ServerStartedEvent e) {
+        MinecraftServer server = e.getServer();
+        SanalSu.sunucuSaati = DunyaDonemi.al(server).saat();
+        SuKalicilik.kur(server, DunyaDonemi.al(server).ekVeri(DenizYukselmesiSureci.VERI));
     }
 
     @SubscribeEvent

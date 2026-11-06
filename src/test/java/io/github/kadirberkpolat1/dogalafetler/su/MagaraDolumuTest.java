@@ -201,4 +201,48 @@ class MagaraDolumuTest {
         assertEquals(Tur.ACIK, MagaraDolumu.sinifla(true, BlokOzu.HAVA, 66, 64));
         assertEquals(Tur.KATI, MagaraDolumu.sinifla(true, BlokOzu.KATI, 70, 64));
     }
+
+    /** Doldurmayla aynı hücreleri mi verir: yeniden kurulum (yalnız merkez ve yüzey saklanır) için. */
+    private static void ayniCep(MagaraCebi a, MagaraCebi b) {
+        assertEquals(a.hacim(), b.hacim(), "hacim");
+        assertEquals(a.minY(), b.minY(), "minY");
+        assertEquals(a.ustY(), b.ustY(), "ustY");
+        assertEquals(a.sutunlar().keySet(), b.sutunlar().keySet(), "sütunlar");
+        for (long k : a.sutunAnahtarlari()) {
+            assertTrue(java.util.Arrays.equals(a.sutunlar().get(k), b.sutunlar().get(k)), "sütun aralıkları " + k);
+        }
+    }
+
+    @Test
+    void seviyeyeKadarDolumDoldurmaylaAyniCebiKurar() {
+        // Yan ağızlı oda + alçak kol + hacim sınırı: üç farklı yüzey kuralı. Hacim 20'de yalnız kol dolar ve doldurulan
+        // hücreler tohumu (4,2,4) içermez: yeniden kurulum cebin en alçak hücresinden başlar.
+        MagaraDolumu.Hucre agizli = (x, y, z) -> {
+            if (x >= 14 && y >= 4) {
+                return Tur.ACIK;
+            }
+            boolean oda = kutuda(x, y, z, 3, 2, 3, 11, 6, 11);
+            boolean tunel = kutuda(x, y, z, 11, 4, 6, 14, 6, 8);
+            boolean kol = kutuda(x, y, z, 0, 0, 3, 3, 3, 5);
+            return oda || tunel || kol ? Tur.BOS : Tur.KATI;
+        };
+        for (int hacim : new int[] {4000, 150, 20}) {
+            MagaraCebi asil = MagaraDolumu.doldur(agizli, 4, 2, 4, hacim, 20_000);
+            int[] e = asil.enAlcak();
+            MagaraCebi yeniden = MagaraDolumu.seviyeyeKadar(agizli, e[0], e[1], e[2], asil.ustY(), asil.agizY(), hacim);
+            ayniCep(asil, yeniden);
+        }
+        MagaraCebi kapali = MagaraDolumu.doldur(ikili((x, y, z) -> kutuda(x, y, z, 0, 10, 0, 5, 13, 5)), 2, 12, 2, 60, 10_000);
+        int[] e = kapali.enAlcak();
+        ayniCep(kapali, MagaraDolumu.seviyeyeKadar(ikili((x, y, z) -> kutuda(x, y, z, 0, 10, 0, 5, 13, 5)), e[0], e[1], e[2],
+                kapali.ustY(), kapali.agizY(), 60));
+    }
+
+    @Test
+    void seviyeyeKadarDolumSiniriAsarsaBos() {
+        MagaraDolumu.Hucre kutu = ikili((x, y, z) -> kutuda(x, y, z, 0, 10, 0, 5, 13, 5));
+        assertTrue(MagaraDolumu.seviyeyeKadar(kutu, 2, 12, 2, 13, Integer.MAX_VALUE, 10).bos(),
+                "dünya değişip cep sınırı aştıysa kurulmaz");
+        assertTrue(MagaraDolumu.seviyeyeKadar(kutu, 9, 12, 9, 13, Integer.MAX_VALUE, 1000).bos(), "tohum katı");
+    }
 }

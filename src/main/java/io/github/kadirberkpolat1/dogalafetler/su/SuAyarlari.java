@@ -82,6 +82,7 @@ public final class SuAyarlari {
         public final ForgeConfigSpec.IntValue lodMesafeChunk;
         public final ForgeConfigSpec.DoubleValue parcacikYogunlugu;
         public final ForgeConfigSpec.IntValue okumaButcesi;
+        public final ForgeConfigSpec.DoubleValue yakinKurulumButcesiMs;
 
         private Istemci(ForgeConfigSpec.Builder k) {
             lodMesafeChunk = k.comment("Uzak (LOD) sanal su çiziminin en büyük mesafesi (chunk); görüş mesafesi ve kalite ayrıca sınırlar.")
@@ -90,6 +91,8 @@ public final class SuAyarlari {
                     .defineInRange("parcacikYogunlugu", 1.0, 0.0, 4.0);
             okumaButcesi = k.comment("İstemci deniz alanı: 10 tick'te okunan en çok chunk (tick'lere yayılır).")
                     .defineInRange("okumaButcesi", 64, 1, 512);
+            yakinKurulumButcesiMs = k.comment("Yakın su halkası kurulumunun tick başına zaman bütçesi (ms); kalanı sonraki tick'e kalır.")
+                    .defineInRange("yakinKurulumButcesiMs", 2.0, 0.25, 50.0);
         }
     }
 }

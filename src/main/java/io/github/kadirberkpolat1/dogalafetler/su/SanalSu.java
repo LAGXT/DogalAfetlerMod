@@ -274,12 +274,18 @@ public final class SanalSu {
         return new long[] {x0 - 2, cep.minY() - 2, z0 - 2, x1 + 2, cep.ustY() + 2, z1 + 2, 0};
     }
 
-    /** Boyuttaki bütün oyunculara tam durum. */
+    /** Boyuttaki bütün oyunculara tam durum; parametreler döneme de yazılır (kalıcılık, SU-24). */
     public static void yayinla(ServerLevel l) {
         Boyut b = BOYUTLAR.get(l.dimension());
         if (b != null) {
             AgKanali.boyuttakilereGonder(l.dimension(), SuPaketi.durumdan(l.dimension(), b.dunya));
         }
+        SuKalicilik.yaz(l.getServer());
+    }
+
+    /** Kayıttan kurulan kimlik: yeni kimlikler onun üstünden verilir. */
+    static void kimlikGordu(int id) {
+        sonKimlik = Math.max(sonKimlik, id);
     }
 
     // ---------------------------------------------------------------- mixin kancaları (K0-25)

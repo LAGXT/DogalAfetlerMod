@@ -88,4 +88,26 @@ class SanalSuDunyasiTest {
         assertEquals(donuk, dunya.ustu(2.5, 10.5, 2.5, 300), 1e-9, "çözülünce kaldığı yerden");
         assertTrue(dunya.ustu(2.5, 10.5, 2.5, 400) < donuk, "sonra kurumaya devam eder");
     }
+
+    @Test
+    void kalicilikEtiketiDalgaCekilmeVeMagaraParametreleriniTasir() {
+        SanalSuDunyasi dunya = new SanalSuDunyasi(duzKiyi());
+        Dalga d = new Dalga(-40, 4, 1, 0, 120, 0.5, 8, 80, 30, 63, 200, 0.07, 1.5);
+        Cekilme c = new Cekilme(4, 4, 6, 2, 100, 10);
+        dunya.dalgaEkle(3, d);
+        dunya.cekilmeAyarla(5, c);
+        net.minecraft.nbt.CompoundTag etiket = new net.minecraft.nbt.CompoundTag();
+        SuKalicilik.dalgaYaz(etiket, 3, d);
+        assertEquals(d, SuKalicilik.dalgaOku(etiket));
+        net.minecraft.nbt.CompoundTag ce = new net.minecraft.nbt.CompoundTag();
+        SuKalicilik.cekilmeYaz(ce, c);
+        assertEquals(c, SuKalicilik.cekilmeOku(ce));
+        MagaraZamani z = new MagaraZamani(50, 10, 14, 0.1, 600, 0.002);
+        net.minecraft.nbt.CompoundTag me = new net.minecraft.nbt.CompoundTag();
+        SuKalicilik.zamanYaz(me, z, 77.5);
+        MagaraZamani geri = SuKalicilik.zamanOku(me, 10, 14);
+        assertEquals(z.seviye(80), geri.seviye(80), 1e-9);
+        assertEquals(z.bitis(), geri.bitis(), 1e-9);
+        assertEquals(77.5, SuKalicilik.donmaOku(me), 1e-9);
+    }
 }

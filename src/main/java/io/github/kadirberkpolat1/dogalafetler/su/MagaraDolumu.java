@@ -203,6 +203,12 @@ public final class MagaraDolumu {
         if (hacim == 0) {
             return new MagaraCebi(new HashMap<>(), 0, 0, 0, kesif.size(), acik, agizY);
         }
+        Map<Long, int[]> sutunlar = sutunlaraCevir(sutunY);
+        return new MagaraCebi(sutunlar, hacim, dolMinY, y0 + seviye, kesif.size(), acik, agizY);
+    }
+
+    /** Sütun başına y listelerini sıralı {@code [y0, y1)} çiftlerine çevirir. */
+    private static Map<Long, int[]> sutunlaraCevir(Map<Long, List<Integer>> sutunY) {
         Map<Long, int[]> sutunlar = new HashMap<>();
         for (Map.Entry<Long, List<Integer>> e : sutunY.entrySet()) {
             List<Integer> ys = e.getValue();
@@ -227,6 +233,52 @@ public final class MagaraDolumu {
             }
             sutunlar.put(e.getKey(), dizi);
         }
-        return new MagaraCebi(sutunlar, hacim, dolMinY, y0 + seviye, kesif.size(), acik, agizY);
+        return sutunlar;
+    }
+
+    /**
+     * Kaydedilmiş bir cebi yeniden kurar (SU-24): {@code (x0, y0, z0)} cebin en alçak hücresinden ({@link MagaraCebi#enAlcak})
+     * yalnız {@code ustY}'nin altındaki boş hücrelere taşar. Dünya aynıysa {@link #doldur} ile aynı hücreleri verir (keşif
+     * en alçak önce olduğu için dolu kümenin {@code ustY} altındaki komşuları zaten dolu kümededir). {@code maksHacim}
+     * aşılırsa ya da tohum boş değilse (dünya değişti) boş cep döner.
+     */
+    public static MagaraCebi seviyeyeKadar(Hucre hucre, int x0, int y0, int z0, int ustY, int agizY, int maksHacim) {
+        if (y0 >= ustY || hucre.tur(x0, y0, z0) != Tur.BOS) {
+            return MagaraCebi.BOS;
+        }
+        Set<Long> dolu = new HashSet<>();
+        ArrayDeque<Long> kuyruk = new ArrayDeque<>();
+        long tohum = paket(0, 0, 0);
+        dolu.add(tohum);
+        kuyruk.add(tohum);
+        while (!kuyruk.isEmpty()) {
+            long k = kuyruk.poll();
+            int x = dx(k);
+            int y = dy(k);
+            int z = dz(k);
+            for (int[] d : KOMSU) {
+                int ny = y + d[1];
+                if (y0 + ny >= ustY || Math.abs(x + d[0]) >= KAYMA || Math.abs(ny) >= KAYMA || Math.abs(z + d[2]) >= KAYMA) {
+                    continue;
+                }
+                long nk = paket(x + d[0], ny, z + d[2]);
+                if (dolu.contains(nk) || hucre.tur(x0 + x + d[0], y0 + ny, z0 + z + d[2]) != Tur.BOS) {
+                    continue;
+                }
+                if (dolu.size() >= maksHacim) {
+                    return MagaraCebi.BOS;
+                }
+                dolu.add(nk);
+                kuyruk.add(nk);
+            }
+        }
+        Map<Long, List<Integer>> sutunY = new HashMap<>();
+        int minY = Integer.MAX_VALUE;
+        for (long k : dolu) {
+            int y = y0 + dy(k);
+            sutunY.computeIfAbsent(MagaraCebi.anahtar(x0 + dx(k), z0 + dz(k)), a -> new ArrayList<>()).add(y);
+            minY = Math.min(minY, y);
+        }
+        return new MagaraCebi(sutunlaraCevir(sutunY), dolu.size(), minY, ustY, dolu.size(), false, agizY);
     }
 }
