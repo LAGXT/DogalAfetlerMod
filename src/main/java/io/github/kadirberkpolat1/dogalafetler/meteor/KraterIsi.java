@@ -132,6 +132,11 @@ public final class KraterIsi {
         return bekliyor;
     }
 
+    /** Kazı, astar ve kenar bitti; bitiş (yangın, ödül, olay) sırada. */
+    boolean bitiste() {
+        return evre == Evre.KENAR && sira >= plan.kenar().size();
+    }
+
     /** Kayıt karşılaştırması (GameTest): evre, sıra ve sayaçlar. */
     String ozet() {
         return merkez.toShortString() + " " + boyut + " " + gorunum + " " + kaynak + " " + odul + " " + evre + "/" + sira
@@ -174,6 +179,9 @@ public final class KraterIsi {
                     if (sira < plan.kenar().size()) {
                         yig(level, plan.kenar().get(sira++));
                         kullanilan++;
+                    } else if (!bitisYuklu(level)) {
+                        bekliyor = true;
+                        return kullanilan;
                     } else {
                         bitir(level);
                         evre = Evre.BITTI;
@@ -203,6 +211,22 @@ public final class KraterIsi {
 
     private BlockPos konum(KraterProfili.AstarHucresi h) {
         return merkez.offset(h.dx(), h.dy(), h.dz());
+    }
+
+    /**
+     * Bitiş ödülleri krater tabanına bırakır: merkez sütunu ve parça için merkezden en çok {@code 0,6 r} uzaklıktaki
+     * kare. Bu karenin değdiği bütün chunk'lar yüklü olmalı; değilse bitiş bekler (senkron chunk yüklemesi yok).
+     */
+    private boolean bitisYuklu(ServerLevel level) {
+        int d = odul.parca() ? (int) Math.ceil(0.6 * yaricap) : 0;
+        for (int cx = (merkez.getX() - d) >> 4; cx <= (merkez.getX() + d) >> 4; cx++) {
+            for (int cz = (merkez.getZ() - d) >> 4; cz <= (merkez.getZ() + d) >> 4; cz++) {
+                if (!MeteorYoneticisi.yuklu(level, new BlockPos(cx << 4, merkez.getY(), cz << 4))) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     /** Krater kazmaz: çarpışma sert etiketli, kırılmaz ya da blok varlıklı (sandık vb.) blok. */

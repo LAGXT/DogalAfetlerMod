@@ -77,8 +77,12 @@ public final class MeteorOyunTestleri {
         }
     }
 
-    /** Taban: y 1–5 toprak (tüm kutu), üstü hava. */
+    /**
+     * Taban: y 1–5 toprak (tüm kutu), üstü hava. Kalıcı GameTest dünyasında (K-C24) önceki koşudan bu sahnede kalmış
+     * krater işleri atılır; testler yalnız kendi sahnelerindeki işleri sayar.
+     */
     private static void zemin(GameTestHelper y, Block blok) {
+        MeteorYoneticisi.kraterleriUnut(y.getLevel(), sahneAlani(y));
         for (int x = 0; x < 15; x++) {
             for (int z = 0; z < 15; z++) {
                 for (int k = 1; k <= 5; k++) {
@@ -96,6 +100,15 @@ public final class MeteorOyunTestleri {
 
     private static AABB kutu(GameTestHelper y) {
         return new AABB(y.absolutePos(BlockPos.ZERO), y.absolutePos(new BlockPos(15, 12, 15)));
+    }
+
+    /** Sahnenin krater merkezleri (yangın alanı ve yağmur halkası payıyla). */
+    private static AABB sahneAlani(GameTestHelper y) {
+        return kutu(y).inflate(4);
+    }
+
+    private static int bekleyenKrater(GameTestHelper y) {
+        return MeteorYoneticisi.bekleyenKraterSayisi(y.getLevel(), sahneAlani(y));
     }
 
     /** Doğrudan çarpma (uçuşsuz): krater işi döner. */
@@ -146,7 +159,7 @@ public final class MeteorOyunTestleri {
         dogrula(y, m.get().getY() > y.absolutePos(MERKEZ).getY() + 100, "meteor yukarıdan başlamalı: " + m.get().getY());
         y.succeedWhen(() -> {
             y.assertTrue(m.get().isRemoved(), "meteor henüz çarpmadı");
-            y.assertTrue(MeteorAPI.bekleyenKraterSayisi(level) == 0, "krater işi sürüyor");
+            y.assertTrue(bekleyenKrater(y) == 0, "krater işi sürüyor");
             y.assertBlockPresent(Blocks.AIR, MERKEZ);
             y.assertBlockPresent(Blocks.AIR, MERKEZ.below(2));
             y.assertBlockPresent(Blocks.AIR, MERKEZ.offset(3, 0, 0));
@@ -358,7 +371,7 @@ public final class MeteorOyunTestleri {
             MeteorCarptiEvent olay = olaylar.get(0);
             y.assertTrue(olay.suya(), "çarpma suya olmalı");
             y.assertTrue(olay.odul().bos(), "suda ödül zarı atılmaz (zar 1'de bile): " + olay.odul());
-            y.assertTrue(MeteorAPI.bekleyenKraterSayisi(level) == 0, "suda krater işi olmamalı");
+            y.assertTrue(bekleyenKrater(y) == 0, "suda krater işi olmamalı");
             y.assertTrue(esyalar(y).isEmpty(), "suda ödül düşmemeli");
             y.assertTrue(YanginYoneticisi.aktifSayi(level, kutu(y).inflate(4)) == 0, "suda ateş olmamalı");
             long sonra = SanalSu.bolgeHash(level, a.getX(), a.getY(), a.getZ(), b.getX(), b.getY(), b.getZ());
@@ -390,7 +403,7 @@ public final class MeteorOyunTestleri {
         y.onEachTick(() -> enCok[0] = Math.max(enCok[0], MeteorAPI.aktifMeteorSayisi(level)));
         y.succeedWhen(() -> {
             y.assertTrue(MeteorAPI.aktifYagmurSayisi(level) == 0, "yağmur sürüyor");
-            y.assertTrue(MeteorAPI.aktifMeteorSayisi(level) == 0 && MeteorAPI.bekleyenKraterSayisi(level) == 0,
+            y.assertTrue(MeteorAPI.aktifMeteorSayisi(level) == 0 && bekleyenKrater(y) == 0,
                     "meteorlar düşmedi");
             y.assertTrue(olaylar.size() == enCok[0], "her uçan meteor çarpmalı: " + olaylar.size() + " / " + enCok[0]);
             MinecraftForge.EVENT_BUS.unregister(dinleyici);
@@ -463,22 +476,36 @@ public final class MeteorOyunTestleri {
 
     /**
      * M-25: krater işinin sıradaki hücresi yüklü olmayan chunk'taysa iş bekler (kayıttan aynen okunur), chunk yüklenince
-     * tamamlanır; zamanı gelmiş magma soğuması da yüklenene kadar kayıtta kalır.
+     * sürer; zamanı gelmiş magma soğuması da yüklenene kadar kayıtta kalır. Bitişte merkez chunk'ı yüklü değilse bitiş
+     * (ödül, yangın, olay) bekler, yüklenince tamamlanır (Md1: senkron chunk yüklemesi yok).
      */
     @GameTest(template = SAHNE, batch = "meteor_bekleyen", timeoutTicks = 200)
     public static void kraterIsiYukluDegilkenBeklerSonraTamamlanir(GameTestHelper y) {
         blokHasari(y, true);
         zemin(y, Blocks.DIRT);
         ServerLevel level = y.getLevel();
-        int sinirX = y.absolutePos(MERKEZ).getX() + 3;
+        BlockPos merkez = y.absolutePos(MERKEZ);
+        int sinirX = merkez.getX() + 3;
         BlockPos magma = y.absolutePos(new BlockPos(1, 6, 1));
         y.setBlock(new BlockPos(1, 6, 1), Blocks.MAGMA_BLOCK);
-        BiPredicate<ServerLevel, BlockPos> onceki = MeteorYoneticisi.yukluKaynagiAyarla(
-                (l, p) -> p.getX() < sinirX && !p.equals(magma) && l.isLoaded(p));
+        // Aşama 0: x ≥ sınır ve magma yüklü değil; aşama 1: bitiş sırasında merkez chunk'ı yüklü değil.
+        int[] asama = {0};
+        KraterIsi[] isRef = {null};
+        BiPredicate<ServerLevel, BlockPos> onceki = MeteorYoneticisi.yukluKaynagiAyarla((l, p) -> {
+            if (asama[0] == 0 && (p.getX() >= sinirX || p.equals(magma))) {
+                return false;
+            }
+            if (asama[0] == 1 && isRef[0] != null && isRef[0].bitiste() && p.getX() >> 4 == merkez.getX() >> 4
+                    && p.getZ() >> 4 == merkez.getZ() >> 4) {
+                return false;
+            }
+            return l.isLoaded(p);
+        });
         KraterIsi is;
         try {
             MeteorYoneticisi.sogumaEkle(level, magma, level.getGameTime() + 2, Blocks.BLACKSTONE.defaultBlockState());
-            is = carp(y, MeteorBoyutu.BUYUK, YanginKaynagi.KOMUT, HIC);
+            is = carp(y, MeteorBoyutu.BUYUK, YanginKaynagi.KOMUT, HEP);
+            isRef[0] = is;
         } catch (RuntimeException hata) {
             MeteorYoneticisi.yukluKaynagiAyarla(onceki);
             throw hata;
@@ -497,14 +524,26 @@ public final class MeteorOyunTestleri {
                         && okunan.kraterler.get(i).ozet().equals(is.ozet()), "krater işi kayıttan aynen okunmalı: "
                         + is.ozet() + " / " + (i >= 0 ? okunan.kraterler.get(i).ozet() : "yok"));
                 dogrula(y, okunan.sogumalar.size() == veri.sogumalar.size(), "soğumalar kayıttan okunmalı");
+                asama[0] = 1;
+            } catch (RuntimeException hata) {
+                MeteorYoneticisi.yukluKaynagiAyarla(onceki);
+                throw hata;
+            }
+        });
+        y.runAfterDelay(60, () -> {
+            try {
+                dogrula(y, is.bitiste() && !is.bitti() && is.bekliyor(),
+                        "merkez chunk'ı yüklü değilken bitiş beklemeli: " + is.ozet());
+                dogrula(y, esyalar(y).isEmpty(), "bitiş beklerken ödül düşmemeli");
+                y.assertBlockPresent(Blocks.AIR, MERKEZ.offset(4, 0, 0));
+                y.assertBlockPresent(Blocks.BLACKSTONE, new BlockPos(1, 6, 1));
             } finally {
                 MeteorYoneticisi.yukluKaynagiAyarla(onceki);
             }
         });
-        y.runAfterDelay(60, () -> {
+        y.runAfterDelay(90, () -> {
             dogrula(y, is.bitti(), "chunk yüklenince krater işi tamamlanmalı");
-            y.assertBlockPresent(Blocks.AIR, MERKEZ.offset(4, 0, 0));
-            y.assertBlockPresent(Blocks.BLACKSTONE, new BlockPos(1, 6, 1));
+            dogrula(y, esyalar(y).size() == 2, "bitişte çekirdek ve parça düşmeli: " + esyalar(y).size());
             sahneyiTemizle(y);
             y.succeed();
         });

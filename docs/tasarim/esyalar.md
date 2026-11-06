@@ -25,7 +25,7 @@ https://www.amsmeteors.org/fireballs/faqf/ (bolid renkleri, iz, ses).
   turuncu/mavi parlama diski oyuncuya düşüş yerini gösterir. İz, kabuk ve disk sissiz çizilir (gece görüş sisi
   uzaktan gelen izi söndürmesin); 96 blok ötesinde blok kümesi gövde yerine yalnız plazma. Işık motoruna dokunulmaz. 192 blok ötesinde parçacık yok,
   yalnız şerit.
-- **Çarpma:** beyaz parlama (uzaklıkla azalan, 5 tick; dünya çiziminin sonunda tam ekran, F1 karelerinde de görünür), mesafeyle karesel azalan ekran sarsıntısı (oyuncuya özgü paket),
+- **Çarpma:** beyaz parlama (uzaklıkla azalan, 5 tick; dünyanın üstünde, elin ve GUI'nin altında tam ekran, F1 karelerinde de görünür), mesafeyle karesel azalan ekran sarsıntısı (oyuncuya özgü paket),
   0,8 sn'de 4×çapa yayılan toz halkası, zeminin blok parçacıklarıyla fışkıran enkaz, eriyik kaya kıvılcımları, duman,
   derin güm. Suya düşen meteor sıçrama + buhar, krater/ateş/ödül yok.
 - **Krater** (`KraterProfili`): paraboloit çanak (küçük r 2,5 / derinlik 2, büyük r 5,5 / 4), üstte 2 blok bitki/kar

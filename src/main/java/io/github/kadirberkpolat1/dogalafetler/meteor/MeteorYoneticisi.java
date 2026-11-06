@@ -24,6 +24,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.event.level.LevelEvent;
 import net.minecraftforge.event.TickEvent;
@@ -104,6 +106,21 @@ public final class MeteorYoneticisi {
     static int bekleyenKraterSayisi(ServerLevel level) {
         Durum d = DURUMLAR.get(level.dimension());
         return d == null ? 0 : d.veri.kraterler.size();
+    }
+
+    /** Merkezi {@code alan} içindeki bekleyen krater işleri (GameTest: kalıcı dünyada yalnız kendi sahnesi, K-C24). */
+    static int bekleyenKraterSayisi(ServerLevel level, AABB alan) {
+        Durum d = DURUMLAR.get(level.dimension());
+        return d == null ? 0
+                : (int) d.veri.kraterler.stream().filter(k -> alan.contains(Vec3.atCenterOf(k.merkez()))).count();
+    }
+
+    /** Merkezi {@code alan} içindeki krater işlerini atar (GameTest sahne hazırlığı: önceki koşudan kalan iş). */
+    static void kraterleriUnut(ServerLevel level, AABB alan) {
+        MeteorVerisi veri = durum(level).veri;
+        if (veri.kraterler.removeIf(k -> alan.contains(Vec3.atCenterOf(k.merkez())))) {
+            veri.setDirty();
+        }
     }
 
     /** Bekleyen krater işlerinden sıradaki hücresinin chunk'ı yüklü olmadığı için duranlar. */
