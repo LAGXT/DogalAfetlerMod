@@ -4,7 +4,8 @@
 Çalıştırma alt yapısı tools/senaryo/cekirdek_sunucu.py'den gelir; dünya `run-server/ay-carpmasi-senaryo` her koşuda sıfırdan
 üretilir. Oyuncusuz sunucuda ay parçası yağmuru dünya doğuş noktasına düşer (MeteorAPI sözleşmesi).
 
-Koşu 1 (zincir, §6 #12): `start ay_carpmasi` → `asama ileri` (SIREN: "ay yaklaşıyor", global yaklaşma ve çıtırtı katmanları)
+Koşu 1 (zincir, §6 #12): `forceload add ~-32 ~-32 ~32 ~32` (oyuncusuz dünya 300 tick sonra varlık işlemeyi bırakır; zorlanan
+chunk varken sürer, meteor_sunucu.py gibi) → `start ay_carpmasi` → `asama ileri` (SIREN: "ay yaklaşıyor", global yaklaşma ve çıtırtı katmanları)
 → `asama ileri` (çarpma: "ay çarptı ... tsunami çarpanı x3.50", deniz sürecinin 10 dk beklemesi) → 15 sn içinde
 "sarsıntı bitti" ve 10. sn'de "ay parçası yağmuru" → doğuş noktasına en az bir AY görünümlü krater → `asama ileri` x2
 (doğal bitiş) → `start ay_carpmasi` reddedilir (ay yok, madde 4) → `aysonrasi atla` (deniz yükseliyor) → `asama ileri`
@@ -34,6 +35,7 @@ AY_KRATERI = r"meteor krateri tamam: -?\d+, -?\d+, -?\d+ \((KUCUK|BUYUK), AY, mi
 
 def kosu1(sunucu):
     sunucu.bekle(r"Done \(", 0, cs.ACILIS_SURESI, "açılış")
+    sunucu.komut("forceload add ~-32 ~-32 ~32 ~32", r"to be force loaded|already marked")
     sunucu.komut("dogalafet start ay_carpmasi", r"Moon Impact started")
     isaret = sunucu.isaret()
     sunucu.komut("dogalafet asama ileri", r"Moon Impact phase")
@@ -62,6 +64,7 @@ def kosu1(sunucu):
     isaret = sunucu.isaret()
     sunucu.komut("dogalafet asama ileri", r"Moon Impact phase")
     sunucu.bekle(r"\[ay_carpmasi\] ay yaklaşıyor", isaret, 10, "ikinci yaklaşma (kayıtta kalacak)")
+    sunucu.komut("forceload remove all", r"Unmarked all force loaded chunks")
 
 
 def kosu2(sunucu):
