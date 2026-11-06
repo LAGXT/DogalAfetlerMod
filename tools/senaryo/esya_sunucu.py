@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Radar ve sismograf dedicated sunucu kabulü (K0-18): `runServer -PoyunTestiAfeti=deprem`, oyuncusuz.
+"""Radar ve sismograf dedicated sunucu kabulü (K0-18): `runServer -PoyunTestiAfeti=!deprem`, oyuncusuz
+(K-E23: deprem birleşse de taklit onun yerine geçer; yaşam döngüsü ve süre aynı kalır).
 
 Ayrı `run-server/esya` dünyası (eski serverconfig uyarıları karışmasın, K-E8). Konsoldan: `give @a dogalafetler:hava_radari`
 (oyuncu yok), `dogalafet start deprem 2`, `durum`, iki kez `asama ileri`, `stop`, sunucu `stop`. Beklenen: açılış ve kayıt
@@ -63,7 +64,7 @@ def main():
     yol = KANIT / f"runServer-{no}.log"
     dosya = open(yol, "w", encoding="utf-8")
     p = subprocess.Popen(["timeout", "1500", "./gradlew", "runServer", "--offline", "--console=plain", "--no-daemon",
-                          "-PoyunTestiAfeti=deprem"], cwd=W, env=dict(os.environ, JAVA_HOME=JAVA_HOME),
+                          "-PoyunTestiAfeti=!deprem"], cwd=W, env=dict(os.environ, JAVA_HOME=JAVA_HOME),
                          stdin=subprocess.PIPE, stdout=dosya, stderr=subprocess.STDOUT, text=True, start_new_session=True)
 
     def metin():
@@ -110,7 +111,7 @@ def main():
     paket = re.search(r"\d+ ağ paketi kaydedildi.*", m)
     log("ağ paketleri:", paket.group(0) if paket else "YOK")
     log("esya/radar:", "esya/radar" in m, "| esya/sismograf:", "esya/sismograf" in m)
-    log("oyun testi afeti:", "Oyun testi afeti deprem için kaydedildi" in m)
+    log("oyun testi afeti:", bool(re.search(r"Oyun testi afeti deprem (için|gerçek afetin yerine) kaydedildi", m)))
     log("invalid dist =", m.count("invalid dist"), "| Exception =", m.count("Exception"), "| ERROR =",
         len(re.findall(r"/ERROR\]", m)), "| çıkış =", kod)
     return 0 if kod == 0 and "invalid dist" not in m and "Exception" not in m and paket else 1

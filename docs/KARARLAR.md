@@ -358,7 +358,10 @@ değişince istemci ve sunucu sürümü uyuşmalıdır (K0-07, K-C33). Birden ç
 birleştirmede çakışırdı (sıcaklık S-19, uyarı, yangın §E). Kural (çekirdek sözleşmesi §9): paket ekleyen dal
 `PROTOKOL_SURUMU`'nu artırmaz; entegratör birleştirmede bir kez artırır. Faz 2b'de "3" → "4" (`d62d796`): `sicaklik/durum`,
 `su/durum`, `uyari/ortam`, `uyari/ortam_durdur`, `uyari/siren`, `uyari/siren_durdur`, `yangin/ates_durumu` eklendi; log
-`9 ağ paketi kaydedildi (protokol 4)` (`.vibe/kanit/entegrasyon-2b/gametest-4.log` ve yedi dedicated senaryo).
+`9 ağ paketi kaydedildi (protokol 4)` (`.vibe/kanit/entegrasyon-2b/gametest-4.log` ve yedi dedicated senaryo). Faz 3: "5" (K-E17 d).
+**Faz 4 notu (ay, entegrasyon 4 2/6):** "5" → "6", Faz 4'te tek sefer: paket kümesi aynı (12 paket), ama ay `DonemPaketi`'nin tel
+biçimine `long ayOlaySaati` ekledi (+8 bayt, sonda); eski istemci yeni paketi okuyamaz. Diğer beş Faz 4 dalı paket eklemedi,
+artırmaz.
 
 **K-C48 `/dogalafet asama ileri [süreç]`.** Donma K-D31: donma ve buharlaşma süreçlerinin ayrık aşaması yok; argümansız
 `asama ileri` ilk dolu çıktıyı veren süreci ilerlettiği için, birden çok süreç sürerken (güneş zinciri, donma, buharlaşma, deniz)
@@ -376,6 +379,10 @@ yükselmeyi tüketir) durdurmayla bozulmamalı. Çekirdek sözleşmesi §3a'ya i
 **K-C50 Güneş evresi ilerlemesini evrenin sahibi yazar (sıcaklık §A.8).** Sıcaklık `evreIlerlemesi()`'ni okur, yazmaz: evrenin
 sahibi (güneş patlaması afeti ya da gökyüzü dönem süreci) `BUYUYEN` boyunca 0→1'i 5 MC gününde (ölçekli afet saatiyle) doğrusal,
 `SUPERNOVA` boyunca 0→1'i evre süresinde yazar; yazılmazsa güneş patlaması sıcaklığı 0 kalır ve süpernova artığı sönmez.
+**Faz 4 notu (güneş GP1, entegrasyon 4):** `BUYUYEN` eğrisi güneş patlamasında iki parçalıdır: sirende 0 → 0,273 karesel
+(`0,273·τ²`, gökyüzü ölçeği 1 → 1,6), AKTIF'in 5 MC gününde 0,273 → 1 doğrusal (sıcaklık artışı siren sonunda %27, 1. gün
+%42, 5. gün %100). Çekirdek §6 ve sıcaklık §A.8 sözleşme metinleri buna göre değişti; okuyucu kod (sıcaklık, gökyüzü) değişmedi
+(çarpan `evreIlerlemesi` olarak kaldı; inceleme-gunes-patlamasi-kizil-cuce doğruladı).
 Çekirdek sözleşmesi §6 tablosunun evre ilerlemesi satırına işlendi.
 
 ### Reddedilen yollar
@@ -2291,6 +2298,503 @@ afetlerinindir (§A.3). (f) `runData`: #7, #15, #16, #19, #22 ikonları mod eşy
 (g) `DogalAfetler` kaydı `DonmaSistemi.kaydet`'ten sonra: `Yiyecek`, `EsyaKayitlari`, `Meteor`, `Balikcilik`, `Basarim`, sonra
 `Kancalar.bagla()` (`68577b1`, `1e70a46`).
 
+## Faz 4 — Güneş patlaması ve kızıl cüce
+
+Parça `gunes-patlamasi-kizil-cuce` (dal `is/gunes-patlamasi-kizil-cuce`, son commit `84b2faf`; `main`'e birleştirme `ded08d7`, entegrasyon 4
+1/6). Kaynak `.vibe/kararlar/gunes-patlamasi-kizil-cuce.md` §B/§C/§D; diğer işçilerin kullandığı arayüz sözleşmeleri (§A) ve
+entegratöre notlar (§E) o dosyada kalır. Şef kararları (§E b, c; GP17 FPS) "Şef kararları (Faz 4)" bölümündedir; N17 satırları
+sondaki tablodadır. Rapor `.vibe/rapor/gunes-patlamasi-kizil-cuce.md`, inceleme `.vibe/rapor/inceleme-gunes-patlamasi-kizil-cuce.md`
+(kabul, P0/P1 = 0, P2 = 5), birleştirme `.vibe/rapor/entegrasyon-4.md`.
+
+**GP1 Evre ilerlemesi: siren karesel 0 → 0,273, AKTIF doğrusal 0,273 → 1 (sıcaklık §A.8 sapması).** Gökyüzü güneşi
+`1 + 2,2·p` ölçekle çizer (gokyuzu §2). Şartname "siren başladıktan sonra güneş yavaş yavaş büyüsün"; tasarım §2 siren
+60 sn'de 1,0 → 1,6 kat (`1 + 0,6·τ²`). 5 günlük doğrusal 0 → 1 sirende yalnız 1,02 kat verirdi (görünmez). Bu yüzden siren
+boyunca `p = (0,6/2,2)·τ²`, AKTIF'te `p = 0,273 + 0,727·t` (güneş 1,6 → 3,2 kat, sıçramasız). Sıcaklık aynı `p`'yi okur:
+`gunesPatlamasiArtisi` = 18 ise siren sonu +4,9, 1. gün sonu +7,6, 5. gün +18; tasarımın "1. gün +6 → 5. gün +18" eğrisiyle
+uyumlu. Sıcaklık §A.8'in "BÜYÜYEN boyunca 0 → 1 doğrusal" cümlesi buna göre güncellenmeli (§E). JUnit: monoton, sona doğru
+hızlanan siren, siren sonu = AKTIF başı, 1,6 ve 3,2 kat; GameTest `sirendeGunesBuyurMeteorlarAktifteBaslarStopNormaleDondurur`.
+
+**GP2 BÜYÜYEN'e geçiş SIREN başında.** Ön-uyarıda gök değişseydi eşyası olmayan oyuncu afeti önceden görürdü (madde 4,
+N7: radarda bile görünmez). Buharlaşma (BÜYÜYEN'de başlar) bu yüzden meteorlardan 60 sn önce başlar; 5 günlük sürecin
+%0,8'i, derinlik farkı ihmal edilir. Çekirdeğin taklidi BÜYÜYEN'i AKTIF'te yapıyordu; gerçek afet bundan ayrılır (taklit yalnız
+yaşam döngüsü içindir).
+
+**GP3 Meteor yoğunluğu dakikalık ardışık yağmurlarla; gerçek tick.** `MeteorAPI.yagmur` tek bir yoğunluk alır; eğri (1/40 sn →
+1/12 sn, oyuncu başına) afetin (meteor §A.1). Her 1200 oyun tick'inde (gerçek tick, afet `asamaTick` sayısı) 1200 tick'lik
+yeni bir yağmur o anın yoğunluğuyla başlar; yağmur dengeli dağıtımı ve giren/çıkan oyuncuyu kendisi yürütür (`oyuncular`
+boş). `/dogalafet hiz` 5 günü sıkıştırır ama meteor yoğunluğu gerçek zamanda kalır (test aracı meteor yağdırmayı 1000 katına
+çıkarmasın). Büyük meteor %5 (tasarım: "büyük %5, Kozmik Çekirdek yalnız burada"); API'de orta boy yok, tasarımın %25 "orta"sı
+küçük sayılır. Yağmur kaydedilmez (M-05): kayıttan dönüşte `yuklendi` ilk tick'te yenisini başlatır.
+
+**GP4 Alt aşama = gün; `asama ileri` bir gün atlar.** N18 "güneş patlamasının 5 gününü beklemeden". Gün gün atlamak
+sıcaklık, kavrulma ve meteor yoğunluğunun her gününün ayrı sınanmasını sağlar; 5. günde (son alt aşama) `asama ileri` BITIS'e
+geçer = doğal bitiş (süpernova, "Güneşi Atlattım"). Siren + 5 gün + bitiş = 7 komut; sonrası zincirin `asama ileri`'si.
+
+**GP5 Başlama kapısı `yerUygunMu`'da.** Çekirdeğin tek seferlik kapısı (K-C6) rastgele seçimi korur, `/dogalafet start` korumaz.
+Süpernova/güneşsiz/doğuş sürerken başlayan afet evreyi BÜYÜYEN yapıp zinciri ve donmayı bozardı; `yerUygunMu` false →
+"uygun yer bulunamadı" (N14 yolu, ek çekirdek kodu yok). Tamamlanmış kızıl cücede elle başlar (test aracı; rastgele seçim
+`gunesPatlamasiTekrarlanabilir`'e bağlı).
+
+**GP6 Kavrulma: güneşe açık çimen → kaba toprak, 3. günden.** Tasarım §2 "çimenler 3. günden sonra rastgele kaba toprağa
+dönüşür (yangın sistemi dışı, `afetBlokHasari` ile)". Her tick oyuncu başına bir deneme, olasılık 3. gün 0 → 5. gün 0,5 ×
+TPS kısması, 64 blok yarıçap; 2 günde 128×128 alanın ~%50'si (yamalı). "Güneşe açık" = sütunun `MOTION_BLOCKING` yüksekliğinin
+hemen altı (yaprak ve çatı gölgeler; yükseklik haritası eşzamanlı, gök ışığı gecikebilir). Her değişimde
+`SanalSu.chunkDegisti`. GameTest `kavrulmaCimeniKabaToprakYaparBlokHasariKapaliykenDokunmaz`. Kalıcı izdir (krater gibi);
+`stop` geri almaz.
+
+**GP7 Taklitle çakışma (K-E22 ile değişti).** Tur 1'de gerçek kayıt `ozelliktenKaydet`'ten sonraydı ve taklit kayıtlıysa gerçek afet
+atlanıyordu. K-E22 (şef kararı) sırayı çevirdi: gerçek kayıt önce, taklit kayıtlı türü atlar ve güneş türü atlanınca
+`OyunTestiSureci` de kaydedilmez, `GunesZinciriSureci` her zaman kayıtlıdır. Bu daldaki atlama dalı ölü kod olduğu için kaldırıldı;
+senaryonun alt sınıfı (`GercekAfetSunucusu`) da kalktı, betik ortak `Sunucu`'yu kullanır. Sonuç: `-PoyunTestiAfeti=...,gunes_patlamasi`
+taşıyan eski senaryolar artık gerçek afeti koşar (§E'de kırılan adımlar).
+
+**GP8 Kalıcılık.** NBT `aktifSure` (başlarken config'ten sabitlenir; süreç ortasında config değişse de aynı kalır), `aktifGecen`.
+Evre ve ilerleme `DunyaDonemi`'nde. GameTest `kayitOkumaGunuVeKalaniKorurZincirDisindaBaslamaz`; senaryo koşu 2 "Aktif afet geri
+yüklendi: gunes_patlamasi ... aktif" + büyüyen güneş + yağmurun yeniden başlaması; koşu 3 kızıl cüce kalıcı.
+
+**GP9 GameTest hijyeni (K-E15, K-E16).** Beş test, beş batch (her biri 1 test). Global dönemi değiştirenler başta ve sonda
+`sifirla` ("eski değer" = boş dünyanın ilk hâli; her koşu boş dünyayla başlar, gokyuzu testleriyle aynı desen); değiştirilen
+gamerule (`afetBlokHasari`) eski değerine döner. Meteor yağdıran test `afetBlokHasari=false` ile koşar ve afeti aynı testte
+`stop` ile temizce bitirir (uçan meteor ve yağmur 0 doğrulanır). Sahte oyuncu test sonunda listeden çıkarılır.
+
+**GP10 İstemci ve ses kapsamı (tur 2'de güncellendi).** Güneş diski, süpernova, nebula, kızıl cüce (gokyuzu), meteor izi/çarpma
+(meteor), siren (uyarı), donma ve buhar (donma) ortak çizicilerdedir. Afete özel ekler `client.gunes_patlamasi`'ndadır (GP11–GP14);
+tek durum kaynağı çekirdeğin `DonemPaketi`'si (evre, ilerleme, evre başlangıcı): yeni paket, yeni mixin ve gokyuzu dosyasına yazım yok.
+Yapılmayanlar: çarpma anının beyaz örtüsü (meteor parçasının çarpma parlaması var), süpernova çökmesinde öteki ortam seslerinin
+susturulması (vanilla kategorilerine dokunmak gerekir), kavrulmada uzak yangın uğultusunun ayrı katmanı (rüzgâr dosyasının içinde).
+
+**GP11 Aurora perdesi `AFTER_SKY`'da.** Tasarım §2 aşama 0: "gece ufuktan yükselen kızıl-yeşil aurora" (Carrington 1859). Forge
+`RenderLevelStageEvent.Stage.AFTER_SKY`'da `position_color`, toplamalı, derinlik yazımı yok: kuzey göğünde ±100°'lik yay, 7–13°'den
+22–36° yukarı üç bant (alt kenar yeşil `#3CFF8A`, üst kenar kızıl `#FF3C5A`, uçlar saydam), U yönünde kayan ışın deseni
+(`GunesGorselEgrileri.isin`) ve dalgalanan yükseklik/yarıçap. Güç `aurora(p, gece, yağmur)`: BUYUYEN'in bütün gecelerinde (siren ve
+5 gün), sirende %35'ten tama açılır, gündüz ve yağmurda söner. Arazi sonra çizildiği için perdenin önünde kalır. Kalite (N13,
+mevcut `gorsel.efektKalitesi`): katman 1/2/3/3, dilim 48/64/96/128 (Düşük/Orta/Yüksek/Ultra); en çok 1 152 dörtgen, kare başına
+ayırma yok (statik sütun dizileri, yalnız render thread'i).
+
+**GP12 Ekran örtüleri görünüm uzayında (`AFTER_WEATHER`), arayüz katmanı değil.** F1 (`hideGui`) bütün arayüz katmanlarını gizler;
+süpernova parlaması ve ısı dalgalanması arayüz değil dünyanın parlaklığıdır (vitrin kareleri de F1'le alınır). Model-görünüm birim
+matrise alınır, z = −1'de projeksiyondan hesaplanan ekranın 1,2 katı dörtgenler çizilir, sonra geri yüklenir. (a) Süpernova: beyaz
+%85 × `GokyuzuEgrileri.supernovaFlas(evre saniyesi)` (gökyüzünün parlama eğrisiyle aynı an), çatı altında %35. (b) Isı
+dalgalanması: ekranın alt %55'inde yana kayan, titreşen sıcak şeritler (kalite 10/16/24/32 şerit), yalnız gündüz ve göğü gören
+konumda, AKTIF ilerledikçe %25'ten tama (şadersiz serap; vücut sıcaklığının sıcak vinyeti sıcaklığın kendi katmanıdır). (c) Kızıl
+cüce şafak tonu: doğuş boyunca `#FF6A3A`, tepe %14 (doğuşun ortası), doğuş tamam olunca 0; gündüz gök/sis tonu ve ışık haritası
+gokyuzu'nundur (G11, G14).
+
+**GP13 Yaprak/çimen kuruması blok renk işleyicisiyle.** Tasarım §2 "yapraklar kahverengiye döner (biyom rengi istemcide
+karıştırılır), blok değişmez". `RegisterColorHandlersEvent.Block`'ta çimen (`grass_block`, `grass`, `fern`, `potted_fern`,
+`tall_grass`, `large_fern`) ve yapraklar (meşe, orman, akasya, kara meşe, mangrov, sarmaşık, ladin, huş) için vanilla'nın
+`BlockColors.createDefault` hesabının aynısı + kuruluk karışımı (çimen `#B59A55`, yaprak `#8A6A2E`). Kuruluk 2. günün sonundan (p =
+0,564) sürecin sonuna yumuşak geçiş, tavan %72; 8 basamak, basamak değişince bir kez `levelRenderer.allChanged()` (5 günde en
+çok 8 + dönüş). Kuruluk 0'da renk vanilla ile bire bir; eşya simgesi (`level == null`) değişmez. Bilinen sınır: aynı blokları
+renk işleyicisiyle kaydeden başka bir mod varsa mod yükleme sırası kazananı belirler (önceki işleyici Forge API'sinde okunamaz).
+
+**GP14 Sesler.** `tools/assets/gunes_sesleri.py` (ses_uret yardımcıları, deterministik), ölçüm `docs/kanit/ses/gunes_*_ebur128.txt` +
+spektrogram: kavurucu rüzgâr (20 sn döngü, −26,1 LUFS, −9,0 dBTP, baskın 40 Hz), süpernova basıncı (8 sn, 25 → 60 Hz, −25,0 LUFS,
+−9,3 dBTP), kristal uğultu (20 sn, −29,9 LUFS, −18,2 dBTP, 340–660 Hz), kızıl cüce akoru (4,5 sn, −27,0 LUFS, −14,5 dBTP); dördü
+de "UYGUN". Rüzgâr sunucunun `OrtamSesi` katmanıdır (`gunes/kavrulma`, global, WEATHER; AKTIF'te %30 → %100, afet bitince söner,
+kayıttan dönüşte yeniden). Süpernova ve akor eşitlenmiş evre saniyesinden istemcide bir kez çalar (AMBIENT, konumsuz): basınç
+çökme bitince (8. sn), kristal 6 sn sonra, akor doğuşun ilk 6 sn'sinde; sonradan giren oyuncu yalnız pencere içindeyse duyar.
+Siren uyarınındır (K0-19). `sounds.json` ve altyazılar datagen (`GunesPatlamasiSesleri`).
+
+**GP15 Kavrulma ölçekli saate bağlı (tur 1'den değişti).** Tur 1'de her gerçek tick'te oyuncu başına bir deneme vardı;
+`/dogalafet hiz` 5 günü sıkıştırırken kavrulmayı sıkıştırmıyordu (hızlı testte çimen hiç kurumuyordu). Şimdi ölçekli tick başına
+bir deneme (`adim` kadar, oyuncu başına tick'te en çok 32; TPS kısması olasılığı çarpar). Hız 1'de davranış aynıdır.
+
+**GP16 Görsel otomasyon.** `client.gunes_patlamasi.GunesPatlamasiOtomasyonu` (`-Potomasyon=gunes_patlamasi`) + `tools/senaryo/
+gunes_patlamasi_gorsel.py` (ws 96, `runclient_kilit.py kos`, K0-21 rev. 2 (a)–(e), kare eksik/bayatsa bir tekrar). Kamera en yakın
+ormanın 40 blok batısında uçan yaratıcı oyuncudur: izleyici meteor yağmurunun hedefi değildir (meteor §A.1). Gerçek afet komutlarla
+yürütülür; tek vitrin eki 4. günde afetin kendi kaynağıyla kısa, yoğun bir yağmurdur (oyuncu başına dakikada 40, %15 büyük,
+düşme 0,6 yavaş çekim) — tasarım vitrini "4–6 meteor izi" ister, afetin 4. gün yoğunluğu (dakikada 4,3) tek karede bunu vermez.
+Kavrulma karesi hız 60 × 300 tick (4. günün %75'i) sonrasıdır. Her kare: koşul + FPS ≥ 15 (en çok 60 tick) + en az iki yeni
+çizilmiş kare; satırı FPS, TPS, mspt, evre, ilerleme, evre saniyesi, uçan meteor, parçacık ve kuruluk basamağını yazar.
+Toast'lar (F1'de de çizilir) her istemci tick'inde temizlenir; süpernova çökmesi ve parlaması `hiz 0.25` ile ağır çekimde alınır.
+
+**GP17 Gizli workspace'te FPS 1: tekrar yok, ölçüm Faz 5'e.** Koşu 1'de 13 karenin hepsi FPS 1 (15 FPS kapısı her karede 60 tick'te
+zaman aşımına düştü); kareler yine en az iki yeni çizilmiş karenin sonunda alındı, 13 farklı md5 ve piksel ölçümleri evrelerle
+uyumlu (`gorsel/kare-olcum-1.tsv`: aurora karesinde üst yarı yeşil %8,4 / kızıl %4,3, kızıl cücede kızıl %72). Şefin tekrar koşulu
+"kare boş çıkarsa" sağlanmadığı için ikinci runClient açılmadı. FPS 1 compositor kısmasıdır, modün maliyeti değildir: emsal
+yangın ("İstemci FPS ve Ultra karesi bilinen sınır: gizli workspace ~1 FPS çizer, ölçüm Faz 5'te görünür pencerede", şef
+kararı), spike-gokyuzu Faz 2 notu, K0-21 rev. 2 (j). Sunucu tarafı ölçüldü: TPS her karede 20,0, meteor vitrini tepesinde mspt
+6,7–7,1 (10 uçan meteor, 4 482 parçacık). Gerçek FPS ve Düşük/Yüksek/Ultra karşılaştırması görünür pencere ya da başsız
+kalibrasyon ister (§E).
+
+**GP18 Başarısız GameTest de batch sonunda temizlenir (entegrasyon 4, inceleme P2).** `succeedWhen` kullanan iki test
+(`sirendeGunesBuyur...`, `zincirKizilCuceye...`) başarısız bitince kendi temizliğini çalıştırmıyordu (`try/finally` asıl
+kontrolü geçtiği için işlemez: koşul zaman aşımına kadar yeniden denenir). Batch'leri `@AfterBatch` ile afeti durdurur, dönemi ve
+hızı `sifirla` ile sıfırlar, siren testinin kapattığı `afetBlokHasari`'nı eski değerine döndürür (K-E15; balıkçılık K-E22 c ile aynı
+desen). Başarılı yol değişmedi.
+
+### Reddedilen yollar
+
+- **BÜYÜYEN'i AKTIF'te açmak (taklit gibi):** sirende güneş büyümezdi (bölüm D).
+- **Siren büyümesini gökyüzü çizicisinde ayrı alanla vermek:** gokyuzu paketine yazmak (sahiplik dışı) ve yeni dönem alanı/paket
+  (çekirdek); aynı sonuç evre ilerlemesiyle alınır (GP1).
+- **Tek uzun yağmur:** yoğunluk eğrisi uygulanamazdı (GP3).
+- **Kavrulmada `canSeeSky`:** gök ışığı blok değişiminden sonra gecikir; yükseklik haritası eşzamanlı (GP6).
+- **Başlama kapısını komutta denetlemek:** `CekirdekKomutlari` çekirdeğindir; `yerUygunMu` aynı işi kendi sınıfında görür (GP5).
+
+## Faz 4 — Ay çarpması
+
+Parça `ay-carpmasi` (dal `is/ay-carpmasi`, son commit `a588720`; `main`'e birleştirme `3127568`, protokol `d0fe4b9`, P2 `1a3f80a`, entegrasyon 4 2/6). Kaynak
+`.vibe/kararlar/ay-carpmasi.md` §B/§C/§D; sözleşmeler (§A) ve entegratör notları (§E) o dosyada kalır. Şef kararları (K-E24 AY-07,
+protokol "6") "Şef kararları (Faz 4)" bölümündedir; N17 satırları sondaki tablodadır. Rapor `.vibe/rapor/ay-carpmasi.md`, inceleme
+`.vibe/rapor/inceleme-ay-carpmasi.md` (kabul, P2 = 7) ve `-2.md` (AY-12, P2 = 1), birleştirme `.vibe/rapor/entegrasyon-4.md`.
+
+**AY-01 Ay veri modeli: bool + olay saati, ayrı alan değil `AyDurumu` türetmesi.** `ayVar` bool'u korunur, yanına tek long
+`ayOlaySaati` eklenir; durum ikisinden türetilir. Neden: `ayVar()`'ı okuyan altı alt sistem (su, başarım, tek seferlik kural,
+gökyüzü, komut, testler) değişmeden kalır; NBT ve paket geriye uyumlu tek alan alır. Ayrı enum alanı iki kaynaklı durum (bool
+ile tutarsız) riski getirirdi.
+
+**AY-02 Yaklaşma = SIREN aşaması, çarpma = AKTIF başı.** Bölüm H "siren çaldıktan 60 sn sonra çarpsın (siren bu anda
+fade-out)" çekirdeğin SIREN → AKTIF geçişiyle zaten aynı an (uyarı-ses §A.1). Yaklaşmanın 60 sn'si istemcide SIREN başından
+ölçekli saatle çizilir; `/dogalafet hiz` hepsini birlikte hızlandırır. JUnit `yaklasmaSirenSuresiyleAyni` bağı denetler.
+
+**AY-03 Siren sırasında durdurma ayı geri getirir; çarpmadan sonra hiçbir durdurma geri getirmez.** Ay çarpması tek
+seferliktir ve "ulaşılmış dönem geri alınmaz" (madde 11). Yaklaşma henüz ulaşılmış dönem değildir (güneşin BUYUYEN →
+NORMAL dönüşüyle aynı mantık, K-C26). Kural (KURAL, yumuşak) durdurmada da aynı: ay çarpmadıysa yerinde kalır.
+
+**AY-04 Çarpma noktası görseldir; harita sarsıntısı yalnız "sağlam olmayan" düşmesidir.** Tasarım §6 (spike sonrası): dev
+krater açılmaz. "Harita sallansın" (H.3) oyuncu çevresinde desteksiz yaprak/cam/fener düşmesiyle verilir (tasarım §2),
+`afetBlokHasari=false` iken hiç blok düşmez (madde 11). Deprem işçisinin "sağlam olmayan" listesi bu dalda yok; kendi
+etiketimiz `#dogalafetler:ay_sarsintisi_duser` veri paketiyle genişletilir (N12). Desteksiz = altı `FallingBlock.isFree`.
+
+**AY-05 Sarsıntı mesafeden bağımsız ve her boyutta.** H.3 "tüm oyuncuların ekranı". Kamera sarsıntısı çarpma saatinden
+istemcide hesaplanır (paket yok); Nether/End'deki oyuncu da sarsılır (N11 global olay), parlama yalnız Overworld'de (göğü
+olmayan boyutta beyaz ekran anlamsız).
+
+**AY-06 Ses: güm her oyuncuya kendi konumunda.** `playNotifySound` her oyuncuya ayrı ve mesafesiz (uyarı-ses §A.4 kural 2
+konumlu `level.playSound`'u önerir; çarpma ufkun ötesinde, herkes aynı düzeyde duymalı, madde 3). Yaklaşma uğultusu ve
+çıtırtı `OrtamSesi` global katmanı (siren sırasında −3 dB bastırma ve geç gelen oyuncu çekirdekte/uyarıda çözülü).
+
+**AY-07 Döngülü ay sesleri −30 LUFS (tasarım tercihi, K-E24).** Uyarı-ses hedefi −26 LUFS'tur; K-E24 döngülü ortam
+katmanına −26…−30 bandını tanır. −30 seçildi çünkü 18–100 Hz alçak uğultu −26'da "konuşmayı bastırmayan, hissedilen"
+(tasarım §4) karaktere fazla geliyordu. Tepe sınırı gerekçe değildir: +4 dB ile tepe −7,6 / −7,4 dBTP olurdu, −6 dBTP sınırının
+içinde (entegrasyon 4 düzeltmesi, inceleme P2). −30 LUFS, tepe −11,6 dBTP; çıtırtının 2,5 kHz üstü −58 dB (konuşma bandı çentikli).
+
+**AY-08 Gökyüzü çizimi gök küresinde sabit dünya yönünde, zaman dönüşü dışında.** Yaklaşan ay gece/gündüz dönmeden "çarpma
+noktasına dönük sabit yön" (tasarım §2) çizilir; azimut doğudan 20° güneye (`AyEgrileri.AZIMUT_DERECE`). Enkaz halkası
+doğu-batı ekseninden geçen, tepeden güneye 30° eğik büyük çember (ekvator düzlemi hissi), ufuk altı yarısı çizilmez.
+
+**AY-09 Gündüz de biz çizeriz (yalnız ay çarpması sürerken ve izleri sönene kadar).** Sarmalayıcı normalde NORMAL güneş + ay
+yok gündüzünde iç nesneye devreder (G1/B4). Yaklaşan ay ve mantar sütunu "gündüz ya da gece fark etmeksizin" (tasarım §2)
+görünmeli; `IstemciAy.gokyuzuEtkin()` true iken sarmalayıcı çizer. Halka (3 gün) da bunun içinde; halka kapalıysa ya da
+söndükten sonra davranış eskisi gibidir (başka modun gündüz göğü korunur).
+
+**AY-10 Yağmur doğuş noktasına düşer (oyuncusuz).** `MeteorAPI.yagmur(oyuncular=boş)` sözleşmesi: boyuttaki oyuncular her tick
+yeniden okunur, oyuncu yoksa doğuş noktası. GameTest'lerde yağmur başladığı tick'te bitirilir ya da sıklık 0 yapılır
+(`meteorDakikaBasinaAyarla`, paket içi); sahnelere meteor düşmez.
+
+**AY-11 Kayan yıldızlar istemci yerel rastgelesi.** Tasarım "oyuncu başına 1 / 3 dk, zararsız": ağ yok, her istemci kendi
+kayan yıldızını görür (oyuncuya özgü efekt, madde 3).
+
+**AY-12 Sarsıntı yalnız varlık işleyen chunk'ta blok düşürür; GameTest sahnesi varlık işleyince koşar.** Kök neden: GameTest'in
+zorladığı sahne chunk'larından biri (z < 0 yanı, chunk `[59,-1]`) ilk tick'te henüz FULL/ENTITY_TICKING görünürlüğüne çıkmamışken
+`aday` yalnız `hasChunkAt` sorduğu için oradaki yaprağı seçiyor, `FallingBlockEntity.fall` bloğu kaldırıyor ama varlık
+`PersistentEntitySectionManager.addEntity`'de görünürlüğü `HIDDEN` olan bölüme giriyordu; `getEntitiesOfClass` yalnız
+erişilebilir bölümleri gezdiği için sayaç (`toplam`, bu sarsıntı nesnesine özel) kutudaki varlık sayısından büyük çıkıyordu.
+Kanıt (geçici TANI satırı, `.vibe/kanit/ay-carpmasi/tani-1..3.log`): koşu 1 toplam 12 / görünen 7, eksik 5'in hepsi `chunk=[59, -1]
+gorunur=false varlikIsler=false kutuda=true`; koşu 3 toplam 8 / görünen 3, eksik 5'in hepsi aynı; geçen koşu 2'de 15/15, bütün
+varlıklar `gorunur=true` (iki tanesi `[60,-1]` TRACKED: görünür, işlemiyor). Sayaç başka sahnenin ya da vanilla'nın düşen
+bloğunu saymıyor (her köken sahnenin yaprak karesi içinde, `blok=oak_leaves`), varlıklar kutu dışına düşmüyor (hepsi `kutuda=true`,
+aynı tick). Başarısız koşularda TPS kısma çarpanı 0,5 (sunucu gecikmesi chunk görünürlük güncellemesini geciktiriyor).
+Düzeltme: üretimde `SarsintiDusmeleri.aday` `level.isPositionEntityTicking` ister (aynı görünürlük haritasını okur: düşen blok
+görünmez bölümde donup kalmaz, oyunda da varlık işlemeyen kenar chunk'ta blok kaybolmaz); test `succeedWhen` ile tarama alanının
+bütün chunk'ları varlık işleyene dek bekler, sonra eşik ve doğrulamalar aynen bir kez koşar (zayıflatma yok). Reddedilen: sayımı
+`havadakiler` listesinden yapmak (görünmez varlığı "düştü" sayıp asıl hatayı gizlerdi).
+
+**AY-13 Birleştirme düzeltmeleri (entegrasyon 4, inceleme P2).** (a) Sunucu açılışında (`ServerStartedEvent`, çekirdeğin geri
+yüklemesinden sonra, LOWEST) ay YAKLASIYOR ama aktif afet ay çarpması değilse ay VAR'a döner ve WARN yazılır: afet kaydı
+okunamazsa ay yaklaşma hâlinde takılı kalmaz (`AyCarpmasiSistemi`). (b) Sarsıntı GameTest'i hacim boşaltma, düşen blok silme
+ve sahne kurulumunu `varlikIsliyor` sağlandıktan sonra yapar (gizli bölümdeki eski düşen blok silinmeden kalmaz, AY-12 ailesi);
+sahnedeki `GameTestAssertException` dışı istisna da testi düşürür, sunucu tick'ine kaçmaz. (c) Hız testi başarısız bitse de
+batch sonunda (`@AfterBatch`) afet durur, dönem sıfırlanır, `meteorDakikaBasina` eski değerine döner (K-E15, GP18 deseni).
+(d) AY-07 gerekçesi ölçümle hizalandı (tasarım tercihi, K-E24).
+
+### Reddedilen yollar
+
+- **Kendi ay meteoru varlığı:** Faz 4 kuralı; yalnız `MeteorAPI`.
+- **Çarpma için ayrı istemci paketi (`ay_carpmasi/carpma`):** dönem paketindeki olay saati yeter; ayrı paket protokol
+  artışı ve sonradan girenler için ikinci senkron yolu gerektirirdi.
+- **Gerçek dev krater:** tasarım §6 spike sonrası kararı (harita korunur).
+- **`AFTER_SKY` ile yaklaşan ay:** vanilla ay o anda çizilmiştir, gizlenemez (G1); sarmalayıcı yolu kullanıldı. 3. kademede
+  (yansıma bozuk) yaklaşan ay vanilla ayın üstüne çizilir (bilinen sınır, gökyüzü G1 ile aynı).
+- **Sarsıntıyı meteor sarsıntı paketiyle göndermek:** o paket mesafeyle söner (M-11); ay çarpması mesafeden bağımsız.
+
+## Faz 4 — Deprem ve sinkhole
+
+Parça `deprem-sinkhole` (dal `is/deprem-sinkhole`, son commit `2f02ffe`; `main`'e birleştirme `455b801`, kod `d5fd7cb`, entegrasyon 4 3/6; plan
+sırası tsunamiden önceye alındı). Kaynak `.vibe/kararlar/deprem-sinkhole.md` §B/§C/§D; sözleşmeler (§A) ve entegratör notları (§E) o
+dosyada kalır. Şef kararları (DS-02 Faz 5, DS-14 yapıldı) "Şef kararları (Faz 4)" bölümündedir; N17 satırları sondaki tablodadır.
+Rapor `.vibe/rapor/deprem-sinkhole.md`, inceleme `.vibe/rapor/inceleme-deprem-sinkhole.md` (kabul, P0/P1 = 0, P2 = 6), doğrulama
+`.vibe/rapor/dogrulama-deprem-sinkhole.md` (9/9), birleştirme `.vibe/rapor/entegrasyon-4.md`.
+
+- **DS-01 Yeni ağ paketi yok.** Sarsıntı ve toz istemcide `IstemciAfetDurumu`'ndan hesaplanır: paket aşama/alt aşama
+  değişiminde hemen, sonra 1 Hz gelir; aradaki tick'ler yerel saatle (en çok 40 tick) tahmin edilir. Sinkhole'un çekirdek
+  çöküşü alt aşama değişimi olduğu için sert sarsma gecikmesiz başlar. Tasarım notunun "sunucu yalnız başlangıç anı, merkez,
+  seviye ve süreyi bir kez gönderir" ilkesiyle aynı trafik; protokol değişmedi (K-C47).
+- **DS-02 Çöken kütle varlığı yerine tavanlı `FallingBlockEntity`.** Tasarım notu sinkhole §2'deki derlenmiş `VertexBuffer`li tek
+  "çöken kütle" varlığı yazılmadı. Yerine: halkanın içi önce görünmeden boşaltılır, sonra yüzey ve üstündeki her şey aynı
+  tick'te düşen blok olur (sıra karıştırılır, böylece tavan dolsa da düşen bloklar tüm halkaya yayılır); tavanı aşan bloklar
+  kırılma parçacığıyla kaldırılır (config `sinkhole.dusenBlokTavani` 60, tasarım §5 "Yüksek"). Gerekçe: özel varlık + istemci
+  ağı + parçalanma bu turun bütçesini aşıyordu; eğilen ağaç görseli (§2 "Eğilen ağaçlar") da bu yüzden yok, ağaçlar çekirdekle
+  birlikte dik düşer. Tasarım notu güncellendi. **Şef kararı (tur 2): çöken kütle varlığı ve eğilen ağaç bu fazda
+  yapılmaz; Faz 5 cilası, performans gerekçesi** (S5 çukurunun ~29 000 bloğunu istemcide ayrı ağ olarak taşımanın maliyeti
+  ölçülmeden kabul edilmedi; tavanlı düşen blok yolu TPS/FPS ölçüsüyle sınandı, rapor). Tasarım notu sinkhole §7'ye işlendi.
+- **DS-03 `deprem_dayanikli` yazıcısı yangın kalır.** Görev metni "kendi etiketin (kendi sağlayıcın)" diyor; ama etiket
+  dosyasını bugün `YanginEtiketSaglayici` yazıyor ve K-E12 "bir etiketin yazıcısı tektir" diyor (iki sağlayıcı aynı dosyayı
+  yazarsa son yazan sessizce kazanır). Yangın paketine yazma yetkim yok. Deprem `DepremEtiketleri.DAYANIKLI` ile okur; kendi
+  sağlayıcım yalnız yeni `deprem_kirilgan`'ı yazar. Taşıma isteği §E-1'de.
+- **DS-04 Yıkım kuralı.** Yarık hattında (ana yarık, yan çatlak, fay basamağı) dayanıklı dahil her kırılabilir blok kaldırılır;
+  hat dışında yalnız `deprem_kirilgan` (yaprak kırılır, altı boş olan düşer, üstü dolu olan kırılır) ve S4–5 heyelanında
+  komşusundan ≥ 2 blok yüksek toprak/kum/çakıl yüzeyi. Hiçbir yol blok varlıklı (sandık vb.), kırılmaz bloklara ve sıvılara
+  dokunmaz; eşya düşürmez (`dropItem=false`, eşya yağmuru yok). `afetBlokHasari=false` iken hiçbir blok değişmez; örtü, toz,
+  ses ve sarsıntı sürer.
+- **DS-05 Yarık dibi molozu.** "Boşaltılan bloğun %20'si dibe moloz" sütunların beşte birinde yüzey bloğunun iç boşaldıktan
+  sonra düşmesiyle yapılır (düşen blok dipte durur); ek moloz konmaz, yarığın derinliği korunur.
+- **DS-06 Kazı tabanı config'te.** "En alt Y −50" `deprem.enAltY` (vars. −50) oldu; GameTest dünyası y ≈ −60'ta olduğu için
+  testler sürelerince `geciciEnAltY` ile dünya tabanına iner ve temizlikte geri alır (K-E15).
+- **DS-07 Yüklü olmayan chunk.** Yarık ve çukur yalnız yüklü chunk'larda kazar (chunk zorla yüklenmez); S5 yarığının (256
+  blok) yüklü alan dışındaki ucu açılmaz (bilinen sınır). Gerekçe: eşzamanlı chunk üretimi TPS'i düşürür; oyuncunun
+  gördüğü alan zaten yüklüdür.
+- **DS-08 Deprem merkezi.** Hedef oyuncudan `6 + 2·seviye` blok uzakta rastgele yönde; hat doğrultusu rastgele. Yarık oyuncunun
+  ayak altından başlamaz (S5'te 6 blok geniş yarığa ilk anda düşmesin), ama hat oyuncunun yakınından geçebilir.
+- **DS-09 Sinkhole yeri.** Tasarım §6: oyuncudan 12–40 blok, merkez ve çap çemberindeki 8 noktada yükseklik farkı ≤ 4 (8 deneme,
+  en düz aday). `yerUygunMu` yalnız merkez chunk'ı yüklü değilse ya da merkez sıvıysa reddeder (yönetici başka oyuncu
+  dener/erteler, N14 deseni). Düzlük reddetme ölçütü değil: ilk sürümde `fark ≤ 8` şartı dedicated senaryoda konsolun
+  (doğuş noktası) `start sinkhole 3`'ünü "uygun yer yok" ile reddetti; elle verilen konumda da çukur açılmalı.
+- **DS-10 Sinkhole zaman çizelgesi.** Çöküş süresi tablosu (3–10 sn) çekirdek + basamaklı geri çekilmenin toplamıdır: tek
+  halkada hepsi çekirdek, çok halkada yarısı çekirdek, yarısı halkalara eşit. Sarkma 3 sn, durulma 14 sn. TPS düşünce süre
+  uzamaz, bütçe düşer; aşama biterken kalan halka işi zorla tamamlanır (sıra bozulmaz).
+- **DS-11 "Delikten Dönüş" ipucu.** `CUKURA_DUSTU` oyuncu başına afet başına bir kez: çekirdek düşerken çekirdek yarıçapında
+  yüzeyde/yakınında duran ya da sonraki alt aşamalarda çukurun içinde (yatay ≤ R + 0,5, Y < zemin) bulunan oyuncu. Etki
+  alanı (R + 16) bu bölgeyi kapsar; ipucu yalnız AKTIF'te yayınlanır.
+- **DS-12 Hasar.** Deprem S4/S5: yarık hattına yatay 8 blok içindeki canlılara 2 sn'de bir 1/2 can puanı; sinkhole S3–5:
+  çöken halkadaki canlılara bir kez 4/6/8 (düşme hasarı ayrıca). Kaynak `damageSources().generic()` (yeni `damage_type` ve
+  vanilla etiket katkısı gerekmez).
+- **DS-13 Ses.** Ana gürleme kendi döngümüz (−26 LUFS, ≤ −6 dBTP, konuşma çentiği); nokta sesler vanilla (`stone/deepslate.break`
+  0,6–0,8, tick başına en çok 2; `dripstone_block.break` çıtırtı; `gravel.fall`, `sand.fall`). Kategori `BLOCKS` (zemin
+  sesi; ses.md kural 6 "kırılma BLOCKS"). Tasarım notundaki ayrı `deprem_oncu.ogg` ve `sinkhole_catlama.ogg` üretilmedi: öncü
+  gürleme `HacimEgrisi.giris(30)` ile ana döngünün yükselen girişidir, çatlama vanilla çıtırtı + alçak gürlemedir.
+- **DS-14 Artçı sarsıntılar (tur 2, yapıldı).** `mantik.ArtciPlani`: S1…S5 0, 0, 1, 2, 3 artçı (config `deprem.artciSayisi`);
+  her biri bir öncekinin (ilki ana sarsıntının) bitişinden `artciEnAzAralik`–`artciEnCokAralik` (20–60 sn) sonra, 3–5 sn sürer;
+  ilki ana genliğin `artciSiddeti` (0,15) kesri, sonrakiler 0,8 kat (Båth yasasının oyun karşılığı). Plan depremin tohumundan
+  türetilir, kayıttan dönüşte aynıdır (ek NBT yok). AKTIF aşama son artçı bitene kadar sürer (`aktifKalanTick` artçıları kapsar,
+  radar "Kalan"); süren artçının sırası `altAsama()`'dır: değişim durum paketini hemen gönderir, istemci sarsıntıyı gecikmesiz
+  başlatır (yeni paket yok, DS-01 korunur). Artçı blok yıkmaz: ana sarsıntı bitince `yik`, heyelan ve yakın hasar durur, ana
+  gürleme 3 sn'de söner; artçıda `deprem/artci` kısa gürleme katmanı ve yarık boyunca 16 noktada toz/çakıl. Neden AKTIF içinde,
+  BITIS'te değil: istemci sarsıntısı ve "etkilenen" takibi AKTIF'e bağlı; BITIS çekirdeğin sönüm aşamasıdır ve `asama ileri`
+  AKTIF'ten BITIS'e artçıları atlayıp biter. JUnit `artciPlaniAralikSureVeZayiflama`, `artcisizPlanAnaSarsintidaBiterZarfSinirli`;
+  GameTest `depremArtciSarsintilariPlanlaBlokYikmaz` (S3, blok hasarı kapalı: 96 bloklu yarık komşu test alanlarına taşmasın);
+  dedicated senaryo `[deprem] artçı sarsıntı 1/1`. Hâlâ yapılmayanlar: kendi toz sprite dokusu (vanilla `campfire_cosy_smoke` +
+  `falling_dust` + `block`), sinkhole dibinde nem buharı; çöken kütle ve eğilen ağaç DS-02 (Faz 5).
+- **DS-16 Görsel otomasyon (tur 2).** `client.deprem.DepremOtomasyonu` (`-Potomasyon=deprem`) + `tools/senaryo/deprem_gorsel.py`
+  (ws 92, `runclient_kilit.py kos`). Afet merkezi oyuncuya göre seçildiği için kamera başlatmadan sonra sunucudan okunan merkeze
+  ve fay doğrultusuna (`Deprem.fayAcisi()`, salt okuma) göre seyirci modda konur; sahneye ahşap ev (köşeler kütük, duvar kalas,
+  cam, kalas çatı) ve `place feature minecraft:oak` ağaçları kurulur. S1/S5 karşılaştırması aynı göreli bakıştan (hatta dik
+  40 blok, 22 blok yukarı). A-34 kapıları: FPS ≥ 15, adım başından ≥ 20 çizilen kare, iç imleç köşede; dar zamanlı kareler
+  (vitrin, sarsıntı) kapıyı eylemden önce geçer. Artçı beklemesi `dogalafet hiz 20` ile kısalır. Tepe TPS dedicated senaryoda
+  `forge tps` örnekleriyle (`tps.txt`). **Gizli workspace ~1 FPS (GP17 emsali):** ilk koşu (protokol koşu 1, 22:48) istemci
+  FPS 1 çizerken her kapıda 1200–3000 tick tam süre bekledi; 25 dk tavanına çarpıp sinkhole karelerini kaçıracağı görülünce
+  hiç kare alınmadan durduruldu (`kos`'a SIGTERM, kilit bırakıldı). Kapı GP17 desenine çekildi: FPS ≥ 15 ve ≥ 20 kare, ya da
+  60 tick sonra ≥ 2 yeni çizilmiş kare. FPS 1 compositor kısmasıdır; gerçek FPS ölçümü Faz 5 görünür pencerede (K0-21 rev. 2 (j)).
+- **DS-15 Çekirdeğin "kasıtlı deprem ERROR" satırları.** `.vibe/kanit/**/gametest*.log`'daki iki satır (`Afet kodu hata verdi
+  (deprem.etkiAlani|deprem.aktifKalanTick)`) çekirdeğin `CekirdekOyunTestleri.afetKancasiHataVerince` testinden gelir: test
+  DEPREM yuvasını `geciciKaydet` ile `HataVerenAfet`'e bağlar ve kapanışta gerçek fabrikayı geri koyar. Bu parçanın afetiyle
+  ilgisi yok; satırlar beklenen hata sınamasıdır, dokunulmadı (çekirdek dosyası). Kabul log'unda bu iki satır dışında
+  `Afet kodu hata verdi (deprem|sinkhole` 0 olmalı.
+- **DS-17 Düşen yüzey yalnız altında boşluk varsa (tur 2, kabul bulgusu).** K-E22 sonrası filtresiz GameTest ×2'de
+  `depremYarikAcarKirilganYikarDayanikliKorur` iki koşuda da "yarık yüzeyi boş değil" ile düştü (yarık uçlarında, y = yüzey;
+  `gametest-3/4.log`). Neden kendi kodumuzda: sütunların beşte birinde yüzey bloğu yarığa düşer (DS-05); uçlardaki tek blok
+  derin sütunda yüzeyin altı boşaltılmadığı için düşen blok anında yerine kondu. Rastgeleye bağlı olduğu için filtreli
+  koşular tesadüfen geçmişti. Düzeltme (`4aa012a`): yüzey yalnız `taban < zemin` iken düşürülür. Aynı desen sinkhole
+  halkasında: tek blokluk boşlukta dibe konan moloz o boşluğu doldurup yüzeyi yerine geri koyuyordu; moloz artık yalnız
+  ≥ 2 boşlukta, boşluk yoksa yüzey kaldırılır ve üstündekiler onun yerine iner (yalnız çok sığ config'lerde oluşur).
+
+**DS-18 `deprem_dayanikli` yazıcısı deprem sağlayıcısına taşındı (entegrasyon 4, deprem §E-1; DS-03'ü değiştirir).** K-E12 tek
+yazar kuralı korunur: satır `YanginEtiketSaglayici`'dan silindi, `DepremEtiketleri.Saglayici` aynı içeriği aynı sırayla yazar (SERT +
+`#minecraft:base_stone_overworld` + vanilla cevher etiketleri + isteğe bağlı `#forge:ores`; sabitlerin kendi kopyası).
+`YanginEtiketleri.DEPREM_DAYANIKLI` okuyucuları (meteor krateri) ve `DepremEtiketleri.DAYANIKLI` aynı etikettir. Kanıt: `runData`
+sonrası `tags/blocks/deprem_dayanikli.json` bayt bayt aynı (`git diff` boş).
+
+**DS-19 Birleştirme düzeltmeleri (entegrasyon 4, inceleme P2).** (a) `BlokIsleri.dusur` varlık işlemeyen chunk'ta
+(`isPositionEntityTicking` değil) bloğa dokunmaz, false döner (AY-12 ailesi: düşen blok görünmez ya da havada asılı kalırdı);
+yarık sütununun yüzeyi düşemezse `kaldir` ile alınır (yarık yine açılır). (b) Sinkhole `merkezSec` yüklü olmayan chunk'a
+değen adayı atlar (`duzlukFarki` `YUKLU_DEGIL`): yükseklik okuması chunk'ı eşzamanlı yüklemez. (c) Sinkhole düşüş FOV'u (+6°)
+`deprem.sarsintiCarpani` × vanilla FOV efekti ölçeğiyle çarpılır (0'da kapalı, erişilebilirlik). (d) Deprem ve sinkhole GameTest'leri
+başarısız bitse de batch sonunda (`@AfterBatch`, `DepremOyunTestleri.batchSonu`) afet durur, kazı tabanı (`geciciEnAltY`),
+`afetBlokHasari`, olay dinleyicileri ve sahte oyuncular geri döner (K-E15, GP18); deprem testlerinin geçen yolda da çıkarılmayan
+sahte oyuncuları artık `sahneyiTemizle`'de çıkar. (e) `deprem_sunucu.py`'de hasar kapalı S1 sinkhole adımı S5 depremden önceye
+alındı: S5 yarığı ve ±45° dalları (yarım boy 128) doğuş çaprazını kesip yüzeye su açabiliyor, sinkhole "uygun yer yok" diyordu
+(birleşik `main`'de ilk koşu `deprem-sunucu-1-s5-sonrasi-sinkhole/`, sıra değişince 0).
+
+### Reddedilen yollar
+
+- Yeni `deprem/sarsinti` paketi (meteor deseni): durum paketi zaten aşama/alt aşama anında gidiyor; ikinci kanal
+  eşzamanlama hatası riski ve protokol artışı getirirdi.
+- Chunk'ları zorla yükleyip S5 yarığını tam açmak: eşzamanlı chunk üretimi TPS düşürür (DS-07).
+- Yarığın boşaltılan hacminin %20'sini ayrıca moloz olarak koymak: S1'de (derinlik 4) yarığı yarıya doldururdu (DS-05).
+- `deprem_dayanikli`'yi kendi sağlayıcımda da yazmak: K-E12 çakışması, biri sessizce kaybolur (DS-03).
+
+## Faz 4 — Asit yağmuru ve orman yangını
+
+Parça `asit-orman-yangini` (dal `is/asit-orman-yangini`, son commit `af7ce04`; `main`'e birleştirme `8048de7`, kod `26514f8`,
+entegrasyon 4 4/6; şartnamede asit bölüm E, orman bölüm G). Kaynak `.vibe/kararlar/asit-orman-yangini.md` §B/§C/§D; sözleşmeler (§A)
+ve entegratör notları (§E) o dosyada kalır. Şef kararları "Şef kararları (Faz 4)" bölümündedir; N17 satırları sondaki tablodadır.
+Rapor `.vibe/rapor/asit-orman-yangini.md`, inceleme `.vibe/rapor/inceleme-asit-orman-yangini.md` (kabul, P0/P1 = 0, P2 = 8),
+doğrulama `.vibe/rapor/dogrulama-asit-orman-yangini.md` (9/9), birleştirme `.vibe/rapor/entegrasyon-4.md`.
+
+**AO-01 Asit yağmuru yaşam döngüsü.** `AsitYagmuru extends Afet`: merkez hedef oyuncunun bloğu (çekirdek varsayılanı),
+alan seviye tablosundaki yarıçapla `EtkiAlani.daire`, AKTIF süresi tablodaki saniye. Alan günün rüzgârı yönünde
+(`YanginMantigi.gununRuzgari`, ortak yangının dumanıyla aynı yön) `asit_yagmuru.kaymaHizi` (0,3 blok/sn) ile kayar.
+Yoğunluk AKTIF'in ilk 10 sn'sinde 0→1, son 15 sn'de 1→0 (`AsitKurallari.yogunluk`); 0,15 altında (giriş/çıkış çisesi)
+hasar ve aşınma yok, yalnız görüntü. SIREN'de sunucu bir şey yapmaz, istemci bulut tavanını ve sisi toplar. BITIS hemen biter
+(çekirdek varsayılanı); `temizle` iki kipte de çatlak kuyruğunu boşaltır ve tek INFO satırı yazar (`asit yağmuru bitti:
+seviye S N blok aşındı, K çatlak örtüsü kaldırıldı`). Kalıcılık: merkez, birikim ve toplam aşınma NBT'de; kuyruk
+kaydedilmez (yeniden açılışta çatlak örtüsü istemcide 400 tick'te vanilla'nın kendi temizliğiyle söner).
+
+**AO-02 Aşınma: örnekleme + çatlak kuyruğu + dönüşüm tablosu.** Her tick alandan 3–16 rastgele sütun (hıza göre, TPS
+kısmasıyla) örneklenir; alanda oyuncu (gözlemci dahil) varsa örneklerin yarısı rastgele bir oyuncunun 24 blok çevresinden
+(değişim görenin önünde olur; madde 9.6'daki yakınlık önceliği gibi, alanın kalanı da aşınır); aday önce `MOTION_BLOCKING` yüksekliğindeki bitki, sonra en üst katı blok (yalnız gökyüzünü
+gören yüzey). Hız birikimi (saniyede tablo değeri × yoğunluk × TPS kısması, tavan 2) el verdikçe aday 3–5 sn'lik
+`destroyBlockProgress` çatlak örtüsüyle kuyruğa girer (aynı anda en çok `eszamanliAsindirma` 64: tasarım §5'teki 32 tavanı
+3–5 sn'lik örtüyle saniyede ancak 6–11 bloğa izin veriyordu, §6'daki S5 16 blok/sn'ye yetmiyordu; kırılma kimlikleri
+negatif, oyuncu varlık kimlikleriyle çakışmaz), süre dolunca dönüşür; o tick'te en çok 4 `block.fire.extinguish` (perde
+1,4–1,8, düzey 0,25). Bu arada blok başka bir şeye dönüştüyse örtü kalkar, dönüşüm olmaz. Tablo (`AsitKurallari.donusum`):
+yaprak, çiçek/uzun ot, ekin, ahşap kalas/çit/kapı/basamak/levha/tuzak kapı, yün ve halı eşya düşürmeden kırılır
+(`destroyBlock(p, false)`: vanilla kırılma parçacığı ve sesi); çimen ve eğrelti kırılır, yarı olasılıkla ölü çalı olur
+(yaşayabiliyorsa); çimen bloğu → toprak → kaba toprak; kırıktaş → yosunlu kırıktaş, taş tuğla → çatlak taş tuğla (yalnız
+`tasSeviyesi` 3 ve üstü); kalsit → çakıl; mumsuz bakır bir oksidasyon aşaması ilerler. İğne yapraklı (ladin)
+yaprak her zaman, diğer yapraklar %70 olasılıkla kuyruğa girer: Kara Orman gözlemi gibi önce iğne yapraklılar yapraksız
+kalır. Tanınmayan (başka modun) blok hiç değişmez. **`dogalafetler:asit_dayanikli` tablonun önündedir** (N12): etiket
+`#minecraft:base_stone_overworld` içerdiği için tasarım tablosundaki "diyorit → çakıl" satırı uygulanmaz (diyorit dayanıklı);
+yalnız kalsit çözünür. Etikete yangının sağlayıcısında (§A4 "satır ekleme serbest") cam ve cam panel (`forge:glass`,
+`forge:glass_panes`, isteğe bağlı), demir blok/parmaklık/kapı/tuzak kapı, tuğla, deepslate tuğla/karo, 16 beton ve
+`#minecraft:terracotta` eklendi: tasarımın "cam sera ile korunma" fikri ve sağlam yapı malzemeleri. `afetBlokHasari=false`
+iken örnekleme yapılmaz ve kuyruktaki örtüler ilk tick'te kalkar. Değişen her chunk için `SanalSu.chunkDegisti` (Faz 4 kuralı).
+
+**AO-03 Oyuncu hasarı ve öldürmeme garantisi.** 4 tick'te bir, alanın içindeki (yatay) her canlı, izleyici ve yaratıcı olmayan
+oyuncu için `MOTION_BLOCKING` yüksekliği göz bloğunun üstünde değilse oyuncu açıktadır (`AsitKurallari.acikta`; yaprak
+da çatı sayılır). Açıkta geçen süre birikir; seviye aralığı (80/60/40/50/40 tick) dolunca hasar (0,5/0,5/0,5/1/1 can
+puanı) `dogalafetler:asit` tipiyle verilir. Hasar canı `asitMinimumCan` (4 = 2 kalp) altına indirmez (`hasarMiktari`); 0'sa
+hiç vurulmaz. Vanilla hasar tipi etiketi olmadığı için zırh hasarı azaltır ve her vuruşta yıpranır: tasarımdaki "zırhın
+dayanıklılığı 4 sn'de 1 azalır" ayrı sayacı yerine vanilla zırh yıpranması (`hurtArmor`) kullanıldı; bir hasar tipi
+etiketi istemek K-E12 ortak sağlayıcı değişikliği gerektirirdi. Hasar `hurt` true döndüğü an `BasarimIpucuEvent(oyuncu,
+HASAR_ALDI)` yayınlanır (§A.3 #6); çatı altındaki oyuncu hiç hasar ve ipucu almaz.
+
+**AO-04 Orman yangını = ortak motor + koreografi.** `OrmanYangini extends Afet` yangın mantığı yazmaz (G.4, madde 6):
+AKTIF'e geçerken `YanginYoneticisi.alanTutustur(level, merkez, r, YanginKaynagi.afet(ORMAN_YANGINI, afetNo), y)` (seviye
+tablosu r 3/6/10/16/24, y 0/0,2/0,4/0,7/1 = yayılma ×0,5…×1,8, sıçrama yok…12 blok). Yayılma, bütçe, tavan, TPS kısması,
+yağmurda sönme, yanmaz etiketi ve ortam ısısı motorun işidir. Afet `kaynakBitti` çağırmaz: motor `AfetBittiEvent`'ten kaynağı
+kendisi kapatır (Y-27; stop/sifirla → söndür, doğal → yayılmadan en geç 30 sn'de yanıp biter); çekirdeğin `temiz` bayrağı
+yangına geçirilmez. AKTIF süresi 2/3/4/6/8 dk; alanda `erkenBitisSaniye` (15) boyunca yanan hücre ve bekleyen tutuşturma
+kalmazsa afet doğal biter (seyrek yakıt, yağmur: "yağmur yağınca sönebilsin" afetin kendisini de bitirir). `temizle`
+ateşe dokunmaz, tek INFO satırı yazar (`orman yangını bitti: seviye S en çok N hücre, alan R blok, yanık izi M blok`).
+
+**AO-05 Başlangıç alanı ve yer uygunluğu.** `merkezSec`: hedef oyuncunun 40–90 blok (`aramaEnAz/EnCok`) uzağında 24
+rastgele nokta; yüklü chunk'larda 5×5 ızgarada yanıcı yüzey sayısı + orman biyomu (`#minecraft:is_forest`) +6 puan; en
+yüksek puanın en üst katı bloğu (yaprak dahil). Hiçbiri puan almazsa oyuncunun kendi sütunu. `yerUygunMu`: merkezin
+çevresinde (ızgara aralığı r/2) yanıcı yüzey yoksa ret (N14 deseni: yönetici başka oyuncu dener, sonra erteler). Chunk
+yüklenmez. Komutla konum (`execute positioned … run dogalafet start orman_yangini S`) o konumda başlar.
+
+**AO-06 Etki alanı yangınla büyür; sıcak kareler.** Motorun hücre konumları public değil; afet saniyede bir etki alanı + 32
+blok üzerindeki 32 blokluk karelerde `YanginYoneticisi.aktifSayi(level, AABB)` sayar (en çok 15×15 sorgu × aktif tavan
+1500 = ~340 bin karşılaştırma/sn). Etki alanı en uzak dolu kare + 16 blok kadar büyür, küçülmez, en çok 192 blok: siren,
+"etkilenen" ve paket alanı yangını izler. En kalabalık 32 kare istemciye gider (sis/ısı için).
+
+**AO-07 "Yanmadan Çıktım" ipucu.** AKTIF'te saniyede bir, etki alanındaki oyuncunun 8 blok çevresinde
+(`aktifSayi(level, AABB(oyuncu).inflate(8))`) yanan hücre varsa `BasarimIpucuEvent(oyuncu, YANGIN_ALANINDA)` (§A.3 #5;
+başarım saniyede en çok birini sayar). Tasarımdaki "yanan hücrelerin dışbükeyi + 8 blok" yerine "bir yanan hücreye 8 blok":
+hücre konumları motorun içinde, dışbükey için ek API gerekirdi; başarımın yedeğiyle aynı ölçüt.
+
+**AO-08 Yanık izi (afet sonrası iz).** `afetBlokHasari` açıkken tick başına `yanikIziButcesi` (8) × TPS kısması sütun sıcak
+karelerden yoklanır; yapraksız en üst katı blok çimen/toprak/podzol/miselyum/köklü toprak/yosun ise ve hemen üstündeki 3
+blokta afet ateşi yanıyorsa kaba toprağa döner; değişen chunk sanal suya bildirilir. Motorun "kömürleşmiş blok reddedildi;
+yanık izi gerekirse Faz 4 zemin dönüşümünü `afetBlokHasari` ile kendi yapar" notunun uygulaması. Odun ve yaprak motorda havaya
+döner (tasarımın "kütüklerin %30'u kalır" satırı motor kararı Y-06 gereği uygulanmadı).
+
+**AO-09 Rüzgâr ve ısı.** Tasarım "rüzgâr afet başında seçilir (±20°)" diyordu; yayılma motorundadır ve motor günün rüzgârını
+kullanır (Y-03), afet ayrı rüzgâr vermez. Ortam ısısı (madde 7) motorun sıcaklık kancasından gelir (K-E1: güç
+4 + 2√n, en çok 18 °C, yarıçap 6 + √n); seviye farkı yanan hücre sayısı üzerinden doğar. Afet `SicaklikKancalari`'nı doğrudan
+çağırmaz (çift kaynak olurdu).
+
+**AO-10 Asit yağmuru istemcisi.** Durum `AfetDurumPaketi`'nden (merkez, yarıçap, aşama, `ozel.y`, `ozel.a`); merkez ve
+yoğunluk 1 Hz paket arasında yumuşatılır; görünen yoğunluk ve bulut tavanı seviyeyle 0,4 / 0,55 / 0,7 / 0,85 / 1
+çarpılır (`AsitKurallari.gorselCarpan`; tasarım §2 "S1 seyrek çise, S5 yoğun sağanak"; görsel koşu 1'de S1 ve S5 aktif kareleri
+aynı tondayı: sarı-yeşil piksel %58,4 / %57,0). Yağış `RenderLevelStageEvent.AFTER_WEATHER`'da vanilla `renderSnowAndRain` sütun
+geometrisiyle (tohumlu kayma/hız, kameraya dönük dörtgen) kendi dokumuzla çizilir; model-görünüm yığını birim yapılır ve
+köşeler olayın poz matrisiyle dönüştürülür (aşamada yığının ne taşıdığına bağlı kalınmaz). Damla %20 kalın; alfa alan
+kenarında 16 blokta söner; yağmur yarıçapı 5/10/10/15. Gerçek hava değişmez. Sis rengi ve görüş: 1,5R içinde gündüz `#9AA35A`,
+gece `#2F3420` (güneş açısıyla), görüş %40'a kadar kısalır (`RenderFog` iptal edilerek; Forge yalnız iptalde uygular).
+Parçacıklar (force eklenir, sayı kademe × vanilla parçacık ayarı): sıçrama 20/50/100/180 tick başına, cızlama dumancığı
+%8/15/25/35, yüzey buharı 0/8/16/24 blok, bulut tavanı 30/60/120/200 canlı (bulut yüksekliği ama kameraya en çok 60 blok
+yukarıda), aşınan bloklardan yoğun cızlama. Hasar anında 0,3 sn sarı-yeşil kenar vinyeti ve içe akan damla izleri (yazı değil).
+
+**AO-11 Ses: yeni ses dosyası yok (tasarım §4 değişti).** Yağış vanilla `weather.rain` (perde 0,9; çatı altında
+`weather.rain.above`) istemcide vanilla `tickRain` deseniyle; "cızlama döngüsü" yerine seyrek, kısık (0,05), tiz (perde 1,8–2,0)
+`block.fire.extinguish`; aşınma anında sunucu `block.fire.extinguish` (en çok 4). Gerekçe: §4'ün istediği üç katman vanilla
+sesleriyle karşılanıyor, `ses_uret.py` + ebur128 ölçüm hattı (uyarı §4 kural 1) gereksiz yeni dosya olurdu; konuşma bandını
+kapatan yeni döngü yok. Orman yangını sesi ortak yangının istemcisindedir (vanilla ateş, sönme tıslaması).
+
+**AO-12 Orman yangını istemcisi.** Alev, duman, kıvılcım, duman sütunu ve pirokümülüs ortak yangının istemcisindedir
+(Y-10, Y-24). Afet ekler: en yakın sıcak kareye 48 blok içinde turuncu-kahverengi sis `#7A5236` (yangın büyüklüğüyle, 40
+hücrede tam) ve görüş %55'e kadar; 24 blok içinde Yüksek/Ultra'da ısı dalgalanması (şader yok: kamera yaw/pitch'ine 0,05°
+3 Hz sinüs, ekranın alt dörtte birinde yukarı kayan yarı saydam ısı dokusu; Y-10'un "ısı titremesi Faz 4" notu); sis
+altında havada süzülen vanilla kül/beyaz kül (1/4/8/14 tick başına; Düşük tur 3'te 2'den 1'e indi, §C). Güneş diskini turuncuya boyamak gokyuzu renderer'ına
+"duman örtüsü" parametresi ister (gökyüzü paketi bu dalın değil): yapılmadı, açık nokta.
+
+**AO-13 Dokular.** `tools/assets/asit_yagmuru_dokulari.py` (PIL, tohumlu; iki üretimde 14 dosyanın md5'i aynı): yağış
+64×256, sıçrama 4×8², duman 4×16², bulut 4×64² (dış iki piksel halkası alfa 0; Y-28 dersi), ısı bandı 64². Parçacık
+JSON'ları el yazımı kaynak (ortak yangının parçacık JSON'ları gibi); dil ve hasar tipi `runData` ile.
+
+**AO-14 Testler.** JUnit `AsitKurallariTest` (12), `OrmanKurallariTest` (8). GameTest (yuvayı kullananlar kendi batch'inde,
+şablon `yangin_sahne`): `asit_asindirma` (tablo ve etiket önceliği, çimen üstü bitki adayı), `asit_hasar` (S5 açık oyuncu 5 → 4
+can, tek `HASAR_ALDI`; cam çatı altı 20 can, ipucu yok), `asit_blok_hasari` (kural kapalı: kuyruk boşalır, sahne hash'i
+aynı), `asit_stop` (stop çatlak kuyruğunu boşaltır, kuyruktaki tahtalar kalır), `orman_baslar` (S3 başlangıç alanı tutuşur,
+yanmaz taş kalır, stop ateş ve hücre bırakmaz), `orman_ipucu` (61 tick'te yakın oyuncuya 2–4 ipucu, 56 blok uzaktakine 0),
+`orman_blok_hasari` (kural kapalı: yangın veri olarak sürer, sahne aynı), `orman_yanik_izi` (ateş altındaki çimen kaba
+toprak, ateşsiz çimen ve taş değişmez). Sahte oyuncunun doğuş dokunulmazlığı sıcaklık testlerindeki gibi
+`ObfuscationReflectionHelper` (`f_8921_`) ile sıfırlanır.
+
+**AO-15 Başarım testiyle çakışma (kapandı, K-E22).** Zorunlu `yayinciKaydet` (§A.3) sonrasında
+`BasarimOyunTestleri.olaysizAfetteYedekTahminSayilir` (basarim paketi, `:580-619`) asit ve orman için yedek tahmin
+bitlerinin sayılmasını beklediğinden kırmızıya döner (kayıtlı türde `BasarimOlaylari:141` yalnız olay bitlerini okur;
+tsunami ve sinkhole dalları da aynı testi kıracak). Kanıt: filtresiz GameTest `kabul-1.log` satır 2221
+`olaysizafetteyedektahminsayilir failed! asit yağmurunda hasar alan Çatı Altı almaz`, satır 2485 `1 required tests failed`
+(166 testin diğer 165'i geçti; `kabul-2.log` aynı). Bu dal basarim paketine yazmadı (sahiplik); Main'e bildirildi. **Şef kararı:** düzeltme main'de K-E22 (`BasarimIpucuEvent.geciciKayitsiz(tur, ipucu)`,
+`olaysizAfetteYedekTahminSayilir` ve `olaysizAfetteYedekKayitliYayincidaYedekKapali` onunla sarılır); bu daldaki iki
+`yayinciKaydet` kalır, dal main'i (`86224a2`) `merge` ile aldı (`60afa52`, çatışma yok), kayıt K-E22 (a) yerine taşındı (`a3409e6`);
+filtresiz `kabul-3.log` ve `kabul-4.log`: `All 166 required tests passed`.
+
+**AO-16 Birleştirme düzeltmeleri (entegrasyon 4, inceleme P2).** (a) Asit ve orman GameTest'leri başarısız bitse de batch
+sonunda temizlenir: ortak `core.OyunTestiTemizligi` (`oyuncu`, `dinle`, `blokHasari`, `batchSonu`; `@AfterBatch` her batch'te)
+afeti durdurur, `afetBlokHasari`'nı batch başındaki değerine, dinleyicileri ve sahte oyuncuları geri alır (K-E15, GP18; AOi-5).
+(b) Gerçek asit → başarım uçtan uca (AOi-4): GameTest `dogalBitenAsitteCatiAltiYalnizHasarsizaAcilir` (batch `asit_basarim`)
+doğal biten S5 asitte cam çatı altındaki sahte oyuncuya "Çatı Altı"nı verir, açıkta hasar alana vermez. Orman tarafında
+`YANGIN_ALANINDA` → "Yanmadan Çıktım" uçtan uca testi yazılmadı (30 saniyelik ipucu birikimi; açık nokta). (c) Asit, meteor ve
+yangın parçacık tanımları datagen'e taşındı (K-E25).
+
+N17 dışı sabitler ve FPS ölçümleri: Kod sabitleri (config dışı): yoğunlaşma 10 sn, seyrelme 15 sn, etki eşiği 0,15; çatlak 3–5 sn; hasar denetimi 4 tick; sıcak
+kare 32 blok, en çok 32 kare paketle; etki alanı payı 16, tavanı 192 blok; ipucu yakınlığı 8 blok; istemci sis 48 / ısı 24 blok.
+Orman kül bütçesi (istemci sabiti `IstemciOrmanYangini.KUL`): Düşük/Orta/Yüksek/Ultra 1/4/8/14 parçacık/tick (Düşük tur 3'te
+2 → 1). FPS sayıları (gizli workspace, koşu 1): orman S5 tepe 19, afetsiz 40, oran 0,48 (hedef 0,5; şef kararı: engel değil);
+görsel koşu 3 (`af7ce04`, vsync kapalı, maxFps 120, ~1000 hücre): taban 120 FPS / 2,40 ms; S5 Düşük 63 FPS / 8,01 ms,
+Yüksek 48 / 7,42, Ultra 60 / 11,70; oran Düşük 0,53, Yüksek 0,40, Ultra 0,50 (taban tavanda, gizli workspace gürültülü).
+Faz 5 görünür koşuda yeniden ölçülür. Görsel otomasyon A-34 kare kapısı ve `enableVsync:false`/`maxFps:120` kasırga K-13'ten alındı.
+
+### Reddedilen yollar
+
+- **Vanilla yağmuru (`setWeatherParameters`) açmak:** bütün dünyada yağar, ortak yangını her yerde söndürür, oyuncunun
+  hava durumunu ezer; tasarım "gerçek hava değişmez" der.
+- **`DimensionSpecialEffects.renderSnowAndRain` sarmalamak:** gökyüzü sistemi zaten sarmalıyor (`SarmalayanGokyuzuEfekti`),
+  ikinci sarmalayıcı sıraya bağlı olurdu; vanilla yağmur zaten bu bölgede yağmıyor, `AFTER_WEATHER` aşaması yeter.
+- **Hasar tipine `bypasses_armor` vermek:** vanilla etiket yazarı olurdu (K-E12) ve zırhın anlamı kalmazdı.
+- **Hücre konum API'si istemek (dışbükey alan için):** ızgara sayımı ve 8 blok yakınlık aynı sonucu yangın paketine
+  dokunmadan veriyor (AO-06, AO-07).
+- **Orman yangınında kendi yağmur söndürme mantığı:** motor zaten yapıyor (Y-08, Y-23); afet yalnız boşta beklememek için
+  erken biter.
+- **Aşınma için kendi parcacık paketi:** 1 Hz `AfetDurumPaketi.ozel.a` (en çok 32 konum, ~260 B) ve vanilla kırılma örtüsü
+  yeterli; protokol değişmedi.
+
 ## Şef kararları (Faz 0–1)
 
 **K0-19 Ay çarpması siren süresi: 60 sn.** Madde 5 "Güneş Patlaması hariç 10 sn" der; bölüm H "siren çaldıktan 60 saniye
@@ -2948,6 +3452,61 @@ koyar (şef kararı, 2026-11-06).** Üç Faz 4 işçisi (deprem-sinkhole, asit-o
 
 Kanıt `.vibe/kanit/k-e22/` (`ozet.txt`).
 
+**K-E23 Çekirdek senaryosu taklidi gerçek afetin yerine geçirir (`!tür`); ağır süreç kapısı zaman aşımında görevi
+başlatmaz (şef kararı, 2026-11-06).** (a) **Sorun:** K-E22'den sonra gerçek `gunes_patlamasi` kayıtlıyken
+`-PoyunTestiAfeti=deprem,gunes_patlamasi` bayrağı güneş türünü atlar; `cekirdek_sunucu.py` K-C41 bloğu taklidin üç
+`asama ileri`'de biten AKTİF'ine ve `oyuntesti_gunes` sürecine dayanıyordu (güneş §E c; gerçek afet 5 günlük AKTİF,
+`gunes_zinciri`). Deprem adımları da deprem birleşince gerçek depremi (blok hasarı, süre, geri yükleme) açardı. **Karar:**
+`!` önekli tür (`-PoyunTestiAfeti=!deprem,!gunes_patlamasi`) gerçek afeti kayıtlıysa onun fabrikasını oyun testi afetiyle
+değiştirir (`AfetKaydi.oyunTestiEz`, paket içi; yalnız `ozelliktenKaydet`), kayıtsızsa düz kayıt gibi davranır; log "Oyun testi
+afeti <tür> gerçek afetin yerine kaydedildi (…, K-E23)". Güneş türü taklit olunca `OyunTestiSureci` kaydedilir ve
+`GunesZinciriSureci`'nin mevcut koruması zinciri kaydetmez (K-C41 süreci tek). Saf seçim `OyunTestiAfetSecimi` (`ezilecek` listesi;
+JUnit `unlemliTurGercekKaydinYerineGecer`). `cekirdek_sunucu.py` kendi `Sunucu`'sunu `!deprem,!gunes_patlamasi` ile açar ve iki
+açılışta iki taklit satırını ister (yoksa "mod K-E23'ten eski" hatası); `start kasirga 3` kasırga kayıtsızsa "not registered
+yet", kayıtlıysa başlat + `stop`. Ortak `Sunucu`'nun varsayılan bayrağı (`deprem,gunes_patlamasi`, diğer betikler) değişmedi.
+**Reddedilen:** blokta 7 `asama ileri` + `gunes_zinciri` (çekirdek senaryosu güneş afetinin süresine ve donma/buharılaşma
+yan etkilerine bağlanır, deprem adımları yine gerçek depreme düşer); K-C41 bloğunu `gunes_patlamasi_sunucu.py`'ye devretmek
+(çekirdek kendi sözleşmesini sınamaz, başka parçanın betiklerine bağlanır); kalıcı `oyun_testi` `AfetTuru` (üretim yüzeyine
+test türü sızar: N18 adları, tab tamamlama, zamanlayıcı, gamerule haritası, dil, başarım sayımları; ayrıca K-C41 tam da
+`gunes_patlamasi` türünü, onun gamerule'ünü ve ona bağlı dönem süreçlerini ister, sentetik türle sınanamaz). Aynı bayrağa
+dayanan diğer betikler `!tür`'e geçti (her biri taklidin anlık yaşam döngüsüne dayanıyor; gerçek afeti sınamak afetin kendi
+senaryosunun işi): `esya_sunucu.py` `!deprem` (radar/sismograf kaydı + deprem 2 yaşam döngüsü; gerçek depremin blok hasarı ve
+süresi kabulü bozmasın; log satırı iki taklit iletisini de tanır); `uyari_sunucu.py` `!deprem,!gunes_patlamasi` (siren sırası
+afetin süresinden bağımsız; güneşin gerçek kaydı K-E22 ile zaten atlanıyordu); `uyari_istemci.py` `!deprem` (istemcili siren
+koşusu, aynı gerekçe); `basarim_sunucu.py` `!deprem` (`start deprem 5` + üç `asama ileri` → doğal bitiş taklidin anlık
+BITIS'ine dayanır); `basarim_gorsel.py` `!kasirga` (`BasarimOtomasyonu` "kasırga S5" adımı hızlı yaşam döngüsü bekler);
+`radar_gorsel.py` `!deprem,!sinkhole,!kasirga,!gunes_patlamasi` (otomasyonun kare sırası taklidin aşamalarına göre; radar ve
+sismograf göstergesi afetin türünden ve çekirdeğin `etkiAlani`/`kalanOku`'sundan okur). Kanıt (`.vibe/kanit/k-e23-betik/`, `main`
+`58f2fa6`, güneş gerçek kayıtlı): `esya_sunucu.py` 25611, `uyari_sunucu.py` 25612, `basarim_sunucu.py` 25613 → üçü de çıkış 0 (esya: `12 ağ paketi … protokol 5`, `invalid dist`/`Exception`/`ERROR` 0, deprem taklidi kaydı; uyarı: `gunes_patlamasi gerçek afetin yerine kaydedildi (K-E23)`; başarım: deprem 5 doğal bitiş). Üç runClient
+betiği (`uyari_istemci`, `basarim_gorsel`, `radar_gorsel`) koşulmadı: yalnız `py_compile` + bayrak satırı; Faz 5 görünür koşuda
+sınanır. Bayrağı bilerek varsayılan (`deprem,gunes_patlamasi`, taklit atlanır) bırakan tek betik `gunes_patlamasi_sunucu.py`'dir
+(gerçek afeti sınar).
+(b) **Kapı zaman aşımı (doğrulayıcı-2):** `gradle_kapisi.sh` 20 dk dolunca kapı açılmasa da görevi başlatıyordu (GOREV §2,
+K-E19 a tavanını sessizce deliyordu); artık görev başlatılmaz, log'a ve çıktıya `KAPI: açılmadı (N dk)`, çıkış 3
+(`agir_surec_kapisi` ile aynı); `KAPI_DK` üst sınırı (varsayılan 20), `TEST_FILTRE`/`KAPI_PORT` davranışı aynı. Kanıt
+(`.vibe/kanit/k-e23/`): `build --rerun-tasks` 0, `warning:` 0, JUnit 482/0; main'de `cekirdek_sunucu.py --port 25611` 0 (iki taklit
+satırı "için kaydedildi", kasırga "not registered yet"); güneş dalı `84b2faf` + `26acbfd` geçici birleşiminde (`.worktrees/k-e23-gunes`, dal dosyalarına yazılmadı) `cekirdek_sunucu.py --port 25612` 0 (`cekirdek-gunes/kosu1.log`:56 "gunes_patlamasi gerçek afetin yerine kaydedildi", :390 `Solar Flare phase: Ending`, :455-499 `oyuntesti_gunes` zinciri; doğrulayıcı-2'nin K-E23 öncesi düşüşü `gunes-patlamasi-dogrulama/sunucu-cekirdek/kosu1.log`:328-329 kapandı). Değişmemiş güneş worktree'sinde main betiği koşmaz: `!` desteği modun Java tarafındadır, dal `main`'i (`26acbfd`) alınca geçer; kapı dolu portla `KAPI_DK=1` → 60 sn'de
+`KAPI: açılmadı (1 dk)`, çıkış 3, Gradle başlamadı (`kapi-zaman-asimi.*`).
+
+**K-E24 Döngülü ortam ses katmanı −26…−30 LUFS (şef kararı, 2026-11-06; 2026-11-07 düzeltildi).** Döngülü ortam katmanı
+−26…−30 LUFS (±1) bandında kabul (izin, zorunluluk değil; `docs/tasarim/ses.md` §4 kural 2'nin −26'sı da geçerli). Tek
+seferlik sesler ve sirenler ses.md §4'e tabidir (tek seferlik: tepe ≤ −6 dBTP, LUFS bağlayıcı değil; siren −20/−21 LUFS); K-E24
+bunları değiştirmez. Gerekçe: ay çarpmasının döngülü sesleri (`ay_carpmasi_yaklasma`, `ay_carpmasi_citirti`; AY-07) −30 LUFS'te
+uzun süre kulağı yormuyor, siren ve çarpma gibi olayların önünde kalıyor (şef kabul, 2026-11-06); kabul edilmiş tek seferlik
+sesler de LUFS bakımından zaten serbest (`sinkhole_cokus` −22, güneş kristal −29,9 / akor −27,0). **Düzeltme (2026-11-07, inceleme):**
+ilk metin "tek atımlı sesler ve sirenler −26 ± 1 LUFS" diyordu; ses.md §4 ile çelişiyordu, şef kararıyla ses.md §4 geçerli.
+AY-07'nin "−26'da tepe sınırı aşılıyordu" gerekçesi ölçümle çelişiyordu (+4 dB ile −7,6 / −7,4 dBTP, sınır içinde); ay
+birleştirmesinde (entegrasyon 4, 2/6) "tasarım tercihi, K-E24" olarak düzeltildi.
+
+**K-E25 Parçacık tanımları da datagen'dir (şef kararı, 2026-11-07).** Doğrulayıcı asit dalında dört elle yazılmış
+`assets/dogalafetler/particles/*.json` buldu; birleşik `main`'de sayı 17'ydi (asit 4, meteor 8, yangın 5). Kaynak JSON'ları elle
+yazılmaz (GOREV §3, AGENTS.md); parçacık listede yoktu. Karar: tek sağlayıcı `veri.ParcacikTanimlari`
+(`ParticleDescriptionProvider`, ad "Doğal Afetler parçacık tanımları", K-E5), alt sistemler `DataGenerators.parcacikEkle(tür,
+doku kökü, kare sayısı)` ile katkı verir (`AsitKayitlari`, `MeteorKayitlari`, `YanginKayitlari`); kareler
+`textures/particle/<kök>_0 … _(n−1)`, Forge eksik dokuda `runData`'yı durdurur. Elle JSON'lar silindi; `runData` sonrası
+`src/generated/.../particles/` 17 dosya, içerik birebir aynı (12 eski dosyadaki sondaki satır sonu dışında bayt bayt; JSON eşit,
+kanıt `.vibe/kanit/entegrasyon-4/asit/parcacik-eski/`). Yeni parçacık ekleyen dal tanımını `parcacikEkle` ile verir.
+
 ### Yiyecek
 
 **F-17 Kutup Balığı Çorbası koşullu tarif (şef kararı, inceleme Yi1).** Tarif ve tarif kitabı başarımı Forge'un üst düzey
@@ -3064,6 +3623,44 @@ düşüşün, 30 yedek yangın saniyesinin ve zombi hasarının sayılmadığın
   verdiği GameTest'lerde sınanır (`dogalBitenKasirga…`, `seviyeUc…`, `seviyeBes…`). Tasarım notu "Vitrin anı" sıranın oyunda garanti
   olmadığını yazar.
 
+## Şef kararları (Faz 4)
+
+Faz 4 parçalarında şefin verdiği ya da kabul ettiği kararlar (kaynak `.vibe/kararlar/<parça>.md` §B/§E; parça bölümlerinde aynı
+kimliklerle atıf vardır). Faz 4 öncesi entegrasyon kararları (K-E18…K-E24) "Şef kararları (Faz 3)" bölümünün Entegrasyon alt
+başlığındadır.
+
+### Güneş patlaması ve kızıl cüce
+
+- **GP1 sözleşme cümleleri (§E a):** başkasının karar dosyasına işçi yazmaz; entegratör işledi (`.vibe/kararlar/cekirdek.md` §6
+  evre ilerlemesi satırı, `.vibe/kararlar/sicaklik.md` §A.8, K-C50 notu).
+- **K-C26 ve tekrarlanabilir güneş patlaması (§E b): sözleşmeye uygun, değişmez.** `gunesPatlamasiTekrarlanabilir=true` iken kızıl
+  cücede başlayıp sirende/AKTIF'te `stop` ile duran afetin BÜYÜYEN'i çekirdekçe `NORMAL`'e döner (K-C26 metni). Varsayılan
+  config'te (tekrarlanamaz) bu yol yoktur.
+- **B-20 açık kalır (§E c):** kızıl cüce tabanında yeniden donan buz deliği donma/balıkçılık kodudur, bu parçanın kapsamı dışı
+  ("Açık noktalar (Faz 3)").
+- **GP17 FPS ölçümü Faz 5'e:** gizli workspace 1 FPS çizer; kareler boş değilken ikinci runClient açılmaz (yangındaki şef
+  kararıyla aynı). Gerçek FPS ve Düşük/Yüksek/Ultra karşılaştırması "Açık noktalar (Faz 4)".
+
+### Ay çarpması
+
+- **Protokol "6" (K-C47, Faz 4 tek sefer):** ay `DonemPaketi`'ne `long ayOlaySaati` ekledi (tel biçimi değişti, paket sayısı aynı);
+  entegratör birleştirmede "5" → "6" yaptı (`d0fe4b9`). Diğer Faz 4 dalları paket eklemedi, artırmaz.
+- **AY-07 döngülü sesler −30 LUFS (K-E24):** şef kabul, 2026-11-06; K-E24 döngülü ortam katmanına −26…−30 bandını tanır.
+
+### Deprem ve sinkhole
+
+- **DS-02 çöken kütle varlığı ve eğilen ağaç görseli Faz 5 cilası:** tavanlı `FallingBlockEntity` yeterli; tasarım notunun tek
+  varlıklı çöken kütlesi Faz 5'e.
+- **DS-14 artçı sarsıntılar yapıldı (tur 2):** S3+ 1–3 artçı, 20–60 sn arayla, ana genliğin %15'i; blok yıkmaz.
+- **`deprem_dayanikli` taşınır (§E-1):** işçi yangın paketine yazmadı; entegratör taşıdı (DS-18).
+
+### Asit yağmuru ve orman yangını
+
+- **Orman S5 FPS oranı 0,48 (hedef 0,5) engel değil:** gizli workspace ölçümü gürültülü; Faz 5 görünür koşuda yeniden ölçülür.
+- **Güneşin dumanla turuncu örtüsü (AO-12, gökyüzü API isteği) yapılmaz.**
+- **E.1 dumanlanma zayıf (P2):** Faz 5 görünür koşu yer seviyesi karesiyle yeniden puanlanır.
+- **K-E25 parçacık datagen:** birleştirmede yapıldı.
+
 ## Açık noktalar (Faz 2b)
 
 Entegratöre bırakılan notlardan işlenenler: kancalar (K-E1), protokol (K-C47), `asama ileri [süreç]` (K-C48), sanal su §3a istisnası
@@ -3111,6 +3708,52 @@ birleşmiş beş worktree kaldırıldı (`.vibe/diff/<parça>.patch` kalır). A�
   senaryolar `cekirdek_sunucu.argumanlar` / `agir_surec_kapisi` ile `--port` / `--kanit` alır (K-E13); tsunami, sinkhole, orman
   yangını ve asit yağmuru mod kurucusunda `BasarimIpucuEvent.yayinciKaydet`, koşulda `BasarimIpucuEvent` yayınlar (başarım §A.3,
   A-30, A-31; Faz 4 log'unda "yayıncı olarak kayıtlı değil" satırı 0); kodla blok değiştiren afet `SanalSu.chunkDegisti` çağırır.
+
+## Açık noktalar (Faz 4)
+
+Birleşen parçalardan kalanlar (her birleştirmede güncellenir; plan `.vibe/rapor/entegrasyon-4.md`):
+
+- **Güneş — FPS (GP17):** gerçek FPS ve Düşük/Yüksek/Ultra karşılaştırması Faz 5'te görünür pencere ya da başsız kalibrasyonla
+  (K0-21 rev. 2 (j)); hazır yol `gunes_patlamasi_gorsel.py` (kare başına FPS/TPS/mspt), kalite için
+  `gorsel.efektKalitesi` değiştirilip üç koşu.
+- **Güneş — vitrin kareleri zayıf (inceleme P2):** kavrulma için aynı açıdan 1. gün / 4. gün sonu kare çifti (ağaçlık ve çimen
+  çerçevede) yok; süpernova kabuğu karesi gökyüzü sahibinin kabuk kalibrasyonuyla yeniden alınmalı
+  (`client/gunes_patlamasi/GunesPatlamasiOtomasyonu`). Faz 5 görünür koşu.
+- **Güneş — şeker kamışı kurumuyor (inceleme P2):** `client/gunes_patlamasi/KavrulmaRengi.java:38-42` renk işleyicisi
+  listesinde `Blocks.SUGAR_CANE` yok; nilüfer ve saplar da dışarıda (GP13 bilinen sınırına eklenmeli). Faz 5.
+- **Güneş — GP10 yapılmayanlar:** çarpma anının ayrı beyaz örtüsü, süpernova çökmesinde öteki ortam seslerinin susturulması,
+  kavrulmada ayrı uzak yangın katmanı.
+- **Betikler (K-E22/K-E23):** `-PoyunTestiAfeti` taşıyan betikler birleştirme turlarında `!tür`'e geçer ya da gerçek afete
+  uyarlanır (`entegrasyon-4.md` §3.6). Güneş birleştiğinde `uyari_sunucu.py` ve `radar_gorsel.py` güneş adımları gerçek afetle
+  aynı çıktıyı verir (güneş §E); `basarim_sunucu.py`'de güneş adımı yok.
+
+- **Ay — vitrin kamerası (inceleme P2):** çarpma vitrininde ufuk arazinin arkasında; parlama sonrası ufuk ışığı ve mantar sütunu
+  09–12 karelerinde seçilmiyor. Kamera açık ufka (kıyı ya da `ust + 40`, pitch −3…−5°), `00_once` ve `17_sifirla_ay_geri` −88°'de
+  (`client/ay_carpmasi/AyCarpmasiOtomasyonu.java:149-172, 208`). Faz 5 görünür koşu.
+- **Ay — kayan yıldız görünmedi:** bütün karelerde kayan yıldız sayısı 0; otomasyon halka karesinden önce paket içi
+  `kayanYildizZorla`'yı çağırmalı (`AyCarpmasiGokyuzu.java:313-327`). Faz 5.
+- **Ay — düşen cam/yaprak eşyaya dönüşebiliyor:** `SarsintiDusmeleri.java:117-122` düşen varlıkta `dropItem = false` yok.
+- **Ay — #13 Yıldızlı Gece ve #14 Yükselen Sular gerçek zincirle sınanmadı:** zincir GameTest'ine sahte oyuncuyla iki iddia
+  eklenmeli (bugün başarımın kendi testleri dönem alanından sınıyor).
+- **Ay — FPS:** gizli workspace 1 FPS (GP17 ile aynı), Faz 5.
+
+- **Deprem/sinkhole — görsel kareler (inceleme P2):** kare `RenderTickEvent.END`'de, istekten sonra ≥ 2 yeni çizilmiş kareyle
+  alınmalı; çöküş ve S1 yavaş çekimde (`hiz 0.2`), siren karesi siren aşamasında (`client/deprem/DepremOtomasyonu.java:286-291,
+  615-617`). Rapordaki "bayat kopya yok" cümlesi yanlış: `sinkhole_cokus_vitrin` bayat; `deprem_s1` sarsıntı bittikten sonra,
+  `deprem_siren` AKTIF'te alındı. Faz 5 görünür koşu.
+- **Deprem/sinkhole — DS-02 ve ses:** çöken kütle varlığı, eğilen ağaç, kendi toz dokusu, sinkhole dibinde nem buharı, ayrı
+  öncü gürleme/çatlama sesleri Faz 5 cilası.
+- **Deprem/sinkhole — FPS:** gizli workspace 1 FPS (GP17), Faz 5.
+
+- **Asit/orman — görsel kareler (AOi-1–3):** asit kamerası 40 blok üstte; sıçrama/cızlama 24 blok eşiği altında görünmüyor,
+  dumanlanma zayıf. Faz 5'te yere yakın (göz ≤ 10 blok) asit S5 karesi, ufku gören siren karesi, S1 görsel çarpanı 0,25 ile "çise";
+  FPS tabanı `maxFps` sınırsız ve aynı kamerada (taban 120 FPS tavanda kalıyordu).
+- **Asit — maruziyet ölçekli saat (AOi-6):** `AsitYagmuru.java:103, 207` maruziyet gerçek tick'le birikiyor; ölçekli `adim`
+  (K-C11) Faz 5.
+- **Asit — ekran efekti kaynağı (AOi-7):** `IstemciAsitYagmuru.java:288` efekt yalnız son hasar `dogalafetler:asit` iken
+  çalışmalı.
+- **Orman — kayıttan dönüş adımı (AOi-8)** `asit_orman_yangini_sunucu.py`'de yok; "Yanmadan Çıktım" uçtan uca GameTest'i yok
+  (AOi-4'ün orman yarısı; 12–16 blok uzak oyuncu 0 ipucu sahnesi dahil).
 
 ## N17 — Sayısal varsayılanlar
 
@@ -3360,6 +4003,70 @@ birleşmiş beş worktree kaldırıldı (`.vibe/diff/<parça>.patch` kalır). A�
 | başarım (kod) | yangın yakınlığı | 8 | blok | ipucu gelmezse "yangın alanında": yangın ısısının etkili olduğu yakınlık (yangın 6 + √n) |
 | başarım (kod) | çorba aday penceresi | 60 | tick | yedikten sonra ısınmanın görülmesi için 3 sn |
 | başarım (kod) | çorba varsayılan etki süresi | 180 | sn | madde 14'ün en uzun sıcak yiyeceği |
+| güneş patlaması | `gunes_patlamasi.aktifSureGun` | 5,0 | MC günü (1–10) | bölüm D "5 Minecraft günü" |
+| güneş patlaması | `gunes_patlamasi.meteorBaslangicDakikaBasina` | 1,5 | meteor/dk/oyuncu (0–30) | tasarım: oyuncu başına 1/40 sn |
+| güneş patlaması | `gunes_patlamasi.meteorSonDakikaBasina` | 5,0 | meteor/dk/oyuncu (0–30) | tasarım: 5. gün 1/12 sn; arası doğrusal |
+| güneş patlaması | `gunes_patlamasi.buyukMeteorOrani` | 0,05 | oran (0–1) | tasarım: büyük %5 (Kozmik Çekirdek yalnız büyükte) |
+| güneş patlaması | `gunes_patlamasi.kavrulmaBaslangicGun` | 3,0 | gün (0–10) | tasarım §2 "3. günden sonra" |
+| güneş patlaması | `gunes_patlamasi.kavrulmaOlasiligi` | 0,5 | olasılık (0–1) | 2 günde çevrenin ~yarısı: yamalı, çöl değil |
+| güneş patlaması | `gunes_patlamasi.kavrulmaYaricap` | 64 | blok (8–160) | 4 chunk: oyuncunun gördüğü çevre, yüklü alan |
+| güneş patlaması | sabit: yağmur dilimi | 1200 | tick | yoğunluk dakikada bir güncellenir (GP3) |
+| güneş patlaması | sabit: siren sonu güneş | 1,6 | kat | tasarım §2 aşama 0 (GP1) |
+| güneş patlaması | sabit: kavrulma denemesi tavanı | 32 | deneme/oyuncu/tick | `hiz` yüksekken TPS korunur (GP15) |
+| güneş patlaması | sabit: yaprak/çimen kuruluğu | p 0,564 → 1, tavan %72, 8 basamak | — | tasarım "yapraklar kahverengiye"; basamak = yeniden örme (GP13) |
+| güneş patlaması | `gorsel.efektKalitesi` (mevcut, CLIENT) | Yüksek | Düşük/Orta/Yüksek/Ultra | aurora katmanı 1/2/3/3, dilim 48–128; ısı şeridi 10–32 (N13, tasarım §5) |
+| ay çarpması | `ay_carpmasi.meteorSuresiSn` | 90 | sn | bölüm H "1-2 dk" ortası (tasarım §6) |
+| ay çarpması | `ay_carpmasi.meteorDakikaBasina` | 7,5 | adet/dk/oyuncu | tasarım §6 "oyuncu başına 1 / 8 sn"; güneşten hafif (H.1) |
+| ay çarpması | `ay_carpmasi.meteorBuyukOrani` | 0,04 | olasılık | meteor sözleşmesi örneği; ay parçaları küçük |
+| ay çarpması | `ay_carpmasi.sarsintiBlokSayisi` | 35 | blok/oyuncu | tasarım §5 Yüksek satırı |
+| ay çarpması | `ay_carpmasi.sarsintiYaricapi` | 48 | blok | tasarım §5 |
+| ay çarpması | `ay_carpmasi.sarsintiYogunlugu` | 0,30 | olasılık | tasarım §6 |
+| ay çarpması | `ay_carpmasi.halka` | true | — | tasarım §2 "config ile kapatılabilir" |
+| ay çarpması | (sabit) sarsıntı | 12 sn, 2,5° | — | tasarım §6; `AyEgrileri` |
+| ay çarpması | (sabit) parlama | 0,5 sn %70 | — | tasarım §2 |
+| ay çarpması | (sabit) mantar | 45 sn'de 25°, 1 günde söner | — | tasarım §2, §2 "afet sonrası iz" |
+| ay çarpması | (sabit) halka | 3 gün, alfa 0,6 → 0 | — | tasarım §2 |
+| deprem | `deprem.yarikUzunlugu` | 24, 48, 96, 160, 256 | blok | tasarım §6; S5 "haritayı ikiye bölen" görüş mesafesi ölçeği |
+| deprem | `deprem.yarikGenisligi` | 1, 2, 3, 4, 6 | blok | S1 tek blok çatlak, S5 kanyon |
+| deprem | `deprem.yarikDerinligi` | 4, 8, 14, 22, 32 | blok | yüzeyden; S1 düşülüp çıkılır, S5 ölümcül |
+| deprem | `deprem.sarsintiSuresi` | 8, 15, 25, 40, 60 | sn | Richter 4–9 hissi; S5 gerçek büyük deprem süresi mertebesi |
+| deprem | `deprem.kameraGenligi` | 0,3; 0,8; 1,5; 2,5; 4,0 | derece | okunabilirliği bozmayan üst sınır; istemci çarpanı 0–200 % |
+| deprem | `deprem.yikimYaricapi` | 16, 32, 48, 72, 100 | blok | etki alanı = max(yarıçap, yarım boy + 8) |
+| deprem | `deprem.yakinHasar` | 0, 0, 0, 1, 2 | can puanı / 2 sn | tasarım §6: S4 0,5 kalp, S5 1 kalp |
+| deprem | `deprem.blokButcesi` | 32, 48, 64, 96, 128 | blok/tick | tasarım §5 (S5 64) iki katı: S5 hacmi (~24 bin blok) 60 sn içinde bitsin; TPS kademesiyle çarpılır |
+| deprem | `deprem.dusenBlokTavani` | 60 | varlık | tasarım §5 "Yüksek" |
+| deprem | `deprem.enAltY` | −50 | Y | ana kaya ve deepslate tabanı korunur (sinkhole da kullanır) |
+| deprem | `deprem.artciSayisi` | 0, 0, 1, 2, 3 | artçı | tasarım §2 "S3+: 1–3 adet" |
+| deprem | `deprem.artciEnAzAralik` / `artciEnCokAralik` | 20 / 60 | sn | tasarım §2 "20–60 sn arayla" |
+| deprem | `deprem.artciSiddeti` | 0,15 | ana genliğe oran | tasarım §2 "ana sarsıntının %15'i"; sonrakiler 0,8 kat (kod) |
+| deprem (kod) | artçı süresi | 3–5 | sn | kısa, fark edilir; blok yıkmaz |
+| deprem (istemci) | `deprem.sarsintiCarpani` | 100 | % (0–200) | erişilebilirlik |
+| deprem (kod) | açılma hızı | 6 + 1,2·seviye | blok/sn | tasarım §2 "6–12 blok/sn" |
+| deprem (kod) | yıkım yoğunluğu | 0,15; 0,4; 0,7; 1,0; 1,4 × 12 sütun/tick | çarpan | S1 "birkaç yaprak", S5 "ahşap köy çökmüş" |
+| sinkhole | `sinkhole.cap` | 6, 10, 16, 24, 34 | blok | tasarım §6 |
+| sinkhole | `sinkhole.derinlik` | 6, 10, 16, 24, 32 | blok | tasarım §6 |
+| sinkhole | `sinkhole.catlamaSuresi` | 4, 4, 5, 6, 7 | sn | kaçma fırsatı |
+| sinkhole | `sinkhole.cokusSuresi` | 3, 4, 6, 8, 10 | sn | çekirdek + geri çekilme (DS-10) |
+| sinkhole | `sinkhole.basamak` | 1, 1, 2, 2, 3 | halka | S1 tek adımlı, S5 üç basamaklı çanak |
+| sinkhole | `sinkhole.dusenBlokHasari` | 0, 0, 4, 6, 8 | can puanı | tasarım §6 "düşen blok 2–4 can" |
+| sinkhole | `sinkhole.blokButcesi` | 400 | blok/tick | tasarım §5 |
+| sinkhole | `sinkhole.dusenBlokTavani` | 60 | varlık | tasarım §5 "Yüksek" |
+| sinkhole (kod) | sarkma / durulma | 3 / 14 | sn | tasarım §2 zaman çizelgesi |
+| asit yağmuru | `asit_yagmuru.yaricap` (SERVER) | 32, 48, 64, 96, 128 | blok (S1…S5) | tasarım §6; S5 bir köyü ve çevresindeki ormanı kaplar |
+| asit yağmuru | `asit_yagmuru.sureSaniye` | 60, 90, 120, 180, 240 | sn | tasarım §6; S5'te bir orman 4 dk'da yapraksız kalır |
+| asit yağmuru | `asit_yagmuru.asindirmaBlokSaniye` | 2, 4, 7, 11, 16 | blok/sn (tam yoğunluk) | bölüm E "yavaş yavaş"; S5'te 240 sn'de ~3500 yüzey bloğu, 128 blokluk alanın %7'si |
+| asit yağmuru | `asit_yagmuru.hasar` | 0,5, 0,5, 0,5, 1, 1 | can puanı | bölüm E "orta düzey"; zehir (1/1,25 sn) ve soğuk yağmurdan hafif |
+| asit yağmuru | `asit_yagmuru.hasarAraligiTick` | 80, 60, 40, 50, 40 | tick | açıkta 1 dk: S1 7,5 can, S5 30 can (min. can garantisiyle 2 kalpte durur) |
+| asit yağmuru | `asit_yagmuru.tasSeviyesi` | 3 | seviye | tasarım §6: taş tuğla S3+ |
+| asit yağmuru | `asit_yagmuru.asitMinimumCan` | 4,0 | can puanı | madde 10 "Seviye 5'te bile öldürücü olmasın": 2 kalbin altına inmez |
+| asit yağmuru | `asit_yagmuru.eszamanliAsindirma` | 64 | blok | S5 16 blok/sn × ortalama çatlak 4 sn; tasarım §5'in 32'si bu hızı kesiyordu (kırılma örtüsü paketi küçük, yalnız 32 blok içindekilere) |
+| asit yağmuru | `asit_yagmuru.kaymaHizi` | 0,3 | blok/sn | tasarım §6; S5 240 sn'de 72 blok kayar, oyuncu alanda kalır |
+| orman yangını | `orman_yangini.baslangicYaricapi` (SERVER) | 3, 6, 10, 16, 24 | blok | tasarım §6; ortak yangın `alanTutustur` en çok 24 |
+| orman yangını | `orman_yangini.yogunluk` | 0, 0,2, 0,4, 0,7, 1 | 0–1 | yangın §A1 önerisi: yayılma ×0,5…×1,8, sıçrama yok/2/5/8/12 blok |
+| orman yangını | `orman_yangini.sureSaniye` | 120, 180, 240, 360, 480 | sn | tasarım §6 (2–8 dk); sonra yeni tutuşma durur, kalan en geç 30 sn'de yanar |
+| orman yangını | `orman_yangini.aramaEnAz` / `aramaEnCok` | 40 / 90 | blok | tasarım §2: yangın uzaktan görülür, oyuncu kaçabilir |
+| orman yangını | `orman_yangini.yanikIziButcesi` | 8 | sütun/tick | sıcak karelerden örnekleme; 8 okuma × 3 blok, TPS kısmasıyla |
+| orman yangını | `orman_yangini.erkenBitisSaniye` | 15 | sn | yangın söndüyse (yağmur, seyrek yakıt) afet boşta beklemez; başlangıç alan işi bitmeden saymaz |
 
 Config dışı sabitler (oynanış değeri değil, sınır/biçim): siren 200/1200 tick (şartname, K0-19); son afet geçmişi 5
 (madde 13a); tek çarpan ≤ 100, toplam ≤ 1000 (K-C22); hız 0,1–1000; TPS ölçüm aralığı 20 tick; dönem kaydı sınırları

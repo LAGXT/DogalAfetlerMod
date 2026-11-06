@@ -1,6 +1,13 @@
 package io.github.kadirberkpolat1.dogalafetler;
 
 import com.mojang.logging.LogUtils;
+import io.github.kadirberkpolat1.dogalafetler.afet.asit_yagmuru.AsitSistemi;
+import io.github.kadirberkpolat1.dogalafetler.afet.ay_carpmasi.AyCarpmasiSistemi;
+import io.github.kadirberkpolat1.dogalafetler.afet.deprem.DepremSistemi;
+import io.github.kadirberkpolat1.dogalafetler.afet.gunes_patlamasi.GunesPatlamasiSistemi;
+import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.KasirgaSistemi;
+import io.github.kadirberkpolat1.dogalafetler.afet.orman_yangini.OrmanSistemi;
+import io.github.kadirberkpolat1.dogalafetler.afet.sinkhole.SinkholeSistemi;
 import io.github.kadirberkpolat1.dogalafetler.afet.tsunami.Tsunami;
 import io.github.kadirberkpolat1.dogalafetler.balikcilik.Balikcilik;
 import io.github.kadirberkpolat1.dogalafetler.basarim.Basarim;
@@ -52,6 +59,13 @@ public final class DogalAfetler {
         IstemciAyarlari.kaydet();
         // Afet kayıtları (Faz 4: AfetKaydi.kaydet yapan satırlar) buraya, ozelliktenKaydet'in üstüne: test afeti gerçek
         // afeti kayıtlı türü atlar; tersi sırada gerçek kayıt "zaten kayıtlı" ile modu düşürür (K-E22).
+        GunesPatlamasiSistemi.kaydet(modBus);
+        AyCarpmasiSistemi.kaydet(modBus);
+        DepremSistemi.kaydet(modBus);
+        SinkholeSistemi.kaydet();
+        AsitSistemi.kaydet(modBus);
+        OrmanSistemi.kaydet();
+        KasirgaSistemi.kaydet(modBus);
         Tsunami.kaydet(modBus);
         OyunTestiAfeti.ozelliktenKaydet();
         SuAyarlari.kaydet();

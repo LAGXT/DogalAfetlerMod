@@ -67,3 +67,17 @@ Kaynaklar:
 - Yarık derinliği yüzeyden ölçülür, en alt Y = −50 (ana kaya ve deepslate tabanı korunur).
 - Taşıyıcı blokların yıkılması yalnız `minecraft:planks`, `logs` dışı ahşap, `glass`, `leaves`, `fences` ve `dogalafetler:deprem_kirilgan` etiketiyle.
 - Öncü sarsıntı (sismograf) çok hafif titreme: 0,1°, 0,5 sn, 6–10 sn arayla; yalnız eşyayı taşıyanda.
+
+## 7. Uygulama notu (Faz 4)
+
+Uygulanan: fay hattı (`afet.deprem.mantik.FayHatti`: segmentler, kademeli sıçrama, `sin(π·u)^0.7` profili, pürüzlü derinlik,
+S2+ yan çatlaklar, S4–5 fay basamağı), merkezden iki uca 6 + 1,2·seviye blok/sn ilerleyiş, cephenin önünde 3 blok çatlak
+örtüsü, sütun başına toz ve kaya kırılması, tick bütçeli yukarıdan aşağı boşaltma, sütunların beşte birinde yüzey bloğunun
+yarığa düşmesi (dipteki moloz), `deprem_kirilgan` yıkımı, S4–5 heyelan ve yakın hasar, istemcide zarf + iki kanallı titreme +
+yuvarlanma + el sallanması + yarık tozu, CLIENT config sarsıntı çarpanı, döngülü gürleme (`deprem_gurleme.ogg`). Ayrıntı ve
+sapmalar `.vibe/kararlar/deprem-sinkhole.md` §B: yeni ağ paketi yok, sarsıntı durum paketinden (DS-01); taban `deprem.enAltY`
+(DS-06); yüklü olmayan chunk kazılmaz (DS-07). Artçı sarsıntılar (DS-14, tur 2): S1…S5 0, 0, 1, 2, 3 artçı, her biri bir
+öncekinin bitişinden 20–60 sn sonra, 3–5 sn, ilki ana sarsıntının %15'i, sonrakiler 0,8 kat; blok yıkmaz, kısa gürleme
+katmanı ve yarıktan toz; ana sarsıntı bitince yıkım, heyelan ve yakın hasar durur (`afet.deprem.mantik.ArtciPlani`, config
+`deprem.artci*`). Yapılmayanlar: kendi toz sprite dokusu (vanilla duman/toz parçacıkları kullanılıyor; artçı bitene kadar
+yarıktan istemci tozu süzlür), ayrı öncü gürleme dosyası (ana döngünün 1,5 sn'lik girişi).

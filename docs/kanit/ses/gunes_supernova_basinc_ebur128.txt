@@ -1,0 +1,24 @@
+Dosya: src/main/resources/assets/dogalafetler/sounds/gunes_supernova_basinc.ogg (39242 bayt, 8.0 sn, mono, 48000 Hz, Vorbis q5)
+Hedef (docs/tasarim/ses.md §4): -25.0 LUFS ±1, gerçek tepe <= -6.0 dBTP, baskın frekans 20–80 Hz, 2500 Hz üstü <= -30 dB
+Ölçülen (ogg): I = -25.0 LUFS, gerçek tepe = -9.3 dBTP
+Baskın frekanslar (20 Hz kümeleri, güçlüden zayıfa): 40 Hz, 60 Hz, 20 Hz
+Perde izi (0,5 sn pencerelerde en güçlü frekans, ilk 20): 26, 26, 26, 28, 30, 32, 34, 38, 40, 44, 48, 52, 54, 58, 58, 60 Hz
+Bant enerjisi / toplam: 20–80 Hz -0.3 dB; 300–3400 Hz (konuşma) -33.2 dB; >2500 Hz -81.9 dB; >8000 Hz -87.1 dB
+Döngü dikişi: |ilk - son| / en büyük iç adım = 0.000 (<= 1 ise süreksizlik yok); ilk örnek = -0.00000
+Hedefle karşılaştırma: UYGUN
+
+ffmpeg -i gunes_supernova_basinc.ogg -af ebur128=peak=true -f null -
+Summary:
+
+  Integrated loudness:
+    I:         -25.0 LUFS
+    Threshold: -35.3 LUFS
+
+  Loudness range:
+    LRA:         4.2 LU
+    Threshold: -44.5 LUFS
+    LRA low:   -27.2 LUFS
+    LRA high:  -23.0 LUFS
+
+  True peak:
+    Peak:       -9.3 dBFS

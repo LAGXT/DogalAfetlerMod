@@ -25,7 +25,7 @@ Kaynaklar:
 
 **İstemci katmanları (aşağıdan yukarı):**
 
-1. **Taban enkaz eteği.** Çap = huni gövdesinin taban çapının 1,8 katı, yükseklik 6–14 blok, kahverengi-gri, alfa 0,6–0,8 (tabanda yüksek, üst kenarda sönen); huninin tabanını sarar ve onunla birleşir, böylece silüet tabanda genişler. 4 karelik animasyonlu toz sprite'ı (kendi dokumuz), halka üzerinde açısal hız `ω(r) = ω0·(r0/r)` (dışa doğru yavaşlayan Rankine benzeri profil). Vitrin karesinde etek zorunludur.
+1. **Taban enkaz eteği.** Çap = huni gövdesinin taban çapının 1,8 katı, yükseklik 6–14 blok, toz kahvesi (fırtına ışığında da ekranda R > G > B; K-17), alfa 0,6–0,8 (tabanda yüksek, üst kenarda sönen); huninin tabanını sarar ve onunla birleşir, böylece silüet tabanda genişler. 4 karelik animasyonlu toz sprite'ı (kendi dokumuz), halka üzerinde açısal hız `ω(r) = ω0·(r0/r)` (dışa doğru yavaşlayan Rankine benzeri profil). Vitrin karesinde etek zorunludur.
 2. **Huni gövdesi.** Prosedürel ağ: 24 dilim × 32 halka; her halkanın yarıçapı `r(h) = r_taban + (r_tepe - r_taban)·h^0.6`, `r_tepe` tabandan geniştir (S5'te ~1,6×) ve tepe duvar bulutuyla birleşir; ekseni gürültüyle hafifçe kıvrılır (tabanda en çok). S4–5'te gövdenin orta yükseklikteki genişliği yüksekliğin ~%40–50'sidir (kama görünümü). Doku yatayda periyodik bulut gürültüsü; U koordinatı zamanla kayar (dönüş hissi), iki katman farklı hızda ve ters fazda üst üste (derinlik). Yarı saydam, kenarlara doğru alfa düşer (Fresnel taklidi: normal·bakış açısı). Şader gerekmez.
 3. **Alt girdaplar (Seviye 4–5).** 2–4 ince ikincil huni, ana eksen çevresinde 0,5 tur/sn döner; yerde sikloidal iz bırakır (aşağıda).
 4. **Duvar bulutu.** Huni tepesinde, çap = 6 × taban çapı, 8 blok kalın, koyu gri-mavi disk; 120 büyük bulut sprite'ı, 0,05 tur/sn döner. Arka tarafında açık renkli at nalı boşluk (RFD yarığı) — bu, kasırganın yönünü uzaktan okutur.
@@ -94,6 +94,17 @@ Kaynak: `.vibe/kararlar/spike-kasirga.md` (SK-01…SK-06), `.vibe/rapor/inceleme
 | 5 Felaket | 34 | 55 | 60 | 110 | 4,4 | 180 sn | 51 | 20 | ≤5,0 (taş, kırıktaş) | 4 |
 
 - Spike sonrası güncelleme, 2026-11-06: "Gövde tepe çapı" ve "Etek çapı" sütunları eklendi; gövdenin orta yükseklikteki genişliği (h = 0,5; `h^0.6` = 0,66) S4 ~38,5 / 95 = %41, S5 ~48 / 110 = %44 (kama). Etek yüksekliği S1 6 → S5 14 blok, doğrusal.
-- Yönelim: hedef oyuncudan 80–140 blok uzakta doğar, oyuncu çevresine doğru ±35° sapmalı rastgele yürüyüşle ilerler; doğuş 8 sn (toz girdabı → huni iner), dağılma 10 sn (ip evresi).
+- Yönelim: hedef oyuncudan `[0,5·(R + 56), R + 56]` blok uzakta doğar (R = çekim yarıçapı; S1 32–65, S5 54–107 blok), hedefin başlangıç konumuna doğru ±35° sapmalı yürüyüşle ilerler, 12 bloğuna girince ana yönü donar ve uzaklaşır; doğuş 8 sn (toz girdabı → huni iner), dağılma 10 sn (ip evresi). (Faz 4 düzeltmesi, `.vibe/kararlar/kasirga.md` K-03: eski 80–140 blokta S1–S3’ün hedefi sireni duymazdı; siren alanı etki alanı + 64 blok.)
 - Bloklar `dogalafetler:kasirga_dayanikli` etiketiyle korunur (obsidyen, deepslate, ana kaya varsayılan).
 - Kaldırılan oyuncu en çok 25 blok yükselir; düşme hasarı vanilla.
+
+### Faz 4 güncellemesi, 2026-11-06
+
+Kaynak: `.vibe/kararlar/kasirga.md` K-01…K-12.
+
+- **Evreler aşamalara oturdu (K-02):** siren aşamasında huni yoktur; duvar bulutu 8 bloktan alçalıp koyulaşır, tabanda kısa bir huni bulutu sarkar, uzak uğultu açılır. AKTIF ile huni iner (doğuş), olgun evre seviye süresince sürer, ip ve dağılma evresiyle afet doğal biter.
+- **Zemin (K-04):** S1–3 yalnız üstteki bitki/yaprak/ahşap/camı kaldırır, toprak ve taş zemini yalnız S4–5 sıyırır; S1 "çimen" bitki demektir.
+- **Ses (K-07):** elytra ıslığı konuşma bandını doldurduğu için yazılmadı; yakın katmanın düşük düzeyli 500–1500 Hz rüzgâr uğultusu yerini aldı.
+- **Şimşek (K-08):** sunucuda vanilla `LightningBolt` (yalnız görsel); herkes aynı şimşeği görür.
+- **Yağmur yoğunluğu:** dünya havasını değiştirmeden istemcide artırılamaz; yapılmadı (kararlar §D).
+- **Yakın mesafe (spike B9):** sprite boyutu kameraya uzaklığın %36'sıyla sınırlı, kamera huninin/eteğin içindeyken iç katmanlar atlanır; duvar bulutu alfası 0,88 → 0,74.

@@ -1,0 +1,24 @@
+Dosya: src/main/resources/assets/dogalafetler/sounds/gunes_supernova_kristal.ogg (155383 bayt, 20.0 sn, mono, 48000 Hz, Vorbis q5)
+Hedef (docs/tasarim/ses.md §4): -30.0 LUFS ±1, gerçek tepe <= -6.0 dBTP, baskın frekans 310–700 Hz, 2500 Hz üstü <= -30 dB
+Ölçülen (ogg): I = -29.9 LUFS, gerçek tepe = -18.2 dBTP
+Baskın frekanslar (20 Hz kümeleri, güçlüden zayıfa): 500 Hz, 340 Hz, 660 Hz
+Perde izi (0,5 sn pencerelerde en güçlü frekans, ilk 20): 330, 330, 330, 496, 330, 330, 496, 330, 496, 660, 330, 496, 496, 330, 496, 496, 330, 496, 330, 496 Hz
+Bant enerjisi / toplam: 310–700 Hz -0.1 dB; 300–3400 Hz (konuşma) -0.0 dB; >2500 Hz -68.5 dB; >8000 Hz -70.6 dB
+Döngü dikişi: |ilk - son| / en büyük iç adım = 0.000 (<= 1 ise süreksizlik yok); ilk örnek = +0.00000
+Hedefle karşılaştırma: UYGUN
+
+ffmpeg -i gunes_supernova_kristal.ogg -af ebur128=peak=true -f null -
+Summary:
+
+  Integrated loudness:
+    I:         -29.9 LUFS
+    Threshold: -40.8 LUFS
+
+  Loudness range:
+    LRA:        13.8 LU
+    Threshold: -50.9 LUFS
+    LRA low:   -42.2 LUFS
+    LRA high:  -28.4 LUFS
+
+  True peak:
+    Peak:      -18.2 dBFS

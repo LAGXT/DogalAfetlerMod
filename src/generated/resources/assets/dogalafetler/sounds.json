@@ -1,9 +1,72 @@
 {
+  "ay_carpmasi_carpma": {
+    "sounds": [
+      {
+        "name": "dogalafetler:ay_carpmasi_carpma",
+        "stream": true
+      }
+    ],
+    "subtitle": "subtitles.dogalafetler.ay_carpmasi_carpma"
+  },
+  "ay_carpmasi_citirti": {
+    "sounds": [
+      {
+        "name": "dogalafetler:ay_carpmasi_citirti",
+        "stream": true
+      }
+    ],
+    "subtitle": "subtitles.dogalafetler.ay_carpmasi_citirti"
+  },
+  "ay_carpmasi_yaklasma": {
+    "sounds": [
+      {
+        "name": "dogalafetler:ay_carpmasi_yaklasma",
+        "stream": true
+      }
+    ],
+    "subtitle": "subtitles.dogalafetler.ay_carpmasi_yaklasma"
+  },
+  "deprem.gurleme": {
+    "sounds": [
+      "dogalafetler:deprem_gurleme"
+    ],
+    "subtitle": "subtitles.dogalafetler.deprem.gurleme"
+  },
   "esya.oncu_sarsinti": {
     "sounds": [
       "dogalafetler:esya_oncu_sarsinti"
     ],
     "subtitle": "subtitles.dogalafetler.esya.oncu_sarsinti"
+  },
+  "gunes.kavrulma_ruzgar": {
+    "sounds": [
+      {
+        "name": "dogalafetler:gunes_kavrulma_ruzgar",
+        "stream": true
+      }
+    ],
+    "subtitle": "subtitles.dogalafetler.gunes.kavrulma_ruzgar"
+  },
+  "gunes.kizil_cuce_akor": {
+    "sounds": [
+      "dogalafetler:gunes_kizil_cuce_akor"
+    ],
+    "subtitle": "subtitles.dogalafetler.gunes.kizil_cuce_akor"
+  },
+  "gunes.supernova_basinc": {
+    "sounds": [
+      "dogalafetler:gunes_supernova_basinc"
+    ],
+    "subtitle": "subtitles.dogalafetler.gunes.supernova_basinc"
+  },
+  "gunes.supernova_kristal": {
+    "sounds": [
+      {
+        "name": "dogalafetler:gunes_supernova_kristal",
+        "stream": true
+      }
+    ],
+    "subtitle": "subtitles.dogalafetler.gunes.supernova_kristal"
   },
   "ortam_test": {
     "sounds": [
@@ -13,6 +76,15 @@
       }
     ],
     "subtitle": "subtitles.dogalafetler.ortam_test"
+  },
+  "sinkhole.cokus": {
+    "sounds": [
+      {
+        "attenuation_distance": 64,
+        "name": "dogalafetler:sinkhole_cokus"
+      }
+    ],
+    "subtitle": "subtitles.dogalafetler.sinkhole.cokus"
   },
   "siren_gunes": {
     "sounds": [

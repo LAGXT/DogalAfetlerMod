@@ -127,7 +127,7 @@ def secenekleri_hazirla():
     yol.write_text("\n".join(satirlar) + "\n", encoding="utf-8")
 
 
-def kos(kanit, otomasyon="radar", gradle_ek=("-PquickPlay=test", "-PoyunTestiAfeti=deprem,sinkhole,kasirga,gunes_patlamasi"),
+def kos(kanit, otomasyon="radar", gradle_ek=("-PquickPlay=test", "-PoyunTestiAfeti=!deprem,!sinkhole,!kasirga,!gunes_patlamasi"),
         wav=WAV):
     """İstemciyi protokolle açar, kapanışına kadar bekler, kanıtları `kanit`'a kopyalar; koşu geçerli ve senaryo
     tamamlandıysa True. `run/options.txt` koşudan önce saklanır ve sonunda bayt bayt geri yazılır (U-17)."""

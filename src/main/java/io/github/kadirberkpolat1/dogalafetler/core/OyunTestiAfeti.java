@@ -13,7 +13,9 @@ import net.minecraft.server.level.ServerLevel;
  * (madde 11 "tamamlanmamış süreç" sınanabilsin). GameTest'ler {@link AfetKaydi#geciciKaydet} ile kullanır (hata sınaması
  * için alt sınıflanır); geliştirme sunucusunda {@code -Ddogalafetler.oyunTestiAfeti=deprem,sinkhole} (Gradle:
  * {@code -PoyunTestiAfeti=...}) verilirse o türler için kaydedilir, güneş patlaması türüyle birlikte
- * {@link OyunTestiSureci} de kaydedilir. Gerçek afeti kayıtlı tür uyarıyla atlanır (K-E22). Üretim kurulumunda kaydedilmez.
+ * {@link OyunTestiSureci} de kaydedilir. Gerçek afeti kayıtlı tür uyarıyla atlanır (K-E22); {@code !} önekli tür
+ * ({@code !deprem}) gerçek afetin yerine geçer (K-E23: çekirdek senaryosu gerçek afetlerden bağımsız koşar). Üretim
+ * kurulumunda kaydedilmez.
  */
 public class OyunTestiAfeti extends Afet {
     public static final String OZELLIK = "dogalafetler.oyunTestiAfeti";
@@ -32,19 +34,25 @@ public class OyunTestiAfeti extends Afet {
 
     /**
      * {@value #OZELLIK} sistem özelliğindeki kayıtsız türler için kayıt yapar; özellik yoksa hiçbir şey yapmaz. Gerçek afet
-     * kayıtlarından sonra çağrılır (K-E22): gerçek afeti kayıtlı tür {@code WARN} ile atlanır.
+     * kayıtlarından sonra çağrılır (K-E22): gerçek afeti kayıtlı tür {@code WARN} ile atlanır, {@code !} önekliyse gerçek
+     * afetin yerine geçer (K-E23).
      */
     public static void ozelliktenKaydet() {
         OyunTestiAfetSecimi.Secim secim = OyunTestiAfetSecimi.sec(System.getProperty(OZELLIK), AfetKaydi::kayitliMi);
         for (AfetTuru tur : secim.atlanan()) {
             DogalAfetler.LOGGER.warn("Oyun testi afeti {} atlandı ({}): gerçek afet kayıtlı (K-E22)", tur.kimlik(), OZELLIK);
         }
+        for (AfetTuru tur : secim.ezilecek()) {
+            AfetKaydi.oyunTestiEz(tur, () -> new OyunTestiAfeti(tur, 32, VARSAYILAN_AKTIF_SURE));
+            DogalAfetler.LOGGER.warn("Oyun testi afeti {} gerçek afetin yerine kaydedildi ({}, K-E23); gerçek afet değildir",
+                    tur.kimlik(), OZELLIK);
+        }
         for (AfetTuru tur : secim.kaydedilecek()) {
             AfetKaydi.oyunTestiKaydet(tur, () -> new OyunTestiAfeti(tur, 32, VARSAYILAN_AKTIF_SURE));
             DogalAfetler.LOGGER.warn("Oyun testi afeti {} için kaydedildi ({}); gerçek afet değildir", tur.kimlik(), OZELLIK);
-            if (tur == AfetTuru.GUNES_PATLAMASI) {
-                OyunTestiSureci.kaydet();
-            }
+        }
+        if (secim.kaydedilecek().contains(AfetTuru.GUNES_PATLAMASI) || secim.ezilecek().contains(AfetTuru.GUNES_PATLAMASI)) {
+            OyunTestiSureci.kaydet();
         }
     }
 

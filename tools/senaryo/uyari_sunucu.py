@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Uyarı alt sisteminin dedicated server senaryosu, çekirdeğin `cekirdek_sunucu.py` altyapısıyla.
 
-Sunucu Gradle ile pty'siz, stdin'i boruya bağlı açılır (K0-18); `-PoyunTestiAfeti=deprem,gunes_patlamasi`. Kendi dünyası
+Sunucu Gradle ile pty'siz, stdin'i boruya bağlı açılır (K0-18); `-PoyunTestiAfeti=!deprem,!gunes_patlamasi` (K-E23: gerçek afetler
+birleşse de taklit yerlerine geçer; siren sırası afetin süresinden bağımsız kalır). Kendi dünyası
 (`run-server/cekirdek-senaryo`) silinip yeniden üretilir, `server.properties` sonda geri döner.
 
 Oyuncusuz (varsayılan): start deprem 1, asama ileri (SIREN: uyarı log'u "SIREN aşaması ... 0 oyuncuya"; oyuncusuz sunucuda
@@ -129,7 +130,7 @@ def main():
     sonuc = 0
     yol = klasor / ("runServer-uyari-istemcili.log" if istemcili else "runServer-uyari.log")
     try:
-        sunucu = c.Sunucu("uyari", yol)
+        sunucu = c.Sunucu("uyari", yol, "!deprem,!gunes_patlamasi")
         try:
             istemcili_kosu(sunucu, klasor) if istemcili else kosu(sunucu)
         except c.SenaryoHatasi as hata:

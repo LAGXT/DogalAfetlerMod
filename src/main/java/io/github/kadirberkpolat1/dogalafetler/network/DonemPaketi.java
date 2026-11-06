@@ -1,5 +1,6 @@
 package io.github.kadirberkpolat1.dogalafetler.network;
 
+import io.github.kadirberkpolat1.dogalafetler.core.AyDurumu;
 import io.github.kadirberkpolat1.dogalafetler.core.DenizSeviyesi;
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
@@ -13,19 +14,24 @@ import net.minecraftforge.network.NetworkEvent;
 /**
  * Dünya döneminin istemcinin bilmesi gereken tam durumu (madde 3, 16): değişimde herkese (toplanarak), girişte ve boyut
  * değişiminde o oyuncuya, ayrıca 30 sn'de bir (istemci saati kaymasın). {@code saat} ölçekli afet saati, {@code hiz} onun
- * çarpanıdır; istemci evre geçişlerini {@code evreBaslangicSaati}'nden hesaplar. Afet geçmişi ve beklemeler gitmez.
+ * çarpanıdır; istemci evre geçişlerini {@code evreBaslangicSaati}'nden, ay çarpmasının yaklaşma/çarpma görünümünü
+ * {@code ayOlaySaati}'nden ({@link AyDurumu}) hesaplar. Afet geçmişi ve beklemeler gitmez.
  */
 public record DonemPaketi(boolean ayVar, GunesEvresi gunesEvresi, float evreIlerlemesi, long evreBaslangicSaati,
         float donmaIlerlemesi, boolean cozulmeDonemi, float buharlasmaDerinligi, DenizSeviyesi deniz, long saat,
-        double hiz) {
+        double hiz, long ayOlaySaati) {
     /** İstemcinin sunucudan paket gelmeden önceki varsayımı (normal dünya). */
     public static final DonemPaketi VARSAYILAN = new DonemPaketi(true, GunesEvresi.NORMAL, 0f, 0L, 0f, false, 0f,
-            DenizSeviyesi.VARSAYILAN, 0L, 1.0);
+            DenizSeviyesi.VARSAYILAN, 0L, 1.0, AyDurumu.OLAY_YOK);
 
     public static DonemPaketi den(DunyaDonemi donem, double hiz) {
         return new DonemPaketi(donem.ayVar(), donem.gunesEvresi(), donem.evreIlerlemesi(), donem.evreBaslangicSaati(),
                 donem.donmaIlerlemesi(), donem.cozulmeDonemi(), donem.buharlasmaDerinligi(), donem.deniz(), donem.saat(),
-                hiz);
+                hiz, donem.ayOlaySaati());
+    }
+
+    public AyDurumu ayDurumu() {
+        return AyDurumu.den(ayVar, ayOlaySaati);
     }
 
     public void yaz(FriendlyByteBuf tampon) {
@@ -42,6 +48,7 @@ public record DonemPaketi(boolean ayVar, GunesEvresi gunesEvresi, float evreIler
         tampon.writeBoolean(deniz.kalici());
         tampon.writeLong(saat);
         tampon.writeDouble(hiz);
+        tampon.writeLong(ayOlaySaati);
     }
 
     public static DonemPaketi oku(FriendlyByteBuf tampon) {
@@ -55,7 +62,7 @@ public record DonemPaketi(boolean ayVar, GunesEvresi gunesEvresi, float evreIler
         DenizSeviyesi deniz = new DenizSeviyesi(tampon.readFloat(), tampon.readFloat(), tampon.readLong(),
                 tampon.readBoolean());
         return new DonemPaketi(ayVar, evre, ilerleme, evreBaslangic, donma, cozulme, buharlasma, deniz,
-                tampon.readLong(), tampon.readDouble());
+                tampon.readLong(), tampon.readDouble(), Math.max(AyDurumu.OLAY_YOK, tampon.readLong()));
     }
 
     /** İstemci ana thread'inde: istemci önbelleğine ({@code client.core.IstemciDonem}) N15 yoluyla iletilir. */

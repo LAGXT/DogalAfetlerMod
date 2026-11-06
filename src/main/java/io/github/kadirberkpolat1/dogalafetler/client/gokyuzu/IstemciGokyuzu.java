@@ -1,5 +1,6 @@
 package io.github.kadirberkpolat1.dogalafetler.client.gokyuzu;
 
+import io.github.kadirberkpolat1.dogalafetler.client.ay_carpmasi.IstemciAy;
 import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciDonem;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.GokyuzuAyarlari;
@@ -22,7 +23,7 @@ public final class IstemciGokyuzu {
     record Gorunum(GunesEvresi evre, GunesEvresi onceki, float gecis, float ilerleme, float saniye, boolean ayVar,
             float boyutOrani, float renkGucu, float[] isik) {
         boolean vanillaMi() {
-            return evre == GunesEvresi.NORMAL && ayVar && (onceki == null || gecis >= 1f);
+            return evre == GunesEvresi.NORMAL && ayVar && (onceki == null || gecis >= 1f) && !IstemciAy.gokyuzuEtkin();
         }
 
         @Override

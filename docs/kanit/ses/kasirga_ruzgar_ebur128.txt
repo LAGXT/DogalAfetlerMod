@@ -1,0 +1,24 @@
+Dosya: src/main/resources/assets/dogalafetler/sounds/kasirga_ruzgar.ogg (89492 bayt, 12.0 sn, mono, 48000 Hz, Vorbis q5)
+Hedef (docs/tasarim/ses.md §4): -26.0 LUFS ±1, gerçek tepe <= -6.0 dBTP, baskın frekans 30–220 Hz, 2500 Hz üstü <= -30 dB
+Ölçülen (ogg): I = -26.1 LUFS, gerçek tepe = -9.9 dBTP
+Baskın frekanslar (20 Hz kümeleri, güçlüden zayıfa): 40 Hz, 60 Hz, 80 Hz
+Perde izi (0,5 sn pencerelerde en güçlü frekans, ilk 20): 50, 50, 38, 140, 36, 32, 40, 54, 46, 42, 60, 44, 58, 34, 50, 34, 40, 70, 36, 102 Hz
+Bant enerjisi / toplam: 30–220 Hz -0.2 dB; 300–3400 Hz (konuşma) -20.7 dB; >2500 Hz -33.0 dB; >8000 Hz -71.9 dB
+Döngü dikişi: |ilk - son| / en büyük iç adım = 0.036 (<= 1 ise süreksizlik yok); ilk örnek = +0.00036
+Hedefle karşılaştırma: UYGUN
+
+ffmpeg -i kasirga_ruzgar.ogg -af ebur128=peak=true -f null -
+Summary:
+
+  Integrated loudness:
+    I:         -26.1 LUFS
+    Threshold: -36.1 LUFS
+
+  Loudness range:
+    LRA:         0.5 LU
+    Threshold: -46.0 LUFS
+    LRA low:   -26.3 LUFS
+    LRA high:  -25.8 LUFS
+
+  True peak:
+    Peak:       -9.9 dBFS

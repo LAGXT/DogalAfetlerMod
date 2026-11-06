@@ -1,6 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.yangin;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.veri.DataGenerators;
 import net.minecraft.core.particles.ParticleType;
 import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraft.world.level.block.Block;
@@ -41,5 +42,10 @@ public final class YanginKayitlari {
     static void kaydet(IEventBus modBus) {
         BLOKLAR.register(modBus);
         PARCACIKLAR.register(modBus);
+        DataGenerators.parcacikEkle(ALEV, "yangin_alevi", 4);
+        DataGenerators.parcacikEkle(DUMAN, "yangin_dumani", 4);
+        DataGenerators.parcacikEkle(SUTUN, "yangin_kumesi", 4);
+        DataGenerators.parcacikEkle(KIVILCIM, "yangin_kivilcimi", 2);
+        DataGenerators.parcacikEkle(KUME, "yangin_kumesi", 4);
     }
 }
