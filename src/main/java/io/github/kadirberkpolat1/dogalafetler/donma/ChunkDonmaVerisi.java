@@ -35,6 +35,7 @@ public final class ChunkDonmaVerisi {
     private boolean cozulme;
     private long dongu;
     private byte sonBuhar;
+    private byte sonYon;
     private int yarimG = YARIM_YOK;
     private boolean yarimCozulme;
     private final long[] kar = new long[4];
@@ -62,6 +63,15 @@ public final class ChunkDonmaVerisi {
 
     public void sonBuhar(int derinlik) {
         sonBuhar = (byte) Math.max(0, Math.min(127, derinlik));
+    }
+
+    /** Son tamamlanan adımın yönü (1 donma, -1 çözülme, 0 bilinmiyor; eşik aralığı atlaması için). */
+    public int sonYon() {
+        return sonYon;
+    }
+
+    public void sonYon(int yon) {
+        sonYon = (byte) Integer.signum(yon);
     }
 
     public void durum(int g, boolean cozulmeDonemi) {
@@ -100,6 +110,7 @@ public final class ChunkDonmaVerisi {
         kuruUstY = null;
         kuruSayi = null;
         sonBuhar = 0;
+        sonYon = 0;
     }
 
     /** Chunk içi sütun indeksi, 0–255. */
@@ -194,6 +205,7 @@ public final class ChunkDonmaVerisi {
         etiket.putBoolean("cozulme", cozulme);
         etiket.putLong("dongu", dongu);
         etiket.putByte("buhar", sonBuhar);
+        etiket.putByte("yon", sonYon);
         if (yarimVar()) {
             etiket.putByte("yarimG", (byte) yarimG);
             etiket.putBoolean("yarimCozulme", yarimCozulme);
@@ -218,6 +230,7 @@ public final class ChunkDonmaVerisi {
         cozulme = c.getBoolean("cozulme");
         dongu = c.getLong("dongu");
         sonBuhar = (byte) Math.max(0, c.getByte("buhar"));
+        sonYon = (byte) Integer.signum(c.getByte("yon"));
         yarimG = c.contains("yarimG", Tag.TAG_BYTE) ? Math.max(0, Math.min(100, c.getByte("yarimG"))) : YARIM_YOK;
         yarimCozulme = c.getBoolean("yarimCozulme");
         kopyala(c.getLongArray("kar"), kar);

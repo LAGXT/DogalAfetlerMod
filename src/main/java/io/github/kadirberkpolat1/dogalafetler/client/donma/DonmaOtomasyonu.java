@@ -2,6 +2,8 @@ package io.github.kadirberkpolat1.dogalafetler.client.donma;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciDonem;
+import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
+import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
 import io.github.kadirberkpolat1.dogalafetler.donma.DonmaApi;
 import io.github.kadirberkpolat1.dogalafetler.donma.DonmaZamanlayici;
 import java.util.ArrayList;
@@ -25,11 +27,13 @@ import net.minecraftforge.fml.common.Mod;
 
 /**
  * Donma görsel kanıt otomasyonu (K0-21 rev. 2). Yalnız {@code -Ddogalafetler.otomasyon=donma} ile, tek oyunculu Quick Play
- * dünyasında çalışır; üretimde etkisizdir. Yakındaki bir gölü bulur, kıyısındaki tepeden ona bakar ve sırayla: vitrin
- * (G 40 → 55, 72 tick'te 1 puan = {@code hiz 20} eşdeğeri, %55'te kenardan içeri donan göl; üstten ikinci kare), %100
- * donmuş manzara, buharlaşmış göl yatağı ve bir kalıcı kış sınırında çözülme (G=40, çözülme dönemi). Aralarda
- * {@code /forge tps} ve {@code /dogalafet donma bilgi} çıktıları sohbete (log'a) düşer. Karelerde arayüz gizlidir. Klavye, fare
- * ve tekerlek girdileri kapanışa kadar sayılır; kendi açmadığı duraklatma ekranını kapatır; adımlar durum koşuluyla ilerler.
+ * dünyasında çalışır; üretimde etkisizdir. Yakındaki bir gölü (yoksa nehir/kıyıyı) bulur, kıyısındaki tepeden ona bakar
+ * ve sırayla: vitrin (güneşsiz evre, G 40'tan gerçek donma süreciyle {@code hiz 20} altında %55'e, kar yağışı; %55'te
+ * kenardan içeri donan göl, üstten ikinci kare), %100 donmuş manzara, büyüyen güneşte buharlaşmış göl yatağı ve
+ * süpernovada geri dolması, kızıl cücede bir kalıcı kış sınırında çözülme (G=40). Güneş evresi entegre sunucuda doğrudan
+ * ayarlanır (evre komutu gökyüzü dalında). Aralarda {@code /forge tps} ve {@code /dogalafet donma bilgi} çıktıları log'a
+ * düşer. Karelerde arayüz gizlidir. Klavye, fare ve tekerlek girdileri kapanışa kadar sayılır; kendi açmadığı duraklatma
+ * ekranını kapatır; adımlar durum koşuluyla ilerler.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class DonmaOtomasyonu {
@@ -145,7 +149,7 @@ public final class DonmaOtomasyonu {
 
     private static void plan(Minecraft mc) {
         ekle("kurulum", () -> {
-            for (String k : new String[] {"gamemode spectator", "gamerule doDaylightCycle false", "time set 1500",
+            for (String k : new String[] {"gamemode spectator", "gamerule doDaylightCycle false", "time set 6000",
                     "weather clear 100000", "gamerule doWeatherCycle false", "dogalafet donma 0 donma",
                     "dogalafet buharlasma 0"}) {
                 komut(mc, k);
@@ -158,12 +162,18 @@ public final class DonmaOtomasyonu {
                             gol[3], gol[4]));
             yanBak(mc);
         }, bekle(120), 200);
-        ekle("G 30", () -> komut(mc, "dogalafet donma 30"), yetisti(60), 3000);
-        for (int g = 40; g <= 55; g++) {
-            int deger = g;
-            ekle("G " + g, () -> komut(mc, "dogalafet donma " + deger), bekle(72), 80);
-        }
-        ekle("vitrin %55 yetişme sırasında", () -> kare(mc, "vitrin_55_yetisirken"), bekle(1), 2);
+        ekle("G 40, güneşsiz", () -> {
+            evre(mc, GunesEvresi.GUNESSIZ);
+            komut(mc, "dogalafet donma 40 donma");
+            komut(mc, "weather rain 100000");
+        }, yetisti(60), 3000);
+        ekle("hiz 20 ile 55'e", () -> komut(mc, "dogalafet hiz 20"),
+                () -> IstemciDonem.durum().donmaIlerlemesi() >= 55f, 2400);
+        ekle("vitrin %55 yetişme sırasında", () -> {
+            kare(mc, "vitrin_55_yetisirken");
+            komut(mc, "dogalafet stop");
+            komut(mc, "dogalafet hiz 1");
+        }, bekle(1), 2);
         ekle("vitrin %55", () -> { }, yetisti(20), 2400);
         ekle("vitrin kare", () -> {
             kare(mc, "vitrin_55");
@@ -183,27 +193,35 @@ public final class DonmaOtomasyonu {
         ekle("manzara kare", () -> kare(mc, "donmus_100_manzara"), bekle(20), 30);
         ekle("çöz 0", () -> {
             yanBak(mc);
+            komut(mc, "weather clear 100000");
             komut(mc, "dogalafet donma 0 donma");
         }, yetisti(100), 4800);
-        ekle("buharlaşma 6", () -> komut(mc, "dogalafet buharlasma 6"), yetisti(60), 3000);
+        ekle("buharlaşma 6", () -> {
+            evre(mc, GunesEvresi.BUYUYEN);
+            komut(mc, "dogalafet buharlasma 6");
+        }, yetisti(60), 3000);
         ekle("buharlaşma kare", () -> {
             kare(mc, "buharlasma_gol_yatagi");
             bilgi(mc);
         }, bekle(40), 60);
-        ekle("geri dol", () -> komut(mc, "dogalafet buharlasma 0"), yetisti(60), 3000);
+        ekle("süpernova: geri dol", () -> evre(mc, GunesEvresi.SUPERNOVA), yetisti(60), 3000);
         ekle("geri dolmuş kare", () -> kare(mc, "buharlasma_geri_dolmus"), bekle(20), 30);
         ekle("kış sınırı ara", () -> {
             MinecraftServer server = mc.getSingleplayerServer();
             BlockPos o = mc.player.blockPosition();
             sinir = server.submit(() -> DonmaApi.kisSiniriBul(server.overworld(), o.getX(), o.getZ(), 4000)).join();
             DogalAfetler.LOGGER.info(ON + "kış sınırı: {}", sinir);
+            evre(mc, GunesEvresi.GUNESSIZ);
             komut(mc, "dogalafet donma 100 donma");
             if (sinir != null) {
                 komut(mc, "tp @s " + sinir.getX() + " 200 " + sinir.getZ() + " 0 60");
             }
         }, bekle(200), 220);
         ekle("sınırda %100", () -> sinirBak(mc), yetisti(200), 7200);
-        ekle("sınırda çözülme", () -> komut(mc, "dogalafet donma 40 cozulme"), yetisti(100), 6000);
+        ekle("kızıl cüce: sınırda çözülme", () -> {
+            evre(mc, GunesEvresi.KIZIL_CUCE);
+            komut(mc, "dogalafet donma 40 cozulme");
+        }, yetisti(100), 6000);
         ekle("sınır kare", () -> {
             sinirBak(mc);
             bilgi(mc);
@@ -222,6 +240,13 @@ public final class DonmaOtomasyonu {
     private static void bilgi(Minecraft mc) {
         komut(mc, "forge tps");
         komut(mc, "dogalafet donma bilgi");
+    }
+
+    /** Güneş evresini entegre sunucuda ayarlar (yalnız geliştirme otomasyonu; evre komutu gökyüzü dalında). */
+    private static void evre(Minecraft mc, GunesEvresi evre) {
+        MinecraftServer server = mc.getSingleplayerServer();
+        server.submit(() -> DunyaDonemi.al(server).gunesEvresiAyarla(evre)).join();
+        DogalAfetler.LOGGER.info(ON + "güneş evresi {}", evre.kimlik());
     }
 
     private static void kare(Minecraft mc, String ad) {
@@ -302,6 +327,8 @@ public final class DonmaOtomasyonu {
         int[] kuyruk = new int[n * n];
         int[] en = null;
         long enUzaklik = Long.MAX_VALUE;
+        int[] yedek = null;
+        long yedekUzaklik = Long.MAX_VALUE;
         for (int i = 0; i < n * n; i++) {
             if (gorulen[i] || yuzey[i] == Integer.MIN_VALUE) {
                 continue;
@@ -316,12 +343,19 @@ public final class DonmaOtomasyonu {
             int maxX = 0;
             int minZ = n;
             int maxZ = 0;
+            int yakin = i;
+            long yakinUzaklik = Long.MAX_VALUE;
             while (bas < son) {
                 int j = kuyruk[bas++];
                 int jx = j % n;
                 int jz = j / n;
                 sx += jx;
                 sz += jz;
+                long u = (long) (jx - r) * (jx - r) + (long) (jz - r) * (jz - r);
+                if (u < yakinUzaklik) {
+                    yakinUzaklik = u;
+                    yakin = j;
+                }
                 minX = Math.min(minX, jx);
                 maxX = Math.max(maxX, jx);
                 minZ = Math.min(minZ, jz);
@@ -335,6 +369,10 @@ public final class DonmaOtomasyonu {
                 }
             }
             int alan = son;
+            if (alan > 3000 && yakinUzaklik < yedekUzaklik) {
+                yedekUzaklik = yakinUzaklik;
+                yedek = new int[] {merkez.getX() + yakin % n - r, merkez.getZ() + yakin / n - r, yuzey[i], alan, 24};
+            }
             if (alan < 60 || alan > 3000) {
                 continue;
             }
@@ -347,6 +385,6 @@ public final class DonmaOtomasyonu {
                         Math.max(maxX - minX, maxZ - minZ) / 2 + 1};
             }
         }
-        return en;
+        return en != null ? en : yedek;
     }
 }

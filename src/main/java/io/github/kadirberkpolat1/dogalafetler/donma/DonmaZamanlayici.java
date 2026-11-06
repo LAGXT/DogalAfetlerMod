@@ -95,16 +95,19 @@ public final class DonmaZamanlayici {
         final int hedefG;
         final long baslangicTick;
         final KisKaynagi kis;
+        /** Adım bitince chunk'a yazılacak yön (0: sütunlar karışık ya da bilinmiyor). */
+        final int sonrakiYon;
         final DonmaIsleyici.Sayac sayac = new DonmaIsleyici.Sayac();
         int[] kiyi;
         boolean bfsYeni;
         int sutun;
 
-        ChunkIsi(DonmaIsleyici.Gecis gecis, int hedefG, long baslangicTick, KisKaynagi kis) {
+        ChunkIsi(DonmaIsleyici.Gecis gecis, int hedefG, long baslangicTick, KisKaynagi kis, int sonrakiYon) {
             this.gecis = gecis;
             this.hedefG = hedefG;
             this.baslangicTick = baslangicTick;
             this.kis = kis;
+            this.sonrakiYon = sonrakiYon;
         }
     }
 
@@ -238,10 +241,11 @@ public final class DonmaZamanlayici {
         double kisma = TpsOlcer.kismaCarpani();
         sonKisma = kisma;
         sonBlokSiniri = butce.blokSiniri(kisma);
-        int kalan = butce.birim(kisma);
+        int birim = butce.birim(kisma);
+        int kalan = birim;
         DonmaEsikleri e = DonmaAyarlari.esikler();
-        int rezerv = Math.min(kalan, butce.rezerv(Math.max(e.maksBuzKalinligi() + 1, 2)
-                + (int) Math.ceil(DonmaAyarlari.buharlasmaEnCok())));
+        int temelDegisim = Math.max(e.maksBuzKalinligi() + 1, 2);
+        int enAzRezerv = Math.min(birim, butce.rezerv(temelDegisim));
         long basla = System.nanoTime();
         long sinir = basla + butce.sureSiniriNs(oncekiAsimNs);
         Tablo tablo = DonmaTablosuYukleyici.etkin();
@@ -250,7 +254,7 @@ public final class DonmaZamanlayici {
         BlockPos.MutableBlockPos konum = new BlockPos.MutableBlockPos();
         int bakilan = 0;
         boolean sureDoldu = false;
-        while (!sureDoldu && butce.sutunSigar(kalan, rezerv) && siraBasi < sira.length) {
+        while (!sureDoldu && butce.sutunSigar(kalan, enAzRezerv) && siraBasi < sira.length) {
             long anahtar = sira[siraBasi];
             if (!BEKLEYEN.contains(anahtar) || kapsam != null && !kapsam.contains(anahtar)) {
                 siraBasi++;
@@ -285,10 +289,16 @@ public final class DonmaZamanlayici {
                 int eskiG = yarim ? durum.yarimG() : durum.sonG();
                 boolean eskiCozulme = yarim ? durum.yarimCozulme() : durum.cozulme();
                 int bitisG = DonmaHedefi.siradakiSeviye(eskiG, g, adim);
-                DonmaIsleyici.Gecis gecis = new DonmaIsleyici.Gecis(eskiG, eskiCozulme, bitisG, cozulme, buhar,
-                        durum.sonBuhar() != buhar, !yarim);
+                boolean buharIsle = durum.sonBuhar() != buhar;
+                boolean atlama = !buharIsle
+                        && DonmaHedefi.atlamaSerbest(durum.sonYon(), eskiG, eskiCozulme, bitisG, cozulme, yarim);
+                int sonrakiYon = yarim || buharIsle ? 0
+                        : eskiG == bitisG && eskiCozulme == cozulme ? durum.sonYon()
+                                : DonmaHedefi.adimYonu(eskiG, eskiCozulme, bitisG, cozulme);
+                DonmaIsleyici.Gecis gecis = new DonmaIsleyici.Gecis(eskiG, eskiCozulme, bitisG, cozulme, buhar, buharIsle,
+                        atlama);
                 KisKaynagi kis = eskiCozulme || cozulme ? KisBolgesi.alan(level).chunk(cx, cz) : KisKaynagi.YOK;
-                is = new ChunkIsi(gecis, g, tick, kis);
+                is = new ChunkIsi(gecis, g, tick, kis, sonrakiYon);
                 ISLER.put(anahtar, is);
                 durum.yarimAdim(bitisG, cozulme);
             }
@@ -302,6 +312,7 @@ public final class DonmaZamanlayici {
                 }
                 return suren.kiyi[ChunkDonmaVerisi.indeks(x, z)];
             };
+            int rezerv = Math.min(birim, butce.rezerv(temelDegisim + Math.max(is.gecis.buhar(), durum.sonBuhar())));
             while (is.sutun < 256 && butce.sutunSigar(kalan, rezerv)) {
                 if ((is.sutun & 3) == 0 && System.nanoTime() >= sinir) {
                     ozetSureSiniri++;
@@ -321,9 +332,10 @@ public final class DonmaZamanlayici {
                 }
                 bakilan++;
             }
-            if (is.sutun >= 256) {
-                bitir(level, chunk, durum, anahtar, is);
+            if (is.sutun < 256) {
+                break;
             }
+            bitir(level, chunk, durum, anahtar, is);
         }
         long gecen = System.nanoTime() - basla;
         oncekiAsimNs = Math.max(0L, gecen - butce.tavanNs());
@@ -337,6 +349,7 @@ public final class DonmaZamanlayici {
     private static void bitir(ServerLevel level, LevelChunk chunk, ChunkDonmaVerisi durum, long anahtar, ChunkIsi is) {
         durum.durum(is.gecis.yeniG(), is.gecis.yeniCozulme());
         durum.sonBuhar(is.gecis.buhar());
+        durum.sonYon(is.sonrakiYon);
         chunk.setUnsaved(true);
         ISLER.remove(anahtar);
         tamamlananAdim++;

@@ -105,8 +105,11 @@ def hazirla():
     shutil.copytree(KOK / "run/saves/test", hedef, ignore=shutil.ignore_patterns("session.lock"))
     yol = run / "options.txt"
     satirlar = yol.read_text().splitlines() if yol.exists() else []
-    satirlar = [s for s in satirlar if not s.startswith(("tutorialStep:", "pauseOnLostFocus:", "renderDistance:"))]
-    yol.write_text("\n".join(satirlar + ["tutorialStep:none", "pauseOnLostFocus:false", "renderDistance:12"]) + "\n")
+    satirlar = [s for s in satirlar if not s.startswith(("tutorialStep:", "pauseOnLostFocus:", "renderDistance:",
+                                                         "simulationDistance:"))]
+    # Simülasyon 8 chunk: yetişen chunk sayısı ~289, kareler 128 blok içinde.
+    yol.write_text("\n".join(satirlar + ["tutorialStep:none", "pauseOnLostFocus:false", "renderDistance:8",
+                                         "simulationDistance:8"]) + "\n")
     for eski in (run / "screenshots").glob("donma_*.png"):
         eski.unlink()
     latest = run / "logs/latest.log"
@@ -135,7 +138,7 @@ def main():
                      f"cd '{W}'\n"
                      f"export JAVA_HOME='{JAVA_HOME}'\n"
                      "export JAVA_TOOL_OPTIONS='-Ddogalafetler.otomasyon=donma'\n"
-                     "exec timeout 1800 ./gradlew runClient --offline --no-daemon --console=plain -PquickPlay=donma "
+                     "exec timeout 3000 ./gradlew runClient --offline --no-daemon --console=plain -PquickPlay=donma "
                      f"> '{istemci_log}' 2>&1\n")
     sahip = hypr_json("activewindow")
     sahip_adres = sahip.get("address") if isinstance(sahip, dict) else None

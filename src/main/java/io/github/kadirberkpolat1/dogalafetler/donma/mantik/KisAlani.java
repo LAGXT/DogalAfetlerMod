@@ -52,6 +52,11 @@ public final class KisAlani {
         return ayar;
     }
 
+    /** Blok noktasındaki maske ağırlığı (biyom örneği almaz; geniş aramalar için ucuz). */
+    public double maskeNoktada(int x, int z) {
+        return maske.agirlikNoktada(x, z);
+    }
+
     public Chunk chunk(int cx, int cz) {
         return new Chunk(cx, cz);
     }

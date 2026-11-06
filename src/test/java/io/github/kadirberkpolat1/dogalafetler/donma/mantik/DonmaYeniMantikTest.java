@@ -191,4 +191,31 @@ class DonmaYeniMantikTest {
         assertEquals(3, SuSutunu.mevcutSeviye(new Tur[] {BUZ, BUZ, SU}));
         assertEquals(0, SuSutunu.mevcutSeviye(new Tur[] {SU, SU}));
     }
+
+    /**
+     * Yön dönüşünde sütun öbür yönün fonksiyonundadır: donma 60'ta (c=0) 3 blok buz, çözülme fonksiyonu (55, 60]'ta sabit,
+     * ama 55'e inince sütun 2 bloğa incelmeli. Bu yüzden eşik aralığı atlaması yalnız aynı yöndeki ardışık adımlarda serbest.
+     */
+    @Test
+    void yonDonusundeAtlamaGuvenliDegil() {
+        DonmaEsikleri e = DonmaEsikleri.VARSAYILAN;
+        assertEquals(e.buzSeviyesiCozulme(55, 0), e.buzSeviyesiCozulme(60, 0), "çözülme fonksiyonu aralıkta sabit");
+        assertTrue(e.buzSeviyesi(60, 0) > e.buzSeviyesiCozulme(55, 0), "donmuş sütun yine de incelmeli");
+    }
+
+    @Test
+    void atlamaYalnizAyniYondeSerbest() {
+        assertTrue(DonmaHedefi.atlamaSerbest(1, 20, false, 25, false, false), "donma sürüyor");
+        assertTrue(DonmaHedefi.atlamaSerbest(-1, 60, true, 55, true, false), "çözülme sürüyor");
+        assertFalse(DonmaHedefi.atlamaSerbest(1, 60, false, 55, false, false), "donmadan çözülmeye dönüş");
+        assertFalse(DonmaHedefi.atlamaSerbest(-1, 40, false, 45, false, false), "çözülmeden donmaya dönüş");
+        assertFalse(DonmaHedefi.atlamaSerbest(1, 20, false, 25, false, true), "yarım adımdan devam");
+        assertFalse(DonmaHedefi.atlamaSerbest(-1, 100, false, 100, true, false), "dönem değişimi");
+        assertTrue(DonmaHedefi.atlamaSerbest(0, 0, false, 5, false, false), "hiç işlenmemiş chunk donmaya başlıyor");
+        assertFalse(DonmaHedefi.atlamaSerbest(0, 30, false, 35, false, false), "yön bilinmiyor (dönem değişimi sonrası)");
+        assertFalse(DonmaHedefi.atlamaSerbest(0, 0, true, 5, true, false), "çözülme döneminde bilinmeyen yön");
+        assertEquals(0, DonmaHedefi.adimYonu(100, false, 100, true), "dönem değişen adımın yönü bilinmez");
+        assertEquals(-1, DonmaHedefi.adimYonu(60, true, 55, true));
+        assertEquals(1, DonmaHedefi.adimYonu(55, false, 60, false));
+    }
 }

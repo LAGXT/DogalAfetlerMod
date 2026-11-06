@@ -111,20 +111,21 @@ public final class DonmaApi {
     }
 
     /**
-     * En yakın kalıcı kış sınırı (görsel tur için): {@code (x, z)} çevresinde 32 blokluk halkalarla, maske ağırlığı 0,35–0,65
-     * olan, okyanus, dağ ve soğuk biyom olmayan ilk nokta. Chunk yüklemez (gürültü biyomu). Bulunamazsa {@code null}.
+     * En yakın kalıcı kış sınırı (görsel tur için): {@code (x, z)} çevresinde 16 blokluk halkalarla, maske ağırlığının 0,5'i
+     * 16 blok içinde (doğu ya da güney) kestiği, okyanus, dağ ve soğuk biyom olmayan ilk nokta. Yalnız maske gürültüsü
+     * ve aday noktada bir gürültü biyomu okunur; chunk yüklenmez. Bulunamazsa {@code null}.
      */
     public static BlockPos kisSiniriBul(ServerLevel level, int x, int z, int yaricap) {
         KisAlani alan = KisBolgesi.alan(level);
         int y = level.getSeaLevel() + 1;
-        for (int r = 0; r <= yaricap; r += 32) {
-            int adim = Math.max(1, r / 32 * 8);
+        for (int r = 0; r <= yaricap; r += 16) {
+            int adim = Math.max(1, (int) Math.ceil(2 * Math.PI * r / 16));
             for (int k = 0; k < adim; k++) {
                 double a = 2 * Math.PI * k / adim;
                 int px = x + (int) Math.round(r * Math.cos(a));
                 int pz = z + (int) Math.round(r * Math.sin(a));
-                double w = alan.chunk(px >> 4, pz >> 4).maskeAgirligi(px, pz);
-                if (w < 0.35 || w > 0.65) {
+                double w = alan.maskeNoktada(px, pz) - 0.5;
+                if (w * (alan.maskeNoktada(px + 16, pz) - 0.5) > 0 && w * (alan.maskeNoktada(px, pz + 16) - 0.5) > 0) {
                     continue;
                 }
                 Holder<Biome> b = level.getUncachedNoiseBiome(px >> 2, y >> 2, pz >> 2);

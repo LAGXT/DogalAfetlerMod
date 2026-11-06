@@ -124,8 +124,9 @@ public final class DonmaOyunTestleri {
         return DonmaIsleyici.bolgeyiIsle(y.getLevel(), k[0], k[1], k[2], k[3], ustY, gecis, kis, e);
     }
 
+    /** Doğrudan yolda adımlar yön değiştirir (100 → 30 → 100): eşik aralığı atlaması kapalı (yalnız zamanlayıcı kuralıyla). */
     private static DonmaIsleyici.Gecis gecis(int onceki, boolean oncekiCozulme, int seviye, boolean cozulme) {
-        return new DonmaIsleyici.Gecis(onceki, oncekiCozulme, seviye, cozulme, 0, false, true);
+        return new DonmaIsleyici.Gecis(onceki, oncekiCozulme, seviye, cozulme, 0, false, false);
     }
 
     private static int isle(GameTestHelper y, int onceki, int seviye) {
@@ -133,7 +134,7 @@ public final class DonmaOyunTestleri {
     }
 
     private static int buharla(GameTestHelper y, int derinlik) {
-        return isle(y, new DonmaIsleyici.Gecis(0, false, 0, false, derinlik, true, true), KisKaynagi.YOK,
+        return isle(y, new DonmaIsleyici.Gecis(0, false, 0, false, derinlik, true, false), KisKaynagi.YOK,
                 DonmaEsikleri.VARSAYILAN);
     }
 
@@ -380,7 +381,7 @@ public final class DonmaOyunTestleri {
     public static void buharlasmaSonrasiOnceGeriDolarSonraDonar(GameTestHelper y) {
         sahneKur(y);
         buharla(y, 6);
-        isle(y, new DonmaIsleyici.Gecis(0, false, 100, false, 0, true, true), KisKaynagi.YOK, DonmaEsikleri.VARSAYILAN);
+        isle(y, new DonmaIsleyici.Gecis(0, false, 100, false, 0, true, false), KisKaynagi.YOK, DonmaEsikleri.VARSAYILAN);
         y.assertTrue(is(y, 4, 3, 4, Blocks.ICE) && is(y, 4, 1, 4, Blocks.WATER),
                 "geri dolan göl yüzeyinden donmalı; " + sutunTani(y, 4, 4));
         y.succeed();
@@ -437,6 +438,7 @@ public final class DonmaOyunTestleri {
         s.veri.donguyeGec(77L, 42, true);
         s.veri.yarimAdim(47, true);
         s.veri.sonBuhar(3);
+        s.veri.sonYon(-1);
         s.veri.kar(17, true);
         s.veri.buz(255, true);
         s.veri.kuru(9, -12, 4);
@@ -444,7 +446,8 @@ public final class DonmaOyunTestleri {
         ChunkDonmaVerisi.Saglayici yeni = new ChunkDonmaVerisi.Saglayici();
         yeni.deserializeNBT(nbt);
         ChunkDonmaVerisi v = yeni.veri;
-        y.assertTrue(v.sonG() == 42 && v.cozulme() && v.dongu() == 77L && v.sonBuhar() == 3, "G, dönem, döngü, buhar");
+        y.assertTrue(v.sonG() == 42 && v.cozulme() && v.dongu() == 77L && v.sonBuhar() == 3 && v.sonYon() == -1,
+                "G, dönem, döngü, buhar, yön");
         y.assertTrue(v.yarimVar() && v.yarimG() == 47 && v.yarimCozulme(), "yarım adım korunmadı");
         y.assertTrue(v.kar(17) && !v.kar(16) && v.buz(255) && !v.buz(0), "bitler korunmadı");
         y.assertTrue(v.kuruSayi(9) == 4 && v.kuruUstY(9) == -12 && v.kuruSayi(10) == 0, "kuru kaydı korunmadı");

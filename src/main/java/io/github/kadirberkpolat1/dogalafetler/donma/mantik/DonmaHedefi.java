@@ -41,4 +41,26 @@ public final class DonmaHedefi {
         }
         return mevcut;
     }
+
+    /** Bir chunk adımının yönü: dönem değişmediyse G farkının işareti (sütun hedefi G ile azalmaz), değiştiyse 0 (bilinmez). */
+    public static int adimYonu(int eskiG, boolean eskiCozulme, int yeniG, boolean yeniCozulme) {
+        return eskiCozulme == yeniCozulme ? Integer.signum(yeniG - eskiG) : 0;
+    }
+
+    /**
+     * Eşik aralığı atlaması ({@link EsikKumesi}) bu adımda güvenli mi. Tam bir adımdan sonra her sütun o adımın yönündeki
+     * fonksiyonun değerindedir; aynı yönde devam ederken aralıkta eşik yoksa sütun değişmez. Yön dönünce (donma →
+     * çözülme) sütun öbür fonksiyondadır ve aralıkta eşik olmasa da değişebilir; yarım adımda ve dönem değişiminde de
+     * sütunlar farklı noktadadır. Hiç işlenmemiş chunk (G 0, donma dönemi) doğal durumdadır, donarken atlanabilir.
+     *
+     * @param sonYon chunk'ın son tamamlanan adımının yönü ({@link #adimYonu}; 0 bilinmiyor)
+     */
+    public static boolean atlamaSerbest(int sonYon, int eskiG, boolean eskiCozulme, int yeniG, boolean yeniCozulme,
+            boolean yarim) {
+        int yon = adimYonu(eskiG, eskiCozulme, yeniG, yeniCozulme);
+        if (yarim || yon == 0) {
+            return false;
+        }
+        return sonYon == yon || sonYon == 0 && yon > 0 && eskiG == 0 && !eskiCozulme;
+    }
 }
