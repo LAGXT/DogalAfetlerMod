@@ -143,7 +143,7 @@ def oldur(pid, neden):
         pass
 
 
-def istemci_calistir(kip, ek_ozellikler, bitince=None):
+def istemci_calistir(kip, ek_ozellikler, bitince=None, her_turda=None):
     """İstemciyi protokolle açar; otomasyon 'bitti' logunu yazınca bitince bir kez çağrılır."""
     betik = Path(f"/tmp/sicaklik_istemci_{kip}.sh")
     istemci_log = KANIT / f"runClient-{kip}.log"
@@ -196,6 +196,8 @@ def istemci_calistir(kip, ek_ozellikler, bitince=None):
             if sahip_adres:
                 log("odak geri:", hypr("dispatch", f'hl.dsp.focus({{ window = "address:{sahip_adres}" }})'))
             break
+        if her_turda:
+            her_turda()
         if bitince and not bitti_cagrildi and "SICAKLIK_OTOMASYON bitti" in istemci_log.read_text(errors="replace"):
             bitti_cagrildi = True
             bitince()
@@ -224,7 +226,8 @@ def main():
             log("sunucu açılmadı")
             sunucu.durdur()
             return 1
-        for k in ("op A", "gamerule sendCommandFeedback false", "time set 6000", "weather clear 6000",
+        # op oyuncu girdikten sonra: offline modda girmemiş oyuncunun profili bulunamaz ("Made a a server operator").
+        for k in ("gamerule sendCommandFeedback false", "time set 6000", "weather clear 6000",
                   "gamerule doDaylightCycle false", "gamerule doWeatherCycle false"):
             sunucu.komut(k)
         if not kapi():
@@ -235,7 +238,14 @@ def main():
             time.sleep(2)
             sunucu.komut("dogalafet sicaklik bilgi A")
 
-        ok = istemci_calistir("hud", f"-PkullaniciAdi=A -PquickPlaySunucu=localhost:{PORT}", konsol)
+        op_verildi = []
+
+        def op_ver():
+            if not op_verildi and "A joined the game" in sunucu.metin():
+                op_verildi.append(True)
+                sunucu.komut("op A")
+
+        ok = istemci_calistir("hud", f"-PkullaniciAdi=A -PquickPlaySunucu=localhost:{PORT}", konsol, op_ver)
         time.sleep(3)
         sunucu.durdur()
         metin = sunucu.metin()

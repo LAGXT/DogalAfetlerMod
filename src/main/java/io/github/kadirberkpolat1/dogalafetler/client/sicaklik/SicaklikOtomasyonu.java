@@ -124,9 +124,10 @@ public final class SicaklikOtomasyonu {
             Sahne s = SAHNELER.get(sahne);
             if (sayac == 40) {
                 kare(mc, s.ad());
-            } else if (sayac == 43 && s.ikinciKare()) {
+            } else if (sayac == 70 && s.ikinciKare()) {
+                // Gizli workspace'te istemci ~1 FPS çizer: titreşimin ikinci kareşi yeni bir çizimden gelsin.
                 kare(mc, s.ad() + "_b");
-            } else if (sayac >= 46) {
+            } else if (sayac >= (s.ikinciKare() ? 76 : 46)) {
                 sahne++;
                 adim = 0;
             }
