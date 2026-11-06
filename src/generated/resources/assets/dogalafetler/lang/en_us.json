@@ -23,6 +23,7 @@
   "commands.dogalafetler.donma.bilgi.chunk_yok": "Chunk [%s, %s]: not loaded",
   "commands.dogalafetler.donma.bilgi.ilerleme": "Freeze: %s%% (%s period, sun %s); evaporation %s blocks (%s on real water); process: %s",
   "commands.dogalafetler.donma.bilgi.kuyruk": "Queue: loaded %s, waiting %s, running %s; done %s steps (%s at target), %s blocks",
+  "commands.dogalafetler.donma.bilgi.sure": "Longest worker tick: %s ms after warm-up (warm-up window %s ms); time cap %s ms",
   "commands.dogalafetler.donma.bilgi.sutun": "Column (%s, %s) surface Y=%s: target level %s, winter weight %s (mask %s, biome %s, height %s), warm offset %s, parameters %s",
   "commands.dogalafetler.donma.buharlasma_ayarlandi": "Evaporation depth set to %s blocks (%s applied to real water).",
   "commands.dogalafetler.donma.donem.cozulme": "thaw",

@@ -138,6 +138,11 @@ Uygulama `is/donma` dalında; kararlar `.vibe/kararlar/donma.md` (K-D6…K-D21),
   ince karla (55'in altında) kalkar; etiket `#dogalafetler:donma/yapi_kar_zemini`.
 - **`sifirla`:** test aracı; bizim kar, buz ve kırağımız kuyrukla 0'a çözülür, kurumuş su geri dolar; oyuncunun ve
   doğanın karı/buzu kalır.
+- **Kar yağışı 30 (şef kararı, §2'deki 40'ın yerine):** sıra kırağı 10 → ince kar 15 → kenardan buz 20 → yağmur yerine
+  kar 30 → kalın buz ve yapı karı 40. Vitrin %35 böylece kar yağışında (§3 "kar yağıyor" korunur); config kıyı buzu ile kalın
+  buz arasına çekilir.
+- **Yaprak altındaki su (bilinen sınır):** yüzey `MOTION_BLOCKING`'den okunduğu için yaprak çıkıntısı altındaki su donmaz;
+  Faz 5'te sütun taraması adayı (kararlar K-D34).
 - **Bu turda yapılmayanlar (açık):** vanilla çimen/yaprak biyom rengi tonlaması, kayrağı örtüsü ve sarkit çizimi, rüzgâr ve
   buz şarkısı sesleri. Blok düzeyindeki adımlar (kırağı, kar katmanları, kıyıdan içeri ince buz → buz → kalınlaşma,
   çözülme sırası) ve yukarıdaki parçacıklar vitrini taşır.
