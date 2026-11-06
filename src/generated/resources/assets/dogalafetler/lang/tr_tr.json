@@ -52,6 +52,7 @@
   "commands.dogalafetler.kizilcuce.bilgi.kalan.dogus": "Kızıl cüce doğuşu sürüyor: %%%s",
   "commands.dogalafetler.kizilcuce.bilgi.kalan.donma": "Kızıl cüce: donmanın %%100 olması bekleniyor (şu an %%%s).",
   "commands.dogalafetler.kizilcuce.bilgi.kalan.gecikme": "Kızıl cüce %s sonra, ardından gelen ilk şafakta doğar.",
+  "commands.dogalafetler.kizilcuce.bilgi.kalan.gecikme_dongusuz": "Kızıl cüce %s sonra doğar (gün döngüsü kapalı: şafak beklenmez).",
   "commands.dogalafetler.kizilcuce.bilgi.kalan.safak": "Kızıl cüce ilk şafakta doğar (gün saatinde %s tick).",
   "commands.dogalafetler.kizilcuce.bilgi.kalan.supernova": "Süpernova %s sonra sönüp güneşsiz dönem başlar.",
   "commands.dogalafetler.kizilcuce.bilgi.kalan.tamam": "Kızıl cüce dönemi kuruldu.",

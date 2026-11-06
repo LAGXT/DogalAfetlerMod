@@ -9,7 +9,9 @@ ilerletir; `/dogalafet gokyuzutest` yalnız geliştirme ortamında vardır.
 Koşu 1: kizilcuce bilgi (zincir başlamadı), gokyuzutest evre supernova, kizilcuce bilgi (kalan 1,50 gün), hiz 1000 →
 süpernova kendiliğinden söner (GÜNEŞSİZ), hiz 1, gokyuzutest ay yok, kizilcuce bilgi (donma bekleniyor), gokyuzutest
 donma 100, kizilcuce bilgi (7 gün), hiz 1000 → kapı açılır, time set 22900 → ilk şafakta kızıl cüce doğar, hiz 1,
-durum, sunucuya `stop`.
+durum; gün döngüsü kapalı doğuş (şef kararı G19): donma 99, gamerule doDaylightCycle false, time set 6000,
+gokyuzutest evre gunessiz (donma %100 değil: önceki döngünün kapı sayacı sıfırlanır), donma 100, kizilcuce bilgi (şafak beklenmez), hiz 1000 → "gün döngüsü kapalı,
+şafak beklenmedi" ve öğlen doğuş, time query daytime (6000, gün saatine dokunulmadı), hiz 1, gamerule geri, sunucuya `stop`.
 Koşu 2 (aynı dünya): açılışta dönem okundu (ay yok, kızıl cüce), kizilcuce bilgi (ay yok, kızıl cüce), sifirla, `stop`.
 Sonda iki log da denetlenir: `invalid dist` yok, istisna yok, istemci sınıfı (`client.gokyuzu`, `[gokyuzu] kanca`) yok,
 iki süreç de 0 ile çıktı.
@@ -174,6 +176,24 @@ def kosu1(sunucu):
     sunucu.bekle(r"Güneş zinciri: gunessiz -> kizil_cuce \(ilk şafak\)", isaret, ADIM_SURESI, "ilk şafakta doğuş")
     sunucu.komut("dogalafet hiz 1", r"timers run at x1\.00")
     sunucu.komut("dogalafet durum", r"Moon: none; sun: Red dwarf era", "durum (ay yok, kızıl cüce)")
+    sunucu.komut("dogalafet gokyuzutest donma 99", r"\[test\] donma = 99")
+    sunucu.komut("gamerule doDaylightCycle false", r"doDaylightCycle is now set to: false")
+    sunucu.komut("time set 6000", r"Set the time to 6000")
+    sunucu.komut("dogalafet gokyuzutest evre gunessiz", r"\[test\] güneş = gunessiz")
+    sunucu.komut("dogalafet kizilcuce bilgi", r"waiting for freeze to reach 100%", "bilgi (kapı sayacı sıfır)")
+    sunucu.komut("dogalafet gokyuzutest donma 100", r"\[test\] donma = 100")
+    sunucu.komut("dogalafet kizilcuce bilgi", r"Red dwarf rises 7\.00 days from now \(daylight cycle is off",
+                 "bilgi (gün döngüsü kapalı: şafak beklenmez)")
+    isaret = sunucu.isaret()
+    sunucu.komut("dogalafet hiz 1000", r"timers run at x1000")
+    sunucu.bekle(r"Kızıl cüce: gün döngüsü kapalı, şafak beklenmedi \(gün saati 6000\)", isaret, ADIM_SURESI,
+                 "gün döngüsü kapalı log'u")
+    sunucu.bekle(r"Güneş zinciri: gunessiz -> kizil_cuce \(gün döngüsü kapalı\)", isaret, ADIM_SURESI,
+                 "gün döngüsü kapalıyken o anki saatte doğuş")
+    sunucu.komut("time query daytime", r"The time is 6000", "gün saatine dokunulmadı")
+    sunucu.komut("dogalafet hiz 1", r"timers run at x1\.00")
+    sunucu.komut("gamerule doDaylightCycle true", r"doDaylightCycle is now set to: true")
+    sunucu.komut("dogalafet durum", r"Moon: none; sun: Red dwarf era", "durum (gün döngüsü kapalı doğuş sonrası)")
 
 
 def kosu2(sunucu):

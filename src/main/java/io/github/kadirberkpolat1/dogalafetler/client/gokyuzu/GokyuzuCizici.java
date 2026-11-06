@@ -201,24 +201,33 @@ final class GokyuzuCizici {
         return c.mul(Mth.cos(enlem)).add(new Vector3f(SAMANYOLU_N).mul(Mth.sin(enlem)));
     }
 
-    /** Gök küresinde eğik büyük çember boyunca 24° geniş şerit; u=0,5 galaksi merkezi (gece tepe noktasına yakın). */
+    /**
+     * Gök küresinde eğik büyük çember boyunca 28° geniş şerit; u=0,5 galaksi merkezi (gece tepe noktasına yakın). Enine üç
+     * bant: dış bantlarda köşe alfası kenarda 0'a iner (doku kenarındaki düşüşe ek; sert kenarlı şerit görünmesin).
+     */
     private static VertexBuffer samanyoluSeridi(int dilim) {
         BufferBuilder bb = Tesselator.getInstance().getBuilder();
         bb.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
-        float w = (float) Math.toRadians(12);
+        float w = (float) Math.toRadians(14);
+        float[] v = {0f, 0.3f, 0.7f, 1f};
+        float[] alfa = {0f, 1f, 1f, 0f};
         for (int i = 0; i < dilim; i++) {
             float u0 = (float) i / dilim;
             float u1 = (float) (i + 1) / dilim;
             float t0 = u0 * Mth.TWO_PI;
             float t1 = u1 * Mth.TWO_PI;
-            Vector3f a = seritNoktasi(t0, -w).mul(100f);
-            Vector3f b = seritNoktasi(t0, w).mul(100f);
-            Vector3f c = seritNoktasi(t1, w).mul(100f);
-            Vector3f d = seritNoktasi(t1, -w).mul(100f);
-            bb.vertex(a.x, a.y, a.z).uv(u0, 0f).color(1f, 1f, 1f, 1f).endVertex();
-            bb.vertex(b.x, b.y, b.z).uv(u0, 1f).color(1f, 1f, 1f, 1f).endVertex();
-            bb.vertex(c.x, c.y, c.z).uv(u1, 1f).color(1f, 1f, 1f, 1f).endVertex();
-            bb.vertex(d.x, d.y, d.z).uv(u1, 0f).color(1f, 1f, 1f, 1f).endVertex();
+            for (int bant = 0; bant < 3; bant++) {
+                float e0 = Mth.lerp(v[bant], -w, w);
+                float e1 = Mth.lerp(v[bant + 1], -w, w);
+                Vector3f a = seritNoktasi(t0, e0).mul(100f);
+                Vector3f b = seritNoktasi(t0, e1).mul(100f);
+                Vector3f c = seritNoktasi(t1, e1).mul(100f);
+                Vector3f d = seritNoktasi(t1, e0).mul(100f);
+                bb.vertex(a.x, a.y, a.z).uv(u0, v[bant]).color(1f, 1f, 1f, alfa[bant]).endVertex();
+                bb.vertex(b.x, b.y, b.z).uv(u0, v[bant + 1]).color(1f, 1f, 1f, alfa[bant + 1]).endVertex();
+                bb.vertex(c.x, c.y, c.z).uv(u1, v[bant + 1]).color(1f, 1f, 1f, alfa[bant + 1]).endVertex();
+                bb.vertex(d.x, d.y, d.z).uv(u1, v[bant]).color(1f, 1f, 1f, alfa[bant]).endVertex();
+            }
         }
         return yukle(bb.end());
     }
@@ -365,7 +374,7 @@ final class GokyuzuCizici {
         float uzay = GokyuzuRenkleri.uzayAlfa(d, zaman) * yagmursuz;
         if (uzay > 0.003f) {
             FogRenderer.setupNoFog();
-            derinUzay(poz.last().pose(), izdusum, d, uzay, sn);
+            derinUzay(poz.last().pose(), izdusum, d, uzay, gun, sn);
             sisKur.run();
         }
         gunesEvresi(poz.last().pose(), d, yagmursuz, sn);
@@ -424,7 +433,8 @@ final class GokyuzuCizici {
         RenderSystem.blendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE,
                 GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ZERO);
         FogRenderer.setupNoFog();
-        derinUzay(m, izdusum, d, GokyuzuRenkleri.uzayAlfa(d, zaman) * (1f - level.getRainLevel(pt)), sn);
+        derinUzay(m, izdusum, d, GokyuzuRenkleri.uzayAlfa(d, zaman) * (1f - level.getRainLevel(pt)),
+                GokyuzuRenkleri.gunIsigi(zaman), sn);
         poz.popPose();
         RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
         RenderSystem.disableBlend();
@@ -458,11 +468,15 @@ final class GokyuzuCizici {
         poz.popPose();
     }
 
-    private static void derinUzay(Matrix4f m, Matrix4f izdusum, IstemciGokyuzu.Gorunum d, float uzay, float sn) {
+    /** Samanyolu gündüz yarı parlaklıkta: güneşsiz/kızıl cüce gündüzünde göğe yapışık bir şerit gibi öne çıkmasın. */
+    private static final float SAMANYOLU_GUNDUZ = 0.5f;
+
+    private static void derinUzay(Matrix4f m, Matrix4f izdusum, IstemciGokyuzu.Gorunum d, float uzay, float gun,
+            float sn) {
         boolean zengin = GokyuzuRenkleri.zengin(d);
         if (zengin && GokyuzuAyarlari.nebulaKatmani()) {
             RenderSystem.setShaderTexture(0, SAMANYOLU);
-            RenderSystem.setShaderColor(1f, 1f, 1f, uzay * 0.6f);
+            RenderSystem.setShaderColor(1f, 1f, 1f, uzay * 0.6f * Mth.lerp(gun, 1f, SAMANYOLU_GUNDUZ));
             samanyoluVbo.bind();
             samanyoluVbo.drawWithShader(m, izdusum, GameRenderer.getPositionTexColorShader());
             VertexBuffer.unbind();

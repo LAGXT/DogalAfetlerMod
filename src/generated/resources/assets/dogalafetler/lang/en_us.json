@@ -52,6 +52,7 @@
   "commands.dogalafetler.kizilcuce.bilgi.kalan.dogus": "Red dwarf dawn in progress: %s%%",
   "commands.dogalafetler.kizilcuce.bilgi.kalan.donma": "Red dwarf: waiting for freeze to reach 100%% (now %s%%).",
   "commands.dogalafetler.kizilcuce.bilgi.kalan.gecikme": "Red dwarf rises %s from now, at the first dawn after that.",
+  "commands.dogalafetler.kizilcuce.bilgi.kalan.gecikme_dongusuz": "Red dwarf rises %s from now (daylight cycle is off: dawn is not awaited).",
   "commands.dogalafetler.kizilcuce.bilgi.kalan.safak": "Red dwarf rises at the next dawn (%s ticks of daytime).",
   "commands.dogalafetler.kizilcuce.bilgi.kalan.supernova": "Supernova fades into the sunless era in %s.",
   "commands.dogalafetler.kizilcuce.bilgi.kalan.tamam": "Red dwarf era established.",

@@ -151,8 +151,10 @@ def samanyolu(rng):
     # Yıldız tozu: tek piksellik sönük noktalar şeridi tanecikli gösterir.
     benek = (rng.random((h, w)) > 0.985).astype(np.float32) * rng.random((h, w)).astype(np.float32)
     yogunluk += benek * profil * 0.6
-    kenar = yumusak_basamak(0.0, 0.18, V) * yumusak_basamak(0.0, 0.18, 1 - V)
-    alfa = np.clip(yogunluk * kenar * 1.15, 0, 1)
+    # Kenarlar: şerit yarısının dışa doğru %70'inde yumuşak düşüş (sert şerit görünmesin) ve 1'de kırpmak yerine
+    # yumuşak doyma (1 - e^-x): parlak merkez bile kenara doğru tek düze bir "bant" duvarı oluşturmaz.
+    kenar = (yumusak_basamak(0.0, 0.35, V) * yumusak_basamak(0.0, 0.35, 1 - V)) ** 1.5
+    alfa = np.clip(1 - np.exp(-1.6 * yogunluk * kenar), 0, 1)
     rgb_merkez, rgb_uc = renk("#FFE9C4"), renk("#C9D6FF")
     t = siskinlik[..., None]
     rgb = rgb_uc[None, None, :] * (1 - t) + rgb_merkez[None, None, :] * t
