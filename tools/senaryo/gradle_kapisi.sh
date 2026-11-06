@@ -2,8 +2,12 @@
 # Ağır süreç kapısı (GOREV §2): çalışan Gradle sayısı < 2 ve boş RAM >= 4 GB olana kadar 60 sn'de bir bekler (en çok
 # 20 dk), sonra verilen görevi JDK 17 ile çalıştırır. Kullanım: tools/senaryo/gradle_kapisi.sh <log> <gradle argümanları...>
 # KAPI_PORT verilirse o portu dinleyen süreç kalmamasını da bekler (runServer; K-E13).
+# TEST_FILTRE verilirse -Ptest_filtre=<regex> olarak geçer: runGameTestServer yalnız uyan testleri koşar (K-E20).
 log="$1"
 shift
+if [ -n "$TEST_FILTRE" ]; then
+    set -- "$@" "-Ptest_filtre=$TEST_FILTRE"
+fi
 i=0
 while [ $i -lt 20 ]; do
     sayi=$(pgrep -fc GradleWrapperMain)
