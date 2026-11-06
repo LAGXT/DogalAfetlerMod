@@ -104,3 +104,43 @@ Gökyüzü kendi başına ses çıkarmaz; evre geçiş sesleri ilgili afet notla
 - **Gündüz karanlığı (G5):** ışık motoru değişmez; karanlık his kubbe rengi + sis/temizleme rengi + sarmalayıcının `adjustLightmapColors`'ıyla verilir: ışık haritası dokusunda yalnız gök ışığının renk katkısı ölçeklenir (GUNESSIZ ×0,35 mavimsi, KIZIL_CUCE ×0,75 sıcak, SUPERNOVA parlaklığa göre 0,4–1,1); sarmalayıcı önce iç nesnenin `adjustLightmapColors`'ını çağırır. Işık seviyeleri, mob spawn ve vanilla mantığı bu dokuyu okumaz. Sonuç: güneşsiz dönemde oyun mantığı gündüzdür (ölümsüz moblar gündüz yanar, yatak gündüz uyutmaz); bu, madde 16'nın isteğidir ve Berk'e açıkça söylenmeli. KARARLAR'a işleme entegratörün işi.
 - **Performans (G4):** gökyüzü bölümünün GPU süresi (en küçük değer) vanilla ~0,16 ms, nebula gecesi ~0,23–0,30, süpernova ~0,36–0,41, kızıl cüce gündüz ~0,36–0,38 ms; FPS hedefi tutuyor. Kalite farkı süre değil doku belleğidir (kalıntı 2048² = 16 MiB, 1024² = 4 MiB). Düşük'te süpernova hale/ışın kareleri küçültülür (maliyet büyük toplamalı karelerin doldurma hızı).
 - Nether/End'deki oyuncu durumu alır ama oradaki gökyüzü değişmez (N11).
+
+## Faz 2 güncellemesi, 2026-11-06
+
+Kaynak: `.vibe/kararlar/gokyuzu.md` G7…G18, rapor `.vibe/rapor/gokyuzu.md`. Kareler 1870×969, kalite Yüksek, gözlemci Y=150,
+doğuya bakış; koşu 4 (`KOK/.vibe/kanit/gokyuzu/kareler-kosu4/`, önizleme `onizleme-kosu4.png`).
+
+**Uygulananlar (tasarımdan sapmalar dahil).**
+- Tek durum: çekirdeğin `DunyaDonemi` + `DonemPaketi` (ay, evre, ilerleme, evre başlangıcı); ayrı gökyüzü verisi ve paketi yok.
+  Geçişler istemcide ölçekli saatten (20 sn renk geçişi; süpernova koreografisi gerçek saniyeyle), ilerleme monoton.
+- Süpernova koreografisi: 0–8 sn şişmiş güneş (3,2×) turuncudan mavi-beyaza dönerek noktaya çöker → 8 sn'de parlama
+  (0,4 sn tepe, ~6 sn sönüm) → 12 ışın ve ~10 sn'de açılan kabuk → 1,5 günlük üstel sönüm, kalıntı nebulası belirir.
+- Kızıl cüce: donma %100 + 7 gün sonra ilk şafakta (uyku şafağı atlasa da) doğar; doğuş 6000 tick, önce ufukta kızıl
+  ışık, disk ilk %20'de belirir; boy ve gök/sis tonu SERVER config (%60, ton gücü 1).
+- Yapılmayan: ufka yakın yıldız sönükleşmesi, BÜYÜYEN gecesinde aurora, bulutların kızıl tonlanması, ay YAKLASIYOR durumu
+  (çekirdek veri modeli; Faz 4 ay çarpmasına öneri).
+
+**Kareler (ay × güneş, 10 kombinasyonun hepsi).**
+
+| Kare | Durum | Ölçüm (gök bölgesi) |
+|---|---|---|
+| `gokyuzu-01-normal-gunduz.png` | NORMAL × ay var, gündüz | vanilla (sarmalayıcı devreder) |
+| `gokyuzu-12-normal-gunduz-aysiz.png` | NORMAL × ay yok, gündüz | vanilla (iç nesneye devredildi) |
+| `gokyuzu-10-normal-gece-aysiz.png` | NORMAL × ay yok, gece | ay yok, ~4600 yıldız + Samanyolu |
+| `gokyuzu-11-normal-gece-ayli.png` | NORMAL × ay var, gece | vanilla, ~1140 yıldız |
+| `gokyuzu-02a-buyuyen-baslangic.png`, `02b-buyuyen-son.png` | BÜYÜYEN × ay var | p=0,85 disk (255,190,99), hale ~120 px, gök sarımsı (203,204,193) |
+| `gokyuzu-02c-buyuyen-gece-aysiz.png` | BÜYÜYEN × ay yok, gece | yıldızlı |
+| `gokyuzu-03a-supernova-cokme.png` | SUPERNOVA, 4 sn | çöken turuncu-beyaz çekirdek (255,214,159) |
+| `gokyuzu-03b-supernova-parlama.png` | SUPERNOVA, 11 sn | parlama, gökün üst bölümünün %4,5'i doymuş |
+| `gokyuzu-03c-supernova-vitrin.png` (vitrin), `03d-supernova-ogle-tepe.png` | SUPERNOVA × ay var | gök (70,77,94), ışınlar 1100×570 px, gündüz ~5100 yıldız |
+| `gokyuzu-03e-supernova-gece-aysiz.png` | SUPERNOVA × ay yok, gece | yıldızlı, sönümde |
+| `gokyuzu-04a-gunessiz-ogle-tepe.png`, `04b-gunessiz-sabah-ufuk.png` | GÜNEŞSİZ × ay var, gündüz | gök ≈ #03050C, ~6200 yıldız, kalıntı nebulası |
+| `gokyuzu-05-gunessiz-gece-ayli.png` | GÜNEŞSİZ × ay var, gece | soluk gri ay diski |
+| `gokyuzu-06a-gunessiz-gece-aysiz-vitrin.png`, `06b-...-ufuk.png` | GÜNEŞSİZ × ay yok | ay yok, ~4600 yıldız (vitrin: "Yıldızlı Gece") |
+| `gokyuzu-07a-kizilcuce-dogus-ilk-isik.png`, `07b-kizilcuce-yukselis.png` | KIZIL CÜCE doğuşu × ay yok | ufukta kızıl yay, gök (82,61,50) → (136,93,80) |
+| `gokyuzu-08a-kizilcuce-sabah-aysiz.png`, `08b-...-ogle-tepe-aysiz.png` | KIZIL CÜCE × ay yok, gündüz | gök (177,123,105) ≈ #B07A68, disk (255,136,76), soluk yıldızlar |
+| `gokyuzu-09a-kizilcuce-gece-aysiz.png` | KIZIL CÜCE × ay yok, gece | koyu kızıl gece |
+| `gokyuzu-09b-kizilcuce-gece-ayli.png`, `09c-...-sabah-ayli.png` | KIZIL CÜCE × ay var | turuncu tonlu ay |
+
+Ezilme denemesi (K0-26): `kareler-ezilme/` (ikinci kademe: normal durumda sahte modun göğü, aysız ve güneşsiz durumda
+bizim gök, sahte ay/güneş %0), `kareler-ezilme-yansimasiz/` (üçüncü kademe: sahte ay ve güneş görünür, BILİNEN SINIR).
