@@ -24,6 +24,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.projectile.FishingHook;
 import net.minecraft.world.item.EnchantedBookItem;
 import net.minecraft.world.item.Item;
@@ -41,6 +42,7 @@ import net.minecraft.world.level.storage.loot.LootParams;
 import net.minecraft.world.level.storage.loot.LootTable;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.gametest.framework.GameTest;
@@ -415,9 +417,19 @@ public final class BalikcilikOyunTestleri {
                 y.assertTrue(BuzBalikciligi.delikteMi(olta), "olta deliğin suyunda yüzmeli");
                 y.assertTrue(kalan <= enCok && kalan >= enAz - 200, "bekleme 30–60 sn aralığında olmalı: " + kalan
                         + " (" + enAz + ".." + enCok + ")");
+                // Isırmada vanilla şamandırayı aşağı çeker: olta deliğin altındaki suya inse de delikte sayılmalı.
+                olta.setPos(olta.getX(), delik.getY() - 0.35, olta.getZ());
+                y.assertTrue(BuzBalikciligi.delikteMi(olta), "deliğin altındaki suya inen olta delikte sayılmalı");
                 isirmaZorla(y, olta);
                 int hasar = olta.retrieve(olta_);
                 y.assertTrue(hasar == 1, "çekme oltaya 1 hasar vermeli: " + hasar);
+                List<ItemEntity> esyalar = level.getEntitiesOfClass(ItemEntity.class, new AABB(delik).inflate(2, 3, 2));
+                y.assertTrue(!esyalar.isEmpty(), "çekilen eşya doğmalı");
+                for (ItemEntity e : esyalar) {
+                    y.assertTrue(e.getY() >= delik.getY() + 1.0 && e.getDeltaMovement().y > 0,
+                            "çekilen eşya deliğin üstünden oyuncuya fırlamalı (delikte kalmamalı): y=" + e.getY());
+                    e.discard();
+                }
                 y.assertTrue(olaylar.size() == 1, "BalikTutulduEvent bir kez yayınlanmalı: " + olaylar.size());
                 BalikTutulduEvent e = olaylar.get(0);
                 y.assertTrue(e.oyuncu() == o && e.delik().equals(delik) && !e.yakalananlar().isEmpty(),

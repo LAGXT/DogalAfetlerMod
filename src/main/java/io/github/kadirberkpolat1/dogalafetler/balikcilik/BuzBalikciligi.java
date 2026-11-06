@@ -18,6 +18,8 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.FluidTags;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.FishingHook;
 import net.minecraft.world.level.block.state.BlockState;
@@ -64,6 +66,10 @@ public final class BuzBalikciligi {
     }
 
     private static final Map<FishingHook, Olta> OLTALAR = new WeakHashMap<>();
+    /** Bu tick'te çekilen deliğin konumu ve çeken (vanilla eşyayı aynı çağrıda, olaydan hemen sonra doğurur). */
+    private static BlockPos cekilenDelik;
+    private static long cekilenTick = -1;
+    private static ServerPlayer cekilenOyuncu;
     private static final Map<UUID, Hareketsizlik> OYUNCULAR = new HashMap<>();
 
     private BuzBalikciligi() {
@@ -82,19 +88,71 @@ public final class BuzBalikciligi {
                 buz && kizilCuce ? DonmaApi.kisAgirligi(level, konum) : 0.0, buz);
     }
 
-    /** Olta bir buz deliğinin içinde mi. */
+    /**
+     * Olta bir buz deliğinin sütununda mı: deliğin içinde ya da ısırmada aşağı çekilip deliğin altındaki suya (en çok
+     * iki blok) inmiş.
+     */
     public static boolean delikteMi(FishingHook olta) {
-        return olta.level().getBlockState(olta.blockPosition()).is(BalikcilikKayitlari.BUZ_DELIGI.get());
+        return delikKonumu(olta) != null;
+    }
+
+    /** Oltanın içinde ya da altında durduğu delik; yoksa {@code null}. */
+    public static BlockPos delikKonumu(FishingHook olta) {
+        BlockPos.MutableBlockPos p = olta.blockPosition().mutable();
+        for (int i = 0; i <= 2; i++) {
+            BlockState s = olta.level().getBlockState(p);
+            if (s.is(BalikcilikKayitlari.BUZ_DELIGI.get())) {
+                return p.immutable();
+            }
+            if (!s.getFluidState().is(FluidTags.WATER)) {
+                return null;
+            }
+            p.move(0, 1, 0);
+        }
+        return null;
     }
 
     static void varlikKatildi(EntityJoinLevelEvent olay) {
-        if (!olay.getLevel().isClientSide && olay.getEntity() instanceof FishingHook olta) {
+        if (olay.getLevel().isClientSide) {
+            return;
+        }
+        if (olay.getEntity() instanceof FishingHook olta) {
             OLTALAR.putIfAbsent(olta, new Olta());
+        } else if (olay.getEntity() instanceof ItemEntity esya && cekilenDelik != null
+                && olay.getLevel().getGameTime() == cekilenTick) {
+            deliktenCikar(esya);
+        }
+    }
+
+    /**
+     * Vanilla çekilen eşyayı olta konumunda (deliğin suyunda) doğurur ve oyuncuya doğru fırlatır; deliğin komşuları buz
+     * olduğu için eşya duvara çarpıp delikte kalırdı. Eşya deliğin üstüne alınır ve vanilla formülüyle yeniden fırlatılır.
+     */
+    private static void deliktenCikar(ItemEntity esya) {
+        BlockPos d = cekilenDelik;
+        if (Math.abs(esya.getX() - (d.getX() + 0.5)) > 1.0 || Math.abs(esya.getZ() - (d.getZ() + 0.5)) > 1.0
+                || esya.getY() < d.getY() - 3 || esya.getY() > d.getY() + 1.5) {
+            return;
+        }
+        double x = d.getX() + 0.5;
+        double y = d.getY() + 1.05;
+        double z = d.getZ() + 0.5;
+        esya.setPos(x, y, z);
+        if (cekilenOyuncu != null) {
+            double dx = cekilenOyuncu.getX() - x;
+            double dy = cekilenOyuncu.getY() - y;
+            double dz = cekilenOyuncu.getZ() - z;
+            esya.setDeltaMovement(dx * 0.1, dy * 0.1 + Math.sqrt(Math.sqrt(dx * dx + dy * dy + dz * dz)) * 0.08, dz * 0.1);
         }
     }
 
     static void sunucuTick(TickEvent.ServerTickEvent olay) {
-        if (olay.phase != TickEvent.Phase.END || OLTALAR.isEmpty()) {
+        if (olay.phase != TickEvent.Phase.END) {
+            return;
+        }
+        cekilenDelik = null;
+        cekilenOyuncu = null;
+        if (OLTALAR.isEmpty()) {
             return;
         }
         MinecraftServer server = olay.getServer();
@@ -190,13 +248,19 @@ public final class BuzBalikciligi {
     /** Vanilla {@code ItemFishedEvent} geçti: olta delikteyse {@link BalikTutulduEvent} yayınlanır. */
     static void balikTutuldu(ItemFishedEvent olay) {
         FishingHook olta = olay.getHookEntity();
-        if (olay.getEntity() instanceof ServerPlayer oyuncu && delikteMi(olta)) {
-            MinecraftForge.EVENT_BUS.post(new BalikTutulduEvent(oyuncu, olay.getDrops(), olta.blockPosition()));
+        BlockPos delik = delikKonumu(olta);
+        if (olay.getEntity() instanceof ServerPlayer oyuncu && delik != null) {
+            cekilenDelik = delik;
+            cekilenTick = olta.level().getGameTime();
+            cekilenOyuncu = oyuncu;
+            MinecraftForge.EVENT_BUS.post(new BalikTutulduEvent(oyuncu, olay.getDrops(), delik));
         }
     }
 
     static void sunucuDurdu(ServerStoppedEvent olay) {
         OLTALAR.clear();
         OYUNCULAR.clear();
+        cekilenDelik = null;
+        cekilenOyuncu = null;
     }
 }
