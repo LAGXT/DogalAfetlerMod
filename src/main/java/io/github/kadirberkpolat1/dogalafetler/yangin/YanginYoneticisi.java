@@ -1,8 +1,11 @@
 package io.github.kadirberkpolat1.dogalafetler.yangin;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.core.DonemAlani;
+import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import io.github.kadirberkpolat1.dogalafetler.core.TpsOlcer;
 import io.github.kadirberkpolat1.dogalafetler.core.olay.AfetBittiEvent;
+import io.github.kadirberkpolat1.dogalafetler.core.olay.DonemDegistiEvent;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import io.github.kadirberkpolat1.dogalafetler.network.AgKanali;
 import io.github.kadirberkpolat1.dogalafetler.yangin.mantik.KureTarayici;
@@ -285,6 +288,31 @@ public final class YanginYoneticisi {
         MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
         if (server != null) {
             kaynakBitti(server, YanginKaynagi.afet(olay.tur(), olay.baslangicSaati()), YanginMantigi.temizBitis(olay.neden()));
+        }
+    }
+
+    /**
+     * {@code /dogalafet sifirla} dünyayı ilk hâline döndürür (N18, K-E11): her boyuttaki bütün hücreler kaynağından bağımsız
+     * (komut ateşleri dahil) iz bırakmadan söner ve süren alan işleri durur; yüklü olmayan chunk'taki ateş blokları bekleyen
+     * silmede kalır ve chunk yüklenince kalkar (Y-19). Yalnız sunucunun kendi dönem nesnesi sayılır.
+     */
+    @SubscribeEvent
+    public static void donemDegisti(DonemDegistiEvent olay) {
+        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+        if (olay.alan() != DonemAlani.SIFIRLAMA || server == null || DunyaDonemi.al(server) != olay.donem()) {
+            return;
+        }
+        for (ServerLevel level : server.getAllLevels()) {
+            YanginVerisi veri = VERILER.get(level.dimension());
+            if (veri == null) {
+                continue;
+            }
+            veri.alanIsleri.clear();
+            int sonen = sondur(level, veri, h -> true, "sifirla");
+            if (sonen > 0) {
+                DogalAfetler.LOGGER.info("yangın: dünya dönemi sıfırlandı, {} hücre söndürüldü ({})", sonen,
+                        level.dimension().location());
+            }
         }
     }
 

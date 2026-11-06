@@ -13,7 +13,8 @@ ve tutuşturulur, yangın sürerken 144 uzak chunk forceload ile üretilir; TPS 
 hiç boşalmadığı için 1000,1000'de (chunk 62,62) forceload ile döşeme ve `tutustur 4`; `forceload remove` sonrası
 `execute if loaded` başarısız olana dek beklenir (chunk gerçekten boşaldı), `sondur` → log'da "ateş bloğu yüklü olmayan
 chunk'ta"; `forceload add` → "bekleyen silme: N ateş bloğu kaldırıldı"; `fill … replace dogalafetler:afet_atesi` → "No blocks
-were filled"; `forceload remove`, `stop`.
+were filled"; `forceload remove`. K-E11 (`sifirla` yangını söndürür): spawn döşemesi yeniden tutuşturulur, `dogalafet sifirla` →
+log'da "yangın: dünya dönemi sıfırlandı, N hücre söndürüldü", bilgi (0), döşemede `afet_atesi` kalmadı; `stop`.
 Sonda iki log da denetlenir: `invalid dist` yok, istisna yok, config düzeltme WARN'ı yok, iki süreç de 0 ile çıktı.
 
 Kullanım (worktree kökünden): python3 tools/senaryo/yangin_sunucu.py <log klasörü>
@@ -66,6 +67,24 @@ def kosu2(sunucu):
     sunucu.komut("dogalafet yangin bilgi", rf"Burning cells: 0/{TAVAN}", "bilgi (aktif 0)")
     sunucu.komut("forceload remove all", r"Unmarked all force loaded chunks")
     bekleyen_silme(sunucu)
+    sifirla_sondurur(sunucu)
+
+
+def sifirla_sondurur(sunucu):
+    """K-E11: `/dogalafet sifirla` komutla yakılanlar dahil bütün yangın hücrelerini iz bırakmadan söndürür."""
+    sunucu.komut("forceload add -16 -16 16 16", r"to be force loaded|already marked")
+    sunucu.komut("fill -6 199 -6 6 199 6 minecraft:oak_planks", r"Successfully filled [0-9]+ block|No blocks were filled")
+    sunucu.komut("fill -6 200 -6 6 200 6 minecraft:oak_leaves[persistent=true]",
+                 r"Successfully filled [0-9]+ block|No blocks were filled")
+    sunucu.komut("execute positioned 0 201 0 run dogalafet yangin tutustur 6", r"Ignited [1-9][0-9]* fire cells")
+    sunucu.komut("dogalafet yangin bilgi", rf"Burning cells: [1-9][0-9]*/{TAVAN}", "bilgi (sıfırlamadan önce aktif > 0)")
+    isaret = sunucu.isaret()
+    sunucu.komut("dogalafet sifirla", r"disaster and era state was reset")
+    sunucu.bekle(r"yangın: dünya dönemi sıfırlandı, [1-9][0-9]* hücre söndürüldü", isaret, 10, "sifirla yangını söndürdü")
+    sunucu.komut("dogalafet yangin bilgi", rf"Burning cells: 0/{TAVAN}", "bilgi (sifirla sonrası aktif 0)")
+    sunucu.komut("fill -6 199 -6 6 202 6 minecraft:air replace dogalafetler:afet_atesi", r"No blocks were filled",
+                 "sifirla ateş bloğu bırakmadı")
+    sunucu.komut("forceload remove all", r"Unmarked all force loaded chunks")
 
 
 def bekleyen_silme(sunucu):

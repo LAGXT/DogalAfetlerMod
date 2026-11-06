@@ -301,6 +301,35 @@ public final class YanginOyunTestleri {
         y.succeed();
     }
 
+    /** K-E11: {@code /dogalafet sifirla} komutla yakılanlar dahil bütün hücreleri söndürür; ateş bloğu kalmaz. */
+    @GameTest(template = SAHNE, batch = "yangin_sifirla")
+    public static void sifirlaYanginlariSondurur(GameTestHelper y) {
+        ServerLevel level = y.getLevel();
+        dosemeKur(y, 1, Blocks.OAK_PLANKS.defaultBlockState());
+        dosemeKur(y, 2, kaliciYaprak());
+        int ilk = ozet(y);
+        y.assertTrue(komut(y, Vec3.atCenterOf(y.absolutePos(new BlockPos(4, 3, 4))), "dogalafet yangin tutustur 4") > 0
+                && atesSayisi(y) > 0, "tutustur 4 ateş koymalı");
+        y.assertTrue(komut(y, Vec3.atCenterOf(y.absolutePos(BlockPos.ZERO)), "dogalafet sifirla") == 1, "sifirla");
+        y.assertTrue(YanginYoneticisi.aktifSayi(level) == 0, "sifirla sonrası aktif hücre kaldı: "
+                + YanginYoneticisi.aktifSayi(level));
+        y.assertTrue(YanginYoneticisi.bekleyenAlanSayisi(level) == 0, "sifirla sonrası alan işi kaldı");
+        y.assertTrue(atesSayisi(y) == 0, "sifirla sonrası afet_atesi kaldı: " + atesSayisi(y));
+        y.assertTrue(ozet(y) == ilk, "sıfırlama iz bırakmamalı (yakıt yerinde)");
+        y.succeed();
+    }
+
+    private static int komut(GameTestHelper y, Vec3 konum, String komut) {
+        var server = y.getLevel().getServer();
+        try {
+            return server.getCommands().getDispatcher().execute(komut, server.createCommandSourceStack()
+                    .withLevel(y.getLevel()).withPosition(konum).withSuppressedOutput().withPermission(2));
+        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException hata) {
+            y.fail("/" + komut + " çalışmadı: " + hata.getMessage());
+            return 0;
+        }
+    }
+
     @GameTest(template = SAHNE, batch = "yangin_genel")
     public static void kayitYazOkuSurer(GameTestHelper y) {
         ServerLevel level = y.getLevel();
