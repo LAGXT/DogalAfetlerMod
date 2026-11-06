@@ -1,6 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler;
 
 import com.mojang.logging.LogUtils;
+import io.github.kadirberkpolat1.dogalafetler.afet.gunes_patlamasi.GunesPatlamasiSistemi;
 import io.github.kadirberkpolat1.dogalafetler.balikcilik.Balikcilik;
 import io.github.kadirberkpolat1.dogalafetler.basarim.Basarim;
 import io.github.kadirberkpolat1.dogalafetler.config.AyarKaydi;
@@ -51,6 +52,7 @@ public final class DogalAfetler {
         IstemciAyarlari.kaydet();
         // Afet kayıtları (Faz 4: AfetKaydi.kaydet yapan satırlar) buraya, ozelliktenKaydet'in üstüne: test afeti gerçek
         // afeti kayıtlı türü atlar; tersi sırada gerçek kayıt "zaten kayıtlı" ile modu düşürür (K-E22).
+        GunesPatlamasiSistemi.kaydet(modBus);
         OyunTestiAfeti.ozelliktenKaydet();
         SuAyarlari.kaydet();
         SanalSu.kaydet();
