@@ -88,6 +88,12 @@ public final class DonmaVeriSaglayicilari {
             super(cikti, arama, DogalAfetler.MOD_ID, dosyalar);
         }
 
+        /** DataGenerator sağlayıcıları ada göre ayırır; varsayılan ad mod başına tek blok etiketi sağlayıcısına izin verir. */
+        @Override
+        public String getName() {
+            return "Donma blok etiketleri";
+        }
+
         @Override
         protected void addTags(HolderLookup.Provider arama) {
             tag(DonmaIsleyici.KAR_ZEMINI).addTag(BlockTags.DIRT).addTag(BlockTags.LEAVES).addTag(BlockTags.SAND)

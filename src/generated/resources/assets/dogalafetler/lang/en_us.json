@@ -16,6 +16,7 @@
   "block.dogalafetler.kiragili_cimen": "Frosted Grass Block",
   "commands.dogalafetler.asama.afet": "%s phase: %s",
   "commands.dogalafetler.asama.afet_bitti": "%s has ended.",
+  "commands.dogalafetler.asama.surec_yok": "No running or stopped era process named %s can advance.",
   "commands.dogalafetler.asama.yok": "There is no disaster or era phase to advance.",
   "commands.dogalafetler.bilinmiyor": "unknown",
   "commands.dogalafetler.donma.ayarlandi": "Freeze progress set to %s%% (%s period).",

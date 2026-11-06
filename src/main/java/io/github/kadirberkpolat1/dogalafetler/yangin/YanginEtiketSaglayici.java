@@ -40,6 +40,12 @@ final class YanginEtiketSaglayici extends BlockTagsProvider {
                 olay.getGenerator().getPackOutput(), olay.getLookupProvider(), olay.getExistingFileHelper()));
     }
 
+    /** DataGenerator sağlayıcıları ada göre ayırır; varsayılan ad mod başına tek blok etiketi sağlayıcısına izin verir. */
+    @Override
+    public String getName() {
+        return "Yangın blok etiketleri";
+    }
+
     @Override
     protected void addTags(HolderLookup.Provider arama) {
         tag(BlockTags.FIRE).add(YanginKayitlari.AFET_ATESI.get());

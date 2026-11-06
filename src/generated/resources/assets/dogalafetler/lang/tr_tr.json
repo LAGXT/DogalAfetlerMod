@@ -16,6 +16,7 @@
   "block.dogalafetler.kiragili_cimen": "Kırağılı Çimen",
   "commands.dogalafetler.asama.afet": "%s aşaması: %s",
   "commands.dogalafetler.asama.afet_bitti": "%s sona erdi.",
+  "commands.dogalafetler.asama.surec_yok": "%s adlı, süren ya da durdurulmuş ve ilerleyebilen bir dönem süreci yok.",
   "commands.dogalafetler.asama.yok": "İlerletilecek afet ya da dönem aşaması yok.",
   "commands.dogalafetler.bilinmiyor": "bilinmiyor",
   "commands.dogalafetler.donma.ayarlandi": "Donma ilerlemesi %%%s olarak ayarlandı (%s dönemi).",
