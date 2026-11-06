@@ -1,192 +1,276 @@
 #!/usr/bin/env python3
-"""İstemci koşusunun ses kaydını (OpenAL Soft wave yazıcısı, `uyari_istemci.py`) ölçer: oyunun gerçekten çaldığı
-karışımda siren ve ortam katmanının düzeyi, sirenin fade-out eğimi, "Sirenler" kaydırıcısının etkisi ve siren
-sırasında ortam bastırması.
+"""İstemci koşusunun ses kaydını (OpenAL Soft wave yazıcısı, `uyari_istemci.py`) kaynak dosyalarla karşılaştırarak ölçer.
 
-Bantlar: siren 200–1000 Hz (280↔420 Hz wail + 2. harmonik; fade'de perde %20 iner), ortam 30–110 Hz (45/67,5 Hz uğultu).
-100 ms pencere, 50 ms adım. Siren bölümleri eşikle (taban + 15 dB) bulunur; 3 sn'den kısa boşluklar (boyut değişimi,
-/stopsound sonrası yeniden çalma) birleştirilir ve ayrıca raporlanır. Daha uzun boşluk (ses ayarları ekranı tek oyunculuda
-oyunu ve sesleri duraklatır) yeni bölüm açar. Ortam bastırması bölümün ilk boşluğuna kadar ölçülür (sonra oyuncu
-Nether'e geçebilir).
+Yöntem: kayıt ve kaynak aynı banda süzülür (siren 250–2000 Hz, ortam 25–150 Hz); 0,5 sn'lik her kayıt penceresi için
+döngülü kaynakta en iyi dairesel gecikme bulunur ve en küçük kareler kazancı `g = <x, s> / <s, s>` hesaplanır;
+`r` normalize korelasyondur. Kaynakta zaten olan dalgalanma (siren wail'i, ortam katmanının 0,25 Hz nefesi) böylece
+ölçümden düşer: `g` doğrudan ses örneğinin düzeyidir (× OpenAL panlama kazancı, koşu boyunca sabit). Yalnız r ≥ 0,99
+pencereler kullanılır (perdesi 1 olmayan açılış/fade pencereleri ve 5 sn'lik yarım periyotla karışan gecikmeler düşer).
+
+Ölçülenler:
+- siren kazanç düzeyleri (ör. "Sirenler" %28 ve %40) ve farkları (beklenen 20·log10(40/28) = +3,10 dB);
+- ortam katmanının siren yokken ve siren çalarken düzeyi (beklenen −3 dB bastırma);
+- dosyanın baştan çalındığı anlar (gecikme sıfıra döner: ses motoru sireni kesti, siren yeniden çalındı);
+- ses içindeki sessizlik boşlukları (boyut değişimi yükleme ekranı vb.);
+- sirenin son düşüşü (200–1000 Hz bant zarfı, 100 ms): süre, toplam düşüş, eğim.
 
 Kullanım: .venv/bin/python tools/senaryo/uyari_kayit_olc.py <kayıt.wav> <çıktı klasörü>
-Çıktılar: <klasör>/ses-kaydi-olcum.txt, <klasör>/ses-kaydi-zarf.png
+Çıktılar: <klasör>/ses-kaydi-olcum.txt, ses-kaydi-zarf.png, ses-kaydi-kazanc.tsv
 """
-import re
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 import numpy as np
 from PIL import Image, ImageDraw
 
 ORNEKLEME = 48_000
-PENCERE = 4800
-ADIM = 2400
-SIREN_BANDI = (200.0, 1000.0)
-ORTAM_BANDI = (30.0, 110.0)
+KOK = Path(__file__).resolve().parents[2]
+SES = KOK / "src/main/resources/assets/dogalafetler/sounds"
+PENCERE_SN = 0.5
+ADIM_SN = 0.25
+R_ESIK = 0.99
+SESSIZ_DBFS = -95.0
 
 
-def coz(yol):
-    sonuc = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-ignore_length", "1", "-i", str(yol), "-f", "f32le",
-                            "-ac", "1", "-ar", str(ORNEKLEME), "-"], capture_output=True)
+def coz(yol, ek=()):
+    sonuc = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", *ek, "-i", str(yol), "-f", "f32le", "-ac", "1",
+                            "-ar", str(ORNEKLEME), "-"], capture_output=True)
     if sonuc.returncode != 0:
-        raise SystemExit(f"ffmpeg çözemedi: {sonuc.stderr.decode(errors='replace')}")
+        raise SystemExit(f"ffmpeg çözemedi {yol}: {sonuc.stderr.decode(errors='replace')}")
     return np.frombuffer(sonuc.stdout, dtype="<f4").astype(np.float64)
 
 
-def bant_zarfi(sinyal):
-    """(zaman sn, siren bandi dBFS, ortam bandi dBFS)."""
-    pencere = np.hanning(PENCERE)
-    olcek = np.sum(pencere ** 2) * PENCERE / 2.0
-    frekans = np.fft.rfftfreq(PENCERE, 1.0 / ORNEKLEME)
-    s_maske = (frekans >= SIREN_BANDI[0]) & (frekans < SIREN_BANDI[1])
-    o_maske = (frekans >= ORTAM_BANDI[0]) & (frekans < ORTAM_BANDI[1])
-    adet = max(0, (sinyal.size - PENCERE) // ADIM + 1)
-    zaman = np.empty(adet)
-    siren = np.empty(adet)
-    ortam = np.empty(adet)
-    for i in range(adet):
-        parca = sinyal[i * ADIM:i * ADIM + PENCERE] * pencere
-        guc = np.abs(np.fft.rfft(parca)) ** 2 / olcek
-        zaman[i] = (i * ADIM + PENCERE / 2) / ORNEKLEME
-        siren[i] = 10 * np.log10(max(guc[s_maske].sum(), 1e-14))
-        ortam[i] = 10 * np.log10(max(guc[o_maske].sum(), 1e-14))
-    return zaman, siren, ortam
+def bant(sinyal, alt, ust):
+    frekans = np.fft.rfftfreq(sinyal.size, 1.0 / ORNEKLEME)
+    spektrum = np.fft.rfft(sinyal)
+    spektrum[(frekans < alt) | (frekans > ust)] = 0
+    return np.fft.irfft(spektrum, sinyal.size)
 
 
-def bolumler(zaman, siren, esik, bosluk_sn=3.0):
-    """Eşiği aşan ardışık bölgeler; kısa boşluklar birleştirilir. [(baş, son, [boşluklar])] indeks."""
-    aktif = siren > esik
-    ham = []
-    i = 0
-    while i < aktif.size:
-        if aktif[i]:
-            j = i
-            while j + 1 < aktif.size and aktif[j + 1]:
-                j += 1
-            ham.append([i, j])
-            i = j + 1
+def eslesik_kazanc(kayit, kaynak, alt, ust):
+    """Her pencere için (zaman, g, r, gecikme sn); kaynak döngülü kabul edilir."""
+    s = bant(kaynak, alt, ust)
+    x = bant(kayit, alt, ust)
+    boy, n, h = s.size, int(PENCERE_SN * ORNEKLEME), int(ADIM_SN * ORNEKLEME)
+    kare = np.concatenate([s, s[:n]]) ** 2
+    toplam = np.concatenate([[0.0], np.cumsum(kare)])
+    enerji = toplam[n:n + boy] - toplam[:boy]
+    kaynak_fft = np.fft.rfft(s)
+    satirlar = []
+    for bas in range(0, x.size - n, h):
+        parca = x[bas:bas + n]
+        e = float(np.dot(parca, parca))
+        zaman = bas / ORNEKLEME + PENCERE_SN / 2
+        if e < 1e-12:
+            satirlar.append((zaman, 0.0, 0.0, 0.0))
+            continue
+        dolgu = np.zeros(boy)
+        dolgu[:n] = parca
+        korelasyon = np.fft.irfft(np.conj(np.fft.rfft(dolgu)) * kaynak_fft, boy)
+        k = int(np.argmax(korelasyon))
+        satirlar.append((zaman, korelasyon[k] / enerji[k], korelasyon[k] / np.sqrt(enerji[k] * e), k / ORNEKLEME))
+    return np.array(satirlar)
+
+
+def db(deger):
+    return 20.0 * np.log10(np.maximum(deger, 1e-12))
+
+
+def duzeyler(zaman, g_db, tolerans=0.6, en_az=3):
+    """Geçerli pencereleri zaman sırasıyla kümeler (ardışık, medyandan ≤ tolerans), sonra aynı düzeydeki kümeleri
+    birleştirir. [(medyan dB, pencere sayısı, [(baş, son)])], en az `en_az` pencereli olanlar."""
+    kumeler = []
+    for t, g in zip(zaman, g_db):
+        if kumeler and abs(g - np.median(kumeler[-1][1])) <= tolerans and t - kumeler[-1][0][-1] <= 1.0:
+            kumeler[-1][0].append(t)
+            kumeler[-1][1].append(g)
         else:
-            i += 1
+            kumeler.append(([t], [g]))
     birlesik = []
-    for bas, son in ham:
-        if birlesik and zaman[bas] - zaman[birlesik[-1][1]] < bosluk_sn:
-            birlesik[-1][2].append((zaman[birlesik[-1][1]], zaman[bas]))
-            birlesik[-1][1] = son
+    for zamanlar, degerler in kumeler:
+        for duzey in birlesik:
+            if abs(np.median(duzey[1]) - np.median(degerler)) <= tolerans:
+                duzey[1].extend(degerler)
+                duzey[2].append((zamanlar[0], zamanlar[-1]))
+                break
         else:
-            birlesik.append([bas, son, []])
-    return [(b, s, g) for b, s, g in birlesik if zaman[s] - zaman[b] >= 1.0]
+            birlesik.append([None, list(degerler), [(zamanlar[0], zamanlar[-1])]])
+    return [(float(np.median(d[1])), len(d[1]), d[2]) for d in birlesik if len(d[1]) >= en_az]
 
 
-def fade_egimi(zaman, siren, son, kararli, taban):
-    """Bölüm sonundaki düşüş: kararlı −6 dB'den −36 dB'e (ya da taban +6'ya) inen kısımda doğrusal eğim (dB/sn)."""
-    k = son
-    while k > 0 and siren[k] < kararli - 6.0:
-        k -= 1
-    bas = k
-    bit = bas
-    alt = max(kararli - 36.0, taban + 6.0)
-    while bit + 1 < siren.size and siren[bit + 1] > alt and zaman[bit + 1] - zaman[bas] < 6.0:
-        bit += 1
-    if bit - bas < 4:
-        return None, None, None
-    egim, _ = np.polyfit(zaman[bas:bit + 1], siren[bas:bit + 1], 1)
-    return float(egim), float(zaman[bas]), float(zaman[bit] - zaman[bas])
+def bant_zarfi(sinyal, alt, ust, pencere=4800, adim=2400):
+    hann = np.hanning(pencere)
+    olcek = np.sum(hann ** 2) * pencere / 2.0
+    frekans = np.fft.rfftfreq(pencere, 1.0 / ORNEKLEME)
+    maske = (frekans >= alt) & (frekans < ust)
+    adet = max(0, (sinyal.size - pencere) // adim + 1)
+    zaman = (np.arange(adet) * adim + pencere / 2) / ORNEKLEME
+    duzey = np.empty(adet)
+    for i in range(adet):
+        guc = np.abs(np.fft.rfft(sinyal[i * adim:i * adim + pencere] * hann)) ** 2 / olcek
+        duzey[i] = 10 * np.log10(max(guc[maske].sum(), 1e-14))
+    return zaman, duzey
 
 
-def lufs(sinyal, bas, son):
-    with tempfile.NamedTemporaryFile(suffix=".wav") as gecici:
-        parca = (np.clip(sinyal[int(bas * ORNEKLEME):int(son * ORNEKLEME)], -1, 1) * 32767).astype("<i2")
-        import wave
-        with wave.open(gecici.name, "wb") as w:
-            w.setnchannels(1)
-            w.setsampwidth(2)
-            w.setframerate(ORNEKLEME)
-            w.writeframes(parca.tobytes())
-        cikti = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", gecici.name, "-af", "ebur128=peak=true",
-                                "-f", "null", "-"], capture_output=True, text=True).stderr
-    i = re.search(r"I:\s+(-?[\d.]+|-inf) LUFS", cikti.split("Summary:")[-1])
-    tepe = re.search(r"Peak:\s+(-?[\d.]+|-inf) dBFS", cikti.split("Summary:")[-1])
-    return (i.group(1) if i else "?"), (tepe.group(1) if tepe else "?")
+def bosluklar(zaman, sesli, en_kisa=0.2):
+    """İlk ve son sesli kare arasında sessiz bölgeler."""
+    indis = np.nonzero(sesli)[0]
+    if indis.size == 0:
+        return []
+    sonuc, bas = [], None
+    for i in range(indis[0], indis[-1] + 1):
+        if not sesli[i] and bas is None:
+            bas = i
+        elif sesli[i] and bas is not None:
+            if zaman[i] - zaman[bas] >= en_kisa:
+                sonuc.append((float(zaman[bas]), float(zaman[i])))
+            bas = None
+    return sonuc
 
 
-def ciz(yol, zaman, siren, ortam, isaretler):
-    gen, yuk = 1600, 600
-    sol, sag, ust, alt = 70, 20, 30, 50
+def kosular(maske, zaman, birlestir_sn=0.5):
+    """Doğru olan ardışık kare dizileri (kısa boşluklar birleştirilir): [(baş indis, son indis)]."""
+    sonuc = []
+    for i in np.nonzero(maske)[0]:
+        if sonuc and zaman[i] - zaman[sonuc[-1][1]] <= birlestir_sn:
+            sonuc[-1][1] = i
+        else:
+            sonuc.append([i, i])
+    return [(a, b) for a, b in sonuc]
+
+
+def son_dusus(zaman, siren_db, bitis, tavan, taban):
+    """`bitis`'ten geriye: siren bandı `tavan − 6`'nın altına ilk indiği andan `bitis`'e kadar doğrusal eğim (dB/sn)."""
+    i_bitis = int(np.searchsorted(zaman, bitis))
+    i = i_bitis - 1
+    while i > 0 and siren_db[i] < tavan - 6.0:
+        i -= 1
+    secim = slice(i, i_bitis)
+    gecerli = siren_db[secim] > taban + 6.0
+    if gecerli.sum() < 5:
+        return None
+    t, d = zaman[secim][gecerli], siren_db[secim][gecerli]
+    egim = float(np.polyfit(t, d, 1)[0])
+    return float(zaman[i]), float(bitis), egim, float(tavan - d[-1])
+
+
+def ciz(yol, zaman, siren_db, ortam_db, kazanc_s, kazanc_o):
+    gen, yuk, sol, sag, ust, alt = 1600, 640, 70, 20, 40, 50
     resim = Image.new("RGB", (gen, yuk), "white")
-    d = ImageDraw.Draw(resim)
+    cizim = ImageDraw.Draw(resim)
     t_max = float(zaman[-1]) if zaman.size else 1.0
-    db_min, db_max = -90.0, 0.0
+    db_min, db_max = -100.0, 0.0
 
     def xy(t, v):
-        x = sol + (gen - sol - sag) * t / t_max
-        y = ust + (yuk - ust - alt) * (db_max - max(db_min, min(db_max, v))) / (db_max - db_min)
-        return x, y
+        return (sol + (gen - sol - sag) * t / t_max,
+                ust + (yuk - ust - alt) * (db_max - max(db_min, min(db_max, v))) / (db_max - db_min))
 
-    for db_ in range(int(db_min), 1, 10):
-        _, y = xy(0, db_)
-        d.line([(sol, y), (gen - sag, y)], fill=(225, 225, 225))
-        d.text((8, y - 6), f"{db_} dB", fill="black")
-    for t in range(0, int(t_max) + 1, 10):
+    for d in range(int(db_min), 1, 10):
+        _, y = xy(0, d)
+        cizim.line([(sol, y), (gen - sag, y)], fill=(225, 225, 225))
+        cizim.text((8, y - 6), f"{d} dB", fill="black")
+    for t in range(0, int(t_max) + 1, 5):
         x, _ = xy(t, db_min)
-        d.line([(x, ust), (x, yuk - alt)], fill=(235, 235, 235))
-        d.text((x - 8, yuk - alt + 6), f"{t}s", fill="black")
-    for t, renk in isaretler:
-        x, _ = xy(t, 0)
-        d.line([(x, ust), (x, yuk - alt)], fill=renk)
-    d.line([xy(t, v) for t, v in zip(zaman, ortam)], fill=(30, 120, 30), width=1)
-    d.line([xy(t, v) for t, v in zip(zaman, siren)], fill=(200, 30, 30), width=1)
-    d.text((sol + 10, 8), "kırmızı: siren bandı 200-1000 Hz, yeşil: ortam bandı 30-110 Hz (dBFS, 100 ms); "
-                          "mavi: bölüm başı, turuncu: fade başı", fill="black")
+        cizim.line([(x, ust), (x, yuk - alt)], fill=(238, 238, 238))
+        cizim.text((x - 8, yuk - alt + 6), f"{t}s", fill="black")
+    cizim.line([xy(t, v) for t, v in zip(zaman, ortam_db)], fill=(120, 190, 120), width=1)
+    cizim.line([xy(t, v) for t, v in zip(zaman, siren_db)], fill=(230, 140, 140), width=1)
+    for satirlar, renk in ((kazanc_s, (180, 0, 0)), (kazanc_o, (0, 110, 0))):
+        for t, g, r, _ in satirlar:
+            if r >= R_ESIK:
+                x, y = xy(t, db(g))
+                cizim.ellipse([x - 3, y - 3, x + 3, y + 3], fill=renk)
+    cizim.text((sol + 10, 8), "açık kırmızı: siren bandı 200-1000 Hz, açık yeşil: ortam bandı 30-110 Hz (dBFS, 100 ms); "
+                              "koyu noktalar: kaynağa eşleşik kazanç g (dB, r >= 0,99) — kırmızı siren, yeşil ortam",
+               fill="black")
     resim.save(yol)
 
 
 def main():
-    kayit = Path(sys.argv[1])
-    klasor = Path(sys.argv[2])
+    kayit_yolu, klasor = Path(sys.argv[1]), Path(sys.argv[2])
     klasor.mkdir(parents=True, exist_ok=True)
-    sinyal = coz(kayit)
-    zaman, siren, ortam = bant_zarfi(sinyal)
-    taban = float(np.percentile(siren, 5))
-    satirlar = [f"Kayıt: {kayit} ({sinyal.size / ORNEKLEME:.1f} sn, {ORNEKLEME} Hz, mono karışım)",
-                f"Siren bandı tabanı (5. yüzdelik): {taban:.1f} dBFS; eşik {taban + 15:.1f} dBFS", ""]
-    isaretler = []
-    sonuclar = []
-    for n, (bas, son, bosluklar) in enumerate(bolumler(zaman, siren, taban + 15.0), 1):
-        t0, t1 = float(zaman[bas]), float(zaman[son])
-        govde = (zaman >= t0 + 1.5) & (zaman <= t1 - 2.5)
-        kararli = float(np.median(siren[govde])) if govde.any() else float(np.max(siren[bas:son + 1]))
-        egim, fade_bas, fade_sure = fade_egimi(zaman, siren, son, kararli, taban)
-        isaretler.append((t0, (40, 60, 220)))
-        if fade_bas is not None:
-            isaretler.append((fade_bas, (240, 140, 0)))
-        oncesi = (zaman >= t0 - 4.0) & (zaman < t0 - 0.5)
-        ilk_bosluk = bosluklar[0][0] if bosluklar else t1 - 2.5
-        bastirma_penceresi = (zaman >= t0 + 1.5) & (zaman <= min(ilk_bosluk, t1 - 2.5))
-        ortam_once = float(np.median(ortam[oncesi])) if oncesi.any() else float("nan")
-        ortam_sira = float(np.median(ortam[bastirma_penceresi])) if bastirma_penceresi.any() else float("nan")
-        lufs_degeri, tepe = lufs(sinyal, t0 + 1.5, max(t0 + 2.0, t1 - 2.5)) if govde.any() else ("?", "?")
-        sonuclar.append(kararli)
-        satirlar.append(f"Bölüm {n}: {t0:.2f}–{t1:.2f} sn (süre {t1 - t0:.2f} sn); boşluklar: "
-                        + (", ".join(f"{a:.2f}–{b:.2f} sn ({b - a:.2f} sn)" for a, b in bosluklar) or "yok"))
-        satirlar.append(f"  kararlı siren bandı (medyan): {kararli:.1f} dBFS; gövde ebur128 I = {lufs_degeri} LUFS, "
-                        f"tepe {tepe} dBFS")
-        if egim is not None:
-            tur = "ani kesilme (duraklatma ya da çıkış; fade değil)" if egim < -150.0 else "fade-out"
-            satirlar.append(f"  sonu: {tur}, {fade_bas:.2f} sn'de başladı, eğim {egim:.1f} dB/sn "
-                            f"(üstel sönüm düz çizgi; 40 tick'te −60 dB = −30 dB/sn), ölçülen aralık {fade_sure:.2f} sn")
-        satirlar.append(f"  ortam bandı: siren öncesi {ortam_once:.1f} dBFS, siren sırasında (ilk boşluğa kadar) "
-                        f"{ortam_sira:.1f} dBFS (fark {ortam_sira - ortam_once:+.1f} dB; bastırma hedefi −3 dB)")
-    if len(sonuclar) >= 2:
-        satirlar += ["", "Bölüm kararlı düzeyleri: " + ", ".join(f"{d:.1f}" for d in sonuclar) + " dBFS",
-                     f"Son bölüm − ilk bölüm: {sonuclar[-1] - sonuclar[0]:+.1f} dB (son bölüm 'Sirenler' 28 → 40 "
-                     f"sonrasıysa beklenen 20·log10(40/28) = +3.1 dB)"]
+    kayit = coz(kayit_yolu, ("-ignore_length", "1") if kayit_yolu.suffix.lower() == ".wav" else ())
+    siren_k = eslesik_kazanc(kayit, coz(SES / "siren_standart.ogg"), 250.0, 2000.0)
+    ortam_k = eslesik_kazanc(kayit, coz(SES / "ortam_test.ogg"), 25.0, 150.0)
+    zaman, siren_db = bant_zarfi(kayit, 200.0, 1000.0)
+    _, ortam_db = bant_zarfi(kayit, 30.0, 110.0)
+    # OpenAL Soft 16 bit çıkışa dither ekler: sessizlik tam bantta ~−97, siren bandında ~−111, ortam bandında ~−121 dBFS.
+    sesli = (siren_db > SESSIZ_DBFS) | (ortam_db > SESSIZ_DBFS)
+
+    satirlar = [f"Kayıt: {kayit_yolu} ({kayit.size / ORNEKLEME:.1f} sn, {ORNEKLEME} Hz, L+R ortalaması)",
+                f"Eşleşik kazanç: 0,5 sn pencere, 0,25 sn adım; geçerli pencere r >= {R_ESIK}", ""]
+
+    gecerli_s = siren_k[siren_k[:, 2] >= R_ESIK]
+    satirlar.append(f"Siren (siren_standart.ogg, 250–2000 Hz): {len(gecerli_s)} geçerli pencere")
+    siren_duzeyleri = duzeyler(gecerli_s[:, 0], db(gecerli_s[:, 1]))
+    for g, adet, araliklar in siren_duzeyleri:
+        satirlar.append(f"  düzey {g:6.2f} dB ({adet} pencere): "
+                        + ", ".join(f"{a:.2f}–{b:.2f}" for a, b in araliklar) + " sn")
+    if len(siren_duzeyleri) >= 2:
+        ilk = min(siren_duzeyleri, key=lambda d: d[2][0][0])
+        son = max(siren_duzeyleri, key=lambda d: d[2][-1][1])
+        satirlar.append(f"  son düzey − ilk düzey: {son[0] - ilk[0]:+.2f} dB "
+                        f"(\"Sirenler\" 28 → 40 için beklenen 20·log10(40/28) = +3.10 dB)")
+
+    yeniden = []
+    for onceki, simdiki in zip(siren_k[:-1], siren_k[1:]):
+        if simdiki[2] >= R_ESIK and simdiki[3] < 0.4 and onceki[3] > 0.6 and onceki[2] > 0.3:
+            yeniden.append(simdiki[0])
+    satirlar.append("  dosyanın baştan çaldığı pencereler (gecikme ~0'a döndü, r >= 0,99): "
+                    + (", ".join(f"{t:.2f} sn" for t in yeniden) or "yok"))
+    satirlar.append("")
+
+    siren_yok = np.interp(zaman, siren_k[:, 0], siren_k[:, 2]) < 0.5
+    sizinti = float(np.median(siren_db[sesli & siren_yok])) if (sesli & siren_yok).any() else SESSIZ_DBFS
+    siren_esigi = sizinti + 15.0
+    siren_aktif_k = np.interp(ortam_k[:, 0], zaman, siren_db) > siren_esigi
+    gecerli_o = ortam_k[:, 2] >= R_ESIK
+    satirlar.append(f"Ortam katmanı (ortam_test.ogg, 25–150 Hz): {int(gecerli_o.sum())} geçerli pencere; siren bandında "
+                    f"siren yokken sızıntı {sizinti:.1f} dBFS, siren çalıyor = bant > {siren_esigi:.1f} dBFS")
+    ozet = {}
+    for ad, maske in (("siren yokken", gecerli_o & ~siren_aktif_k), ("siren çalarken", gecerli_o & siren_aktif_k)):
+        dz = duzeyler(ortam_k[maske, 0], db(ortam_k[maske, 1]))
+        for g, adet, araliklar in dz:
+            satirlar.append(f"  {ad}: düzey {g:6.2f} dB ({adet} pencere): "
+                            + ", ".join(f"{a:.2f}–{b:.2f}" for a, b in araliklar) + " sn")
+        if dz:
+            ozet[ad] = max(dz, key=lambda d: d[1])[0]
+    if len(ozet) == 2:
+        satirlar.append(f"  bastırma (en kalabalık düzeyler): {ozet['siren çalarken'] - ozet['siren yokken']:+.2f} dB "
+                        f"(beklenen −3.0 dB; diğer düzeyler açılış eğrisi, bastırmanın geri dönüşü ya da kapanış fade'idir)")
+    satirlar.append("")
+
+    bos = bosluklar(zaman, sesli)
+    satirlar.append(f"Ses içindeki sessiz boşluklar (bantlar < {SESSIZ_DBFS:.0f} dBFS, ≥ 0,2 sn): "
+                    + (", ".join(f"{a:.2f}–{b:.2f} sn ({b - a:.2f} sn)" for a, b in bos) or "yok"))
+
+    tavan_s = float(np.percentile(siren_db[siren_db > siren_esigi], 90)) if (siren_db > siren_esigi).any() else 0.0
+    for bas, son in kosular(siren_db > siren_esigi, zaman):
+        if zaman[son] - zaman[bas] < 1.0:
+            continue
+        j = son + 1
+        while j < siren_db.size and sesli[j] and siren_db[j] > sizinti + 3.0:
+            j += 1
+        j = min(j, siren_db.size - 1)
+        sessizlige = not sesli[j]
+        sonuc = son_dusus(zaman, siren_db, float(zaman[j]), tavan_s, SESSIZ_DBFS if sessizlige else sizinti)
+        aciklama = f"Siren koşusu {zaman[bas]:.2f}–{zaman[j]:.2f} sn: "
+        if sonuc is None or sonuc[1] - sonuc[0] < 0.4:
+            satirlar.append(aciklama + f"{'sessizliğe' if sessizlige else 'sızıntıya'} ani kesildi (fade değil)")
+            continue
+        fade_bas, fade_son, egim, dusus = sonuc
+        satirlar.append(aciklama + f"son düşüş {fade_bas:.2f}–{fade_son:.2f} sn ({fade_son - fade_bas:.2f} sn, "
+                        f"{'sessizliğe' if sessizlige else 'ortam sızıntısına'}): eğim {egim:.1f} dB/sn, görünen düşüş "
+                        f"{dusus:.0f} dB (siren bandı 90. yüzdelik {tavan_s:.1f} dBFS'ten)")
+
     (klasor / "ses-kaydi-olcum.txt").write_text("\n".join(satirlar) + "\n", encoding="utf-8")
-    ciz(klasor / "ses-kaydi-zarf.png", zaman, siren, ortam, isaretler)
-    np.savetxt(klasor / "ses-kaydi-zarf.tsv", np.column_stack([zaman, siren, ortam]), fmt="%.3f", delimiter="	",
-               header="zaman_sn	siren_200_1000_dBFS	ortam_30_110_dBFS", comments="")
+    np.savetxt(klasor / "ses-kaydi-kazanc.tsv",
+               np.column_stack([siren_k[:, 0], db(siren_k[:, 1]), siren_k[:, 2], siren_k[:, 3], db(ortam_k[:, 1]),
+                                ortam_k[:, 2], ortam_k[:, 3]]),
+               fmt="%.3f", delimiter="	", comments="",
+               header="zaman_sn	siren_g_dB	siren_r	siren_gecikme_sn	ortam_g_dB	ortam_r	ortam_gecikme_sn")
+    ciz(klasor / "ses-kaydi-zarf.png", zaman, siren_db, ortam_db, siren_k, ortam_k)
     print("\n".join(satirlar))
 
 

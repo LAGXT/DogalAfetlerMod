@@ -32,6 +32,7 @@ import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import org.lwjgl.openal.ALC10;
+import org.lwjgl.openal.ALC11;
 
 /**
  * İstemci otomasyonu (K0-21 rev. 2): klavye/fare olmadan uyarı kanıtı toplar. Yalnız {@code -Potomasyon=uyari}
@@ -45,7 +46,9 @@ import org.lwjgl.openal.ALC10;
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class UyariOtomasyonu {
-    private static final boolean ETKIN = "uyari".equals(System.getProperty("dogalafetler.otomasyon", ""));
+    private static final String SENARYO = System.getProperty("dogalafetler.otomasyon", "");
+    /** {@code uyari}: tek oyunculu tam senaryo; {@code uyari-sunucu}: dedicated server'a bağlı, sireni sunucu konsolu başlatır. */
+    private static final boolean ETKIN = SENARYO.equals("uyari") || SENARYO.equals("uyari-sunucu");
     private static final String KATMAN = "uyari/ortam_test";
     private static final String KAYIT_AYGITI = "Wave File Writer";
     private static final long KOSUL_ZAMAN_ASIMI_MS = 40_000;
@@ -66,30 +69,19 @@ public final class UyariOtomasyonu {
 
     private static void plan() {
         adim(3000, "ses aygıtı denetimi, yaratıcı mod, gün, açık hava", () -> {
-            Minecraft mc = Minecraft.getInstance();
-            String aygit = sesAygiti();
-            if (!aygit.contains(KAYIT_AYGITI)) {
-                DogalAfetler.LOGGER.error("[uyari-otomasyon] ses aygıtı '{}' kayıt aygıtı değil; Ana Ses %0 kalıyor, kapanış",
-                        aygit);
-                sonraki = ADIMLAR.size();
-                mc.stop();
+            if (!sesiAc()) {
                 return;
             }
-            mc.options.getSoundSourceOptionInstance(SoundSource.MASTER).set(1.0);
             komut("gamemode creative @s");
             komut("time set day");
             komut("weather clear");
-            log("ses: aygıt='{}' MASTER={} WEATHER={} AMBIENT={} altyazı={} sirenSes={} ortamTavan={}", aygit,
-                    mc.options.getSoundSourceVolume(SoundSource.MASTER), mc.options.getSoundSourceVolume(SoundSource.WEATHER),
-                    mc.options.getSoundSourceVolume(SoundSource.AMBIENT), mc.options.showSubtitles().get(),
-                    UyariAyarlari.sirenSes().get(), UyariAyarlari.ortamTavan());
         });
         adim(1000, "ortam test katmanı (20 blok doğuda, menzil 64)", UyariOtomasyonu::ortamBaslat);
         bekle("ortam katmanı çalıyor", () -> IstemciOrtam.ORNEK.caliyor(KATMAN) && IstemciOrtam.ORNEK.duzey(KATMAN) > 0.1f);
         adim(1500, "ortam düzeyi (siren öncesi)", () -> ortamLog("siren öncesi"));
         adim(500, "deprem 1 başlat", () -> komut("dogalafet start deprem 1"));
         adim(500, "siren aşamasına geç", () -> komut("dogalafet asama ileri"));
-        adim(0, "çekim: siren çalarken ekranda yazı yok (40 tick)", () -> calan(40), () -> {
+        adim(0, "çekim: siren çalarken ekranda yazı yok (40 tick)", () -> calan(40) && ekranYok(), () -> {
             cek("uyari-siren-calarken-yazi-yok");
             ortamLog("siren sırasında (-3 dB bekleniyor)");
         });
@@ -99,12 +91,13 @@ public final class UyariOtomasyonu {
         bekle("siren durdu (AKTIF aşama, fade-out)", UyariOtomasyonu::sustu);
         adim(500, "Overworld'e dön", () -> komut("execute in minecraft:overworld run tp @s ~ ~ ~"));
         adim(2000, "ilk afeti durdur", () -> komut("dogalafet stop"));
+        bekle("Overworld yüklendi (yükleme ekranı kapandı)", UyariOtomasyonu::ekranYok);
         adim(1500, "altyazı aç, ikinci deprem", () -> {
             Minecraft.getInstance().options.showSubtitles().set(true);
             komut("dogalafet start deprem 1");
         });
         adim(500, "siren aşamasına geç", () -> komut("dogalafet asama ileri"));
-        adim(0, "çekim: alt yazı açıkken (20 tick)", () -> calan(20), () -> cek("uyari-siren-altyazi-acik"));
+        adim(0, "çekim: alt yazı açıkken (20 tick)", () -> calan(20) && ekranYok(), () -> cek("uyari-siren-altyazi-acik"));
         adim(300, "altyazı kapat", () -> Minecraft.getInstance().options.showSubtitles().set(false));
         adim(0, "stopsound @s master (50 tick)", () -> calan(50), () -> {
             stopsoundOncesi = SirenCalar.ORNEK.yenidenBaslatmaSayisi();
@@ -141,6 +134,35 @@ public final class UyariOtomasyonu {
         adim(1000, "çıkış", () -> Minecraft.getInstance().stop());
     }
 
+    /** Dedicated server'a bağlı istemci: komut vermez, sunucu konsolunun başlattığı sireni bekler (ses kayda gider). */
+    private static void sunucuPlani() {
+        adim(500, "ses aygıtı denetimi (dedicated server'a bağlı)", () -> sesiAc());
+        bekle("sunucunun sireni çalıyor (40 tick)", () -> calan(40));
+        bekle("siren durdu (sunucunun durdurma paketi, fade-out)", UyariOtomasyonu::sustu);
+        adim(1000, "çıkış", () -> {
+            log("girdi sayacı: tuş={} fare={} tekerlek={}", tusSayisi, fareSayisi, tekerlekSayisi);
+            Minecraft.getInstance().stop();
+        });
+    }
+
+    /** Kayıt aygıtı doğruysa Ana Ses'i açar; değilse Ana Ses'e dokunmadan oyunu kapatır. */
+    private static boolean sesiAc() {
+        Minecraft mc = Minecraft.getInstance();
+        String aygit = sesAygiti();
+        if (!aygit.contains(KAYIT_AYGITI)) {
+            DogalAfetler.LOGGER.error("[uyari-otomasyon] ses aygıtı '{}' kayıt aygıtı değil; Ana Ses %0 kalıyor, kapanış", aygit);
+            sonraki = ADIMLAR.size();
+            mc.stop();
+            return false;
+        }
+        mc.options.getSoundSourceOptionInstance(SoundSource.MASTER).set(1.0);
+        log("ses: aygıt='{}' MASTER={} WEATHER={} AMBIENT={} altyazı={} sirenSes={} ortamTavan={}", aygit,
+                mc.options.getSoundSourceVolume(SoundSource.MASTER), mc.options.getSoundSourceVolume(SoundSource.WEATHER),
+                mc.options.getSoundSourceVolume(SoundSource.AMBIENT), mc.options.showSubtitles().get(),
+                UyariAyarlari.sirenSes().get(), UyariAyarlari.ortamTavan());
+        return true;
+    }
+
     @SubscribeEvent
     public static void tik(TickEvent.ClientTickEvent olay) {
         if (!ETKIN || olay.phase != TickEvent.Phase.END) {
@@ -148,10 +170,16 @@ public final class UyariOtomasyonu {
         }
         Minecraft mc = Minecraft.getInstance();
         if (baslangic < 0) {
-            if (mc.player == null || mc.level == null || mc.screen != null || mc.getSingleplayerServer() == null) {
+            boolean hazir = mc.player != null && mc.level != null
+                    && (SENARYO.equals("uyari-sunucu") || mc.screen == null && mc.getSingleplayerServer() != null);
+            if (!hazir) {
                 return;
             }
-            plan();
+            if (SENARYO.equals("uyari")) {
+                plan();
+            } else {
+                sunucuPlani();
+            }
             baslangic = System.currentTimeMillis();
             oncekiAdimZamani = baslangic;
             log("dünyaya girildi; {} adım", ADIMLAR.size());
@@ -176,7 +204,7 @@ public final class UyariOtomasyonu {
             }
             sonraki++;
             oncekiAdimZamani = simdi;
-            log("t={} ms: {}", simdi - baslangic, adim.ad());
+            log("t={} ms (fps={}): {}", simdi - baslangic, mc.getFps(), adim.ad());
             adim.is().run();
         }
     }
@@ -223,6 +251,11 @@ public final class UyariOtomasyonu {
         DogalAfetler.LOGGER.info("[uyari-otomasyon] " + bicim, degerler);
     }
 
+    /** Ekranda menü ya da yükleme ekranı yok (boyut değişiminde "Loading terrain" kareye girmesin). */
+    private static boolean ekranYok() {
+        return Minecraft.getInstance().screen == null;
+    }
+
     /** Etkin siren henüz sönmüyor ve en az {@code tick} tick geçti. */
     private static boolean calan(int tick) {
         SirenSesi ses = SirenCalar.ORNEK.etkin();
@@ -259,13 +292,20 @@ public final class UyariOtomasyonu {
                 SoundSource.WEATHER, OrtamSesi.Yer.nokta(boyut, konum, 64f), HacimEgrisi.giris(40, 1f)));
     }
 
-    /** Açık OpenAL aygıtının adı (bağlam yoksa boş). */
+    /**
+     * Açık OpenAL aygıtının adı (bağlam yoksa boş). Vanilla {@code Library.getCurrentDeviceName} gibi
+     * {@code ALC_ALL_DEVICES_SPECIFIER} sorulur: OpenAL Soft açık aygıt için {@code ALC_DEVICE_SPECIFIER}'da genel "OpenAL
+     * Soft" adını döndürür.
+     */
     private static String sesAygiti() {
         long baglam = ALC10.alcGetCurrentContext();
         if (baglam == 0L) {
             return "";
         }
-        String ad = ALC10.alcGetString(ALC10.alcGetContextsDevice(baglam), ALC10.ALC_DEVICE_SPECIFIER);
+        long aygit = ALC10.alcGetContextsDevice(baglam);
+        String ad = ALC10.alcIsExtensionPresent(aygit, "ALC_ENUMERATE_ALL_EXT")
+                ? ALC10.alcGetString(aygit, ALC11.ALC_ALL_DEVICES_SPECIFIER)
+                : ALC10.alcGetString(aygit, ALC10.ALC_DEVICE_SPECIFIER);
         return ad == null ? "" : ad;
     }
 

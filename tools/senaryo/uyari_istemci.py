@@ -109,15 +109,16 @@ def secenekleri_hazirla():
     satirlar = yol.read_text(encoding="utf-8").splitlines() if yol.exists() else []
     ayar = {"pauseOnLostFocus": "false", "showSubtitles": "false", "tutorialStep": "none",
             "onboardAccessibility": "false", "narrator": "0", "soundDevice": '""',
-            "soundCategory_master": "0.0", "soundCategory_weather": "1.0"}
+            "soundCategory_master": "0.0", "soundCategory_weather": "1.0", "lang": "tr_tr"}
     for kategori in ("music", "record", "ambient", "block", "hostile", "neutral", "player", "voice"):
         ayar[f"soundCategory_{kategori}"] = "0.0"
     satirlar = [s for s in satirlar if s.split(":", 1)[0] not in ayar] + [f"{k}:{v}" for k, v in ayar.items()]
     yol.write_text("\n".join(satirlar) + "\n", encoding="utf-8")
 
 
-def main():
-    kanit = Path(sys.argv[1]).resolve()
+def kos(kanit, otomasyon="uyari", gradle_ek=("-PquickPlay=test", "-PoyunTestiAfeti=deprem"), wav=WAV):
+    """İstemciyi protokolle açar, kapanışına kadar bekler, kanıtları `kanit`'a kopyalar; koşu geçerliyse True."""
+    kanit = Path(kanit).resolve()
     kanit.mkdir(parents=True, exist_ok=True)
     log = Gunluk(kanit / "pencere-uyari.log")
 
@@ -128,7 +129,7 @@ def main():
         time.sleep(60)
     else:
         log("kapı 10 dk'da açılmadı; koşu iptal")
-        return 1
+        return False
 
     secenekleri_hazirla()
     for eski in (RUN / "uyari-kanit").glob("*") if (RUN / "uyari-kanit").exists() else []:
@@ -136,15 +137,15 @@ def main():
     (RUN / "uyari-kanit").mkdir(parents=True, exist_ok=True)
     for eski in (RUN / "screenshots").glob("uyari-*.png") if (RUN / "screenshots").exists() else []:
         eski.unlink()
-    istemci_log = kanit / "runClient-uyari.log"
-    WAV.unlink(missing_ok=True)
+    istemci_log = kanit / f"runClient-{otomasyon}.log"
+    wav.unlink(missing_ok=True)
     ALSOFT_CONF.write_text(f"[general]\ndrivers = wave\nfrequency = 48000\nchannels = stereo\nsample-type = int16\n"
-                           f"[wave]\nfile = {WAV}\n", encoding="utf-8")
+                           f"[wave]\nfile = {wav}\n", encoding="utf-8")
     BASLATMA_BETIGI.write_text(
         f"#!/bin/sh\ncd '{KOK}' || exit 1\nexport JAVA_HOME='{JAVA_HOME}' DISPLAY=:0 ALSOFT_DRIVERS=wave "
         f"ALSOFT_CONF='{ALSOFT_CONF}'\n"
-        f"exec timeout {TOPLAM_SURE} ./gradlew runClient --no-daemon --offline --console=plain -PquickPlay=test "
-        f"-Potomasyon=uyari -PoyunTestiAfeti=deprem > '{istemci_log}' 2>&1\n", encoding="utf-8")
+        f"exec timeout {TOPLAM_SURE} ./gradlew runClient --no-daemon --offline --console=plain "
+        f"-Potomasyon={otomasyon} {' '.join(gradle_ek)} > '{istemci_log}' 2>&1\n", encoding="utf-8")
 
     sahibin = json.loads(hyprctl("activewindow", "-j") or "{}")
     sahip_adres = sahibin.get("address")
@@ -162,13 +163,13 @@ def main():
     if java_pid is None:
         log("istemci JVM'i 300 sn'de görünmedi; iptal")
         oldur(log, None, "JVM yok")
-        return 1
+        return False
     environ = Path(f"/proc/{java_pid}/environ").read_bytes()
     belirtec = b"HL_EXEC_RULE_TOKEN=" in environ
     log(f"(b) istemci JVM pid={java_pid} ({time.monotonic() - basla:.1f} sn); HL_EXEC_RULE_TOKEN ortamda: {belirtec}")
     if not belirtec:
         oldur(log, java_pid, "belirteç yok")
-        return 1
+        return False
 
     pencere = None
     while time.monotonic() - basla < 600 and pencere is None:
@@ -181,7 +182,7 @@ def main():
     if pencere is None:
         log("pencere eşlenmedi; iptal")
         oldur(log, java_pid, "pencere yok")
-        return 1
+        return False
     yazim = [hyprctl("dispatch", f'hl.dsp.window.set_prop({{ window = "pid:{java_pid}", prop = "{p}", value = "{v}", '
                                  f'lock = true }})') for p, v in (("no_focus", "1"), ("focus_on_activate", "0"))]
     no_focus = hyprctl("getprop", f"pid:{java_pid}", "no_focus")
@@ -190,7 +191,7 @@ def main():
         f"getprop no_focus={no_focus!r}; etkin={json.loads(hyprctl('activewindow', '-j') or '{}').get('address')}")
     if "true" not in no_focus.lower() or ws != WORKSPACE:
         oldur(log, java_pid, "pencere doğrulaması tutmadı")
-        return 1
+        return False
 
     gecerli = True
     yoklama = 0
@@ -220,8 +221,8 @@ def main():
         if yoklama % 6 == 1:
             log(f"(d) denetim {yoklama}: etkin={etkin.get('address')} {etkin.get('class')}; gradle={gradle_sayisi()}")
         time.sleep(5)
-    if WAV.exists():
-        log(f"ses kaydı: {WAV} ({WAV.stat().st_size} bayt)")
+    if wav.exists():
+        log(f"ses kaydı: {wav} ({wav.stat().st_size} bayt)")
     time.sleep(3)
     log(f"istemci kapandı; süre={time.monotonic() - basla:.0f} sn; yoklama={yoklama}; ALARM={0 if gecerli else 1}")
 
@@ -237,7 +238,11 @@ def main():
         shutil.copy2(dosya, kanit / dosya.name)
         log(f"kanıt: {dosya.name}")
     log(f"koşu {'GEÇERLİ' if gecerli else 'GEÇERSİZ'}")
-    return 0 if gecerli else 1
+    return gecerli
+
+
+def main():
+    return 0 if kos(sys.argv[1]) else 1
 
 
 if __name__ == "__main__":
