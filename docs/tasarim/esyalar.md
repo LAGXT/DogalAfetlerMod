@@ -25,10 +25,12 @@ kefal, ringa tutulur; ringa sürüleri kışın kıyıya yaklaşır.
   tanesi parçacıkları; kol sallanır, alet 5 dayanıklılık kaybeder.
 - **Bekleyiş:** olta deliğin suyunda vanilla gibi yüzer. Isırma 30–60 sn (Lure seviye başına 5 sn kısaltır); son 2 sn
   vanilla'nın "balık yaklaşıyor" evresi, sonra şapırtı ve şamandıranın batması. Normal buzda olta buzun üstünde yatar.
-- **Balıklar:** beş tür 16×16, vanilla balıklarıyla aynı çapraz duruş; renk ve desenle ayrılır (alabalık pembe yan
-  şerit + benekler, morina zeytin alacalı, somon koyu lacivert sırt + gümüş yan ve daha iri, kefal boyuna çizgili gri,
-  ringa parlak mavi + beyaz kırağı kenarı ve parıltı). Pişmişler kızarmış kahve-altın, ızgara izli. Tooltip: çiğ "hafifçe
-  serinletir" (camgöbeği), pişmiş "ısıtır (orta)" (altın), pişmiş ringa "daha çok ısıtır" (kırmızı).
+- **Balıklar:** beş tür 16×16, vanilla balıklarıyla aynı çapraz duruş; renk, desen ve siluetle ayrılır (alabalık pembe
+  yan şerit + benekler, morina zeytin alacalı + çene bıyığı, somon koyu lacivert sırt + gümüş yan, iri ve derin çatal
+  kuyruk, kefal boyuna çizgili gri + yuvarlak kuyruk, ringa ince, parlak mavi + beyaz kırağı kenarı ve parıltı).
+  Pişmişler türün kendi et rengiyle ızgara izli (alabalık pembe-turuncu, morina krem beyaz, somon koyu turuncu + yağ
+  çizgileri, kefal gri-kahve çizgili, ringa altın). Tooltip: çiğ "serinletir (küçük)" (camgöbeği), pişmiş "ısıtır
+  (orta)" (altın), pişmiş ringa "güçlü ısıtır (büyük)" (kırmızı); sayılar yiyecek kademelerinden (−8, +20, +35).
 - **Risk:** delikte oltası olan ve buz üstünde hareketsiz duran oyuncunun ortamına 20 sn'de 8 °C'ye çıkan soğuk eklenir;
   sıcaklık barı gözle görülür biçimde mavi tarafa kayar. Ateş, sıcak yiyecek ya da kalın giysi bunu dengeler.
 

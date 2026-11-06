@@ -9,27 +9,27 @@ import org.junit.jupiter.api.Test;
 class AktiflikTest {
     @Test
     void esigiGecenDonmadaSuUstuBuzdaAktif() {
-        assertTrue(Aktiflik.aktifMi(30, 30, false, 0, true), "eşikte aktif");
-        assertTrue(Aktiflik.aktifMi(80, 30, false, 0, true));
-        assertFalse(Aktiflik.aktifMi(29.9, 30, false, 0, true), "eşiğin altında kapalı");
+        assertTrue(Aktiflik.aktifMi(30, 30, false, true), "eşikte aktif");
+        assertTrue(Aktiflik.aktifMi(80, 30, false, true));
+        assertFalse(Aktiflik.aktifMi(29.9, 30, false, true), "eşiğin altında kapalı");
     }
 
     @Test
     void suUstuBuzOlmadanHicAktifDegil() {
-        assertFalse(Aktiflik.aktifMi(100, 30, false, 1, false));
-        assertFalse(Aktiflik.aktifMi(100, 30, true, 1, false), "kızıl cücede de buz şart");
+        assertFalse(Aktiflik.aktifMi(100, 30, false, false));
+        assertFalse(Aktiflik.aktifMi(100, 30, true, false), "kızıl cücede de buz şart");
     }
 
     @Test
-    void kizilCuceDonemindeDusukIlerlemedeKisBolgesindeVeDonmusYuzeydeSurer() {
-        assertTrue(Aktiflik.aktifMi(10, 30, true, 1, true), "kalıcı kış bölgesi");
-        assertTrue(Aktiflik.aktifMi(10, 30, true, 0, true), "hâlâ donmuş su yüzeyi");
-        assertFalse(Aktiflik.aktifMi(10, 30, false, 1, true), "süpernovadan önce kış ağırlığı tek başına açmaz");
+    void kizilCuceDonemindeEsikAltindaDonmusYuzeydeSurer() {
+        assertTrue(Aktiflik.aktifMi(10, 30, true, true), "kızıl cücede donmuş yüzey eşiksiz");
+        assertTrue(Aktiflik.aktifMi(0, 30, true, true), "global ilerleme 0'a düşse de");
+        assertFalse(Aktiflik.aktifMi(10, 30, false, true), "süpernovadan önce doğal buz açılmaz");
     }
 
     @Test
-    void kisBolgesiEsigiYarim() {
-        assertTrue(Aktiflik.kisBolgesiMi(0.5));
-        assertFalse(Aktiflik.kisBolgesiMi(0.49));
+    void esikSifirsaHerBuzdaAktif() {
+        assertTrue(Aktiflik.aktifMi(0, 0, false, true));
+        assertFalse(Aktiflik.aktifMi(0, 0, false, false));
     }
 }

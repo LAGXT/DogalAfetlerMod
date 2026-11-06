@@ -86,8 +86,7 @@ public final class BuzBalikciligi {
         DunyaDonemi d = DunyaDonemi.al(level);
         boolean kizilCuce = d.cozulmeDonemi() || d.gunesEvresi() == GunesEvresi.KIZIL_CUCE;
         boolean buz = DonmaApi.buzYuzeyiMi(level, konum);
-        return Aktiflik.aktifMi(d.donmaIlerlemesi(), BalikcilikAyarlari.aktiflikEsigi(), kizilCuce,
-                buz && kizilCuce ? DonmaApi.kisAgirligi(level, konum) : 0.0, buz);
+        return Aktiflik.aktifMi(d.donmaIlerlemesi(), BalikcilikAyarlari.aktiflikEsigi(), kizilCuce, buz);
     }
 
     /**

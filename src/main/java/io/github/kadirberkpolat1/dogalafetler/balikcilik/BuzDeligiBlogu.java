@@ -1,6 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.balikcilik;
 
 import io.github.kadirberkpolat1.dogalafetler.balikcilik.mantik.DelikOmru;
+import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import io.github.kadirberkpolat1.dogalafetler.donma.DonmaBloklari;
 import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
@@ -37,8 +38,9 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  *
  * <p>Ömür zamanlanmış blok tick'iyle işler (chunk'la kaydedilir): açılınca {@link DelikOmru#ilkGecikme}, sonra üç donma
  * aşamasının ({@link #ASAMA} 1–3, giderek kapanan buz zarı) her biri {@link DelikOmru#asamaGecikmesi}; son aşamadan sonra
- * eski buz ({@link #INCE}: donma sisteminin ince buzu ya da buz) geri gelir. Donma sisteminin sütun biti ("bizim buz")
- * deliğe dokunulmadan kalır; donma süreci üstü buz ya da su olmayan sütuna dokunmaz (donma §A).
+ * eski buz ({@link #INCE}: donma sisteminin ince buzu ya da buz) geri gelir; global donma ilerlemesi 0 ise (sıfırlanmış
+ * dünya) su kalır (B-20). Donma sisteminin sütun biti ("bizim buz") deliğe dokunulmadan kalır; donma süreci üstü buz ya
+ * da su olmayan sütuna dokunmaz (donma §A).
  */
 public final class BuzDeligiBlogu extends Block {
     /** 0 açık; 1–3 yeniden donma aşamaları. */
@@ -109,6 +111,12 @@ public final class BuzDeligiBlogu extends Block {
         double y = konum.getY() + 0.95;
         double z = konum.getZ() + 0.5;
         if (DelikOmru.buzaDonerMi(asama)) {
+            if (DelikOmru.suyaDonerMi(DunyaDonemi.al(level).donmaIlerlemesi())) {
+                level.setBlock(konum, Blocks.WATER.defaultBlockState(), Block.UPDATE_ALL);
+                level.playSound(null, konum, SoundEvents.GENERIC_SPLASH, SoundSource.BLOCKS, 0.3f, 1.2f);
+                level.sendParticles(ParticleTypes.SPLASH, x, y, z, 10, 0.25, 0.05, 0.25, 0.1);
+                return;
+            }
             BlockState buz = eskiBuz(durum);
             level.setBlock(konum, buz, Block.UPDATE_ALL);
             level.playSound(null, konum, SoundEvents.GLASS_PLACE, SoundSource.BLOCKS, 0.7f, 0.6f);

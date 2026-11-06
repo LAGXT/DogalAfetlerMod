@@ -50,6 +50,13 @@ class DelikOmruTest {
     }
 
     @Test
+    void sifirDonmadaSuyaAksiHaldeBuzaDoner() {
+        assertTrue(DelikOmru.suyaDonerMi(0.0), "sıfırlanmış dünyada su");
+        assertFalse(DelikOmru.suyaDonerMi(0.01), "donma sürerken eski buz");
+        assertFalse(DelikOmru.suyaDonerMi(40.0), "kızıl cüce tabanında eski buz (bilinen sınır, B-20)");
+    }
+
+    @Test
     void gecersizAyarReddedilir() {
         assertThrows(IllegalArgumentException.class, () -> new DelikOmru.Ayarlar(600, 400, 20));
         assertThrows(IllegalArgumentException.class, () -> new DelikOmru.Ayarlar(0, 400, 20));

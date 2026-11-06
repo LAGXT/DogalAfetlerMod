@@ -49,6 +49,7 @@ import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraftforge.common.ForgeHooks;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.event.entity.player.ItemFishedEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.fml.util.ObfuscationReflectionHelper;
@@ -294,6 +295,68 @@ public final class BalikcilikOyunTestleri {
         y.succeed();
     }
 
+    /**
+     * §6 #3 gerçek zamanlanmış tick'le: aşama 1'de konan delik (onPlace aşama süresini zamanlar) kendi tick'leriyle
+     * 1 → 2 → 3 → buz ilerler; her geçiş bir sonrakini yeniden zamanlar ve aralık aşama süresidir (15 sn). Açılıştan
+     * aşama 1'e ilk gecikme (≥ 3900 tick) çok uzun olduğu için aynı {@code tick} yolu buradan sınanır.
+     */
+    @GameTest(template = "bos", batch = BATCH, timeoutTicks = 1300)
+    public static void delikGercekZamanlanmisTickleYenidenDonar(GameTestHelper y) {
+        ServerLevel level = y.getLevel();
+        donma(y, 50f);
+        havuzKur(y);
+        BlockPos delik = y.absolutePos(DELIK);
+        Block blok = BalikcilikKayitlari.BUZ_DELIGI.get();
+        int asamaSuresi = DelikOmru.asamaGecikmesi(BalikcilikAyarlari.delikOmru());
+        level.setBlock(delik, blok.defaultBlockState().setValue(BuzDeligiBlogu.ASAMA, 1), Block.UPDATE_ALL);
+        y.assertTrue(level.getBlockTicks().hasScheduledTick(delik, blok), "aşama 1 tick'i zamanlanmalı");
+        long[] son = {level.getGameTime()};
+        int[] gorulen = {1};
+        List<String> gecisler = new ArrayList<>();
+        y.onEachTick(() -> {
+            BlockState s = level.getBlockState(delik);
+            int simdi = delikMi(s) ? s.getValue(BuzDeligiBlogu.ASAMA) : s.is(Blocks.ICE) ? DelikOmru.SON_ASAMA + 1 : -1;
+            if (simdi == gorulen[0]) {
+                return;
+            }
+            long t = level.getGameTime();
+            long aralik = t - son[0];
+            gecisler.add(gorulen[0] + "→" + simdi + " (" + aralik + " tick)");
+            DogalAfetler.LOGGER.info("[balikcilik] test: delik aşaması {} → {} ({} tick sonra; zamanlanmış: {})", gorulen[0],
+                    simdi, aralik, delikMi(s) && level.getBlockTicks().hasScheduledTick(delik, blok));
+            y.assertTrue(simdi == gorulen[0] + 1, "aşama sırası bozuk: " + gecisler + " şimdi " + s);
+            y.assertTrue(Math.abs(aralik - asamaSuresi) <= 2, "aşama aralığı " + asamaSuresi + " tick olmalı: " + gecisler);
+            if (delikMi(s)) {
+                y.assertTrue(level.getBlockTicks().hasScheduledTick(delik, blok), "aşama " + simdi + " yeniden zamanlanmalı");
+            }
+            gorulen[0] = simdi;
+            son[0] = t;
+        });
+        y.succeedWhen(() -> {
+            y.assertTrue(gorulen[0] == DelikOmru.SON_ASAMA + 1, "delik gerçek tick'le buza dönmedi: " + gecisler);
+            y.assertTrue(level.getBlockState(delik.below()).is(Blocks.WATER), "alttaki su kalmalı");
+            temizle(y);
+        });
+    }
+
+    /** B-20: global donma 0 (sıfırlanmış dünya) iken son aşamadaki delik buz değil su olur. */
+    @GameTest(template = "bos", batch = "balikcilik_sifir")
+    public static void sifirDonmadaDelikSuyaDoner(GameTestHelper y) {
+        ServerLevel level = y.getLevel();
+        donma(y, 0f);
+        havuzKur(y);
+        BlockPos delik = y.absolutePos(DELIK);
+        level.setBlock(delik, BalikcilikKayitlari.BUZ_DELIGI.get().defaultBlockState()
+                .setValue(BuzDeligiBlogu.ASAMA, DelikOmru.SON_ASAMA).setValue(BuzDeligiBlogu.INCE, true), Block.UPDATE_ALL);
+        BlockState s = level.getBlockState(delik);
+        s.tick(level, delik, level.random);
+        BlockState sonra = level.getBlockState(delik);
+        y.assertTrue(sonra.is(Blocks.WATER) && sonra.getFluidState().isSource(),
+                "donma 0'da delik kaynak su olmalı (ince buz değil): " + sonra);
+        temizle(y);
+        y.succeed();
+    }
+
     /** Ömür: ilk gecikme + üç aşama config aralığında (4–5 dk) kalır. */
     @GameTest(template = "bos", batch = BATCH)
     public static void delikOmruConfigAraligindadir(GameTestHelper y) {
@@ -400,6 +463,7 @@ public final class BalikcilikOyunTestleri {
         ItemStack olta_ = new ItemStack(Items.FISHING_ROD);
         o.setItemInHand(InteractionHand.MAIN_HAND, olta_);
         FishingHook olta = oltaAt(level, o, delik);
+        long atis = level.getGameTime();
         List<BalikTutulduEvent> olaylar = new ArrayList<>();
         Consumer<BalikTutulduEvent> dinleyici = olaylar::add;
         int enCok = IsirmaSuresi.beklemeTick(IsirmaSuresi.toplamTick(1.0, 0, BalikcilikAyarlari.isirma()));
@@ -415,8 +479,12 @@ public final class BalikcilikOyunTestleri {
             dinle(dinleyici);
             try {
                 y.assertTrue(BuzBalikciligi.delikteMi(olta), "olta deliğin suyunda yüzmeli");
-                y.assertTrue(kalan <= enCok && kalan >= enAz - 200, "bekleme 30–60 sn aralığında olmalı: " + kalan
-                        + " (" + enAz + ".." + enCok + ")");
+                // Bekleme olta deliğe girdiği tick'te başlar ve her tick bir azalır: atıştan beri geçen tick kadar eksilebilir.
+                long gecen = level.getGameTime() - atis;
+                DogalAfetler.LOGGER.info("[balikcilik] test: delikte kalan bekleme {} tick, atıştan {} tick ({}..{})", kalan,
+                        gecen, enAz, enCok);
+                y.assertTrue(kalan <= enCok && kalan >= enAz - gecen - 1, "bekleme config aralığında (30–60 sn) olmalı: "
+                        + kalan + " (" + enAz + ".." + enCok + ", geçen " + gecen + ")");
                 // Isırmada vanilla şamandırayı aşağı çeker: olta deliğin altındaki suya inse de delikte sayılmalı.
                 olta.setPos(olta.getX(), delik.getY() - 0.35, olta.getZ());
                 y.assertTrue(BuzBalikciligi.delikteMi(olta), "deliğin altındaki suya inen olta delikte sayılmalı");
@@ -446,6 +514,59 @@ public final class BalikcilikOyunTestleri {
 
     private static void dinle(Consumer<BalikTutulduEvent> dinleyici) {
         MinecraftForge.EVENT_BUS.addListener(EventPriority.NORMAL, false, BalikTutulduEvent.class, dinleyici);
+    }
+
+    /**
+     * Ba4: vanilla açık suda (buzsuz havuz) zorlanmış ısırmada {@code ItemFishedEvent} sonucu vanilla tablodandır: hiçbir
+     * yığın bizim ad alanımızdan değil (GLM tetiklenmedi) ve {@link BalikTutulduEvent} yayınlanmaz.
+     */
+    @GameTest(template = "bos", batch = BATCH, timeoutTicks = 200)
+    public static void acikSudaVanillaLootDegismez(GameTestHelper y) {
+        ServerLevel level = y.getLevel();
+        donma(y, 50f);
+        havuzKur(y);
+        for (int x = 1; x <= 3; x++) {
+            for (int z = 1; z <= 3; z++) {
+                y.setBlock(new BlockPos(x, 4, z), Blocks.WATER);
+            }
+        }
+        BlockPos su = y.absolutePos(DELIK);
+        ServerPlayer o = oyuncu(y, 0, 0);
+        ItemStack olta_ = new ItemStack(Items.FISHING_ROD);
+        o.setItemInHand(InteractionHand.MAIN_HAND, olta_);
+        FishingHook olta = oltaAt(level, o, su);
+        List<BalikTutulduEvent> olaylar = new ArrayList<>();
+        Consumer<BalikTutulduEvent> dinleyici = olaylar::add;
+        List<ItemStack> vanilla = new ArrayList<>();
+        Consumer<ItemFishedEvent> tutulan = e -> vanilla.addAll(e.getDrops());
+        boolean[] bitti = {false};
+        y.onEachTick(() -> {
+            if (bitti[0] || !olta.isInWater()) {
+                return;
+            }
+            bitti[0] = true;
+            dinle(dinleyici);
+            MinecraftForge.EVENT_BUS.addListener(EventPriority.NORMAL, false, ItemFishedEvent.class, tutulan);
+            try {
+                y.assertTrue(!BuzBalikciligi.delikteMi(olta) && BuzBalikciligi.kalanBekleme(olta) == -1,
+                        "açık suda bizim bekleme işlememeli");
+                isirmaZorla(y, olta);
+                olta.retrieve(olta_);
+                y.assertTrue(!vanilla.isEmpty(), "vanilla balıkçılık bir şey vermeli");
+                for (ItemStack s : vanilla) {
+                    String kimlik = String.valueOf(ForgeRegistries.ITEMS.getKey(s.getItem()));
+                    y.assertTrue(!kimlik.startsWith(DogalAfetler.MOD_ID + ":"),
+                            "açık suda buz deliği loot'u çıktı (GLM yalnız delikte çalışmalı): " + kimlik);
+                }
+                y.assertTrue(olaylar.isEmpty(), "açık suda BalikTutulduEvent yayınlanmamalı");
+                DogalAfetler.LOGGER.info("[balikcilik] test: açık su vanilla loot {}", vanilla);
+            } finally {
+                MinecraftForge.EVENT_BUS.unregister(dinleyici);
+                MinecraftForge.EVENT_BUS.unregister(tutulan);
+                temizle(y, o);
+            }
+        });
+        y.succeedWhen(() -> y.assertTrue(bitti[0], "olta açık suya düşmedi: " + olta.blockPosition()));
     }
 
     /** Normal buza atılan olta suya değmez: bekleme başlamaz, zorlanmış çekme bizim olayımızı yayınlamaz. */
@@ -478,7 +599,7 @@ public final class BalikcilikOyunTestleri {
         });
     }
 
-    /** Madde 14/15: çiğ buz balığı vücudu soğutur, pişmiş ısıtır, pişmiş Donmuş Ringa daha çok ısıtır. */
+    /** Madde 14/15: çiğ buz balığı küçük serinlik, pişmiş orta ısınma, pişmiş Donmuş Ringa büyük ısınma (B-19). */
     @GameTest(template = "bos", batch = BATCH)
     public static void cigBalikSogutururPismisIsitir(GameTestHelper y) {
         ServerLevel level = y.getLevel();
@@ -495,9 +616,10 @@ public final class BalikcilikOyunTestleri {
             y.assertTrue(yemek.getCount() == 1, "bir tane yenmeli");
             y.assertTrue(!VucutSicakligi.etkiler(o).isEmpty(), "süreli sıcaklık etkisi eklenmeli");
         }
-        y.assertTrue(sonuc[0] < 0, "çiğ balık vücudu soğutmalı: " + sonuc[0]);
-        y.assertTrue(sonuc[1] > 0, "pişmiş balık vücudu ısıtmalı: " + sonuc[1]);
-        y.assertTrue(sonuc[2] > sonuc[1], "pişmiş Donmuş Ringa daha çok ısıtmalı: " + sonuc[2] + " <= " + sonuc[1]);
+        // Yiyecek kademeleri (B-19): küçük −8, orta +20, büyük +35; yenince %25'i.
+        y.assertTrue(Math.abs(sonuc[0] + 2.0) < 1e-6, "çiğ balık anında −2 soğutmalı: " + sonuc[0]);
+        y.assertTrue(Math.abs(sonuc[1] - 5.0) < 1e-6, "pişmiş balık anında +5 ısıtmalı: " + sonuc[1]);
+        y.assertTrue(Math.abs(sonuc[2] - 8.75) < 1e-6, "pişmiş Donmuş Ringa anında +8,75 ısıtmalı: " + sonuc[2]);
         VucutSicakligi.sifirla(o);
         level.getServer().getPlayerList().remove(o);
         y.succeed();

@@ -54,11 +54,15 @@ class LootAgirliklariTest {
     }
 
     @Test
-    void kategorilerArasindaMeteorYok() {
-        for (Kategori k : Kategori.values()) {
-            assertTrue(!k.name().contains("METEOR") && !k.name().contains("KOZMIK"), k.name());
-        }
-        assertEquals(5, Kategori.values().length);
+    void varsayilanOranlarTamDegerler() {
+        assertEquals(0.56, a.oran(Kategori.YAYGIN, 0), 1e-12);
+        assertEquals(0.28, a.oran(Kategori.ORTA, 0), 1e-12);
+        assertEquals(0.08, a.oran(Kategori.NADIR, 0), 1e-12);
+        assertEquals(0.07, a.oran(Kategori.COP, 0), 1e-12);
+        assertEquals(0.01, a.oran(Kategori.HAZINE, 0), 1e-12);
+        // Şans 3: çöp 7 − 6 = 1, hazine 1 + 3 = 4, toplam 97.
+        assertEquals(1 / 97.0, a.oran(Kategori.COP, 3), 1e-12);
+        assertEquals(4 / 97.0, a.oran(Kategori.HAZINE, 3), 1e-12);
     }
 
     @Test

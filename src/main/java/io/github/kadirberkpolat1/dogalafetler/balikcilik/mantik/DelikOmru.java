@@ -51,6 +51,14 @@ public final class DelikOmru {
         return asama >= SON_ASAMA;
     }
 
+    /**
+     * Son aşamada delik buz yerine su mu olur: global donma ilerlemesi 0 (sıfırlanmış ya da tamamen çözülmüş dünya). Donma
+     * süreci deliğin sütununu açıkken atladığı için geri gelen buz bir daha çözülmezdi (karar B-20).
+     */
+    public static boolean suyaDonerMi(double donmaIlerlemesi) {
+        return donmaIlerlemesi <= 0;
+    }
+
     /** Chunk'ta {@code acik} delik varken yenisi açılabilir mi (sınır 0 = hiç). */
     public static boolean acilabilirMi(int acik, int sinir) {
         return acik < sinir;
