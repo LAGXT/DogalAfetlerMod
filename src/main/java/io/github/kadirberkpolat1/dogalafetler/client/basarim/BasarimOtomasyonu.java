@@ -8,6 +8,7 @@ import java.util.UUID;
 import java.util.function.BooleanSupplier;
 import net.minecraft.advancements.Advancement;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.MouseHandler;
 import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.PauseScreen;
@@ -22,6 +23,7 @@ import net.minecraftforge.client.event.InputEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.util.ObfuscationReflectionHelper;
 
 /**
  * Başarım görsel kanıt otomasyonu (K0-21 rev. 2). Yalnız {@code -Ddogalafetler.otomasyon=basarim} ile, tek oyunculu
@@ -30,14 +32,19 @@ import net.minecraftforge.fml.common.Mod;
  * kendisiyle), ünvanlı sohbet satırı, ünvanlı tab listesi, başarım sekmesinin erken hali (kök + iki kat), gizliler
  * dışındaki bütün başarımlar açıkken sekmenin dört kaydırma konumu (gizli iki başarım görünmez) ve gizliler açılınca
  * üç konum (gizliler ortada tam görünür). Sahne komutları entegre sunucunun konsol kaynağından çıktısız verilir:
- * sohbete komut satırı (başarı ya da hata) düşmez; sohbet kareden önce temizlenir (A-33). Klavye, fare ve tekerlek
- * girdileri kapanışa kadar sayılır; kendi açmadığı duraklatma ekranını kapatır.
+ * sohbete komut satırı (başarı ya da hata) düşmez; sohbet kareden önce temizlenir (A-33). Toast üreten komuttan önce
+ * istemci en az {@value #AKICI_FPS} FPS çizmeli ve toast karesi ancak toast'ın kayma süresi boyunca gerçekten kare
+ * çizildikten sonra alınır: görünmeyen workspace'te FPS 1'e düşünce framebuffer bayat kalıyordu (koşu 2). Sekme
+ * açılmadan istemcinin iç imleç konumu pencerenin köşesine alınır (ipucu kutusu sekmeyi karartmasın). Klavye, fare
+ * ve tekerlek girdileri kapanışa kadar sayılır; kendi açmadığı duraklatma ekranını kapatır.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class BasarimOtomasyonu {
     private static final String MOD = System.getProperty("dogalafetler.otomasyon", "");
     private static final String ON = "BASARIM_OTOMASYON ";
     private static final ResourceLocation KOK = DogalAfetler.konum("dogalafetler/root");
+    /** Toast üreten komuttan önce beklenen en az FPS. */
+    private static final int AKICI_FPS = 20;
 
     private record Adim(String ad, Runnable is, BooleanSupplier hazir, int enCokTick) {
     }
@@ -49,6 +56,9 @@ public final class BasarimOtomasyonu {
     private static int sayac;
     private static int adim = -1;
     private static int adimTick;
+    /** Çizilen kare sayısı ({@code RenderTickEvent}) ve adımın başındaki değeri. */
+    private static int kareSayaci;
+    private static int adimKaresi;
 
     private BasarimOtomasyonu() {
     }
@@ -82,6 +92,13 @@ public final class BasarimOtomasyonu {
     }
 
     @SubscribeEvent
+    public static void cizildi(TickEvent.RenderTickEvent olay) {
+        if (aktif() && olay.phase == TickEvent.Phase.END) {
+            kareSayaci++;
+        }
+    }
+
+    @SubscribeEvent
     public static void tick(TickEvent.ClientTickEvent olay) {
         if (!aktif() || olay.phase != TickEvent.Phase.END) {
             return;
@@ -102,6 +119,7 @@ public final class BasarimOtomasyonu {
             plan(mc);
             adim = 0;
             adimTick = 0;
+            adimKaresi = kareSayaci;
             DogalAfetler.LOGGER.info(ON + "başlıyor: {} adım", ADIMLAR.size());
             ADIMLAR.get(0).is().run();
             return;
@@ -118,6 +136,7 @@ public final class BasarimOtomasyonu {
             }
             adim++;
             adimTick = 0;
+            adimKaresi = kareSayaci;
             if (adim < ADIMLAR.size()) {
                 ADIMLAR.get(adim).is().run();
             }
@@ -159,6 +178,16 @@ public final class BasarimOtomasyonu {
         return () -> adimTick >= tick;
     }
 
+    /** En az {@code tick} tick geçti ve adım başından beri en az {@code kare} kare çizildi. */
+    private static BooleanSupplier cizimle(int tick, int kare) {
+        return () -> adimTick >= tick && kareSayaci - adimKaresi >= kare;
+    }
+
+    /** İstemci akıcı çiziyor: toast'ın 5 sn'lik görünürlüğü içinde kareye girecek kadar. */
+    private static BooleanSupplier akici(Minecraft mc) {
+        return () -> adimTick >= 20 && mc.getFps() >= AKICI_FPS;
+    }
+
     /** Başarım oyuncuda açık mı (entegre sunucudan, sunucu thread'inde okunur). */
     private static BooleanSupplier kazanildi(Minecraft mc, Basarimlar basarim) {
         return () -> {
@@ -179,20 +208,23 @@ public final class BasarimOtomasyonu {
             for (String k : new String[] {"gamemode survival @s", "difficulty peaceful",
                     "gamerule doDaylightCycle false", "time set 6000", "weather clear 100000",
                     "gamerule doWeatherCycle false",
-                    "gamerule announceAdvancements true", "advancement revoke @s everything", "dogalafet unvan @s yok",
+                    "gamerule announceAdvancements true", "advancement revoke @s from dogalafetler:dogalafetler/root",
+                    "dogalafet unvan @s yok",
                     "dogalafet stop", "xp set @s 0 levels", "xp set @s 0 points"}) {
                 komut(mc, k);
             }
         }, bekle(60), 80);
         ekle("sohbeti temizle", () -> sohbetiTemizle(mc), bekle(5), 10);
         ekle("kasırga S5", () -> komut(mc, "dogalafet start kasirga 5 @s"), bekle(40), 60);
+        ekle("akıcı çizim (kök toast)", () -> { }, akici(mc), 1200);
         ekle("siren", () -> komut(mc, "dogalafet asama ileri"), kazanildi(mc, Basarimlar.KOK), 200);
-        ekle("kök toast", () -> { }, bekle(30), 40);
+        ekle("kök toast", () -> { }, cizimle(25, 20), 60);
         ekle("kök toast kare", () -> kare(mc, "toast_kok"), bekle(10), 20);
         ekle("aktif", () -> komut(mc, "dogalafet asama ileri"), bekle(60), 80);
+        ekle("akıcı çizim (son)", () -> { }, akici(mc), 1200);
         // AKTIF → BITIS: sınama afetinin sönümü hemen biter, afet doğal sonlanır (dördüncü "asama ileri" yok).
         ekle("doğal son", () -> komut(mc, "dogalafet asama ileri"), kazanildi(mc, Basarimlar.FELAKET_USTASI), 200);
-        ekle("toast'lar", () -> { }, bekle(25), 30);
+        ekle("toast'lar", () -> { }, cizimle(25, 20), 60);
         ekle("toast kare", () -> kare(mc, "toast_felaket_ustasi"), bekle(10), 20);
         ekle("ünvanlı sohbet", () -> mc.player.connection.sendChat("Felaketi atlattık!"), bekle(40), 60);
         ekle("sohbet ekranı", () -> mc.setScreen(new ChatScreen("")), bekle(20), 30);
@@ -263,6 +295,7 @@ public final class BasarimOtomasyonu {
     }
 
     private static void sekmeyiAc(Minecraft mc) {
+        imleciKenaraAl(mc);
         ClientAdvancements liste = mc.player.connection.getAdvancements();
         mc.setScreen(new AdvancementsScreen(liste));
         Advancement kok = liste.getAdvancements().get(KOK);
@@ -270,6 +303,16 @@ public final class BasarimOtomasyonu {
             liste.setSelectedTab(kok, true);
         }
         DogalAfetler.LOGGER.info(ON + "sekme açıldı (kök {})", kok != null ? "var" : "yok");
+    }
+
+    /**
+     * İstemcinin iç imleç konumunu pencerenin sol üst köşesine alır: sabit imleç bir widget'ın üstünde kalırsa vanilla
+     * ipucu kutusu çıkar ve sekmeyi karartır. Gerçek imlece ve sahibin oturumuna dokunmaz (yalnız {@code MouseHandler}
+     * alanı; SRG adları {@code build/createSrgToMcp/output.srg}).
+     */
+    private static void imleciKenaraAl(Minecraft mc) {
+        ObfuscationReflectionHelper.setPrivateValue(MouseHandler.class, mc.mouseHandler, 0.0, "f_91507_");
+        ObfuscationReflectionHelper.setPrivateValue(MouseHandler.class, mc.mouseHandler, 0.0, "f_91508_");
     }
 
     /** Seçili sekmeyi dikey kaydırır (ekranın sürükleme yolu; gerçek fare girdisi değildir, sayılmaz). */
@@ -283,7 +326,7 @@ public final class BasarimOtomasyonu {
     private static void kare(Minecraft mc, String ad) {
         String dosya = "basarim_" + ad + ".png";
         Screenshot.grab(mc.gameDirectory, dosya, mc.getMainRenderTarget(), mesaj -> { });
-        DogalAfetler.LOGGER.info(ON + "kare {} (FPS {}, ekran {})", dosya, mc.getFps(),
-                mc.screen == null ? "yok" : mc.screen.getClass().getSimpleName());
+        DogalAfetler.LOGGER.info(ON + "kare {} (FPS {}, adımda çizilen kare {}, ekran {})", dosya, mc.getFps(),
+                kareSayaci - adimKaresi, mc.screen == null ? "yok" : mc.screen.getClass().getSimpleName());
     }
 }
