@@ -3,11 +3,16 @@ package io.github.kadirberkpolat1.dogalafetler.client.gokyuzu;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciDonem;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
+import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
+import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.GokyuzuEgrileri;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
+import java.util.List;
 import java.util.Locale;
 import java.util.function.Predicate;
 import net.minecraft.client.Minecraft;
@@ -39,6 +44,8 @@ public final class GokyuzuOtomasyonu {
     private static int teker;
     private static int bekleme;
     private static boolean basladi;
+    /** İlk bekleme bitti mi; ondan sonra açılan her ekran kapatılır (yükleme ekranına dokunulmaz). */
+    private static boolean hazir;
     private static float sapma = -90f;
     private static float egim = -40f;
 
@@ -112,7 +119,7 @@ public final class GokyuzuOtomasyonu {
             return;
         }
         mc.options.hideGui = true;
-        if (mc.screen != null) {
+        if (hazir && mc.screen != null) {
             DogalAfetler.LOGGER.warn("[gokyuzu-oto] otomasyonun açmadığı ekran kapatıldı: {}", mc.screen.getClass().getSimpleName());
             mc.setScreen(null);
         }
@@ -124,6 +131,7 @@ public final class GokyuzuOtomasyonu {
             bekleme--;
             return;
         }
+        hazir = true;
         while (!KUYRUK.isEmpty() && bekleme == 0) {
             if (!KUYRUK.peek().test(mc)) {
                 return;
@@ -165,6 +173,11 @@ public final class GokyuzuOtomasyonu {
         });
     }
 
+    /** Koşul görünümde sağlanınca sürer (tick sayımından bağımsız: düşük FPS'te de aynı an). */
+    private static void kosul(Predicate<IstemciGokyuzu.Gorunum> kosul) {
+        KUYRUK.add(mc -> kosul.test(IstemciGokyuzu.gorunum(0f)));
+    }
+
     private static void cek(String ad) {
         KUYRUK.add(mc -> {
             mc.gui.getChat().clearMessages(false);
@@ -179,6 +192,34 @@ public final class GokyuzuOtomasyonu {
                     "[gokyuzu-oto] ÇEKİM %s fps=%d kalite=%s görünüm=[%s] saat=%.0f günSaati=%d kanca=%s tuş=%d düğme=%d teker=%d",
                     ad, mc.getFps(), IstemciAyarlari.efektKalitesi(), IstemciGokyuzu.gorunum(0f), IstemciDonem.saat(0f),
                     mc.level.getDayTime() % 24_000L, IstemciGokyuzu.kanca, tus, dugme, teker));
+            return true;
+        });
+    }
+
+    /** {@code saniye} boyunca saniyede bir {@code getFps()} örneği alır (ilki ısınma); ortanca, en az ve en çok log'a gider. */
+    private static void fps(String etiket, int saniye) {
+        int[] sayac = {0};
+        List<Integer> ornekler = new ArrayList<>();
+        KUYRUK.add(mc -> {
+            if (sayac[0] == 0) {
+                GokyuzuCizici.ortalamaCizimMikrosaniye();
+            }
+            sayac[0]++;
+            if (sayac[0] % 20 != 0) {
+                return false;
+            }
+            if (sayac[0] > 20) {
+                ornekler.add(mc.getFps());
+            }
+            if (sayac[0] < (saniye + 1) * 20) {
+                return false;
+            }
+            Collections.sort(ornekler);
+            DogalAfetler.LOGGER.info(String.format(Locale.ROOT,
+                    "[gokyuzu-oto] FPS %s ortanca=%d en_az=%d en_cok=%d örnek=%d bizim_cizim_cpu=%.0fus kalite=%s "
+                            + "görünüm=[%s]", etiket, ornekler.get(ornekler.size() / 2), ornekler.get(0),
+                    ornekler.get(ornekler.size() - 1), ornekler.size(), GokyuzuCizici.ortalamaCizimMikrosaniye(),
+                    IstemciAyarlari.efektKalitesi(), IstemciGokyuzu.gorunum(0f)));
             return true;
         });
     }
@@ -214,6 +255,7 @@ public final class GokyuzuOtomasyonu {
         int gecis = 22 * 20;
         hazirlik();
         an(3000, -35f, 40, "01-normal-gunduz");
+        fps("normal-gunduz", 6);
         evre("buyuyen", 0.3f);
         an(3000, -35f, gecis, "02a-buyuyen-baslangic");
         evre("buyuyen", 0.85f);
@@ -225,12 +267,13 @@ public final class GokyuzuOtomasyonu {
         bakis(-90f, -35f);
         bekle(40);
         evre("supernova", 0.08f);
-        bekle(5 * 20);
+        kosul(g -> g.evre() == GunesEvresi.SUPERNOVA && g.saniye() >= 3f);
         cek("03a-supernova-cokme");
-        bekle(4 * 20);
+        kosul(g -> g.saniye() >= GokyuzuEgrileri.SN_COKME_SN + 1.5f);
         cek("03b-supernova-parlama");
-        bekle(20 * 20);
+        kosul(g -> g.saniye() >= 45f);
         cek("03c-supernova-vitrin");
+        fps("supernova-vitrin", 6);
         an(6000, -70f, 40, "03d-supernova-ogle-tepe");
         evre("supernova", 0.45f);
         ay(false);
@@ -242,6 +285,7 @@ public final class GokyuzuOtomasyonu {
         an(18000, -70f, 40, "05-gunessiz-gece-ayli");
         ay(false);
         an(18000, -70f, 40, "06a-gunessiz-gece-aysiz-vitrin");
+        fps("gunessiz-gece-aysiz", 6);
         an(18000, -30f, 40, "06b-gunessiz-gece-aysiz-ufuk");
         komut("dogalafet gokyuzutest donma 100");
         komut("time set 23000");
@@ -254,6 +298,7 @@ public final class GokyuzuOtomasyonu {
         komut("dogalafet asama ileri");
         an(3000, -35f, 60, "08a-kizilcuce-sabah-aysiz");
         an(6000, -70f, 40, "08b-kizilcuce-ogle-tepe-aysiz");
+        fps("kizilcuce-ogle", 6);
         an(18000, -70f, 40, "09a-kizilcuce-gece-aysiz");
         ay(true);
         an(18000, -70f, 40, "09b-kizilcuce-gece-ayli");
@@ -264,6 +309,7 @@ public final class GokyuzuOtomasyonu {
         an(6000, -70f, 40, "12-normal-gunduz-aysiz");
         ay(true);
         an(18000, -70f, 40, "11-normal-gece-ayli");
+        fps("normal-gece-ayli", 6);
     }
 
     /** K0-26 ezilme denemesi: normal durumda kazananın göğü, aysız + güneşsiz durumda bizim göğümüz. */

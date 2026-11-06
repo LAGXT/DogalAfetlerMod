@@ -40,7 +40,7 @@ final class GokyuzuRenkleri {
 
     /** Süpernovanın göğü aydınlatma oranı; gök beyaza doymaz ki ışın ve halka okunsun. */
     static float supernovaAydinlatma(float p, float saniye, float gun) {
-        return Mth.clamp(0.5f * GokyuzuEgrileri.supernovaParlaklik(p) * Math.max(gun, 0.3f)
+        return Mth.clamp(0.38f * GokyuzuEgrileri.supernovaParlaklik(p) * Math.max(gun, 0.3f)
                 + 0.25f * GokyuzuEgrileri.supernovaFlas(saniye), 0f, 1f);
     }
 

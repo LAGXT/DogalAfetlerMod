@@ -557,8 +557,8 @@ final class GokyuzuCizici {
         kuad(m, HALE, TEPE, (40f + 50f * f) * k, 0f, 0.8f, 0.88f, 1f, (0.3f * bp + 0.35f * f) * ga);
         kuad(m, SN_HALKA, TEPE, GokyuzuEgrileri.supernovaHalka(s, p), sn * 0.5f, Mth.lerp(sicak, 0.85f, 1f),
                 Mth.lerp(sicak, 0.9f, 0.93f), Mth.lerp(sicak, 1f, 0.78f), (0.35f + 0.65f * bp) * ga);
-        kuad(m, SN_ISIN, TEPE, (30f + 70f * f + 15f * bp) * k, sn * 1.5f, 0.85f, 0.92f, 1f,
-                Math.min(1f, 0.25f + 0.5f * bp + 0.4f * f) * ga);
+        kuad(m, SN_ISIN, TEPE, (30f + 70f * f + 25f * bp) * k, sn * 1.5f, 0.85f, 0.92f, 1f,
+                Math.min(1f, 0.35f + 0.6f * bp + 0.4f * f) * ga);
         kuad(m, HALE, TEPE, 4f + 6f * bp + 8f * f, 0f, 1f, 1f, 1f, ga);
     }
 
