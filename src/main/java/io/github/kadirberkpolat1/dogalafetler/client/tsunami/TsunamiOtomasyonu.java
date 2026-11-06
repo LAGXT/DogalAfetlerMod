@@ -42,6 +42,10 @@ public final class TsunamiOtomasyonu {
     private static final String BOLUM = System.getProperty("dogalafetler.otomasyon.bolum", "hepsi");
     private static final Deque<String> ADIMLAR = new ArrayDeque<>();
     private static final List<Long> KARELER = new ArrayList<>();
+    /** Render thread'inin kare başına CPU süresi: makinedeki başka süreçlerin yükünden (kardeş işçiler) duvar saatinden az etkilenir. */
+    private static final List<Long> KARE_CPU = new ArrayList<>();
+    private static final java.lang.management.ThreadMXBean IPLIK = java.lang.management.ManagementFactory.getThreadMXBean();
+    private static long sonCpu;
     private static int tus;
     private static int fare;
     private static int teker;
@@ -180,10 +184,21 @@ public final class TsunamiOtomasyonu {
     public static void kare(TickEvent.RenderTickEvent e) {
         if (ACIK && e.phase == TickEvent.Phase.START && olcum != null) {
             long simdi = System.nanoTime();
+            long cpu = IPLIK.getCurrentThreadCpuTime();
             if (sonKare != 0) {
                 KARELER.add(simdi - sonKare);
+                KARE_CPU.add(cpu - sonCpu);
             }
             sonKare = simdi;
+            sonCpu = cpu;
+        }
+    }
+
+    private static String yuk() {
+        try {
+            return java.nio.file.Files.readString(java.nio.file.Path.of("/proc/loadavg")).trim();
+        } catch (java.io.IOException | RuntimeException hata) {
+            return "?";
         }
     }
 
@@ -204,14 +219,19 @@ public final class TsunamiOtomasyonu {
             if (++olcumTick >= 100) {
                 List<Long> s = new ArrayList<>(KARELER);
                 Collections.sort(s);
+                List<Long> c = new ArrayList<>(KARE_CPU);
+                Collections.sort(c);
                 double ortanca = s.isEmpty() ? Double.NaN : s.get(s.size() / 2) / 1e6;
                 double enUzun = s.isEmpty() ? Double.NaN : s.get(s.size() - 1) / 1e6;
+                double cpuOrtanca = c.isEmpty() ? Double.NaN : c.get(c.size() / 2) / 1e6;
                 var sunucu = mc.getSingleplayerServer();
                 float mspt = sunucu == null ? Float.NaN : sunucu.getAverageTickTime();
-                log("FPS {} ortanca_kare_ms={} fps_ortanca={} en_uzun_kare_ms={} kare={} sunucu_mspt={} tps={} su={} yagmur={} "
-                        + "bolum=[{}] parcacik={} varlik={} kopuk={}", olcum, String.format(Locale.ROOT, "%.2f", ortanca),
-                        String.format(Locale.ROOT, "%.1f", 1000 / ortanca), String.format(Locale.ROOT, "%.1f", enUzun), s.size(),
-                        String.format(Locale.ROOT, "%.2f", mspt), String.format(Locale.ROOT, "%.1f", Math.min(20, 1000 / mspt)),
+                log("FPS {} ortanca_kare_ms={} fps_ortanca={} cpu_kare_ms={} en_uzun_kare_ms={} kare={} yuk=[{}] sunucu_mspt={} "
+                        + "tps={} su={} yagmur={} bolum=[{}] parcacik={} varlik={} kopuk={}", olcum,
+                        String.format(Locale.ROOT, "%.2f", ortanca), String.format(Locale.ROOT, "%.1f", 1000 / ortanca),
+                        String.format(Locale.ROOT, "%.2f", cpuOrtanca), String.format(Locale.ROOT, "%.1f", enUzun), s.size(),
+                        yuk(), String.format(Locale.ROOT, "%.2f", mspt),
+                        String.format(Locale.ROOT, "%.1f", Math.min(20, 1000 / mspt)),
                         SuRenderer.olcumOzeti(), TsunamiYagmuru.ozet(), mc.levelRenderer.getChunkStatistics(),
                         mc.particleEngine.countParticles(), mc.level.getEntityCount(), TsunamiKopugu.sonSegment());
                 olcum = null;
@@ -236,6 +256,7 @@ public final class TsunamiOtomasyonu {
                 olcumTick = 0;
                 sonKare = 0;
                 KARELER.clear();
+                KARE_CPU.clear();
                 SuRenderer.olcumSifirla();
             }
             case 's' -> {
