@@ -3104,8 +3104,18 @@ yan etkilerine bağlanır, deprem adımları yine gerçek depreme düşer); K-C4
 (çekirdek kendi sözleşmesini sınamaz, başka parçanın betiklerine bağlanır); kalıcı `oyun_testi` `AfetTuru` (üretim yüzeyine
 test türü sızar: N18 adları, tab tamamlama, zamanlayıcı, gamerule haritası, dil, başarım sayımları; ayrıca K-C41 tam da
 `gunes_patlamasi` türünü, onun gamerule'ünü ve ona bağlı dönem süreçlerini ister, sentetik türle sınanamaz). Aynı bayrağa
-dayanan diğer betikler (`esya_sunucu.py`, `uyari_istemci.py`, `uyari_sunucu.py`, `basarim_sunucu.py`, `basarim_gorsel.py`,
-`radar_gorsel.py`) Faz 4 birleştirme turunda `!tür`'e geçer ya da gerçek afete uyarlanır (`.vibe/rapor/entegrasyon-4.md` §3.6).
+dayanan diğer betikler `!tür`'e geçti (her biri taklidin anlık yaşam döngüsüne dayanıyor; gerçek afeti sınamak afetin kendi
+senaryosunun işi): `esya_sunucu.py` `!deprem` (radar/sismograf kaydı + deprem 2 yaşam döngüsü; gerçek depremin blok hasarı ve
+süresi kabulü bozmasın; log satırı iki taklit iletisini de tanır); `uyari_sunucu.py` `!deprem,!gunes_patlamasi` (siren sırası
+afetin süresinden bağımsız; güneşin gerçek kaydı K-E22 ile zaten atlanıyordu); `uyari_istemci.py` `!deprem` (istemcili siren
+koşusu, aynı gerekçe); `basarim_sunucu.py` `!deprem` (`start deprem 5` + üç `asama ileri` → doğal bitiş taklidin anlık
+BITIS'ine dayanır); `basarim_gorsel.py` `!kasirga` (`BasarimOtomasyonu` "kasırga S5" adımı hızlı yaşam döngüsü bekler);
+`radar_gorsel.py` `!deprem,!sinkhole,!kasirga,!gunes_patlamasi` (otomasyonun kare sırası taklidin aşamalarına göre; radar ve
+sismograf göstergesi afetin türünden ve çekirdeğin `etkiAlani`/`kalanOku`'sundan okur). Kanıt (`.vibe/kanit/k-e23-betik/`, `main`
+`58f2fa6`, güneş gerçek kayıtlı): `esya_sunucu.py` 25611, `uyari_sunucu.py` 25612, `basarim_sunucu.py` 25613 → üçü de çıkış 0 (esya: `12 ağ paketi … protokol 5`, `invalid dist`/`Exception`/`ERROR` 0, deprem taklidi kaydı; uyarı: `gunes_patlamasi gerçek afetin yerine kaydedildi (K-E23)`; başarım: deprem 5 doğal bitiş). Üç runClient
+betiği (`uyari_istemci`, `basarim_gorsel`, `radar_gorsel`) koşulmadı: yalnız `py_compile` + bayrak satırı; Faz 5 görünür koşuda
+sınanır. Bayrağı bilerek varsayılan (`deprem,gunes_patlamasi`, taklit atlanır) bırakan tek betik `gunes_patlamasi_sunucu.py`'dir
+(gerçek afeti sınar).
 (b) **Kapı zaman aşımı (doğrulayıcı-2):** `gradle_kapisi.sh` 20 dk dolunca kapı açılmasa da görevi başlatıyordu (GOREV §2,
 K-E19 a tavanını sessizce deliyordu); artık görev başlatılmaz, log'a ve çıktıya `KAPI: açılmadı (N dk)`, çıkış 3
 (`agir_surec_kapisi` ile aynı); `KAPI_DK` üst sınırı (varsayılan 20), `TEST_FILTRE`/`KAPI_PORT` davranışı aynı. Kanıt

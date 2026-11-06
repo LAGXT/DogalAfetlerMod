@@ -3,7 +3,8 @@
 
 Çalıştırma alt yapısı (Sunucu, server.properties geçişi, log denetimi) tools/senaryo/cekirdek_sunucu.py'den gelir; dünya
 `run-server/basarim-senaryo` her koşuda sıfırdan üretilir, `test` dünyasına dokunulmaz (pty'siz, stdin boruda). Sunucu
-`-PoyunTestiAfeti=deprem,gunes_patlamasi` ile açılır (yaşam döngüsü sınama afeti, core.OyunTestiAfeti).
+`-PoyunTestiAfeti=!deprem` ile açılır (yaşam döngüsü sınama afeti, core.OyunTestiAfeti; K-E23: gerçek deprem
+birleşse de taklit onun yerine geçer, üç `asama ileri` ile doğal bitiş korunur).
 
 Koşu: açılışta vanilla `Loaded N advancements` satırı; `dogalafet basarim bilgi` → sekmenin 27/27 başarımı yüklü;
 `forceload add 0 0` + `loot spawn 0 100 0 loot dogalafetler:rewards/hedef` → hedef ödül tablosu 1–2 eşya düşürür;
@@ -95,7 +96,7 @@ def main():
     kod = None
     yol = klasor / "kosu.log"
     try:
-        sunucu = cs.Sunucu("kosu", yol)
+        sunucu = cs.Sunucu("kosu", yol, "!deprem")
         try:
             kosu(sunucu)
         except cs.SenaryoHatasi as hata:

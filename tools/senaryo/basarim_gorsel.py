@@ -3,7 +3,8 @@
 Kullanım (worktree kökünden): python3 tools/senaryo/basarim_gorsel.py
 
 Tek oyunculu Quick Play dünyası `run/saves/basarim` her koşuda KOK/run/saves/test'ten (seed 20261105, allowCommands=1)
-taze kopyalanır; istemci `-Potomasyon=basarim -PoyunTestiAfeti=kasirga` ile açılır ve `client.basarim.BasarimOtomasyonu`
+taze kopyalanır; istemci `-Potomasyon=basarim -PoyunTestiAfeti=!kasirga` ile açılır (K-E23: gerçek kasırga
+birleşse de hızlı yaşam döngülü taklit) ve `client.basarim.BasarimOtomasyonu`
 adımlarını yürütür: kök toast'ı, seviye 5 kasırganın doğal bitişinde toast + sohbet duyurusu, ünvanlı sohbet ve tab
 listesi, sekmenin erken/tam/gizliler-açık halleri.
 
@@ -150,7 +151,7 @@ def main():
                      f"export JAVA_HOME='{JAVA_HOME}'\n"
                      f"exec python3 tools/senaryo/runclient_kilit.py kos '{W}' --bekle 1800 -- "
                      "timeout 1500 ./gradlew runClient --offline --no-daemon --console=plain -PquickPlay=basarim "
-                     "-Potomasyon=basarim -PoyunTestiAfeti=kasirga "
+                     "-Potomasyon=basarim -PoyunTestiAfeti=!kasirga "
                      f"> '{istemci_log}' 2>&1\n")
     sahip = hypr_json("activewindow")
     sahip_adres = sahip.get("address") if isinstance(sahip, dict) else None
