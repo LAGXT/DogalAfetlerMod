@@ -34,3 +34,6 @@ src/generated/resources/.cache/
 # Python
 __pycache__/
 *.pyc
+
+# Sunucu/istemci log klasörü (worktree kökünde oluşur)
+logs/

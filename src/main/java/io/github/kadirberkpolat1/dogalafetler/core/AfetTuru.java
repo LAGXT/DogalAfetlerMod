@@ -44,6 +44,14 @@ public enum AfetTuru {
         return seviyeli;
     }
 
+    /**
+     * Sunucu geneli afet mi (güneş patlaması, ay çarpması): hedef oyuncusu yoktur, etki alanı globaldir, siren herkese gider
+     * (madde 3, N11) ve uzun süreçtir; gamerule kapatılınca süren süreci durdurulur (madde 11).
+     */
+    public boolean sunucuGeneli() {
+        return this == GUNES_PATLAMASI || this == AY_CARPMASI;
+    }
+
     public String ingilizceAd() {
         return ingilizceAd;
     }
