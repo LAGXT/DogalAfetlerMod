@@ -998,7 +998,7 @@ public final class SuRenderer {
 
     /**
      * Mağara suyunda tavan yansıması (SU-35, şader'siz): köşeden kameraya bakış dalgacık normaline göre yansıtılır, ışın
-     * yarım blok adımlarla en çok 8 blok izlenir. Işık kaynağına (ışıltaşı, fener) vuran ışın keskin sıcak parlama, başka
+     * yarım blok adımlarla en çok 12 blok izlenir. Işık kaynağına (ışıltaşı, fener) vuran ışın keskin sıcak parlama, başka
      * bloka vuran ise o noktanın blok ışığıyla hafif amber verir; Fresnel ile yatık bakışta güçlenir. Dalgacık ışını
      * oynattığı için yansıma titrer. Köşe başına yapım başına bir kez hesaplanır ({@link #YANSIMA}).
      */
@@ -1042,7 +1042,7 @@ public final class SuRenderer {
         int ox = Integer.MIN_VALUE;
         int oy = 0;
         int oz = 0;
-        for (int s = 1; s <= 16; s++) {
+        for (int s = 1; s <= 24; s++) {
             double t = s * 0.5;
             int bx = (int) Math.floor(px + rx * t);
             int by = (int) Math.floor(py + ry * t);
