@@ -28,7 +28,7 @@ public final class TsunamiAyarlari {
         yikimCarpani = k.comment("Tick başına yıkım bütçesi çarpanı (S1 16 … S5 48 blok; ayrıca TPS kısmasıyla çarpılır).")
                 .defineInRange("yikimCarpani", 1.0, 0.1, 4.0);
         yikimBolumTick = k.comment("Tick başına yıkımın değiştirdiği en çok farklı 16x16x16 chunk bölümü (her biri istemcide yeniden "
-                + "derlenir; TPS kısmasıyla çarpılır).").defineInRange("yikimBolumTick", 4, 1, 64);
+                + "derlenir; TPS kısmasıyla çarpılır).").defineInRange("yikimBolumTick", 2, 1, 64);
         magaraHacmi = k.comment("Seviye başına bir mağara cebine dolan en çok hücre (su.magaraMaksHacim ile sınırlı).")
                 .defineInRange("magaraHacmi", 400, 16, 4000);
     }

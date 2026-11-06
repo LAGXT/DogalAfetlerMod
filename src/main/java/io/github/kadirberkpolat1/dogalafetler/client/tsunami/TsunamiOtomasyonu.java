@@ -113,13 +113,14 @@ public final class TsunamiOtomasyonu {
     }
 
     /**
-     * #2 Dalga Avcısı uçtan uca (GOREV §6 #16): hayatta kalma modundaki oyuncu S1 tsunamisinde kıyının 6 blok içinde dalganın
-     * yolunda durur; dalga onu sürükler (sunucu log'unda {@code SURUKLENDI}), afet hızlandırılmış saatle doğal biter ve sunucuya
-     * başarımın verilip verilmediği sorulur ("Test passed").
+     * #2 Dalga Avcısı uçtan uca (GOREV §6 #16): hayatta kalma modundaki oyuncu S2 tsunamisinde kıyıda, dalga tabanının en çok 2
+     * blok üstündeki ilk zeminde dalganın yolunda durur; dalga onu sürükler (sunucu log'unda {@code SURUKLENDI}), afet
+     * hızlandırılmış saatle doğal biter ve sunucuya başarımın verilip verilmediği sorulur ("Test passed"). İlk koşuda oyuncu
+     * kıyıdan 6 blok içeride y 69'da (taban 62 + 7) dalga tepesinin üstünde kaldı, sürüklenmedi.
      */
     private static List<String> avci() {
         return List.of("k:dogalafet su vitrin", "b:300", "k:time set 6000", "k:dogalafet su vitrin kamera tepe", "b:100",
-                "k:gamemode survival", "k:dogalafet start tsunami 1", "b:20", "k:dogalafet asama ileri", "b:20",
+                "k:gamemode survival", "k:dogalafet start tsunami 2", "b:20", "k:dogalafet asama ileri", "b:20",
                 "k:dogalafet asama ileri", "b:30", "a:yerles", "b:60", "s:tsunami-avci-once", "b:480",
                 "s:tsunami-avci-dalga", "b:80", "a:durum", "k:dogalafet hiz 6", "b:400", "k:dogalafet hiz 1", "b:40",
                 "a:durum", "k:execute if entity @s[advancements={dogalafetler:dogalafetler/dalga_avcisi=true}]", "b:20",
@@ -154,6 +155,9 @@ public final class TsunamiOtomasyonu {
             for (EfektKalitesi k : new EfektKalitesi[] {EfektKalitesi.DUSUK, EfektKalitesi.YUKSEK, EfektKalitesi.ULTRA}) {
                 a.addAll(olcum("tsunami-olc-" + k.name().toLowerCase(Locale.ROOT), k, List.of(), List.of()));
             }
+            a.add("q:YUKSEK");
+        }
+        if (BOLUM.contains("ayrinti")) {
             a.addAll(olcum("tsunami-olc-yuksek-yikimsiz", EfektKalitesi.YUKSEK, List.of("k:gamerule afetBlokHasari false"),
                     List.of("k:gamerule afetBlokHasari true")));
             a.addAll(olcum("tsunami-olc-yuksek-yagmursuz", EfektKalitesi.YUKSEK, List.of("y:0"), List.of("y:1")));
@@ -278,9 +282,21 @@ public final class TsunamiOtomasyonu {
         }
         float yx = o.getFloat("yx");
         float yz = o.getFloat("yz");
-        double x = o.getFloat("kx") + yx * 6;
-        double z = o.getFloat("kz") + yz * 6;
+        double x = o.getFloat("kx") + yx;
+        double z = o.getFloat("kz") + yz;
         int y = mc.level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, Mth.floor(x), Mth.floor(z));
+        for (int i = 1; i <= 16; i++) {
+            double xi = o.getFloat("kx") + yx * i;
+            double zi = o.getFloat("kz") + yz * i;
+            int yi = mc.level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, Mth.floor(xi), Mth.floor(zi));
+            if (yi <= o.getFloat("tb") + 3 && mc.level.getFluidState(new net.minecraft.core.BlockPos(Mth.floor(xi), yi - 1,
+                    Mth.floor(zi))).isEmpty()) {
+                x = xi;
+                z = zi;
+                y = yi;
+                break;
+            }
+        }
         float yaw = (float) Math.toDegrees(Math.atan2(yx, -yz));
         String komut = String.format(Locale.ROOT, "tp @s %.2f %d %.2f %.1f 5", x, y, z, yaw);
         mc.player.connection.sendCommand(komut);

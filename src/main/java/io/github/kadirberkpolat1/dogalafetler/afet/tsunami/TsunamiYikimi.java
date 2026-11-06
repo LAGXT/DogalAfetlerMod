@@ -22,8 +22,10 @@ import net.minecraftforge.common.Tags;
  * halı (anında), sonra ahşap (0,3 sn), sonra taş yapı (0,6 sn, yalnız S4–5). Doğal arazi (toprak, kum, taş), çimen ve çiçek
  * gibi bitkiler, sıvı içeren ve blok varlıklı (sandık, tabela) bloklar yıkılmaz (her kırılan blok istemcide bölüm yeniden derler;
  * çayırı düzlemek S5'te FPS'i ve TPS'i çökertti). Kırılan ahşap/taş bloğun %30'u eşya bırakır (dalga onu sürükler), tick
- * başına en çok {@value #DUSURME_TICK}, afet başına {@code 16·seviye}; tick başına en çok 6 kırılma
- * efekti (ses + parçacık). Her değişen chunk için {@link SanalSu#chunkDegisti}. Tarama sırasında dalgaya açılan mağara ağızları
+ * başına en çok {@value #DUSURME_TICK}, afet başına {@code 16·seviye}; tick başına en çok {@value #EFEKT_SINIRI} kırılma
+ * efekti (ses + parçacık). Blok komşu güncellemesi olmadan değişir ({@link #BAYRAK}): komşu şekil güncellemesi yaprak mesafesi,
+ * çit/cam bağlantısı zincirleriyle ikinci bir blok değişikliği dalgası doğuruyordu (TS-12). Her değişen chunk için
+ * {@link SanalSu#chunkDegisti}. Tarama sırasında dalgaya açılan mağara ağızları
  * (doğal tavanlı, göğü görmeyen, yanında açık hava olan hücre) afete bildirilir.
  */
 final class TsunamiYikimi {
@@ -45,7 +47,9 @@ final class TsunamiYikimi {
     }
 
     static final int KOLON_BUTCESI = 192;
-    static final int EFEKT_SINIRI = 6;
+    static final int EFEKT_SINIRI = 3;
+    /** İstemciye gönder, komşu şekillerini güncelleme (yaprak/çit zinciri yok), komşuya {@code neighborChanged} yok. */
+    static final int BAYRAK = Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE;
     static final double DUSURME_ORANI = 0.3;
     static final int DUSURME_TICK = 2;
     private static final double ADIM = 0.7;
@@ -149,7 +153,7 @@ final class TsunamiYikimi {
                 if (efekt++ < EFEKT_SINIRI) {
                     l.levelEvent(2001, m, Block.getId(s));
                 }
-                l.setBlock(m, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+                l.setBlock(m, Blocks.AIR.defaultBlockState(), BAYRAK);
                 bolumler.add(bolum);
                 degisenChunk.add(ChunkPos.asLong(m.getX() >> 4, m.getZ() >> 4));
                 kirilan++;

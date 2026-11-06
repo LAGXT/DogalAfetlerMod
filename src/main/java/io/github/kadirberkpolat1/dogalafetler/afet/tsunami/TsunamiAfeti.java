@@ -466,6 +466,7 @@ public final class TsunamiAfeti extends Afet {
             t.putFloat("yz", (float) geometri.yonZ());
             t.putFloat("kx", (float) geometri.kiyiX());
             t.putFloat("kz", (float) geometri.kiyiZ());
+            t.putFloat("tb", (float) taban);
             t.putBoolean("yagmur", aktifBaslangic >= 0);
         }
     }
