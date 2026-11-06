@@ -3674,6 +3674,26 @@ doku kökü, kare sayısı)` ile katkı verir (`AsitKayitlari`, `MeteorKayitlari
 `src/generated/.../particles/` 17 dosya, içerik birebir aynı (12 eski dosyadaki sondaki satır sonu dışında bayt bayt; JSON eşit,
 kanıt `.vibe/kanit/entegrasyon-4/asit/parcacik-eski/`). Yeni parçacık ekleyen dal tanımını `parcacikEkle` ile verir.
 
+**K-E26 Sanal suda sıçrama yalnız girişte (şef kararı, 2026-11-07; inceleme-tsunami-2 Ts1).** Kök neden:
+`su/mixin/EntityMixin` `updateInWaterStateAndDoFluidPushing`'in `RETURN`'ünde `!wasTouchingWater && !firstTick` iken
+`doWaterSplashEffect()` çağırıyordu. Forge 47.4.28 `Entity.updateInWaterStateAndDoWaterCurrentPushing` gerçek su yoksa her
+çağrıda `wasTouchingWater = false` yazar (javap: ofset 87–89, `else` dalı; gerçek suya girişteki sıçrama ofset 53–67'de önceki
+değeri yazmadan önce okur). Kanca bayrağı bu yüzden her çağrıda `false` gördü: sanal suya değen her varlık (deniz yükselmesi,
+mağara suyu, tsunami dalgası; sunucu ve istemci) her tick bir "suya giriş" sıçraması üretti. Her sıçrama istemcide
+`(1 + 20·genişlik)` kabarcık ve aynı sayıda damla parçacığı, sunucuda sıçrama sesi ve `SPLASH` oyun olayı demek.
+`ItemEntity.tick` metodu bir tick'te iki kez çağırdığı için eşya tick başına iki kez sıçrattı. Faz 2b'den beri gizli P1; tsunami
+S5 sahnesindeki 6716 parçacığın kaynağı (`stop` sonrası varlık 148 kalırken parçacık 27'ye iniyor). Karar: kanca kendi
+`@Unique dogalafetler$sudaydi` alanını tutar (önceki çağrının sonunda varlık gerçek ya da sanal suya değiyor muydu); sıçrama
+yalnız `!sudaydi && !wasTouchingWater && !firstTick` iken, yani kuru → ıslak geçişinde bir kez (vanilla ile eş). Gerçek su ↔
+sanal su geçişi sıçratmaz (vanilla'da su → su sıçratmaz); gerçek suya girişte vanilla kendi sıçramasını yapar. Suda kalırken
+`wasTouchingWater`, su yüksekliği, göz sıvısı, itme, düşme ve ateş sıfırlaması değişmedi; yüzme, boğulma, sürüklenme ve
+ıslaklık (K0-25, SU-03, SU-22) aynı yoldan gelir. Kanıt: GameTest `SuOyunTestleri.sanalSuyaGirenVarlikBirKezSicratir` (batch
+`su_sicrama`; dolu odaya ışınlanan yapay zekâsız domuz ve eşya, 40 tick). Düzeltmeden önce SPLASH domuz 40, eşya 80, sıçrama sesi
+120 (her tick 1 / 2 / 3; `.vibe/kanit/k-e26/gametest-once.log:103`); sonra 1 / 1 / 2, yalnız giriş tick'inde; domuz suda,
+havası 260/300 (`gametest-filtre.log:178`). Reddedilen: tsunami tarafında parçacık ya da eşya tavanı (semptom; deniz yükselmesi ve
+mağara suyunda sürerdi, sıçrama sesi her tick çalardı); yalnız sanal su bayrağı (`sudaydi = h > 0`; gerçek sudan sanal suya
+geçişte vanilla'da olmayan bir sıçrama verirdi). Tsunami S5 FPS'i bu düzeltmeyle (`merge main`) yeniden ölçülür.
+
 ### Yiyecek
 
 **F-17 Kutup Balığı Çorbası koşullu tarif (şef kararı, inceleme Yi1).** Tarif ve tarif kitabı başarımı Forge'un üst düzey
