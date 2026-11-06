@@ -94,13 +94,14 @@ final class TsunamiYikimi {
     }
 
     /**
-     * Bir tick: sütun taraması ({@link #KOLON_BUTCESI} × kısma), sonra hazır işlerden en çok {@code butce} blok ve en çok
-     * {@code bolumButcesi} farklı 16³ chunk bölümü: her değişen bölüm istemcide yeniden derlenir (Kök neden ölçümü, TS-12);
-     * sınırı aşan iş sırasını koruyarak sonraki tick'e kalır (kuyruk cephe satır sırasında olduğu için bölümler kümelenir).
+     * Bir tick: sütun taraması ({@link #KOLON_BUTCESI} × kısma), sonra hazır işlerden en çok {@code butce} blok, en çok
+     * {@code bolumButcesi} farklı 16³ chunk bölümü ve en çok {@code chunkButcesi} farklı chunk sütunu: her değişen bölüm
+     * istemcide yeniden derlenir, ışık değişimi sütun boyunca ve komşu bölümlere yayılıp onları da derletir (TS-12); sınırı
+     * aşan iş sırasını koruyarak sonraki tick'e kalır (kuyruk cephe satır sırasında olduğu için bölümler kümelenir).
      * {@code magara} mağara ağzı adayını alır ve daha aday istiyorsa {@code true} döner. Kırılan blok sayısı.
      */
     int tick(ServerLevel l, long simdi, TsunamiSeviyesi sv, double taban, double kisma, int butce, int bolumButcesi,
-            int efektSiniri, boolean blokHasari, Predicate<BlockPos> magara) {
+            int chunkButcesi, int efektSiniri, boolean blokHasari, Predicate<BlockPos> magara) {
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
         int alt = (int) Math.floor(taban) - 1;
         boolean magaraIstiyor = true;
@@ -134,7 +135,9 @@ final class TsunamiYikimi {
             while (kirilan < butce && !kuyruk.isEmpty() && kuyruk.peek().hazir() <= simdi) {
                 m.set(kuyruk.peek().konum());
                 long bolum = SectionPos.asLong(m.getX() >> 4, m.getY() >> 4, m.getZ() >> 4);
-                if (!bolumler.contains(bolum) && bolumler.size() >= bolumButcesi) {
+                long sutun = ChunkPos.asLong(m.getX() >> 4, m.getZ() >> 4);
+                if (!bolumler.contains(bolum) && bolumler.size() >= bolumButcesi
+                        || !degisenChunk.contains(sutun) && degisenChunk.size() >= chunkButcesi) {
                     break;
                 }
                 kuyruk.poll();
@@ -154,7 +157,7 @@ final class TsunamiYikimi {
                 }
                 l.setBlock(m, Blocks.AIR.defaultBlockState(), BAYRAK);
                 bolumler.add(bolum);
-                degisenChunk.add(ChunkPos.asLong(m.getX() >> 4, m.getZ() >> 4));
+                degisenChunk.add(sutun);
                 kirilan++;
             }
         }
