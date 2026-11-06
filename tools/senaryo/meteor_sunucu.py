@@ -26,7 +26,7 @@ cs.SENARYO_DUNYASI = "meteor-senaryo"
 cs.SENARYO_OZELLIKLERI = {"level-name": cs.SENARYO_DUNYASI, "level-seed": "20261106", "online-mode": "false"}
 
 TAVAN = 48
-KRATER = r"meteor krateri tamam: \S+ \({boyut}, {gorunum}, minecraft:overworld\): kazılan (\d+), korunan \d+"
+KRATER = r"meteor krateri tamam: -?\d+, -?\d+, -?\d+ \({boyut}, {gorunum}, minecraft:overworld\): kazılan (\d+), korunan \d+"
 
 
 def kosu(sunucu):
