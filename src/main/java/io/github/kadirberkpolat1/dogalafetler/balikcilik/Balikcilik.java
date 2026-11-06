@@ -34,6 +34,7 @@ public final class Balikcilik {
         forge.addListener(BuzBalikciligi::sunucuTick);
         forge.addListener(EventPriority.LOWEST, BuzBalikciligi::balikTutuldu);
         forge.addListener(BuzBalikciligi::sunucuDurdu);
+        forge.addListener(BuzBalikciligi::donemDegisti);
         forge.addListener(Balikcilik::sunucuBasladi);
         DataGenerators.ceviriEkle(BalikcilikCevirileri::yaz);
         // Lambda: sağlayıcı sınıfı (istemci model üreticilerine bağlı) yalnız datagen'de yüklenir (K-E9).

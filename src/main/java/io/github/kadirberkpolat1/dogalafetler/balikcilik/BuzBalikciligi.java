@@ -3,8 +3,10 @@ package io.github.kadirberkpolat1.dogalafetler.balikcilik;
 import io.github.kadirberkpolat1.dogalafetler.balikcilik.mantik.Aktiflik;
 import io.github.kadirberkpolat1.dogalafetler.balikcilik.mantik.HareketsizlikSogumasi;
 import io.github.kadirberkpolat1.dogalafetler.balikcilik.mantik.IsirmaSuresi;
+import io.github.kadirberkpolat1.dogalafetler.core.DonemAlani;
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
+import io.github.kadirberkpolat1.dogalafetler.core.olay.DonemDegistiEvent;
 import io.github.kadirberkpolat1.dogalafetler.donma.DonmaApi;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.SicaklikKancalari;
 import java.lang.reflect.Field;
@@ -254,6 +256,19 @@ public final class BuzBalikciligi {
             cekilenTick = olta.level().getGameTime();
             cekilenOyuncu = oyuncu;
             MinecraftForge.EVENT_BUS.post(new BalikTutulduEvent(oyuncu, olay.getDrops(), delik));
+        }
+    }
+
+    /**
+     * {@code /dogalafet sifirla} (K-E11): kalıcı olmayan balikçı durumu (hareketsizlik sayaçları, oltaların beklemesi)
+     * sıfırlanır. Açık delikler blok durumu ve zamanlanmış tick'tir (sayaç yok, B-07): kendi ömürleriyle donar.
+     */
+    static void donemDegisti(DonemDegistiEvent olay) {
+        if (olay.alan() == DonemAlani.SIFIRLAMA) {
+            OYUNCULAR.clear();
+            for (Olta d : OLTALAR.values()) {
+                d.basladi = false;
+            }
         }
     }
 

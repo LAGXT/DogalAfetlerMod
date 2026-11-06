@@ -9,8 +9,8 @@
           "functions": [
             {
               "enchantments": [
-                "minecraft:lure",
                 "minecraft:frost_walker",
+                "minecraft:lure",
                 "minecraft:luck_of_the_sea"
               ],
               "function": "minecraft:enchant_randomly"

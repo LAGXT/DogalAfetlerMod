@@ -1,5 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.balikcilik.veri;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.balikcilik.BalikcilikEtiketleri;
 import io.github.kadirberkpolat1.dogalafetler.balikcilik.BalikcilikKayitlari;
@@ -32,17 +34,18 @@ import net.minecraft.data.recipes.SimpleCookingRecipeBuilder;
 import net.minecraft.data.tags.ItemTagsProvider;
 import net.minecraft.data.tags.TagsProvider;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.tags.ItemTags;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.storage.loot.BuiltInLootTables;
 import net.minecraft.world.level.storage.loot.LootPool;
 import net.minecraft.world.level.storage.loot.LootTable;
 import net.minecraft.world.level.storage.loot.entries.LootItem;
-import net.minecraft.world.level.storage.loot.functions.EnchantRandomlyFunction;
+import net.minecraft.world.level.storage.loot.Deserializers;
+import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
 import net.minecraft.world.level.storage.loot.functions.SetItemCountFunction;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets;
 import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
@@ -56,14 +59,15 @@ import net.minecraftforge.common.data.ExistingFileHelper;
 import net.minecraftforge.common.data.GlobalLootModifierProvider;
 import net.minecraftforge.common.loot.LootTableIdCondition;
 import net.minecraftforge.data.event.GatherDataEvent;
+import net.minecraftforge.registries.ForgeRegistries;
 
 /**
  * Balıkçılığın datagen çıktıları (GOREV §3, madde 2, N12): balıkçılık loot tabloları ({@link #ANA} ve kategori
  * tabloları), global loot değiştiricisi, eşya etiketleri ({@code #dogalafetler:pismis_kutup_baligi},
- * {@code #dogalafetler:cig_kutup_baligi}, {@code #minecraft:fishes}), pişirme tarifleri (ocak, tütsüleme, kamp ateşi) ve
+ * {@code #dogalafetler:cig_kutup_baligi}), pişirme tarifleri (ocak, tütsüleme, kamp ateşi) ve
  * {@code buz_parcasi} → buz, blok durumu ve modeller (dokuları {@code tools/assets/balikcilik_dokular.py} üretir).
  * Sağlayıcı adları benzersizdir (K-E5). Vanilla blok etiketlerine yazılmaz: aynı etiket dosyasını yazan ikinci sağlayıcı
- * birincinin içeriğini siler (donma {@code mineable/pickaxe}'e ince buzu yazar; karar B-10).
+ * birincinin içeriğini siler (B-10); vanilla etiket katkıları yalnız çekirdeğin kancasıyla (K-E12).
  */
 public final class BalikcilikVeriSaglayicilari {
     private static final ResourceLocation ANA = BuzDeligiLootDegistirici.TABLO;
@@ -123,9 +127,24 @@ public final class BalikcilikVeriSaglayicilari {
                             .apply(SetItemCountFunction.setCount(UniformGenerator.between(1, 3))),
                     LootItem.lootTableItem(Items.SNOWBALL).setWeight(2)
                             .apply(SetItemCountFunction.setCount(UniformGenerator.between(1, 4)))));
-            c.accept(kategoriTablosu(Kategori.HAZINE), tablo(LootItem.lootTableItem(Items.BOOK)
-                    .apply(new EnchantRandomlyFunction.Builder().withEnchantment(Enchantments.FROST_WALKER)
-                            .withEnchantment(Enchantments.FISHING_SPEED).withEnchantment(Enchantments.FISHING_LUCK))));
+            LootItemFunction kitap = hazineBuyusu(Enchantments.FROST_WALKER, Enchantments.FISHING_SPEED,
+                    Enchantments.FISHING_LUCK);
+            c.accept(kategoriTablosu(Kategori.HAZINE), tablo(LootItem.lootTableItem(Items.BOOK).apply(() -> kitap)));
+        }
+
+        /**
+         * {@code enchant_randomly} verilen sırayla: vanilla kurucusu büyüleri kimlik hash'li bir {@code HashSet}'te tutar ve
+         * her {@code runData}'da sıra değişir (üretilen dosya sabit kalmaz); işlev JSON'dan kurulur.
+         */
+        private static LootItemFunction hazineBuyusu(Enchantment... buyuler) {
+            JsonObject json = new JsonObject();
+            json.addProperty("function", "minecraft:enchant_randomly");
+            JsonArray liste = new JsonArray();
+            for (Enchantment b : buyuler) {
+                liste.add(String.valueOf(ForgeRegistries.ENCHANTMENTS.getKey(b)));
+            }
+            json.add("enchantments", liste);
+            return Deserializers.createFunctionSerializer().create().fromJson(json, LootItemFunction.class);
         }
 
         private static LootTable.Builder tablo(net.minecraft.world.level.storage.loot.entries.LootPoolEntryContainer.Builder<?>... girdiler) {
@@ -170,7 +189,6 @@ public final class BalikcilikVeriSaglayicilari {
             for (Balik b : Balik.values()) {
                 tag(BalikcilikEtiketleri.CIG_KUTUP_BALIGI).add(b.cig());
                 tag(BalikcilikEtiketleri.PISMIS_KUTUP_BALIGI).add(b.pismis());
-                tag(ItemTags.FISHES).add(b.cig(), b.pismis());
             }
         }
     }
