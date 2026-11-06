@@ -22,10 +22,10 @@ import net.minecraftforge.common.Tags;
  * halı (anında), sonra ahşap (0,3 sn), sonra taş yapı (0,6 sn, yalnız S4–5). Doğal arazi (toprak, kum, taş), çimen ve çiçek
  * gibi bitkiler, sıvı içeren ve blok varlıklı (sandık, tabela) bloklar yıkılmaz (her kırılan blok istemcide bölüm yeniden derler;
  * çayırı düzlemek S5'te FPS'i ve TPS'i çökertti). Kırılan ahşap/taş bloğun %30'u eşya bırakır (dalga onu sürükler), tick
- * başına en çok {@value #DUSURME_TICK}, afet başına {@code 16·seviye}; tick başına en çok {@value #EFEKT_SINIRI} kırılma
- * efekti (ses + parçacık). Blok komşu güncellemesi olmadan değişir ({@link #BAYRAK}): komşu şekil güncellemesi yaprak mesafesi,
- * çit/cam bağlantısı zincirleriyle ikinci bir blok değişikliği dalgası doğuruyordu (TS-12). Her değişen chunk için
- * {@link SanalSu#chunkDegisti}. Tarama sırasında dalgaya açılan mağara ağızları
+ * başına en çok {@value #DUSURME_TICK}, afet başına {@code 16·seviye}; tick başına en çok {@code efektSiniri} kırılma efekti
+ * (ses + parçacık; config {@code tsunami.yikimEfektTick}). Blok komşu güncellemesi olmadan değişir ({@link #BAYRAK}):
+ * komşu şekil güncellemesi yaprak mesafesi, çit/cam bağlantısı zincirleriyle ikinci bir blok değişikliği dalgası doğuruyordu
+ * (TS-12). Her değişen chunk için {@link SanalSu#chunkDegisti}. Tarama sırasında dalgaya açılan mağara ağızları
  * (doğal tavanlı, göğü görmeyen, yanında açık hava olan hücre) afete bildirilir.
  */
 final class TsunamiYikimi {
@@ -47,7 +47,6 @@ final class TsunamiYikimi {
     }
 
     static final int KOLON_BUTCESI = 192;
-    static final int EFEKT_SINIRI = 3;
     /** İstemciye gönder, komşu şekillerini güncelleme (yaprak/çit zinciri yok), komşuya {@code neighborChanged} yok. */
     static final int BAYRAK = Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE;
     static final double DUSURME_ORANI = 0.3;
@@ -101,7 +100,7 @@ final class TsunamiYikimi {
      * {@code magara} mağara ağzı adayını alır ve daha aday istiyorsa {@code true} döner. Kırılan blok sayısı.
      */
     int tick(ServerLevel l, long simdi, TsunamiSeviyesi sv, double taban, double kisma, int butce, int bolumButcesi,
-            boolean blokHasari, Predicate<BlockPos> magara) {
+            int efektSiniri, boolean blokHasari, Predicate<BlockPos> magara) {
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
         int alt = (int) Math.floor(taban) - 1;
         boolean magaraIstiyor = true;
@@ -150,7 +149,7 @@ final class TsunamiYikimi {
                     dusen++;
                     toplamDusen++;
                 }
-                if (efekt++ < EFEKT_SINIRI) {
+                if (efekt++ < efektSiniri) {
                     l.levelEvent(2001, m, Block.getId(s));
                 }
                 l.setBlock(m, Blocks.AIR.defaultBlockState(), BAYRAK);

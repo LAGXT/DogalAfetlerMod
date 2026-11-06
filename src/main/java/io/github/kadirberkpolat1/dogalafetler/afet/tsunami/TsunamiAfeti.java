@@ -273,7 +273,8 @@ public final class TsunamiAfeti extends Afet {
         int hacim = Math.min(a.magaraHacmi.get() * seviye(), SuAyarlari.sunucu().magaraMaksHacim.get());
         long kalis = SuAyarlari.sunucu().magaraKalisSn.get() * 20L;
         int bolum = Math.max(1, (int) Math.round(a.yikimBolumTick.get() * kisma));
-        yikim.tick(level, simdi, sv, taban, kisma, butce, bolum, Kurallar.blokHasariAcik(level.getGameRules()),
+        yikim.tick(level, simdi, sv, taban, kisma, butce, bolum, a.yikimEfektTick.get(),
+                Kurallar.blokHasariAcik(level.getGameRules()),
                 p -> magaraDene(level, sv, p, hacim, kalis));
     }
 

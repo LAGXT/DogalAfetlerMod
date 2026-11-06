@@ -152,15 +152,20 @@ public final class TsunamiOtomasyonu {
                     "m:icine", "b:100", "s:tsunami-magara-sualti", "k:dogalafet su temizle", "b:40"));
         }
         if (BOLUM.contains("olc")) {
+            // Isınma: ilk ölçüm JIT ve ilk sahnenin chunk yüklemesiyle kirleniyordu (ölçüm 2'de Düşük tabanı Yüksek'ten düşük).
+            a.addAll(List.of("k:dogalafet su vitrin", "b:300", "k:dogalafet su vitrin kamera tepe", "b:600"));
             for (EfektKalitesi k : new EfektKalitesi[] {EfektKalitesi.DUSUK, EfektKalitesi.YUKSEK, EfektKalitesi.ULTRA}) {
                 a.addAll(olcum("tsunami-olc-" + k.name().toLowerCase(Locale.ROOT), k, List.of(), List.of()));
             }
             a.add("q:YUKSEK");
         }
         if (BOLUM.contains("ayrinti")) {
+            a.addAll(olcum("tsunami-olc-yuksek-efektsiz", EfektKalitesi.YUKSEK, List.of("c:tsunami.yikimEfektTick=0"),
+                    List.of("c:tsunami.yikimEfektTick=1")));
+            a.addAll(olcum("tsunami-olc-yuksek-yarimbutce", EfektKalitesi.YUKSEK, List.of("c:tsunami.yikimCarpani=0.5"),
+                    List.of("c:tsunami.yikimCarpani=1.0")));
             a.addAll(olcum("tsunami-olc-yuksek-yikimsiz", EfektKalitesi.YUKSEK, List.of("k:gamerule afetBlokHasari false"),
                     List.of("k:gamerule afetBlokHasari true")));
-            a.addAll(olcum("tsunami-olc-yuksek-yagmursuz", EfektKalitesi.YUKSEK, List.of("y:0"), List.of("y:1")));
             a.add("q:YUKSEK");
         }
         if (hepsi || BOLUM.contains("avci")) {
@@ -241,6 +246,7 @@ public final class TsunamiOtomasyonu {
             case 'm' -> magara(mc, deger);
             case 'y' -> TsunamiYagmuru.kapali = "0".equals(deger);
             case 'q' -> kalite(EfektKalitesi.valueOf(deger));
+            case 'c' -> sunucuAyari(deger);
             case 'a' -> avciAdimi(mc, deger);
             case 'x' -> {
                 log("BITTI girdi tus={} fare={} teker={}", tus, fare, teker);
@@ -260,6 +266,29 @@ public final class TsunamiOtomasyonu {
             }
         }
         log("KALITE istenen={} etkin={}", k, IstemciAyarlari.efektKalitesi());
+    }
+
+    /**
+     * Kök neden ayrıştırması: entegre sunucunun SERVER config değerini ({@code <yol>=<değer>}, ör.
+     * {@code tsunami.yikimEfektTick=0}) çalışma anında değiştirir; dosyaya yazılmaz. Afet değeri her tick okur.
+     */
+    @SuppressWarnings("unchecked")
+    private static void sunucuAyari(String atama) {
+        String yol = atama.substring(0, atama.indexOf('='));
+        String deger = atama.substring(atama.indexOf('=') + 1);
+        for (ModConfig c : ConfigTracker.INSTANCE.configSets().get(ModConfig.Type.SERVER)) {
+            if (DogalAfetler.MOD_ID.equals(c.getModId()) && c.getSpec() instanceof ForgeConfigSpec spec
+                    && spec.getValues().get(yol) instanceof ForgeConfigSpec.ConfigValue<?> v) {
+                if (v.get() instanceof Integer) {
+                    ((ForgeConfigSpec.ConfigValue<Integer>) v).set(Integer.parseInt(deger));
+                } else if (v.get() instanceof Double) {
+                    ((ForgeConfigSpec.ConfigValue<Double>) v).set(Double.parseDouble(deger));
+                }
+                log("AYAR {}={} etkin={}", yol, deger, v.get());
+                return;
+            }
+        }
+        log("AYAR {} bulunamadı", yol);
     }
 
     /**
