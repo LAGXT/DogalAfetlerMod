@@ -225,7 +225,8 @@ public final class SuOyunTestleri {
     /**
      * Düz taş zeminde +x yönünde ilerleyen dalga: dalga tabanının altındaki hendekteki domuz ve zemindeki eşya dalga
      * yönünde 3 bloktan fazla sürüklenir ve domuz suda sayılır (sunucu, SU-27); sahte oyuncu ıslaktır ve istemcisinin
-     * uygulayacağı ivme dalga yönündedir (oyuncuyu kendi istemcisi iter, SU-03).
+     * uygulayacağı ivme dalga yönündedir (oyuncuyu kendi istemcisi iter, SU-03). Deniz alanı okuması duraklatılır: hendek
+     * sütunu bilinmez, dalga tabanı yalnız yedek zeminden gelir; yedek olmadan domuz kuru kalır (kırmızı: SU-33).
      */
     @GameTest(template = "su_alani", batch = "su_dalga", timeoutTicks = 400)
     public static void dalgaMobuVeEsyayiSurukler(GameTestHelper h) {
@@ -244,28 +245,30 @@ public final class SuOyunTestleri {
         BlockPos koken = m(h, -20, 1, 8);
         double domuzX = domuz.getX();
         double esyaX = esya.getX();
+        SanalSuDunyasi dunya = SanalSu.boyut(l).dunya;
+        SanalSu.alanOkumasiDuraklat(l, new ChunkPos(m(h, -24, 0, 0)), new ChunkPos(m(h, 16, 0, 16)), 420);
+        long yedek0 = dunya.yedekZeminSayisi();
+        BlockPos hendek = m(h, 6, 0, 6);
         int id = SanalSu.dalgaBaslat(l, new Dalga(koken.getX(), koken.getZ() + 0.5, 1, 0, SanalSu.sunucuSaati, 0.5, 6, 60, 60,
                 koken.getY(), 200));
         double[] it = new double[2];
-        boolean[] oldu = new boolean[5];
-        // Her koşul gerçekleştiği ilk tick'te kilitlenir (domuz ve eşya suda yüzeye çıkar, dalga oyuncuyu geçer: hepsi aynı
-        // anda doğru olmak zorunda değil). Bekleme süresiyle değil koşulla; üst sınır testin 400 tick'i.
+        // Bütün koşullar aynı tick'te doğru olmalı (kilit yok); üst sınır testin 400 tick'i.
         h.startSequence()
                 .thenWaitUntil(() -> {
-                    oldu[0] |= SanalSu.icindeMi(oyuncu);
-                    oldu[1] |= SanalSu.itmeHesapla(oyuncu, it) != null && it[0] > 0 && Math.abs(it[1]) < 1e-9;
-                    oldu[2] |= domuz.getX() - domuzX > 3;
-                    oldu[3] |= esya.getX() - esyaX > 3;
-                    oldu[4] |= domuz.isInWater() && domuz.getY() < dalgaTabani;
-                    h.assertTrue(oldu[0], "oyuncu dalgada ıslak değil");
-                    h.assertTrue(oldu[1], "oyuncunun sürükleme ivmesi dalga yönünde değil");
-                    h.assertTrue(oldu[4], "hendekteki domuz suyu tanımadı (y=" + domuz.getY() + ", dalga tabanı " + dalgaTabani + ")");
-                    h.assertTrue(oldu[2], "domuz sürüklenmedi: dx=" + (domuz.getX() - domuzX));
-                    h.assertTrue(oldu[3], "eşya sürüklenmedi: dx=" + (esya.getX() - esyaX));
+                    h.assertTrue(dunya.alan().zemin(hendek.getX(), hendek.getZ()) == Integer.MIN_VALUE,
+                            "deniz alanı hendek sütununu okudu (duraklatma tutmadı)");
+                    h.assertTrue(domuz.isInWater(), "hendekteki domuz suyu tanımadı (y=" + domuz.getY() + ", dalga tabanı " + dalgaTabani + ")");
+                    h.assertTrue(SanalSu.icindeMi(oyuncu), "oyuncu dalgada ıslak değil");
+                    h.assertTrue(SanalSu.itmeHesapla(oyuncu, it) != null && it[0] > 0 && Math.abs(it[1]) < 1e-9,
+                            "oyuncunun sürükleme ivmesi dalga yönünde değil");
+                    h.assertTrue(domuz.getX() - domuzX > 3, "domuz sürüklenmedi: dx=" + (domuz.getX() - domuzX));
+                    h.assertTrue(esya.getX() - esyaX > 3, "eşya sürüklenmedi: dx=" + (esya.getX() - esyaX));
+                    h.assertTrue(dunya.yedekZeminSayisi() > yedek0, "yedek zemin yolu kullanılmadı");
                 })
                 .thenExecute(() -> {
-                    DogalAfetler.LOGGER.info("Sanal su GameTest: dalga domuz dx={} y={} eşya dx={} oyuncu ivme={} domuz suda={} tick={}",
-                            domuz.getX() - domuzX, domuz.getY(), esya.getX() - esyaX, it[0], domuz.isInWater(), h.getTick());
+                    DogalAfetler.LOGGER.info("Sanal su GameTest: dalga domuz dx={} y={} eşya dx={} oyuncu ivme={} domuz suda={} yedek zemin={} tick={}",
+                            domuz.getX() - domuzX, domuz.getY(), esya.getX() - esyaX, it[0], domuz.isInWater(),
+                            dunya.yedekZeminSayisi() - yedek0, h.getTick());
                     SanalSu.dalgaBitir(l, id);
                     l.getServer().getPlayerList().remove(oyuncu);
                 })
@@ -275,8 +278,8 @@ public final class SuOyunTestleri {
     /**
      * Deniz yükselmesi süreci (bölüm H, N10, N18, §3a): ay yok olunca bekleme kurulur; {@code aysonrasi atla} yükselmeyi
      * başlatır (hedef 4, kalıcı); artış monoton yükselir; {@code stop} süreci dondurur (KOMUT); {@code asama ileri} durmuş
-     * süreci hedefe ulaştırır; durmuş süreçte buharlaşma da indirmez (SU-25); süreç sürdürülünce buharlaşma artışı
-     * derinlik kadar kademeli 0'a indirir ve geri getirmez.
+     * süreci hedefe ulaştırır; buharlaşma artışı derinlik kadar 0'a indirir ve geri getirmez. İniş durdurmadan bağımsızdır
+     * (SU-32): {@code stop} (KOMUT) ve {@code ayCarpmasiAfeti false} (KURAL) altında da sürer.
      */
     @GameTest(template = "bos", batch = "su_surec", timeoutTicks = 400)
     public static void denizSureciAyYokOluncaBaslarDururBuharlasmaSifirlar(GameTestHelper h) {
@@ -315,17 +318,26 @@ public final class SuOyunTestleri {
                     artislar.add(d.deniz().mevcutArtis());
                     h.assertTrue(Math.abs(d.deniz().mevcutArtis() - 2.5f) < 1e-4, "buharlaşma 1,5: artış " + d.deniz().mevcutArtis());
                     komut(h, "dogalafet stop");
-                    h.assertTrue(y.surecDurdu(DenizYukselmesiSureci.ORNEK), "iniş sırasında stop süreci durdurmadı");
-                    d.buharlasmaDerinligiAyarla(5f);
-                })
-                .thenExecuteAfter(2, () -> {
-                    h.assertTrue(Math.abs(d.deniz().mevcutArtis() - 2.5f) < 1e-4,
-                            "durmuş süreçte buharlaşma artışı indirdi (SU-25): " + d.deniz().mevcutArtis());
-                    y.donemSureciBasladi(DenizYukselmesiSureci.ORNEK);
+                    h.assertTrue(y.durdurmaNedeni(DenizYukselmesiSureci.ORNEK).orElse(null) == DonemSureci.DurdurmaNedeni.KOMUT,
+                            "iniş sırasında stop süreci durdurmadı");
+                    d.buharlasmaDerinligiAyarla(3f);
                 })
                 .thenExecuteAfter(2, () -> {
                     artislar.add(d.deniz().mevcutArtis());
-                    h.assertTrue(d.deniz().mevcutArtis() == 0f, "buharlaşma 5: artış 0 değil");
+                    h.assertTrue(Math.abs(d.deniz().mevcutArtis() - 1f) < 1e-4,
+                            "KOMUT ile durmuş süreçte buharlaşma inişi sürmedi (SU-32): " + d.deniz().mevcutArtis());
+                    y.donemSureciBasladi(DenizYukselmesiSureci.ORNEK);
+                    komut(h, "gamerule ayCarpmasiAfeti false");
+                    y.kurallariDenetle();
+                    h.assertTrue(y.durdurmaNedeni(DenizYukselmesiSureci.ORNEK).orElse(null) == DonemSureci.DurdurmaNedeni.KURAL,
+                            "kural kapatılınca süreç KURAL ile durmadı");
+                    d.buharlasmaDerinligiAyarla(5f);
+                })
+                .thenExecuteAfter(2, () -> {
+                    artislar.add(d.deniz().mevcutArtis());
+                    h.assertTrue(d.deniz().mevcutArtis() == 0f,
+                            "KURAL ile durmuş süreçte buharlaşma 5: artış 0 değil (SU-32): " + d.deniz().mevcutArtis());
+                    komut(h, "gamerule ayCarpmasiAfeti true");
                     d.buharlasmaDerinligiAyarla(0f);
                 })
                 .thenExecuteAfter(2, () -> {

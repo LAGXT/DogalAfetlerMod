@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.HashSet;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 class TazelemePlaniTest {
     private static long a(int cx, int cz) {
@@ -128,6 +129,7 @@ class TazelemePlaniTest {
     }
 
     @Test
+    @Timeout(10)
     void yakindanUzagaIkiThreaddenAyniAndaGuvenli() throws Exception {
         // Tek oyunculuda sunucu ve istemci thread'i aynı anda çağırır (koşu 8'de paylaşılan haritada NPE).
         java.util.List<Long> istenen = new java.util.ArrayList<>();

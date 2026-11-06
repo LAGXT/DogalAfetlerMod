@@ -7,7 +7,6 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import io.github.kadirberkpolat1.dogalafetler.komut.KomutKaydi;
 import io.github.kadirberkpolat1.dogalafetler.veri.CeviriYazici;
 import io.github.kadirberkpolat1.dogalafetler.veri.DataGenerators;
-import java.util.List;
 import java.util.Locale;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -20,6 +19,7 @@ import net.minecraft.tags.FluidTags;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.fml.loading.FMLEnvironment;
 
 /**
  * Sanal su komutları (KOMUTLAR, N18): {@code /dogalafet denizseviyesi <değer> [kademeli]}, {@code /dogalafet aysonrasi atla}
@@ -75,25 +75,27 @@ public final class SuKomutlari {
                                         .executes(k -> cekilme(k, IntegerArgumentType.getInteger(k, "yaricap"),
                                                 IntegerArgumentType.getInteger(k, "derinlik"))))))
                 .then(Commands.literal("temizle").executes(SuKomutlari::temizle))
-                .then(Commands.literal("kiyi").executes(SuKomutlari::kiyi))
-                .then(Commands.literal("vitrin").executes(SuKomutlari::vitrin)
-                        .then(Commands.literal("kamera")
-                                .then(Commands.literal("iskele").executes(k -> vitrinKamera(k, SuVitrin.Kamera.ISKELE)))
-                                .then(Commands.literal("sualti").executes(k -> vitrinKamera(k, SuVitrin.Kamera.SUALTI)))
-                                .then(Commands.literal("tepe").executes(k -> vitrinKamera(k, SuVitrin.Kamera.TEPE))))
-                        .then(Commands.literal("dalga").then(Commands.argument("yukseklik", IntegerArgumentType.integer(1, 30))
-                                .executes(k -> vitrinDalga(k, IntegerArgumentType.getInteger(k, "yukseklik"))))))
-                .then(Commands.literal("ay")
-                        .then(Commands.literal("var").executes(k -> ay(k, true)))
-                        .then(Commands.literal("yok").executes(k -> ay(k, false)))));
+                .then(Commands.literal("kiyi").executes(SuKomutlari::kiyi)));
+        if (gelistirmeKomutlari()) {
+            SuVitrinKomutlari.kaydet();
+        }
         DataGenerators.ceviriEkle(SuKomutlari::cevirileriYaz);
+    }
+
+    /**
+     * Gerçek blok koyan vitrin sahnesi ve ayı elle değiştiren komut yalnız geliştirme ortamında ve istemci otomasyonu
+     * açıkken ({@code -Potomasyon}) kayıtlıdır (SU-31); üretim jar'ında ve düz {@code runServer}'da yoktur, {@code SuVitrin}
+     * yüklenmez.
+     */
+    static boolean gelistirmeKomutlari() {
+        return !FMLEnvironment.production && System.getProperty("dogalafetler.otomasyon") != null;
     }
 
     static String sayi(double v) {
         return String.format(Locale.ROOT, "%.2f", v);
     }
 
-    private static void yaz(CommandContext<CommandSourceStack> k, Component c) {
+    static void yaz(CommandContext<CommandSourceStack> k, Component c) {
         k.getSource().sendSuccess(() -> c, true);
     }
 
@@ -225,45 +227,6 @@ public final class SuKomutlari {
             }
         }
         return en;
-    }
-
-    /** Vitrin sahnesi (SU-29): kumsala iskele ve kıyı köyü kurar, kamera iskelenin ucunda. */
-    private static int vitrin(CommandContext<CommandSourceStack> k) throws CommandSyntaxException {
-        ServerPlayer p = k.getSource().getPlayerOrException();
-        SuVitrin.Sahne s = SuVitrin.kur(p.serverLevel(), p.getBlockX(), p.getBlockZ());
-        if (s == null) {
-            k.getSource().sendFailure(Component.translatable(KIYI_YOK));
-            return 0;
-        }
-        SuVitrin.kamera(p, SuVitrin.Kamera.ISKELE);
-        yaz(k, Component.translatable(VITRIN, s.x(), s.deniz(), s.z()));
-        return 1;
-    }
-
-    private static int vitrinKamera(CommandContext<CommandSourceStack> k, SuVitrin.Kamera ne) throws CommandSyntaxException {
-        if (!SuVitrin.kamera(k.getSource().getPlayerOrException(), ne)) {
-            k.getSource().sendFailure(Component.translatable(VITRIN_YOK));
-            return 0;
-        }
-        yaz(k, Component.translatable(VITRIN_KAMERA, ne.name().toLowerCase(Locale.ROOT)));
-        return 1;
-    }
-
-    private static int vitrinDalga(CommandContext<CommandSourceStack> k, int yukseklik) {
-        int id = SuVitrin.dalga(k.getSource().getLevel(), yukseklik);
-        if (id < 0) {
-            k.getSource().sendFailure(Component.translatable(VITRIN_YOK));
-            return 0;
-        }
-        yaz(k, Component.translatable(VITRIN_DALGA, id, yukseklik));
-        return id;
-    }
-
-    /** Test: ayı kaldırır/geri koyar ({@code DunyaDonemi.ayVarAyarla}); ay yok olunca deniz süreci beklemeye girer. */
-    private static int ay(CommandContext<CommandSourceStack> k, boolean var) {
-        io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi.al(k.getSource().getServer()).ayVarAyarla(var);
-        yaz(k, Component.translatable(AY, var ? "+" : "-"));
-        return 1;
     }
 
     /** Kumsal puanı (0: uygun değil). */

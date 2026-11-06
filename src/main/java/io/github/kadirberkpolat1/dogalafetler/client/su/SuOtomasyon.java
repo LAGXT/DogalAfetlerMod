@@ -98,13 +98,13 @@ public final class SuOtomasyon {
         }
         if (hepsi || BOLUM.contains("dalga")) {
             a.addAll(List.of("k:time set 10500", "k:dogalafet su vitrin kamera tepe", "b:200", "f:dalga-afetsiz",
-                    "s:sanal-su-dalga-once", "k:dogalafet su vitrin dalga 16", "b:110", "f:dalga-afet", "s:sanal-su-dalga",
+                    "s:sanal-su-dalga-once", "k:dogalafet su vitrin dalga 16", "b:90", "f:dalga-afet", "s:sanal-su-dalga",
                     "k:dogalafet su temizle", "b:40"));
         }
         if (hepsi || BOLUM.contains("magara")) {
             a.addAll(List.of("m:kur", "b:200", "f:magara-afetsiz", "s:sanal-su-magara-once", "m:doldur", "b:160",
                     "f:magara-afet", "s:sanal-su-magara", "m:icine", "b:100", "s:sanal-su-magara-sualti",
-                    "m:kamera", "b:20", "k:dogalafet asama ileri", "k:dogalafet hiz 8", "b:50", "s:sanal-su-magara-kuruyor",
+                    "m:kamera", "b:20", "k:dogalafet asama ileri", "k:dogalafet hiz 8", "b:110", "s:sanal-su-magara-kuruyor",
                     "k:dogalafet hiz 1", "k:dogalafet su temizle"));
         }
         a.add("x:son");
@@ -211,7 +211,8 @@ public final class SuOtomasyon {
 
     /**
      * Mağara sahnesi: oyuncunun altında taş bir oda (hava y 10..16), damlataş tavanda ışıltaşı yamaları, sarkıtlar ve asılı
-     * fenerler, yosunlu duvarlar, bir duvarda deniz fenerleri, iki sütun ve çakıl zemin; kamera bir köşede suya yakın, alçak.
+     * fenerler, yosunlu duvarlar, bir duvarda deniz fenerleri, iki sütun ve çakıl zemin; kamera bir köşede yüzeyin ~1 blok
+     * üstünde, tavan ışıklarının yansıması kadrajın ortasında (SU-35).
      */
     private static void magara(Minecraft mc, String ne) {
         if ("kur".equals(ne)) {
@@ -245,16 +246,16 @@ public final class SuOtomasyon {
                 k.add("setblock %d 16 %d lantern[hanging=true]".formatted(ox + q[0], oz + q[1]));
             }
             k.add("time set 6000");
-            k.add("tp @s %d 14.8 %d -45 14".formatted(ox - 7, oz - 7));
+            k.add("tp @s %d 14.2 %d -45 20".formatted(ox - 7, oz - 7));
             for (String komut : k) {
                 mc.player.connection.sendCommand(komut);
             }
         } else if ("icine".equals(ne)) {
-            mc.player.connection.sendCommand("gamemode survival");
-            mc.player.connection.sendCommand("tp @s %d.5 10 %d.5 -45 20".formatted(ox, oz));
+            // Su altından yukarı: yüzeyin altı ve sıcak demetler (izleyici: kamera sürüklenmez).
+            mc.player.connection.sendCommand("tp @s %d.5 11 %d.5 -45 -22".formatted(ox - 5, oz - 5));
         } else if ("kamera".equals(ne)) {
             mc.player.connection.sendCommand("gamemode spectator");
-            mc.player.connection.sendCommand("tp @s %d 14.8 %d -45 14".formatted(ox - 7, oz - 7));
+            mc.player.connection.sendCommand("tp @s %d 14.2 %d -45 20".formatted(ox - 7, oz - 7));
         } else {
             mc.player.connection.sendCommand("dogalafet su magara %d 10 %d 900 600".formatted(ox, oz));
         }

@@ -45,6 +45,10 @@ public final class SanalSu {
         final Map<Integer, long[]> magaraKutusu = new HashMap<>();
         /** Deniz alanının tick başına okuma bütçesi (her 10 tick'te yeniden hesaplanır). */
         int tickButcesi = 1;
+        /** Bu oyun saatine kadar deniz alanı okunmaz (yalnız test, {@link #alanOkumasiDuraklat}). */
+        long okumaDuraklatBitis = Long.MIN_VALUE;
+        /** Dalga kimliği -> afet numarası ({@link #dalgaBaslat(ServerLevel, Dalga, long)}; kalıcı). */
+        final Map<Integer, Long> dalgaAfetNo = new HashMap<>();
 
         Boyut(ServerLevel l) {
             dunya = yeniDunya(l.getSeaLevel(), sunucuYurutucu());
@@ -53,6 +57,8 @@ public final class SanalSu {
     }
 
     static final Map<ResourceKey<Level>, Boyut> BOYUTLAR = new HashMap<>();
+    /** Afet numarası yok: {@link #dalgaBaslat(ServerLevel, Dalga)} tekillik denetlemez. */
+    public static final long AFET_YOK = Long.MIN_VALUE;
     /** İstemci seviyesinin kopyası ({@code client.su} doldurur); yoksa {@code null}. Ortak kod istemci sınıfı görmez. */
     public static volatile SanalSuDunyasi istemci;
     /** İstemcide tahmin edilen ölçekli afet saati ({@code client.su} bağlar). */
@@ -164,6 +170,20 @@ public final class SanalSu {
         }
     }
 
+    /**
+     * Test (SU-27): kutudaki chunk'ları deniz alanından bırakır ve okumayı {@code tick} oyun tick'i duraklatır; bu sürede dalga
+     * aralığının tabanı yalnız yedek zeminden gelebilir. Süre dolunca okuma kendiliğinden sürer.
+     */
+    static void alanOkumasiDuraklat(ServerLevel l, ChunkPos a, ChunkPos b, int tick) {
+        Boyut by = boyut(l);
+        for (int cx = Math.min(a.x, b.x); cx <= Math.max(a.x, b.x); cx++) {
+            for (int cz = Math.min(a.z, b.z); cz <= Math.max(a.z, b.z); cz++) {
+                by.dunya.alan().birak(DenizAlani.anahtar(cx, cz));
+            }
+        }
+        by.okumaDuraklatBitis = l.getGameTime() + tick;
+    }
+
     /** Oyuncu olmasa da deniz alanı hesaplanacak chunk aralığı (tsunami hedefi, GameTest). */
     public static void bolgeSabitle(ServerLevel l, ChunkPos a, ChunkPos b) {
         Set<Long> s = boyut(l).sabit;
@@ -182,10 +202,48 @@ public final class SanalSu {
 
     /** Dalgayı başlatır ve boyuttaki oyunculara gönderir; kimliği döner. */
     public static int dalgaBaslat(ServerLevel l, Dalga d) {
+        return dalgaBaslat(l, d, AFET_YOK);
+    }
+
+    /**
+     * Afete bağlı dalga: aynı {@code afetNo} ile süren bir dalga varsa yeni dalga eklenmez, onun kimliği döner (çift dalga
+     * olmaz; yeniden başlatmada dalga zaten kayıttan geri gelir, §A2). {@code afetNo} afetin kendi kalıcı numarasıdır.
+     */
+    public static int dalgaBaslat(ServerLevel l, Dalga d, long afetNo) {
+        if (afetNo != AFET_YOK) {
+            int var = dalgaAfetBul(afetNo);
+            if (var > 0) {
+                return var;
+            }
+        }
         int id = ++sonKimlik;
-        boyut(l).dunya.dalgaEkle(id, d);
+        Boyut b = boyut(l);
+        b.dunya.dalgaEkle(id, d);
+        if (afetNo != AFET_YOK) {
+            b.dalgaAfetNo.put(id, afetNo);
+        }
         yayinla(l);
         return id;
+    }
+
+    /** {@code afetNo}'ya bağlı süren dalganın kimliği, yoksa -1 (bitmiş dalgaların kaydı silinir). */
+    static int dalgaAfetBul(long afetNo) {
+        int sonuc = -1;
+        for (Boyut b : BOYUTLAR.values()) {
+            b.dalgaAfetNo.keySet().removeIf(id -> !b.dunya.dalgalar().containsKey(id));
+            for (Map.Entry<Integer, Long> e : b.dalgaAfetNo.entrySet()) {
+                if (e.getValue() == afetNo) {
+                    sonuc = e.getKey();
+                }
+            }
+        }
+        return sonuc;
+    }
+
+    /** Dalga henüz sürüyor mu (kimlik kayıttan geri gelmiş olabilir). */
+    public static boolean dalgaVarMi(ServerLevel l, int id) {
+        Boyut b = BOYUTLAR.get(l.dimension());
+        return b != null && b.dunya.dalgalar().containsKey(id);
     }
 
     /** Dalganın parametrelerini değiştirir (ör. kıyıda yavaşlama); yoksa {@code false}. */
@@ -275,16 +333,20 @@ public final class SanalSu {
         return new long[] {x0 - 2, cep.minY() - 2, z0 - 2, x1 + 2, cep.ustY() + 2, z1 + 2, 0};
     }
 
-    /** Boyuttaki bütün oyunculara tam durum; parametreler döneme de yazılır (kalıcılık, SU-24). */
+    /** Boyuttaki bütün oyunculara tam durum; parametreler tick sonunda bir kez döneme yazılır (kalıcılık, SU-24, SU-34). */
     public static void yayinla(ServerLevel l) {
         Boyut b = BOYUTLAR.get(l.dimension());
         if (b != null) {
             AgKanali.boyuttakilereGonder(l.dimension(), SuPaketi.durumdan(l.dimension(), b.dunya));
         }
-        SuKalicilik.yaz(l.getServer());
+        SuKalicilik.kirlet();
     }
 
     /** Kayıttan kurulan kimlik: yeni kimlikler onun üstünden verilir. */
+    static int sonKimlik() {
+        return sonKimlik;
+    }
+
     static void kimlikGordu(int id) {
         sonKimlik = Math.max(sonKimlik, id);
     }

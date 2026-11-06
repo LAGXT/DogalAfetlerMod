@@ -179,16 +179,16 @@ final class SuVitrin {
                 egim = -12f;
             }
             default -> {
-                // Tsunami vitrini: kıyıda, evlerin arkasından cephenin yanından çapraz ve alçaktan; dalga tepesi gözün üstünde,
-                // öndeki evler ölçek verir (tasarım notu: dalga bir evden belirgin şekilde büyük görünmeli).
-                x = s.wx(10, 26);
-                z = s.wz(10, 26);
+                // Tsunami vitrini, geniş plan: dalga ekseninde, evlerin arkasından ve üstünden denize bakar; dalga kıyıya 25-30
+                // blok kala duvar kadrajın ortasında, öndeki çatılar ölçek verir (tasarım notu: dalga bir evden belirgin büyük).
+                x = s.wx(30, 4);
+                z = s.wz(30, 4);
                 l.getChunk((int) Math.floor(x) >> 4, (int) Math.floor(z) >> 4);
-                y = Math.max(l.getHeight(Heightmap.Types.MOTION_BLOCKING, (int) Math.floor(x), (int) Math.floor(z)) + 2.5,
-                        s.deniz() + 5);
-                hx = s.wx(-30, 0) - x;
-                hz = s.wz(-30, 0) - z;
-                egim = -4f;
+                y = Math.max(l.getHeight(Heightmap.Types.MOTION_BLOCKING, (int) Math.floor(x), (int) Math.floor(z)) + 3,
+                        s.deniz() + 13);
+                hx = -s.dx();
+                hz = -s.dz();
+                egim = 5f;
             }
         }
         float yaw = (float) Math.toDegrees(Math.atan2(-hx, hz));

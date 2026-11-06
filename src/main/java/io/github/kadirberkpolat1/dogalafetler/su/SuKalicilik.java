@@ -2,9 +2,8 @@ package io.github.kadirberkpolat1.dogalafetler.su;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -26,8 +25,16 @@ public final class SuKalicilik {
     static final String DALGALAR = "dalgalar";
     static final String CEKILMELER = "cekilmeler";
     static final String MAGARALAR = "magaralar";
-    /** {@code ekVeri} küçük kalsın (çekirdek önerisi ≤ 16 KB): tür başına en çok bu kadar kayıt (en yenileri). */
-    static final int EN_COK_KAYIT = 40;
+    static final String SON_KIMLIK = "sonKimlik";
+    /**
+     * {@code ekVeri} küçük kalsın (çekirdek önerisi ≤ 16 KB): bütün boyutlar için tür başına en çok bu kadar kayıt, en
+     * yenileri (SU-34). Kayıt başına ~0,2–0,3 KB: en kötü durum ~4 KB.
+     */
+    static final int EN_COK_DALGA = 4;
+    static final int EN_COK_CEKILME = 4;
+    static final int EN_COK_MAGARA = 8;
+    private static boolean kirli;
+    private static boolean uyarildi;
 
     private SuKalicilik() {
     }
@@ -84,31 +91,47 @@ public final class SuKalicilik {
         return t.getDouble("donma");
     }
 
-    /** Bütün boyutların dalga, çekilme ve mağara parametrelerini döneme yazar (her senkronda, {@link SanalSu#yayinla}). */
+    /** Durum değişti ({@link SanalSu#yayinla}); yazım sunucu tick'inin sonunda bir kez ({@link #yazGerekirse}). */
+    static void kirlet() {
+        kirli = true;
+    }
+
+    static void yazGerekirse(MinecraftServer server) {
+        if (kirli) {
+            kirli = false;
+            yaz(server);
+        }
+    }
+
+    /** Bütün boyutların dalga, çekilme ve mağara parametrelerini döneme yazar; değişmediyse dokunmaz. */
     static void yaz(MinecraftServer server) {
         if (server == null) {
             return;
         }
-        ListTag dalgalar = new ListTag();
-        ListTag cekilmeler = new ListTag();
-        ListTag magaralar = new ListTag();
+        TreeMap<Integer, CompoundTag> dalgalar = new TreeMap<>();
+        TreeMap<Integer, CompoundTag> cekilmeler = new TreeMap<>();
+        TreeMap<Integer, CompoundTag> magaralar = new TreeMap<>();
         for (Map.Entry<ResourceKey<Level>, SanalSu.Boyut> e : SanalSu.BOYUTLAR.entrySet()) {
             String boyut = e.getKey().location().toString();
             SanalSu.Boyut b = e.getValue();
-            for (Map.Entry<Integer, Dalga> d : son(b.dunya.dalgalar())) {
+            for (Map.Entry<Integer, Dalga> d : b.dunya.dalgalar().entrySet()) {
                 CompoundTag t = new CompoundTag();
                 t.putString("boyut", boyut);
                 dalgaYaz(t, d.getKey(), d.getValue());
-                dalgalar.add(t);
+                Long afet = b.dalgaAfetNo.get(d.getKey());
+                if (afet != null) {
+                    t.putLong("afet", afet);
+                }
+                dalgalar.put(d.getKey(), t);
             }
-            for (Map.Entry<Integer, Cekilme> c : son(b.dunya.cekilmeler())) {
+            for (Map.Entry<Integer, Cekilme> c : b.dunya.cekilmeler().entrySet()) {
                 CompoundTag t = new CompoundTag();
                 t.putString("boyut", boyut);
                 t.putInt("id", c.getKey());
                 cekilmeYaz(t, c.getValue());
-                cekilmeler.add(t);
+                cekilmeler.put(c.getKey(), t);
             }
-            for (Map.Entry<Integer, SanalSuDunyasi.Magara> m : son(b.dunya.magaralar())) {
+            for (Map.Entry<Integer, SanalSuDunyasi.Magara> m : b.dunya.magaralar().entrySet()) {
                 MagaraCebi cep = m.getValue().cep();
                 int[] tohum = cep.enAlcak();
                 long[] kutu = b.magaraKutusu.get(m.getKey());
@@ -124,28 +147,38 @@ public final class SuKalicilik {
                 t.putInt("hacim", cep.hacim());
                 t.putLongArray("kutu", kutu);
                 zamanYaz(t, m.getValue().zaman(), m.getValue().donma());
-                magaralar.add(t);
+                magaralar.put(m.getKey(), t);
             }
         }
+        ListTag dl = son(dalgalar, EN_COK_DALGA, "dalga");
+        ListTag cl = son(cekilmeler, EN_COK_CEKILME, "çekilme");
+        ListTag ml = son(magaralar, EN_COK_MAGARA, "mağara");
         DunyaDonemi donem = DunyaDonemi.al(server);
         CompoundTag su = donem.ekVeri(DenizYukselmesiSureci.VERI);
-        if (su.getList(DALGALAR, Tag.TAG_COMPOUND).equals(dalgalar)
-                && su.getList(CEKILMELER, Tag.TAG_COMPOUND).equals(cekilmeler)
-                && su.getList(MAGARALAR, Tag.TAG_COMPOUND).equals(magaralar)) {
+        if (su.getList(DALGALAR, Tag.TAG_COMPOUND).equals(dl) && su.getList(CEKILMELER, Tag.TAG_COMPOUND).equals(cl)
+                && su.getList(MAGARALAR, Tag.TAG_COMPOUND).equals(ml) && su.getInt(SON_KIMLIK) == SanalSu.sonKimlik()) {
             return;
         }
-        su.put(DALGALAR, dalgalar);
-        su.put(CEKILMELER, cekilmeler);
-        su.put(MAGARALAR, magaralar);
+        su.put(DALGALAR, dl);
+        su.put(CEKILMELER, cl);
+        su.put(MAGARALAR, ml);
+        su.putInt(SON_KIMLIK, SanalSu.sonKimlik());
         donem.ekVeriDegisti(DenizYukselmesiSureci.VERI);
     }
 
-    private static <V> List<Map.Entry<Integer, V>> son(Map<Integer, V> m) {
-        List<Map.Entry<Integer, V>> l = new ArrayList<>(m.entrySet());
-        if (l.size() > EN_COK_KAYIT) {
-            l.sort(Map.Entry.comparingByKey());
-            DogalAfetler.LOGGER.warn("Sanal su: {} kayıttan yalnız en yeni {} tanesi kalıcı", l.size(), EN_COK_KAYIT);
-            l = l.subList(l.size() - EN_COK_KAYIT, l.size());
+    /** Kimliğe göre sıralı kayıtların en yeni {@code enCok} tanesi (kimlikler monoton); aşım bir kez uyarılır. */
+    private static ListTag son(TreeMap<Integer, CompoundTag> m, int enCok, String tur) {
+        if (m.size() > enCok && !uyarildi) {
+            uyarildi = true;
+            DogalAfetler.LOGGER.warn("Sanal su: {} {} kaydından yalnız en yeni {} tanesi kalıcı (bir kez uyarılır)", m.size(), tur,
+                    enCok);
+        }
+        ListTag l = new ListTag();
+        int atla = Math.max(0, m.size() - enCok);
+        for (CompoundTag t : m.values()) {
+            if (atla-- <= 0) {
+                l.add(t);
+            }
         }
         return l;
     }
@@ -162,15 +195,26 @@ public final class SuKalicilik {
      */
     public static int[] kur(MinecraftServer server, CompoundTag su) {
         int[] sayi = new int[3];
+        SanalSu.kimlikGordu(su.getInt(SON_KIMLIK));
         for (Tag x : su.getList(DALGALAR, Tag.TAG_COMPOUND)) {
             CompoundTag t = (CompoundTag) x;
             ServerLevel l = seviye(server, t.getString("boyut"));
-            if (l != null) {
-                int id = t.getInt("id");
-                SanalSu.kimlikGordu(id);
-                SanalSu.boyut(l).dunya.dalgaEkle(id, dalgaOku(t));
-                sayi[0]++;
+            if (l == null) {
+                continue;
             }
+            int id = t.getInt("id");
+            SanalSu.Boyut b = SanalSu.boyut(l);
+            // Afet dalgayı kurulumdan önce yeniden başlattıysa (aynı afetNo) ya da kimlik doluysa çift dalga kurulmaz.
+            if (t.contains("afet") && SanalSu.dalgaAfetBul(t.getLong("afet")) > 0 || b.dunya.dalgalar().containsKey(id)) {
+                DogalAfetler.LOGGER.warn("Sanal su: kayıtlı dalga {} zaten sürüyor; yeniden kurulmadı", id);
+                continue;
+            }
+            SanalSu.kimlikGordu(id);
+            b.dunya.dalgaEkle(id, dalgaOku(t));
+            if (t.contains("afet")) {
+                b.dalgaAfetNo.put(id, t.getLong("afet"));
+            }
+            sayi[0]++;
         }
         for (Tag x : su.getList(CEKILMELER, Tag.TAG_COMPOUND)) {
             CompoundTag t = (CompoundTag) x;

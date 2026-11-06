@@ -38,6 +38,7 @@ public final class SanalSuDunyasi {
     private volatile Cekilme[] cekilmeDizi = CEKILME_YOK;
     private final SuAraliklari gecici = new SuAraliklari();
     private ZeminOkuyucu zeminYedek;
+    private long yedekZeminSayisi;
 
     /** Alanın henüz okumadığı sütunun zemini (dünyadan, yüklü chunk); bilinmiyorsa {@link Integer#MIN_VALUE}. */
     @FunctionalInterface
@@ -59,6 +60,11 @@ public final class SanalSuDunyasi {
      */
     public void zeminYedek(ZeminOkuyucu okuyucu) {
         zeminYedek = okuyucu;
+    }
+
+    /** Dalga aralığının tabanı için yedek zeminin kaç kez okunduğu (test: SU-27 yolunun gerçekten kullanıldığı). */
+    public long yedekZeminSayisi() {
+        return yedekZeminSayisi;
     }
 
     public void denizArtisiAyarla(double artis) {
@@ -198,6 +204,7 @@ public final class SanalSuDunyasi {
                 int zemin = alan.zemin(x, z);
                 if (zemin == Integer.MIN_VALUE && zeminYedek != null) {
                     zemin = zeminYedek.zemin(x, z);
+                    yedekZeminSayisi++;
                 }
                 a.ekle(zemin == Integer.MIN_VALUE ? d.taban() : Math.min(zemin, y), y);
             }

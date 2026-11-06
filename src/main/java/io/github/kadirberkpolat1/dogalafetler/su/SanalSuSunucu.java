@@ -54,6 +54,7 @@ public final class SanalSuSunucu {
             return;
         }
         DenizYukselmesiSureci.ORNEK.tick(server);
+        SuKalicilik.yazGerekirse(server);
     }
 
     @SubscribeEvent
@@ -70,7 +71,7 @@ public final class SanalSuSunucu {
         SanalSuDunyasi d = b.dunya;
         d.denizArtisiAyarla(artis);
         long t = l.getGameTime();
-        if (d.alanGerekli()) {
+        if (d.alanGerekli() && t >= b.okumaDuraklatBitis) {
             if (t % 10 == 0) {
                 alanIsle(l, t, b);
             }

@@ -20,9 +20,11 @@ import java.util.function.Consumer;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.material.FogType;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
@@ -301,7 +303,8 @@ public final class IstemciSu {
     public static void sisRengi(ViewportEvent.ComputeFogColor e) {
         if (kameraSuda(e.getCamera())) {
             // Biyom su sisi (çoğu biyomda neredeyse siyah lacivert) su rengine kaydırılır, kamera noktasının ışığıyla ölçeklenir:
-            // gündüz sığ su turkuaz-mavi ve okunur, gece ve mağarada karanlık kalır (SU-28).
+            // gündüz sığ su turkuaz-mavi ve okunur, gece karanlık kalır (SU-28). Gökyüzü görmeyen ama blok ışığı alan suda
+            // (mağara, fener) sis sıcak amber tona kayar.
             ClientLevel l = Minecraft.getInstance().level;
             var biyom = l.getBiome(e.getCamera().getBlockPosition()).value();
             int sis = biyom.getWaterFogColor();
@@ -311,6 +314,11 @@ public final class IstemciSu {
             float r = ((sis >> 16 & 255) * 0.3f + (su >> 16 & 255) * 0.7f) / 255f * k;
             float g = ((sis >> 8 & 255) * 0.3f + (su >> 8 & 255) * 0.7f) / 255f * k;
             float b = ((sis & 255) * 0.3f + (su & 255) * 0.7f) / 255f * k;
+            BlockPos kp = e.getCamera().getBlockPosition();
+            float sicak = l.getBrightness(LightLayer.BLOCK, kp) / 15f * (1 - l.getBrightness(LightLayer.SKY, kp) / 15f) * 0.5f;
+            r += (0.85f * k - r) * sicak;
+            g += (0.55f * k - g) * sicak;
+            b += (0.3f * k - b) * sicak;
             e.setRed(r);
             e.setGreen(g);
             e.setBlue(b);

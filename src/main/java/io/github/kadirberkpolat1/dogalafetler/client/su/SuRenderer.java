@@ -14,6 +14,7 @@ import io.github.kadirberkpolat1.dogalafetler.su.Cekilme;
 import io.github.kadirberkpolat1.dogalafetler.su.Dalga;
 import io.github.kadirberkpolat1.dogalafetler.su.SuAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.su.DenizAlani;
+import io.github.kadirberkpolat1.dogalafetler.su.KurulumButcesi;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSuDunyasi;
 import io.github.kadirberkpolat1.dogalafetler.su.SuAraliklari;
@@ -33,6 +34,8 @@ import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.inventory.InventoryMenu;
+import net.minecraft.world.level.LightLayer;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
@@ -57,6 +60,8 @@ public final class SuRenderer {
     private static final ResourceLocation KOPUK = DogalAfetler.konum("block/su_kopuk");
     /** Işık demetleri: tepe rengi ve en çok sayısı (kalite). */
     private static final int ISIK_RENGI = 0xBFE6FF;
+    /** Gökyüzü görmeyen suda (mağara) demetler fener/ışıltaşı ışığının sıcak rengini alır. */
+    private static final int SICAK_ISIK_RENGI = 0xFFC27A;
     private static final int N = 2 * YAKIN + 1;
     private static final float[] UST = new float[N * N];
     private static final float[] ALT = new float[N * N];
@@ -64,6 +69,9 @@ public final class SuRenderer {
     private static final byte[] TUR = new byte[N * N];
     /** Köşe ızgarası ({@code (N+1)²}): dalgacık yüksekliği ve çok oktavlı yüzey eğimi (SU-28). */
     private static final float[] VH = new float[(N + 1) * (N + 1)];
+    /** Mağara tavan yansıması gücü (köşe başına) ve hesaplandığı yapım (SU-35). */
+    private static final float[] YANSIMA = new float[(N + 1) * (N + 1)];
+    private static final int[] YANSIMA_NO = new int[(N + 1) * (N + 1)];
     private static final float[] VSX = new float[(N + 1) * (N + 1)];
     private static final float[] VSZ = new float[(N + 1) * (N + 1)];
     private static final SuAraliklari A = new SuAraliklari();
@@ -161,8 +169,15 @@ public final class SuRenderer {
     private static long yapNs;
     private static int yapTickSayisi;
     private static long yapSonTick;
-    private static long butceTick = Long.MIN_VALUE;
-    private static long butceHarcanan;
+    private static int yapSutun;
+    /** Yapım sayısı: {@link #YANSIMA} köşe önbelleğinin damgası. */
+    private static int yapNo;
+    private static final KurulumButcesi BUTCE = new KurulumButcesi();
+    /** Tick'in gerçek kurulum işi (borç hariç, ölçüm). */
+    private static long tickIsNs;
+    private static long tickIsTick = Long.MIN_VALUE;
+    /** Yapım parçası (sütun): bütçe her parçadan sonra denetlenir, tek tick'in aşımı bir parçayla sınırlı (SU-33). */
+    private static final int PARCA = 16;
     // Ölçüm: tick başına en çok kurulum ve yayılma (otomasyon özeti ve 10 sn'lik log).
     private static long olcEnCokTickNs;
     private static long olcTickToplam;
@@ -216,6 +231,8 @@ public final class SuRenderer {
         }
         if (l != sonSeviye) {
             yapIptal();
+            yakinBos = true;
+            uzakBos = true;
             RENK.clear();
             ISIK.clear();
             sonSeviye = l;
@@ -296,6 +313,7 @@ public final class SuRenderer {
         VertexBuffer.unbind();
         mc.gameRenderer.lightTexture().turnOffLightLayer();
         RenderSystem.enableCull();
+        RenderSystem.disableBlend();
         olcCizimNs += System.nanoTime() - t2;
     }
 
@@ -519,6 +537,8 @@ public final class SuRenderer {
         yapTick = tick;
         yapSonTick = Long.MIN_VALUE;
         yapSatir = 0;
+        yapSutun = 0;
+        yapNo++;
         yapVar = false;
         yapNs = 0;
         yapTickSayisi = 0;
@@ -533,17 +553,18 @@ public final class SuRenderer {
     }
 
     /**
-     * Yapımı {@code su.yakinKurulumButcesiMs} (tick başına, CLIENT) dolana kadar satır satır sürdürür; kalanı sonraki tick'e.
-     * Yapım bitene kadar önceki tampon çizilir.
+     * Yapımı {@code su.yakinKurulumButcesiMs} (tick başına, CLIENT) dolana kadar {@link #PARCA} sütunluk parçalarla sürdürür;
+     * kalanı sonraki tick'e, aşım sonraki tick'in bütçesinden düşülür ({@link KurulumButcesi}). Yapım bitene kadar önceki tampon
+     * çizilir.
      */
     private static void yapIlerlet(ClientLevel l, SanalSuDunyasi d, long tick) {
-        if (tick != butceTick) {
-            butceTick = tick;
-            butceHarcanan = 0;
-        }
-        long butce = (long) (SuAyarlari.istemci().yakinKurulumButcesiMs.get() * 1e6);
-        if (yapAsama == 0 || butceHarcanan >= butce) {
+        BUTCE.tickBasla(tick, (long) (SuAyarlari.istemci().yakinKurulumButcesiMs.get() * 1e6));
+        if (yapAsama == 0 || !BUTCE.calisabilir()) {
             return;
+        }
+        if (tickIsTick != tick) {
+            tickIsTick = tick;
+            tickIsNs = 0;
         }
         long t0 = System.nanoTime();
         if (yapSonTick != tick) {
@@ -553,45 +574,36 @@ public final class SuRenderer {
         bb = BB_YAKIN;
         oyAktif = yapOy;
         dortgen = yapDortgen;
-        while (yapAsama != 0 && butceHarcanan + System.nanoTime() - t0 < butce) {
+        long onceki = t0;
+        while (yapAsama != 0 && BUTCE.calisabilir()) {
+            int j0 = yapSutun;
+            int j1 = Math.min(N, j0 + PARCA);
             if (yapAsama == 1) {
-                sorguSatiri(d, yapSatir);
-                if (++yapSatir == N) {
-                    yapSatir = 0;
-                    if (yapVar) {
-                        BB_YAKIN.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
-                        dortgen = 0;
-                        yapAsama = 2;
-                    } else {
-                        yakinDortgen = 0;
-                        yakinBos = true;
-                        yapAsama = 0;
-                    }
-                }
+                sorguParcasi(d, yapSatir, j0, j1);
             } else {
-                for (int j = 0; j < N; j++) {
+                for (int j = j0; j < j1; j++) {
                     if (TUR[yapSatir * N + j] != 0) {
                         sutun(l, d.alan(), yapOx - YAKIN + yapSatir, yapOz - YAKIN + j, yapSatir, j, yapT, yapTick);
                     }
                 }
-                if (++yapSatir == N) {
-                    yakinDortgen = dortgen;
-                    yakinBos = !yukle(BB_YAKIN, true);
-                    yakinOx = yapOx;
-                    yakinOy = yapOy;
-                    yakinOz = yapOz;
-                    yapAsama = 0;
-                }
             }
+            yapSutun = j1;
+            if (j1 == N) {
+                yapSutun = 0;
+                satirBitti();
+            }
+            long simdi = System.nanoTime();
+            BUTCE.harca(simdi - onceki);
+            onceki = simdi;
         }
         yapDortgen = dortgen;
         bb = BB;
         long gecen = System.nanoTime() - t0;
-        butceHarcanan += gecen;
+        tickIsNs += gecen;
         yapNs += gecen;
         olcYakinNs += gecen;
-        olcEnCokTickNs = Math.max(olcEnCokTickNs, butceHarcanan);
-        logEnCokTickNs = Math.max(logEnCokTickNs, butceHarcanan);
+        olcEnCokTickNs = Math.max(olcEnCokTickNs, tickIsNs);
+        logEnCokTickNs = Math.max(logEnCokTickNs, tickIsNs);
         if (yapAsama == 0) {
             olcYakin++;
             olcTickToplam += yapTickSayisi;
@@ -601,11 +613,38 @@ public final class SuRenderer {
         }
     }
 
-    /** Halkanın {@code i}. sütun sırasının su aralıkları ({@link #UST}, {@link #ALT}, {@link #TUR}). */
-    private static void sorguSatiri(SanalSuDunyasi d, int i) {
+    /** Satır sonu: aşama geçişi ya da yapımın bitmesi. */
+    private static void satirBitti() {
+        if (++yapSatir < N) {
+            return;
+        }
+        yapSatir = 0;
+        if (yapAsama == 1) {
+            if (yapVar) {
+                BB_YAKIN.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
+                dortgen = 0;
+                yapAsama = 2;
+            } else {
+                yakinDortgen = 0;
+                yakinBos = true;
+                yapAsama = 0;
+            }
+        } else {
+            yakinDortgen = dortgen;
+            yakinBos = !yukle(BB_YAKIN, true);
+            yakinOx = yapOx;
+            yakinOy = yapOy;
+            yakinOz = yapOz;
+            yapAsama = 0;
+        }
+    }
+
+    /** Halkanın {@code i}. sütun sırasının {@code [j0, j1)} parçası: köşeler ve su aralıkları ({@link #UST}, {@link #ALT}, {@link #TUR}). */
+    private static void sorguParcasi(SanalSuDunyasi d, int i, int j0, int j1) {
         DenizAlani alan = d.alan();
+        int jSon = j1 == N ? N : j1 - 1;
         for (int satir = i; satir <= (i == N - 1 ? N : i); satir++) {
-            for (int j = 0; j <= N; j++) {
+            for (int j = j0; j <= jSon; j++) {
                 int x = yapOx - YAKIN + satir;
                 int z = yapOz - YAKIN + j;
                 int v = satir * (N + 1) + j;
@@ -616,7 +655,7 @@ public final class SuRenderer {
             }
         }
         Cekilme[] cekilmeler = d.cekilmeDizisi();
-        for (int j = 0; j < N; j++) {
+        for (int j = j0; j < j1; j++) {
             int x = yapOx - YAKIN + i;
             int z = yapOz - YAKIN + j;
             int k = i * N + j;
@@ -868,19 +907,23 @@ public final class SuRenderer {
                 dudak(dalga, rx, rz, dalga.taban() + dalgaH, dalgaH, isik);
             }
         } else if (tur == 2) {
-            // Mağara suyu sakin ama cımsız değil: dalgacığın %55'i yükseklikte, eğim ışıkta (SU-28).
+            // Mağara suyu sakin ama cımsız değil: dalgacığın %90'ı yükseklikte, eğim ışıkta ve tavan yansımasında (SU-28, SU-35).
             int v00 = i * (N + 1) + j;
             int v01 = v00 + 1;
             int v10 = v00 + N + 1;
             int v11 = v10 + 1;
-            float y00 = yu + 0.55f * VH[v00];
-            float y01 = yu + 0.55f * VH[v01];
-            float y11 = yu + 0.55f * VH[v11];
-            float y10 = yu + 0.55f * VH[v10];
+            float y00 = yu + 0.9f * VH[v00];
+            float y01 = yu + 0.9f * VH[v01];
+            float y11 = yu + 0.9f * VH[v11];
+            float y10 = yu + 0.9f * VH[v10];
             kosegolgeOlcekli(0, tabanRenk, a, x, y00, z, v00, isik);
             kosegolgeOlcekli(1, tabanRenk, a, x, y01, z + 1, v01, isik);
             kosegolgeOlcekli(2, tabanRenk, a, x + 1, y11, z + 1, v11, isik);
             kosegolgeOlcekli(3, tabanRenk, a, x + 1, y10, z, v10, isik);
+            tavanYansimasi(l, 0, x, y00, z, v00);
+            tavanYansimasi(l, 1, x, y01, z + 1, v01);
+            tavanYansimasi(l, 2, x + 1, y11, z + 1, v11);
+            tavanYansimasi(l, 3, x + 1, y10, z, v10);
             dortgenSerbest(rx, y00, rz, rx, y01, rz + 1, rx + 1, y11, rz + 1, rx + 1, y10, rz, false, x, z);
             if (kopuk > 0.08f) {
                 for (int q = 0; q < 4; q++) {
@@ -947,10 +990,83 @@ public final class SuRenderer {
     }
 
     private static void kosegolgeOlcekli(int q, int taban, float alfa, double x, double y, double z, int v, int isik) {
-        golgele(taban, alfa, x, y, z, VSX[v] * 1.1, VSZ[v] * 1.1, isik);
+        golgele(taban, alfa, x, y, z, VSX[v] * 1.8, VSZ[v] * 1.8, isik);
         QC[q] = gRenk;
         QA[q] = gAlfa;
         QI[q] = gIsik;
+    }
+
+    /**
+     * Mağara suyunda tavan yansıması (SU-35, şader'siz): köşeden kameraya bakış dalgacık normaline göre yansıtılır, ışın
+     * yarım blok adımlarla en çok 8 blok izlenir. Işık kaynağına (ışıltaşı, fener) vuran ışın keskin sıcak parlama, başka
+     * bloka vuran ise o noktanın blok ışığıyla hafif amber verir; Fresnel ile yatık bakışta güçlenir. Dalgacık ışını
+     * oynattığı için yansıma titrer. Köşe başına yapım başına bir kez hesaplanır ({@link #YANSIMA}).
+     */
+    private static void tavanYansimasi(ClientLevel l, int q, double px, double py, double pz, int v) {
+        if (YANSIMA_NO[v] != yapNo) {
+            YANSIMA_NO[v] = yapNo;
+            YANSIMA[v] = yansimaGucu(l, px, py, pz, VSX[v] * 2.2, VSZ[v] * 2.2);
+        }
+        float g = YANSIMA[v];
+        if (g <= 0.01f) {
+            return;
+        }
+        QC[q] = karistir(QC[q], 0xFFD49A, Math.min(0.9f, g));
+        QA[q] = Math.max(QA[q], Math.min(0.95f, 0.5f + 0.45f * g));
+        QI[q] = parlakIsik(QI[q], g);
+    }
+
+    private static float yansimaGucu(ClientLevel l, double px, double py, double pz, double sx, double sz) {
+        double vx = kamX - px;
+        double vy = kamY - py;
+        double vz = kamZ - pz;
+        double vl = Math.sqrt(vx * vx + vy * vy + vz * vz);
+        if (vy <= 0 || vl < 1e-6) {
+            return 0;
+        }
+        vx /= vl;
+        vy /= vl;
+        vz /= vl;
+        double nl = Math.sqrt(sx * sx + 1 + sz * sz);
+        double nx = -sx / nl;
+        double ny = 1 / nl;
+        double nz = -sz / nl;
+        double d = nx * vx + ny * vy + nz * vz;
+        double rx = 2 * d * nx - vx;
+        double ry = 2 * d * ny - vy;
+        double rz = 2 * d * nz - vz;
+        if (ry < 0.05) {
+            return 0;
+        }
+        double fresnel = 0.3 + 0.7 * Math.pow(1 - Math.max(0, d), 3);
+        int ox = Integer.MIN_VALUE;
+        int oy = 0;
+        int oz = 0;
+        for (int s = 1; s <= 16; s++) {
+            double t = s * 0.5;
+            int bx = (int) Math.floor(px + rx * t);
+            int by = (int) Math.floor(py + ry * t);
+            int bz = (int) Math.floor(pz + rz * t);
+            if (bx == ox && by == oy && bz == oz) {
+                continue;
+            }
+            BlockState b = l.getBlockState(P.set(bx, by, bz));
+            if (!b.isAir()) {
+                int yayim = b.getLightEmission(l, P);
+                if (yayim > 0) {
+                    return (float) (fresnel * yayim / 15.0);
+                }
+                if (ox == Integer.MIN_VALUE) {
+                    return 0;
+                }
+                double bl = (l.getBrightness(LightLayer.BLOCK, P.set(ox, oy, oz)) - 9) / 6.0;
+                return bl > 0 ? (float) (fresnel * bl * bl * 0.4) : 0;
+            }
+            ox = bx;
+            oy = by;
+            oz = bz;
+        }
+        return 0;
     }
 
     private static void kosegolge(int q, int taban, float alfa, double x, double y, double z, int v, int isik) {
@@ -1028,25 +1144,30 @@ public final class SuRenderer {
 
     /**
      * Su altı ışık demetleri (SU-28): kamera sanal suyun içindeyken yüzeyden aşağı inen, kameraya dönük, alt ucu güneşten
-     * uzağa kayan, yavaşça salınan saydam dörtgenler; toplamalı karışım, derinlik yazılmaz. Kalite: Orta 14, Yüksek 26, Ultra 40.
+     * uzağa kayan, yavaşça salınan saydam huzmeler; toplamalı karışım, derinlik yazılmaz. Her huzme enine üç bant: dış
+     * köşelerde alfa 0 (sert kenar yok), aşağı doğru %60 genişler, genişliği yavaşça dalgalanır. Gökyüzü ışığı düşükse
+     * (mağara) renk sıcak. Kalite: Orta 10, Yüksek 18, Ultra 26 huzme.
      */
     private static void isinlariCiz(SanalSuDunyasi d, Vec3 cam, Matrix4f mv, Matrix4f proj, ShaderInstance sh) {
         double yuzey = d.ustu(cam.x, cam.y, cam.z, saat);
         if (Double.isNaN(yuzey)) {
             return;
         }
-        int enCok = bilesen >= 4 ? 40 : bilesen == 3 ? 26 : 14;
+        int enCok = bilesen >= 4 ? 26 : bilesen == 3 ? 18 : 10;
         int ox = (int) Math.floor(cam.x);
         int oy = (int) Math.floor(cam.y);
         int oz = (int) Math.floor(cam.z);
+        int gok = Minecraft.getInstance().level.getBrightness(LightLayer.SKY, P.set(ox, (int) Math.floor(yuzey) + 1, oz));
+        int renk = gok < 8 ? SICAK_ISIK_RENGI : ISIK_RENGI;
+        int demet = 0;
         bb = BB_ISIK;
         oyAktif = oy;
         BB_ISIK.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
         dortgen = 0;
         int tam = LightTexture.pack(15, 15);
         float du = (u1 - u0) * 0.12f;
-        for (int gx = Math.floorDiv(ox - 15, 3); gx * 3 <= ox + 15 && dortgen < enCok; gx++) {
-            for (int gz = Math.floorDiv(oz - 15, 3); gz * 3 <= oz + 15 && dortgen < enCok; gz++) {
+        for (int gx = Math.floorDiv(ox - 15, 3); gx * 3 <= ox + 15 && demet < enCok; gx++) {
+            for (int gz = Math.floorDiv(oz - 15, 3); gz * 3 <= oz + 15 && demet < enCok; gz++) {
                 int h = (gx * 73856093) ^ (gz * 19349663);
                 h ^= h >>> 13;
                 h *= 0x5bd1e995;
@@ -1062,22 +1183,33 @@ public final class SuRenderer {
                 if (dl > 15 || dl < 0.8) {
                     continue;
                 }
-                double gen = 0.35 + ((h >>> 20) & 15) / 15.0 * 0.55;
+                double gen = (0.4 + ((h >>> 20) & 15) / 15.0 * 0.6) * (1 + 0.18 * Math.sin(saat * 0.035 + (h & 511)));
                 double wx = -dz / dl * gen;
                 double wz = dx / dl * gen;
                 double ust = yuzey - 0.15;
                 double boy = 9 + ((h >>> 24) & 7);
                 double kx = -gunesX * boy * 0.25 + 0.4 * Math.sin(saat * 0.02 + (h & 255));
                 double kz = 0.3 * Math.cos(saat * 0.017 + (h & 127));
-                float a = (float) (0.26 * (0.6 + 0.4 * Math.sin(saat * 0.05 + (h & 63))));
+                float a = (float) (0.3 * (0.6 + 0.4 * Math.sin(saat * 0.05 + (h & 63))));
                 float sx = (float) (px - ox);
                 float sz = (float) (pz - oz);
                 float ua = u0 + du * ((h >>> 8) & 7);
-                kose(sx - (float) wx, (float) ust, sz - (float) wz, ISIK_RENGI, a, ua, v0, tam, 0);
-                kose(sx + (float) wx, (float) ust, sz + (float) wz, ISIK_RENGI, a, ua + du, v0, tam, 0);
-                kose(sx + (float) (wx + kx), (float) (ust - boy), sz + (float) (wz + kz), ISIK_RENGI, 0f, ua + du, v1, tam, 0);
-                kose(sx - (float) (wx - kx), (float) (ust - boy), sz - (float) (wz - kz), ISIK_RENGI, 0f, ua, v1, tam, 0);
-                dortgen++;
+                float yu = (float) ust;
+                float ya = (float) (ust - boy);
+                // Enine dört kenar çizgisi (-1, -1/3, 1/3, 1): dıştakiler alfa 0, alt uç 1,6 kat geniş ve güneşten uzağa kaymış.
+                for (int b = 0; b < 3; b++) {
+                    float s0 = -1 + b * (2f / 3f);
+                    float s1 = s0 + 2f / 3f;
+                    float a0 = b == 0 ? 0f : a;
+                    float a1 = b == 2 ? 0f : a;
+                    float u = ua + du * b / 3f;
+                    kose(sx + (float) (wx * s0), yu, sz + (float) (wz * s0), renk, a0, u, v0, tam, 0);
+                    kose(sx + (float) (wx * s1), yu, sz + (float) (wz * s1), renk, a1, u + du / 3f, v0, tam, 0);
+                    kose(sx + (float) (wx * s1 * 1.6 + kx), ya, sz + (float) (wz * s1 * 1.6 + kz), renk, 0f, u + du / 3f, v1, tam, 0);
+                    kose(sx + (float) (wx * s0 * 1.6 + kx), ya, sz + (float) (wz * s0 * 1.6 + kz), renk, 0f, u, v1, tam, 0);
+                    dortgen++;
+                }
+                demet++;
             }
         }
         bb = BB;

@@ -5,7 +5,8 @@ Kendi dünyasını sıfırdan üretir: `run-server/su-senaryo` silinir, `run-ser
 `level-name=su-senaryo` yapılır ve senaryo bitince özgün içeriğine döner. Sunucu Gradle ile pty'siz, stdin'i boruya bağlı
 açılır (K0-18).
 
-Koşu 1: durum (deniz +0), denizseviyesi 3, durum (deniz +3), su bilgi, aysonrasi atla (ay var: reddedilir), denizseviyesi 8
+Koşu 1: durum (deniz +0), denizseviyesi 3, durum (deniz +3), su bilgi, geliştirme komutları `su vitrin` ve `su ay yok`
+kayıtlı değil (SU-31: bilinmeyen komut), aysonrasi atla (ay var: reddedilir), denizseviyesi 8
 (üst sınır 6'ya kırpılır), denizseviyesi 2 kademeli + asama ileri (hedefe ulaşır), denizseviyesi 3, spawn altında kapalı
 oda + su magara (294 hücre, 1 saat kalış), su bilgi (mağara 1), `stop`.
 Koşu 2 (aynı dünya): mağara kayıttan kuruldu log'u, durum (deniz +3 korundu), su bilgi (mağara 1 korundu), sifirla, durum
@@ -56,6 +57,9 @@ def kosu1(s):
     s.komut("dogalafet denizseviyesi 3", r"Sea level set to \+3\.00 blocks")
     s.komut("dogalafet durum", r"Sea level: \+3[.,]0+ blocks \(target \+3", "durum (deniz +3)")
     s.komut("dogalafet su bilgi", r"Virtual water \(minecraft:overworld\): sea \+3\.00", "su bilgi (deniz +3)")
+    # SU-31: gerçek blok koyan vitrin ve ay komutu yalnız geliştirme otomasyonunda kayıtlı; dedicated sunucuda yok.
+    s.komut("dogalafet su vitrin", r"Unknown or incomplete command|Incorrect argument for command", "su vitrin kayıtlı değil")
+    s.komut("dogalafet su ay yok", r"Unknown or incomplete command|Incorrect argument for command", "su ay kayıtlı değil")
     s.komut("dogalafet aysonrasi atla", r"The moon is still there", "atla: ay var, reddedilir")
     s.komut("dogalafet denizseviyesi 8", r"Sea level set to \+6\.00 blocks", "üst sınır 6")
     s.komut("dogalafet denizseviyesi 2 kademeli", r"Sea level is moving to \+2\.00 blocks")
