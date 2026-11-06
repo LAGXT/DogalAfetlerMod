@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:fishing",
+  "pools": [
+    {
+      "bonus_rolls": 0.0,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "dogalafetler:donmus_ringa"
+        }
+      ],
+      "rolls": 1.0
+    }
+  ],
+  "random_sequence": "dogalafetler:gameplay/buz_deligi/nadir"
+}

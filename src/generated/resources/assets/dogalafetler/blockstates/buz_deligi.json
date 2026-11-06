@@ -1,0 +1,28 @@
+{
+  "variants": {
+    "asama=0,ince=false": {
+      "model": "dogalafetler:block/buz_deligi_0"
+    },
+    "asama=0,ince=true": {
+      "model": "dogalafetler:block/buz_deligi_0"
+    },
+    "asama=1,ince=false": {
+      "model": "dogalafetler:block/buz_deligi_1"
+    },
+    "asama=1,ince=true": {
+      "model": "dogalafetler:block/buz_deligi_1"
+    },
+    "asama=2,ince=false": {
+      "model": "dogalafetler:block/buz_deligi_2"
+    },
+    "asama=2,ince=true": {
+      "model": "dogalafetler:block/buz_deligi_2"
+    },
+    "asama=3,ince=false": {
+      "model": "dogalafetler:block/buz_deligi_3"
+    },
+    "asama=3,ince=true": {
+      "model": "dogalafetler:block/buz_deligi_3"
+    }
+  }
+}

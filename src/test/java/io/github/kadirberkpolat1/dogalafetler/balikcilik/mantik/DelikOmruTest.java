@@ -27,7 +27,7 @@ class DelikOmruTest {
             int omur = DelikOmru.omurTick(u, a);
             int toplam = DelikOmru.ilkGecikme(omur, a);
             for (int asama = 0; asama < DelikOmru.SON_ASAMA; asama++) {
-                toplam += DelikOmru.asamaGecikmesi(omur, a);
+                toplam += DelikOmru.asamaGecikmesi(a);
             }
             assertEquals(omur, toplam, "delik tam ömründe donmalı");
         }
@@ -36,9 +36,10 @@ class DelikOmruTest {
 
     @Test
     void asamaSuresiKisaOmurdeOmrunDortteBirineKisilir() {
-        DelikOmru.Ayarlar kisa = new DelikOmru.Ayarlar(400, 400, 300);
-        assertEquals(100, DelikOmru.asamaGecikmesi(400, kisa));
+        DelikOmru.Ayarlar kisa = new DelikOmru.Ayarlar(400, 800, 300);
+        assertEquals(100, DelikOmru.asamaGecikmesi(kisa));
         assertEquals(100, DelikOmru.ilkGecikme(400, kisa));
+        assertEquals(500, DelikOmru.ilkGecikme(800, kisa), "uzun ömürde de aşamalar en kısa ömürden");
     }
 
     @Test

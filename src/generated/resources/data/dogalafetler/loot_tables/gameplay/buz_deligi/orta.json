@@ -1,0 +1,20 @@
+{
+  "type": "minecraft:fishing",
+  "pools": [
+    {
+      "bonus_rolls": 0.0,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "dogalafetler:derin_soguk_somonu"
+        },
+        {
+          "type": "minecraft:item",
+          "name": "dogalafetler:buz_kefali"
+        }
+      ],
+      "rolls": 1.0
+    }
+  ],
+  "random_sequence": "dogalafetler:gameplay/buz_deligi/orta"
+}

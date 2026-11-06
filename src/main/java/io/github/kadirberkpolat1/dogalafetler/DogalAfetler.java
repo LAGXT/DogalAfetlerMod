@@ -1,6 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler;
 
 import com.mojang.logging.LogUtils;
+import io.github.kadirberkpolat1.dogalafetler.balikcilik.Balikcilik;
 import io.github.kadirberkpolat1.dogalafetler.config.AyarKaydi;
 import io.github.kadirberkpolat1.dogalafetler.config.CekirdekAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
@@ -52,6 +53,7 @@ public final class DogalAfetler {
         GokyuzuSistemi.kaydet();
         YanginSistemi.kaydet(modBus);
         DonmaSistemi.kaydet(modBus);
+        Balikcilik.kaydet(modBus);
         Kancalar.bagla();
 
         DataGenerators.ceviriEkle(CekirdekCevirileri::yaz);

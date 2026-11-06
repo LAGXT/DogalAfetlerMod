@@ -1,0 +1,22 @@
+{
+  "type": "minecraft:fishing",
+  "pools": [
+    {
+      "bonus_rolls": 0.0,
+      "entries": [
+        {
+          "type": "dogalafetler:balikcilik_kategorisi",
+          "tablolar": {
+            "cop": "dogalafetler:gameplay/buz_deligi/cop",
+            "hazine": "dogalafetler:gameplay/buz_deligi/hazine",
+            "nadir": "dogalafetler:gameplay/buz_deligi/nadir",
+            "orta": "dogalafetler:gameplay/buz_deligi/orta",
+            "yaygin": "dogalafetler:gameplay/buz_deligi/yaygin"
+          }
+        }
+      ],
+      "rolls": 1.0
+    }
+  ],
+  "random_sequence": "dogalafetler:gameplay/buz_deligi_balikcilik"
+}

@@ -33,14 +33,17 @@ public final class DelikOmru {
         return a.enAzTick() + Math.min(ek, aralik - 1);
     }
 
-    /** Bir donma aşamasının süresi: istenen süre, ömrün dörtte birini aşmaz (açık aşama en az o kadar sürer). */
-    public static int asamaGecikmesi(int omurTick, Ayarlar a) {
-        return Math.max(1, Math.min(a.asamaTick(), omurTick / (SON_ASAMA + 1)));
+    /**
+     * Bir donma aşamasının süresi: istenen süre, en kısa ömrün dörtte birini aşmaz (açık aşama en az o kadar sürer).
+     * Deliğin kendi ömrüne bağlı değildir: blok ömrü saklamaz, yalnız aşamasını bilir.
+     */
+    public static int asamaGecikmesi(Ayarlar a) {
+        return Math.max(1, Math.min(a.asamaTick(), a.enAzTick() / (SON_ASAMA + 1)));
     }
 
     /** Açılıştan ilk donma aşamasına kadar. */
     public static int ilkGecikme(int omurTick, Ayarlar a) {
-        return Math.max(1, omurTick - SON_ASAMA * asamaGecikmesi(omurTick, a));
+        return Math.max(1, omurTick - SON_ASAMA * asamaGecikmesi(a));
     }
 
     /** Bu aşamadaki zamanlanmış tick deliği eski buza mu döndürür (yoksa bir sonraki aşamaya mı geçirir). */

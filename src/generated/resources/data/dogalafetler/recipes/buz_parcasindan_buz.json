@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "building",
+  "ingredients": [
+    {
+      "item": "dogalafetler:buz_parcasi"
+    },
+    {
+      "item": "dogalafetler:buz_parcasi"
+    },
+    {
+      "item": "dogalafetler:buz_parcasi"
+    },
+    {
+      "item": "dogalafetler:buz_parcasi"
+    }
+  ],
+  "result": {
+    "item": "minecraft:ice"
+  }
+}
