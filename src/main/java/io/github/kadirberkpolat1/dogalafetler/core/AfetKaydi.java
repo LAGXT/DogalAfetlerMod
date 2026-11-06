@@ -26,6 +26,8 @@ public final class AfetKaydi {
     }
 
     private static final Map<AfetTuru, Supplier<? extends Afet>> FABRIKALAR = new EnumMap<>(AfetTuru.class);
+    /** {@link OyunTestiAfeti#ozelliktenKaydet} ile kaydedilen türler (yalnız hata iletisi için). */
+    private static final Set<AfetTuru> OYUN_TESTI = EnumSet.noneOf(AfetTuru.class);
 
     private AfetKaydi() {
     }
@@ -34,9 +36,18 @@ public final class AfetKaydi {
         Objects.requireNonNull(tur, "tur");
         Objects.requireNonNull(fabrika, "fabrika");
         if (FABRIKALAR.containsKey(tur)) {
-            throw new IllegalStateException(tur.kimlik() + " zaten kayıtlı");
+            throw new IllegalStateException(tur.kimlik() + " zaten kayıtlı" + (OYUN_TESTI.contains(tur)
+                    ? " (oyun testi afeti olarak: gerçek afet kaydı DogalAfetler kurucusunda OyunTestiAfeti.ozelliktenKaydet'ten"
+                            + " önce olmalı, K-E22)"
+                    : ""));
         }
         FABRIKALAR.put(tur, fabrika);
+    }
+
+    /** Yalnız {@link OyunTestiAfeti#ozelliktenKaydet}: türü oyun testi afeti olarak kaydeder (tür kayıtsız olmalı). */
+    static synchronized void oyunTestiKaydet(AfetTuru tur, Supplier<? extends Afet> fabrika) {
+        kaydet(tur, fabrika);
+        OYUN_TESTI.add(tur);
     }
 
     public static synchronized boolean kayitliMi(AfetTuru tur) {

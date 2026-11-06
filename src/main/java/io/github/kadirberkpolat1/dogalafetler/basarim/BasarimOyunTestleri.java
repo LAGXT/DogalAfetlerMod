@@ -581,7 +581,13 @@ public final class BasarimOyunTestleri {
     public static void olaysizAfetteYedekTahminSayilir(GameTestHelper y) {
         ServerPlayer hasarli = oyuncu(y, "asit-a", 0);
         ServerPlayer kosullu = oyuncu(y, "iz-b", 2);
-        try {
+        // Faz 4 afetleri bu türlerin yayıncısını kaydeder; yedek tahmin yolu geçici kayıtsızlıkla sınanır (K-E22).
+        try (BasarimIpucuEvent.GeciciKayitsiz asit = BasarimIpucuEvent.geciciKayitsiz(AfetTuru.ASIT_YAGMURU, Ipucu.HASAR_ALDI);
+                BasarimIpucuEvent.GeciciKayitsiz tsunami = BasarimIpucuEvent.geciciKayitsiz(AfetTuru.TSUNAMI, Ipucu.SURUKLENDI);
+                BasarimIpucuEvent.GeciciKayitsiz sinkhole =
+                        BasarimIpucuEvent.geciciKayitsiz(AfetTuru.SINKHOLE, Ipucu.CUKURA_DUSTU);
+                BasarimIpucuEvent.GeciciKayitsiz yangin =
+                        BasarimIpucuEvent.geciciKayitsiz(AfetTuru.ORMAN_YANGINI, Ipucu.YANGIN_ALANINDA)) {
             long no = -8_000_000L;
             AfetIzi iz = new AfetIzi();
             iz.afeteBagla(no);
@@ -881,7 +887,8 @@ public final class BasarimOyunTestleri {
     public static void olaysizAfetteYedekKayitliYayincidaYedekKapali(GameTestHelper y) {
         ServerPlayer a = oyuncu(y, "yayinci-a", 0);
         ServerPlayer b = oyuncu(y, "yayinci-b", 2);
-        try {
+        try (BasarimIpucuEvent.GeciciKayitsiz kayitsiz =
+                BasarimIpucuEvent.geciciKayitsiz(AfetTuru.SINKHOLE, Ipucu.CUKURA_DUSTU)) {
             afet(y, AfetTuru.SINKHOLE, 1, a, false, () -> {
                 a.fallDistance = 10;
                 BasarimOlaylari.tickDenetimi(a);
