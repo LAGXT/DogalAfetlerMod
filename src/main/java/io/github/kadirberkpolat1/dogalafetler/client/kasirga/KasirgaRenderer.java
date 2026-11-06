@@ -40,9 +40,13 @@ import org.joml.Vector3f;
  * {@link #EKRAN_ORANI_YAKIN}'a iner.
  */
 final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
-    private static final float[] TOZ = {0.52f, 0.42f, 0.31f};
-    private static final float[] ETEK_ALT = {0.40f, 0.31f, 0.22f};
-    private static final float[] ETEK_UST = {0.56f, 0.47f, 0.37f};
+    /**
+     * Toz ve etek renkleri doygun ve açık tutulur: fırtına ışığı (yağmurda gök ışığı ~%65, mavimsi) ve öndeki yağmur çizgileri
+     * eklenince ekranda kahverengi kalmalı (R &gt; G &gt; B; K-17). Eski 0,52/0,42/0,31 vitrinde nötr gri görünüyordu.
+     */
+    private static final float[] TOZ = {0.80f, 0.56f, 0.30f};
+    private static final float[] ETEK_ALT = {0.62f, 0.42f, 0.22f};
+    private static final float[] ETEK_UST = {0.78f, 0.60f, 0.40f};
     private static final float[][] YAPRAK = {{0.30f, 0.48f, 0.22f}, {0.42f, 0.58f, 0.24f}, {0.50f, 0.38f, 0.18f}};
     private static final float PIKSEL = 1f / KasirgaDokusu.BOYUT;
     private static final double TAM_TUR = Math.PI * 2;

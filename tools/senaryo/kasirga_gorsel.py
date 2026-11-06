@@ -129,6 +129,35 @@ def girdi_sayilari(istemci_log):
     return None
 
 
+def taban_rengi(no):
+    """K-17: vitrin ↔ kontrol fark maskesinin (|ΔR|+|ΔG|+|ΔB| > 60) alt üçte birinde vitrin pikselleri ortalaması."""
+    import numpy as np
+    from PIL import Image
+    sonuc = True
+    for ad in ("s5_vitrin", "s5_taban_uzak"):
+        vitrin, kontrol = KARELER / f"kasirga_{ad}-{no}.png", KARELER / f"kasirga_{ad}_kontrol-{no}.png"
+        if not (vitrin.exists() and kontrol.exists()):
+            log(f"taban rengi {ad}: kare eksik")
+            sonuc = False
+            continue
+        v = np.asarray(Image.open(vitrin).convert("RGB")).astype(int)
+        k = np.asarray(Image.open(kontrol).convert("RGB")).astype(int)
+        maske = np.abs(v - k).sum(2) > 60
+        maske[: 2 * maske.shape[0] // 3] = False
+        piksel = v[maske]
+        if len(piksel) == 0:
+            log(f"taban rengi {ad}: fark pikseli yok")
+            sonuc = False
+            continue
+        r, g, b = piksel.mean(0)
+        pay = ((piksel[:, 0] > piksel[:, 1]) & (piksel[:, 1] > piksel[:, 2])).mean()
+        tutar = r > g > b
+        sonuc = sonuc and tutar
+        log(f"taban rengi {ad}: R {r:.1f} G {g:.1f} B {b:.1f}, piksel {len(piksel)}, R>G>B payı %{100 * pay:.0f} → "
+            + ("R>G>B tuttu" if tutar else "TUTMADI"))
+    return sonuc
+
+
 def main():
     no = kosu_no()
     if not kapi():
@@ -198,6 +227,7 @@ def main():
     latest = W / "run/logs/latest.log"
     if latest.exists():
         shutil.copy2(latest, KANIT / f"latest-{no}.log")
+    taban_rengi(no)
     sayim = girdi_sayilari(istemci_log)
     if sayim is None:
         log(f"koşu {no} GEÇERSİZ: girdi sayıları satırı yok")

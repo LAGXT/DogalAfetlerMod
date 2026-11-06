@@ -44,7 +44,9 @@ import net.minecraftforge.registries.ForgeRegistries;
  * Radarı elde, arayüz açık), siren (duvar bulutu alçalır), aktif doğuş, vitrin (olgun evre, {@link #VITRIN} kamerası) ve
  * aynı kameranın kasırgasız kontrol karesi; vitrinde Düşük/Yüksek/Ultra ve kasırgasız (çizimi atlanmış) FPS; LOD
  * kademeleri (120 ve 180 blok); K0-33 mesafeleri 52/36/20/5 blok Yüksek; yakın ve iç kare; {@code stop} sonrası istemci
- * varlık sayımı ve aynı noktada afetsiz taban FPS; S1 aynı vitrin kamerasından, ip evresi, doğal bitiş ve iz karesi.
+ * varlık sayımı ve aynı noktada afetsiz taban FPS; S1 S5 izinin {@link #S1_UZAKLIK} blok yanındaki taze zeminde, aynı vitrin
+ * kamerasından (kaldırılan ve görsel enkaz varken), ip evresi, doğal bitiş ve S1 yoluna bakan iz karesi. Vitrinden sonra
+ * kasırga sisinin dışından ({@link #UZAK}) taban karesi ve kontrolü (renk ölçümü, K-17).
  * Ölçüm süresince kamera kasırgayı izler (mesafe sabit kalır). Kareler A-34 kapısıyla alınır: istekten sonra en az
  * {@link #KARE_CIZIM} kare çizilmiş ve FPS en az {@link #AKICI_FPS} olmalı (gizli workspace'te bayat framebuffer), en çok
  * 60 sn beklenir. Siren ve aktif aşamaya geçmeden ve her ölçümden önce de aynı FPS kapısı beklenir; ortanca kare süresi
@@ -64,6 +66,8 @@ public final class KasirgaOtomasyonu {
     private static final int KAPI_EN_COK = 1200;
     private static final double BAYAT_MS = 200;
     private static final String YAVAS = "0.2";
+    /** S1 hedef noktasının S5 izinin orta noktasından dik uzaklığı (blok): S1 S5'in soymadığı zeminde başlar. */
+    private static final double S1_UZAKLIK = 220;
 
     /** Kasırganın hareket yönünde {@code mesafe} blok önünde, zemin + {@code yukseklik}, {@code egim} derece. */
     private record Kamera(double mesafe, double yukseklik, float egim) {
@@ -73,6 +77,8 @@ public final class KasirgaOtomasyonu {
     private static final Kamera YAKIN = new Kamera(22, 4, -20);
     /** Kaldırılan oyuncu noktası (K0-33 "≤ 5 blok"): etek ve huninin içi. */
     private static final Kamera IC = new Kamera(5, 3, -25);
+    /** Huni kenarı 64 bloktan uzakta (kasırga sisi yok); taban rengi ölçümü (K-17). */
+    private static final Kamera UZAK = new Kamera(90, 10, -6);
 
     /** {@code bekle} tick sonra (ve istenen kare alınmışsa) {@code kosul} doğruysa {@code is} çalışır; {@code enCok} tick sonra zorla. */
     private record Adim(String ad, int bekle, BooleanSupplier kosul, int enCok, Runnable is) {
@@ -94,6 +100,10 @@ public final class KasirgaOtomasyonu {
     private static int kareSayisi;
     private static long sonKare;
     private static volatile boolean kosulSunucu;
+    /** S5 izinin başı/sonu ve S1'in dağılma noktası (x, z, yön); yalnız sunucu thread'i yazar, sonra yine o okur. */
+    private static Vec3 s5Bas;
+    private static Vec3 s5Son;
+    private static double[] s1Son;
 
     private KasirgaOtomasyonu() {
     }
@@ -281,6 +291,8 @@ public final class KasirgaOtomasyonu {
             ilerletEger(server, k -> k.asama() == AfetAsamasi.ON_UYARI);
             komut(server, "dogalafet hiz " + YAVAS);
             sunucuda(server, level -> {
+                Kasirga k = kasirga(server);
+                s5Bas = k != null ? k.konum() : null;
                 ServerPlayer o = oyuncu(server);
                 o.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
                 o.setGameMode(GameType.SPECTATOR);
@@ -300,6 +312,11 @@ public final class KasirgaOtomasyonu {
         adim("kontrol karesi", 10, () -> kare("s5_vitrin_kontrol"));
         adim("kontrol bitti", 5, () -> IstemciKasirga.gizli = false);
         adim("vitrin karesi b", 60, () -> kare("s5_vitrin_b"));
+        adim("uzak taban kamerası", 10, () -> kamera(server, UZAK));
+        adim("uzak taban karesi", 30, () -> kare("s5_taban_uzak"));
+        adim("uzak kontrol", 5, () -> IstemciKasirga.gizli = true);
+        adim("uzak kontrol karesi", 10, () -> kare("s5_taban_uzak_kontrol"));
+        adim("uzak kontrol bitti", 5, () -> IstemciKasirga.gizli = false);
         fps(server, "S5 55 blok DÜŞÜK", VITRIN, EfektKalitesi.DUSUK, false);
         fps(server, "S5 55 blok YÜKSEK", VITRIN, EfektKalitesi.YUKSEK, false);
         fps(server, "S5 55 blok ULTRA", VITRIN, EfektKalitesi.ULTRA, false);
@@ -316,6 +333,10 @@ public final class KasirgaOtomasyonu {
         fps(server, "S5 5 blok YÜKSEK", IC, EfektKalitesi.YUKSEK, false);
         fps(server, "S5 5 blok kasırgasız (çizim yok)", IC, null, true);
         adim("stop", 5, () -> {
+            sunucuda(server, level -> {
+                Kasirga k = kasirga(server);
+                s5Son = k != null ? k.konum() : null;
+            });
             komut(server, "dogalafet stop");
             komut(server, "dogalafet hiz 1");
         });
@@ -329,22 +350,71 @@ public final class KasirgaOtomasyonu {
         });
         ADIMLAR.addAll(olcumAdimlari(server, "afetsiz taban (stop sonrası, 5 blok noktası)", null, null, false, false)
                 .subList(1, 3));
-        adim("S1 başlat", 40, () -> {
+        adim("S1 yeri", 10, () -> sunucuda(server, level -> {
+            // S5 izine dik yönde taze zemin; chunk'lar S1 başlamadan yüklensin diye oyuncu önce oraya, yükseğe taşınır.
+            ServerPlayer o = oyuncu(server);
+            Vec3 bas = s5Bas != null ? s5Bas : o.position();
+            Vec3 son = s5Son != null ? s5Son : o.position();
+            double dx = son.x - bas.x;
+            double dz = son.z - bas.z;
+            double uzunluk = Math.hypot(dx, dz);
+            double nx = uzunluk < 1 ? 1 : -dz / uzunluk;
+            double nz = uzunluk < 1 ? 0 : dx / uzunluk;
+            double x = (bas.x + son.x) / 2 + nx * S1_UZAKLIK;
+            double z = (bas.z + son.z) / 2 + nz * S1_UZAKLIK;
+            o.teleportTo(level, x, 140, z, o.getYRot(), 0);
+            DogalAfetler.LOGGER.info(ON + "S1 yeri {} (S5 izi {} → {})", BlockPos.containing(x, 140, z).toShortString(),
+                    BlockPos.containing(bas).toShortString(), BlockPos.containing(son).toShortString());
+        }));
+        akiciBekle("S1 yeri");
+        adim("S1 başlat", 200, () -> {
             komut(server, "dogalafet start kasirga 1 " + mc.player.getGameProfile().getName());
+            komut(server, "dogalafet hiz " + YAVAS);
             ilerletEger(server, k -> k.asama() == AfetAsamasi.ON_UYARI);
             ilerletEger(server, k -> k.asama() == AfetAsamasi.SIREN);
             ilerletEger(server, k -> k.durum().evre() == KasirgaEvresi.DOGUS);
         });
         adim("S1 kamerası", 80, () -> kamera(server, VITRIN));
-        adim("S1 karesi", 40, () -> kare("s1_vitrin"));
+        kosullu("S1 enkaz", 20, () -> {
+            sunucuda(server, level -> {
+                Kasirga k = kasirga(server);
+                kosulSunucu = k != null && k.toplamKaldirilan() > 0;
+            });
+            return kosulSunucu && IstemciKasirga.gorselEnkazSayisi() > 0;
+        }, KAPI_EN_COK, () -> kamera(server, VITRIN));
+        adim("S1 karesi", 20, () -> kare("s1_vitrin"));
         adim("S1 ip", 10, () -> ilerletEger(server, k -> k.durum().evre() == KasirgaEvresi.OLGUN));
         adim("S1 ip kamerası", 60, () -> kamera(server, VITRIN));
         adim("ip karesi", 30, () -> kare("ip"));
-        adim("S1 dağılma", 60, () -> ilerletEger(server, k -> k.durum().evre() == KasirgaEvresi.IP));
-        adim("doğal bitiş", 30, () -> ilerletEger(server, k -> k.durum().evre() == KasirgaEvresi.DAGILMA));
+        adim("S1 dağılma", 60, () -> {
+            sunucuda(server, level -> {
+                Kasirga k = kasirga(server);
+                s1Son = k != null ? new double[] {k.konum().x, k.konum().z, k.yon()} : null;
+            });
+            ilerletEger(server, k -> k.durum().evre() == KasirgaEvresi.IP);
+        });
+        adim("doğal bitiş", 30, () -> {
+            ilerletEger(server, k -> k.durum().evre() == KasirgaEvresi.DAGILMA);
+            komut(server, "dogalafet hiz 1");
+        });
         adim("bitiş kamerası", 30, () -> sunucuda(server, level -> {
+            // S1'in son noktasının 10 blok önünden, 28 blok yukarıdan geride kalan yoluna (25 blok geri) bakar.
             ServerPlayer o = oyuncu(server);
-            o.teleportTo(level, o.getX(), o.getY() + 14, o.getZ(), o.getYRot(), 50);
+            if (s1Son == null) {
+                o.teleportTo(level, o.getX(), o.getY() + 14, o.getZ(), o.getYRot(), 50);
+                return;
+            }
+            double cx = s1Son[0] + Math.cos(s1Son[2]) * 10;
+            double cz = s1Son[1] + Math.sin(s1Son[2]) * 10;
+            double hx = s1Son[0] - Math.cos(s1Son[2]) * 25;
+            double hz = s1Son[1] - Math.sin(s1Son[2]) * 25;
+            int zemin = level.getHeight(Heightmap.Types.MOTION_BLOCKING, Mth.floor(cx), Mth.floor(cz));
+            float yaw = (float) Math.toDegrees(Math.atan2(-(hx - cx), hz - cz));
+            float egim = (float) Math.toDegrees(Math.atan2(28, Math.hypot(hx - cx, hz - cz)));
+            o.teleportTo(level, cx, zemin + 28, cz, yaw, egim);
+            DogalAfetler.LOGGER.info(ON + "bitiş kamerası S1 yoluna: son nokta {}, bakılan {}",
+                    BlockPos.containing(s1Son[0], zemin, s1Son[1]).toShortString(),
+                    BlockPos.containing(hx, zemin, hz).toShortString());
         }));
         adim("bitiş karesi", 40, () -> kare("bitis_iz"));
         adim("kapanış", 60, () -> {
