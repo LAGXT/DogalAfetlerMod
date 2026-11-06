@@ -208,10 +208,12 @@ def ozet_cikar(no):
     log(f"özet-{no}.log: {len(satirlar)} satır; Exception={sum('Exception' in s for s in satirlar)}")
 
 
-def kareleri_tasi():
+def kareleri_tasi(no):
+    hedef = KANIT / f"kosu-{no}"
+    hedef.mkdir(exist_ok=True)
     for p in sorted((W / "run/screenshots").glob("yangin_*.png")):
-        shutil.copy2(p, KANIT / p.name)
-        log("kare:", p.name, "md5", hashlib.md5(p.read_bytes()).hexdigest()[:12])
+        shutil.copy2(p, hedef / p.name)
+        log("kare:", f"kosu-{no}/{p.name}", "md5", hashlib.md5(p.read_bytes()).hexdigest()[:12])
 
 
 def main():
@@ -227,7 +229,7 @@ def main():
     dunyayi_hazirla()
     ok = istemci_calistir(no)
     ozet_cikar(no)
-    kareleri_tasi()
+    kareleri_tasi(no)
     log(f"koşu {no} sonucu: {'GEÇERLİ' if ok else 'GEÇERSİZ'}")
     return 0 if ok else 1
 
