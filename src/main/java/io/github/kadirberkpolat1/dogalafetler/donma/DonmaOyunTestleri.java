@@ -507,9 +507,10 @@ public final class DonmaOyunTestleri {
         try {
             y.assertTrue(level.getHeight(Heightmap.Types.MOTION_BLOCKING, agac.getX(), agac.getZ()) > 120,
                     "yaprak sütunu MOTION_BLOCKING'de görünmeli (sahne geçersiz)");
+            // LevelChunk.getHeight en üst bloğun Y'sini döner (Level.getHeight'in bir altı): zemin = çimen bloğu.
             int zemin = DonmaApi.yuzeyY(level, agac);
-            y.assertTrue(zemin == agac.getY() && zemin == DonmaApi.yuzeyY(level, yan), "zemin yaprak saymamalı: " + zemin
-                    + " / yan " + DonmaApi.yuzeyY(level, yan) + " / beklenen " + agac.getY());
+            y.assertTrue(zemin == agac.getY() - 1 && zemin == DonmaApi.yuzeyY(level, yan), "zemin yaprak saymamalı: " + zemin
+                    + " / yan " + DonmaApi.yuzeyY(level, yan) + " / beklenen " + (agac.getY() - 1));
             y.assertTrue(DonmaIsleyici.zeminY(level.getChunkAt(agac), agac.getX(), agac.getZ(), DonmaIsleyici.SINIRSIZ,
                     new BlockPos.MutableBlockPos()) == zemin, "işleyicinin zemini de yapraksız olmalı");
             double wAgac = DonmaApi.kisAgirligi(level, agac);
@@ -837,7 +838,8 @@ public final class DonmaOyunTestleri {
 
     /**
      * D3 (N9): buharlaşmanın geri dolması çok tick'e ve chunk'lara yayılır; erken dolan sütundan akan su sonraki sütunları
-     * durdurmaz. Chunk sınırını kesen göl 6 blok kurur, sonra 0'a geri dolar; sahne başlangıçla aynı (akıcı su kalmaz).
+     * durdurmaz. Chunk sınırını kesen göl (sahnenin planlı sıvı tick'leri bittikten sonra) 6 blok kurur, sonra 0'a geri
+     * dolar; sahne başlangıçla aynı (akıcı su kalmaz).
      */
     @GameTest(template = GOL, batch = "donma_zamanlayici_6", timeoutTicks = 3000)
     public static void buharlasmaCokTickliGeriDolmaBaslangicVerir(GameTestHelper y) {
@@ -845,22 +847,28 @@ public final class DonmaOyunTestleri {
         BlockState[] baslangic = anlik(y, GOL_EN, GOL_BOY);
         LongOpenHashSet chunklar = zamanlayiciHazirla(y, GOL_EN);
         DunyaDonemi d = DunyaDonemi.al(y.getLevel().getServer());
-        d.buharlasmaDerinligiAyarla(6f);
         int[] asama = {0};
         int[] bekle = {0};
         y.onEachTick(() -> {
-            if (asama[0] == 0 && buharHepsi(y, chunklar, 6)) {
-                y.assertTrue(y.getBlockState(p(15, 1, 15)).isAir(), "6 blokta 3 derin göl tamamen kurumalı");
+            if (asama[0] == 0 && ++bekle[0] >= 20) {
+                // Sahnenin setBlock'la koyduğu su sıvı tick'i planlar; kuruyan sütuna henüz işlenmemiş komşudan akan su
+                // kaynağa döner. Planlı tick'ler bitince (doğal göl gibi) buharlaşma başlar.
+                d.buharlasmaDerinligiAyarla(6f);
+                bekle[0] = 0;
                 asama[0] = 1;
-                d.buharlasmaDerinligiAyarla(0f);
-            } else if (asama[0] == 1 && buharHepsi(y, chunklar, 0)) {
+            } else if (asama[0] == 1 && buharHepsi(y, chunklar, 6)) {
+                y.assertTrue(y.getBlockState(p(15, 1, 15)).isAir(), "6 blokta 3 derin göl tamamen kurumalı; "
+                        + sutunTani(y, 15, 15) + " | " + buharTani(y, chunklar));
                 asama[0] = 2;
-            } else if (asama[0] == 2) {
+                d.buharlasmaDerinligiAyarla(0f);
+            } else if (asama[0] == 2 && buharHepsi(y, chunklar, 0)) {
+                asama[0] = 3;
+            } else if (asama[0] == 3) {
                 bekle[0]++;
             }
         });
         y.succeedWhen(() -> {
-            y.assertTrue(asama[0] == 2 && bekle[0] >= 40, "kuruma, geri dolma ve 40 tick bekleme bitmedi");
+            y.assertTrue(asama[0] == 3 && bekle[0] >= 40, "kuruma, geri dolma ve 40 tick bekleme bitmedi");
             ayniMi(y, baslangic, "çok tick'li geri dolma başlangıcı vermeli", GOL_EN, GOL_BOY);
             zamanlayiciBitir(y);
         });
@@ -874,6 +882,17 @@ public final class DonmaOyunTestleri {
             }
         }
         return true;
+    }
+
+    private static String buharTani(GameTestHelper y, LongOpenHashSet chunklar) {
+        StringBuilder sb = new StringBuilder("süren iş " + DonmaZamanlayici.surenIsSayisi() + ", bekleyen "
+                + DonmaZamanlayici.bekleyenSayisi() + ";");
+        for (long c : chunklar) {
+            ChunkDonmaVerisi v = ChunkDonmaVerisi.al(y.getLevel().getChunk(ChunkPos.getX(c), ChunkPos.getZ(c)));
+            sb.append(" [").append(ChunkPos.getX(c)).append(',').append(ChunkPos.getZ(c)).append("] G ").append(v.sonG())
+                    .append(" buhar ").append(v.sonBuhar());
+        }
+        return sb.toString();
     }
 
     /** 32x32 sahne: taş zemin, toprak, çimen; ortada chunk sınırını kesen yarıçap 12, 3 derin göl. */
