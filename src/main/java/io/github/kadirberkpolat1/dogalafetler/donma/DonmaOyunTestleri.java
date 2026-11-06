@@ -591,6 +591,17 @@ public final class DonmaOyunTestleri {
         ServerChunkCache kaynak = level.getChunkSource();
         DistanceManager mesafe = kaynak.chunkMap.getDistanceManager();
         mesafe.addTicket(GORUS_BILETI, hedef, 31, hedef);
+        // GameTest sunucusu tick'ler arasında beklemez (waitUntilNextTick yalnız görevleri işler), zaman aşımı tick sayar;
+        // dünya üretimi arka planda duvar saatiyle ilerler. Boş dünyada (K-E16) hedef ve komşuları her koşu üretilir:
+        // eşzamanlı yükleme üretimi tick sayacının dışına alır (K-E21).
+        long uretimBasi = System.nanoTime();
+        for (int dz = -1; dz <= 1; dz++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                level.getChunk(hedef.x + dx, hedef.z + dz);
+            }
+        }
+        DogalAfetler.LOGGER.info("[donma] test sahnesi: chunk {},{} ve 8 komşusu eşzamanlı üretildi ({} ms)", hedef.x, hedef.z,
+                (System.nanoTime() - uretimBasi) / 1_000_000L);
         int[] asama = {0};
         y.onEachTick(() -> {
             LevelChunk chunk = kaynak.getChunkNow(hedef.x, hedef.z);
