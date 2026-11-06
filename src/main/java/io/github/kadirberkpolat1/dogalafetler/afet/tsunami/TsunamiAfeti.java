@@ -14,6 +14,8 @@ import io.github.kadirberkpolat1.dogalafetler.su.Cekilme;
 import io.github.kadirberkpolat1.dogalafetler.su.Dalga;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
 import io.github.kadirberkpolat1.dogalafetler.su.SuAyarlari;
+import io.github.kadirberkpolat1.dogalafetler.uyari.HacimEgrisi;
+import io.github.kadirberkpolat1.dogalafetler.uyari.OrtamSesi;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -27,6 +29,7 @@ import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.common.MinecraftForge;
 
 /**
@@ -41,6 +44,7 @@ import net.minecraftforge.common.MinecraftForge;
  */
 public final class TsunamiAfeti extends Afet {
     static final double IKINCI_PAY = 0.6;
+    static final String KATMAN = "tsunami/ugultu";
     private static final int GUNCELLEME_ARALIGI = 10;
 
     /** Test ölçeği: küçük sahnede açıklık, karaya giriş, genişlik, dalga uzunluğu ve dalga gecikmesi (tick). */
@@ -229,8 +233,8 @@ public final class TsunamiAfeti extends Afet {
         }
         if (!vurdu && on >= 0) {
             vurdu = true;
-            cepheSesi(level, SoundEvents.GENERIC_SPLASH, 6f, 0.5f, 0.7f, 0.9f);
-            cepheSesi(level, SoundEvents.PLAYER_SPLASH_HIGH_SPEED, 6f, 0.6f, 0.6f, 0.6f);
+            cepheSesi(level, TsunamiSesleri.CARPMA.get(), 6f, 0.85f, 0.95f, 1.05f);
+            cepheSesi(level, SoundEvents.PLAYER_SPLASH_HIGH_SPEED, 4f, 0.6f, 0.6f, 0.6f);
             DogalAfetler.LOGGER.info("Tsunami: dalga kıyıya vurdu (yükseklik {})", sayi(h1));
         }
         yik(level, sv, on);
@@ -268,7 +272,8 @@ public final class TsunamiAfeti extends Afet {
         int butce = Math.max(1, (int) Math.round(sv.yikimButcesi() * a.yikimCarpani.get() * kisma));
         int hacim = Math.min(a.magaraHacmi.get() * seviye(), SuAyarlari.sunucu().magaraMaksHacim.get());
         long kalis = SuAyarlari.sunucu().magaraKalisSn.get() * 20L;
-        yikim.tick(level, simdi, sv, taban, kisma, butce, Kurallar.blokHasariAcik(level.getGameRules()),
+        int bolum = Math.max(1, (int) Math.round(a.yikimBolumTick.get() * kisma));
+        yikim.tick(level, simdi, sv, taban, kisma, butce, bolum, Kurallar.blokHasariAcik(level.getGameRules()),
                 p -> magaraDene(level, sv, p, hacim, kalis));
     }
 
@@ -307,7 +312,7 @@ public final class TsunamiAfeti extends Afet {
         }
     }
 
-    /** Çekilmede çırpınan balık ve damlama, yaklaşan dalganın uğultusu (cephe boyunca sol-orta-sağ). */
+    /** Çekilmede çırpınan balık ve damlama; yaklaşan dalganın uğultusu cephenin ortasında döngülü ortam katmanı. */
     private void sesler(ServerLevel level, double on) {
         long t = level.getGameTime();
         if (on < 0 && t % 30 == 0) {
@@ -318,9 +323,33 @@ public final class TsunamiAfeti extends Afet {
             level.playSound(null, x, taban, z, SoundEvents.COD_FLOP, SoundSource.AMBIENT, 1f, 0.9f);
             level.playSound(null, x, taban + 1, z, SoundEvents.POINTED_DRIPSTONE_DRIP_WATER, SoundSource.AMBIENT, 1f, 1f);
         }
-        if (on > Double.NEGATIVE_INFINITY && on < 0 && t % 20 == 0) {
-            float yakinlik = (float) (1 + on / aciklik());
-            cepheSesi(level, SoundEvents.WEATHER_RAIN_ABOVE, 3f + 5f * yakinlik, 0.45f, 0.5f, 0.55f);
+        ugultu(level, on);
+    }
+
+    /**
+     * Uğultu katmanı (uyarı-ses §A3): dalga doğduğu an başlar, açıklığı geçerken %35'ten tama çıkar (sığlaşmayla), cepheyle
+     * 4 Hz taşınır, dalgalar sönünce 3 sn'de söner. Sunucu yeniden açılınca katman bellekte olmadığı için kaldığı yerden
+     * yeniden kurulur.
+     */
+    private void ugultu(ServerLevel level, double on) {
+        boolean suruyor = on > Double.NEGATIVE_INFINITY && !dalgalarBitti;
+        if (!suruyor) {
+            if (OrtamSesi.aktifMi(KATMAN)) {
+                OrtamSesi.durdur(level.getServer(), KATMAN, 60);
+            }
+            return;
+        }
+        Vec3 nokta = new Vec3(geometri.x(on, 0), taban + 2, geometri.z(on, 0));
+        if (!OrtamSesi.aktifMi(KATMAN)) {
+            int kiyiya = (int) Math.ceil(aciklik() / sv().hizTick());
+            int gecen = (int) Math.max(0, simdi - b1);
+            HacimEgrisi egri = gecen >= kiyiya ? HacimEgrisi.sabit(1f)
+                    : HacimEgrisi.of(new HacimEgrisi.Nokta(0, 0.35f + 0.65f * gecen / kiyiya),
+                            new HacimEgrisi.Nokta(kiyiya - gecen, 1f));
+            OrtamSesi.baslat(level.getServer(), KATMAN, baglam().baslangicSaati(), TsunamiSesleri.UGULTU, SoundSource.WEATHER,
+                    OrtamSesi.Yer.nokta(level.dimension(), nokta, (float) (96 + genislik() / 2)), egri);
+        } else if (level.getGameTime() % 5 == 0) {
+            OrtamSesi.konumGuncelle(level.getServer(), KATMAN, nokta);
         }
     }
 
@@ -412,10 +441,11 @@ public final class TsunamiAfeti extends Afet {
             }
         }
         SanalSu.bolgeBirak(level);
+        OrtamSesi.durdur(level.getServer(), KATMAN, temiz ? 20 : 60);
         var d = SanalSu.dunya(level);
-        DogalAfetler.LOGGER.info("Tsunami: temizlendi (temiz={}, doğal={}): kırılan {} blok, taranan {} sütun, mağara {}; "
-                + "boyutta kalan dalga {}, çekilme {}, mağara {}", temiz, dogalBitti, yikim.toplamKirilan(),
-                yikim.toplamTaranan(), magaralar.size(), d == null ? 0 : d.dalgalar().size(),
+        DogalAfetler.LOGGER.info("Tsunami: temizlendi (temiz={}, doğal={}): kırılan {} blok, değişen bölüm {}, taranan {} sütun, "
+                + "mağara {}; boyutta kalan dalga {}, çekilme {}, mağara {}", temiz, dogalBitti, yikim.toplamKirilan(),
+                yikim.toplamBolum(), yikim.toplamTaranan(), magaralar.size(), d == null ? 0 : d.dalgalar().size(),
                 d == null ? 0 : d.cekilmeler().size(), d == null ? 0 : d.magaralar().size());
     }
 

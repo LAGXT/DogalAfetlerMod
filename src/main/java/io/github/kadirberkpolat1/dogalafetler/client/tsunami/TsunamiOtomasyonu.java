@@ -78,11 +78,25 @@ public final class TsunamiOtomasyonu {
         // AKTIF'in ilk anından: çekilme 8 sn, ufuktaki dalga 13 sn, ölçüm 13-18 sn, vitrin anı 24 sn (kıyıya ~28 sn),
         // çarpma 31 sn, karada 36-41 sn.
         return List.of("k:dogalafet su vitrin", "b:300", "k:time set 10500", "k:dogalafet su vitrin kamera tepe", "b:200",
-                "s:" + on + "-once", "k:dogalafet start tsunami " + seviye, "b:60", "s:" + on + "-onuyari",
-                "k:dogalafet asama ileri", "b:60", "s:" + on + "-siren", "k:dogalafet asama ileri", "b:160",
-                "s:" + on + "-cekilme", "b:100", "s:" + on + "-ufuk", "f:" + on + "-yaklasma", "b:120",
+                "f:" + on + "-afetsiz", "s:" + on + "-once", "k:dogalafet start tsunami " + seviye, "b:60",
+                "s:" + on + "-onuyari", "k:dogalafet asama ileri", "b:60", "s:" + on + "-siren", "k:dogalafet asama ileri",
+                "b:160", "s:" + on + "-cekilme", "b:100", "s:" + on + "-ufuk", "f:" + on + "-yaklasma", "b:120",
                 "s:" + on + "-vitrin", "b:140", "s:" + on + "-carpma", "b:100", "s:" + on + "-karada",
                 "f:" + on + "-karada", "k:dogalafet stop", "b:100", "s:" + on + "-sonra", "k:dogalafet su temizle", "b:40");
+    }
+
+    /**
+     * Kök neden ayrıştırması (S5 karada FPS): aynı sahne ve zamanlamayla yalnız karadaki kare süresi; {@code ayar} adımları
+     * (ör. blok hasarı kapalı, yağmur kapalı) afetten önce uygulanır, sonra geri alınır.
+     */
+    private static List<String> olcum(String ad, List<String> ayar, List<String> geri) {
+        List<String> a = new ArrayList<>(List.of("k:dogalafet su vitrin", "b:300", "k:time set 10500",
+                "k:dogalafet su vitrin kamera tepe", "b:200"));
+        a.addAll(ayar);
+        a.addAll(List.of("k:dogalafet start tsunami 5", "b:20", "k:dogalafet asama ileri", "b:20",
+                "k:dogalafet asama ileri", "b:720", "f:" + ad, "k:dogalafet stop", "b:60", "k:dogalafet su temizle", "b:40"));
+        a.addAll(geri);
+        return a;
     }
 
     @SubscribeEvent
@@ -108,6 +122,13 @@ public final class TsunamiOtomasyonu {
         if (hepsi || BOLUM.contains("magara")) {
             a.addAll(List.of("m:kur", "b:200", "s:tsunami-magara-once", "m:doldur", "b:160", "f:magara", "s:tsunami-magara",
                     "m:icine", "b:100", "s:tsunami-magara-sualti", "k:dogalafet su temizle", "b:40"));
+        }
+        if (BOLUM.contains("olc")) {
+            a.addAll(olcum("olc-s5-yikimsiz", List.of("k:gamerule afetBlokHasari false"),
+                    List.of("k:gamerule afetBlokHasari true")));
+            a.addAll(olcum("olc-s5-yagmursuz", List.of("y:0"), List.of("y:1")));
+            a.addAll(olcum("olc-s5-yikimsiz-yagmursuz", List.of("k:gamerule afetBlokHasari false", "y:0"),
+                    List.of("k:gamerule afetBlokHasari true", "y:1")));
         }
         a.add("x:son");
         ADIMLAR.addAll(a);
@@ -146,11 +167,12 @@ public final class TsunamiOtomasyonu {
                 double enUzun = s.isEmpty() ? Double.NaN : s.get(s.size() - 1) / 1e6;
                 var sunucu = mc.getSingleplayerServer();
                 float mspt = sunucu == null ? Float.NaN : sunucu.getAverageTickTime();
-                log("FPS {} ortanca_kare_ms={} fps_ortanca={} en_uzun_kare_ms={} kare={} sunucu_mspt={} tps={} su={} yagmur={}",
-                        olcum, String.format(Locale.ROOT, "%.2f", ortanca), String.format(Locale.ROOT, "%.1f", 1000 / ortanca),
-                        String.format(Locale.ROOT, "%.1f", enUzun), s.size(), String.format(Locale.ROOT, "%.2f", mspt),
-                        String.format(Locale.ROOT, "%.1f", Math.min(20, 1000 / mspt)), SuRenderer.olcumOzeti(),
-                        TsunamiYagmuru.ozet());
+                log("FPS {} ortanca_kare_ms={} fps_ortanca={} en_uzun_kare_ms={} kare={} sunucu_mspt={} tps={} su={} yagmur={} "
+                        + "bolum=[{}] parcacik={} varlik={} kopuk={}", olcum, String.format(Locale.ROOT, "%.2f", ortanca),
+                        String.format(Locale.ROOT, "%.1f", 1000 / ortanca), String.format(Locale.ROOT, "%.1f", enUzun), s.size(),
+                        String.format(Locale.ROOT, "%.2f", mspt), String.format(Locale.ROOT, "%.1f", Math.min(20, 1000 / mspt)),
+                        SuRenderer.olcumOzeti(), TsunamiYagmuru.ozet(), mc.levelRenderer.getChunkStatistics(),
+                        mc.particleEngine.countParticles(), mc.level.getEntityCount(), TsunamiKopugu.sonSegment());
                 olcum = null;
             }
             return;
@@ -176,11 +198,12 @@ public final class TsunamiOtomasyonu {
                 SuRenderer.olcumSifirla();
             }
             case 's' -> {
-                log("KARE {} {}", deger, TsunamiYagmuru.ozet());
+                log("KARE {} {} kopuk={}", deger, TsunamiYagmuru.ozet(), TsunamiKopugu.sonSegment());
                 Screenshot.grab(mc.gameDirectory, deger + ".png", mc.getMainRenderTarget(),
                         m -> log("FOTO {} {}", deger, m.getString()));
             }
             case 'm' -> magara(mc, deger);
+            case 'y' -> TsunamiYagmuru.kapali = "0".equals(deger);
             case 'x' -> {
                 log("BITTI girdi tus={} fare={} teker={}", tus, fare, teker);
                 mc.stop();

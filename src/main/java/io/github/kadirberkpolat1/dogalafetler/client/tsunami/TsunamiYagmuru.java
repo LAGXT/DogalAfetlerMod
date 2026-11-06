@@ -63,6 +63,8 @@ public final class TsunamiYagmuru {
     private static float yonZ;
     private static int seviye = 1;
     private static ClientLevel sonLevel;
+    /** Yalnız otomasyonun kök neden ölçümü için: yağmuru kapatır. */
+    static volatile boolean kapali;
     private static final RandomSource RASTGELE = RandomSource.create();
 
     private TsunamiYagmuru() {
@@ -83,6 +85,9 @@ public final class TsunamiYagmuru {
     }
 
     private static boolean aktif() {
+        if (kapali) {
+            return false;
+        }
         return IstemciAfetDurumu.aktif().filter(p -> p.tur() == AfetTuru.TSUNAMI
                 && (p.asama() == AfetAsamasi.AKTIF || p.asama() == AfetAsamasi.BITIS) && p.ozel().getBoolean("yagmur"))
                 .map(TsunamiYagmuru::oku).isPresent();

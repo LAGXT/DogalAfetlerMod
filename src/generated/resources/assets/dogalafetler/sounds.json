@@ -28,5 +28,20 @@
       "dogalafetler:siren_standart"
     ],
     "subtitle": "subtitles.dogalafetler.siren"
+  },
+  "tsunami_carpma": {
+    "sounds": [
+      "dogalafetler:tsunami_carpma"
+    ],
+    "subtitle": "subtitles.dogalafetler.tsunami_carpma"
+  },
+  "tsunami_ugultu": {
+    "sounds": [
+      {
+        "name": "dogalafetler:tsunami_ugultu",
+        "stream": true
+      }
+    ],
+    "subtitle": "subtitles.dogalafetler.tsunami_ugultu"
   }
 }

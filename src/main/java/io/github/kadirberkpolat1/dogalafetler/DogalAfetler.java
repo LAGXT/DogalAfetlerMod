@@ -63,7 +63,7 @@ public final class DogalAfetler {
         Meteor.kaydet(modBus);
         Balikcilik.kaydet(modBus);
         Basarim.kaydet(modBus);
-        Tsunami.kaydet();
+        Tsunami.kaydet(modBus);
         Kancalar.bagla();
 
         DataGenerators.ceviriEkle(CekirdekCevirileri::yaz);

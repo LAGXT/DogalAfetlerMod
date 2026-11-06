@@ -6,6 +6,7 @@ import java.util.ArrayDeque;
 import java.util.function.Predicate;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.SectionPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.ChunkPos;
@@ -54,8 +55,10 @@ final class TsunamiYikimi {
     private final ArrayDeque<Is>[] isler = new ArrayDeque[] {new ArrayDeque<>(), new ArrayDeque<>(), new ArrayDeque<>()};
     private final LongOpenHashSet gorulen = new LongOpenHashSet();
     private final LongOpenHashSet degisenChunk = new LongOpenHashSet();
+    private final LongOpenHashSet bolumler = new LongOpenHashSet();
     private long toplamKirilan;
     private long toplamTaranan;
+    private long toplamBolum;
     private int toplamDusen;
 
     long toplamKirilan() {
@@ -64,6 +67,11 @@ final class TsunamiYikimi {
 
     long toplamTaranan() {
         return toplamTaranan;
+    }
+
+    /** Tick başına değişen farklı chunk bölümü sayılarının toplamı (istemcide yeniden derlenen bölüm). */
+    long toplamBolum() {
+        return toplamBolum;
     }
 
     int bekleyen() {
@@ -83,11 +91,13 @@ final class TsunamiYikimi {
     }
 
     /**
-     * Bir tick: sütun taraması ({@link #KOLON_BUTCESI} × kısma), sonra hazır işlerden en çok {@code butce} blok. {@code magara}
-     * mağara ağzı adayını alır ve daha aday istiyorsa {@code true} döner. Kırılan blok sayısı.
+     * Bir tick: sütun taraması ({@link #KOLON_BUTCESI} × kısma), sonra hazır işlerden en çok {@code butce} blok ve en çok
+     * {@code bolumButcesi} farklı 16³ chunk bölümü: her değişen bölüm istemcide yeniden derlenir (Kök neden ölçümü, TS-12);
+     * sınırı aşan iş sırasını koruyarak sonraki tick'e kalır (kuyruk cephe satır sırasında olduğu için bölümler kümelenir).
+     * {@code magara} mağara ağzı adayını alır ve daha aday istiyorsa {@code true} döner. Kırılan blok sayısı.
      */
-    int tick(ServerLevel l, long simdi, TsunamiSeviyesi sv, double taban, double kisma, int butce, boolean blokHasari,
-            Predicate<BlockPos> magara) {
+    int tick(ServerLevel l, long simdi, TsunamiSeviyesi sv, double taban, double kisma, int butce, int bolumButcesi,
+            boolean blokHasari, Predicate<BlockPos> magara) {
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
         int alt = (int) Math.floor(taban) - 1;
         boolean magaraIstiyor = true;
@@ -116,9 +126,15 @@ final class TsunamiYikimi {
         int kirilan = 0;
         int efekt = 0;
         int dusen = 0;
+        bolumler.clear();
         for (ArrayDeque<Is> kuyruk : isler) {
             while (kirilan < butce && !kuyruk.isEmpty() && kuyruk.peek().hazir() <= simdi) {
-                m.set(kuyruk.poll().konum());
+                m.set(kuyruk.peek().konum());
+                long bolum = SectionPos.asLong(m.getX() >> 4, m.getY() >> 4, m.getZ() >> 4);
+                if (!bolumler.contains(bolum) && bolumler.size() >= bolumButcesi) {
+                    break;
+                }
+                kuyruk.poll();
                 BlockState s = l.getBlockState(m);
                 Sinif c = blokHasari ? sinif(l, m, s, sv) : null;
                 if (c == null) {
@@ -134,6 +150,7 @@ final class TsunamiYikimi {
                     l.levelEvent(2001, m, Block.getId(s));
                 }
                 l.setBlock(m, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+                bolumler.add(bolum);
                 degisenChunk.add(ChunkPos.asLong(m.getX() >> 4, m.getZ() >> 4));
                 kirilan++;
             }
@@ -143,6 +160,7 @@ final class TsunamiYikimi {
         }
         degisenChunk.clear();
         toplamKirilan += kirilan;
+        toplamBolum += bolumler.size();
         return kirilan;
     }
 

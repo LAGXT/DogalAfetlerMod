@@ -99,10 +99,12 @@ Kaynak: `.vibe/kararlar/spike-sanal-su.md` SU-01…SU-05, `docs/KARARLAR.md` K0-
 
 ## 7. Faz 4 uygulama güncellemesi, 2026-11-06
 
-Ayrıntı ve gerekçeler `.vibe/kararlar/tsunami.md` TS-01…TS-11.
+Ayrıntı ve gerekçeler `.vibe/kararlar/tsunami.md` TS-01…TS-14.
 
 - **Zaman:** dalga her seviyede kıyıdan `clamp(hız·18 sn, 60, 150)` blok açıkta doğar ve ~18 sn'de kıyıya varır (çarpma ~28. sn); S3+ ikinci dalga birincisi menzile vardığı an başlar. Sığlaşma formülü açıkta %35 pay ile (sıfır yükseklik yerine ufukta alçak çizgi).
-- **Yıkım:** yalnız yapı ve bitki blokları (yaprak, cam, çit, çiçek → ahşap → S4–5 taş yapı); doğal arazi, su dolu ve blok varlıklı bloklar (sandık) yıkılmaz. Enkaz görsel varlık (`SuruklenenBlokVarligi`) yerine kırılan blokların %30'unun gerçek eşyasıdır ve dalgada sürüklenir.
+- **Yıkım:** yalnız yapı ve ağaç blokları (yaprak, cam, çit → ahşap → S4–5 taş yapı); doğal arazi, çimen/çiçek, su dolu ve blok varlıklı bloklar (sandık) yıkılmaz. Tick başına değişen chunk bölümü sınırlı (istemci yeniden derlemesi, TS-12). Enkaz kırılan ahşap/taş blokların bir kısmının gerçek eşyasıdır ve dalgada sürüklenir.
 - **Mağara:** doğal tavanlı, göğü görmeyen ve yanında açık hava olan hücre dalgaya açılan ağız sayılır; seviye başına `1 + seviye/2` cep.
-- **Ses:** vanilla seslerle (çırpınan balık, damlama, alçak perdeli yağmur uğultusu cephe boyunca üç kaynak, çarpmada üç perdeli sıçrama); özel sentez sesler sonraya kaldı.
-- **Yağmur:** kendi damla havuzu (çizgi + zemin/sanal su halkası), iki katman, 25° eğik; sanal su yüzeyindeki halka normal haritası bozulması yerine çizilen halkadır. Ekran kenarındaki su perdesi yapılmadı.
+- **Ses:** kendi sentez seslerimiz (`tools/assets/tsunami_ses.py`): yaklaşan dalganın 40–150 Hz uğultusu cephenin ortasında döngülü ortam katmanı (`uyari.OrtamSesi`, açıklığı geçerken %35 → %100), kıyıya vurmada derin güm + sıçrama darbesi cephe boyunca üç noktada; çekilmede vanilla çırpınan balık ve damlama.
+- **Köpük:** ortak su renderer'ının üstüne tsunaminin kendi katmanı (`client.tsunami.TsunamiKopugu`): tepe boyunca beyaz şerit, ön yüzde kesik köpük çizgileri, tabanda yuvarlanan bore.
+- **Yağmur:** kendi damla havuzu (çizgi + zemin/sanal su halkası), iki katman, 25° eğik; sanal su yüzeyindeki halka normal haritası bozulması yerine çizilen halkadır.
+- **Faz 5 cilası (şef kararı, Faz 4'te yapılmaz):** ekran kenarındaki su perdesi ve istemcide yüzen görsel enkaz (`SuruklenenBlokVarligi`).
