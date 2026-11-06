@@ -34,6 +34,9 @@ public final class GunesZinciriSureci implements DonemSureci {
 
     private static GunesZinciriSureci ornek;
 
+    /** Önceki tick'in üst dünya gün saati (uyku atlaması şafağı geçerse doğuş kaçmasın); kalıcı değil. */
+    private long sonGunSaati = Long.MIN_VALUE;
+
     private GunesZinciriSureci() {
     }
 
@@ -102,8 +105,12 @@ public final class GunesZinciriSureci implements DonemSureci {
         MinecraftServer server = olay.getServer();
         ServerLevel ust = server.overworld();
         if (!aktifMi(ust)) {
+            sonGunSaati = Long.MIN_VALUE;
             return;
         }
+        long gunSaati = ust.getDayTime();
+        long oncekiGunSaati = sonGunSaati;
+        sonGunSaati = gunSaati;
         AfetYoneticisi yonetici = AfetYoneticisi.al(server);
         DunyaDonemi donem = yonetici.donem();
         CompoundTag veri = donem.ekVeri(KIMLIK);
@@ -128,12 +135,12 @@ public final class GunesZinciriSureci implements DonemSureci {
         }
         donem.evreIlerlemesiAyarla(ilerleme);
         if (evre == GunesEvresi.GUNESSIZ) {
-            kapiyiIsle(ust, donem, veri, adim, ayar);
+            kapiyiIsle(ust, donem, veri, adim, ayar, oncekiGunSaati, gunSaati);
         }
     }
 
     private static void kapiyiIsle(ServerLevel ust, DunyaDonemi donem, CompoundTag veri, int adim,
-            GunesZinciri.Ayarlar ayar) {
+            GunesZinciri.Ayarlar ayar, long oncekiGunSaati, long gunSaati) {
         long once = veri.getLong(KAPI);
         long gecen = GunesZinciri.kapiIlerlet(once, donem.donmaIlerlemesi(), adim);
         if (gecen != once) {
@@ -147,8 +154,9 @@ public final class GunesZinciriSureci implements DonemSureci {
                         ayar.kizilCuceGecikmeGun());
             }
         }
-        if (GunesZinciri.kapiAcik(gecen, ayar)
-                && GunesZinciri.safakMi(ust.getDayTime(), ust.getGameRules().getBoolean(GameRules.RULE_DAYLIGHT))) {
+        boolean gunDongusu = ust.getGameRules().getBoolean(GameRules.RULE_DAYLIGHT);
+        if (GunesZinciri.kapiAcik(gecen, ayar) && (GunesZinciri.safakMi(gunSaati, gunDongusu)
+                || GunesZinciri.safakGecti(oncekiGunSaati, gunSaati))) {
             dogusBaslat(donem, "ilk şafak");
         }
     }

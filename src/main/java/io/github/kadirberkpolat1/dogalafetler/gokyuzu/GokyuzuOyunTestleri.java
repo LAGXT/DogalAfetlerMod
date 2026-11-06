@@ -127,12 +127,11 @@ public final class GokyuzuOyunTestleri {
                     yardimci.fail("kızıl cüce şafaktan önce doğdu (gün saati " + ust.getDayTime() + ")");
                 }
                 safakVerildi[0] = true;
-                ust.setDayTime(22_990);
-                yardimci.fail("kapı açık, şafak bekleniyor");
+                ust.setDayTime(Math.floorDiv(ust.getDayTime(), 24_000L) * 24_000L + 24_000L);
+                yardimci.fail("kapı açık; uykudaki gibi sabaha atılandı, şafak geçildi");
             }
-            yardimci.assertTrue(donem.gunesEvresi() == GunesEvresi.KIZIL_CUCE, "ilk şafakta kızıl cüce doğmalı");
-            yardimci.assertTrue(Math.floorMod(ust.getDayTime(), 24_000L) >= GunesZinciri.SAFAK_SAATI,
-                    "doğuş şafak penceresinde olmalı: " + ust.getDayTime());
+            yardimci.assertTrue(donem.gunesEvresi() == GunesEvresi.KIZIL_CUCE,
+                    "uyku şafağı atlayınca da kızıl cüe doğmalı: " + donem.ozet());
             temizle.run();
         });
     }

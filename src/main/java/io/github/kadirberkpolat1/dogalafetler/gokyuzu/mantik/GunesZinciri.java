@@ -103,6 +103,18 @@ public final class GunesZinciri {
         return !gunDongusu || Math.floorMod(gunSaati, GUN_TICK) >= SAFAK_SAATI;
     }
 
+    /**
+     * {@code onceki} ile {@code simdi} arasında bir şafak anı ({@value #SAFAK_SAATI}) geçildi mi: uyku geceyi atlayınca gün
+     * saati 13000'den 24000'e sıçrar ve şafak penceresi hiç görülmez. Geri giden saat ({@code /time set}) ve önceki saatin
+     * bilinmemesi ({@link Long#MIN_VALUE}) şafak sayılmaz.
+     */
+    public static boolean safakGecti(long onceki, long simdi) {
+        if (onceki == Long.MIN_VALUE || simdi <= onceki) {
+            return false;
+        }
+        return Math.floorDiv(simdi - SAFAK_SAATI, GUN_TICK) > Math.floorDiv(onceki - SAFAK_SAATI, GUN_TICK);
+    }
+
     /** Bir sonraki şafağa kalan gün saati tick'i (şafak penceresindeyse 0). */
     public static long safagaKalan(long gunSaati) {
         long saat = Math.floorMod(gunSaati, GUN_TICK);

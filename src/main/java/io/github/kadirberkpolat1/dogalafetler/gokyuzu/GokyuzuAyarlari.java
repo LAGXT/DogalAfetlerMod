@@ -12,6 +12,7 @@ import net.minecraftforge.common.ForgeConfigSpec;
 public final class GokyuzuAyarlari {
     private static AyarKaydi.Bolum<Sunucu> sunucu;
     private static AyarKaydi.Bolum<Istemci> istemci;
+    private static GunesZinciri.Ayarlar zincirOnbellegi;
 
     private GokyuzuAyarlari() {
     }
@@ -21,10 +22,20 @@ public final class GokyuzuAyarlari {
         istemci = AyarKaydi.istemciBolumu("gokyuzu", "Gökyüzü görseli (madde 16, N13)", Istemci::new);
     }
 
+    /** Güneş zinciri ayarları; süreç her tick okur, değerler değişmedikçe aynı kayıt döner. */
     public static GunesZinciri.Ayarlar zincir() {
         Sunucu s = sunucu.get();
-        return new GunesZinciri.Ayarlar(s.supernovaSuresiGun.get(), s.kizilCuceGecikmeGun.get(), s.kizilCuceDogusSuresiTick.get(),
-                s.kalintiGenislemeGun.get());
+        double supernova = s.supernovaSuresiGun.get();
+        double gecikme = s.kizilCuceGecikmeGun.get();
+        long dogus = s.kizilCuceDogusSuresiTick.get();
+        double kalinti = s.kalintiGenislemeGun.get();
+        GunesZinciri.Ayarlar onbellek = zincirOnbellegi;
+        if (onbellek == null || onbellek.supernovaSuresiGun() != supernova || onbellek.kizilCuceGecikmeGun() != gecikme
+                || onbellek.dogusSuresiTick() != dogus || onbellek.kalintiGenislemeGun() != kalinti) {
+            onbellek = new GunesZinciri.Ayarlar(supernova, gecikme, dogus, kalinti);
+            zincirOnbellegi = onbellek;
+        }
+        return onbellek;
     }
 
     public static double kizilCuceBoyutOrani() {

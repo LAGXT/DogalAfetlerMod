@@ -77,6 +77,18 @@ class GunesZinciriTest {
     }
 
     @Test
+    void uykuVeZamanAtlamasiSafagiGecerseDogusKacmaz() {
+        assertTrue(GunesZinciri.safakGecti(13_000, 24_000), "uyku geceyi atlayınca (13000 → 24000) şafak geçilmiş sayılır");
+        assertTrue(GunesZinciri.safakGecti(22_999, 23_000), "pencereye girildi");
+        assertFalse(GunesZinciri.safakGecti(22_000, 22_999));
+        assertFalse(GunesZinciri.safakGecti(23_100, 23_200), "pencere içinde kalmak safakMi'nin işi");
+        assertFalse(GunesZinciri.safakGecti(18_000, 1_000), "/time set geri almak şafak değildir");
+        assertFalse(GunesZinciri.safakGecti(Long.MIN_VALUE, 23_500), "ilk tick: önceki saat yok");
+        assertTrue(GunesZinciri.safakGecti(24_000L * 3 + 20_000, 24_000L * 4 + 100), "çok günlü saat");
+        assertTrue(GunesZinciri.safakGecti(5_000, 5_000 + 3 * 24_000L), "time add birkaç gün");
+    }
+
+    @Test
     void dogusIlkSafagaHizalanir() {
         assertFalse(GunesZinciri.safakMi(6_000, true), "öğlen doğmaz");
         assertFalse(GunesZinciri.safakMi(22_999, true));
