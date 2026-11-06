@@ -14,9 +14,9 @@ açar ve karışımı /tmp/uyari-ses-cikis.wav'a yazar (ölçüm dosyadan, `tool
 iken hiçbir sesi başlatmaz), değilse oyunu kapatır. Bu betik de log'daki "OpenAL initialized on device" satırını denetler,
 başka aygıtta süreci öldürür. Kategoriler: WEATHER %100 (örnek ortam katmanı; açık havada başka WEATHER sesi yok), diğerleri
 0 (kayıtta yalnız siren ve ortam katmanı kalır).
-(f) U-17: worktree'nin `run/options.txt`'i koşudan önce bayt bayt saklanır, sonunda (hata olsa da) geri yazılır; önce/sonra
-    sha256 log'a girer. Java kapısı (`UyariOtomasyonu`) da dosyaya güvenmez: ilk tick'te Ana Ses 0, seçenek ekranı kapanırken
-    ve kapanışta 0 kaydeder.
+(f) U-17: worktree'nin `run/options.txt`'i koşudan önce bayt bayt saklanır, sonunda (hata, SIGTERM ve SIGINT'te de) geri
+    yazılır; önce/sonra sha256 log'a girer. Java kapısı (`UyariOtomasyonu`) da dosyaya güvenmez: istemci kurulumunda (ses
+    motorundan önce) Ana Ses 0, seçenek ekranı kapanırken ve kapanışta 0 kaydeder.
 (g) Senaryo son adımına ("çıkış") ulaşmadıysa koşu "tamamlanmadı" sayılır (protokol temiz olsa da).
 
 Kullanım (worktree kökünden): python3 tools/senaryo/uyari_istemci.py <kanıt klasörü>
@@ -30,6 +30,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -141,9 +142,17 @@ def kos(kanit, otomasyon="uyari", gradle_ek=("-PquickPlay=test", "-PoyunTestiAfe
     ozgun = secenekler.read_bytes() if secenekler.exists() else None
     log(f"(f) options.txt önce: sha256={sha256(ozgun)}")
     gecerli = False
+    # SIGTERM (timeout, kill) varsayılan olarak `finally`'yi atlar; SystemExit'e çevrilince geri yazım ve istemciyi kapatma
+    # çalışır. Sinyal işleyicisi yalnız ana thread'de kurulabilir (uyari_sunucu.py `kos`'u yan thread'den çağırır).
+    eski_isleyiciler = {}
+    if threading.current_thread() is threading.main_thread():
+        for sinyal, kod in ((signal.SIGTERM, 143), (signal.SIGINT, 130)):
+            eski_isleyiciler[sinyal] = signal.signal(sinyal, lambda _s, _c, kod=kod: sys.exit(kod))
     try:
         gecerli = _kos(kanit, log, otomasyon, gradle_ek, wav)
     finally:
+        for sinyal in eski_isleyiciler:
+            signal.signal(sinyal, signal.SIG_IGN)
         acik = istemci_jvm()
         if acik is not None:
             oldur(log, acik, "betik bitti, istemci açık (options.txt geri yazılmadan önce)")
@@ -155,6 +164,8 @@ def kos(kanit, otomasyon="uyari", gradle_ek=("-PquickPlay=test", "-PoyunTestiAfe
         sonra = secenekler.read_bytes() if secenekler.exists() else None
         log(f"(f) options.txt geri yazıldı: sha256={sha256(sonra)} "
             f"({'öncekiyle AYNI' if sonra == ozgun else 'FARKLI'})")
+        for sinyal, isleyici in eski_isleyiciler.items():
+            signal.signal(sinyal, isleyici)
     return gecerli
 
 

@@ -53,9 +53,10 @@ class SirenNobetiTest {
     }
 
     /**
-     * V2: boyut değişimi ({@code SoundManager.stop()}) sırasında zarf örnekten ayrı yaşar. Kesilmeden önceki ve yeni
-     * örneğin okuduğu düzey aynıdır, kalan süre kesintide ilerlemez ve kalan süre boyunca tam düzeyde sürer; açılış
-     * tekrarlanmaz. İstemci bu yolu {@code SirenCalar.denetle} → {@code SirenSesi.devam()} ile izler.
+     * V2: boyut değişimi ({@code SoundManager.stop()}) zarfı sıfırlamaz. Kesildikten sonra yeni örneğin çaldığı her tick'te
+     * kalan süre = kesilmeden önceki kalan − geçen tick ve düzey kesilmeden öncekiyle aynıdır (açılış tekrarlanmaz); süre
+     * dolunca zarf kendiliğinden sönmez. {@code SirenSesi.devam()}'ın aynı zarfı paylaşması istemci log'unda
+     * ({@code zarf korundu t=…}) ve kayıtta ölçülür; bu test zarf tarafını sınar.
      */
     @Test
     void boyutDegisimindeZarfAyniDuzeyVeKalanSureyleSurer() {
@@ -69,11 +70,10 @@ class SirenNobetiTest {
         int kalanOncesi = zarf.kalanTick();
         assertEquals(1f, kesilmeOncesi, 1e-6f);
         assertTrue(nobet.yenidenCalinmali(false, zarf.bitti(), false, false), "motor kesti: aynı zarfla yeniden çal");
-        assertEquals(kesilmeOncesi, zarf.duzey(), 0f, "yeni örneğin ilk düzeyi kesilmeden öncekiyle aynı");
-        assertEquals(kalanOncesi, zarf.kalanTick(), "kesinti kalan süreyi tüketmez");
-        for (int i = 0; i < kalanOncesi; i++) {
+        for (int gecen = 1; gecen <= kalanOncesi; gecen++) {
             zarf.ilerle();
-            assertEquals(1f, zarf.duzey(), 1e-6f, "kalan süre boyunca tam düzey (tick " + i + ")");
+            assertEquals(kalanOncesi - gecen, zarf.kalanTick(), "kalan = önceki kalan − geçen (tick " + gecen + ")");
+            assertEquals(kesilmeOncesi, zarf.duzey(), 1e-6f, "düzey kesilmeden öncekiyle aynı (tick " + gecen + ")");
             assertFalse(nobet.yenidenCalinmali(false, zarf.bitti(), true, false));
         }
         assertEquals(0, zarf.kalanTick());

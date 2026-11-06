@@ -33,6 +33,7 @@ import net.minecraftforge.client.event.ScreenEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import org.lwjgl.openal.ALC10;
 import org.lwjgl.openal.ALC11;
 
@@ -42,11 +43,12 @@ import org.lwjgl.openal.ALC11;
  * çalışır (S-05). Komutlar entegre sunucuda çıktısı bastırılmış kaynakla verilir: sohbete yazı düşmez, ekran
  * görüntüsünde yalnız oyun kalır (N6). Her girdi olayı kurulumdan kapanışa log'a yazılır ve sayılır.
  *
- * <p>Ses (U-15, U-17): otomasyon dosyaya güvenmez. İlk istemci tick'inde Ana Ses'i kendisi 0 yapar; açık OpenAL aygıtı
- * "Wave File Writer" (karışımı dosyaya yazan, hoparlörsüz aygıt) değilse Ana Ses'i 0 kaydedip oyunu kapatır. Aygıt
- * doğruysa Ana Ses %100 olur (vanilla Ana Ses 0 iken hiçbir sesi başlatmaz, siren ölçülemezdi). Seçenek ekranı
- * kapanırken ({@code OptionsSubScreen.removed()} → {@code options.save()}) Ana Ses o an 0'dır, sonraki tick'te geri açılır;
- * kapanışta 0 yazılıp kaydedilir. Böylece {@code options.txt}'e Ana Ses 1.0 hiç yazılmaz.
+ * <p>Ses (U-15, U-17): otomasyon dosyaya güvenmez. İstemci kurulumunda ({@code FMLClientSetupEvent}, ana thread kuyruğu;
+ * ses motoru kaynak yüklemesinin sonunda, bundan sonra açılır) Ana Ses'i kendisi 0 yapar; ilk istemci tick'i yedek kapıdır.
+ * Açık OpenAL aygıtı "Wave File Writer" (karışımı dosyaya yazan, hoparlörsüz aygıt) değilse Ana Ses'i 0 kaydedip oyunu
+ * kapatır. Aygıt doğruysa Ana Ses %100 olur (vanilla Ana Ses 0 iken hiçbir sesi başlatmaz, siren ölçülemezdi). Seçenek
+ * ekranı kapanırken ({@code OptionsSubScreen.removed()} → {@code options.save()}) Ana Ses o an 0'dır, sonraki tick'te geri
+ * açılır; kapanışta 0 yazılıp kaydedilir. Böylece {@code options.txt}'e Ana Ses 1.0 hiç yazılmaz.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class UyariOtomasyonu {
@@ -73,6 +75,24 @@ public final class UyariOtomasyonu {
     }
 
     private UyariOtomasyonu() {
+    }
+
+    /** Mod olay yolu: Ana Ses ses motoru açılmadan 0 olur (betiksiz koşuda dosyadaki değer hoparlöre ses çıkarmasın). */
+    @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
+    public static final class Kurulum {
+        private Kurulum() {
+        }
+
+        @SubscribeEvent
+        public static void istemciKurulumu(FMLClientSetupEvent olay) {
+            if (ETKIN) {
+                olay.enqueueWork(() -> {
+                    anaSes(0.0);
+                    anaSesSifirlandi = true;
+                    log("istemci kurulumu: Ana Ses %0 (ses motoru açılmadan, aygıt doğrulanana dek)");
+                });
+            }
+        }
     }
 
     private static void plan() {
