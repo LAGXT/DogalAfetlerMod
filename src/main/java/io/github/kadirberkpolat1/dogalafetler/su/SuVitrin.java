@@ -180,7 +180,7 @@ final class SuVitrin {
             }
             default -> {
                 // Tsunami vitrini, geniş plan: iskele ekseninde, ilk ev sırasının arasından alçaktan denize bakar; iskele gözü
-                // dalgaya taşır, yanlardaki evler ölçek verir. Dalga kıyıya ~24 blok kala (kameradan ~35 blok, yakın halkada:
+                // dalgaya taşır, yanlardaki evler ölçek verir. Dalga kıyıya ~8 blok kala (kameradan ~19 blok, yakın halkada:
                 // tepe köpüğü ve kırılan dudak tam ayrıntıda) duvar kadrajın ortasında; arkası uzak LOD cephesiyle (SU-37).
                 x = s.wx(11, 0.5);
                 z = s.wz(11, 0.5);
