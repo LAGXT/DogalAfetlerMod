@@ -95,7 +95,10 @@ Kaynaklar:
   ilerlemeyi okur: artış 18 iken 1. gün sonu +7,6, 5. gün +18 (§6'daki "1. gün +6 → 5. gün +18"e yakın).
 - **Meteor boyu (GP3):** meteor API'sinde iki boy var; %5 büyük, kalanı küçük (§6'daki "orta" küçük sayılır). Yoğunluk
   dakikalık ardışık yağmurlarla 1/40 sn → 1/12 sn.
-- **Kavrulma (GP6):** güneşe açık (yaprak/çatı altı değil) çimen 3. günden sonra kaba toprağa döner; yaprak rengi
-  (istemci `ColorResolver`) yapılmadı.
-- **Yapılmayan istemci ekleri (GP10):** aurora perdesi, ısı dalgalanması, çarpma beyaz örtüsü, süpernova/kavrulma/kızıl cüce
-  sesleri ve vitrin kareleri bu turda yok; görüntü ortak gökyüzü, meteor, donma ve uyarı çizicilerindendir.
+- **Kavrulma (GP6, GP15):** güneşe açık (yaprak/çatı altı değil) çimen 3. günden sonra kaba toprağa döner; denemeler ölçekli
+  saate bağlı (`/dogalafet hiz` ile sıkışır). Yaprak ve çimen rengi 2. günün sonundan itibaren istemcide samana/kahverengiye
+  karışır (blok renk işleyicisi, 8 basamak, GP13).
+- **İstemci ekleri (GP11–GP14):** aurora perdesi `AFTER_SKY`'da (BUYUYEN gecelerinde); süpernova beyaz parlaması, ısı dalgalanması
+  ve kızıl cüce şafak tonu görünüm uzayında (F1'de de); sesler kavurucu rüzgâr (`OrtamSesi`), süpernova basıncı + kristal
+  uğultu ve kızıl cüce akoru (`tools/assets/gunes_sesleri.py`). Yapılmayanlar: çarpma anının ayrı beyaz örtüsü, süpernova
+  çökmesinde öteki ortam seslerinin susturulması.

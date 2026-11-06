@@ -5,6 +5,36 @@
     ],
     "subtitle": "subtitles.dogalafetler.esya.oncu_sarsinti"
   },
+  "gunes.kavrulma_ruzgar": {
+    "sounds": [
+      {
+        "name": "dogalafetler:gunes_kavrulma_ruzgar",
+        "stream": true
+      }
+    ],
+    "subtitle": "subtitles.dogalafetler.gunes.kavrulma_ruzgar"
+  },
+  "gunes.kizil_cuce_akor": {
+    "sounds": [
+      "dogalafetler:gunes_kizil_cuce_akor"
+    ],
+    "subtitle": "subtitles.dogalafetler.gunes.kizil_cuce_akor"
+  },
+  "gunes.supernova_basinc": {
+    "sounds": [
+      "dogalafetler:gunes_supernova_basinc"
+    ],
+    "subtitle": "subtitles.dogalafetler.gunes.supernova_basinc"
+  },
+  "gunes.supernova_kristal": {
+    "sounds": [
+      {
+        "name": "dogalafetler:gunes_supernova_kristal",
+        "stream": true
+      }
+    ],
+    "subtitle": "subtitles.dogalafetler.gunes.supernova_kristal"
+  },
   "ortam_test": {
     "sounds": [
       {

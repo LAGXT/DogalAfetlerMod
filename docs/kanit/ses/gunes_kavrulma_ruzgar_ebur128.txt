@@ -1,0 +1,24 @@
+Dosya: src/main/resources/assets/dogalafetler/sounds/gunes_kavrulma_ruzgar.ogg (148192 bayt, 20.0 sn, mono, 48000 Hz, Vorbis q5)
+Hedef (docs/tasarim/ses.md §4): -26.0 LUFS ±1, gerçek tepe <= -6.0 dBTP, baskın frekans 25–260 Hz, 2500 Hz üstü <= -30 dB
+Ölçülen (ogg): I = -26.1 LUFS, gerçek tepe = -9.0 dBTP
+Baskın frekanslar (20 Hz kümeleri, güçlüden zayıfa): 40 Hz, 60 Hz, 80 Hz
+Perde izi (0,5 sn pencerelerde en güçlü frekans, ilk 20): 56, 46, 48, 32, 82, 46, 80, 70, 54, 44, 62, 46, 50, 58, 44, 60, 60, 58, 48, 90 Hz
+Bant enerjisi / toplam: 25–260 Hz -0.2 dB; 300–3400 Hz (konuşma) -15.8 dB; >2500 Hz -40.0 dB; >8000 Hz -78.3 dB
+Döngü dikişi: |ilk - son| / en büyük iç adım = 0.170 (<= 1 ise süreksizlik yok); ilk örnek = +0.00022
+Hedefle karşılaştırma: UYGUN
+
+ffmpeg -i gunes_kavrulma_ruzgar.ogg -af ebur128=peak=true -f null -
+Summary:
+
+  Integrated loudness:
+    I:         -26.1 LUFS
+    Threshold: -36.1 LUFS
+
+  Loudness range:
+    LRA:         3.1 LU
+    Threshold: -46.1 LUFS
+    LRA low:   -27.9 LUFS
+    LRA high:  -24.7 LUFS
+
+  True peak:
+    Peak:       -9.0 dBFS

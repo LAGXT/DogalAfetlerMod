@@ -13,12 +13,15 @@ import io.github.kadirberkpolat1.dogalafetler.core.TpsOlcer;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorAPI;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
+import io.github.kadirberkpolat1.dogalafetler.uyari.HacimEgrisi;
+import io.github.kadirberkpolat1.dogalafetler.uyari.OrtamSesi;
 import io.github.kadirberkpolat1.dogalafetler.yangin.YanginKaynagi;
 import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
@@ -36,6 +39,10 @@ import net.minecraft.world.level.levelgen.Heightmap;
 public final class GunesPatlamasi extends Afet {
     /** Ardışık meteor yağmurlarının uzunluğu (oyun tick'i); yoğunluk her yağmurda yeniden hesaplanır. */
     static final int YAGMUR_DILIMI_TICK = 1_200;
+    /** Kavurucu rüzgâr katmanı ({@code OrtamSesi}, global). */
+    static final String RUZGAR_KATMANI = "gunes/kavrulma";
+    /** Oyuncu başına bir tick'teki en çok kavrulma denemesi ({@code /dogalafet hiz} yüksekken TPS korunur). */
+    static final int KAVRULMA_DENEME_TAVANI = 32;
 
     private long aktifSure = -1;
     private long aktifGecen;
@@ -81,6 +88,7 @@ public final class GunesPatlamasi extends Afet {
                 if (donem.gunesEvresi() == GunesEvresi.BUYUYEN) {
                     donem.evreIlerlemesiAyarla(GunesPatlamasiEgrileri.aktifIlerlemesi(aktifGecen, aktifSure));
                 }
+                ruzgarBaslat(level);
             }
             case BITIS -> {
                 if (eski == AfetAsamasi.AKTIF && donem.gunesEvresi() == GunesEvresi.BUYUYEN) {
@@ -119,7 +127,7 @@ public final class GunesPatlamasi extends Afet {
             yagmurBaslat(level);
         }
         kavur(level, GunesPatlamasiEgrileri.kavrulmaOlasiligi(aktifGecen, aktifSure,
-                GunesPatlamasiAyarlari.kavrulmaBaslangicGun(), GunesPatlamasiAyarlari.kavrulmaOlasiligi()));
+                GunesPatlamasiAyarlari.kavrulmaBaslangicGun(), GunesPatlamasiAyarlari.kavrulmaOlasiligi()), adim);
     }
 
     private void yagmurBaslat(ServerLevel level) {
@@ -133,22 +141,44 @@ public final class GunesPatlamasi extends Afet {
         DogalAfetler.LOGGER.debug("Güneş patlaması: meteor yağmuru {} (oyuncu başına dakikada {})", kimlik, adet);
     }
 
-    /** Her oyuncu için olasılıkla bir kavrulma denemesi; bütçe TPS kısmasıyla çarpılır. */
-    private static void kavur(ServerLevel level, double olasilik) {
-        if (olasilik <= 0 || !Kurallar.blokHasariAcik(level.getGameRules())) {
+    /**
+     * Kavurucu rüzgâr (global, WEATHER): kalan süre boyunca çalışmaya geçen paya göre %30'dan %100'e yükselir (eğri gerçek
+     * tick; hız 1 varsayılır, sonra son düzeyde kalır). Afet bitince temizlikte söner.
+     */
+    private void ruzgarBaslat(ServerLevel level) {
+        float bas = 0.3f + 0.7f * (float) aktifGecen / Math.max(1L, aktifSure);
+        int kalan = (int) Math.min(Integer.MAX_VALUE / 2, Math.max(200L, aktifSure - aktifGecen));
+        OrtamSesi.baslat(level.getServer(), RUZGAR_KATMANI, baglam().baslangicSaati(), GunesPatlamasiSesleri.KAVRULMA_RUZGAR,
+                SoundSource.WEATHER, OrtamSesi.Yer.global(), HacimEgrisi.of(new HacimEgrisi.Nokta(0, 0f),
+                        new HacimEgrisi.Nokta(100, bas), new HacimEgrisi.Nokta(100 + kalan, 1f)));
+    }
+
+    /**
+     * Kavrulma: oyuncu başına her ölçekli tick'te olasılıkla bir deneme ({@code adim} kadar, en çok
+     * {@value #KAVRULMA_DENEME_TAVANI}); süreç {@code /dogalafet hiz} ile sıkışınca kavrulma da sıkışır. Bütçe TPS
+     * kısmasıyla çarpılır.
+     */
+    private static void kavur(ServerLevel level, double olasilik, int adim) {
+        if (olasilik <= 0 || adim <= 0 || !Kurallar.blokHasariAcik(level.getGameRules())) {
             return;
         }
         double p = olasilik * TpsOlcer.kismaCarpani();
+        int deneme = Math.min(adim, KAVRULMA_DENEME_TAVANI);
         int yaricap = GunesPatlamasiAyarlari.kavrulmaYaricap();
         RandomSource r = level.getRandom();
         for (ServerPlayer oyuncu : level.players()) {
-            if (oyuncu.isSpectator() || r.nextDouble() >= p) {
+            if (oyuncu.isSpectator()) {
                 continue;
             }
-            int x = oyuncu.getBlockX() + r.nextInt(2 * yaricap + 1) - yaricap;
-            int z = oyuncu.getBlockZ() + r.nextInt(2 * yaricap + 1) - yaricap;
-            if (level.hasChunk(x >> 4, z >> 4)) {
-                kavur(level, new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1, z));
+            for (int i = 0; i < deneme; i++) {
+                if (r.nextDouble() >= p) {
+                    continue;
+                }
+                int x = oyuncu.getBlockX() + r.nextInt(2 * yaricap + 1) - yaricap;
+                int z = oyuncu.getBlockZ() + r.nextInt(2 * yaricap + 1) - yaricap;
+                if (level.hasChunk(x >> 4, z >> 4)) {
+                    kavur(level, new BlockPos(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1, z));
+                }
             }
         }
     }
@@ -198,12 +228,18 @@ public final class GunesPatlamasi extends Afet {
     @Override
     protected void temizle(ServerLevel level, boolean temiz) {
         int durdu = MeteorAPI.yagmurlariDurdur(level.getServer(), kaynak(), temiz);
+        if (OrtamSesi.aktifMi(RUZGAR_KATMANI)) {
+            OrtamSesi.durdur(level.getServer(), RUZGAR_KATMANI, 80);
+        }
         DogalAfetler.LOGGER.info("Güneş patlaması durdu (temiz {}): {} meteor yağmuru durduruldu", temiz, durdu);
     }
 
     @Override
     protected void yuklendi(ServerLevel level) {
         yagmurBekleme = 0;
+        if (asama() == AfetAsamasi.AKTIF) {
+            ruzgarBaslat(level);
+        }
     }
 
     @Override
