@@ -16,7 +16,7 @@
     "frame": "task",
     "hidden": false,
     "icon": {
-      "item": "minecraft:compass"
+      "item": "dogalafetler:hava_radari"
     },
     "show_toast": true,
     "title": {

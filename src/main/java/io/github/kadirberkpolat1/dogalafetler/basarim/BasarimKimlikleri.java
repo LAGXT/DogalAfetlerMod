@@ -12,7 +12,7 @@ import net.minecraft.world.item.Items;
 import net.minecraftforge.registries.ForgeRegistries;
 
 /**
- * Başarımların kimlikleri. Karşılaştırılan mod eşyaları ve blokları (çekirdek dışındaki Faz 3 işçilerinin) yalnız
+ * Başarımların kimlikleri. Karşılaştırılan mod eşyaları (çekirdek dışındaki Faz 3 işçilerinin) yalnız
  * {@link ResourceLocation} ile anılır: sınıflarına bağlanmayız, eşya kayıtlı değilse ölçüt yalnız tutmaz.
  */
 public final class BasarimKimlikleri {
@@ -24,8 +24,6 @@ public final class BasarimKimlikleri {
     public static final ResourceLocation HAVA_RADARI = DogalAfetler.konum("hava_radari");
     /** Madde 13b (radar-sismograf işçisi): #15 "Yer Dinleyici". */
     public static final ResourceLocation SISMOGRAF = DogalAfetler.konum("sismograf");
-    /** Madde 15 (balıkçılık işçisi): #20, #21. */
-    public static final ResourceLocation BUZ_DELIGI = DogalAfetler.konum("buz_deligi");
     /** Madde 14 (yiyecek işçisi): "hedef" ödülünün sıcak yiyeceği. */
     public static final ResourceLocation SICAK_SALEP = DogalAfetler.konum("sicak_salep");
     /** Madde 14'ün sıcak yiyecekleri (yiyecek işçisi); #19 için isteğe bağlı etiket girdileri. */

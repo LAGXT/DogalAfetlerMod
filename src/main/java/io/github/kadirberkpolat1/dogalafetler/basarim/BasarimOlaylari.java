@@ -1,6 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.basarim;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.balikcilik.BalikTutulduEvent;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.AfetIzi;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.AfetKumesi;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.ArdisikSayac;
@@ -39,7 +40,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import net.minecraft.advancements.Advancement;
-import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
@@ -47,16 +47,13 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.entity.projectile.FishingHook;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.living.LivingEntityUseItemEvent;
 import net.minecraftforge.event.entity.player.AdvancementEvent;
-import net.minecraftforge.event.entity.player.ItemFishedEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.event.server.ServerStoppedEvent;
@@ -64,7 +61,6 @@ import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.LogicalSide;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.server.ServerLifecycleHooks;
 
 /**
@@ -82,8 +78,6 @@ public final class BasarimOlaylari {
     static final float CUKUR_DUSUSU = 4.0f;
     /** Orman yangını: oyuncunun bu kadar blok yakınında yanan hücre varsa "yangın alanında" (afet ipucu yoksa). */
     static final double YANGIN_YAKINLIGI = 8.0;
-    /** Batan kancanın üstünde buz deliğinin aranacağı en çok yükseklik (blok). */
-    static final int DELIK_YUKARI = 3;
     private static final float DONMA_TAM = DunyaDonemi.DONMA_EN_COK - 0.001f;
     private static final Map<UUID, Gecici> GECICI = new HashMap<>();
     private static final double[] ITME = new double[2];
@@ -423,19 +417,10 @@ public final class BasarimOlaylari {
         }
     }
 
-    /** #20, #21: kanca bir buz deliğindeyken tutulan yenebilir eşyalar (balık; çöp ve kitap yenmez). */
-    @SubscribeEvent(priority = EventPriority.LOWEST)
-    public static void balikTutuldu(ItemFishedEvent olay) {
-        if (!(olay.getEntity() instanceof ServerPlayer oyuncu) || !buzDeliginden(olay.getHookEntity())) {
-            return;
-        }
-        int balik = 0;
-        for (ItemStack yigin : olay.getDrops()) {
-            if (yigin.isEdible()) {
-                balik += yigin.getCount();
-            }
-        }
-        buzDeligiBaligi(oyuncu, balik);
+    /** #20, #21: balıkçılığın delikten her çekmede bir kez yayınladığı olay (tek kaynak). */
+    @SubscribeEvent
+    public static void balikTutuldu(BalikTutulduEvent olay) {
+        buzDeligiBaligi(olay.oyuncu(), olay.balikSayisi());
     }
 
     /** Buz deliğinden {@code adet} balık; toplam oyuncu verisinde birikir (balıkçılık olayı da buraya bağlanır). */
@@ -443,22 +428,6 @@ public final class BasarimOlaylari {
         if (adet > 0) {
             BasarimOlcutleri.BALIK_TUTULDU.tetikle(oyuncu, BasarimVerisi.balikEkle(oyuncu, adet));
         }
-    }
-
-    /**
-     * Kanca bir buz deliğinin sütununda mı: ısırmada olta deliğin altındaki suya 1–2 blok inebilir, bu yüzden kancanın
-     * bloğundan {@value #DELIK_YUKARI} blok yukarıya (ve bir aşağıya) bakılır.
-     */
-    private static boolean buzDeliginden(FishingHook kanca) {
-        Level level = kanca.level();
-        BlockPos konum = kanca.blockPosition();
-        for (int dy = -1; dy <= DELIK_YUKARI; dy++) {
-            ResourceLocation blok = ForgeRegistries.BLOCKS.getKey(level.getBlockState(konum.above(dy)).getBlock());
-            if (BasarimKimlikleri.BUZ_DELIGI.equals(blok)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     // ---------------------------------------------------------------- dünya dönemi

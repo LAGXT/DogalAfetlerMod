@@ -16,7 +16,7 @@
     "frame": "task",
     "hidden": false,
     "icon": {
-      "item": "minecraft:sculk_sensor"
+      "item": "dogalafetler:sismograf"
     },
     "show_toast": true,
     "title": {

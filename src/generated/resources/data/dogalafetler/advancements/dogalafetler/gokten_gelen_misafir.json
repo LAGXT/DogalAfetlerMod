@@ -16,7 +16,7 @@
     "frame": "task",
     "hidden": false,
     "icon": {
-      "item": "minecraft:fire_charge"
+      "item": "dogalafetler:meteorit_parcasi"
     },
     "show_toast": true,
     "title": {

@@ -26,6 +26,9 @@ import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.SicaklikKapisi;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.VucutSicakligi;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.ZirhEkleri;
+import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Kademe;
+import io.github.kadirberkpolat1.dogalafetler.yiyecek.YiyecekKayitlari;
+import io.github.kadirberkpolat1.dogalafetler.yiyecek.YiyecekYendiEvent;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -763,6 +766,45 @@ public final class BasarimOyunTestleri {
         } finally {
             kural.set(onceki, server);
             cikar(y, List.of(soguk, donan, serin));
+        }
+        y.succeed();
+    }
+
+    /**
+     * Birleşik zincir (entegrasyon 3): gerçek Ateşli Güveç {@code YiyecekAPI} yoluyla yenir. Yiyeceğin olayı bir kez gelir ve
+     * başlangıcı {@code DONUYOR}'dur (yiyecek §A3 ile başarım A-29 aynı); başarım bu olayı dinlemez, aynı yemeyi
+     * {@code Start}/{@code Finish} ve yiyeceğin eklediği taze ısınma etkisiyle tanır (tek kaynak). Anlık ısınma vücudu donma
+     * kademesinden çıkarır; başarım yine de yemeye başlarkenki kademeyi sayıp nötre dönüşte açılır.
+     */
+    @GameTest(template = "bos", batch = "basarim_corba_zincir")
+    public static void corbaGercekYiyecekZinciriyleAcilir(GameTestHelper y) {
+        MinecraftServer server = y.getLevel().getServer();
+        GameRules.BooleanValue kural = server.getGameRules().getRule(Kurallar.SICAKLIK_SISTEMI);
+        boolean onceki = kural.get();
+        kural.set(true, server);
+        ServerPlayer o = oyuncu(y, "corba-zincir", 0);
+        List<YiyecekYendiEvent> olaylar = new ArrayList<>();
+        Consumer<YiyecekYendiEvent> dinleyici = olaylar::add;
+        MinecraftForge.EVENT_BUS.addListener(EventPriority.NORMAL, false, YiyecekYendiEvent.class, dinleyici);
+        try {
+            VucutSicakligi.ayarla(o, -80);
+            ItemStack guvec = new ItemStack(YiyecekKayitlari.esya("atesli_guvec"), 2);
+            o.setItemInHand(InteractionHand.MAIN_HAND, guvec);
+            MinecraftForge.EVENT_BUS.post(new LivingEntityUseItemEvent.Start(o, guvec, 32));
+            ItemStack kalan = guvec.finishUsingItem(o.level(), o);
+            MinecraftForge.EVENT_BUS.post(new LivingEntityUseItemEvent.Finish(o, guvec, 0, kalan));
+            dogrula(y, olaylar.size() == 1 && olaylar.get(0).uygulandi()
+                    && olaylar.get(0).oncekiKademe() == Kademe.DONUYOR, "yiyecek olayı bir kez, DONUYOR'dan: " + olaylar.size());
+            dogrula(y, VucutSicakligi.al(o) > -80, "anlık ısınma uygulanmalı: " + VucutSicakligi.al(o));
+            BasarimOlaylari.saniyelikDenetim(o);
+            dogrula(y, !kazandi(y, o, Basarimlar.CORBA_ICER_ISINIR), "henüz nötr değil");
+            VucutSicakligi.ayarla(o, 0);
+            BasarimOlaylari.saniyelikDenetim(o);
+            dogrula(y, kazandi(y, o, Basarimlar.CORBA_ICER_ISINIR), "gerçek Güveç + etki sürerken nötr");
+        } finally {
+            MinecraftForge.EVENT_BUS.unregister(dinleyici);
+            kural.set(onceki, server);
+            cikar(y, List.of(o));
         }
         y.succeed();
     }
