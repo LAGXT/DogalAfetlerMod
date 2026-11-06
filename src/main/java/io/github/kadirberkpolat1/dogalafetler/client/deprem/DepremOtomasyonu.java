@@ -48,15 +48,18 @@ import net.minecraftforge.fml.util.ObfuscationReflectionHelper;
  * yarığın uzantısında 30 blok ötede kameraya doğru açılış; S1 ile aynı göreli yan bakış; geniş bakış; bitiş), sinkhole S1
  * (çatlama, çukur) ve sinkhole S5 (çatlama, çöküş vitrini, üstten çukur, bitiş). Afet merkezi oyuncuya göre seçildiği için
  * kamera başlatmadan sonra sunucudan okunan merkeze (depremde fay doğrultusuna) göre seyirci modda konur; sahneye ahşap ev
- * ve ağaç kurulur. Her kare öncesi istemci en az {@value #AKICI_FPS} FPS çizmeli ve adım başından beri en az 20 kare çizilmiş
- * olmalı (A-34); zamanlaması dar kareler (vitrin, sarsıntı) kapıyı eylemden önce geçer. Kare log'u FPS, parçacık, düşen blok,
- * sarsıntı genliği ve afet durumunu yazar. Klavye, fare ve tekerlek girdileri kapanışa kadar sayılır; iç imleç köşeye alınır.
+ * ve ağaç kurulur. Her kare öncesi istemci en az {@value #AKICI_FPS} FPS çizip adım başından beri en az 20 kare çizmiş olmalı
+ * (A-34); gizli workspace'te compositor istemciyi ~1 FPS'e kısar (GP17): kapı {@value #KAPI_PAYI} tick sonra en az iki yeni
+ * çizilmiş kareyle geçer. Zamanlaması dar kareler (vitrin, sarsıntı) kapıyı eylemden önce geçer. Kare log'u FPS, parçacık,
+ * düşen blok, sarsıntı genliği ve afet durumunu yazar. Klavye, fare ve tekerlek girdileri kapanışa kadar sayılır; iç imleç
+ * köşeye alınır.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class DepremOtomasyonu {
     private static final String MOD = System.getProperty("dogalafetler.otomasyon", "");
     private static final String ON = "DEPREM_OTOMASYON ";
     private static final int AKICI_FPS = 15;
+    private static final int KAPI_PAYI = 60;
     private static final int ARALIK = 600;
     private static final int TOPLAM_TAVAN = 20 * 1500;
 
@@ -234,7 +237,7 @@ public final class DepremOtomasyonu {
         ekle("deprem S1 aktif", () -> {
             mc.options.hideGui = true;
             komut(mc, "dogalafet asama ileri");
-        }, () -> adimTick >= 90 && mc.getFps() >= AKICI_FPS, 125);
+        }, () -> adimTick >= 90 && (mc.getFps() >= AKICI_FPS || kareSayaci - adimKaresi >= 2), 125);
         ekle("kare S1", () -> kare(mc, "deprem_s1"), bekle(2), 4);
         ekle("deprem S1 bitsin", () -> { }, afetYok(mc), 1200);
         ekle("S1 bitiş kamerası", () -> kamera(mc, yakin(mc, sahne)), () -> akici(mc, 40, 20), 1200);
@@ -314,9 +317,14 @@ public final class DepremOtomasyonu {
         return () -> adimTick >= tick;
     }
 
-    /** En az {@code tick} tick geçti, adım başından beri en az {@code kare} kare çizildi ve istemci akıcı çiziyor (A-34). */
+    /**
+     * En az {@code tick} tick geçti ve istemci akıcı (≥ {@value #AKICI_FPS} FPS, adım başından ≥ {@code kare} kare) çiziyor; ya da
+     * {@value #KAPI_PAYI} tick daha geçti ve en az iki yeni kare çizildi (gizli workspace, GP17).
+     */
     private static boolean akici(Minecraft mc, int tick, int kare) {
-        return adimTick >= tick && kareSayaci - adimKaresi >= kare && mc.getFps() >= AKICI_FPS;
+        int cizilen = kareSayaci - adimKaresi;
+        return adimTick >= tick && (cizilen >= kare && mc.getFps() >= AKICI_FPS
+                || adimTick >= tick + KAPI_PAYI && cizilen >= 2);
     }
 
     private static BooleanSupplier afetYok(Minecraft mc) {
