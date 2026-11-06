@@ -1,10 +1,10 @@
 package io.github.kadirberkpolat1.dogalafetler.su;
 
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
-import io.github.kadirberkpolat1.dogalafetler.komut.KomutKaydi;
 import java.util.Locale;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -21,9 +21,9 @@ final class SuVitrinKomutlari {
     private SuVitrinKomutlari() {
     }
 
-    static void kaydet() {
-        KomutKaydi.ekle(Commands.literal("su")
-                .then(Commands.literal("vitrin").executes(SuVitrinKomutlari::vitrin)
+    /** Geliştirme dallarını {@code /dogalafet su} düğümüne ekler (yalnız {@link SuKomutlari#gelistirmeKomutlari()}). */
+    static void ekle(LiteralArgumentBuilder<CommandSourceStack> su) {
+        su.then(Commands.literal("vitrin").executes(SuVitrinKomutlari::vitrin)
                         .then(Commands.literal("kamera")
                                 .then(Commands.literal("iskele").executes(k -> vitrinKamera(k, SuVitrin.Kamera.ISKELE)))
                                 .then(Commands.literal("sualti").executes(k -> vitrinKamera(k, SuVitrin.Kamera.SUALTI)))
@@ -32,7 +32,7 @@ final class SuVitrinKomutlari {
                                 .executes(k -> vitrinDalga(k, IntegerArgumentType.getInteger(k, "yukseklik"))))))
                 .then(Commands.literal("ay")
                         .then(Commands.literal("var").executes(k -> ay(k, true)))
-                        .then(Commands.literal("yok").executes(k -> ay(k, false)))));
+                        .then(Commands.literal("yok").executes(k -> ay(k, false))));
     }
 
     /** Vitrin sahnesi (SU-29): kumsala iskele ve kıyı köyü kurar, kamera iskelenin ucunda. */

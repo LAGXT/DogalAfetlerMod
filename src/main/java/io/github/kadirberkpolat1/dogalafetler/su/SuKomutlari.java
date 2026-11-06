@@ -2,6 +2,7 @@ package io.github.kadirberkpolat1.dogalafetler.su;
 
 import com.mojang.brigadier.arguments.FloatArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import io.github.kadirberkpolat1.dogalafetler.komut.KomutKaydi;
@@ -57,7 +58,7 @@ public final class SuKomutlari {
                         .executes(k -> deniz(k, false))
                         .then(Commands.literal("kademeli").executes(k -> deniz(k, true)))));
         KomutKaydi.ekle(Commands.literal("aysonrasi").then(Commands.literal("atla").executes(SuKomutlari::atla)));
-        KomutKaydi.ekle(Commands.literal("su")
+        LiteralArgumentBuilder<CommandSourceStack> su = Commands.literal("su")
                 .then(Commands.literal("bilgi").executes(SuKomutlari::bilgi))
                 .then(Commands.literal("dalga").executes(k -> dalga(k, 10))
                         .then(Commands.argument("yukseklik", IntegerArgumentType.integer(1, 30))
@@ -75,10 +76,12 @@ public final class SuKomutlari {
                                         .executes(k -> cekilme(k, IntegerArgumentType.getInteger(k, "yaricap"),
                                                 IntegerArgumentType.getInteger(k, "derinlik"))))))
                 .then(Commands.literal("temizle").executes(SuKomutlari::temizle))
-                .then(Commands.literal("kiyi").executes(SuKomutlari::kiyi)));
+                .then(Commands.literal("kiyi").executes(SuKomutlari::kiyi));
+        // Çekirdek aynı adlı ikinci alt komutu reddeder: geliştirme dalları aynı "su" düğümüne eklenir.
         if (gelistirmeKomutlari()) {
-            SuVitrinKomutlari.kaydet();
+            SuVitrinKomutlari.ekle(su);
         }
+        KomutKaydi.ekle(su);
         DataGenerators.ceviriEkle(SuKomutlari::cevirileriYaz);
     }
 
