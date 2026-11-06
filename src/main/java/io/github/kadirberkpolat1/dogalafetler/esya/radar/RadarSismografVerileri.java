@@ -4,6 +4,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.esya.EsyaKayitlari;
+import io.github.kadirberkpolat1.dogalafetler.esya.MeteorEsyaKayitlari;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -91,7 +92,7 @@ public final class RadarSismografVerileri implements DataProvider {
         // R-17: boş etiketin malzemesi Forge'da "Empty Tag" bariyeridir; etiket dolana kadar tarif hiç yüklenmez.
         JsonObject bos = new JsonObject();
         bos.addProperty("type", "forge:tag_empty");
-        bos.addProperty("tag", EsyaKayitlari.KOZMIK_CEKIRDEK.location().toString());
+        bos.addProperty("tag", MeteorEsyaKayitlari.KOZMIK_CEKIRDEK_ETIKETI.location().toString());
         JsonObject degil = new JsonObject();
         degil.addProperty("type", "forge:not");
         degil.add("value", bos);
@@ -103,7 +104,7 @@ public final class RadarSismografVerileri implements DataProvider {
         esya.addProperty("item", DogalAfetler.MOD_ID + ":" + temel);
         malzemeler.add(esya);
         JsonObject cekirdek = new JsonObject();
-        cekirdek.addProperty("tag", EsyaKayitlari.KOZMIK_CEKIRDEK.location().toString());
+        cekirdek.addProperty("tag", MeteorEsyaKayitlari.KOZMIK_CEKIRDEK_ETIKETI.location().toString());
         malzemeler.add(cekirdek);
         j.add("ingredients", malzemeler);
         j.add("result", sonuc(sonuc));

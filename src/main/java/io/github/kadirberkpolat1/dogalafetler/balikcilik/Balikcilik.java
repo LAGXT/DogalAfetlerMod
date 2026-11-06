@@ -6,6 +6,7 @@ import io.github.kadirberkpolat1.dogalafetler.balikcilik.veri.BalikcilikVeriSagl
 import io.github.kadirberkpolat1.dogalafetler.veri.DataGenerators;
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.tags.ItemTags;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.storage.loot.LootDataManager;
@@ -37,6 +38,9 @@ public final class Balikcilik {
         forge.addListener(BuzBalikciligi::donemDegisti);
         forge.addListener(Balikcilik::sunucuBasladi);
         DataGenerators.ceviriEkle(BalikcilikCevirileri::yaz);
+        for (BalikcilikKayitlari.Balik b : BalikcilikKayitlari.Balik.values()) {
+            DataGenerators.vanillaEsyaEtiketiEkle(ItemTags.FISHES, b::cig, b::pismis);
+        }
         // Lambda: sağlayıcı sınıfı (istemci model üreticilerine bağlı) yalnız datagen'de yüklenir (K-E9).
         DataGenerators.saglayiciEkle(olay -> BalikcilikVeriSaglayicilari.ekle(olay));
     }

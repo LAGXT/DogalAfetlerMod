@@ -25,8 +25,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Holder;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.FriendlyByteBuf;
@@ -395,8 +393,8 @@ public final class EsyaOyunTestleri {
 
     /**
      * Tarif kimlikleri sabit (başarım işçisi); şekilli tarifler madde 13a-b'deki desenle dokuz hücrede birebir. Gelişmiş
-     * tarifler {@code forge:not(forge:tag_empty)} koşuluyla yüklenir (R-17): {@code #dogalafetler:kozmik_cekirdek} boşken yoktur
-     * ve "Empty Tag" bariyeri eşleşmez; doluysa (entegrasyon) Kozmik Çekirdekle gerçekten craft edilir.
+     * tarifler {@code forge:not(forge:tag_empty)} koşuluyla yüklenir (R-17); {@code #dogalafetler:kozmik_cekirdek}'i meteor doldurur,
+     * bu yüzden ikisi de yüklüdür ve meteorun Kozmik Çekirdeğiyle gerçekten craft edilir (boş etiket regresyondur).
      */
     @GameTest(template = "bos")
     public static void tariflerYukluVeDesenlerSartnameyleAyni(GameTestHelper yardimci) {
@@ -407,8 +405,9 @@ public final class EsyaOyunTestleri {
         hucreler(yardimci, desen(yardimci, server, EsyaKayitlari.TARIF_SISMOGRAF, EsyaKayitlari.SISMOGRAF.get()), "Sismograf",
                 Items.IRON_INGOT, Items.PAPER, Items.IRON_INGOT, Items.STICK, Items.REDSTONE, Items.STICK, Items.STONE,
                 Items.COPPER_INGOT, Items.STONE);
-        Optional<Item> cekirdek = BuiltInRegistries.ITEM.getTag(EsyaKayitlari.KOZMIK_CEKIRDEK)
-                .flatMap(etiket -> etiket.stream().findFirst()).map(Holder::value);
+        Item cekirdek = MeteorEsyaKayitlari.KOZMIK_CEKIRDEK.get();
+        yardimci.assertTrue(cekirdek.builtInRegistryHolder().is(MeteorEsyaKayitlari.KOZMIK_CEKIRDEK_ETIKETI),
+                "#dogalafetler:kozmik_cekirdek Kozmik Çekirdeği içermiyor");
         ServerPlayer oyuncu = CekirdekOyunTestleri.sahteOyuncu(yardimci, 0.5, 2, 0.5);
         try {
             gelismisTarif(yardimci, oyuncu, EsyaKayitlari.TARIF_GELISMIS_HAVA_RADARI, EsyaKayitlari.HAVA_RADARI.get(),
@@ -418,8 +417,7 @@ public final class EsyaOyunTestleri {
         } finally {
             server.getPlayerList().remove(oyuncu);
         }
-        DogalAfetler.LOGGER.info("Eşya GameTest: gelişmiş tarifler {}", cekirdek.isPresent()
-                ? "yüklü, " + cekirdek.get() + " ile craft edildi" : "yok (koşullu, #kozmik_cekirdek boş)");
+        DogalAfetler.LOGGER.info("Eşya GameTest: gelişmiş tarifler yüklü, {} ile craft edildi", cekirdek);
         yardimci.succeed();
     }
 
@@ -431,17 +429,11 @@ public final class EsyaOyunTestleri {
     }
 
     private static void gelismisTarif(GameTestHelper yardimci, ServerPlayer oyuncu, ResourceLocation kimlik, Item temel,
-            Item sonuc, Optional<Item> cekirdek) {
+            Item sonuc, Item cekirdek) {
         ServerLevel level = yardimci.getLevel();
         Optional<? extends Recipe<?>> tarif = level.getRecipeManager().byKey(kimlik);
-        if (cekirdek.isEmpty()) {
-            yardimci.assertTrue(tarif.isEmpty(), "etiket boşken yüklenmemeli: " + kimlik);
-            yardimci.assertTrue(level.getRecipeManager().getRecipeFor(RecipeType.CRAFTING, tezgah(oyuncu, temel,
-                    Items.BARRIER), level).isEmpty(), "bariyerle eşleşti: " + kimlik);
-            return;
-        }
         yardimci.assertTrue(tarif.isPresent() && tarif.get().getIngredients().size() == 2, "şekilsiz tarif: " + kimlik);
-        TransientCraftingContainer tezgah = tezgah(oyuncu, temel, cekirdek.get());
+        TransientCraftingContainer tezgah = tezgah(oyuncu, temel, cekirdek);
         Optional<CraftingRecipe> eslesen = level.getRecipeManager().getRecipeFor(RecipeType.CRAFTING, tezgah, level);
         yardimci.assertTrue(eslesen.isPresent() && eslesen.get().assemble(tezgah, level.registryAccess()).is(sonuc),
                 "Kozmik Çekirdekle craft edilmedi: " + kimlik);

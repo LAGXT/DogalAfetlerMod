@@ -17,8 +17,6 @@ import io.github.kadirberkpolat1.dogalafetler.veri.SesSaglayici;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvent;
-import net.minecraft.tags.ItemTags;
-import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
 import net.minecraftforge.common.data.SoundDefinition;
@@ -58,9 +56,6 @@ public final class EsyaKayitlari {
     public static final ResourceLocation TARIF_GELISMIS_HAVA_RADARI = DogalAfetler.konum("gelismis_hava_radari");
     public static final ResourceLocation TARIF_SISMOGRAF = DogalAfetler.konum("sismograf");
     public static final ResourceLocation TARIF_HASSAS_SISMOGRAF = DogalAfetler.konum("hassas_sismograf");
-
-    /** Kozmik Çekirdek etiketi (meteor işçisi doldurur). */
-    public static final TagKey<Item> KOZMIK_CEKIRDEK = ItemTags.create(DogalAfetler.konum("kozmik_cekirdek"));
 
     private EsyaKayitlari() {
     }

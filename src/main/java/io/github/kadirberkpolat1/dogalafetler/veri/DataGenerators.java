@@ -12,13 +12,14 @@ import java.util.function.Supplier;
 import net.minecraft.data.DataGenerator;
 import net.minecraft.data.PackOutput;
 import net.minecraft.tags.TagKey;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import net.minecraftforge.data.event.GatherDataEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 /**
- * Datagen kayıt noktası. Ortak dosyalar (dil dosyaları, sounds.json, vanilla blok etiketleri) tek bir provider tarafından
+ * Datagen kayıt noktası. Ortak dosyalar (dil dosyaları, sounds.json, vanilla blok ve eşya etiketleri) tek bir provider tarafından
  * yazılır ve alt sistemler bunlara katkı ekler; kendi dosyalarını yazan provider'lar (tarif, loot, advancement,
  * {@code dogalafetler:*} etiketleri) {@link #saglayiciEkle} ile eklenir. Kayıtlar mod inşasında yapılır,
  * {@link GatherDataEvent}'te okunur.
@@ -35,6 +36,7 @@ public final class DataGenerators {
     private static final List<Consumer<SesSaglayici>> SESLER = new CopyOnWriteArrayList<>();
     private static final List<SaglayiciEkleyici> SAGLAYICILAR = new CopyOnWriteArrayList<>();
     private static final Map<TagKey<Block>, List<Supplier<? extends Block>>> VANILLA_BLOK_ETIKETLERI = new LinkedHashMap<>();
+    private static final Map<TagKey<Item>, List<Supplier<? extends Item>>> VANILLA_ESYA_ETIKETLERI = new LinkedHashMap<>();
 
     private DataGenerators() {
     }
@@ -57,12 +59,24 @@ public final class DataGenerators {
      */
     @SafeVarargs
     public static synchronized void vanillaBlokEtiketiEkle(TagKey<Block> etiket, Supplier<? extends Block>... bloklar) {
+        ekle(VANILLA_BLOK_ETIKETLERI, etiket, bloklar);
+    }
+
+    /** Vanilla ({@code minecraft:*}) bir eşya etiketine katkı (K-E12): tek sağlayıcı {@link OrtakEsyaEtiketleri}. */
+    @SafeVarargs
+    public static synchronized void vanillaEsyaEtiketiEkle(TagKey<Item> etiket, Supplier<? extends Item>... esyalar) {
+        ekle(VANILLA_ESYA_ETIKETLERI, etiket, esyalar);
+    }
+
+    @SafeVarargs
+    private static <T> void ekle(Map<TagKey<T>, List<Supplier<? extends T>>> hedef, TagKey<T> etiket,
+            Supplier<? extends T>... girdiler) {
         if (!"minecraft".equals(etiket.location().getNamespace())) {
             throw new IllegalArgumentException("vanilla olmayan etiket ortak sağlayıcıya eklenemez: " + etiket.location());
         }
-        List<Supplier<? extends Block>> liste = VANILLA_BLOK_ETIKETLERI.computeIfAbsent(etiket, e -> new ArrayList<>());
-        for (Supplier<? extends Block> blok : bloklar) {
-            liste.add(Objects.requireNonNull(blok, "blok"));
+        List<Supplier<? extends T>> liste = hedef.computeIfAbsent(etiket, e -> new ArrayList<>());
+        for (Supplier<? extends T> girdi : girdiler) {
+            liste.add(Objects.requireNonNull(girdi, "girdi"));
         }
     }
 
@@ -77,6 +91,8 @@ public final class DataGenerators {
         uretici.addProvider(istemci, new SesSaglayici(cikti, olay.getExistingFileHelper(), SESLER));
         uretici.addProvider(olay.includeServer(), new OrtakEtiketler(cikti, olay.getLookupProvider(),
                 olay.getExistingFileHelper(), VANILLA_BLOK_ETIKETLERI));
+        uretici.addProvider(olay.includeServer(), new OrtakEsyaEtiketleri(cikti, olay.getLookupProvider(),
+                olay.getExistingFileHelper(), VANILLA_ESYA_ETIKETLERI));
 
         for (SaglayiciEkleyici ekleyici : SAGLAYICILAR) {
             ekleyici.ekle(olay);
