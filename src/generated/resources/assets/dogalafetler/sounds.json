@@ -1,4 +1,10 @@
 {
+  "esya.oncu_sarsinti": {
+    "sounds": [
+      "dogalafetler:esya_oncu_sarsinti"
+    ],
+    "subtitle": "subtitles.dogalafetler.esya.oncu_sarsinti"
+  },
   "ortam_test": {
     "sounds": [
       {

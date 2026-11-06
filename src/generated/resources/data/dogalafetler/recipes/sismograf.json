@@ -1,0 +1,32 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "key": {
+    "B": {
+      "item": "minecraft:copper_ingot"
+    },
+    "C": {
+      "item": "minecraft:stick"
+    },
+    "D": {
+      "item": "minecraft:iron_ingot"
+    },
+    "K": {
+      "item": "minecraft:paper"
+    },
+    "R": {
+      "item": "minecraft:redstone"
+    },
+    "T": {
+      "item": "minecraft:stone"
+    }
+  },
+  "pattern": [
+    "DKD",
+    "CRC",
+    "TBT"
+  ],
+  "result": {
+    "item": "dogalafetler:sismograf"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "key": {
+    "B": {
+      "item": "minecraft:copper_ingot"
+    },
+    "C": {
+      "item": "minecraft:glass"
+    },
+    "D": {
+      "item": "minecraft:iron_ingot"
+    },
+    "K": {
+      "item": "minecraft:redstone"
+    },
+    "P": {
+      "item": "minecraft:compass"
+    }
+  },
+  "pattern": [
+    "DCD",
+    "KPK",
+    "DBD"
+  ],
+  "result": {
+    "item": "dogalafetler:hava_radari"
+  }
+}
