@@ -227,6 +227,7 @@ public final class GunesPatlamasiOyunTestleri {
         } finally {
             hasar.set(eskiHasar, server);
             level.setBlockAndUpdate(konum.above(3), Blocks.AIR.defaultBlockState());
+            level.setBlockAndUpdate(konum, Blocks.AIR.defaultBlockState());
         }
         y.succeed();
     }

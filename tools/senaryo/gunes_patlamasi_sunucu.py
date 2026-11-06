@@ -6,9 +6,9 @@
 `server.properties` sonda geri döner. Üç açılış:
 
 koşu 1: start gunes_patlamasi, durum (normal güneş, ön-uyarıda gök değişmez), asama ileri (siren: güneş büyümeye başlar),
-durum (büyüyen güneş), asama ileri (AKTIF: meteorlar), meteor bilgi (yağmur var), gamerule gunesPatlamasiAfeti false (KURAL:
-afet durur, tamamlanmamış büyüme NORMAL'e döner), gamerule true; yeniden start, asama ileri x4 (siren, AKTIF, 2. ve 3. gün),
-sunucu `stop`.
+durum (büyüyen güneş), asama ileri (AKTIF: meteorlar), meteor bilgi (yağmur var), stop (temiz: yağmur durur, tamamlanmamış
+büyüme NORMAL'e döner, K-C26; elle başlatılan afet gamerule'den muaf olduğu için kural yolu GameTest/çekirdekte sınanır, K-C7),
+meteor bilgi (yağmur 0); yeniden start, asama ileri x4 (siren, AKTIF, 2. ve 3. gün), sunucu `stop`.
 koşu 2: aktif güneş patlaması geri yüklendi, durum (büyüyen güneş), meteor bilgi (yağmur yeniden başladı), asama ileri x3
 (4., 5. gün, doğal bitiş: süpernova), durum (süpernova, güneş zinciri sürüyor), hiz 1000 (süpernova söner: güneşsiz),
 donma 100, kizilcuce baslat, kizilcuce bilgi (doğuş tamam), hiz 1, start gunes_patlamasi (kızıl cücede tekrarlanamaz ama elle
@@ -85,11 +85,11 @@ def kosu1(sunucu):
                  "AKTIF: 5 günlük süreç")
     bekle_komut(sunucu, "dogalafet meteor bilgi", r"showers: [1-9]", "meteor yağmuru başladı")
     isaret = sunucu.isaret()
-    sunucu.komut("gamerule gunesPatlamasiAfeti false", r"gunesPatlamasiAfeti is now set to: false")
-    sunucu.bekle(r"Afet bitti: gunes_patlamasi seviye 0 neden KURAL", isaret, c.ADIM_SURESI, "kural kapalı: afet durdu")
-    sunucu.bekle(r"Güneş patlaması durdu \(temiz false\)", isaret, c.ADIM_SURESI, "yumuşak durdurma")
+    sunucu.komut("dogalafet stop", rf"{GUNES} stopped\.")
+    sunucu.bekle(r"Afet bitti: gunes_patlamasi seviye 0 neden KOMUT", isaret, c.ADIM_SURESI, "stop: afet durdu")
+    sunucu.bekle(r"Güneş patlaması durdu \(temiz true\)", isaret, c.ADIM_SURESI, "temiz durdurma")
     sunucu.komut("dogalafet durum", r"sun: Normal sun", "durum (tamamlanmamış büyüme geri alındı, K-C26)")
-    sunucu.komut("gamerule gunesPatlamasiAfeti true", r"gunesPatlamasiAfeti is now set to: true")
+    bekle_komut(sunucu, "dogalafet meteor bilgi", r"Flying meteors: 0/\d+, showers: 0", "stop sonrası meteor/yağmur 0")
     sunucu.komut("dogalafet start gunes_patlamasi", rf"{GUNES} started \(Unleveled\)")
     sunucu.komut("dogalafet asama ileri", rf"{GUNES} phase: Siren")
     sunucu.komut("dogalafet asama ileri", rf"{GUNES} phase: Active")
