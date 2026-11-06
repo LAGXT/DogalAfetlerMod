@@ -1,0 +1,25 @@
+{
+  "values": [
+    "minecraft:bedrock",
+    "minecraft:obsidian",
+    "minecraft:crying_obsidian",
+    "minecraft:reinforced_deepslate",
+    "minecraft:cobbled_deepslate",
+    "minecraft:end_stone",
+    "minecraft:nether_quartz_ore",
+    "minecraft:ancient_debris",
+    "#minecraft:base_stone_overworld",
+    "#minecraft:coal_ores",
+    "#minecraft:iron_ores",
+    "#minecraft:copper_ores",
+    "#minecraft:gold_ores",
+    "#minecraft:redstone_ores",
+    "#minecraft:lapis_ores",
+    "#minecraft:diamond_ores",
+    "#minecraft:emerald_ores",
+    {
+      "id": "#forge:ores",
+      "required": false
+    }
+  ]
+}

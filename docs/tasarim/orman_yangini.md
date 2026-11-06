@@ -71,3 +71,40 @@ Kaynaklar:
 - Süre dolunca yeni tutuşma durur, mevcut hücreler 20–40 sn içinde söner (afet temiz biter).
 - Sıcaklık birimi `sicaklik` sisteminin ölçeğine göre KARARLAR'da ayarlanır; buradaki sayılar göreli büyüklüktür.
 - "Yanmadan Çıktım" için yangın alanı = yanan hücrelerin dışbükeyinin 8 blok genişletilmişi.
+
+## Faz 2 güncellemesi (ortak yangın motoru, `is/yangin`)
+
+Motor `yangin.YanginYoneticisi` olarak hazır; sözleşme ve kararlar `.vibe/kararlar/yangin.md` (§A API, Y-01…Y-29). Faz 4
+orman yangını afeti siren, seviye ve başlangıç alanını ekler; yangın mantığı bu motordur.
+
+- **Ateş bloğu:** kendi `dogalafetler:afet_atesi` (vanilla ateş dokusu, multipart zemin/yan/tavan alevi, ışığı 15, kendi
+  tick'i yok, `minecraft:fire` etiketinde: su iksiri söndürür, moblar kaçınır). Dayanağı kalkan ateş havaya döner.
+  Yayılma, sönme ve yakıtın tükenmesi yalnız yöneticinin kuyruğundan gelir; `doFireTick` değerinden bağımsızdır (deney:
+  200 tick'te afet ateşi 0, vanilla ateş 1–4 blok değiştirdi). Haritayı koruyan tek denetim `afetBlokHasari`.
+- **§5 sunucu satırı uygulandı:** aktif tavan 1500, tick başına 64 hücre, TPS &lt; 18'de yarı, &lt; 15'te dörtte bir (çekirdek
+  `TpsOlcer`, histerezisli dönüş), tavan dolunca en eskiler söner, yüklü olmayan chunk bekler. İşlenme sırası oyuncuya
+  yakınlık (bekledikçe uzak hücre de öne geçer). "Ağ: vanilla ateş blok değişimleri dışında paket yok" değişti: alev,
+  duman ve sütun istemcide üretildiği için 2 Hz'lik chunk özeti `yangin/ates_durumu` yalnız 128 blok içindekilere gider.
+- **§5 istemci tablosu** kalite kademelerinde aynen (alev hücresi 40/120/250/500, kıvılcım 30/80/160/300, hücre dumanı
+  her 4/2/1/1). LOD: 48 blok (`yangin.lodMesafesi`) ötesinde chunk başına duman kümesi (4×4 hücre yerine 16×16 chunk;
+  sunucu özeti chunk başınadır), 96 blok ötesinde yalnız vanilla ateş + duman sütunu, kamera arkası üretmez. Duman
+  sütunu 160 blok içinde ve kademe tavanlı (Yüksek 64 canlı parçacık), alttan turuncu aydınlanır; 12+ hücrede tepesinde
+  açık gri pirokümülüs kümesi (§2.5). Kıvılcımlar rüzgârla sürüklenip söner. Isı dalgalanması Faz 4'te.
+- **§6 seviye tablosu motorda:** yoğunluk 0–1 yayılma çarpanını (0,5 + 1,3·y → ×0,5…×1,8), rüzgâr altı kıvılcım sıçramasını
+  (round(12·y) → yok…12 blok) ve başlangıç alanı tutuşma oranını belirler. Öneri S1…S5: 0 / 0,2 / 0,4 / 0,7 / 1
+  (sıçrama yok / 2 / 5 / 8 / 12; tablodaki S2 değeri 3 yerine 2). Başlangıç yarıçapı `alanTutustur` ile (en çok 24; büyük
+  alan bütçeyle birkaç tick'te tutuşur). Afet bitince motor kendisi karar verir (`AfetBittiEvent`): stop ve sıfırlama ateşi
+  hemen söndürür, yanıcı bloklar kalır; doğal bitiş, gamerule ve hata bitişinde yeni tutuşma durur, kalan hücreler en
+  geç 30 sn'de yanıp biter (yakıt havaya döner, "afet temiz biter").
+- **Taç yangını ve cephe:** günün rüzgârı (oyun gününden türeyen yön) yayılmayı rüzgâr yönünde ×1,6, karşısında ×0,4
+  yapar; yukarı yayılma ×1,6, aşağı ×0,5; yaprak yakıtı ateşi tepelere taşır, sıçrama tepeden tepeye atlar.
+- **Yanma sonucu:** yaprak ve odun havaya döner (vanilla gibi); kömürleşmiş blok yok. `afetBlokHasari=false` iken hiçbir
+  blok değişmez (ateş bloğu da konmaz); yangın parçacık, ısı ve hasar olarak sürer.
+- **Yağmur:** yağmur gören ateş ~2–3 sn'de, yaprak ya da çatı altındaki ateş ~5–8 sn'de söner (buhar + tıslama);
+  yağmurdaki ateş yayılmaz ve kıvılcım sıçratmaz, yangın tekdüze azalır. Yağmur yalnız gökyüzüne yakın ateşi etkiler
+  (üstünde en çok 8 blok katı örtü); maden ve mağaradaki ateş normal yanar. Yağışı olmayan (çöl, savan) ve karlı
+  biyomda yağmur yangını söndürmez.
+- **Isı:** yangın chunk'ı başına geçici ortam kaynağı (güç 4 + 2√n, en çok 18; yarıçap 6 + √n); sicaklik birleşince
+  `YanginKancalari.isiKaynagiAyarla(SicaklikKancalari::ortamKaynagiEkle)` ile bağlanır. §6'daki "+4…+14 birim" Faz 4'te
+  sicaklik ölçeğine göre ayarlanır.
+- "Yanmadan Çıktım" alanı için `aktifSayi(level, AABB)` ve hücre konumları motorda; dışbükey hesabı Faz 4/başarım.
