@@ -1,6 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.client.sinkhole;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.afet.deprem.DepremIstemciAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.afet.sinkhole.mantik.SinkholeSeviyesi;
 import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciAfetDurumu;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
@@ -20,7 +21,7 @@ import net.minecraftforge.fml.common.Mod;
 /**
  * Sinkhole istemci efektleri (tasarım notu sinkhole §2 "Kamera", "Çöküşün görselliği"): çekirdek çökerken boşluktan yukarı
  * patlayan toz bulutu (efekt kalitesiyle; sunucunun gönderdiği blok parçacıklarına ek) ve çukura düşen oyuncuda 6° FOV
- * genişlemesi. Sarsıntı {@code client.deprem.IstemciSarsinti}'dadır.
+ * genişlemesi (deprem {@code sarsintiCarpani} ve vanilla FOV efekti ölçeğiyle çarpılır; 0'da kapalı). Sarsıntı {@code client.deprem.IstemciSarsinti}'dadır.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class IstemciSinkhole {
@@ -65,7 +66,8 @@ public final class IstemciSinkhole {
         AfetDurumPaketi p = durum.get();
         double d = Math.hypot(oyuncu.getX() - p.merkez().getX() - 0.5, oyuncu.getZ() - p.merkez().getZ() - 0.5);
         if (d <= p.ozel().getFloat("R") + 0.5 && oyuncu.getY() < p.ozel().getInt("z")) {
-            olay.setNewFovModifier(olay.getNewFovModifier() * (1 + 6f / 70f));
+            double olcek = DepremIstemciAyarlari.sarsintiCarpani() * Minecraft.getInstance().options.fovEffectScale().get();
+            olay.setNewFovModifier(olay.getNewFovModifier() * (float) (1 + 6.0 / 70.0 * olcek));
         }
     }
 }

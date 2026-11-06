@@ -132,11 +132,12 @@ public final class BlokIsleri {
 
     /**
      * Bloğu {@code FallingBlockEntity} olarak düşürür; düşen blok tavanı doluysa blok kaldırılır ve yalnız kırılma
-     * parçacığı gönderilir (tasarım notu deprem §5). {@code hiz} düşen bloka verilen ilk hız.
+     * parçacığı gönderilir (tasarım notu deprem §5). {@code hiz} düşen bloka verilen ilk hız. Varlık işlemeyen chunk'ta bloğa
+     * dokunmaz ve false döner: oradaki düşen blok görünmez ya da havada asılı kalırdı (AY-12 ailesi).
      */
     public boolean dusur(BlockPos p, Vec3 hiz, int tavan) {
         BlockState s = level.getBlockState(p);
-        if (!kirilabilir(p, s)) {
+        if (!kirilabilir(p, s) || !level.isPositionEntityTicking(p)) {
             return false;
         }
         dusenler.removeIf(e -> !e.isAlive());

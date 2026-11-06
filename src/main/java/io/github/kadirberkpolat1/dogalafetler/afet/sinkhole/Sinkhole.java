@@ -125,6 +125,9 @@ public final class Sinkhole extends Afet {
             int x = (int) Math.floor(hedef.getX() + Math.cos(a) * d);
             int z = (int) Math.floor(hedef.getZ() + Math.sin(a) * d);
             int fark = duzlukFarki(level, x, z, yaricap);
+            if (fark >= YUKLU_DEGIL) {
+                continue;
+            }
             if (fark < enIyiFark) {
                 enIyiFark = fark;
                 enIyi = new BlockPos(x, level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z), z);
@@ -149,7 +152,10 @@ public final class Sinkhole extends Afet {
         return level.getFluidState(ust).isEmpty();
     }
 
-    /** Merkez ve çap çemberindeki 8 noktanın yüzey yüksekliği farki; yüklü olmayan chunk varsa çok büyük. */
+    /** {@link #duzlukFarki} yüklü olmayan chunk'ta; aday atlanır (yükseklik okuması chunk'ı eşzamanlı yüklemesin). */
+    private static final int YUKLU_DEGIL = 1000;
+
+    /** Merkez ve çap çemberindeki 8 noktanın yüzey yüksekliği farki; yüklü olmayan chunk varsa {@link #YUKLU_DEGIL}. */
     private static int duzlukFarki(ServerLevel level, int x, int z, double yaricap) {
         int enAz = Integer.MAX_VALUE;
         int enCok = Integer.MIN_VALUE;
@@ -157,7 +163,7 @@ public final class Sinkhole extends Afet {
             int px = i < 0 ? x : (int) Math.floor(x + Math.cos(i * Math.PI / 4) * yaricap);
             int pz = i < 0 ? z : (int) Math.floor(z + Math.sin(i * Math.PI / 4) * yaricap);
             if (!level.hasChunk(px >> 4, pz >> 4)) {
-                return 1000;
+                return YUKLU_DEGIL;
             }
             int h = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, px, pz);
             enAz = Math.min(enAz, h);

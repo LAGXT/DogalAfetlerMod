@@ -2,9 +2,12 @@ package io.github.kadirberkpolat1.dogalafetler.afet.sinkhole;
 
 import static io.github.kadirberkpolat1.dogalafetler.afet.deprem.DepremOyunTestleri.SAHNE;
 import static io.github.kadirberkpolat1.dogalafetler.afet.deprem.DepremOyunTestleri.aktifBaslat;
+import static io.github.kadirberkpolat1.dogalafetler.afet.deprem.DepremOyunTestleri.batchSonu;
 import static io.github.kadirberkpolat1.dogalafetler.afet.deprem.DepremOyunTestleri.blokHasari;
+import static io.github.kadirberkpolat1.dogalafetler.afet.deprem.DepremOyunTestleri.dinle;
 import static io.github.kadirberkpolat1.dogalafetler.afet.deprem.DepremOyunTestleri.dusenSayisi;
 import static io.github.kadirberkpolat1.dogalafetler.afet.deprem.DepremOyunTestleri.kutuHash;
+import static io.github.kadirberkpolat1.dogalafetler.afet.deprem.DepremOyunTestleri.oyuncu;
 import static io.github.kadirberkpolat1.dogalafetler.afet.deprem.DepremOyunTestleri.sahneyiTemizle;
 import static io.github.kadirberkpolat1.dogalafetler.afet.deprem.DepremOyunTestleri.zemin;
 
@@ -15,24 +18,25 @@ import io.github.kadirberkpolat1.dogalafetler.basarim.BasarimIpucuEvent;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.Ipucu;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
-import io.github.kadirberkpolat1.dogalafetler.core.CekirdekOyunTestleri;
 import io.github.kadirberkpolat1.dogalafetler.uyari.OrtamSesi;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.gametest.framework.AfterBatch;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraftforge.common.MinecraftForge;
-import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
 
 /**
  * Sinkhole'un oyun içi testleri (GOREV §6 #1–#4, #3, #16 #4 "Delikten Dönüş" ipucu). Sahne depremin {@code deprem_sahne}
- * kutusudur; yüzey y 11, merkez kutunun ortasına sabitlenir. Her test kendi batch'indedir.
+ * kutusudur; yüzey y 11, merkez kutunun ortasına sabitlenir. Her test kendi batch'indedir; batch sonu temizliği depremle
+ * ortak ({@code DepremOyunTestleri.batchSonu}, K-E15).
  */
 @GameTestHolder(DogalAfetler.MOD_ID)
 @PrefixGameTestTemplate(false)
@@ -41,6 +45,21 @@ public final class SinkholeOyunTestleri {
     private static final BlockPos MERKEZ = new BlockPos(16, YUZEY + 1, 16);
 
     private SinkholeOyunTestleri() {
+    }
+
+    @AfterBatch(batch = "sinkhole_cokus")
+    public static void cokusSonrasi(ServerLevel level) {
+        batchSonu(level);
+    }
+
+    @AfterBatch(batch = "sinkhole_kapali")
+    public static void kapaliSonrasi(ServerLevel level) {
+        batchSonu(level);
+    }
+
+    @AfterBatch(batch = "sinkhole_stop")
+    public static void stopSonrasi(ServerLevel level) {
+        batchSonu(level);
     }
 
     private static Sinkhole baslat(GameTestHelper y, int seviye, ServerPlayer oyuncu) {
@@ -58,14 +77,14 @@ public final class SinkholeOyunTestleri {
         zemin(y, YUZEY);
         boolean eski = blokHasari(y, true);
         BlockPos m = y.absolutePos(MERKEZ);
-        ServerPlayer oyuncu = CekirdekOyunTestleri.sahteOyuncu(y, m.getX() + 0.5, m.getY(), m.getZ() + 0.5);
+        ServerPlayer oyuncu = oyuncu(y, m.getX() + 0.5, m.getY(), m.getZ() + 0.5);
         List<BasarimIpucuEvent> ipuclari = new ArrayList<>();
         Consumer<BasarimIpucuEvent> dinleyici = olay -> {
             if (olay.oyuncu() == oyuncu) {
                 ipuclari.add(olay);
             }
         };
-        MinecraftForge.EVENT_BUS.addListener(EventPriority.NORMAL, false, BasarimIpucuEvent.class, dinleyici);
+        dinle(BasarimIpucuEvent.class, dinleyici);
         Sinkhole sinkhole = baslat(y, 1, oyuncu);
         AfetYoneticisi yonetici = AfetYoneticisi.al(y.getLevel().getServer());
         y.succeedWhen(() -> {
@@ -106,7 +125,7 @@ public final class SinkholeOyunTestleri {
         boolean eski = blokHasari(y, false);
         long once = kutuHash(y);
         BlockPos m = y.absolutePos(MERKEZ);
-        ServerPlayer oyuncu = CekirdekOyunTestleri.sahteOyuncu(y, m.getX() + 12.5, m.getY(), m.getZ() + 0.5);
+        ServerPlayer oyuncu = oyuncu(y, m.getX() + 12.5, m.getY(), m.getZ() + 0.5);
         Sinkhole sinkhole = baslat(y, 2, oyuncu);
         AfetYoneticisi yonetici = AfetYoneticisi.al(y.getLevel().getServer());
         y.runAfterDelay(20, () -> {
@@ -136,7 +155,7 @@ public final class SinkholeOyunTestleri {
         zemin(y, YUZEY);
         boolean eski = blokHasari(y, true);
         BlockPos m = y.absolutePos(MERKEZ);
-        ServerPlayer oyuncu = CekirdekOyunTestleri.sahteOyuncu(y, m.getX() + 12.5, m.getY(), m.getZ() + 0.5);
+        ServerPlayer oyuncu = oyuncu(y, m.getX() + 12.5, m.getY(), m.getZ() + 0.5);
         Sinkhole sinkhole = baslat(y, 2, oyuncu);
         AfetYoneticisi yonetici = AfetYoneticisi.al(y.getLevel().getServer());
         y.assertTrue(yonetici.asamaIleri() && yonetici.asamaIleri(), "alt aşama ilerlemedi");

@@ -14,7 +14,8 @@ import net.minecraftforge.common.data.ExistingFileHelper;
 import net.minecraftforge.data.event.GatherDataEvent;
 
 /**
- * N12 etiketlerinin varsayılanları: taş, deepslate, obsidyen, cevherler, bedrock vb. Başka modların cevherleri isteğe bağlı
+ * N12 etiketlerinin varsayılanları ({@code asit_dayanikli}, {@code yanmaz}): taş, deepslate, obsidyen, cevherler, bedrock vb.
+ * {@code deprem_dayanikli}'yi deprem sağlayıcısı yazar ({@code afet.deprem.DepremEtiketleri}, entegrasyon 4). Başka modların cevherleri isteğe bağlı
  * {@code forge:ores} ile girer; veri paketi etiketi genişletebilir. Yalnız {@code dogalafetler:*} etiketlerini yazar (K-E12);
  * afet ateşinin {@code minecraft:fire} katkısı (Y-22) ortak sağlayıcıdan gelir ({@code YanginSistemi.kaydet}, K-E12).
  */
@@ -48,8 +49,6 @@ final class YanginEtiketSaglayici extends BlockTagsProvider {
 
     @Override
     protected void addTags(HolderLookup.Provider arama) {
-        tag(YanginEtiketleri.DEPREM_DAYANIKLI).add(SERT).addTag(BlockTags.BASE_STONE_OVERWORLD).addTags(CEVHERLER)
-                .addOptionalTag(FORGE_CEVHERLERI);
         tag(YanginEtiketleri.ASIT_DAYANIKLI).add(SERT).addTag(BlockTags.BASE_STONE_OVERWORLD).addTags(CEVHERLER)
                 .addOptionalTag(FORGE_CEVHERLERI);
         tag(YanginEtiketleri.YANMAZ).add(SERT)

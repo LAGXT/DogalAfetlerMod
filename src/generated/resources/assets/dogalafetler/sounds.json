@@ -26,6 +26,12 @@
     ],
     "subtitle": "subtitles.dogalafetler.ay_carpmasi_yaklasma"
   },
+  "deprem.gurleme": {
+    "sounds": [
+      "dogalafetler:deprem_gurleme"
+    ],
+    "subtitle": "subtitles.dogalafetler.deprem.gurleme"
+  },
   "esya.oncu_sarsinti": {
     "sounds": [
       "dogalafetler:esya_oncu_sarsinti"
@@ -70,6 +76,15 @@
       }
     ],
     "subtitle": "subtitles.dogalafetler.ortam_test"
+  },
+  "sinkhole.cokus": {
+    "sounds": [
+      {
+        "attenuation_distance": 64,
+        "name": "dogalafetler:sinkhole_cokus"
+      }
+    ],
+    "subtitle": "subtitles.dogalafetler.sinkhole.cokus"
   },
   "siren_gunes": {
     "sounds": [

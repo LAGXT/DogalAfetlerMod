@@ -7,9 +7,10 @@ log denetimi); sunucu `-PoyunTestiAfeti` olmadan açılır çünkü deprem ve si
 sinkhole'lar yarığın üstüne düşmesin diye `execute positioned` ile doğuşun 48 blok çaprazına (doğuş chunk'ları yüklü).
 
 Koşu 1: `start deprem 2`, `asama ileri` x2 (AKTIF) → `[deprem] yarık tamam` (değişen blok > 0) ve doğal bitiş;
-`start sinkhole 3`, `asama ileri` x2 → `[sinkhole] çukur tamam` (değişen blok > 0) ve doğal bitiş; `start deprem 5`, AKTIF,
-15 sn sonra `stop` (neden KOMUT); `gamerule afetBlokHasari false` + `start sinkhole 1`, `asama ileri` x2 → çukur tamam
-değişen blok 0, doğal bitiş, `gamerule afetBlokHasari true`; `start deprem 3`, AKTIF'te sunucuya `stop` (afet sürerken
+`start sinkhole 3`, `asama ileri` x2 → `[sinkhole] çukur tamam` (değişen blok > 0) ve doğal bitiş; `gamerule afetBlokHasari
+false` + `start sinkhole 1`, `asama ileri` x2 → çukur tamam değişen blok 0, doğal bitiş, `gamerule afetBlokHasari true`
+(S5'ten önce: S5 yarığının dalları doğuş çaprazlarını kesebilir); `start deprem 5`, AKTIF, 15 sn sonra `stop` (neden KOMUT);
+`start deprem 3`, AKTIF'te sunucuya `stop` (afet sürerken
 kayıt). Koşu 2 (aynı dünya): `Aktif afet geri yüklendi: deprem seviye 3 aşama aktif`, yarık tamam, artçı sarsıntı
 (`[deprem] artçı sarsıntı 1/1`, DS-14) ve doğal bitiş, `stop`.
 Tepe TPS: S2 yarığı, S3 çukurun çöküşü ve S5 deprem sırasında `forge tps` (Forge'un 100 tick'lik ortalaması) örneklenir;
@@ -94,13 +95,8 @@ def kosu1(sunucu):
         raise cs.SenaryoHatasi(f"çukur blok değiştirmedi: {satir.strip()}")
     sunucu.bekle(r"Afet bitti: sinkhole seviye 3 neden DOGAL", 0, 60, "sinkhole doğal bitiş")
 
-    sunucu.komut("dogalafet start deprem 5", r"Afet başladı: deprem seviye 5")
-    aktife(sunucu, "deprem")
-    for saniye in (5, 10, 15):
-        time.sleep(5)
-        tps_ornegi(sunucu, f"deprem S5 (+{saniye} sn)")
-    sunucu.komut("dogalafet stop", r"Afet bitti: deprem seviye 5 neden KOMUT")
-
+    # Hasar kapalı S1 çukuru S5 depremden önce: S5 yarığı ve ±45° dalları (yarım boy 128) doğuş çaprazlarını kesip
+    # yüzeyde su açabilir, sinkhole "uygun yer yok" der (entegrasyon 4).
     sunucu.komut("gamerule afetBlokHasari false", r"afetBlokHasari is now set to: false")
     sunucu.komut("execute positioned ~-48 ~ ~48 run dogalafet start sinkhole 1", r"Afet başladı: sinkhole seviye 1")
     aktife(sunucu, "sinkhole")
@@ -109,6 +105,13 @@ def kosu1(sunucu):
         raise cs.SenaryoHatasi(f"blok hasarı kapalıyken blok değişti: {satir.strip()}")
     sunucu.bekle(r"Afet bitti: sinkhole seviye 1 neden DOGAL", 0, 40, "sinkhole doğal bitiş")
     sunucu.komut("gamerule afetBlokHasari true", r"afetBlokHasari is now set to: true")
+
+    sunucu.komut("dogalafet start deprem 5", r"Afet başladı: deprem seviye 5")
+    aktife(sunucu, "deprem")
+    for saniye in (5, 10, 15):
+        time.sleep(5)
+        tps_ornegi(sunucu, f"deprem S5 (+{saniye} sn)")
+    sunucu.komut("dogalafet stop", r"Afet bitti: deprem seviye 5 neden KOMUT")
 
     sunucu.komut("dogalafet start deprem 3", r"Afet başladı: deprem seviye 3")
     aktife(sunucu, "deprem")

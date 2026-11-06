@@ -18,8 +18,10 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import net.minecraft.core.BlockPos;
+import net.minecraft.gametest.framework.AfterBatch;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.FallingBlockEntity;
@@ -28,6 +30,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.eventbus.api.Event;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
@@ -37,7 +40,8 @@ import net.minecraftforge.gametest.PrefixGameTestTemplate;
  * Sahne {@code deprem_sahne} (32x20x32 hava) kutusuna her test kendisi kurulur ve geçince boşaltılır (kutu y ≈ −60'ta
  * olduğundan kazı tabanı test süresince dünya tabanına iner, {@link DepremAyarlari#geciciEnAltY}); deprem merkezi
  * kutunun ortasına sabitlenir (geçici kayıt, başlatılır başlatılmaz geri alınır). Her test tek afet yuvasını kullandığı
- * için kendi batch'indedir. Sahne yardımcılarını sinkhole testleri de kullanır.
+ * için kendi batch'indedir. Sahne yardımcılarını sinkhole testleri de kullanır. Başarısız biten test de batch sonunda
+ * temizlenir ({@link #batchSonu}: afet durur, kazı tabanı, {@code afetBlokHasari}, dinleyiciler ve sahte oyuncular geri; K-E15).
  */
 @GameTestHolder(DogalAfetler.MOD_ID)
 @PrefixGameTestTemplate(false)
@@ -50,7 +54,67 @@ public final class DepremOyunTestleri {
     private static final BlockPos[] KOSELER = {new BlockPos(1, YUZEY + 1, 1), new BlockPos(30, YUZEY + 1, 1),
             new BlockPos(1, YUZEY + 1, 30), new BlockPos(30, YUZEY + 1, 30)};
 
+    /** İlk {@link #blokHasari} çağrısından önceki kural değeri; sahne temizlenince null. */
+    private static Boolean eskiBlokHasari;
+    private static final List<ServerPlayer> OYUNCULAR = new ArrayList<>();
+    private static final List<Object> DINLEYICILER = new ArrayList<>();
+
     private DepremOyunTestleri() {
+    }
+
+    @AfterBatch(batch = "deprem_yarik")
+    public static void yarikSonrasi(ServerLevel level) {
+        batchSonu(level);
+    }
+
+    @AfterBatch(batch = "deprem_kapali")
+    public static void kapaliSonrasi(ServerLevel level) {
+        batchSonu(level);
+    }
+
+    @AfterBatch(batch = "deprem_stop")
+    public static void stopSonrasi(ServerLevel level) {
+        batchSonu(level);
+    }
+
+    @AfterBatch(batch = "deprem_artci")
+    public static void artciSonrasi(ServerLevel level) {
+        batchSonu(level);
+    }
+
+    /** Batch sonu (geçen ya da başarısız test): afet durur, kazı tabanı, kural, dinleyici ve sahte oyuncular geri döner. */
+    public static void batchSonu(ServerLevel level) {
+        AfetYoneticisi.al(level.getServer()).durdur();
+        DepremAyarlari.geciciEnAltY(null);
+        if (eskiBlokHasari != null) {
+            level.getGameRules().getRule(Kurallar.AFET_BLOK_HASARI).set(eskiBlokHasari, level.getServer());
+            eskiBlokHasari = null;
+        }
+        DINLEYICILER.forEach(MinecraftForge.EVENT_BUS::unregister);
+        DINLEYICILER.clear();
+        oyunculariCikar(level);
+    }
+
+    /** Batch sonunda çıkarılan sahte oyuncu. */
+    public static ServerPlayer oyuncu(GameTestHelper y, double x, double yy, double z) {
+        ServerPlayer o = CekirdekOyunTestleri.sahteOyuncu(y, x, yy, z);
+        OYUNCULAR.add(o);
+        return o;
+    }
+
+    /** Batch sonunda kaldırılan olay dinleyicisi. */
+    public static <T extends Event> void dinle(Class<T> tur, Consumer<T> dinleyici) {
+        MinecraftForge.EVENT_BUS.addListener(EventPriority.NORMAL, false, tur, dinleyici);
+        DINLEYICILER.add(dinleyici);
+    }
+
+    private static void oyunculariCikar(ServerLevel level) {
+        for (ServerPlayer o : OYUNCULAR) {
+            if (level.getServer().getPlayerList().getPlayer(o.getUUID()) == o) {
+                level.getServer().getPlayerList().remove(o);
+            }
+        }
+        OYUNCULAR.clear();
     }
 
     /** Taban: y 1–({@code yuzey}−2) taş, bir kat toprak, yüzeyde çimen; üstü hava. */
@@ -80,6 +144,9 @@ public final class DepremOyunTestleri {
     public static boolean blokHasari(GameTestHelper y, boolean deger) {
         var kural = y.getLevel().getGameRules().getRule(Kurallar.AFET_BLOK_HASARI);
         boolean eski = kural.get();
+        if (eskiBlokHasari == null) {
+            eskiBlokHasari = eski;
+        }
         kural.set(deger, y.getLevel().getServer());
         return eski;
     }
@@ -88,10 +155,15 @@ public final class DepremOyunTestleri {
         return y.getLevel().getEntitiesOfClass(FallingBlockEntity.class, kutu(y).inflate(4)).size();
     }
 
-    /** Test geçince: afet durur, düşen blok ve eşyalar kalkar, kutu havayla boşalır. */
+    /**
+     * Test geçince (kural testçe geri konduktan sonra): afet durur, sahte oyuncular çıkar, düşen blok ve eşyalar kalkar, kutu
+     * havayla boşalır.
+     */
     public static void sahneyiTemizle(GameTestHelper y) {
         AfetYoneticisi.al(y.getLevel().getServer()).durdur();
         DepremAyarlari.geciciEnAltY(null);
+        eskiBlokHasari = null;
+        oyunculariCikar(y.getLevel());
         for (Entity e : y.getLevel().getEntitiesOfClass(Entity.class, kutu(y).inflate(4),
                 e -> e instanceof FallingBlockEntity || e instanceof ItemEntity)) {
             e.discard();
@@ -132,7 +204,7 @@ public final class DepremOyunTestleri {
     private static Deprem baslat(GameTestHelper y, int seviye) {
         AfetYoneticisi.al(y.getLevel().getServer()).durdur();
         BlockPos merkez = y.absolutePos(MERKEZ);
-        ServerPlayer oyuncu = CekirdekOyunTestleri.sahteOyuncu(y, merkez.getX() + 0.5, merkez.getY(), merkez.getZ() - 9.5);
+        ServerPlayer oyuncu = oyuncu(y, merkez.getX() + 0.5, merkez.getY(), merkez.getZ() - 9.5);
         return aktifBaslat(y, AfetTuru.DEPREM, seviye, merkez, () -> Deprem.sabitMerkezli(merkez), oyuncu);
     }
 
@@ -279,8 +351,8 @@ public final class DepremOyunTestleri {
                 bitisler.add(olay);
             }
         };
-        MinecraftForge.EVENT_BUS.addListener(EventPriority.NORMAL, false, AfetAsamaDegistiEvent.class, asama);
-        MinecraftForge.EVENT_BUS.addListener(EventPriority.NORMAL, false, AfetBittiEvent.class, bitis);
+        dinle(AfetAsamaDegistiEvent.class, asama);
+        dinle(AfetBittiEvent.class, bitis);
         Deprem deprem = baslat(y, 3);
         AfetYoneticisi yonetici = AfetYoneticisi.al(y.getLevel().getServer());
         int sure = deprem.seviyeBilgisi().sureTick();

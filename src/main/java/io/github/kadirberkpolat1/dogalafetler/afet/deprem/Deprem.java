@@ -378,8 +378,11 @@ public final class Deprem extends Afet {
                 }
                 if (c.y < c.taban) {
                     if (c.dusur) {
-                        isler.dusur(new BlockPos(c.x, c.zemin, c.z), new Vec3(0, -0.05, 0),
-                                DepremAyarlari.dusenBlokTavani());
+                        BlockPos yuzey = new BlockPos(c.x, c.zemin, c.z);
+                        // Varlık işlemeyen chunk'ta yüzey düşmez: yarık yine açılsın diye kaldırılır.
+                        if (!isler.dusur(yuzey, new Vec3(0, -0.05, 0), DepremAyarlari.dusenBlokTavani())) {
+                            isler.kaldir(yuzey, true);
+                        }
                     }
                     tamam.set(c.sira);
                     it.remove();
