@@ -37,8 +37,14 @@ public final class IstemciYangin {
     private static final double KUME_MESAFESI = 96;
     private static final double YAKIN_PARCACIK = 32;
     private static AtesDurumuPaketi son = BOS;
+    private static EfektKalitesi kaliteZorlamasi;
 
     private IstemciYangin() {
+    }
+
+    /** Görsel kanıt otomasyonu için: {@code null} config'teki kaliteye döner. */
+    static void kaliteZorla(EfektKalitesi kalite) {
+        kaliteZorlamasi = kalite;
     }
 
     public static Consumer<AtesDurumuPaketi> alici() {
@@ -56,7 +62,7 @@ public final class IstemciYangin {
             double y = BlockPos.getY(b) + 0.2;
             double z = BlockPos.getZ(b) + 0.5;
             for (int i = 0; i < 8; i++) {
-                level.addParticle(ParticleTypes.CLOUD, x + level.random.nextGaussian() * 0.3, y,
+                level.addAlwaysVisibleParticle(ParticleTypes.CLOUD, x + level.random.nextGaussian() * 0.3, y,
                         z + level.random.nextGaussian() * 0.3, 0, 0.06 + level.random.nextDouble() * 0.06, 0);
             }
             level.playLocalSound(x, y, z, SoundEvents.FIRE_EXTINGUISH, SoundSource.BLOCKS, 0.5F,
@@ -76,7 +82,7 @@ public final class IstemciYangin {
         if (olay.phase != TickEvent.Phase.END || level == null || mc.isPaused() || son.ozetler().isEmpty()) {
             return;
         }
-        Kademe kademe = Kademe.al(IstemciAyarlari.efektKalitesi());
+        Kademe kademe = Kademe.al(kaliteZorlamasi != null ? kaliteZorlamasi : IstemciAyarlari.efektKalitesi());
         double yogunluk = YanginAyarlari.parcacikYogunlugu();
         double lod = YanginAyarlari.lodMesafesi();
         Camera kamera = mc.gameRenderer.getMainCamera();
@@ -89,7 +95,7 @@ public final class IstemciYangin {
             double mesafe = Math.sqrt(goz.distanceToSqr(o.x(), o.y(), o.z()));
             if (o.sayi() >= 3 && r.nextDouble() < kademe.sutunOrani * yogunluk) {
                 ekle(level, YanginKayitlari.SUTUN.get(), o.x() + r.nextGaussian() * 2, o.ustY() + 2.0,
-                        o.z() + r.nextGaussian() * 2, 0, 0.14 + r.nextDouble() * 0.06, 0, true);
+                        o.z() + r.nextGaussian() * 2, 0, 0.18 + r.nextDouble() * 0.06, 0, true);
             }
             if (mesafe > lod || o.hucreler().length == 0) {
                 if (mesafe <= KUME_MESAFESI && r.nextDouble() < 0.3 * yogunluk) {
@@ -138,8 +144,8 @@ public final class IstemciYangin {
             int sayi = Math.min(64, (int) kivilcim + (r.nextDouble() < kivilcim - (int) kivilcim ? 1 : 0));
             for (int i = 0; i < sayi; i++) {
                 double[] h = yakinlar.get(r.nextInt(adet));
-                level.addParticle(ParticleTypes.LAVA, h[0] + r.nextGaussian() * 0.3, h[1] + 0.6, h[2] + r.nextGaussian() * 0.3,
-                        0, 0, 0);
+                ekle(level, ParticleTypes.LAVA, h[0] + r.nextGaussian() * 0.3, h[1] + 0.6, h[2] + r.nextGaussian() * 0.3,
+                        0, 0, 0, h[3] > YAKIN_PARCACIK * YAKIN_PARCACIK);
             }
         }
     }

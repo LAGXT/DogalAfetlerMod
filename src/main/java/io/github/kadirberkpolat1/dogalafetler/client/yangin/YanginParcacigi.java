@@ -45,9 +45,9 @@ final class YanginParcacigi extends TextureSheetParticle {
                 alpha = 0.75F;
             }
             case SUTUN -> {
-                lifetime = 180 + random.nextInt(80);
+                lifetime = 200 + random.nextInt(80);
                 quadSize = 2.5F + random.nextFloat() * 2.0F;
-                friction = 0.99F;
+                friction = 0.995F;
                 float gri = 0.16F + random.nextFloat() * 0.12F;
                 setColor(gri, gri * 0.97F, gri * 0.95F);
                 alpha = 0.65F;
