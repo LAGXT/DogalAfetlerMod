@@ -23,6 +23,10 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.world.level.ItemLike;
+import net.minecraftforge.common.crafting.CraftingHelper;
+import net.minecraftforge.common.crafting.conditions.ICondition;
+import net.minecraftforge.common.crafting.conditions.NotCondition;
+import net.minecraftforge.common.crafting.conditions.TagEmptyCondition;
 import net.minecraftforge.data.event.GatherDataEvent;
 import net.minecraftforge.registries.ForgeRegistries;
 
@@ -67,11 +71,15 @@ public final class YiyecekVerileri {
         sekilsiz("meyve_serbeti", 1).requires(Items.GLASS_BOTTLE).requires(Items.SWEET_BERRIES, 3).requires(Items.SUGAR)
                 .requires(Items.SNOWBALL).unlockedBy("has_sweet_berries", sahip(Items.SWEET_BERRIES))
                 .save(c, DogalAfetler.konum("meyve_serbeti"));
+        List<FinishedRecipe> corba = new ArrayList<>();
         sekilsiz("kutup_baligi_corbasi", 1).requires(Items.BOWL).requires(YiyecekKayitlari.PISMIS_KUTUP_BALIGI)
                 .requires(Items.POTATO)
                 .unlockedBy("has_pismis_kutup_baligi", InventoryChangeTrigger.TriggerInstance.hasItems(
                         ItemPredicate.Builder.item().of(YiyecekKayitlari.PISMIS_KUTUP_BALIGI).build()))
-                .save(c, DogalAfetler.konum("kutup_baligi_corbasi"));
+                .save(corba::add, DogalAfetler.konum("kutup_baligi_corbasi"));
+        JsonArray etiketDolu = CraftingHelper.serialize(new ICondition[] {
+                new NotCondition(new TagEmptyCondition(YiyecekKayitlari.PISMIS_KUTUP_BALIGI.location()))});
+        corba.forEach(t -> c.accept(new KosulluKayit(t, etiketDolu)));
     }
 
     private static ShapelessRecipeBuilder sekilsiz(String ad, int adet) {
@@ -107,6 +115,42 @@ public final class YiyecekVerileri {
         @Override
         public JsonObject serializeAdvancement() {
             return temel.serializeAdvancement();
+        }
+
+        @Override
+        public ResourceLocation getAdvancementId() {
+            return temel.getAdvancementId();
+        }
+    }
+
+    /**
+     * Tarife ve tarif kitabı başarımına Forge'un üst düzey {@code conditions} dizisini ekler (yüklemede denetlenir). Kutup
+     * Balığı Çorbası etiket boşken hiç yüklenmez: Forge boş etiketli malzemeyi "Empty Tag" bariyeriyle eşleştirir (F-17).
+     */
+    private record KosulluKayit(FinishedRecipe temel, JsonArray kosullar) implements FinishedRecipe {
+        @Override
+        public void serializeRecipeData(JsonObject json) {
+            temel.serializeRecipeData(json);
+            json.add("conditions", kosullar.deepCopy());
+        }
+
+        @Override
+        public ResourceLocation getId() {
+            return temel.getId();
+        }
+
+        @Override
+        public RecipeSerializer<?> getType() {
+            return temel.getType();
+        }
+
+        @Override
+        public JsonObject serializeAdvancement() {
+            JsonObject basarim = temel.serializeAdvancement();
+            if (basarim != null) {
+                basarim.add("conditions", kosullar.deepCopy());
+            }
+            return basarim;
         }
 
         @Override

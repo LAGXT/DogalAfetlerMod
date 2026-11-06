@@ -134,9 +134,16 @@ public final class YiyecekOtomasyonu {
 
     private static void senaryoyuKur(Minecraft mc) {
         String ad = mc.player.getGameProfile().getName();
+        // Yeni oyuncuda boş hedefe effect clear / clear kırmızı hata yazar (sendCommandFeedback hatayı kapatmaz): yalnız gerekirse.
         List<String> komutlar = new ArrayList<>(List.of("gamerule sendCommandFeedback false", "time set 6000",
                 "weather clear 6000", "gamerule doDaylightCycle false", "gamerule doWeatherCycle false",
-                "gamemode survival", "effect clear @s", "clear @s"));
+                "gamemode survival"));
+        if (!mc.player.getActiveEffects().isEmpty()) {
+            komutlar.add("effect clear @s");
+        }
+        if (!mc.player.getInventory().isEmpty()) {
+            komutlar.add("clear @s");
+        }
         for (String esya : HOTBAR) {
             komutlar.add("give @s " + DogalAfetler.MOD_ID + ":" + esya + " " + (esya.equals("sicak_salep") ? 3 : 2));
         }
@@ -154,6 +161,11 @@ public final class YiyecekOtomasyonu {
             return true;
         });
         ADIMLAR.add(() -> bekle(60));
+        ADIMLAR.add(() -> {
+            mc.gui.getChat().clearMessages(false);
+            return true;
+        });
+        ADIMLAR.add(() -> bekle(5));
         ADIMLAR.add(() -> kare(mc, "once"));
         ADIMLAR.add(() -> ye(mc, GUVEC, "yerken"));
         ADIMLAR.add(() -> yemeBitti());

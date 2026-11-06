@@ -1,6 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.yiyecek;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.yiyecek.mantik.YiyecekTablosu;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -50,9 +51,16 @@ public final class YiyecekOlaylari {
             }
         }
         tarifler.sort(null);
+        List<String> atlanan = new ArrayList<>();
+        for (YiyecekTablosu.Kayit kayit : YiyecekTablosu.KAYITLAR) {
+            if (server.getRecipeManager().byKey(DogalAfetler.konum(kayit.ad())).isEmpty()) {
+                atlanan.add(kayit.ad());
+            }
+        }
         int balik = BuiltInRegistries.ITEM.getTag(YiyecekKayitlari.PISMIS_KUTUP_BALIGI).map(t -> t.size()).orElse(0);
-        DogalAfetler.LOGGER.info("Yiyecek: {} sıcaklık yiyeceği tarifi yüklendi {}; #{} etiketinde {} eşya; vanillaIsinma={} ({} yiyecek)",
-                tarifler.size(), tarifler, YiyecekKayitlari.PISMIS_KUTUP_BALIGI.location(), balik,
-                YiyecekAyarlari.vanillaIsinma(), YiyecekAyarlari.vanillaTanimlari().size());
+        DogalAfetler.LOGGER.info("Yiyecek: {} sıcaklık yiyeceği tarifi yüklendi {}; koşullu atlanan {} {}; #{} etiketinde {} eşya;"
+                + " vanillaIsinma={} ({} yiyecek)", tarifler.size(), tarifler, atlanan.size(), atlanan,
+                YiyecekKayitlari.PISMIS_KUTUP_BALIGI.location(), balik, YiyecekAyarlari.vanillaIsinma(),
+                YiyecekAyarlari.vanillaTanimlari().size());
     }
 }

@@ -291,26 +291,33 @@ public final class YiyecekOyunTestleri {
     }
 
     /**
-     * Kutup Balığı Çorbası malzemesi {@code #dogalafetler:pismis_kutup_baligi} etiketidir (balıkçılık doldurur). Etiket boşken
-     * tarifin yüklendiği ve etiketi kullandığı sınanır; doluysa (entegrasyon) ilk balıkla gerçekten pişirilir.
+     * Kutup Balığı Çorbası malzemesi {@code #dogalafetler:pismis_kutup_baligi} etiketidir (balıkçılık doldurur) ve tarif
+     * {@code forge:not(forge:tag_empty)} koşuluyla yüklenir (F-17). Etiket boşken tarif yoktur ve boş etiketin "Empty Tag"
+     * bariyeri eşleşmez; doluysa (entegrasyon) tarif etiketlidir ve ilk balıkla gerçekten pişirilir.
      */
     private static void kutupBaligiCorbasi(GameTestHelper y, ServerLevel level, ServerPlayer o) {
         Optional<? extends Recipe<?>> tarif = level.getRecipeManager().byKey(DogalAfetler.konum("kutup_baligi_corbasi"));
-        dogrula(y, tarif.isPresent(), "kutup balığı çorbası tarifi yüklenmeli");
-        boolean etiketli = false;
-        for (Ingredient malzeme : tarif.get().getIngredients()) {
-            etiketli |= malzeme.toJson().toString().contains(YiyecekKayitlari.PISMIS_KUTUP_BALIGI.location().toString());
-        }
-        dogrula(y, etiketli, "malzeme #pismis_kutup_baligi etiketi olmalı");
         Optional<Item> balik = BuiltInRegistries.ITEM.getTag(YiyecekKayitlari.PISMIS_KUTUP_BALIGI)
                 .flatMap(etiket -> etiket.stream().findFirst()).map(h -> h.value());
-        if (balik.isPresent()) {
+        if (balik.isEmpty()) {
+            dogrula(y, tarif.isEmpty(), "etiket boşken kutup balığı çorbası tarifi yüklenmemeli");
+            TransientCraftingContainer bariyer = tezgah(o, List.of(Items.BOWL, Items.BARRIER, Items.POTATO));
+            dogrula(y, level.getRecipeManager().getRecipeFor(RecipeType.CRAFTING, bariyer, level).isEmpty(),
+                    "kase + bariyer + patates eşleşmemeli");
+        } else {
+            dogrula(y, tarif.isPresent(), "etiket doluyken kutup balığı çorbası tarifi yüklenmeli");
+            boolean etiketli = false;
+            for (Ingredient malzeme : tarif.get().getIngredients()) {
+                etiketli |= malzeme.toJson().toString().contains(YiyecekKayitlari.PISMIS_KUTUP_BALIGI.location().toString());
+            }
+            dogrula(y, etiketli, "malzeme #pismis_kutup_baligi etiketi olmalı");
             TransientCraftingContainer tezgah = tezgah(o, List.of(Items.BOWL, balik.get(), Items.POTATO));
             Optional<CraftingRecipe> e = level.getRecipeManager().getRecipeFor(RecipeType.CRAFTING, tezgah, level);
             dogrula(y, e.isPresent() && e.get().assemble(tezgah, level.registryAccess())
                     .is(YiyecekKayitlari.esya("kutup_baligi_corbasi")), "kutup balığı çorbası pişmedi");
         }
-        DogalAfetler.LOGGER.info("Yiyecek GameTest: kutup balığı çorbası tarifi etiketli, etikette balık {}",
+        DogalAfetler.LOGGER.info("Yiyecek GameTest: kutup balığı çorbası tarifi {}, etikette balık {}",
+                tarif.isPresent() ? "yüklü" : "yok (koşullu, etiket boş)",
                 balik.map(i -> BuiltInRegistries.ITEM.getKey(i).toString()).orElse("yok (balıkçılık dalında dolar)"));
     }
 
@@ -364,9 +371,11 @@ public final class YiyecekOyunTestleri {
             Kademe kontrolKademe = e.kademe(VucutSicakligi.al(kontrol));
             dogrula(y, yiyenKademe == Kademe.YANIYOR, "güveç 30 sn'de aşırı ısınmaya itmeli: " + VucutSicakligi.al(yiyen));
             dogrula(y, kontrolKademe.ordinal() < Kademe.YANIYOR.ordinal(), "yemeyen yanmamalı: " + VucutSicakligi.al(kontrol));
+            double yiyenSon = VucutSicakligi.al(yiyen);
             DogalAfetler.LOGGER.info(String.format(Locale.ROOT,
-                    "Yiyecek GameTest: güveç sıcakta ortam=%.1f anında=%.2f 30 sn sonra yiyen=%.1f (%s) kontrol=%.1f (%s)",
-                    ortam, anlik, VucutSicakligi.al(yiyen), yiyenKademe, VucutSicakligi.al(kontrol), kontrolKademe));
+                    "Yiyecek GameTest: güveç sıcakta ortam=%.1f anında=%.2f 30 sn sonra yiyen=%.1f (%s, eşik %.0f, pay %+.1f)"
+                            + " kontrol=%.1f (%s)", ortam, anlik, yiyenSon, yiyenKademe, e.yanmaHasari(),
+                    yiyenSon - e.yanmaHasari(), VucutSicakligi.al(kontrol), kontrolKademe));
             y.succeed();
         } finally {
             cikar(y, List.of(kontrol, yiyen));

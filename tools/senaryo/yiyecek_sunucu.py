@@ -4,8 +4,9 @@
 Çalıştırma alt yapısı (Sunucu, server.properties geçişi, log denetimi) tools/senaryo/cekirdek_sunucu.py'den gelir; dünya
 `run-server/yiyecek-senaryo` her koşuda sıfırdan üretilir, `test` dünyasına dokunulmaz (K0-18: pty'siz, stdin boruda).
 
-Koşu: açılış; yeni config varsayılanlarla yazıldı (`yiyecek` bölümü dahil); açılış log'unda "Yiyecek: 9 sıcaklık yiyeceği
-tarifi yüklendi" (dokuz tarif ve adetleri: salep/çikolata/ayran 3, çay 2, diğerleri 1; Kutup Balığı Çorbası etiketli);
+Koşu: açılış; yeni config varsayılanlarla yazıldı (`yiyecek` bölümü dahil); açılış log'unda tarif sayısı satırı. Etiket
+`#dogalafetler:pismis_kutup_baligi` boşken "8 ... yüklendi; koşullu atlanan 1 [kutup_baligi_corbasi]; ... 0 eşya" (F-17), balıkçılık
+birleşip etiket dolunca "9 ... koşullu atlanan 0 []; ... N eşya" (N > 0); adetler: salep/çikolata/ayran 3, çay 2, diğerleri 1;
 `dogalafet yiyecek bilgi`: madde 14 tablosu config'le kurulmuş haliyle (salep orta 20 birim 90 sn, güveç çok büyük 45 birim
 180 sn, ayran serinlik orta, kutup balığı çorbası büyük 35 birim 150 sn) ve vanilla listesi (açık, 11 yiyecek, 3 birim);
 `stop`. Sonda log denetlenir: `invalid dist` yok, istisna yok, config düzeltme WARN'ı yok, süreç 0 ile çıktı.
@@ -24,8 +25,14 @@ import cekirdek_sunucu as cs  # noqa: E402
 cs.SENARYO_DUNYASI = "yiyecek-senaryo"
 cs.SENARYO_OZELLIKLERI = {"level-name": cs.SENARYO_DUNYASI, "level-seed": "20261106", "online-mode": "false"}
 
-TARIFLER = (r"\[atesli_guvec→1, ayran→3, buzlu_karpuz→1, isitici_cay→2, kutup_baligi_corbasi→1, meyve_serbeti→1, "
-            r"sicak_cikolata→3, sicak_salep→3, sicak_tavuk_corbasi→1\]")
+SEKIZ = (r"\[atesli_guvec→1, ayran→3, buzlu_karpuz→1, isitici_cay→2, meyve_serbeti→1, "
+         r"sicak_cikolata→3, sicak_salep→3, sicak_tavuk_corbasi→1\]")
+DOKUZ = (r"\[atesli_guvec→1, ayran→3, buzlu_karpuz→1, isitici_cay→2, kutup_baligi_corbasi→1, meyve_serbeti→1, "
+         r"sicak_cikolata→3, sicak_salep→3, sicak_tavuk_corbasi→1\]")
+ETIKET = r"#dogalafetler:pismis_kutup_baligi etiketinde "
+TARIF_SATIRI = (r"Yiyecek: (8 sıcaklık yiyeceği tarifi yüklendi " + SEKIZ + r"; koşullu atlanan 1 \[kutup_baligi_corbasi\]; "
+                + ETIKET + r"0 eşya|9 sıcaklık yiyeceği tarifi yüklendi " + DOKUZ + r"; koşullu atlanan 0 \[\]; " + ETIKET
+                + r"[1-9][0-9]* eşya); vanillaIsinma=true \(11 yiyecek\)")
 TABLO = (
     (r"Hot Salep: Inner Warmth \(medium\), 20 units over 90 s", "salep"),
     (r"Hot Chocolate: Inner Warmth \(medium\), 20 units over 90 s", "çikolata"),
@@ -44,9 +51,7 @@ def kosu(sunucu):
     sunucu.bekle(r"Done \(", 0, cs.ACILIS_SURESI, "açılış")
     sunucu.bekle(r"Config dosyası varsayılanlarla oluşturuldu: .*dogalafetler-server\.toml", 0, 5,
                  "yeni dünyada config varsayılanlarla yazıldı")
-    sunucu.bekle(r"Yiyecek: 9 sıcaklık yiyeceği tarifi yüklendi " + TARIFLER
-                 + r"; #dogalafetler:pismis_kutup_baligi etiketinde [0-9]+ eşya; vanillaIsinma=true \(11 yiyecek\)", 0, 5,
-                 "dokuz tarif yüklendi (tarif sayısı log'u)")
+    sunucu.bekle(TARIF_SATIRI, 0, 5, "tarif sayısı log'u (boş etikette çorba koşullu atlandı)")
     isaret = sunucu.isaret()
     sunucu.komut("dogalafet yiyecek bilgi", r"Temperature foods \(instant share 25%, same food again within 60 s: x0\.5\):",
                  "tablo başlığı")

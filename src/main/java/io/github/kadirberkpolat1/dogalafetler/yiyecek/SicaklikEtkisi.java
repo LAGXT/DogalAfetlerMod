@@ -10,8 +10,10 @@ import net.minecraft.world.item.ItemStack;
 /**
  * "İçten Isınma" / "Serinlik" durum efekti (madde 14): yalnız gösterge. Sıcaklığı efekt değil
  * {@code VucutSicakligi}'nın süreli etkisi uygular; efekt ikonla kalan süreyi ve amplifier'la büyüklük kademesini gösterir.
- * Bu yüzden süt onu silmez (sıcaklık etkisi sürerken ikonun kaybolması yanıltırdı). Durumdan bağımsız iyi ya da kötü
- * olmadığı için (soğukta kurtarır, sıcakta pişirir) kategori nötrdür.
+ * Bu yüzden süt onu silmez (sıcaklık etkisi sürerken ikonun kaybolması yanıltırdı). Ölümsüzlük totemi ve
+ * {@code /effect clear} ikonu siler, sıcaklık etkisi sürer (kabul edilen davranış, F-05); ikon aynı yöndeki en yüksek
+ * kademeyi gösterir (vanilla birleştirme) ve azalan verimin yarı etkisini ayrıca göstermez. Durumdan bağımsız iyi ya da
+ * kötü olmadığı için (soğukta kurtarır, sıcakta pişirir) kategori nötrdür.
  */
 public final class SicaklikEtkisi extends MobEffect {
     public static final int ISINMA_RENGI = 0xE8782C;
