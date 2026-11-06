@@ -37,6 +37,13 @@ public final class SanalSuDunyasi {
     private Magara[] magaraDizi = MAGARA_YOK;
     private volatile Cekilme[] cekilmeDizi = CEKILME_YOK;
     private final SuAraliklari gecici = new SuAraliklari();
+    private ZeminOkuyucu zeminYedek;
+
+    /** Alanın henüz okumadığı sütunun zemini (dünyadan, yüklü chunk); bilinmiyorsa {@link Integer#MIN_VALUE}. */
+    @FunctionalInterface
+    public interface ZeminOkuyucu {
+        int zemin(int x, int z);
+    }
 
     public SanalSuDunyasi(DenizAlani alan) {
         this.alan = alan;
@@ -44,6 +51,14 @@ public final class SanalSuDunyasi {
 
     public DenizAlani alan() {
         return alan;
+    }
+
+    /**
+     * Dalga aralığının tabanı için yedek zemin (SU-27): alan sütunu okumadan (okuma bütçesi, uzak bölge) dalga geçerse
+     * aralık dalga tabanından değil gerçek zeminden başlar; yoksa tabanın altındaki varlık kuru kalır.
+     */
+    public void zeminYedek(ZeminOkuyucu okuyucu) {
+        zeminYedek = okuyucu;
     }
 
     public void denizArtisiAyarla(double artis) {
@@ -67,6 +82,11 @@ public final class SanalSuDunyasi {
 
     public Map<Integer, Dalga> dalgalar() {
         return Collections.unmodifiableMap(dalgalar);
+    }
+
+    /** Dalgaların değişmez dizisi (render, tahsissiz). */
+    public Dalga[] dalgaDizisi() {
+        return dalgaDizi;
     }
 
     public void magaraEkle(int id, MagaraCebi cep, MagaraZamani zaman) {
@@ -176,6 +196,9 @@ public final class SanalSuDunyasi {
             double y = d.yuzey(x + 0.5, z + 0.5, t);
             if (!Double.isNaN(y)) {
                 int zemin = alan.zemin(x, z);
+                if (zemin == Integer.MIN_VALUE && zeminYedek != null) {
+                    zemin = zeminYedek.zemin(x, z);
+                }
                 a.ekle(zemin == Integer.MIN_VALUE ? d.taban() : Math.min(zemin, y), y);
             }
         }

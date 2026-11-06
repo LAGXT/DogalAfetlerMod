@@ -36,6 +36,40 @@ public final class TazelemePlani {
         return Math.max(1, (int) Math.ceil(onTick * carpan * kisma / 10.0));
     }
 
+    /**
+     * İstenen chunk'ları en yakın odağa Chebyshev uzaklığına göre sıralar (SU-27): {@link DenizAlani#iste} yeni chunk'ları
+     * bu sırayla kuyruğa ekler, oyuncunun (ve sabit bölgenin) çevresi uzak köşelerden önce okunur. Eşitlikte anahtar.
+     */
+    public static long[] yakindanUzaga(java.util.Collection<Long> istenen, long[] odaklar) {
+        long[] s = new long[istenen.size()];
+        int n = 0;
+        for (long k : istenen) {
+            int cx = (int) (k >> 32);
+            int cz = (int) k;
+            int en = odaklar.length == 0 ? 0 : Integer.MAX_VALUE;
+            for (long o : odaklar) {
+                en = Math.min(en, Math.max(Math.abs(cx - (int) (o >> 32)), Math.abs(cz - (int) o)));
+            }
+            s[n++] = k;
+            UZAKLIK.put(k, en);
+        }
+        Long[] kutu = new Long[n];
+        for (int i = 0; i < n; i++) {
+            kutu[i] = s[i];
+        }
+        Arrays.sort(kutu, (a, b) -> {
+            int c = Integer.compare(UZAKLIK.get(a), UZAKLIK.get(b));
+            return c != 0 ? c : Long.compare(a, b);
+        });
+        UZAKLIK.clear();
+        for (int i = 0; i < n; i++) {
+            s[i] = kutu[i];
+        }
+        return s;
+    }
+
+    private static final java.util.HashMap<Long, Integer> UZAKLIK = new java.util.HashMap<>();
+
     /** Uzak chunk bütçesini değiştirir (config). */
     public void uzakButce(int butce) {
         uzakButce = Math.max(0, butce);

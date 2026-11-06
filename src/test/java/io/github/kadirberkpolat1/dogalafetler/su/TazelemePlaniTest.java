@@ -105,4 +105,25 @@ class TazelemePlaniTest {
         assertEquals(2, TazelemePlani.tickButcesi(32, 1, 0.5), "TPS kısması yarıya indirir");
         assertEquals(1, TazelemePlani.tickButcesi(1, 0, 0.25), "en az 1");
     }
+
+    @Test
+    void istenenlerOdagaYakindanUzagaSiralanir() {
+        java.util.List<Long> istenen = new java.util.ArrayList<>();
+        for (int x = -6; x <= 6; x++) {
+            for (int z = -6; z <= 6; z++) {
+                istenen.add(a(x, z));
+            }
+        }
+        java.util.Collections.shuffle(istenen, new java.util.Random(7));
+        long[] sirali = TazelemePlani.yakindanUzaga(istenen, new long[] {a(4, 4)});
+        assertEquals(169, sirali.length);
+        assertEquals(a(4, 4), sirali[0], "odak chunk'ı önce");
+        int onceki = 0;
+        for (long k : sirali) {
+            int m = Math.max(Math.abs((int) (k >> 32) - 4), Math.abs((int) k - 4));
+            assertTrue(m >= onceki, "mesafe azalmamalı");
+            onceki = m;
+        }
+        assertEquals(0, TazelemePlani.yakindanUzaga(java.util.List.of(), new long[0]).length);
+    }
 }

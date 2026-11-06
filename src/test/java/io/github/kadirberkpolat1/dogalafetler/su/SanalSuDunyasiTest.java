@@ -110,4 +110,22 @@ class SanalSuDunyasiTest {
         assertEquals(z.bitis(), geri.bitis(), 1e-9);
         assertEquals(77.5, SuKalicilik.donmaOku(me), 1e-9);
     }
+
+    @Test
+    void alanBilmeyinceDalgaTabaniYedekZemindenGelir() {
+        // Doğrulama bulgusu (P1): alan sütunu henüz okumamışken dalga aralığı yalnız taban'dan başlıyordu; tabanın altındaki
+        // varlık (ör. şablon kenarından düşen domuz) kuru kalıyordu. Yedek okuyucu dünyanın zeminini verir.
+        SanalSuDunyasi dunya = new SanalSuDunyasi(duzKiyi());
+        dunya.dalgaEkle(1, new Dalga(-80, 4, 1, 0, 0, 1, 8, 80, 30, 63, 200));
+        SuAraliklari a = new SuAraliklari();
+        dunya.araliklar(-40, 4, 50, a);
+        assertEquals(1, a.adet());
+        assertEquals(63, a.alt(0), "yedek yokken taban");
+        dunya.zeminYedek((x, z) -> 60);
+        dunya.araliklar(-40, 4, 50, a);
+        assertEquals(60, a.alt(0), "alan bilmiyorsa zemin dünyadan okunur");
+        dunya.zeminYedek((x, z) -> Integer.MIN_VALUE);
+        dunya.araliklar(-40, 4, 50, a);
+        assertEquals(63, a.alt(0), "dünya da bilmiyorsa taban");
+    }
 }

@@ -117,7 +117,8 @@ public final class SanalSuSunucu {
                 }
             }
         }
-        for (long k : istenen) {
+        long[] odaklar = odak.stream().mapToLong(Long::longValue).toArray();
+        for (long k : TazelemePlani.yakindanUzaga(istenen, odaklar)) {
             alan.iste((int) (k >> 32), (int) k);
         }
         for (long k : alan.istenenler()) {
@@ -127,7 +128,7 @@ public final class SanalSuSunucu {
         }
         SuAyarlari.Sunucu a = SuAyarlari.sunucu();
         b.plan.uzakButce(a.tazelemeUzakButce.get());
-        for (long k : b.plan.sec(t, odak.stream().mapToLong(Long::longValue).toArray(), alan.istenenler())) {
+        for (long k : b.plan.sec(t, odaklar, alan.istenenler())) {
             alan.gecersizKil((int) (k >> 32), (int) k);
         }
         b.tickButcesi = TazelemePlani.tickButcesi(a.alanOkumaButcesi.get(), l.players().size(), TpsOlcer.kismaCarpani());

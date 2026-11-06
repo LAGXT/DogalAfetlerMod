@@ -46,8 +46,9 @@ public final class SanalSu {
         /** Deniz alanının tick başına okuma bütçesi (her 10 tick'te yeniden hesaplanır). */
         int tickButcesi = 1;
 
-        Boyut(int denizSeviyesi) {
-            dunya = yeniDunya(denizSeviyesi, sunucuYurutucu());
+        Boyut(ServerLevel l) {
+            dunya = yeniDunya(l.getSeaLevel(), sunucuYurutucu());
+            dunya.zeminYedek(yedekZemin(l));
         }
     }
 
@@ -105,7 +106,7 @@ public final class SanalSu {
     }
 
     static Boyut boyut(ServerLevel l) {
-        return BOYUTLAR.computeIfAbsent(l.dimension(), k -> new Boyut(l.getSeaLevel()));
+        return BOYUTLAR.computeIfAbsent(l.dimension(), k -> new Boyut(l));
     }
 
     /** Seviyenin şimdiki saati (sunucuda afet saati, istemcide tahmini). */
@@ -371,6 +372,15 @@ public final class SanalSu {
             return MagaraDolumu.BlokOzu.GECIRGEN;
         }
         return MagaraDolumu.BlokOzu.KATI;
+    }
+
+    /**
+     * Alanın okumadığı sütunun zemini doğrudan dünyadan (SU-27): yaprak hariç hareket engelleyen yüzey (sıvı dahil) ve
+     * üstü; chunk yüklü değilse bilinmiyor. Sunucu ve istemci aynı kural.
+     */
+    public static SanalSuDunyasi.ZeminOkuyucu yedekZemin(Level l) {
+        return (x, z) -> l.hasChunk(x >> 4, z >> 4) ? l.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z)
+                : Integer.MIN_VALUE;
     }
 
     /** Mağara dolumu hücresi: yüklü olmayan chunk ve sütunun yaprak hariç yüzeyinin hizası ve üstü açık (K0-29). */

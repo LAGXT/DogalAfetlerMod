@@ -223,14 +223,19 @@ public final class SuOyunTestleri {
     }
 
     /**
-     * Düz taş zeminde +x yönünde ilerleyen dalga: domuz ve eşya dalga yönünde 3 bloktan fazla sürüklenir (sunucu); sahte
-     * oyuncu ıslaktır ve istemcisinin uygulayacağı ivme dalga yönündedir (oyuncuyu kendi istemcisi iter, SU-03).
+     * Düz taş zeminde +x yönünde ilerleyen dalga: dalga tabanının altındaki hendekteki domuz ve zemindeki eşya dalga
+     * yönünde 3 bloktan fazla sürüklenir ve domuz suda sayılır (sunucu, SU-27); sahte oyuncu ıslaktır ve istemcisinin
+     * uygulayacağı ivme dalga yönündedir (oyuncuyu kendi istemcisi iter, SU-03).
      */
     @GameTest(template = "su_alani", batch = "su_dalga", timeoutTicks = 400)
     public static void dalgaMobuVeEsyayiSurukler(GameTestHelper h) {
         ServerLevel l = h.getLevel();
         kutu(h, 0, 0, 0, 15, 0, 15, Blocks.STONE.defaultBlockState());
-        Pig domuz = h.spawn(EntityType.PIG, 3, 1, 6);
+        // Domuz dalga tabanının (y1) bir blok altındaki hendekte (y0, altı düz dünyanın çimeni): doğrulama bulgusunun
+        // (domuz şablon kenarından düşünce kuru) belirlenimci hali (SU-27).
+        kutu(h, 2, 0, 5, 15, 0, 7, Blocks.AIR.defaultBlockState());
+        Pig domuz = h.spawn(EntityType.PIG, 3, 0, 6);
+        int dalgaTabani = m(h, 0, 1, 0).getY();
         BlockPos ep = m(h, 3, 1, 9);
         ItemEntity esya = new ItemEntity(l, ep.getX() + 0.5, ep.getY() + 0.1, ep.getZ() + 0.5, new ItemStack(Items.OAK_LOG));
         l.addFreshEntity(esya);
@@ -241,17 +246,26 @@ public final class SuOyunTestleri {
         double esyaX = esya.getX();
         int id = SanalSu.dalgaBaslat(l, new Dalga(koken.getX(), koken.getZ() + 0.5, 1, 0, SanalSu.sunucuSaati, 0.5, 6, 60, 60,
                 koken.getY(), 200));
+        double[] it = new double[2];
+        boolean[] oldu = new boolean[5];
+        // Her koşul gerçekleştiği ilk tick'te kilitlenir (domuz ve eşya suda yüzeye çıkar, dalga oyuncuyu geçer: hepsi aynı
+        // anda doğru olmak zorunda değil). Bekleme süresiyle değil koşulla; üst sınır testin 400 tick'i.
         h.startSequence()
-                .thenExecuteAfter(110, () -> {
-                    double[] it = new double[2];
-                    h.assertTrue(SanalSu.icindeMi(oyuncu), "oyuncu dalgada ıslak değil");
-                    h.assertTrue(SanalSu.itmeHesapla(oyuncu, it) != null && it[0] > 0 && Math.abs(it[1]) < 1e-9,
-                            "oyuncunun sürükleme ivmesi dalga yönünde değil");
-                    DogalAfetler.LOGGER.info("Sanal su GameTest: dalga domuz dx={} eşya dx={} oyuncu ivme={} domuz suda={}",
-                            domuz.getX() - domuzX, esya.getX() - esyaX, it[0], domuz.isInWater());
-                    h.assertTrue(domuz.isInWater(), "domuz suyu tanımadı");
-                    h.assertTrue(domuz.getX() - domuzX > 3, "domuz sürüklenmedi: dx=" + (domuz.getX() - domuzX));
-                    h.assertTrue(esya.getX() - esyaX > 3, "eşya sürüklenmedi: dx=" + (esya.getX() - esyaX));
+                .thenWaitUntil(() -> {
+                    oldu[0] |= SanalSu.icindeMi(oyuncu);
+                    oldu[1] |= SanalSu.itmeHesapla(oyuncu, it) != null && it[0] > 0 && Math.abs(it[1]) < 1e-9;
+                    oldu[2] |= domuz.getX() - domuzX > 3;
+                    oldu[3] |= esya.getX() - esyaX > 3;
+                    oldu[4] |= domuz.isInWater() && domuz.getY() < dalgaTabani;
+                    h.assertTrue(oldu[0], "oyuncu dalgada ıslak değil");
+                    h.assertTrue(oldu[1], "oyuncunun sürükleme ivmesi dalga yönünde değil");
+                    h.assertTrue(oldu[4], "hendekteki domuz suyu tanımadı (y=" + domuz.getY() + ", dalga tabanı " + dalgaTabani + ")");
+                    h.assertTrue(oldu[2], "domuz sürüklenmedi: dx=" + (domuz.getX() - domuzX));
+                    h.assertTrue(oldu[3], "eşya sürüklenmedi: dx=" + (esya.getX() - esyaX));
+                })
+                .thenExecute(() -> {
+                    DogalAfetler.LOGGER.info("Sanal su GameTest: dalga domuz dx={} y={} eşya dx={} oyuncu ivme={} domuz suda={} tick={}",
+                            domuz.getX() - domuzX, domuz.getY(), esya.getX() - esyaX, it[0], domuz.isInWater(), h.getTick());
                     SanalSu.dalgaBitir(l, id);
                     l.getServer().getPlayerList().remove(oyuncu);
                 })
@@ -421,7 +435,8 @@ public final class SuOyunTestleri {
                     b.dunya.magaraKaldir(id);
                     b.magaraKutusu.remove(id);
                     b.dunya.dalgaKaldir(dalgaId);
-                    h.assertTrue(b.dunya.magaralar().isEmpty() && b.dunya.dalgalar().isEmpty(), "bellek temizlenmedi");
+                    h.assertTrue(!b.dunya.magaralar().containsKey(id) && !b.dunya.dalgalar().containsKey(dalgaId),
+                            "bellek temizlenmedi");
                     int[] sayi = SuKalicilik.kur(server, su);
                     SanalSuDunyasi.Magara sonra = b.dunya.magaralar().get(id);
                     h.assertTrue(sayi[2] >= 1 && sonra != null, "mağara kurulmadı");

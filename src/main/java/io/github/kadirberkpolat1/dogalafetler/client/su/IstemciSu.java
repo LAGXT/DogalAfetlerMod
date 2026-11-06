@@ -59,6 +59,7 @@ public final class IstemciSu {
         if (l != seviye) {
             seviye = l;
             dunya = SanalSu.yeniDunya(l.getSeaLevel(), SanalSu.istemciYurutucu());
+            dunya.zeminYedek(SanalSu.yedekZemin(l));
             SanalSu.istemciSaati = () -> IstemciDonem.saat(0f);
             SanalSu.istemci = dunya;
             derlenen = new Cekilme[0];
@@ -145,8 +146,11 @@ public final class IstemciSu {
         for (int dx = -r; dx <= r; dx++) {
             for (int dz = -r; dz <= r; dz++) {
                 istenen.add(DenizAlani.anahtar(pcx + dx, pcz + dz));
-                alan.iste(pcx + dx, pcz + dz);
             }
+        }
+        long odak = DenizAlani.anahtar(pcx, pcz);
+        for (long k : TazelemePlani.yakindanUzaga(istenen, new long[] {odak})) {
+            alan.iste((int) (k >> 32), (int) k);
         }
         for (long k : alan.istenenler()) {
             if (!istenen.contains(k)) {
