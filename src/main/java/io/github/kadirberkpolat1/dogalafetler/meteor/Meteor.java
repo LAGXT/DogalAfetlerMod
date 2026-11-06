@@ -20,6 +20,7 @@ public final class Meteor {
         AgKanali.kaydet(k -> k.sunucudanIstemciye("meteor/sarsinti", MeteorSarsintiPaketi.class, MeteorSarsintiPaketi::yaz,
                 MeteorSarsintiPaketi::oku, MeteorSarsintiPaketi::isle));
         KomutKaydi.ekle(MeteorKomutlari.komut());
+        KomutKaydi.ekle(MeteorKomutlari.odulKomutu());
         DataGenerators.ceviriEkle(MeteorCevirileri::yaz);
         DataGenerators.saglayiciEkle(MeteorVerileri::ekle);
     }

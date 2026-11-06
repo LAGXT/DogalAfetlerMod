@@ -155,6 +155,8 @@
   "commands.dogalafetler.meteor.dusur_hemen": "Meteor (%s) %s, %s noktasına hemen çarptı (hedef chunk varlık işlemiyor)",
   "commands.dogalafetler.meteor.dusur_yok": "Meteor yok: hedef chunk yüklü değil ya da meteor tavanı (%s) dolu",
   "commands.dogalafetler.meteor.yagmur": "Meteor yağmuru #%s başladı: %s sn, oyuncu başına dakikada %s",
+  "commands.dogalafetler.odul.meteor": "%3$s oyuncusuna %1$s Meteorit Parçası ve %2$s Kozmik Çekirdek verildi",
+  "commands.dogalafetler.odul.meteor_tur": "Bilinmeyen ödül: %s (seçenekler: %s)",
   "commands.dogalafetler.seviye": "Seviye %s (%s)",
   "commands.dogalafetler.sicaklik.acik": "açık",
   "commands.dogalafetler.sicaklik.bilgi.baslik": "%s sıcaklık bilgisi:",

@@ -27,5 +27,8 @@ final class MeteorCevirileri {
                 "%s komut meteor yağmuru durdu; uçan komut meteorları kaldırıldı");
         y.ekle(MeteorKomutlari.BILGI, "Flying meteors: %s/%s, showers: %s, pending craters: %s (%s waiting for unloaded chunks)",
                 "Uçan meteor: %s/%s, yağmur: %s, bekleyen krater: %s (%s yüklü olmayan chunk bekliyor)");
+        y.ekle(MeteorKomutlari.ODUL, "Gave %s Meteorite Fragment(s) and %s Cosmic Core(s) to %s",
+                "%3$s oyuncusuna %1$s Meteorit Parçası ve %2$s Kozmik Çekirdek verildi");
+        y.ekle(MeteorKomutlari.ODUL_TUR, "Unknown reward: %s (choose %s)", "Bilinmeyen ödül: %s (seçenekler: %s)");
     }
 }

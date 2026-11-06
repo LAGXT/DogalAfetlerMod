@@ -7,7 +7,8 @@
 Adımlar: doğuşün 60 blok üstüne 25x25 meşe tahta platform (yakıt; meteor oraya çarpar), `meteor bilgi` (0),
 `meteor dusur buyuk` → log'da `meteor krateri tamam: ... (BUYUK, GUNES, ...)` ve kazılan > 0, `yangin bilgi` > 0;
 `meteor dusur ay` (küçük ay meteoru) → krater satırı; `meteor yagmur 15 40` → en az bir krater daha, 15 sn sonra
-`showers: 0`; `meteor durdur`, `yangin sondur`.
+`showers: 0`; `meteor durdur`, `yangin sondur`. KOM.13 (K-E18): `odul meteor cekirdek 1 Kimse` → "No player was found" (komut
+kayıtlı ve ayrıştırılıyor; konsolda oyuncu yok; verme yolu GameTest `odulKomutuMeteorEsyalariniVerir`).
 Bekleyen krater (M-25): 992..1007 (chunk 62,62) forceload, chunk 64'te y 120'de 11x11 tahta platform (altı okyanus); iki halka ötesi (chunk 64) yüklü ama varlık işlemez, üçüncü
 halka (chunk 65, x ≥ 1040) yüklü değil. 1037,1000'e `meteor dusur buyuk` → hemen çarpar, kraterın x ≥ 1040 kısmı bekler
 (`pending craters: 1 (1 waiting`); `forceload remove` (chunk'lar boşalır), `stop`. Koşu 2 (aynı dünya): açılışta
@@ -40,6 +41,7 @@ def kosu1(sunucu):
     sunucu.komut("forceload add ~-32 ~-32 ~32 ~32", r"to be force loaded|already marked")
     sunucu.komut("fill ~-12 ~60 ~-12 ~12 ~60 ~12 minecraft:oak_planks", r"Successfully filled 625 block")
     sunucu.komut("dogalafet meteor bilgi", rf"Flying meteors: 0/{TAVAN}, showers: 0, pending craters: 0")
+    sunucu.komut("dogalafet odul meteor cekirdek 1 Kimse", r"No player was found", "KOM.13 odul meteor kayıtlı")
 
     isaret = sunucu.isaret()
     sunucu.komut("dogalafet meteor dusur buyuk", r"Meteor \(buyuk/gunes\) (falling towards|struck)")

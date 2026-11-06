@@ -1,6 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.meteor;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.esya.MeteorEsyaKayitlari;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.OdulZari;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.Yorunge;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
@@ -16,6 +17,8 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.FluidTags;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
 
@@ -132,6 +135,28 @@ public final class MeteorAPI {
     /** Kaynağın bütün boyutlardaki yağmurlarını durdurur ({@code ucanlariAt}: uçan meteorlarını da kaldırır). */
     public static int yagmurlariDurdur(MinecraftServer server, YanginKaynagi kaynak, boolean ucanlariAt) {
         return MeteorYoneticisi.durdur(server, Objects.requireNonNull(kaynak, "kaynak"), ucanlariAt);
+    }
+
+    /**
+     * Test ödülü ({@code /dogalafet odul meteor}, KOM.13): {@code parca} Meteorit Parçası ve {@code cekirdek} Kozmik Çekirdek
+     * soğuk olarak envantere girer; sığmayan oyuncunun önüne düşer. Verilen toplam eşya sayısını döndürür.
+     */
+    public static int odulVer(ServerPlayer oyuncu, int parca, int cekirdek) {
+        Objects.requireNonNull(oyuncu, "oyuncu");
+        ver(oyuncu, MeteorEsyaKayitlari.METEORIT_PARCASI.get(), parca);
+        ver(oyuncu, MeteorEsyaKayitlari.KOZMIK_CEKIRDEK.get(), cekirdek);
+        return Math.max(0, parca) + Math.max(0, cekirdek);
+    }
+
+    private static void ver(ServerPlayer oyuncu, Item esya, int adet) {
+        while (adet > 0) {
+            ItemStack yigin = new ItemStack(esya, Math.min(adet, esya.getMaxStackSize()));
+            adet -= yigin.getCount();
+            if (!oyuncu.getInventory().add(yigin) && !yigin.isEmpty()) {
+                oyuncu.drop(yigin, false);
+            }
+        }
+        oyuncu.inventoryMenu.broadcastChanges();
     }
 
     public static int aktifMeteorSayisi(ServerLevel level) {

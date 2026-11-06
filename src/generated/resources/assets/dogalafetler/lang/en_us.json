@@ -155,6 +155,8 @@
   "commands.dogalafetler.meteor.dusur_hemen": "Meteor (%s) struck %s, %s at once (target chunk is not entity-ticking)",
   "commands.dogalafetler.meteor.dusur_yok": "No meteor: the target chunk is not loaded or the meteor cap (%s) is reached",
   "commands.dogalafetler.meteor.yagmur": "Meteor shower #%s started: %s s, %s per player per minute",
+  "commands.dogalafetler.odul.meteor": "Gave %s Meteorite Fragment(s) and %s Cosmic Core(s) to %s",
+  "commands.dogalafetler.odul.meteor_tur": "Unknown reward: %s (choose %s)",
   "commands.dogalafetler.seviye": "Level %s (%s)",
   "commands.dogalafetler.sicaklik.acik": "on",
   "commands.dogalafetler.sicaklik.bilgi.baslik": "Temperature of %s:",

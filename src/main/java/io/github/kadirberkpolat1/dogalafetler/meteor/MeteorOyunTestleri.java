@@ -741,4 +741,49 @@ public final class MeteorOyunTestleri {
         SicaklikYoneticisi.guncelle(duz, 20);
         return VucutSicakligi.al(termostatli) - VucutSicakligi.al(duz);
     }
+
+    /**
+     * KOM.13 (K-E18): {@code /dogalafet odul meteor} argümansız komutu verene birer Meteorit Parçası ve Kozmik Çekirdek, tür ve
+     * adetle adı verilen oyuncuya o kadarını verir; eşyalar soğuktur; bilinmeyen tür hiçbir şey vermez; OP olmayan komutu
+     * görmez.
+     */
+    @GameTest(template = "bos", batch = "meteor_odul_komut")
+    public static void odulKomutuMeteorEsyalariniVerir(GameTestHelper y) {
+        ServerLevel level = y.getLevel();
+        BlockPos m = y.absolutePos(BlockPos.ZERO);
+        ServerPlayer o = CekirdekOyunTestleri.sahteOyuncu(y, new GameProfile(UUID.randomUUID(), "odul-test"), m.getX() + 0.5,
+                m.getY(), m.getZ() + 0.5);
+        try {
+            var dagitici = level.getServer().getCommands().getDispatcher();
+            var oyuncudan = o.createCommandSourceStack().withPermission(2).withSuppressedOutput();
+            var konsol = level.getServer().createCommandSourceStack().withSuppressedOutput();
+            int r1 = dagitici.execute("dogalafet odul meteor", oyuncudan);
+            dogrula(y, r1 == 2 && say(o, MeteorEsyaKayitlari.METEORIT_PARCASI.get()) == 1
+                    && say(o, MeteorEsyaKayitlari.KOZMIK_CEKIRDEK.get()) == 1, "argümansız: birer parça ve çekirdek: " + r1);
+            int r2 = dagitici.execute("dogalafet odul meteor cekirdek 3 odul-test", konsol);
+            dogrula(y, r2 == 3 && say(o, MeteorEsyaKayitlari.KOZMIK_CEKIRDEK.get()) == 4
+                    && say(o, MeteorEsyaKayitlari.METEORIT_PARCASI.get()) == 1, "cekirdek 3: " + r2);
+            int r3 = dagitici.execute("dogalafet odul meteor yildiz 2 odul-test", konsol);
+            dogrula(y, r3 == 0 && say(o, MeteorEsyaKayitlari.KOZMIK_CEKIRDEK.get()) == 4, "bilinmeyen tür vermemeli");
+            for (ItemStack yigin : o.getInventory().items) {
+                dogrula(y, yigin.isEmpty() || MeteorOdulleri.sicakBitis(yigin) == OdulZamani.SOGUK, "komut ödülü soğuk olmalı");
+            }
+            boolean reddedildi = false;
+            try {
+                dagitici.execute("dogalafet odul meteor", o.createCommandSourceStack().withPermission(0).withSuppressedOutput());
+            } catch (com.mojang.brigadier.exceptions.CommandSyntaxException hata) {
+                reddedildi = true;
+            }
+            dogrula(y, reddedildi, "OP olmayan oyuncu komutu kullanamamalı");
+        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException hata) {
+            y.fail("komut çalışmadı: " + hata.getMessage());
+        } finally {
+            level.getServer().getPlayerList().remove(o);
+        }
+        y.succeed();
+    }
+
+    private static int say(ServerPlayer o, net.minecraft.world.item.Item esya) {
+        return o.getInventory().countItem(esya);
+    }
 }
