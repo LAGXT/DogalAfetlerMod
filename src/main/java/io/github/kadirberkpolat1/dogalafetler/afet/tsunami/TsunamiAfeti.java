@@ -166,8 +166,10 @@ public final class TsunamiAfeti extends Afet {
         cekilmeCarpani = donem.carpan(AfetTuru.TSUNAMI) > 1.0001 ? a.ayCekilmeCarpani.get() : 1.0;
         taban = geometri.taban() + Math.floor(donem.deniz().mevcutArtis());
         double mesafe = cekilmeMesafesi();
+        // Çekilmenin başında ve sonunda istemci çember içindeki bütün su bölümlerini yeniden derler; sonu dalganın kıyıya
+        // vurduğu ana, yani S5 yıkımının başına denk gelir (TS-12): yarıçapın cephe genişliği payı %30'da tutulur.
         cekilme = SanalSu.cekilmeBaslat(level, new Cekilme(geometri.x(-mesafe / 2, 0), geometri.z(-mesafe / 2, 0),
-                Math.max(mesafe * 1.5, genislik() * 0.5), sv.cekilmeDerinligi(cekilmeCarpani), simdi,
+                Math.max(mesafe * 1.5, genislik() * 0.3), sv.cekilmeDerinligi(cekilmeCarpani), simdi,
                 Math.round(a.cekilmeSn.get() * 20)));
         long gecikme = olcek != null ? olcek.gecikme() : Math.round(a.dalgaGecikmeSn.get() * 20);
         b1 = simdi + gecikme;
