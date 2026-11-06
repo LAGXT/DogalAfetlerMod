@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "equipment",
+  "conditions": [
+    {
+      "type": "forge:not",
+      "value": {
+        "type": "forge:tag_empty",
+        "tag": "dogalafetler:kozmik_cekirdek"
+      }
+    }
+  ],
+  "ingredients": [
+    {
+      "item": "dogalafetler:sismograf"
+    },
+    {
+      "tag": "dogalafetler:kozmik_cekirdek"
+    }
+  ],
+  "result": {
+    "item": "dogalafetler:hassas_sismograf"
+  }
+}
