@@ -1,0 +1,35 @@
+{
+  "parent": "dogalafetler:dogalafetler/root",
+  "criteria": {
+    "topla": {
+      "conditions": {
+        "esya": "dogalafetler:meteorit_parcasi"
+      },
+      "trigger": "dogalafetler:esya_toplandi"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "translate": "advancements.dogalafetler.gokten_gelen_misafir.description"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:fire_charge"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.gokten_gelen_misafir.title"
+    }
+  },
+  "requirements": [
+    [
+      "topla"
+    ]
+  ],
+  "rewards": {
+    "experience": 15
+  },
+  "sends_telemetry_event": true
+}

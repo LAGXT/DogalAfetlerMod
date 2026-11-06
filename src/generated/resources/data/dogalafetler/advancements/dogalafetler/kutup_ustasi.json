@@ -1,0 +1,38 @@
+{
+  "parent": "dogalafetler:dogalafetler/buz_balikcisi",
+  "criteria": {
+    "balik": {
+      "conditions": {
+        "min": 25
+      },
+      "trigger": "dogalafetler:balik_tutuldu"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "translate": "advancements.dogalafetler.kutup_ustasi.description"
+    },
+    "frame": "goal",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:cod"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.kutup_ustasi.title"
+    }
+  },
+  "requirements": [
+    [
+      "balik"
+    ]
+  ],
+  "rewards": {
+    "experience": 40,
+    "loot": [
+      "dogalafetler:rewards/hedef"
+    ]
+  },
+  "sends_telemetry_event": true
+}

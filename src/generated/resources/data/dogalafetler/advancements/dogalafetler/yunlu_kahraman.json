@@ -1,0 +1,38 @@
+{
+  "parent": "dogalafetler:dogalafetler/katmanli_giyim",
+  "criteria": {
+    "olcut": {
+      "conditions": {
+        "min": 4
+      },
+      "trigger": "dogalafetler:yunlu_parca"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "translate": "advancements.dogalafetler.yunlu_kahraman.description"
+    },
+    "frame": "goal",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:white_wool"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.yunlu_kahraman.title"
+    }
+  },
+  "requirements": [
+    [
+      "olcut"
+    ]
+  ],
+  "rewards": {
+    "experience": 40,
+    "loot": [
+      "dogalafetler:rewards/hedef"
+    ]
+  },
+  "sends_telemetry_event": true
+}

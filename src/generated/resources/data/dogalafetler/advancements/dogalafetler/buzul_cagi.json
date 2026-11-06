@@ -1,0 +1,38 @@
+{
+  "parent": "dogalafetler:dogalafetler/supernova_tanigi",
+  "criteria": {
+    "olcut": {
+      "conditions": {
+        "esik": 50
+      },
+      "trigger": "dogalafetler:donma_ilerlemesi"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "translate": "advancements.dogalafetler.buzul_cagi.description"
+    },
+    "frame": "goal",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:packed_ice"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.buzul_cagi.title"
+    }
+  },
+  "requirements": [
+    [
+      "olcut"
+    ]
+  ],
+  "rewards": {
+    "experience": 40,
+    "loot": [
+      "dogalafetler:rewards/hedef"
+    ]
+  },
+  "sends_telemetry_event": true
+}

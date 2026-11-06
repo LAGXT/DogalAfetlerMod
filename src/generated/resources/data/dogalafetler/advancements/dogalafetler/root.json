@@ -1,0 +1,33 @@
+{
+  "criteria": {
+    "siren": {
+      "conditions": {},
+      "trigger": "dogalafetler:siren_duyuldu"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "background": "dogalafetler:textures/gui/advancements/backgrounds/felaket.png",
+    "description": {
+      "translate": "advancements.dogalafetler.root.description"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:bell"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.root.title"
+    }
+  },
+  "requirements": [
+    [
+      "siren"
+    ]
+  ],
+  "rewards": {
+    "experience": 15
+  },
+  "sends_telemetry_event": true
+}

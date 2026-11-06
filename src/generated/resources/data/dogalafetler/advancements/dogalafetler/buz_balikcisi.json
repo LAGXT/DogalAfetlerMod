@@ -1,0 +1,36 @@
+{
+  "parent": "dogalafetler:dogalafetler/buzul_cagi",
+  "criteria": {
+    "balik": {
+      "conditions": {
+        "min": 1
+      },
+      "trigger": "dogalafetler:balik_tutuldu"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "translate": "advancements.dogalafetler.buz_balikcisi.description"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:fishing_rod",
+      "nbt": "{Damage:0}"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.buz_balikcisi.title"
+    }
+  },
+  "requirements": [
+    [
+      "balik"
+    ]
+  ],
+  "rewards": {
+    "experience": 15
+  },
+  "sends_telemetry_event": true
+}

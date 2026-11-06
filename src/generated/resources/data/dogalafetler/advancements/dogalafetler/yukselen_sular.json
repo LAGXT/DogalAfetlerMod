@@ -1,0 +1,33 @@
+{
+  "parent": "dogalafetler:dogalafetler/ay_dustu",
+  "criteria": {
+    "olcut": {
+      "conditions": {},
+      "trigger": "dogalafetler:deniz_yukseldi"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "translate": "advancements.dogalafetler.yukselen_sular.description"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:conduit"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.yukselen_sular.title"
+    }
+  },
+  "requirements": [
+    [
+      "olcut"
+    ]
+  ],
+  "rewards": {
+    "experience": 15
+  },
+  "sends_telemetry_event": true
+}

@@ -1,0 +1,35 @@
+{
+  "parent": "dogalafetler:dogalafetler/root",
+  "criteria": {
+    "uret": {
+      "conditions": {
+        "esya": "dogalafetler:hava_radari"
+      },
+      "trigger": "dogalafetler:esya_uretildi"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "translate": "advancements.dogalafetler.radar_altinda.description"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:compass"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.radar_altinda.title"
+    }
+  },
+  "requirements": [
+    [
+      "uret"
+    ]
+  ],
+  "rewards": {
+    "experience": 15
+  },
+  "sends_telemetry_event": true
+}

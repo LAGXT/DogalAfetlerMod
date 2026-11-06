@@ -1,0 +1,35 @@
+{
+  "parent": "dogalafetler:dogalafetler/firtinaya_meydan_oku",
+  "criteria": {
+    "olcut": {
+      "conditions": {
+        "min_seviye": 5
+      },
+      "trigger": "dogalafetler:afetten_sag_cikti"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "translate": "advancements.dogalafetler.felaket_ustasi.description"
+    },
+    "frame": "challenge",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:totem_of_undying"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.felaket_ustasi.title"
+    }
+  },
+  "requirements": [
+    [
+      "olcut"
+    ]
+  ],
+  "rewards": {
+    "experience": 100
+  },
+  "sends_telemetry_event": true
+}

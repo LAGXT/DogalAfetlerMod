@@ -1,0 +1,35 @@
+{
+  "parent": "dogalafetler:dogalafetler/ay_dustu",
+  "criteria": {
+    "olcut": {
+      "conditions": {
+        "saniye": 10
+      },
+      "trigger": "dogalafetler:yildizli_gece"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "translate": "advancements.dogalafetler.yildizli_gece.description"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:spyglass"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.yildizli_gece.title"
+    }
+  },
+  "requirements": [
+    [
+      "olcut"
+    ]
+  ],
+  "rewards": {
+    "experience": 15
+  },
+  "sends_telemetry_event": true
+}

@@ -1,0 +1,35 @@
+{
+  "parent": "dogalafetler:dogalafetler/buzul_cagi",
+  "criteria": {
+    "olcut": {
+      "conditions": {
+        "gun": 3
+      },
+      "trigger": "dogalafetler:kutup_siginagi"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "translate": "advancements.dogalafetler.kutup_siginagi.description"
+    },
+    "frame": "challenge",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:blue_ice"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.kutup_siginagi.title"
+    }
+  },
+  "requirements": [
+    [
+      "olcut"
+    ]
+  ],
+  "rewards": {
+    "experience": 100
+  },
+  "sends_telemetry_event": true
+}

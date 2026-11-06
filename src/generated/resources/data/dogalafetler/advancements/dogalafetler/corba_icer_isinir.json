@@ -1,0 +1,33 @@
+{
+  "parent": "dogalafetler:dogalafetler/yunlu_kahraman",
+  "criteria": {
+    "olcut": {
+      "conditions": {},
+      "trigger": "dogalafetler:corba_icer_isinir"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "translate": "advancements.dogalafetler.corba_icer_isinir.description"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:mushroom_stew"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.corba_icer_isinir.title"
+    }
+  },
+  "requirements": [
+    [
+      "olcut"
+    ]
+  ],
+  "rewards": {
+    "experience": 15
+  },
+  "sends_telemetry_event": true
+}

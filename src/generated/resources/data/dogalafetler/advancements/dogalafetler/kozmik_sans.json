@@ -1,0 +1,35 @@
+{
+  "parent": "dogalafetler:dogalafetler/gokten_gelen_misafir",
+  "criteria": {
+    "topla": {
+      "conditions": {
+        "esya": "dogalafetler:kozmik_cekirdek"
+      },
+      "trigger": "dogalafetler:esya_toplandi"
+    }
+  },
+  "display": {
+    "announce_to_chat": true,
+    "description": {
+      "translate": "advancements.dogalafetler.kozmik_sans.description"
+    },
+    "frame": "challenge",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:end_crystal"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.kozmik_sans.title"
+    }
+  },
+  "requirements": [
+    [
+      "topla"
+    ]
+  ],
+  "rewards": {
+    "experience": 100
+  },
+  "sends_telemetry_event": true
+}
