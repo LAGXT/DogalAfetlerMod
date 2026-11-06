@@ -126,4 +126,26 @@ class TazelemePlaniTest {
         }
         assertEquals(0, TazelemePlani.yakindanUzaga(java.util.List.of(), new long[0]).length);
     }
+
+    @Test
+    void yakindanUzagaIkiThreaddenAyniAndaGuvenli() throws Exception {
+        // Tek oyunculuda sunucu ve istemci thread'i aynı anda çağırır (koşu 8'de paylaşılan haritada NPE).
+        java.util.List<Long> istenen = new java.util.ArrayList<>();
+        for (int x = -12; x <= 12; x++) {
+            for (int z = -12; z <= 12; z++) {
+                istenen.add(a(x, z));
+            }
+        }
+        java.util.concurrent.ExecutorService h = java.util.concurrent.Executors.newFixedThreadPool(4);
+        java.util.List<java.util.concurrent.Future<long[]>> sonuc = new java.util.ArrayList<>();
+        for (int i = 0; i < 400; i++) {
+            sonuc.add(h.submit(() -> TazelemePlani.yakindanUzaga(istenen, new long[] {a(3, -2)})));
+        }
+        long[] ilk = sonuc.get(0).get();
+        for (java.util.concurrent.Future<long[]> f : sonuc) {
+            assertTrue(java.util.Arrays.equals(ilk, f.get()));
+        }
+        h.shutdown();
+        assertEquals(a(3, -2), ilk[0]);
+    }
 }

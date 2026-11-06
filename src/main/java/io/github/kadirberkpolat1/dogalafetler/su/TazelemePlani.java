@@ -41,34 +41,30 @@ public final class TazelemePlani {
      * bu sırayla kuyruğa ekler, oyuncunun (ve sabit bölgenin) çevresi uzak köşelerden önce okunur. Eşitlikte anahtar.
      */
     public static long[] yakindanUzaga(java.util.Collection<Long> istenen, long[] odaklar) {
-        long[] s = new long[istenen.size()];
+        long[] anahtar = new long[istenen.size()];
+        long[] sira = new long[anahtar.length];
         int n = 0;
         for (long k : istenen) {
-            int cx = (int) (k >> 32);
-            int cz = (int) k;
+            anahtar[n++] = k;
+        }
+        Arrays.sort(anahtar);
+        for (int i = 0; i < n; i++) {
+            int cx = (int) (anahtar[i] >> 32);
+            int cz = (int) anahtar[i];
             int en = odaklar.length == 0 ? 0 : Integer.MAX_VALUE;
             for (long o : odaklar) {
                 en = Math.min(en, Math.max(Math.abs(cx - (int) (o >> 32)), Math.abs(cz - (int) o)));
             }
-            s[n++] = k;
-            UZAKLIK.put(k, en);
+            // Üst bitler uzaklık, alt bitler sıralı anahtarın sırası: paylaşılan durum yok (sunucu ve istemci thread'i aynı anda çağırır).
+            sira[i] = ((long) Math.min(en, 1 << 20) << 32) | i;
         }
-        Long[] kutu = new Long[n];
+        Arrays.sort(sira);
+        long[] sonuc = new long[n];
         for (int i = 0; i < n; i++) {
-            kutu[i] = s[i];
+            sonuc[i] = anahtar[(int) sira[i]];
         }
-        Arrays.sort(kutu, (a, b) -> {
-            int c = Integer.compare(UZAKLIK.get(a), UZAKLIK.get(b));
-            return c != 0 ? c : Long.compare(a, b);
-        });
-        UZAKLIK.clear();
-        for (int i = 0; i < n; i++) {
-            s[i] = kutu[i];
-        }
-        return s;
+        return sonuc;
     }
-
-    private static final java.util.HashMap<Long, Integer> UZAKLIK = new java.util.HashMap<>();
 
     /** Uzak chunk bütçesini değiştirir (config). */
     public void uzakButce(int butce) {
