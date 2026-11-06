@@ -2433,6 +2433,93 @@ desen). Başarılı yol değişmedi.
 - **Kavrulmada `canSeeSky`:** gök ışığı blok değişiminden sonra gecikir; yükseklik haritası eşzamanlı (GP6).
 - **Başlama kapısını komutta denetlemek:** `CekirdekKomutlari` çekirdeğindir; `yerUygunMu` aynı işi kendi sınıfında görür (GP5).
 
+## Faz 4 — Ay çarpması
+
+Parça `ay-carpmasi` (dal `is/ay-carpmasi`, son commit `a588720`; `main`'e birleştirme `3127568`, protokol `d0fe4b9`, P2 `1a3f80a`, entegrasyon 4 2/6). Kaynak
+`.vibe/kararlar/ay-carpmasi.md` §B/§C/§D; sözleşmeler (§A) ve entegratör notları (§E) o dosyada kalır. Şef kararları (K-E24 AY-07,
+protokol "6") "Şef kararları (Faz 4)" bölümündedir; N17 satırları sondaki tablodadır. Rapor `.vibe/rapor/ay-carpmasi.md`, inceleme
+`.vibe/rapor/inceleme-ay-carpmasi.md` (kabul, P2 = 7) ve `-2.md` (AY-12, P2 = 1), birleştirme `.vibe/rapor/entegrasyon-4.md`.
+
+**AY-01 Ay veri modeli: bool + olay saati, ayrı alan değil `AyDurumu` türetmesi.** `ayVar` bool'u korunur, yanına tek long
+`ayOlaySaati` eklenir; durum ikisinden türetilir. Neden: `ayVar()`'ı okuyan altı alt sistem (su, başarım, tek seferlik kural,
+gökyüzü, komut, testler) değişmeden kalır; NBT ve paket geriye uyumlu tek alan alır. Ayrı enum alanı iki kaynaklı durum (bool
+ile tutarsız) riski getirirdi.
+
+**AY-02 Yaklaşma = SIREN aşaması, çarpma = AKTIF başı.** Bölüm H "siren çaldıktan 60 sn sonra çarpsın (siren bu anda
+fade-out)" çekirdeğin SIREN → AKTIF geçişiyle zaten aynı an (uyarı-ses §A.1). Yaklaşmanın 60 sn'si istemcide SIREN başından
+ölçekli saatle çizilir; `/dogalafet hiz` hepsini birlikte hızlandırır. JUnit `yaklasmaSirenSuresiyleAyni` bağı denetler.
+
+**AY-03 Siren sırasında durdurma ayı geri getirir; çarpmadan sonra hiçbir durdurma geri getirmez.** Ay çarpması tek
+seferliktir ve "ulaşılmış dönem geri alınmaz" (madde 11). Yaklaşma henüz ulaşılmış dönem değildir (güneşin BUYUYEN →
+NORMAL dönüşüyle aynı mantık, K-C26). Kural (KURAL, yumuşak) durdurmada da aynı: ay çarpmadıysa yerinde kalır.
+
+**AY-04 Çarpma noktası görseldir; harita sarsıntısı yalnız "sağlam olmayan" düşmesidir.** Tasarım §6 (spike sonrası): dev
+krater açılmaz. "Harita sallansın" (H.3) oyuncu çevresinde desteksiz yaprak/cam/fener düşmesiyle verilir (tasarım §2),
+`afetBlokHasari=false` iken hiç blok düşmez (madde 11). Deprem işçisinin "sağlam olmayan" listesi bu dalda yok; kendi
+etiketimiz `#dogalafetler:ay_sarsintisi_duser` veri paketiyle genişletilir (N12). Desteksiz = altı `FallingBlock.isFree`.
+
+**AY-05 Sarsıntı mesafeden bağımsız ve her boyutta.** H.3 "tüm oyuncuların ekranı". Kamera sarsıntısı çarpma saatinden
+istemcide hesaplanır (paket yok); Nether/End'deki oyuncu da sarsılır (N11 global olay), parlama yalnız Overworld'de (göğü
+olmayan boyutta beyaz ekran anlamsız).
+
+**AY-06 Ses: güm her oyuncuya kendi konumunda.** `playNotifySound` her oyuncuya ayrı ve mesafesiz (uyarı-ses §A.4 kural 2
+konumlu `level.playSound`'u önerir; çarpma ufkun ötesinde, herkes aynı düzeyde duymalı, madde 3). Yaklaşma uğultusu ve
+çıtırtı `OrtamSesi` global katmanı (siren sırasında −3 dB bastırma ve geç gelen oyuncu çekirdekte/uyarıda çözülü).
+
+**AY-07 Döngülü ay sesleri −30 LUFS (tasarım tercihi, K-E24).** Uyarı-ses hedefi −26 LUFS'tur; K-E24 döngülü ortam
+katmanına −26…−30 bandını tanır. −30 seçildi çünkü 18–100 Hz alçak uğultu −26'da "konuşmayı bastırmayan, hissedilen"
+(tasarım §4) karaktere fazla geliyordu. Tepe sınırı gerekçe değildir: +4 dB ile tepe −7,6 / −7,4 dBTP olurdu, −6 dBTP sınırının
+içinde (entegrasyon 4 düzeltmesi, inceleme P2). −30 LUFS, tepe −11,6 dBTP; çıtırtının 2,5 kHz üstü −58 dB (konuşma bandı çentikli).
+
+**AY-08 Gökyüzü çizimi gök küresinde sabit dünya yönünde, zaman dönüşü dışında.** Yaklaşan ay gece/gündüz dönmeden "çarpma
+noktasına dönük sabit yön" (tasarım §2) çizilir; azimut doğudan 20° güneye (`AyEgrileri.AZIMUT_DERECE`). Enkaz halkası
+doğu-batı ekseninden geçen, tepeden güneye 30° eğik büyük çember (ekvator düzlemi hissi), ufuk altı yarısı çizilmez.
+
+**AY-09 Gündüz de biz çizeriz (yalnız ay çarpması sürerken ve izleri sönene kadar).** Sarmalayıcı normalde NORMAL güneş + ay
+yok gündüzünde iç nesneye devreder (G1/B4). Yaklaşan ay ve mantar sütunu "gündüz ya da gece fark etmeksizin" (tasarım §2)
+görünmeli; `IstemciAy.gokyuzuEtkin()` true iken sarmalayıcı çizer. Halka (3 gün) da bunun içinde; halka kapalıysa ya da
+söndükten sonra davranış eskisi gibidir (başka modun gündüz göğü korunur).
+
+**AY-10 Yağmur doğuş noktasına düşer (oyuncusuz).** `MeteorAPI.yagmur(oyuncular=boş)` sözleşmesi: boyuttaki oyuncular her tick
+yeniden okunur, oyuncu yoksa doğuş noktası. GameTest'lerde yağmur başladığı tick'te bitirilir ya da sıklık 0 yapılır
+(`meteorDakikaBasinaAyarla`, paket içi); sahnelere meteor düşmez.
+
+**AY-11 Kayan yıldızlar istemci yerel rastgelesi.** Tasarım "oyuncu başına 1 / 3 dk, zararsız": ağ yok, her istemci kendi
+kayan yıldızını görür (oyuncuya özgü efekt, madde 3).
+
+**AY-12 Sarsıntı yalnız varlık işleyen chunk'ta blok düşürür; GameTest sahnesi varlık işleyince koşar.** Kök neden: GameTest'in
+zorladığı sahne chunk'larından biri (z < 0 yanı, chunk `[59,-1]`) ilk tick'te henüz FULL/ENTITY_TICKING görünürlüğüne çıkmamışken
+`aday` yalnız `hasChunkAt` sorduğu için oradaki yaprağı seçiyor, `FallingBlockEntity.fall` bloğu kaldırıyor ama varlık
+`PersistentEntitySectionManager.addEntity`'de görünürlüğü `HIDDEN` olan bölüme giriyordu; `getEntitiesOfClass` yalnız
+erişilebilir bölümleri gezdiği için sayaç (`toplam`, bu sarsıntı nesnesine özel) kutudaki varlık sayısından büyük çıkıyordu.
+Kanıt (geçici TANI satırı, `.vibe/kanit/ay-carpmasi/tani-1..3.log`): koşu 1 toplam 12 / görünen 7, eksik 5'in hepsi `chunk=[59, -1]
+gorunur=false varlikIsler=false kutuda=true`; koşu 3 toplam 8 / görünen 3, eksik 5'in hepsi aynı; geçen koşu 2'de 15/15, bütün
+varlıklar `gorunur=true` (iki tanesi `[60,-1]` TRACKED: görünür, işlemiyor). Sayaç başka sahnenin ya da vanilla'nın düşen
+bloğunu saymıyor (her köken sahnenin yaprak karesi içinde, `blok=oak_leaves`), varlıklar kutu dışına düşmüyor (hepsi `kutuda=true`,
+aynı tick). Başarısız koşularda TPS kısma çarpanı 0,5 (sunucu gecikmesi chunk görünürlük güncellemesini geciktiriyor).
+Düzeltme: üretimde `SarsintiDusmeleri.aday` `level.isPositionEntityTicking` ister (aynı görünürlük haritasını okur: düşen blok
+görünmez bölümde donup kalmaz, oyunda da varlık işlemeyen kenar chunk'ta blok kaybolmaz); test `succeedWhen` ile tarama alanının
+bütün chunk'ları varlık işleyene dek bekler, sonra eşik ve doğrulamalar aynen bir kez koşar (zayıflatma yok). Reddedilen: sayımı
+`havadakiler` listesinden yapmak (görünmez varlığı "düştü" sayıp asıl hatayı gizlerdi).
+
+**AY-13 Birleştirme düzeltmeleri (entegrasyon 4, inceleme P2).** (a) Sunucu açılışında (`ServerStartedEvent`, çekirdeğin geri
+yüklemesinden sonra, LOWEST) ay YAKLASIYOR ama aktif afet ay çarpması değilse ay VAR'a döner ve WARN yazılır: afet kaydı
+okunamazsa ay yaklaşma hâlinde takılı kalmaz (`AyCarpmasiSistemi`). (b) Sarsıntı GameTest'i hacim boşaltma, düşen blok silme
+ve sahne kurulumunu `varlikIsliyor` sağlandıktan sonra yapar (gizli bölümdeki eski düşen blok silinmeden kalmaz, AY-12 ailesi);
+sahnedeki `GameTestAssertException` dışı istisna da testi düşürür, sunucu tick'ine kaçmaz. (c) Hız testi başarısız bitse de
+batch sonunda (`@AfterBatch`) afet durur, dönem sıfırlanır, `meteorDakikaBasina` eski değerine döner (K-E15, GP18 deseni).
+(d) AY-07 gerekçesi ölçümle hizalandı (tasarım tercihi, K-E24).
+
+### Reddedilen yollar
+
+- **Kendi ay meteoru varlığı:** Faz 4 kuralı; yalnız `MeteorAPI`.
+- **Çarpma için ayrı istemci paketi (`ay_carpmasi/carpma`):** dönem paketindeki olay saati yeter; ayrı paket protokol
+  artışı ve sonradan girenler için ikinci senkron yolu gerektirirdi.
+- **Gerçek dev krater:** tasarım §6 spike sonrası kararı (harita korunur).
+- **`AFTER_SKY` ile yaklaşan ay:** vanilla ay o anda çizilmiştir, gizlenemez (G1); sarmalayıcı yolu kullanıldı. 3. kademede
+  (yansıma bozuk) yaklaşan ay vanilla ayın üstüne çizilir (bilinen sınır, gökyüzü G1 ile aynı).
+- **Sarsıntıyı meteor sarsıntı paketiyle göndermek:** o paket mesafeyle söner (M-11); ay çarpması mesafeden bağımsız.
+
 ## Şef kararları (Faz 0–1)
 
 **K0-19 Ay çarpması siren süresi: 60 sn.** Madde 5 "Güneş Patlaması hariç 10 sn" der; bölüm H "siren çaldıktan 60 saniye
@@ -3126,13 +3213,15 @@ K-E19 a tavanını sessizce deliyordu); artık görev başlatılmaz, log'a ve ç
 satırı "için kaydedildi", kasırga "not registered yet"); güneş dalı `84b2faf` + `26acbfd` geçici birleşiminde (`.worktrees/k-e23-gunes`, dal dosyalarına yazılmadı) `cekirdek_sunucu.py --port 25612` 0 (`cekirdek-gunes/kosu1.log`:56 "gunes_patlamasi gerçek afetin yerine kaydedildi", :390 `Solar Flare phase: Ending`, :455-499 `oyuntesti_gunes` zinciri; doğrulayıcı-2'nin K-E23 öncesi düşüşü `gunes-patlamasi-dogrulama/sunucu-cekirdek/kosu1.log`:328-329 kapandı). Değişmemiş güneş worktree'sinde main betiği koşmaz: `!` desteği modun Java tarafındadır, dal `main`'i (`26acbfd`) alınca geçer; kapı dolu portla `KAPI_DK=1` → 60 sn'de
 `KAPI: açılmadı (1 dk)`, çıkış 3, Gradle başlamadı (`kapi-zaman-asimi.*`).
 
-**K-E24 Döngülü ortam ses katmanı −26…−30 LUFS (şef kararı, 2026-11-06).** Döngülü ortam katmanları (afet süresince çalan
-uğultu, rüzgâr, çıtırtı) için hedef −26…−30 LUFS (±1) bandıdır; bu bir izindir, zorunluluk değildir (−26 da geçerli). Tek atımlı
-sesler ve sirenler −26 ± 1 LUFS'te kalır (`docs/tasarim/ses.md` §4 değişmez). Gerekçe: ay çarpmasının döngülü sesleri
-(`ay_carpmasi_yaklasma`, `ay_carpmasi_citirti`; AY-07) −30 LUFS'te uzun süre kulağı yormuyor, siren ve çarpma gibi tek atımlı
-olayların önünde kalıyor; şef 2026-11-06'da kabul etti. AY-07'nin "−26'da tepe sınırı aşılıyordu" gerekçesi ölçümle çelişir
-(+4 dB ile −7,6 / −7,4 dBTP, sınır içinde); ay birleştirmesinde gerekçe "tasarım tercihi, K-E24" olarak düzeltilir
-(inceleme-ay-carpmasi P2).
+**K-E24 Döngülü ortam ses katmanı −26…−30 LUFS (şef kararı, 2026-11-06; 2026-11-07 düzeltildi).** Döngülü ortam katmanı
+−26…−30 LUFS (±1) bandında kabul (izin, zorunluluk değil; `docs/tasarim/ses.md` §4 kural 2'nin −26'sı da geçerli). Tek
+seferlik sesler ve sirenler ses.md §4'e tabidir (tek seferlik: tepe ≤ −6 dBTP, LUFS bağlayıcı değil; siren −20/−21 LUFS); K-E24
+bunları değiştirmez. Gerekçe: ay çarpmasının döngülü sesleri (`ay_carpmasi_yaklasma`, `ay_carpmasi_citirti`; AY-07) −30 LUFS'te
+uzun süre kulağı yormuyor, siren ve çarpma gibi olayların önünde kalıyor (şef kabul, 2026-11-06); kabul edilmiş tek seferlik
+sesler de LUFS bakımından zaten serbest (`sinkhole_cokus` −22, güneş kristal −29,9 / akor −27,0). **Düzeltme (2026-11-07, inceleme):**
+ilk metin "tek atımlı sesler ve sirenler −26 ± 1 LUFS" diyordu; ses.md §4 ile çelişiyordu, şef kararıyla ses.md §4 geçerli.
+AY-07'nin "−26'da tepe sınırı aşılıyordu" gerekçesi ölçümle çelişiyordu (+4 dB ile −7,6 / −7,4 dBTP, sınır içinde); ay
+birleştirmesinde (entegrasyon 4, 2/6) "tasarım tercihi, K-E24" olarak düzeltildi.
 
 ### Yiyecek
 
@@ -3268,6 +3357,12 @@ başlığındadır.
 - **GP17 FPS ölçümü Faz 5'e:** gizli workspace 1 FPS çizer; kareler boş değilken ikinci runClient açılmaz (yangındaki şef
   kararıyla aynı). Gerçek FPS ve Düşük/Yüksek/Ultra karşılaştırması "Açık noktalar (Faz 4)".
 
+### Ay çarpması
+
+- **Protokol "6" (K-C47, Faz 4 tek sefer):** ay `DonemPaketi`'ne `long ayOlaySaati` ekledi (tel biçimi değişti, paket sayısı aynı);
+  entegratör birleştirmede "5" → "6" yaptı (`d0fe4b9`). Diğer Faz 4 dalları paket eklemedi, artırmaz.
+- **AY-07 döngülü sesler −30 LUFS (K-E24):** şef kabul, 2026-11-06; K-E24 döngülü ortam katmanına −26…−30 bandını tanır.
+
 ## Açık noktalar (Faz 2b)
 
 Entegratöre bırakılan notlardan işlenenler: kancalar (K-E1), protokol (K-C47), `asama ileri [süreç]` (K-C48), sanal su §3a istisnası
@@ -3333,6 +3428,16 @@ Birleşen parçalardan kalanlar (her birleştirmede güncellenir; plan `.vibe/ra
 - **Betikler (K-E22/K-E23):** `-PoyunTestiAfeti` taşıyan betikler birleştirme turlarında `!tür`'e geçer ya da gerçek afete
   uyarlanır (`entegrasyon-4.md` §3.6). Güneş birleştiğinde `uyari_sunucu.py` ve `radar_gorsel.py` güneş adımları gerçek afetle
   aynı çıktıyı verir (güneş §E); `basarim_sunucu.py`'de güneş adımı yok.
+
+- **Ay — vitrin kamerası (inceleme P2):** çarpma vitrininde ufuk arazinin arkasında; parlama sonrası ufuk ışığı ve mantar sütunu
+  09–12 karelerinde seçilmiyor. Kamera açık ufka (kıyı ya da `ust + 40`, pitch −3…−5°), `00_once` ve `17_sifirla_ay_geri` −88°'de
+  (`client/ay_carpmasi/AyCarpmasiOtomasyonu.java:149-172, 208`). Faz 5 görünür koşu.
+- **Ay — kayan yıldız görünmedi:** bütün karelerde kayan yıldız sayısı 0; otomasyon halka karesinden önce paket içi
+  `kayanYildizZorla`'yı çağırmalı (`AyCarpmasiGokyuzu.java:313-327`). Faz 5.
+- **Ay — düşen cam/yaprak eşyaya dönüşebiliyor:** `SarsintiDusmeleri.java:117-122` düşen varlıkta `dropItem = false` yok.
+- **Ay — #13 Yıldızlı Gece ve #14 Yükselen Sular gerçek zincirle sınanmadı:** zincir GameTest'ine sahte oyuncuyla iki iddia
+  eklenmeli (bugün başarımın kendi testleri dönem alanından sınıyor).
+- **Ay — FPS:** gizli workspace 1 FPS (GP17 ile aynı), Faz 5.
 
 ## N17 — Sayısal varsayılanlar
 
@@ -3594,6 +3699,17 @@ Birleşen parçalardan kalanlar (her birleştirmede güncellenir; plan `.vibe/ra
 | güneş patlaması | sabit: kavrulma denemesi tavanı | 32 | deneme/oyuncu/tick | `hiz` yüksekken TPS korunur (GP15) |
 | güneş patlaması | sabit: yaprak/çimen kuruluğu | p 0,564 → 1, tavan %72, 8 basamak | — | tasarım "yapraklar kahverengiye"; basamak = yeniden örme (GP13) |
 | güneş patlaması | `gorsel.efektKalitesi` (mevcut, CLIENT) | Yüksek | Düşük/Orta/Yüksek/Ultra | aurora katmanı 1/2/3/3, dilim 48–128; ısı şeridi 10–32 (N13, tasarım §5) |
+| ay çarpması | `ay_carpmasi.meteorSuresiSn` | 90 | sn | bölüm H "1-2 dk" ortası (tasarım §6) |
+| ay çarpması | `ay_carpmasi.meteorDakikaBasina` | 7,5 | adet/dk/oyuncu | tasarım §6 "oyuncu başına 1 / 8 sn"; güneşten hafif (H.1) |
+| ay çarpması | `ay_carpmasi.meteorBuyukOrani` | 0,04 | olasılık | meteor sözleşmesi örneği; ay parçaları küçük |
+| ay çarpması | `ay_carpmasi.sarsintiBlokSayisi` | 35 | blok/oyuncu | tasarım §5 Yüksek satırı |
+| ay çarpması | `ay_carpmasi.sarsintiYaricapi` | 48 | blok | tasarım §5 |
+| ay çarpması | `ay_carpmasi.sarsintiYogunlugu` | 0,30 | olasılık | tasarım §6 |
+| ay çarpması | `ay_carpmasi.halka` | true | — | tasarım §2 "config ile kapatılabilir" |
+| ay çarpması | (sabit) sarsıntı | 12 sn, 2,5° | — | tasarım §6; `AyEgrileri` |
+| ay çarpması | (sabit) parlama | 0,5 sn %70 | — | tasarım §2 |
+| ay çarpması | (sabit) mantar | 45 sn'de 25°, 1 günde söner | — | tasarım §2, §2 "afet sonrası iz" |
+| ay çarpması | (sabit) halka | 3 gün, alfa 0,6 → 0 | — | tasarım §2 |
 
 Config dışı sabitler (oynanış değeri değil, sınır/biçim): siren 200/1200 tick (şartname, K0-19); son afet geçmişi 5
 (madde 13a); tek çarpan ≤ 100, toplam ≤ 1000 (K-C22); hız 0,1–1000; TPS ölçüm aralığı 20 tick; dönem kaydı sınırları
