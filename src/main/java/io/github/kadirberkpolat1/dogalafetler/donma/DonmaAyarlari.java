@@ -19,6 +19,7 @@ public final class DonmaAyarlari {
     private static AyarKaydi.Bolum<Istemci> istemci;
     private static volatile DonmaEsikleri onbellekEsikler;
     private static volatile List<?> onbellekAnahtar;
+    private static volatile int onbellekKarYagisi;
 
     private DonmaAyarlari() {
     }
@@ -69,8 +70,10 @@ public final class DonmaAyarlari {
         return s().buharlasmaSuresi.get();
     }
 
+    /** Yağmurun istemcide kar olarak göründüğü ilerleme, madde 9 sırasına çekilmiş (K-D33; {@link #esikler}). */
     public static int karYagisiEsigi() {
-        return s().karYagisiEsigi.get();
+        esikler();
+        return onbellekKarYagisi;
     }
 
     public static double kisOrani() {
@@ -105,15 +108,17 @@ public final class DonmaAyarlari {
     }
 
     /**
-     * Adım eşikleri (config değişince yeniden kurulur; geçersizse varsayılan). Madde 9 sırası (D2): ilk kar kıyı buzundan
-     * önce gelmeli; bozuksa ilk kar eşiği {@code ilkBuzEsigi − 1}'e çekilir ve WARN yazılır.
+     * Adım eşikleri (config değişince yeniden kurulur; geçersizse varsayılan). Madde 9 sırası (D2, K-D33): ilk kar kıyı
+     * buzundan önce, yağmur yerine kar kıyı buzundan sonra ve kalın buzdan önce gelmeli; bozuksa eşik en yakın sınıra
+     * çekilir ve WARN yazılır.
      */
     public static DonmaEsikleri esikler() {
         Sunucu c = s();
         List<?> anahtar = List.of(c.karEsikleri.get(), c.karCozulmeEsikleri.get(), c.ilkBuzEsigi.get(),
                 c.buzKalinlikAdimi.get(), c.kiyiKatsayisi.get(), c.kiyiUzaklikSiniri.get(), c.maksBuzKalinligi.get(),
                 c.buzCozulmeTabani.get(), c.buzCozulmeKiyiKatsayisi.get(), c.buzCozulmeEnAz.get(), c.buzCozulmeAdimi.get(),
-                c.titresimGenligi.get(), c.inceBuzPayi.get(), c.yapiKarEsigi.get(), c.yapiKarCozulmeEsigi.get());
+                c.titresimGenligi.get(), c.inceBuzPayi.get(), c.yapiKarEsigi.get(), c.yapiKarCozulmeEsigi.get(),
+                c.karYagisiEsigi.get());
         DonmaEsikleri e = onbellekEsikler;
         if (e != null && anahtar.equals(onbellekAnahtar)) {
             return e;
@@ -134,6 +139,12 @@ public final class DonmaAyarlari {
             DogalAfetler.LOGGER.error("[donma] config eşikleri geçersiz ({}); varsayılan eşikler kullanılıyor", hata.getMessage());
             e = DonmaEsikleri.VARSAYILAN;
         }
+        int karYagisi = e.siraliKarYagisi(c.karYagisiEsigi.get());
+        if (karYagisi != c.karYagisiEsigi.get()) {
+            DogalAfetler.LOGGER.warn("[donma] kar yağışı eşiği ({}) kıyı buzundan ({}) sonra, kalın buzdan ({}) önce olmalı"
+                    + " (madde 9 sırası); {} kullanılıyor", c.karYagisiEsigi.get(), e.ilkBuzEsigi(), e.kalinBuzEsigi(), karYagisi);
+        }
+        onbellekKarYagisi = karYagisi;
         onbellekEsikler = e;
         onbellekAnahtar = anahtar;
         return e;
@@ -221,8 +232,9 @@ public final class DonmaAyarlari {
                     .defineInRange("titresimGenligi", 8, 0, 20);
             inceBuzPayi = k.comment("İlk buz katmanının ilk/son bu kadar puanında üst blok ince buz (kalınlık adımlarından küçük).")
                     .defineInRange("inceBuzPayi", 6, 0, 50);
-            karYagisiEsigi = k.comment("Yağmurun istemcide kar olarak göründüğü ilerleme (%).")
-                    .defineInRange("karYagisiEsigi", 40, 0, 101);
+            karYagisiEsigi = k.comment("Yağmurun istemcide kar olarak göründüğü ilerleme (%). Sıra (madde 9): ilkBuzEsigi < kar yağışı"
+                    + " ≤ kalın buz (ilkBuzEsigi + buzKalinlikAdimi); dışındaysa en yakın sınıra çekilir.")
+                    .defineInRange("karYagisiEsigi", DonmaEsikleri.VARSAYILAN_KAR_YAGISI, 0, 100);
             yapiKarEsigi = k.comment("Yapı bloklarına (#dogalafetler:donma/yapi_kar_zemini: tahta, taş/tuğla tam bloklar) karın"
                     + " geldiği seviye; kalın buz aşaması (madde 9 'ilerleyen aşamalarda yapılar').")
                     .defineInRange("yapiKarEsigi", 40, 9, 100);

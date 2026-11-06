@@ -16,6 +16,7 @@ public final class DonmaCevirileri {
     static final String BILGI_CHUNK_YOK = ON + "bilgi.chunk_yok";
     static final String BILGI_SUTUN = ON + "bilgi.sutun";
     static final String BILGI_BUTCE = ON + "bilgi.butce";
+    static final String BILGI_SURE = ON + "bilgi.sure";
     static final String BILGI_KUYRUK = ON + "bilgi.kuyruk";
     static final String SUREC_SURUYOR = ON + "surec.suruyor";
     static final String SUREC_DURDU = ON + "surec.durdu";
@@ -49,6 +50,8 @@ public final class DonmaCevirileri {
                 + " biyom %s, yükseklik %s), ılık ofset %s, parametreler %s");
         y.ekle(BILGI_BUTCE, "Budget: %s blocks/tick (throttle x%s, TPS %s); most blocks in one tick %s",
                 "Bütçe: %s blok/tick (kısma x%s, TPS %s); bir tick'te en çok %s blok");
+        y.ekle(BILGI_SURE, "Longest worker tick: %s ms after warm-up (warm-up window %s ms); time cap %s ms",
+                "En uzun işçi tick'i: ısınmadan sonra %s ms (ısınma penceresi %s ms); süre tavanı %s ms");
         y.ekle(BILGI_KUYRUK, "Queue: loaded %s, waiting %s, running %s; done %s steps (%s at target), %s blocks",
                 "Kuyruk: yüklü %s, bekleyen %s, süren %s; tamamlanan %s adım (%s hedefte), %s blok");
         y.ekle(SUREC_SURUYOR, "running", "sürüyor");

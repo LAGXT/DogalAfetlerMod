@@ -4,9 +4,9 @@ import java.util.Arrays;
 
 /**
  * Donma adımlarının eşikleri, yönlü (histerezisli). Donarken bir öğe donma eşiğinde gelir, çözülürken çözülme eşiğinin
- * altında kalkar. Varsayılan donma sırası madde 9 ve K0-24: kırağı (tablo, 10) → ince kar (15) → kenardan buz (20) → kalın
- * buz ve yapı karı (40); çözülme eşikleri çözülme sırasını verir: önce kar (55–95), sonra kırağı (tablo, 50), sonra buz
- * kıyıdan içeri ({@code max(enAz, taban − k·uzaklık)}: kıyıda 45, ortada 10).
+ * altında kalkar. Varsayılan donma sırası madde 9 ve K0-24: kırağı (tablo, 10) → ince kar (15) → kenardan buz (20) → yağmur
+ * yerine kar (istemci, 30) → kalın buz ve yapı karı (40); çözülme eşikleri çözülme sırasını verir: önce kar (55–95), sonra
+ * kırağı (tablo, 50), sonra buz kıyıdan içeri ({@code max(enAz, taban − k·uzaklık)}: kıyıda 45, ortada 10).
  *
  * <p>Seviye sütunun etkin seviyesidir (sütun hedefi + sabit titreşim, ±{@code titresimGenligi}). Titreşim bütün eşiklerden
  * küçük olmalı; yoksa seviye 0'da bazı sütunlar donuk kalır ve çöz(0) başlangıca dönmez.
@@ -14,6 +14,8 @@ import java.util.Arrays;
 public final class DonmaEsikleri {
     public static final DonmaEsikleri VARSAYILAN = new DonmaEsikleri(new int[] {15, 55, 70, 85, 95},
             new int[] {55, 65, 75, 85, 95}, 20, 20, 2, 15, 4, 45, 3, 10, 10, 8, 6);
+    /** Varsayılan yağmur yerine kar eşiği (config {@code karYagisiEsigi}, K-D33). */
+    public static final int VARSAYILAN_KAR_YAGISI = 30;
 
     private final int[] karEsikleri;
     private final int[] karCozulmeEsikleri;
@@ -132,6 +134,23 @@ public final class DonmaEsikleri {
         int[] k = karEsikleri.clone();
         k[0] = Math.max(titresimGenligi + 1, ilkBuzEsigi - 1);
         return k;
+    }
+
+    public int ilkBuzEsigi() {
+        return ilkBuzEsigi;
+    }
+
+    /** Kalın buz aşaması: ilk buzdan bir kalınlık adımı sonra (varsayılan 40). */
+    public int kalinBuzEsigi() {
+        return ilkBuzEsigi + buzKalinlikAdimi;
+    }
+
+    /**
+     * Madde 9 sırası (K-D33): yağmur yerine kar kıyı buzundan sonra, kalın buzdan önce ya da onunla birlikte gelir
+     * ({@code ilkBuzEsigi < esik ≤ kalinBuzEsigi}). Aralık dışındaki eşik en yakın sınıra çekilir.
+     */
+    public int siraliKarYagisi(int esik) {
+        return Math.max(ilkBuzEsigi + 1, Math.min(kalinBuzEsigi(), esik));
     }
 
     /**

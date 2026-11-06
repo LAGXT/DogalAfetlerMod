@@ -42,6 +42,7 @@ public final class DonmaSistemi {
         forge.addGenericListener(LevelChunk.class, ChunkDonmaVerisi::ekle);
         forge.addListener((AddReloadListenerEvent olay) -> olay.addListener(new DonmaTablosuYukleyici()));
         forge.addListener(DonmaZamanlayici::sunucuBasliyor);
+        forge.addListener(DonmaZamanlayici::sunucuBasladi);
         forge.addListener(DonmaZamanlayici::chunkYuklendi);
         forge.addListener(DonmaZamanlayici::chunkBosaltildi);
         forge.addListener(DonmaZamanlayici::tick);

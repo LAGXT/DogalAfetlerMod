@@ -51,7 +51,8 @@ public final class DonmaApi {
 
     /**
      * Sıcaklık (madde 7, K0-24): sütunun kalıcı kış ağırlığı 0–1 (maske ⊕ soğuk biyom oranı ⊕ yükseklik bandı). Üst dünya
-     * dışında 0. Yüzey Y'si yüklü chunk'ın {@code MOTION_BLOCKING} yüksekliğinden, chunk yüklü değilse {@code konum}'dan.
+     * dışında 0. Yüzey Y'si yüklü chunk'ın yapraksız {@code MOTION_BLOCKING_NO_LEAVES} yükseklikten (K-D28), chunk yüklü
+     * değilse {@code konum}'dan.
      */
     public static double kisAgirligi(Level level, BlockPos konum) {
         if (!(level instanceof ServerLevel sl) || sl.dimension() != Level.OVERWORLD) {

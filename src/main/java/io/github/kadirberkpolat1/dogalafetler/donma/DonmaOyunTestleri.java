@@ -11,6 +11,7 @@ import io.github.kadirberkpolat1.dogalafetler.donma.mantik.KisMaskesi;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.TreeSet;
 import net.minecraft.core.BlockPos;
@@ -18,7 +19,10 @@ import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.DistanceManager;
+import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.TicketType;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.block.Block;
@@ -28,6 +32,7 @@ import net.minecraft.world.level.block.SnowLayerBlock;
 import net.minecraft.world.level.block.SnowyDirtBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.LevelChunk;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.level.ChunkEvent;
 import net.minecraftforge.gametest.GameTestHolder;
@@ -41,7 +46,7 @@ import net.minecraftforge.gametest.PrefixGameTestTemplate;
  * {@code afetBlokHasari=false}, chunk yetişmesi ve bütçe, {@code sifirla}.
  *
  * <p>Göl sahnesi (göreli, 9x6x9): y=0 taş; y=1..2 toprak; y=3 çimen; ortada 5x5, 3 derin göl (x,z 2..6, y 1..3); (0,3,0)
- * oyuncunun kuru çamuru; (8,3,0) kırık taş (tanınmayan); (8,4,8) kalıcı meşe yaprağı; (0,4,8) kısa ot.
+ * oyuncunun kuru çamuru; (8,3,0) demir bloğu (tanınmayan); (8,4,8) kalıcı meşe yaprağı; (0,4,8) kısa ot.
  */
 @GameTestHolder(DogalAfetler.MOD_ID)
 @PrefixGameTestTemplate(false)
@@ -52,6 +57,9 @@ public final class DonmaOyunTestleri {
     private static final String GOL = "donma_gol";
     private static final int GOL_EN = 32;
     private static final int GOL_BOY = 5;
+    /** Oyuncunun görüş bileti gibi yalnız yükleme bileti: ticking izleyicisine girmez (simülasyon mesafesi dışı). */
+    private static final TicketType<ChunkPos> GORUS_BILETI = TicketType.create("dogalafetler_donma_gorus",
+            Comparator.comparingLong(ChunkPos::toLong));
 
     private DonmaOyunTestleri() {
     }
@@ -478,6 +486,101 @@ public final class DonmaOyunTestleri {
         isle(y, gecis(100, false, 0, false), KisKaynagi.YOK, e);
         ayniMi(y, baslangic, "çatı karı çözülünce sahne başlangıçla aynı");
         y.succeed();
+    }
+
+    /**
+     * K-D28 (D7): kış ağırlığının zemini yaprak saymaz. Sahnenin bir çimen sütununa Y 130'a kadar kalıcı yaprak sütunu
+     * dikilir ({@code MOTION_BLOCKING} 120'nin üstünde = yükseklik bandında tam kış olurdu); yaprak sütununun zemini yanındaki
+     * çıplak çimenle aynı, kış ağırlıkları farkı ≤ 0,05 (K0-24 komşu sınırı).
+     */
+    @GameTest(template = ALAN)
+    public static void kisAgirligiYaprakSayilmadanZemindenOkunur(GameTestHelper y) {
+        sahneKur(y);
+        ServerLevel level = y.getLevel();
+        BlockPos agac = y.absolutePos(p(0, 4, 4));
+        BlockPos yan = y.absolutePos(p(1, 4, 4));
+        int tepe = 130;
+        BlockState yaprak = Blocks.OAK_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true);
+        for (int yy = agac.getY(); yy <= tepe; yy++) {
+            level.setBlock(agac.atY(yy), yaprak, 2);
+        }
+        try {
+            y.assertTrue(level.getHeight(Heightmap.Types.MOTION_BLOCKING, agac.getX(), agac.getZ()) > 120,
+                    "yaprak sütunu MOTION_BLOCKING'de görünmeli (sahne geçersiz)");
+            int zemin = DonmaApi.yuzeyY(level, agac);
+            y.assertTrue(zemin == agac.getY() && zemin == DonmaApi.yuzeyY(level, yan), "zemin yaprak saymamalı: " + zemin
+                    + " / yan " + DonmaApi.yuzeyY(level, yan) + " / beklenen " + agac.getY());
+            y.assertTrue(DonmaIsleyici.zeminY(level.getChunkAt(agac), agac.getX(), agac.getZ(), DonmaIsleyici.SINIRSIZ,
+                    new BlockPos.MutableBlockPos()) == zemin, "işleyicinin zemini de yapraksız olmalı");
+            double wAgac = DonmaApi.kisAgirligi(level, agac);
+            double wYan = DonmaApi.kisAgirligi(level, yan);
+            y.assertTrue(Math.abs(wAgac - wYan) <= 0.05, "ağaç ile yanındaki zeminin kış ağırlığı farkı " + wAgac + " / " + wYan);
+            double wTepe = KisBolgesi.alan(level).chunk(agac.getX() >> 4, agac.getZ() >> 4)
+                    .agirlik(agac.getX(), agac.getZ(), tepe + 1);
+            y.assertTrue(wTepe >= 0.999, "yaprak tepesi (Y > 120) okunsaydı tam kış olurdu: " + wTepe);
+        } finally {
+            for (int yy = agac.getY(); yy <= tepe; yy++) {
+                level.setBlock(agac.atY(yy), Blocks.AIR.defaultBlockState(), 2);
+            }
+        }
+        y.succeed();
+    }
+
+    /**
+     * K-D26 (D5): görüş mesafesinde olup simülasyon mesafesi dışında kalan chunk da donar. Oyuncunun görüş bileti gibi
+     * yalnız yükleme bileti (seviye 31, ticking izleyicisine girmez) 40 chunk ötedeki bir chunk'ı ve komşularını tam yükler;
+     * chunk {@code isPositionTicking} değilken kuyruk onu G=60'a (konulan çimen kırağılanır), sonra 0'a (çimen geri gelir)
+     * yetiştirir.
+     */
+    @GameTest(template = "bos", batch = "donma_zamanlayici_7", timeoutTicks = 3000)
+    public static void simulasyonDisiGorunenChunkDonar(GameTestHelper y) {
+        ServerLevel level = y.getLevel();
+        DunyaDonemi d = DunyaDonemi.al(level.getServer());
+        d.donmaIlerlemesiAyarla(0f);
+        d.cozulmeDonemiAyarla(false);
+        d.buharlasmaDerinligiAyarla(0f);
+        BlockPos koken = y.absolutePos(BlockPos.ZERO);
+        ChunkPos hedef = new ChunkPos((koken.getX() >> 4) + 40, koken.getZ() >> 4);
+        long anahtar = hedef.toLong();
+        BlockPos cimen = new BlockPos(hedef.getMinBlockX() + 8, 200, hedef.getMinBlockZ() + 8);
+        LongOpenHashSet kapsam = new LongOpenHashSet();
+        kapsam.add(anahtar);
+        DonmaZamanlayici.kapsamAyarla(kapsam);
+        DonmaZamanlayici.istatistikSifirla();
+        ServerChunkCache kaynak = level.getChunkSource();
+        DistanceManager mesafe = kaynak.chunkMap.getDistanceManager();
+        mesafe.addTicket(GORUS_BILETI, hedef, 31, hedef);
+        int[] asama = {0};
+        y.onEachTick(() -> {
+            LevelChunk chunk = kaynak.getChunkNow(hedef.x, hedef.z);
+            if (chunk == null) {
+                return;
+            }
+            ChunkDonmaVerisi v = ChunkDonmaVerisi.al(chunk);
+            if (asama[0] == 0 && DonmaZamanlayici.islenebilir(level, chunk, hedef.x, hedef.z)) {
+                y.assertTrue(!kaynak.isPositionTicking(anahtar), "hedef chunk simülasyon dışında olmalı (sahne geçersiz)");
+                level.setBlock(cimen, Blocks.GRASS_BLOCK.defaultBlockState(), 2);
+                v.donguyeGec(DonmaZamanlayici.dongu(d), 0, false);
+                d.donmaIlerlemesiAyarla(60f);
+                asama[0] = 1;
+            } else if (asama[0] == 1 && v.sonG() == 60 && !v.yarimVar()) {
+                y.assertTrue(!kaynak.isPositionTicking(anahtar), "chunk donarken de simülasyon dışında kalmalı");
+                y.assertTrue(level.getBlockState(cimen).is(kiragili()), "60'ta çimen kırağılı olmalı: "
+                        + level.getBlockState(cimen));
+                d.donmaIlerlemesiAyarla(0f);
+                asama[0] = 2;
+            } else if (asama[0] == 2 && v.sonG() == 0 && !v.yarimVar()) {
+                y.assertTrue(level.getBlockState(cimen).is(Blocks.GRASS_BLOCK), "0'da çimen geri gelmeli: "
+                        + level.getBlockState(cimen));
+                asama[0] = 3;
+            }
+        });
+        y.succeedWhen(() -> {
+            y.assertTrue(asama[0] == 3, "simülasyon dışı chunk 60'a ve geri 0'a yetişmedi (aşama " + asama[0] + ")");
+            level.setBlock(cimen, Blocks.AIR.defaultBlockState(), 2);
+            mesafe.removeTicket(GORUS_BILETI, hedef, 31, hedef);
+            zamanlayiciBitir(y);
+        });
     }
 
     @GameTest(template = "bos")

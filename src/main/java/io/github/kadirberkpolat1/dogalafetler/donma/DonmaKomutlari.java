@@ -47,6 +47,10 @@ final class DonmaKomutlari {
         return String.format(Locale.ROOT, "%.2f", d);
     }
 
+    private static String ms(long ns) {
+        return String.format(Locale.ROOT, "%.2f", ns / 1e6);
+    }
+
     private static int ayarla(CommandContext<CommandSourceStack> b, Boolean cozulme) {
         DunyaDonemi d = DunyaDonemi.al(b.getSource().getServer());
         float yuzde = FloatArgumentType.getFloat(b, "yuzde");
@@ -103,6 +107,8 @@ final class DonmaKomutlari {
         satirlar.add(Component.translatable(DonmaCevirileri.BILGI_BUTCE, DonmaZamanlayici.sonBlokSiniri(),
                 sayi(TpsOlcer.kismaCarpani()), String.format(Locale.ROOT, "%.1f", TpsOlcer.tps()),
                 DonmaZamanlayici.enCokTickDegisen()));
+        satirlar.add(Component.translatable(DonmaCevirileri.BILGI_SURE, ms(DonmaZamanlayici.enUzunNs()),
+                ms(DonmaZamanlayici.isinmaEnUzunNs()), ms(DonmaAyarlari.butce().tavanNs())));
         satirlar.add(Component.translatable(DonmaCevirileri.BILGI_KUYRUK, DonmaZamanlayici.yukluSayisi(),
                 DonmaZamanlayici.bekleyenSayisi(), DonmaZamanlayici.surenIsSayisi(), DonmaZamanlayici.tamamlananAdim(),
                 DonmaZamanlayici.hedefeUlasan(), DonmaZamanlayici.toplamDegisen()));

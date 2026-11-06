@@ -114,6 +114,12 @@ def yetis(s, sure=600):
     log(f"yetişme: {len(ozetler)} özet satırı; son: {ozetler[-1] if ozetler else 'yok'}")
 
 
+def isci_sureleri(metin):
+    """Özet satırlarındaki pencere başına en uzun işçi tick'i (ms): ilk pencere (ısınma) ve sonrakilerin en büyüğü."""
+    ms = [float(x) for x in re.findall(r"\[donma\] özet: .*?en çok ([\d.]+) ms", metin)]
+    return (ms[0] if ms else None), (max(ms[1:]) if len(ms) > 1 else None)
+
+
 def main():
     if not kapi():
         log("kapı 20 dk'da açılmadı")
@@ -128,6 +134,8 @@ def main():
         s.komut("dogalafet donma 60")
         yetis(s)
         s.komut("dogalafet donma bilgi")
+        sure = s.bekle(r"Longest worker tick: .*", 10)
+        log("bilgi süre:", sure.group(0) if sure else "yok")
         s.komut("forge tps")
         if s.bekle(r"Overall: .*TPS", 30):
             log("tps:", s.bekle(r"Overall: .*", 1).group(0))
@@ -157,12 +165,16 @@ def main():
         s2.komut("dogalafet donma bilgi")
         cozuldu = s2.bekle(r"Chunk \[0, 0\]: last processed 0 ", 30, sonra=0)
         log("sıfırlama sonrası chunk:", cozuldu.group(0) if cozuldu else "yok")
+        sure = s2.bekle(r"Longest worker tick: .*", 10, sonra=1)
+        log("bilgi süre:", sure.group(0) if sure else "yok")
     finally:
         s2.durdur()
     ikinci = s2.metin()
     for ad, metin in (("birinci", birinci), ("ikinci", ikinci)):
         log(f"{ad}: invalid dist={metin.count('invalid dist')} Exception={metin.count('Exception')} "
             f"ERROR={len(re.findall(r'/ERROR\]', metin))}")
+        ilk, sonra = isci_sureleri(metin)
+        log(f"{ad}: özet en uzun işçi tick'i: ilk pencere {ilk} ms, sonraki pencereler en çok {sonra} ms")
     korundu = bool(re.search(r"Freeze: 60\.00%", ikinci))
     sifirlandi = bool(re.search(r"Chunk \[0, 0\]: last processed 0 ", ikinci))
     log("ilerleme yeniden başlatmada korundu:", korundu, "| sifirla sonrası chunk 0'a çözüldü:", sifirlandi)

@@ -32,6 +32,7 @@ import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.level.ChunkEvent;
 import net.minecraftforge.event.server.ServerAboutToStartEvent;
+import net.minecraftforge.event.server.ServerStartedEvent;
 
 /**
  * Chunk'ları güncel global ilerlemeye (G), döneme ve buharlaşma derinliğine yetiştiren kuyruk (madde 9 YENİ YÜKLENEN
@@ -54,8 +55,6 @@ import net.minecraftforge.event.server.ServerAboutToStartEvent;
 public final class DonmaZamanlayici {
     /** Bir blok değişiminin bütçe birimi (sütun taraması 1). */
     public static final int BLOK_MALIYETI = 8;
-    /** Kıyı BFS'i chunk + 15 blok halede ~2300 yüzey okur: bir chunk taraması kadar sayılır (K-D20). */
-    private static final int BFS_MALIYETI = 256;
     private static final int[] SUTUN_SIRASI = sutunSirasi();
 
     private static final LongOpenHashSet YUKLU = new LongOpenHashSet();
@@ -90,6 +89,11 @@ public final class DonmaZamanlayici {
     private static long ozetNs;
     private static long ozetEnUzunNs;
     private static int ozetSureSiniri;
+    /** Isınma: istatistik sıfırlandıktan sonraki ilk {@value #ISINMA_TICK} işçi tick'i (soğuk JIT, sınıf yükleme, ilk BFS'ler). */
+    private static final int ISINMA_TICK = 100;
+    private static int isciTick;
+    private static long isinmaEnUzunNs;
+    private static long enUzunNs;
 
     private DonmaZamanlayici() {
     }
@@ -131,8 +135,14 @@ public final class DonmaZamanlayici {
         sonBuhar = -1;
         sonDongu = Long.MIN_VALUE;
         oncekiAsimNs = 0;
+        esikKumesi = null;
         istatistikSifirla();
         KisBolgesi.sifirla();
+    }
+
+    /** Eşik kümesi açılışta kurulur (config ve veri paketi yüklü); ilk işçi tick'inin süresine girmez. */
+    static void sunucuBasladi(ServerStartedEvent olay) {
+        esikKumesi(DonmaAyarlari.esikler(), DonmaTablosuYukleyici.etkin());
     }
 
     private static boolean ustDunya(Object level) {
@@ -180,6 +190,8 @@ public final class DonmaZamanlayici {
         sonTickDegisen = enCokTickDegisen = 0;
         ozetAdim = ozetDegisen = ozetSutun = ozetNs = ozetEnUzunNs = 0;
         ozetSureSiniri = 0;
+        isciTick = 0;
+        isinmaEnUzunNs = enUzunNs = 0;
     }
 
     static void tick(TickEvent.LevelTickEvent olay) {
@@ -258,8 +270,14 @@ public final class DonmaZamanlayici {
         return esikKumesi;
     }
 
-    /** Bir tick'lik iş; işlenebilir (ticking) chunk'ta sütun işlendiyse {@code true}. */
+    /**
+     * Bir tick'lik iş; işlenebilir (ticking) chunk'ta sütun işlendiyse {@code true}. Süre tavanı (D2-2) sıra yenilemeyi,
+     * chunk işi kurulumunu (kış alanı örnekleri) ve kıyı BFS'ini de kapsar: süre her yeni iş kurulmadan ve her sütundan
+     * (BFS ancak bir sütunun içinde başlar) önce denetlenir; tek tick tavanı en çok bir kurulum ya da bir sütun + BFS kadar
+     * aşar. BFS'in birimi sütundan önce ayrılır ({@link YetismeButcesi#sutunRezervi}).
+     */
     private static boolean isle(ServerLevel level, long tick, int g, boolean cozulme, int buhar, long dongu) {
+        long basla = System.nanoTime();
         if (siraKirli) {
             siraYenile(level);
         }
@@ -272,7 +290,6 @@ public final class DonmaZamanlayici {
         DonmaEsikleri e = DonmaAyarlari.esikler();
         int temelDegisim = Math.max(e.maksBuzKalinligi() + 1, 2);
         int enAzRezerv = Math.min(birim, butce.rezerv(temelDegisim));
-        long basla = System.nanoTime();
         long sinir = basla + butce.sureSiniriNs(oncekiAsimNs);
         Tablo tablo = DonmaTablosuYukleyici.etkin();
         EsikKumesi esikler = esikKumesi(e, tablo);
@@ -311,6 +328,10 @@ public final class DonmaZamanlayici {
                     siraBasi++;
                     continue;
                 }
+                if (!butce.sureVar(System.nanoTime(), sinir)) {
+                    ozetSureSiniri++;
+                    break;
+                }
                 boolean yarim = durum.yarimVar();
                 int eskiG = yarim ? durum.yarimG() : durum.sonG();
                 boolean eskiCozulme = yarim ? durum.yarimCozulme() : durum.cozulme();
@@ -338,9 +359,9 @@ public final class DonmaZamanlayici {
                 }
                 return suren.kiyi[ChunkDonmaVerisi.indeks(x, z)];
             };
-            int rezerv = Math.min(birim, butce.rezerv(temelDegisim + Math.max(is.gecis.buhar(), durum.sonBuhar())));
-            while (is.sutun < 256 && butce.sutunSigar(kalan, rezerv)) {
-                if ((is.sutun & 3) == 0 && System.nanoTime() >= sinir) {
+            int rezervTemel = temelDegisim + Math.max(is.gecis.buhar(), durum.sonBuhar());
+            while (is.sutun < 256 && butce.sutunSigar(kalan, Math.min(birim, butce.sutunRezervi(rezervTemel, is.kiyi == null)))) {
+                if (!butce.sureVar(System.nanoTime(), sinir)) {
                     ozetSureSiniri++;
                     sureDoldu = true;
                     break;
@@ -353,7 +374,7 @@ public final class DonmaZamanlayici {
                 kalan -= butce.sutunMaliyeti(degisen);
                 sonTickDegisen += degisen;
                 if (is.bfsYeni) {
-                    kalan -= BFS_MALIYETI;
+                    kalan -= YetismeButcesi.BFS_MALIYETI;
                     is.bfsYeni = false;
                 }
                 bakilan++;
@@ -369,6 +390,11 @@ public final class DonmaZamanlayici {
         ozetSutun += bakilan;
         ozetNs += gecen;
         ozetEnUzunNs = Math.max(ozetEnUzunNs, gecen);
+        if (++isciTick <= ISINMA_TICK) {
+            isinmaEnUzunNs = Math.max(isinmaEnUzunNs, gecen);
+        } else {
+            enUzunNs = Math.max(enUzunNs, gecen);
+        }
         return bakilan > 0;
     }
 
@@ -465,6 +491,16 @@ public final class DonmaZamanlayici {
 
     public static int enCokTickDegisen() {
         return enCokTickDegisen;
+    }
+
+    /** Isınmadan sonraki en uzun işçi tick'i (ns). */
+    static long enUzunNs() {
+        return enUzunNs;
+    }
+
+    /** Isınma penceresindeki (ilk {@value #ISINMA_TICK} işçi tick'i) en uzun tick (ns). */
+    static long isinmaEnUzunNs() {
+        return isinmaEnUzunNs;
     }
 
     static int sonBlokSiniri() {

@@ -5,6 +5,7 @@ import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciDonem;
 import io.github.kadirberkpolat1.dogalafetler.config.EfektKalitesi;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.donma.DonmaAyarlari;
+import io.github.kadirberkpolat1.dogalafetler.donma.mantik.DonmaEsikleri;
 import io.github.kadirberkpolat1.dogalafetler.network.DonemPaketi;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -62,7 +63,7 @@ public final class DonmaIstemciEfektleri {
         try {
             return DonmaAyarlari.karYagisiEsigi();
         } catch (IllegalStateException yuklenmedi) {
-            return 40;
+            return DonmaEsikleri.VARSAYILAN_KAR_YAGISI;
         }
     }
 

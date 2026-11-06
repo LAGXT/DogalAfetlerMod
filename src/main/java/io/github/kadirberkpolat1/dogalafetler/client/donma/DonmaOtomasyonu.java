@@ -31,8 +31,9 @@ import net.minecraftforge.fml.common.Mod;
 /**
  * Donma görsel kanıt otomasyonu (K0-21 rev. 2). Yalnız {@code -Ddogalafetler.otomasyon=donma} ile, tek oyunculu Quick Play
  * dünyasında çalışır; üretimde etkisizdir. Yakındaki bir gölü (yoksa nehir/kıyıyı) bulur, kıyısındaki tepeden ona bakar
- * ve sırayla: vitrin (güneşsiz evre, G 15'ten gerçek donma süreciyle {@code hiz 20} altında %35'e, kar yağışı; kıyıdan
- * içeri donan göl %25 ve %35'te, %35'te üstten), %100 donmuş göl (yan, üst), manzara, tahta çatılı evde yapı karı,
+ * ve sırayla: vitrin (güneşsiz evre, öğle, G 15'ten gerçek donma süreciyle {@code hiz 20} altında %35'e; kıyıdan
+ * içeri donan göl %25'te açık havada, kar yağışı eşiğinde (30) yağmur açılır ve %35 kar yağışında, %35'te üstten), %100
+ * donmuş göl (yan, üst), manzara, tahta çatılı evde yapı karı,
  * büyüyen güneşte buharlaşmış göl yatağı (kıyıdan dik, üstten) ve süpernovada geri dolması, kızıl cücede bir kalıcı
  * kış sınırı boyunca geniş planda çözülme (G=40). Güneş evresi entegre sunucuda doğrudan ayarlanır (evre komutu
  * gökyüzü dalında). Aralarda {@code /forge tps} ve {@code /dogalafet donma bilgi} çıktıları log'a düşer. Arayüz ve sohbet
@@ -177,15 +178,17 @@ public final class DonmaOtomasyonu {
             evKur(mc);
             yanBak(mc);
         }, bekle(120), 200);
-        // Madde 9 sırası: kırağı 10, ince kar 15, kıyı buzu 20 (15 blok içeride 50). "Buz kıyıdan içeri" bandı 20–50:
-        // vitrin %35, gerçek donma süreciyle hiz 20 altında (72 tick'te 1 puan) 15'ten.
-        ekle("G 15, güneşsiz", () -> {
+        // Madde 9 sırası: kırağı 10, ince kar 15, kıyı buzu 20 (15 blok içeride 50), yağmur yerine kar 30 (K-D33). Vitrin
+        // %35, gerçek donma süreciyle hiz 20 altında (72 tick'te 1 puan) 15'ten. Kar yağışı eşiğinin altında yağmur
+        // sahneyi karartır (D2-1): %25 açık havada, yağmur 30'da açılır ve istemcide kar olarak yağar.
+        ekle("G 15, güneşsiz, öğle", () -> {
             evre(mc, GunesEvresi.GUNESSIZ);
+            komut(mc, "time set 6000");
             komut(mc, "dogalafet donma 15 donma");
-            komut(mc, "weather rain 100000");
         }, yetisti(60), 3000);
         ekle("hiz 20 ile 25'e", () -> komut(mc, "dogalafet hiz 20"), gEnAz(25f), 1200);
-        ekle("vitrin %25", () -> kare(mc, "vitrin_25"), gEnAz(35f), 1200);
+        ekle("vitrin %25", () -> kare(mc, "vitrin_25"), gEnAz(30f), 1200);
+        ekle("kar yağışı %30", () -> komut(mc, "weather rain 100000"), gEnAz(35f), 1200);
         ekle("vitrin %35 yetişme sırasında", () -> {
             kare(mc, "vitrin_35_yetisirken");
             komut(mc, "dogalafet stop");
@@ -302,11 +305,16 @@ public final class DonmaOtomasyonu {
         }
     }
 
-    /** Kurumuş göl yatağı: kıyının hemen üstünden dik açıyla (taban ve kuru duvarlar okunur). */
+    /**
+     * Kurumuş göl yatağı: eski su yüzeyinin 3 blok üstünden, gölün içine doğru alçak ve yakın (~8 blok); taban ve kuru
+     * duvarların dokusu okunur (D2-1).
+     */
     private static void yatakBak(Minecraft mc) {
         if (gol != null) {
-            double m = gol[4] * 0.6 + 2;
-            tpBak(mc, gol[0] - m * 0.7071, gol[2] + 10, gol[1] + m * 0.7071, gol[0] + 0.5, gol[2] - 3, gol[1] + 0.5);
+            double m = gol[4] * 0.55;
+            double h = gol[4] * 0.15;
+            tpBak(mc, gol[0] - m * 0.7071, gol[2] + 3, gol[1] + m * 0.7071, gol[0] - h * 0.7071, gol[2] - 5,
+                    gol[1] + h * 0.7071);
         }
     }
 

@@ -97,7 +97,7 @@ class DonmaEsikleriTest {
         assertEquals(0, e.titresimsiz().titresimGenligi());
     }
 
-    /** D2: varsayılan sıra madde 9 (kırağı 10 < ilk kar 15 < kıyı buzu 20 < kalın buz 40). */
+    /** D2, K-D33: varsayılan sıra madde 9 (kırağı 10 < ilk kar 15 < kıyı buzu 20 < kar yağışı 30 ≤ kalın buz 40). */
     @Test
     void varsayilanSiraKiragiKarKiyiBuzuKalinBuz() {
         assertEquals(0, e.karKatmani(14, false));
@@ -106,6 +106,22 @@ class DonmaEsikleriTest {
         assertTrue(e.buzSeviyesi(20, 0) > 0);
         assertEquals(e.yapiKarEsigi(), 40, "yapı karı kalın buz aşamasında (ilk buz + kalınlık adımı)");
         assertTrue(e.buzKalinligi(40, 0) >= 2, "40'ta kıyıda kalın buz");
+        int kar = DonmaEsikleri.VARSAYILAN_KAR_YAGISI;
+        assertEquals(kar, e.siraliKarYagisi(kar), "varsayılan kar yağışı sırada");
+        assertTrue(kar > e.ilkBuzEsigi() && kar <= e.kalinBuzEsigi(), "kıyı buzu < kar yağışı ≤ kalın buz");
+        assertTrue(kar < 35, "vitrin %35 kar yağışında (tasarım §3/§7)");
+    }
+
+    /** K-D33: sıra dışı kar yağışı eşiği en yakın sınıra çekilir. */
+    @Test
+    void karYagisiKiyiBuzuIleKalinBuzArasinaCekilir() {
+        assertEquals(21, e.siraliKarYagisi(15), "kıyı buzundan önce olamaz");
+        assertEquals(21, e.siraliKarYagisi(20), "kıyı buzuyla aynı olamaz");
+        assertEquals(40, e.siraliKarYagisi(40), "kalın buzla aynı olabilir");
+        assertEquals(40, e.siraliKarYagisi(100), "kalın buzdan sonra olamaz");
+        DonmaEsikleri baska = new DonmaEsikleri(new int[] {15, 55}, new int[] {55, 65}, 25, 10, 2, 15, 4, 45, 3, 10, 10, 8);
+        assertEquals(35, baska.kalinBuzEsigi());
+        assertEquals(26, baska.siraliKarYagisi(0));
     }
 
     @Test
