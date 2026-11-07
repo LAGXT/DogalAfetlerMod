@@ -33,7 +33,7 @@ import net.minecraftforge.fml.common.Mod;
  * görünmez) ve gizliler açılınca
  * üç konum (gizliler ortada tam görünür). Sahne komutları entegre sunucunun konsol kaynağından çıktısız verilir:
  * sohbete komut satırı (başarı ya da hata) düşmez; sohbet kareden önce temizlenir (A-33). Toast üreten komuttan önce
- * istemci en az {@value #AKICI_FPS} FPS çizmeli, toast karesi adım başından beri 25 tick geçip 20 kare çizilince istenir
+ * istemci en az {@value #TOAST_FPS} FPS çizmeli, toast karesi adım başından beri 25 tick geçip 20 kare çizilince istenir
  * (toast kayması 600 ms); her kare A-34 kapısından alınır ({@link GorselOtomasyon#kareIste}, istekten sonra en az 20 yeni
  * kare) ve bekleyen kare varken adım ilerlemez. Sekme açıldıktan sonra iç imleç pencerenin köşesine alınır (ipucu kutusu
  * sekmeyi karartmasın). Sekme açıkken tabansız ölçüm {@code sekme_acik} (en az 100 tick, K-E29 biçimi) yazılır. Klavye,
@@ -44,8 +44,11 @@ public final class BasarimOtomasyonu {
     private static final String MOD = System.getProperty("dogalafetler.otomasyon", "");
     private static final String ON = "BASARIM_OTOMASYON ";
     private static final ResourceLocation KOK = DogalAfetler.konum("dogalafetler/root");
-    /** Toast üreten komuttan önce beklenen en az FPS. */
-    private static final int AKICI_FPS = 20;
+    /**
+     * Toast üreten komuttan önce beklenen en az FPS: toast 5 sn görünür, kayma + kapının 20 karesi bu sürede bitmeli (ortak
+     * {@link GorselOtomasyon#AKICI_FPS} kare kapısı içindir).
+     */
+    private static final int TOAST_FPS = 20;
 
     private record Adim(String ad, Runnable is, BooleanSupplier hazir, int enCokTick) {
     }
@@ -182,7 +185,7 @@ public final class BasarimOtomasyonu {
 
     /** İstemci akıcı çiziyor: toast'ın 5 sn'lik görünürlüğü içinde kareye girecek kadar. */
     private static BooleanSupplier akici(Minecraft mc) {
-        return () -> adimTick >= 20 && mc.getFps() >= AKICI_FPS;
+        return () -> adimTick >= 20 && mc.getFps() >= TOAST_FPS;
     }
 
     /** Başarım oyuncuda açık mı (entegre sunucudan, sunucu thread'inde okunur). */

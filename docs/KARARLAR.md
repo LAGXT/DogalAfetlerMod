@@ -3468,6 +3468,139 @@ portu (25612) kullanmasıydı. Reddedilen:
 senaryo başına ayrı `run-server` klasörü (Gradle `runServer` çalışma dizini tek, `build.gradle` değişirdi); yalnız
 özelliklerin yazımını kilitlemek (sunucu çalışırken ikinci senaryo aynı dosyayı yine değiştirirdi).
 
+**K-E41 GameTest'te Cold Sweat sıcaklık kapısında yok sayılır (şef kararı, 2026-11-07; 5-matris bulgusu).** `-Puyum=coldsweat`
+ile filtresiz GameTest'te 12 test düşüyordu (`.vibe/kanit/matris-5/gradle/gametest-coldsweat.log`): sıcaklık (2), yiyecek (7),
+balıkçılık (1), başarım (2) testleri kendi sıcaklık sistemimizi sınar, ama OTOMATIK kipte Cold Sweat yüklüyken kapı kapalı.
+(F-18'in kanıtı `gt-coldsweat.log` filtreliydi.) Karar (K-E28 deseni, testin değeri korunur): `SicaklikKapisi.coldSweatTesti(Boolean)`
+`coldSweatYuklu()`'yı geçersiz kılar (`null` = gerçek `ModList`, önceki değeri döner). `SicaklikOyunTestleri.ColdSweatKapisi`
+GameTest sunucusu açılınca (yalnız `GameTestServer`, Cold Sweat yüklüyse) `false` koyar ve log'a "Cold Sweat yüklü, sıcaklık kapısında
+yok sayılıyor (K-E41)" yazar, sunucu durunca `null`. F-18 testi (`coldSweatYukluykenYiyecekCekirdegeGider`) gövdesinde gerçek değere
+geçer, `finally`'de öncekini koyar. Üretim ve geliştirme sunucusu etkilenmez (geçersiz kılma hiç kurulmaz). Reddedilen: testleri
+Cold Sweat varken atlamak (`-Puyum=coldsweat` koşusunda kendi sistemimizin 12 testi sınanmazdı); her test sınıfına ayrı
+`@BeforeBatch`/`@AfterBatch` (12 test dört sınıf, dokuz batch; unutulan biri sonraki batch'e sızar).
+
+## Faz 5 — Görsel otomasyon
+
+Parça `5-gorsel-otomasyon`, dal `is/gorsel-otomasyon` `08246dd`, `main`'e birleştirme `cc7e3b2`. Rapor
+`.vibe/rapor/gorsel-otomasyon.md`, inceleme `.vibe/rapor/inceleme-gorsel-otomasyon.md` (P0/P1 = 0, P2 = 6; hepsi birleştirmede kapandı),
+patch `.vibe/diff/gorsel-otomasyon.patch`. Dayanak: K-E27, K-E29 (b), A-34, K0-21 rev. 2.
+
+**GO-01 Ortak yardımcı `client.core.GorselOtomasyon` (tek sınıf: ölçüm satırı + A-34 kapısı).** Yalnız
+`dogalafetler.otomasyon` sistem özelliği doluyken olay işleyicileri çalışır (üretimde etkisiz). Tek sınıf: ikisi de aynı
+`RenderTickEvent` sayacına dayanır (ölçüm START→START kare süresi, kapı END'de çizilen kare). Tsunaminin ölçümünden çıkarıldı:
+duvar saati ve render thread CPU (`ThreadMXBean.getCurrentThreadCpuTime`) ortancası, sunucu `getAverageTickTime`, `GradleWrapperMain`
+sayımı (`yabanci` = ata süreç olmayanlar). Kademe ölçüm başında okunur (otomasyon kendi zorluyorsa — kasırga
+`IstemciKasirga.zorlananKalite` — onu verir). **Birleştirme düzeltmesi (inceleme P2-1):** `mspt` artık üstel `getAverageTickTime` (son ~10 tick) değil, entegre sunucunun son 100 tick'lik `tickTimes` ortalaması (`TpsKismasi.ortalamaMs`; ortak pencere 100 tick).
+
+**GO-02 `OLCUM` satır biçimi.** Görevdeki biçim aynen, sona iki alan eklendi:
+`OLCUM <otomasyon> sahne=<ad> kademe=<Düşük|Orta|Yüksek|Ultra> duvar_ms=.. cpu_ms=.. mspt=.. gradle=.. yabanci=.. kare=.. taban=<ad|->`.
+`kare` penceredeki kare sayısı (0 ise ölçüm yok sayılır); `taban` aynı kameranın afetsiz taban sahnesinin adı: K-E29 (b)
+"taban ms" satırda sayı olarak değil bağ olarak durur, tablo onu çözer (taban kimi otomasyonda afetli sahneden sonra ölçülür:
+tsunami "sonra", deprem/sinkhole kamerası afet merkezine bağlı). Ad alanlarındaki boşluk `_` olur. Geçersiz kullanım
+(bitirilmeden yeniden başlatma, açık pencere yokken bitirme) WARN yazar; bu satırlarda `duvar_ms` olmadığı için tabloya girmez.
+
+**GO-03 `tools/senaryo/olcum_tablosu.py` tek TSV ve kural.** Dizinleri özyinelemeli tarar (`latest-*.log`; `--desen` ile tsunami
+`runClient-*.log`), tek TSV yazar: `log satir otomasyon sahne kademe duvar_ms fps cpu_ms mspt gradle yabanci kare taban taban_ms
+kural sonuc`. Kural yalnız `taban` verilmiş satırda: taban aynı log'da aynı otomasyonun o adlı satırı (birden çoksa satırca en
+yakını); taban duvar_ms ≥ 10 → `oran` (duvar ≤ 2 × taban), < 10 → `mutlak` (cpu ≤ 33,3, mspt < 50, yabanci ≤ 1). Sonuç `gecti` /
+`kaldi` / `taban_yok` / `olcum_yok` / `bilgi`. Log başına `KARE-KAPISI` açık/geçersiz sayımı stderr'e. Çıkış 0 satır var, 1
+yok. Sentetik log'la iki dal, taban_yok, olcum_yok ve WARN satırı yanlış pozitifi sınandı. **Birleştirme düzeltmesi (P2-3):** varsayılan desen `latest-*.log,runClient-*.log` (tsunami kanıtı girer); aynı klasörde aynı koşunun iki kopyası (otomasyon, sahne, duvar, cpu, mspt, kare aynı) tek sayılır; yeni `tetik` sütunu duvar saati < 30 FPS satırı işaretler (K-E29 (b) görünür koşu tetikleyicisi; sonucu değiştirmez). Gradle geçerliliği K-E29 (b) rev.: yabancı Gradle ≤ 1 (P2-6).
+
+**GO-04 A-34 kapısı tek yerde.** `kareIste(otomasyon, dosya, [enAzKare], sonra)`: kare `RenderTickEvent` END'de istekten sonra
+≥ `enAzKare` (en az 2) yeni çizilmiş kare ve `getFps() ≥ 15` iken alınır; 60 sn'de sağlanmazsa yine alınır, WARN
+`KARE-KAPISI <otomasyon> <dosya> kapi=GECERSIZ ...` ve kare geçersiz. Geçerli kare `kapi=acik` INFO. Otomasyonun kendi kare satırı
+`sonra` içinde aynı biçimde kalır (deprem/güneş betikleri regex'le okur). Ekran açıkken bekleyen istekte iç imleç her karenin
+START'ında sol üst köşeye alınır (`MouseHandler` SRG `f_91507_`/`f_91508_`; A-34 `3181496` deseni, `setScreen` konumu ortaya
+yazdığı için istekte bir kez yetmez); dünyadayken (imleç tutulu) dokunulmaz: bir sonraki fare olayı dev bir dönüş üretirdi.
+Kapanış satırından önce `KARE-KAPISI <otomasyon> ozet toplam=.. gecersiz=..`. Bekleyen kare varken otomasyon adım ilerletmez.
+Reddedilen: GP17 "60 tick sonra ≥ 2 kare" kaçışını kapıda tutmak (görev: süre aşılırsa kare geçersiz).
+
+**GO-05 Çizim ayarı ortak (`GorselOtomasyon.cizimAyari`).** Vsync kapalı, `maxFps` 260, çalışma anında; dokuz otomasyon
+açılışta çağırır. Gerekçe: yalnız kasırga/asit betikleri vsync'i kapatıyordu (120 tavan), diğerleri gizli workspace'te vsync takasıyla
+1 FPS'e düşüyordu (K-13, GP17); 120 tavanı tabanı 8,3 ms'ye yapıştırıyordu (AOi-3). Tsunaminin 260'ı alındı. Kasırga ve asit
+betiklerinin `options.txt` satırı da 260.
+
+**GO-06 Deprem duman/tekrar yolu.** `deprem_gorsel.py --bolum <deprem_s1,deprem_s5,sinkhole_s1,sinkhole_s5|hepsi>` →
+`-PotomasyonBolum` (build.gradle'daki mevcut `dogalafetler.otomasyon.bolum`), `--kanit <dizin>`; koşu sonunda `olcum-<n>.tsv`
+(`olcum_tablosu.tablo`). `options.txt` vsync kapalı/260 (GO-05). Ws 92 (değişmedi).
+
+**GO-07 Kasırga (Kv2-2, Kv3-2, K-13).** Kare ve ölçüm yardımcıdan; kare öncesi 20 kare şartı (K-13) `enAzKare` olarak kalır.
+`OLCUM` sahneleri `s5_55_{dusuk,yuksek,ultra,cizimsiz}`, `s5_lod{120,180}_yuksek`, `s5_{52,36,20,5}_yuksek`, `s5_5_cizimsiz`; hepsinin
+tabanı `afetsiz_taban` (stop sonrası aynı 5 blok noktası, Yüksek; K-13'ün K0-33 ölçüsü). Kv2-2: 52/36/20/5 blok ölçümü
+sunucuda ≥ 30 uçan blok beklenince başlar (en çok 60 sn, dolarsa WARN ile yine ölçülür); `FPS` bilgi satırı pencere boyunca
+sunucu uçan blok (baş → son) ve kaldırılan artışını yazar (satır bu yüzden sunucu thread'inde yazılır). Kv3-2: S1 olgun → ip
+zorla ilerletilmez; `s1_vitrin` karesinden sonra hız 1, olgun doğal bitene dek (en çok 1800 tick, WARN) beklenir, ip kareleri
+yine yavaş çekimde; bitiş kamerası 28 → 19 blok. Koşul bayrağı `kosulSunucu` her koşullu adımdan önce sıfırlanır (önceki adımdan
+`true` kalıp koşulu erken geçirebiliyordu).
+
+**GO-08 Tsunami (Ts7, TS-16 rev. 3).** `s:` kareleri kapıdan (`KARE`/`FOTO` satırları korunur, `FOTO` artık kapı sonucunu yazar);
+`f:<ad> [taban]` → `OLCUM tsunami`; `FPS` satırının biçimi aynı, ortanca/CPU/mspt/Gradle değerleri `Olcum`'dan (kendi kare
+listeleri ve `gradle()` kopyası kalktı; `ASAMA` kök neden ölçümü ve 30 sn `Runtime.halt` bekçisi kalır). Taban: `olcum()`
+koşularında `-karada` → `-sonra` (TS-16 rev. 3), normal koşularda `-yaklasma`/`-karada` → `-afetsiz`. Ts7 kameraları (`v:`
+adımı, tsunaminin `ozel()` kıyı noktası ve yönünden): `deniz` kıyıdan 14 blok içeride, göz taban + 11 (en az zemin + 3), 10°
+aşağı (çekilme, S5 ufuk); `alcak` 4 blok içeride, göz taban + 4,5, 3° aşağı (S1 ufuk ve vitrin); ölçümler ve sonraki kareler
+tabanla aynı `vitrin kamera tepe`. Ön-uyarı karesi yaratıcı kipte elde Gelişmiş Hava Radarı ve HUD açık (`g:1`); komut geri
+bildirimi o kareye dek kapalı (sohbet yankısı kareye düşmesin; bedeli: o koşularda `start` komutunun `[CHAT]` yankısı yok).
+`tsunami_gorsel.py` özeti `KAMERA`, `OLCUM tsunami`, `KARE-KAPISI tsunami` satırlarını da gösterir. Kadraj kâğıt üzerinde; ilk
+görünür koşu (5-matris #6) doğrular.
+
+**GO-09 Deprem/sinkhole (Ds1, C.4, KARARLAR "Açık noktalar (Faz 4)" deprem/sinkhole görsel kareleri).** Kare istemci tick'inde değil kapıdan (Ds1 (1)); satır biçimi
+`DEPREM_OTOMASYON kare <dosya> (FPS n, ...)` aynı (`deprem_gorsel.py` regex'i), "önceki adımda çizilen kare" yerine "istekten sonra
+çizilen kare". Yavaş çekim `hiz 0.2`: deprem S1 siren ve sarsıntı, sinkhole S1 çatlama, sinkhole S5 çöküş; kareden sonra hız 1.
+Kare adları içerikle uyumlu: siren karesinin koşulu siren aşamasını bekler, `deprem_s1` AKTIF'te sarsıntı sürerken,
+`sinkhole_*_catlama` çatlama alt aşamasında (`altAsama()` yalnız AKTIF'te değer döner: ön-uyarı/siren paketleri de alt aşama
+0 taşıyor). C.4: deprem S5 sarsıntısı sürerken 5 karelik dizi (`ds_deprem_s5_sarsinti_1..5`, 2 tick ara). FPS: `s5_deprem_yuksek`
+(geniş kamera, sarsıntı sürerken, hız 1) → taban `s5_deprem_taban` (artçılardan sonra aynı kaydedilmiş kamera); `s5_sinkhole_yuksek`
+(çukur kamerası, çöküş sonrası hız 1) → `s5_sinkhole_taban` (bitişte aynı çukur kamerası). Kameralar afet merkezine bağlı olduğu için
+taban "sonra" (tsunami emsali). Ölçüm öncesi FPS kapısında GP17 kaçışı yok (tavan dolarsa motor WARN ile geçer). Bölüm seçimi
+`dogalafetler.otomasyon.bolum` (GO-06). Ds1 (4) S1 çatlağı için daha yakın kamera yapılmadı: S1 karesi S5 ile karşılaştırma için
+aynı göreli yan bakışı kullanır.
+
+**GO-10 Asit/orman (AOi-1, AOi-3).** Kare kapıdan (20 kare şartı korunur). AOi-1: `ao_asit_siren_ufuk` (aynı yerden pitch −12°,
+bulut tavanı kadrajda; eski `asit_siren` karesi kalır) ve `ao_asit_s5_yakin` (istemci paketindeki en yakın aşınan bloğun 4 blok
+üstü, yatayda 8 blok, ~27° aşağı; |h − gözY| ≤ 24 sıçrama yolu çalışır). AOi-3: ortak çizim ayarı (GO-05); orman tabanı
+`s5_orman_taban` yangın başlamadan (S5 ön-uyarısında) aynı kamerada, sonra Düşük/Yüksek/Ultra (`s5_orman_*`, her biri 100 tick
+bekleme + 100 tick ölçüm); asit `s5_asit_taban` → `s5_asit_yuksek` aynı kaydedilmiş asit kamerasından. Eski stop sonrası yanmış
+sahne ölçümü tabansız bilgi `s5_orman_sonra`. AOi-2 (S1 çarpanı 0,25) entegratörde K-E39 (§E).
+
+**GO-11 Ay (vitrin, H.3, FPS).** Vitrin kamerası doğuştaki en üst bloğun 40 blok üstünde (`ust + 40`); 48. sn'den (yavaş çekim)
+05–13 kareleri pitch −4° (ay, parlama, mantar sütunu ve ufuk aynı kadrajda); `00_once`, `15`, `17_sifirla_ay_geri` −88°;
+yaklaşma 02–04 −12°. Kareler evre saniyesinde istenir, satır istek ve alış saniyesini ve sarsıntı genliğini yazar. H.3:
+çarpmadan ≥ 5 sn sonra 5 karelik dizi (`ay_carpmasi_sarsinti_1..5`, 2 tick ara; betik `ay_carpmasi_` önekini toplar). FPS:
+`s5_ay_taban` afet başlamadan vitrin kamerasında, `s5_ay_yuksek` çarpmanın 10. sn'sinden (meteorlar, mantar, ufuk ışığı,
+sarsıntı birlikte). Kayan yıldız: GO-15.
+
+**GO-12 Güneş (kavrulma çifti, süpernova kabuğu, GP17).** Kavrulma çifti tek sabit kamera kaydından (ormanın 40 blok batısı, en
+üst blok + 6, doğuya, 15° aşağı; ağaçlık ve çimen çerçevede): `kavrulma_gun1` (1. gün, saat 6000; kavrulma 3. günde başlar,
+yeşil hal) ve `kavrulma_gun4` (4. gün sonu, aynı saat; eski `aktif_gun4_kavrulma`'nın yerine; `gunes_patlamasi_gorsel.py`
+`BEKLENEN` güncellendi). Süpernova kabuğu: ilerleme 0,15'e (kabuk ≈ 51 birim, ışın ≈ 46 ve hale ≈ 40 karesinden büyük, parlaklık
+%65) hız 50 ile varılır, sonra hız 1 ve kamera güneşin gerçek yüksekliğine çevrilir. GP17: `s5_gunes_taban` afet başlamadan,
+4. gün meteor vitrininde `s5_gunes_meteor_{yuksek,dusuk,ultra}` (aynı kamera; kademe tsunami `kalite` deseniyle çalışma anında,
+sonra Yüksek'e geri). Kare satırı `KARE_SATIRI` regex'ine uyar (yalnız ayrıştırılmayan kuyruk "kapı beklemesi X sn"). **Birleştirme düzeltmesi (P2-2, P2-4):** kademe artık `ConfigValue.set` ile değil (Forge autosave dosyayı yazıyordu) `IstemciAyarlari.otomasyonKalitesi` geçersiz kılmasıyla verilir (K-E28 deseni); ölçümden sonra `null` ile kullanıcının değerine döner (sabit Yüksek değil). Adım adlarında "kızıl cüe" → "kızıl cüce".
+
+**GO-13 Meteor, başarım, radar, balıkçılık.** Meteor: `s5_meteor_taban` vitrin kamerasında meteorlardan önce, `s5_meteor_yuksek`
+ilk atıştan 100 tick (yavaş çekim ve atış zamanlaması değişmedi; `odul` kipi ölçmez). Başarım: Bs1/Bs3 A-35 ile zaten
+kodluydu (doğrulandı); toast kareleri 20 kare şartını korur, ayrı vitrin kareleri eklenmedi (`toast_felaket_ustasi` üç toast'ı
+veriliş sırasıyla üst üste gösterir; toast başına kare ilkini silerdi); tabansız bilgi `sekme_acik`. Radar: R-18 için kurulumda
+üç kısa afet daha (geçmiş 5 kayıt), `radar-radar_gelismis_panel` en dolu 7 satırlı panelde; R3/R-19 `radar_yok_taban` →
+`radar_elde`, `radar_gelismis`, `sismograf_ekran`. Balıkçılık (OLCUM yok, dokuzun dışında; kapı ve çizim ayarı var): Ba8 vitrini
+gün batımı (`time set 12500`), göz buzdan ~1,6 blok, deliğe ~21° aşağı, gerçek ısırmada `balikcilik_vitrin_isirma`, ardından elde
+Donmuş Ringa ile `balikcilik_vitrin_ringa`. Kapı kareyi sonra aldığı için kare isteğinin hemen ardından sahneyi değiştiren iki adım
+bir sonraki adıma taşındı. **Birleştirme düzeltmesi (P2-5):** başarımın toast eşiği `TOAST_FPS` (20; ortak kapının `AKICI_FPS` 15'inden ayrı ad).
+
+**GO-14 Eylem öncesi FPS kapısı ortak (`GorselOtomasyon.eylemKapisi`).** Ay, güneş, meteor ve asit/orman aynı kapının kopyasını
+taşıyordu (akıcıysa geç, 60 sn sonra WARN ile geç); tek yerde, WARN `FPS-KAPISI <otomasyon> <eylem> ...`. Kasırga ve deprem
+kapıyı kendi adım motorunun koşul + tavan alanıyla kurar (tavan WARN'ı motorun), oradaki koşul `GorselOtomasyon.akici()`.
+
+**GO-15 Ay kayan yıldız kancası `AyCarpmasiGokyuzu.kayanYildizZorla(RandomSource)` (şef kararı: görsel-otomasyon yapar, yalnız
+mekanik ayırma).** Render sınıfı `tick`'indeki doğurma satırları (`:321-326`: azimut, yükselim, baş ve yön vektörü, listeye ekleme)
+paket içi `kayanYildizZorla`'ya çıktı; `tick` koşul (çarptı, halka açık, halka alfası > 0, `nextInt(3600) == 0`) sağlanınca aynı
+metodu çağırır: rastgele sayı sırası, render parametreleri ve ömür (20 tick) birebir. Gerekçe: kendiliğinden doğma ~3 dk'da bir
+olduğu için Faz 4 karelerinin hiçbirinde kayan yıldız yoktu (KARARLAR "Ay — kayan yıldız görünmedi"); koşulu atlayan ayrı metot
+üretim yolunu değiştirmez. Otomasyon (yalnız `-Potomasyon=ay_carpmasi`) `14_halka_aysiz_gece` isteğinden 8 tick önce çağırır
+(alfa `sin(πt)`, en parlak an 10. tick; kapı akıcıyken 2 kare < 3 tick); kare satırı `kayan yıldız <n>` yazar, 0 ise kapı yıldızın
+ömrünü aşmıştır (5-matris #6 satırdan okur). Reddedilen: otomasyonda yansımayla `KAYANLAR`'a yazmak (özel kayıt türü, kırılgan).
+
 ## Şef kararları (Faz 0–1)
 
 **K0-19 Ay çarpması siren süresi: 60 sn.** Madde 5 "Güneş Patlaması hariç 10 sn" der; bölüm H "siren çaldıktan 60 saniye
@@ -4620,6 +4753,9 @@ P2-9 `5-matris` kabulünde. Açık kalanlar:
 - **F-18 testi varsayılan pakette koşulsuz geçer (P2-3):** `coldSweatYukluykenYiyecekCekirdegeGider` yalnız `-Puyum=coldsweat` ile
   sınar; TEST-RAPORU #3 "213 + 1 koşullu", Cold Sweat'le istemci mixin karesi `5-matris` #9.
 - **K-E33 (P2-6):** şef kabul, düzeltme yok (K-E33 notu).
+- **Görsel otomasyon §E (birleştirmeden):** `SuOtomasyon` (`is/su-gorsel`) henüz ortak `GorselOtomasyon.kareIste`'ye geçmedi → su-gorsel
+  birleşince entegratör çevirir; `TsunamiOtomasyonu.kamera()` su-gorsel'in değiştirdiği `magara()`'ya bitişik (birleştirmede yakın çakışma
+  beklenir). Kadrajlar ve 5-matris #6/#10 ölçümleri yeni HEAD'de (şef kararı matris raporundan sonra).
 
 ## N17 — Sayısal varsayılanlar
 

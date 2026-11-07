@@ -17,9 +17,25 @@ public final class SicaklikKapisi {
     private SicaklikKapisi() {
     }
 
+    private static volatile Boolean coldSweatTesti;
+
     public static boolean coldSweatYuklu() {
+        Boolean test = coldSweatTesti;
+        if (test != null) {
+            return test;
+        }
         ModList liste = ModList.get();
         return liste != null && liste.isLoaded(COLD_SWEAT);
+    }
+
+    /**
+     * Yalnız GameTest (K-E41, K-E28 deseni): kapının Cold Sweat'i yüklü sayıp saymadığını geçersiz kılar; {@code null} gerçek
+     * {@code ModList}'e döner. Önceki değeri döner.
+     */
+    public static Boolean coldSweatTesti(Boolean deger) {
+        Boolean onceki = coldSweatTesti;
+        coldSweatTesti = deger;
+        return onceki;
     }
 
     public static boolean acikMi(MinecraftServer server) {

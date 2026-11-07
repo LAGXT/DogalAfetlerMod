@@ -11,6 +11,7 @@ import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.gametest.framework.GameTestServer;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -34,6 +35,10 @@ import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.GameType;
 import net.minecraftforge.common.ForgeHooks;
+import net.minecraftforge.event.server.ServerStartedEvent;
+import net.minecraftforge.event.server.ServerStoppedEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.util.ObfuscationReflectionHelper;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
@@ -43,6 +48,30 @@ import net.minecraftforge.gametest.PrefixGameTestTemplate;
 @PrefixGameTestTemplate(false)
 public final class SicaklikOyunTestleri {
     private SicaklikOyunTestleri() {
+    }
+
+    /**
+     * K-E41: GameTest sunucusunda Cold Sweat sıcaklık kapısında yok sayılır ({@code -Puyum=coldsweat} ile de sıcaklık, yiyecek,
+     * balıkçılık ve başarım testleri kendi sistemimizi sınar); sunucu durunca gerçek değere döner. Cold Sweat yolunu sınayan
+     * F-18 testi kendi gövdesinde gerçek değere geçer.
+     */
+    @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID)
+    public static final class ColdSweatKapisi {
+        private ColdSweatKapisi() {
+        }
+
+        @SubscribeEvent
+        public static void basladi(ServerStartedEvent olay) {
+            if (olay.getServer() instanceof GameTestServer && SicaklikKapisi.coldSweatYuklu()) {
+                SicaklikKapisi.coldSweatTesti(false);
+                DogalAfetler.LOGGER.info("GameTest: Cold Sweat yüklü, sıcaklık kapısında yok sayılıyor (K-E41)");
+            }
+        }
+
+        @SubscribeEvent
+        public static void durdu(ServerStoppedEvent olay) {
+            SicaklikKapisi.coldSweatTesti(null);
+        }
     }
 
     private static ServerPlayer oyuncu(GameTestHelper y, String ad, double dx) {

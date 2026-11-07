@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Görsel otomasyonların ortak `OLCUM` satırlarından tek FPS tablosu (TSV; K-E29 (b), 5-matris #10).
 
-Kullanım: python3 tools/senaryo/olcum_tablosu.py [-o tablo.tsv] [--desen 'latest-*.log'] <dizin|log> ...
+Kullanım: python3 tools/senaryo/olcum_tablosu.py [-o tablo.tsv] [--desen 'latest-*.log,runClient-*.log'] <dizin|log> ...
 
-Dizinler özyinelemeli taranır (varsayılan desen `latest-*.log`; tsunami istemci log'u `runClient-*.log` için `--desen`),
-dosyalar doğrudan okunur. Satır biçimi (`client.core.GorselOtomasyon`):
+Dizinler özyinelemeli taranır (varsayılan desenler `latest-*.log` ve `runClient-*.log`, virgülle ayrılır; tsunami istemci
+log'unu yalnız `runClient-*.log` olarak saklar), dosyalar doğrudan okunur. Aynı klasörde aynı koşunun iki kopyası (`latest-<n>.log`
++ `runClient-<n>.log`) tek sayılır: (klasör, otomasyon, sahne, duvar_ms, cpu_ms, mspt, kare) aynı olan satırın ilki kalır. Satır biçimi (`client.core.GorselOtomasyon`):
 `OLCUM <otomasyon> sahne=<ad> kademe=<Düşük|Orta|Yüksek|Ultra> duvar_ms=.. cpu_ms=.. mspt=.. gradle=.. yabanci=.. kare=..
 taban=<ad|->`.
 
@@ -13,6 +14,7 @@ Tek FPS kuralı (K-E29 (b)) taban sahnesi verilmiş satırlara uygulanır. Taban
 - taban duvar_ms ≥ 10 → `oran`: duvar_ms ≤ 2 × taban;
 - taban duvar_ms < 10 → `mutlak`: cpu_ms ≤ 33,3 ve mspt < 50 ve yabanci ≤ 1.
 Sonuç: `gecti` / `kaldi`; tabanı bulunamayan `taban_yok`; kare sayısı 0 olan `olcum_yok`; tabansız satır `bilgi`.
+`tetik` sütunu duvar saati 30 FPS'in altındaki satırda `fps<30` yazar (K-E29 (b) görünür koşu tetikleyicisi; kural sonucunu değiştirmez).
 Log başına `KARE-KAPISI` özeti (alınan / geçersiz kare, A-34) ve kural sayımları stderr'e yazılır.
 
 Çıkış: 0 en az bir `OLCUM` satırı yazıldı, 1 hiç satır yok, 2 kullanım hatası.
@@ -27,7 +29,8 @@ OLCUM = re.compile(r"\bOLCUM (\S+) (.*)$")
 ALAN = re.compile(r"(\w+)=(\S+)")
 KAPI = re.compile(r"\bKARE-KAPISI \S+ \S+ kapi=(acik|GECERSIZ)\b")
 SUTUNLAR = ("log", "satir", "otomasyon", "sahne", "kademe", "duvar_ms", "fps", "cpu_ms", "mspt", "gradle", "yabanci",
-            "kare", "taban", "taban_ms", "kural", "sonuc")
+            "kare", "taban", "taban_ms", "kural", "sonuc", "tetik")
+TETIK_FPS = 30.0
 ORAN_ESIGI_MS = 10.0
 CPU_TAVANI_MS = 33.3
 MSPT_TAVANI = 50.0
@@ -87,7 +90,8 @@ def loglar(yollar, desen):
     for yol in yollar:
         p = Path(yol)
         if p.is_dir():
-            bulunan.extend(sorted(p.rglob(desen)))
+            for d in desen.split(","):
+                bulunan.extend(sorted(p.rglob(d.strip())))
         elif p.is_file():
             bulunan.append(p)
         else:
@@ -95,19 +99,30 @@ def loglar(yollar, desen):
     return list(dict.fromkeys(bulunan))
 
 
-def tablo(yollar, desen="latest-*.log"):
+VARSAYILAN_DESEN = "latest-*.log,runClient-*.log"
+
+
+def tablo(yollar, desen=VARSAYILAN_DESEN):
     """TSV satırları (başlık dahil) ve stderr özet satırları."""
     cikti = ["	".join(SUTUNLAR)]
     ozet = []
+    gorulen = set()
     for log in loglar(yollar, desen):
         satirlar, kapi = oku(log)
+        anahtarlar = {(str(log.parent), s["otomasyon"], s.get("sahne"), s["duvar_ms"], s["cpu_ms"], s.get("mspt"), s.get("kare"))
+                      for s in satirlar}
+        if satirlar and anahtarlar <= gorulen:
+            ozet.append(f"{log}: aynı koşunun kopyası, atlandı")
+            continue
+        gorulen |= anahtarlar
         sonuclar = {}
         for s in satirlar:
             taban_ms, ad, sonuc = kural(s, satirlar)
             sonuclar[sonuc] = sonuclar.get(sonuc, 0) + 1
             duvar = sayi(s["duvar_ms"])
             fps = f"{1000 / duvar:.1f}" if duvar > 0 else ""
-            deger = {**s, "fps": fps, "taban_ms": taban_ms, "kural": ad, "sonuc": sonuc}
+            tetik = "fps<30" if duvar > 0 and 1000 / duvar < TETIK_FPS else ""
+            deger = {**s, "fps": fps, "taban_ms": taban_ms, "kural": ad, "sonuc": sonuc, "tetik": tetik}
             cikti.append("	".join(str(deger.get(c, "")) for c in SUTUNLAR))
         if satirlar or any(kapi.values()):
             ozet.append(f"{log}: {len(satirlar)} OLCUM "
@@ -120,7 +135,7 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="OLCUM satırlarından tek FPS tablosu (TSV, K-E29 (b)).")
     ap.add_argument("yollar", nargs="+", help="dizin (özyinelemeli) ya da log dosyası")
     ap.add_argument("-o", "--cikti", help="TSV dosyası (yoksa stdout)")
-    ap.add_argument("--desen", default="latest-*.log", help="dizinlerde aranan dosya deseni")
+    ap.add_argument("--desen", default=VARSAYILAN_DESEN, help="dizinlerde aranan dosya desenleri (virgülle)")
     a = ap.parse_args(argv)
     cikti, ozet = tablo(a.yollar, a.desen)
     metin = "\n".join(cikti) + "\n"

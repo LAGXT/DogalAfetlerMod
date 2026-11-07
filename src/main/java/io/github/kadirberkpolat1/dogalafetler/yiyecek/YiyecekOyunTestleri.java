@@ -472,11 +472,14 @@ public final class YiyecekOyunTestleri {
     /**
      * F-18: Cold Sweat yüklüyken (kendi sistemimiz OTOMATIK kipte kapalı) sıcak yiyecek Cold Sweat çekirdek sıcaklığını etkinin
      * toplamı kadar artırır, bizim vücut sıcaklığımız değişmez. Cold Sweat yüklü değilse (varsayılan GameTest) sınanacak yol
-     * yoktur: test bunu log'a yazıp geçer; kanıt {@code -Puyum=coldsweat} koşusundadır.
+     * yoktur: test bunu log'a yazıp geçer; kanıt {@code -Puyum=coldsweat} koşusundadır. GameTest kapıyı Cold Sweat'siz saydığı için (K-E41)
+ * test gövdesinde gerçek değere geçer, sonra öncekini geri koyar.
      */
     @GameTest(template = "bos", batch = "yiyecek_coldsweat")
     public static void coldSweatYukluykenYiyecekCekirdegeGider(GameTestHelper y) {
+        Boolean oncekiKapi = SicaklikKapisi.coldSweatTesti(null);
         if (!SicaklikKapisi.coldSweatYuklu()) {
+            SicaklikKapisi.coldSweatTesti(oncekiKapi);
             DogalAfetler.LOGGER.info("Yiyecek GameTest: Cold Sweat yüklü değil, F-18 köprüsü sınanmadı (-Puyum=coldsweat ister)");
             y.succeed();
             return;
@@ -508,6 +511,7 @@ public final class YiyecekOyunTestleri {
             DogalAfetler.LOGGER.info("Yiyecek GameTest: F-18 Cold Sweat çekirdeği 0 -> {} (etki {})", cekirdek, beklenen);
             y.succeed();
         } finally {
+            SicaklikKapisi.coldSweatTesti(oncekiKapi);
             cikar(y, List.of(o));
         }
     }

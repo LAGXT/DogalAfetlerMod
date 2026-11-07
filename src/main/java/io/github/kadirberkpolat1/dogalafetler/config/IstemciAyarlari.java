@@ -16,8 +16,19 @@ public final class IstemciAyarlari {
         gorsel = AyarKaydi.istemciBolumu("gorsel", "Görsel ayarlar (madde 1)", Gorsel::new);
     }
 
+    private static volatile EfektKalitesi otomasyonKalitesi;
+
     public static EfektKalitesi efektKalitesi() {
-        return gorsel.get().efektKalitesi.get();
+        EfektKalitesi z = otomasyonKalitesi;
+        return z != null ? z : gorsel.get().efektKalitesi.get();
+    }
+
+    /**
+     * Yalnız görsel otomasyon: kademeyi config dosyasına yazmadan geçersiz kılar ({@code ConfigValue.set} Forge autosave ile
+     * dosyayı yazar, K-E28); {@code null} kullanıcının config değerine döner.
+     */
+    public static void otomasyonKalitesi(EfektKalitesi k) {
+        otomasyonKalitesi = k;
     }
 
     private static final class Gorsel {

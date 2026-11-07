@@ -3,6 +3,7 @@ package io.github.kadirberkpolat1.dogalafetler.client.core;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.config.EfektKalitesi;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.TpsKismasi;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
 import java.util.Arrays;
@@ -28,7 +29,8 @@ import net.minecraftforge.fml.util.ObfuscationReflectionHelper;
  * render thread CPU süresi ({@link ThreadMXBean}; makinedeki başka süreçlerin yükünden duvar saatinden az etkilenir)
  * {@code RenderTickEvent} START'tan START'a toplanır. Bitişte tek satır yazılır:
  * {@code OLCUM <otomasyon> sahne=<ad> kademe=<Düşük|Orta|Yüksek|Ultra> duvar_ms=.. cpu_ms=.. mspt=.. gradle=.. yabanci=..
- * kare=.. taban=..}. {@code duvar_ms} ve {@code cpu_ms} ortancadır; {@code mspt} entegre sunucunun ortalama tick süresi;
+ * kare=.. taban=..}. {@code duvar_ms} ve {@code cpu_ms} ortancadır; {@code mspt} entegre sunucunun son 100 tick'inin ortalaması ({@code tickTimes}; pencere 100 tick, üstel
+ * {@code getAverageTickTime} son ~10 tick'e bakardı);
  * {@code gradle} komut satırında {@code GradleWrapperMain} geçen süreçler, {@code yabanci} bunlardan bu istemciyi başlatan
  * sarmalayıcı (ata süreç) dışındakiler; {@code kare} penceredeki kare sayısı; {@code taban} aynı kameranın afetsiz taban
  * sahnesinin adı ya da {@code -}. {@code tools/senaryo/olcum_tablosu.py} satırları tek TSV'ye toplar ve kuralı uygular.
@@ -168,7 +170,7 @@ public final class GorselOtomasyon {
         IntegratedServer sunucu = Minecraft.getInstance().getSingleplayerServer();
         int[] g = gradle();
         Olcum o = new Olcum(olcumOtomasyon, olcumSahne, olcumKademe, ortanca(d), ortanca(c),
-                sunucu == null ? Double.NaN : sunucu.getAverageTickTime(), g[0], g[1], d.length);
+                sunucu == null ? Double.NaN : TpsKismasi.ortalamaMs(sunucu.tickTimes), g[0], g[1], d.length);
         DogalAfetler.LOGGER.info("OLCUM {} sahne={} kademe={} duvar_ms={} cpu_ms={} mspt={} gradle={} yabanci={} kare={} taban={}",
                 o.otomasyon(), o.sahne(), o.kademe(), sayi(o.duvarMs()), sayi(o.cpuMs()), sayi(o.mspt()), o.gradle(),
                 o.yabanci(), o.kare(), olcumTaban);

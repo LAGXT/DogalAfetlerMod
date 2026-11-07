@@ -35,12 +35,9 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.InputEvent;
-import net.minecraftforge.common.ForgeConfigSpec;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.config.ConfigTracker;
-import net.minecraftforge.fml.config.ModConfig;
 
 /**
  * Görsel kanıt otomasyonu (K0-21 rev. 2). Yalnız {@code -Ddogalafetler.otomasyon=gunes_patlamasi} ile tek oyunculu dünyada
@@ -50,7 +47,7 @@ import net.minecraftforge.fml.config.ModConfig;
  * Ultra FPS ölçümü (GP17, K-E29 (b); efekt kalitesi çalışma anında değişir, sonra Yüksek'e döner) → krater ve ateş →
  * kavrulma (4. gün sonu, 1. gün karesiyle aynı kamera kaydından) → doğal bitiş: süpernova çökmesi ve parlaması (evre
  * saniyesine bağlı, {@code hiz 0.25} ile ağır çekimde), kabuğu (en görünür ilerlemede, kamera süpernovaya dönük) →
- * güneşsiz → kızıl cüe doğuşu ve gündüzlük. Kamera en yakın ormanın {@value #UZAKLIK} blok batısında, ağaçların
+ * güneşsiz → kızıl cüce doğuşu ve gündüzlük. Kamera en yakın ormanın {@value #UZAKLIK} blok batısında, ağaçların
  * {@value #KAMERA_YUKSEKLIGI} blok üstünde uçan yaratıcı oyuncudur (izleyici meteor yağmurunun hedefi olmaz); kavrulma
  * kareleri aynı noktadan {@value #KAVRULMA_YUKSEKLIGI} blok üstten ormana hafif aşağı bakar (ağaçlık ve çimen kadrajda).
  * Her adımın eylemi istemci akıcıyken başlar (zamana bağlı kareler FPS kapısını eylemden önce geçer); kare
@@ -184,11 +181,11 @@ public final class GunesPatlamasiOtomasyonu {
                 komut(s, "dogalafet hiz 1", "time set 6000", "dogalafet donma 100");
                 kamera(s, -90f, -60f);
             }, () -> sayac >= 140, "gunessiz", 400),
-            new Adim("kızıl cüe doğuşu", s -> {
+            new Adim("kızıl cüce doğuşu", s -> {
                 komut(s, "time set 23600", "dogalafet kizilcuce baslat", "dogalafet hiz 4");
                 kamera(s, -90f, -8f);
             }, () -> evre(GunesEvresi.KIZIL_CUCE) && donem().evreIlerlemesi() >= 0.3f, "kizil_cuce_dogus", 900),
-            new Adim("kızıl cüe gündüz", s -> {
+            new Adim("kızıl cüce gündüz", s -> {
                 komut(s, "dogalafet hiz 1", "dogalafet asama ileri gunes_zinciri", "time set 3000");
                 kamera(s, -90f, -35f);
             }, () -> sayac >= 140 && evre(GunesEvresi.KIZIL_CUCE) && donem().evreIlerlemesi() >= 1f,
@@ -315,7 +312,7 @@ public final class GunesPatlamasiOtomasyonu {
             }
         } else if (sayac - olcumBas >= OLCUM_TICK) {
             GorselOtomasyon.olcumBitir();
-            kalite(EfektKalitesi.YUKSEK);
+            kalite(null);
             sonraki();
         }
     }
@@ -341,16 +338,12 @@ public final class GunesPatlamasiOtomasyonu {
         olcumBas = -1;
     }
 
-    /** Efekt kalitesini (CLIENT {@code gorsel.efektKalitesi}) çalışma anında değiştirir; dosyaya yazılmaz. */
-    @SuppressWarnings("unchecked")
+    /**
+     * Efekt kalitesini çalışma anında geçersiz kılar (config dosyasına yazılmaz, K-E28); {@code null} kullanıcının değerine döner.
+     */
     private static void kalite(EfektKalitesi k) {
-        for (ModConfig c : ConfigTracker.INSTANCE.configSets().get(ModConfig.Type.CLIENT)) {
-            if (DogalAfetler.MOD_ID.equals(c.getModId()) && c.getSpec() instanceof ForgeConfigSpec spec
-                    && spec.getValues().get("gorsel.efektKalitesi") instanceof ForgeConfigSpec.EnumValue<?> deger) {
-                ((ForgeConfigSpec.EnumValue<EfektKalitesi>) deger).set(k);
-            }
-        }
-        DogalAfetler.LOGGER.info(ON + "KALITE istenen={} etkin={}", k, IstemciAyarlari.efektKalitesi());
+        IstemciAyarlari.otomasyonKalitesi(k);
+        DogalAfetler.LOGGER.info(ON + "KALITE istenen={} etkin={}", k == null ? "kullanıcı" : k, IstemciAyarlari.efektKalitesi());
     }
 
     private static DonemPaketi donem() {
