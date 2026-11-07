@@ -278,7 +278,9 @@ hasarı alır. Afet dönemleri yine hissedilir:
   sıcaklığına `dogalafetler:donem` değiştiricisiyle eklenir.
 - Sıcaklık yiyeceklerinin etkisi Cold Sweat'in çekirdek sıcaklığına aktarılır; azalan verim ve yiyecek efekti sürer.
 
-`ACIK` seçilirse iki sistem aynı anda çalışır ve oyuncu ikisinden de hasar alabilir; önerilmez.
+Varsayılan kipte Cold Sweat yüklüyken modun kendi sıcaklık hasarı verilmediği ölçüldü (çok soğukta ve tam donmada can
+değişmedi); oyun içi testlerin hepsi Cold Sweat yüklüyken de geçiyor. `ACIK` seçilirse iki sistem aynı anda çalışır ve
+oyuncu ikisinden de hasar alabilir; önerilmez.
 
 ## Ses ve doku dosyaları
 
@@ -561,12 +563,18 @@ Başarım sekmesi arka planı.
 ## Bilinen sınırlar
 
 - **FPS ölçümü:** geliştirme ortamında oyun penceresi gizli çalışma alanında çizildiği için (pencere yöneticisi kare hızını
-  ~1 FPS'e kısıyor) Düşük/Yüksek/Ultra FPS'i güvenilir ölçülemedi; sunucu tarafı (TPS, tick süresi) ölçüldü. Kendi
-  bilgisayarınızda yavaşlık görürseniz önce `gorsel.efektKalitesi`'ni `ORTA` ya da `DUSUK` yapın.
-- **Çok oyunculu:** dedicated sunucu, sahte oyuncular ve tek gerçek istemciyle sınandı; birden çok gerçek istemcinin aynı anda
-  bağlı olduğu bir oturum denenmedi.
-- **e4mc:** e4mc üzerinden internetten gerçek bir arkadaş oturumu geliştirme sırasında denenmedi.
-- **Cold Sweat:** `sicaklikSistemiModu = ACIK` iken iki sistemin birlikte verdiği hasar ölçülmedi.
+  kısıyor) ekranda görülen FPS ölçülemedi. Onun yerine kare başına işlemci süresi ölçüldü: asit yağmuru, orman yangını,
+  kasırga, tsunami ve sanal suyun en yoğun (seviye 5) sahnesinde Yüksek kalitede sınırın altında kaldı; ay çarpması ve güneş
+  patlamasının afetsiz karşılaştırma sahnesi olmadığından onların değerleri ön değerdir. Sunucu tarafı (TPS, tick süresi) ölçüldü.
+  Kendi bilgisayarınızda yavaşlık görürseniz önce `gorsel.efektKalitesi`'ni `ORTA` ya da `DUSUK` yapın.
+- **Çok oyunculu:** dedicated sunucuya (Cold Sweat'li dahil) tek gerçek istemciyle bağlanıldı; 2–10 oyunculu durumlar oyun içi
+  testlerde sahte oyuncularla sınandı. Birden çok gerçek istemcinin aynı anda bağlı olduğu bir oturum denenmedi.
+- **Sonradan giren oyuncu:** afet ya da dönem sürerken sunucuya giren oyuncunun doğru gökyüzünü aldığı oyun içi testle
+  doğrulandı; ekran görüntüsüyle denetlenmedi.
+- **Gamerule tab tamamlaması:** kurallar okunup yazıldı ve yeniden açılışta korundu; `/gamerule` öneri listesi ekranda denetlenmedi.
+- **e4mc:** e4mc üzerinden internetten gerçek bir arkadaş oturumu geliştirme sırasında denenmedi (internet bağlantısı ister).
+- **Cold Sweat:** varsayılan `OTOMATIK` kipte Cold Sweat yüklüyken çift hasar olmadığı ölçüldü (çok soğukta ve tam
+  donmada can değişmedi); `sicaklikSistemiModu = ACIK` iken iki sistemin birlikte verdiği hasar ölçülmedi.
 - **Gamerule ve elle başlatılan güneş patlaması:** `/dogalafet start` ile başlatılan güneş patlaması gamerule'den etkilenmez;
   ama ardından gelen dönem süreci `gunesPatlamasiAfeti false` iken durur.
 - **Güneş zinciri:** `gunesPatlamasiAfeti` süpernovanın başladığı anda kapatılırsa güneş zinciri durmadan önce en çok 1 saniye

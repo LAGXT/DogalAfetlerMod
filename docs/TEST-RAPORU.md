@@ -23,7 +23,7 @@ ana makinede koştu (`5-matris`, K-E43 öncesi; kasırga senaryosu pc2).
 | 13 | Chunk yetişmesi | uzak bir chunk'a git, `/dogalafet donma 60`, geri dön; kızıl cüce döneminde `kizilcuce bilgi` ile kalıcı kış ve ılık bölge | dönülen chunk hedef seviyeye adım adım yetişir, TPS düşmez; kış bölgesi donmuş kalır, sınırda geçiş yumuşak | `7d393d8`'de donma istemci koşusu 12 kare (992 sn), `donma 60` + dönüş + `kizilcuce bilgi`, ilerleme kayıttan kalıcı (`.vibe/kanit/matris-5/wt/istemci/donma/`); GameTest `chunkYetismesiAdimAdimVeButceAsilmaz` (#3). | yeşil |
 | 14 | Gamerule'lar | her kural `/gamerule <ad>` ile okunur ve değiştirilir | tab tamamlama çalışır; kapalı afet seçilmez, başlamış afet güvenle biter; ulaşılmış dönemler geri alınmaz | `7d393d8`'de 13 gamerule okundu, yazıldı ve yeniden açılışta korundu (`.vibe/kanit/matris-5/wt/sunucu/ek-2/ozet.txt`); kapalı afetin seçilmemesi ve başlamış afetin bitmesi GameTest'te (`kapaliKuralliAfetSecilmez`, `gercekGunesKuralKapanincaIptalKuralVeDevam`); tab tamamlama karesi otomasyon olmadığı için alınmadı (bilinen sınır). | bilinen sınır |
 | 15 | Sanal su | tsunami, mağara suyu ve deniz yükselmesi öncesi ve sonrası etkilenen bölgedeki blokların sayımı ya da hash'i; GameTest ve istemcide sanal suya giren oyuncu ve mob | bloklar birebir aynı (harita bozulmadı; mağara suyu kuruduktan sonra iz yok); oyuncu sanal suda yüzer, havası azalır ve boğulur, sürüklenir, ıslanır (sıcaklık); mob'lar da etkilenir | `7d393d8`'de tsunami ve su senaryoları 0, tsunami 23 + su 9 kare (mağara önce/sonra/sualtı/kuruyor, dalga, avcı; `.vibe/kanit/matris-5/wt/istemci/{tsunami,su}/`), hash ve yüzme/boğulma GameTest'leri geçti (#3); kareler şef incelemesinde. | yeşil |
-| 16 | Başarımlar | 27 başarımın her biri komut ve senaryolarla tetiklenir | her biri doğru oyuncuda açılır; toast ve sohbet duyurusu; ödüller verilir; gizli olanlar açılana kadar görünmez | 27/27 başarım GameTest'te kazanılır (#3); gerçek afetle 8/27 (#1, #3, #5, #6, #8, #12, #13, #14), başarım istemci koşusu 12 kare toast/sohbet (`.vibe/kanit/matris-5/wt/istemci/basarim/`). | yeşil |
+| 16 | Başarımlar | 27 başarımın her biri komut ve senaryolarla tetiklenir | her biri doğru oyuncuda açılır; toast ve sohbet duyurusu; ödüller verilir; gizli olanlar açılana kadar görünmez | 27/27 başarım GameTest'te kazanılır (#3); gerçek afetle 12/27 kanıtlı (liste `.vibe/rapor/matris-5.md` #16), başarım istemci koşusu 12 kare toast/sohbet (`.vibe/kanit/matris-5/wt/istemci/basarim/`). | yeşil |
 
 ## Faz 0 notu
 
@@ -78,6 +78,14 @@ kararları (Faz 5)" K-E45, K-E46): **9 yeşil** (#1–#4, #11, #12, #13, #15, #1
 uyarı istemcili koşu), **3 bilinen sınır** (#8, #10, #14), **2 bekliyor** (#5 installer, #9 e4mc; kullanıcı sorusu 4). #6, #11, #12,
 #13 ve #15'in kareleri şef incelemesinde. Birleşik `main` (`00d1500` sonrası) istemci yeniden koşusu (#6/#10, Ts2-1 `tsunami_gorsel.py
 kopuk` karesi, yeni `SuOtomasyon` kapısı) şef kararını bekliyor.
+
+## Üretim jar'ında test afeti
+
+`OyunTestiAfeti` sınıfları jar'da var ama yalnız `dogalafetler.oyunTestiAfeti` sistem özelliğiyle kaydedilir (`DogalAfetler.java:70`
+`OyunTestiAfeti.ozelliktenKaydet()`, özellik yoksa hiçbir şey yapmaz; özelliği yalnız `build.gradle`'ın `-PoyunTestiAfeti` run ayarı verir):
+`cekirdek_sunucu.py`'nin bayraklı kosu1/kosu2'sinde 4'er "Oyun testi" satırı (kasıtlı taklit denetimi), bayraksız kosu3'te ve `5-matris`'in
+diğer 22 senaryo log'unda 0 (`.vibe/kanit/k-e44-dogrulama/sunucu-cekirdek/`, `.vibe/kanit/matris-5/wt/sunucu/`); jar `00d1500`
+(sha256 `687a9cef…4800a`), kayıt yolu o tarihten beri değişmedi. Üretim sunucusu koşusu (#5) kullanıcı sorusu 4'ü bekliyor.
 
 ## Bilinen sınırlar
 
