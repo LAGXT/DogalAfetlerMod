@@ -40,4 +40,13 @@ class YagmurCarpmasiTest {
         assertEquals(YagmurCarpmasi.YAN, YagmurCarpmasi.karar(64.3, 63.15, 65.0, 64.0), "yüzeyden geçti ama bloka yandan");
         assertEquals(67.0, YagmurCarpmasi.karar(67.5, 66.35, 65.0, 67.0), "yüzeye üstten");
     }
+
+    @Test
+    void ustYuzuCizilmeyenGercekSuyaDamlaHalkasizSonerYaDaSanalSuyaIner() {
+        double gizli = YagmurCarpmasi.GIZLI;
+        assertEquals(YagmurCarpmasi.YAN, YagmurCarpmasi.karar(60.3, 59.15, gizli, Double.NaN), "çekilmenin gizlediği katmanın altı, sanal su yok");
+        assertEquals(YagmurCarpmasi.YAN, YagmurCarpmasi.karar(60.3, 59.15, gizli, 58.0), "sanal yüzey daha aşağıda: görünmez suda asılı kalmasın");
+        assertEquals(60.6, YagmurCarpmasi.karar(61.2, 60.05, gizli, 60.6), "alçalmış sanal yüzeyi bu tick geçti");
+        assertEquals(YagmurCarpmasi.YAN, YagmurCarpmasi.karar(60.3, 59.15, gizli, 60.6), "sanal yüzeyin zaten altındaydı");
+    }
 }

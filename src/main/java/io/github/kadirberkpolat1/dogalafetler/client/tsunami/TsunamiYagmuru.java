@@ -63,6 +63,8 @@ public final class TsunamiYagmuru {
     static final float HALKA_YARICAPI = 0.405f;
     /** Halkanın dört ucundaki yüzeyin merkezdekinden en çok farkı (iki piksel; kıyıda su 0,89, kum 1). */
     private static final double DESTEK_PAYI = 0.125;
+    /** Sanal su halkası ile o sütunda çizilen su üstü arasındaki en çok fark (ağ dalgacığı ve bir iki tick'lik gecikme). */
+    private static final double SANAL_PAYI = 0.35;
 
     private static final float[] DX = new float[MAKS_DAMLA];
     private static final float[] DY = new float[MAKS_DAMLA];
@@ -100,34 +102,36 @@ public final class TsunamiYagmuru {
 
     /** Bir halkanın ölçüt durumu (yalnız otomasyon). */
     private record HalkaDurumu(String kaynak, String destek, double x, double y, double z, double gozFark, boolean gorunur,
-            boolean cizilen, int kenar, boolean suAlti) {
+            boolean cizilen, int kenar, boolean dalgaAlti) {
     }
 
     /**
-     * Otomasyon kabul ölçütü (inceleme Af2), halkayı koyan sorgudan ayrı yoldan: {@code goz_ustu} göz hizasının üstünde olup
-     * kameradan görünen halka (merkezine ya da bir ucuna ışın engelsiz; yüzeyin tepesi alttan görünmez, halka asılı durur);
-     * {@code cizimsiz} altında bu karede çizilen yüzey olmayan halka (bloğun çizim şekli yok, gerçek su çekilmede gizli ya da
-     * üst yüzü çizilmiyor, sanal su sütunu {@link SuRenderer} yakın halkasında yok); {@code kenarsiz} dört ucundan birinin 0,5
-     * blok altında çizilen bir yüzey olmayan halka. {@code su_alti} üstüne sanal su yükselmiş blok halkası, ölçüte girmez;
-     * {@code goz_ustu_ham} göz hizasının üstündeki bütün halkalar (görünmeyenler dahil).
+     * Otomasyon kabul ölçütü (inceleme Af2), halkayı koyan fizik sorgusundan ayrı, çizim durumuna bakan yoldan: {@code goz_ustu}
+     * göz hizasının üstünde olup kameradan görünen halka (merkezine ya da bir ucuna ışın engelsiz; yüzeyin tepesi alttan
+     * görünmez, halka asılı durur); {@code cizimsiz} altında bu karede çizilen yüzey olmayan halka (bloğun çizim şekli yok,
+     * gerçek suyun üst yüzü çizilmiyor, sanal su sütununu hiçbir ağ çizmiyor ya da çizilen su üstü halkadan
+     * {@link #SANAL_PAYI}'ndan alçak: {@link SuRenderer#cizilenUst}); {@code kenarsiz} dört ucundan birinin altında 0,5 blok
+     * içinde çizilen yüzey olmayan (ve ucu bir bloka ya da suya gömülü olmayan) halka. {@code dalga_alti} üstüne çizilen ya
+     * da yükselen sanal su gelmiş halka (havada değil, suyun altında), üç ana sayıya girmez; {@code goz_ustu_ham} göz hizasının
+     * üstündeki bütün halkalar.
      */
     static String olcut() {
         int gozUstu = 0;
         int gozUstuHam = 0;
         int cizimsiz = 0;
         int kenarsiz = 0;
-        int suAlti = 0;
+        int dalgaAlti = 0;
         for (HalkaDurumu d : halkaDurumlari()) {
             gozUstuHam += d.gozFark() > 0 ? 1 : 0;
-            if (d.suAlti()) {
-                suAlti++;
+            if (d.dalgaAlti()) {
+                dalgaAlti++;
                 continue;
             }
             gozUstu += d.gozFark() > 0 && d.gorunur() ? 1 : 0;
             cizimsiz += d.cizilen() ? 0 : 1;
             kenarsiz += d.kenar() < 4 ? 1 : 0;
         }
-        return "goz_ustu=" + gozUstu + " cizimsiz=" + cizimsiz + " kenarsiz=" + kenarsiz + " su_alti=" + suAlti
+        return "goz_ustu=" + gozUstu + " cizimsiz=" + cizimsiz + " kenarsiz=" + kenarsiz + " dalga_alti=" + dalgaAlti
                 + " goz_ustu_ham=" + gozUstuHam;
     }
 
@@ -137,7 +141,7 @@ public final class TsunamiYagmuru {
         for (HalkaDurumu d : halkaDurumlari()) {
             satirlar.add(String.format(Locale.ROOT, "%s %s (%.2f %.2f %.2f) goz%+.2f gorunur=%s cizilen=%s kenar=%d/4%s",
                     d.kaynak(), d.destek(), d.x(), d.y(), d.z(), d.gozFark(), d.gorunur() ? "E" : "H",
-                    d.cizilen() ? "E" : "H", d.kenar(), d.suAlti() ? " su_alti" : ""));
+                    d.cizilen() ? "E" : "H", d.kenar(), d.dalgaAlti() ? " dalga_alti" : ""));
         }
         return satirlar;
     }
@@ -157,14 +161,16 @@ public final class TsunamiYagmuru {
             int bx = Mth.floor(x);
             int bz = Mth.floor(z);
             double su = SanalSu.suSeviyesi(l, bx, bz);
+            double ciz = SuRenderer.cizilenUst(bx, bz);
             String kaynak;
             String destek;
             boolean cizilen;
+            boolean dalgaAlti;
             if (HSANAL[i]) {
-                double ciz = SuRenderer.cizilenUst(bx, bz);
                 kaynak = "SANAL";
                 destek = String.format(Locale.ROOT, "su=%.2f cizilen=%.2f", su, ciz);
-                cizilen = Math.abs(ciz - h) <= 0.35;
+                cizilen = Math.abs(ciz - h) <= SANAL_PAYI;
+                dalgaAlti = ciz > h + SANAL_PAYI;
             } else {
                 P.set(bx, Mth.floor(h - 1e-3), bz);
                 BlockState s = l.getBlockState(P);
@@ -176,17 +182,19 @@ public final class TsunamiYagmuru {
                     cizilen = s.getRenderShape() != RenderShape.INVISIBLE;
                 } else if (!f.isEmpty() && Math.abs(P.getY() + f.getHeight(l, P) - h) <= 0.05) {
                     kaynak = "SIVI";
-                    cizilen = !SuGizleme.gizliMi(l, P, f) && !l.getFluidState(P.above()).getType().isSame(f.getType());
+                    double t = siviUstu(l, P, f);
+                    cizilen = !Double.isNaN(t) && t != YagmurCarpmasi.GIZLI;
                 } else {
                     kaynak = "YOK";
                     cizilen = false;
                 }
+                dalgaAlti = su > h + 0.05 || ciz > h + 0.05;
             }
             int kenar = 0;
             for (int u = 0; u < 4; u++) {
                 double px = x + (u == 0 ? HALKA_YARICAPI : u == 1 ? -HALKA_YARICAPI : 0);
                 double pz = z + (u == 2 ? HALKA_YARICAPI : u == 3 ? -HALKA_YARICAPI : 0);
-                kenar += cizilenDestek(l, px, h, pz, HSANAL[i]) ? 1 : 0;
+                kenar += cizilenDestek(l, px, h, pz) ? 1 : 0;
             }
             boolean gorunur = false;
             for (int u = 0; u < 5 && h > goz.y && !gorunur; u++) {
@@ -195,36 +203,33 @@ public final class TsunamiYagmuru {
                 gorunur = l.clip(new ClipContext(goz, hedef, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, mc.player))
                         .getType() == HitResult.Type.MISS;
             }
-            sonuc.add(new HalkaDurumu(kaynak, destek, x, h, z, h - goz.y, gorunur, cizilen, kenar,
-                    !HSANAL[i] && su > h + 0.05));
+            sonuc.add(new HalkaDurumu(kaynak, destek, x, h, z, h - goz.y, gorunur, cizilen, kenar, dalgaAlti));
         }
         return sonuc;
     }
 
     /**
-     * Ölçüt: {@code (px, pz)} noktasının 0,5 blok altına kadar çizilen bir yüzey: bloğun çizilen şekli (çarpışmasız da olsa),
-     * görünen gerçek sıvı; sanal su halkasında {@link SuRenderer}'ın o sütunda çizdiği su üstü.
+     * Ölçüt: halkanın {@code (px, h, pz)} ucunun altında 0,5 blok içinde ya da üstünde çizilen bir yüzey: herhangi bir ağın
+     * çizdiği sanal su üstü, bloğun çizilen şekli (çarpışmasız da olsa), üst yüzü çizilen gerçek sıvı. Ucu bir bloka gömülü
+     * olan da desteklidir (görünmez, asılı değil).
      */
-    private static boolean cizilenDestek(ClientLevel l, double px, double h, double pz, boolean sanal) {
+    private static boolean cizilenDestek(ClientLevel l, double px, double h, double pz) {
         int bx = Mth.floor(px);
         int bz = Mth.floor(pz);
-        if (sanal) {
-            double ciz = SuRenderer.cizilenUst(bx, bz);
-            return ciz >= h - 0.5 && ciz <= h + 0.35;
+        if (SuRenderer.cizilenUst(bx, bz) >= h - 0.5) {
+            return true;
         }
-        for (int by = Mth.floor(h - 1e-3); by >= Mth.floor(h - 0.5); by--) {
+        for (int by = Mth.floor(h); by >= Mth.floor(h - 0.5); by--) {
             P.set(bx, by, bz);
             BlockState s = l.getBlockState(P);
-            if (s.getRenderShape() != RenderShape.INVISIBLE) {
-                double t = by + s.getShape(l, P).max(Direction.Axis.Y, pz - bz, px - bx);
-                if (t >= h - 0.5 && t <= h + 0.05) {
-                    return true;
-                }
+            if (s.getRenderShape() != RenderShape.INVISIBLE
+                    && by + s.getShape(l, P).max(Direction.Axis.Y, pz - bz, px - bx) >= h - 0.5) {
+                return true;
             }
             FluidState f = s.getFluidState();
-            if (!f.isEmpty() && !SuGizleme.gizliMi(l, P, f)) {
-                double t = by + f.getHeight(l, P);
-                if (t >= h - 0.5 && t <= h + 0.05) {
+            if (!f.isEmpty()) {
+                double t = siviUstu(l, P, f);
+                if (t != YagmurCarpmasi.GIZLI && t >= h - 0.5) {
                     return true;
                 }
             }
@@ -334,7 +339,7 @@ public final class TsunamiYagmuru {
                 continue;
             }
             if (yuzey != YagmurCarpmasi.YAN && YAKIN[i] && halka < MAKS_HALKA
-                    && (sonSanal || tabanli(l, DX[i], yuzey, DZ[i]))) {
+                    && (sonSanal ? sanalCizili(DX[i], yuzey, DZ[i]) : tabanli(l, DX[i], yuzey, DZ[i]))) {
                 HX[halka] = DX[i];
                 HY[halka] = (float) yuzey + 0.02f;
                 HZ[halka] = DZ[i];
@@ -346,14 +351,26 @@ public final class TsunamiYagmuru {
         }
     }
 
-    /** Sanal su halkası yüzeyle iner kalkar (dalga geçerken eski yükseklikte asılı kalmasın); su çekilince söner. */
+    /**
+     * Sanal su halkası yüzeyle iner kalkar (dalga geçerken eski yükseklikte asılı kalmasın); su çekilince ya da o sütunun
+     * çizilen su üstü yüzeyden ayrılınca söner.
+     */
     private static boolean yuzeydeKal(ClientLevel l, int i) {
         double su = SanalSu.suSeviyesi(l, Mth.floor(HX[i]), Mth.floor(HZ[i]));
         if (Double.isNaN(su)) {
             return false;
         }
         HY[i] = (float) su + 0.02f;
-        return true;
+        return sanalCizili(HX[i], su, HZ[i]);
+    }
+
+    /**
+     * Sanal su halkası yalnız o sütunda bu karede çizilen su üstüne konur ({@link SuRenderer#cizilenUst}, {@link #SANAL_PAYI}
+     * içinde). Yakın su ağı henüz kurulmamışsa (yavaş makinede ilk yapım ~150 tick; uzak LOD o bölgeyi çizmez) ya da ağ
+     * yüzeyin gerisinde kaldıysa analitik yüzeydeki halka görünmeyen suyun üstünde asılı kalıyordu.
+     */
+    private static boolean sanalCizili(double x, double h, double z) {
+        return Math.abs(SuRenderer.cizilenUst(Mth.floor(x), Mth.floor(z)) - h) <= SANAL_PAYI;
     }
 
     /**
@@ -399,7 +416,8 @@ public final class TsunamiYagmuru {
 
     /**
      * {@code by} hücresinde {@code (px, pz)} noktasının görünen tepesi: katı bloğun çizilen şekli (çit ve duvarın çarpışma kutusu
-     * 1,5 blok, görünen direği 1 blok) ya da çekilmenin gizlemediği gerçek sıvı ({@link SuGizleme#gizliMi}); ikisi de yoksa NaN.
+     * 1,5 blok, görünen direği 1 blok) ya da üst yüzü çizilen gerçek sıvı ({@link #siviUstu}); ikisi de yoksa NaN, yalnız üst
+     * yüzü çizilmeyen gerçek su varsa {@link YagmurCarpmasi#GIZLI}.
      */
     private static double noktaYuzeyi(ClientLevel l, double px, int by, double pz) {
         int bx = Mth.floor(px);
@@ -414,11 +432,30 @@ public final class TsunamiYagmuru {
             }
         }
         FluidState f = s.getFluidState();
-        if (!f.isEmpty() && !SuGizleme.gizliMi(l, P, f)) {
-            double t = by + f.getHeight(l, P);
-            h = Double.isNaN(h) ? t : Math.max(h, t);
+        if (!f.isEmpty()) {
+            double t = siviUstu(l, P, f);
+            if (t == YagmurCarpmasi.GIZLI) {
+                return Double.isNaN(h) ? t : h;
+            }
+            if (!Double.isNaN(t)) {
+                h = Double.isNaN(h) ? t : Math.max(h, t);
+            }
         }
         return h;
+    }
+
+    /**
+     * {@code p}'deki gerçek sıvının bu karede çizilen üst yüzü: çekilmenin gizlediği katmandaysa NaN (damla görünmez hücreden
+     * geçer, {@link SuGizleme#gizliMi}); üstünde aynı sıvı varsa (gizli katmanın altı, üst yüz çizilmez)
+     * {@link YagmurCarpmasi#GIZLI}; yoksa yüzey yüksekliği. {@code p} çağrıdan sonra aynı konumdadır.
+     */
+    private static double siviUstu(ClientLevel l, BlockPos.MutableBlockPos p, FluidState f) {
+        if (SuGizleme.gizliMi(l, p, f)) {
+            return Double.NaN;
+        }
+        boolean ortulu = l.getFluidState(p.move(Direction.UP)).getType().isSame(f.getType());
+        p.move(Direction.DOWN);
+        return ortulu ? YagmurCarpmasi.GIZLI : p.getY() + f.getHeight(l, p);
     }
 
     private static void damlaSil(int i) {
