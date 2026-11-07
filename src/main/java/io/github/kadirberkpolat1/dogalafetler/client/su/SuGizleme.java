@@ -7,6 +7,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import net.minecraft.core.BlockPos;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.world.level.BlockAndTintGetter;
+import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.material.FluidState;
 
 /** Çekilme: gerçek suyun üst katmanlarını tesselatörde atlatır (chunk derleme iş parçacıklarında çağrılır). */
@@ -22,6 +23,15 @@ public final class SuGizleme {
     }
 
     public static boolean gizli(BlockAndTintGetter g, BlockPos pos, FluidState fs) {
+        if (gizliMi(g, pos, fs)) {
+            GIZLENEN.incrementAndGet();
+            return true;
+        }
+        return false;
+    }
+
+    /** Gerçek su bloğu çekilmenin gizlediği üst katmanlarda mı (sayaçsız; yağmur da sorar). */
+    public static boolean gizliMi(BlockGetter g, BlockPos pos, FluidState fs) {
         SanalSuDunyasi d = SanalSu.istemci;
         if (d == null || !fs.is(FluidTags.WATER)) {
             return false;
@@ -37,7 +47,6 @@ public final class SuGizleme {
         for (int j = 1; j <= k; j++) {
             m.setY(pos.getY() + j);
             if (!g.getFluidState(m).is(FluidTags.WATER)) {
-                GIZLENEN.incrementAndGet();
                 return true;
             }
         }

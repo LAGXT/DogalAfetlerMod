@@ -108,3 +108,12 @@ Kaynak: `.vibe/kararlar/kasirga.md` K-01…K-12.
 - **Şimşek (K-08):** sunucuda vanilla `LightningBolt` (yalnız görsel); herkes aynı şimşeği görür.
 - **Yağmur yoğunluğu:** dünya havasını değiştirmeden istemcide artırılamaz; yapılmadı (kararlar §D).
 - **Yakın mesafe (spike B9):** sprite boyutu kameraya uzaklığın %36'sıyla sınırlı, kamera huninin/eteğin içindeyken iç katmanlar atlanır; duvar bulutu alfası 0,88 → 0,74.
+
+## Ek: afet-fizik (2026-11-07)
+
+Sorun: K-04 rastgele sütunun yalnız en üst bloğunu alıyordu; uçan blok tavanı (40) doluyken S5'te tick başına 5 parça ~2900 sütuna dağıldığı için ağacın tepe yaprak katmanı gidiyor, gövdeye hiç sıra gelmiyordu. Yeni kurallar `KasirgaYikimi` (saf, JUnit):
+
+- **Çekim olasılığı seviye × uzaklık:** sütun, yıkım yarıçapında (çekim yarıçapının %60'ı = etek) rastgele seçilir ve huni taban yarıçapı içinde seviyenin tam olasılığıyla (S1 0,6 … S4-5 1), kenara doğru doğrusal azalarak (S1 0,15 … S5 0,35) çekilir. Sütun denemesi K-04 denemesinin S1-2 1, S3 1,5, S4 2, S5 2,5 katı.
+- **Sütun taraması:** en üstten aşağı S1-2 1, S3 3, S4 4, S5 6 blok. En üstte eski kural (sertlik, zemin yalnız S4-5); altında yaprak ve bitki S3+, kütük S4+, ahşap yapı (tahta, ahşap merdiven/basamak/çit/çit kapısı/kapak) S5; zemin ve diğerleri hiç. Kaldırılamayan ilk blokta durur, sığınağın altı kazılmaz.
+- **Ağaç devrilir (S4-5):** taramada dikey kütüğe varılınca gövdenin kesintisiz kütükleri tepeden başlayarak kalkar (tick başına en çok S4 8, S5 12 kütük × evre payı × kısma; tavan doluyken yatırılan kütük parça bütçesinden düşer, beş katlı gövde iki ziyarette devrilir). Tavanda yer varsa uçar, yoksa siklonik teğet rüzgâr yönüne gövde dibinin ±2 bloğundaki zemine yatay konur (devrik kütük; tepedeki kütük en uzağa); yer yoksa parçalanır.
+- **Parça ve eşya:** K-04 ile aynı (tavan doluyken denemenin ¼'ü, S5 5; eşya 1/16); tick başına değişen blok ve eşya K-04'ü aşmaz. Seviyeyle artan parça payı (S5 8) dedicated S5'te ortalama tick'i 4,3 ms'den 7,4 ms'ye çıkardığı için geri alındı. Tavan (40) değişmedi.

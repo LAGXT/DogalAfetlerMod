@@ -1,11 +1,15 @@
 package io.github.kadirberkpolat1.dogalafetler.afet.tsunami;
 
+import io.github.kadirberkpolat1.dogalafetler.afet.ortak.AfetBloklari;
+import io.github.kadirberkpolat1.dogalafetler.afet.ortak.mantik.BlokRolu;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.util.ArrayDeque;
 import java.util.Iterator;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -16,6 +20,7 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraftforge.common.Tags;
@@ -23,20 +28,28 @@ import net.minecraftforge.common.Tags;
 /**
  * Yıkım koreografisi (tasarım notu §2): cephe ilerledikçe önündeki 3 blokluk şeridin sütunları kuyruğa girer; sütun taraması
  * dalga tepesinden tabanın bir altına kadar yıkılabilir blokları sınıfına göre gecikmeyle sıraya koyar: önce yaprak, çit, cam,
- * halı (anında), sonra ahşap (0,3 sn), sonra taş yapı (0,6 sn, yalnız S4–5). Doğal arazi (toprak, kum, taş), çimen ve çiçek
- * gibi bitkiler, sıvı içeren ve blok varlıklı (sandık, tabela) bloklar yıkılmaz (her kırılan blok istemcide bölüm yeniden derler;
- * çayırı düzlemek S5'te FPS'i ve TPS'i çökertti). Kırılan ahşap/taş blok {@code tsunami.yikimEsyaOrani} olasılıkla eşya
- * bırakır (dalga onu sürükler), tick başına en çok {@value #DUSURME_TICK}, afet başına {@code 16·seviye}; tick başına en
- * çok {@code Ayar.efekt} kırılma efekti (ses + parçacık; config {@code tsunami.yikimEfektTick}). Blok komşu güncellemesi
- * olmadan değişir ({@link #BAYRAK}):
+ * halı (anında), sonra ahşap (0,3 sn), sonra taş yapı (0,6 sn, yalnız S4–5). Ortak dekor blokları
+ * ({@code #dogalafetler:afet_dekor}: fener, zincir, meşale, tabela, bayrak, saksı, kapı, çit) her seviyede sertliğe bakılmadan
+ * anında, envanterli kaplar (fıçı, sandık, fırın) S3+'ta ahşapla birlikte içerikleri dökülerek kırılır
+ * ({@link TsunamiSeviyesi#rolYikar}). Doğal arazi (toprak, kum, taş), çimen ve çiçek gibi bitkiler, sıvı içeren ve diğer
+ * blok varlıklı (yatak) bloklar yıkılmaz (her kırılan blok istemcide bölüm yeniden derler; çayırı düzlemek S5'te FPS'i ve
+ * TPS'i çökertti). Kırılan dekor/ahşap/taş blok {@code tsunami.yikimEsyaOrani} olasılıkla eşya bırakır (dalga onu sürükler),
+ * tick başına en çok {@value #DUSURME_TICK}, afet başına {@code 16·seviye}; kap her zaman (blok eşyası + içerik) ve tick'in
+ * bütün eşya bütçesini kullanır, bütçe doluysa sonraki tick'e kalır. Tick başına en çok {@code Ayar.efekt} kırılma efekti
+ * (ses + parçacık; config {@code tsunami.yikimEfektTick}). Blok komşu güncellemesi olmadan değişir ({@link #BAYRAK}):
  * komşu şekil güncellemesi yaprak mesafesi, çit/cam bağlantısı zincirleriyle ikinci bir blok değişikliği dalgası doğuruyordu
- * (TS-12). Her değişen chunk için {@link SanalSu#chunkDegisti}. Tarama sırasında dalgaya açılan mağara ağızları
- * (doğal tavanlı, göğü görmeyen, yanında açık hava olan hücre) afete bildirilir.
+ * (TS-12); bu yüzden dayanağı giden komşular (duvar meşalesi, asılı fener, halı, ray) ayrıca kırılır ({@link #komsulariKir}).
+ * Her değişen chunk için {@link SanalSu#chunkDegisti}. Tarama sırasında dalgaya açılan mağara ağızları (doğal tavanlı, göğü
+ * görmeyen, yanında açık hava olan hücre) afete bildirilir.
  */
 final class TsunamiYikimi {
-    /** Yıkım sınıfı ve cephe şeridine girdikten sonraki gecikmesi (ölçekli tick). */
+    /**
+     * Yıkım sınıfı ve cephe şeridine girdikten sonraki gecikmesi (ölçekli tick). {@code HAFIF} eşya bırakmaz, {@code KAP}
+     * her zaman bırakır, diğerleri {@code Ayar.esyaOrani} olasılıkla; {@code DAYANAKSIZ} yalnız kırılan bloğun komşusu ya da
+     * ondan doğan iştir (taramada seçilmez).
+     */
     enum Sinif {
-        HAFIF(0), AHSAP(6), TAS(12);
+        HAFIF(0), DEKOR(0), AHSAP(6), KAP(6), TAS(12), DAYANAKSIZ(0);
 
         final int gecikme;
 
@@ -60,7 +73,8 @@ final class TsunamiYikimi {
     /**
      * Tick bütçesi: {@code blok} jeton (tick başına dolan, Ts3-1), {@code birim} tick başına başlatılan en çok birim
      * ({@code tsunami.yikimBolumTick} × kısma), {@code sutun} en çok farklı chunk sütunu, {@code efekt} kırılma efekti;
-     * {@code esyaOrani} ahşap/taş bloğun eşya bırakma olasılığı; {@code sutunBirimi} birim chunk sütunu mu (yoksa 16³ bölüm).
+     * {@code esyaOrani} dekor/ahşap/taş bloğun eşya bırakma olasılığı (kap her zaman); {@code sutunBirimi} birim chunk sütunu mu
+     * (yoksa 16³ bölüm).
      */
     /**
      * {@code birimTavani} (Ts4-2): bir birimin tek tick'te kırılabilecek en çok bloğu; aşan birim kalanını sonraki tick'te sürdürür.
@@ -98,6 +112,20 @@ final class TsunamiYikimi {
     private int enCokBlokTick;
     private long enUzunTickNs;
     private int toplamDusen;
+    /** Yıkım tick'inin sayaçları ({@link #kir}): kırılan blok, kırılma efekti, düşen eşya. */
+    private int kirilan;
+    private int efekt;
+    private int dusen;
+    /** Önceki tick'te eşya bütçesi dolu diye bekleyen kap: bu tick rastgele enkaz düşmez, bütçe kaba kalır. */
+    private boolean kapOncelik;
+    private boolean kapBekliyor;
+    private final LongArrayList komsular = new LongArrayList();
+    /** Bu tick kırılamayan komşular (başka sütun, bütçesi dolu kap, ikinci halka): tick sonunda iş olarak kuyruğa girer. */
+    private final LongArrayList ertelenen = new LongArrayList();
+    private final BlockPos.MutableBlockPos komsu = new BlockPos.MutableBlockPos();
+    private final BlockPos.MutableBlockPos halka = new BlockPos.MutableBlockPos();
+    private final Consumer<BlockPos> komsuEkle = k -> komsular.add(k.asLong());
+    private final Consumer<BlockPos> ertele = k -> ertelenen.add(k.asLong());
 
     /** Tick başına blok jetonu: {@code 8 + 8·seviye} × {@code yikimCarpani} × TPS kısması (en az 1). */
     static int blokButcesi(TsunamiSeviyesi sv, double carpan, double kisma) {
@@ -163,7 +191,9 @@ final class TsunamiYikimi {
      * Ortalama hız blok bütçesine eşit kalır, TPS kısmasıyla yavaşlar; bir birim tick'lere bölünmez (TS-15): her değişen
      * bölüm istemcide yeniden derlenir, ışık değişimi sütun boyunca ve komşu bölümlere yayılıp onları da derletir (TS-12).
      * Tick başına en çok {@code Ayar.birim} birim ve {@code Ayar.sutun} sütun; bir birim tick'te en çok {@code Ayar.birimTavani} blok. Sınıf gecikmeleri (cam önce, ahşap 0,3 sn
-     * sonra) korunur. {@code magara} mağara ağzı adayını alır ve daha aday istiyorsa {@code true} döner. Kırılan blok sayısı.
+     * sonra) korunur. Kırılan bloğun dayanaksız komşuları aynı birimin jetonundan kırılır ({@link #komsulariKir}); eşya
+     * bütçesi dolu kap işi sonraki tick'e kalır. {@code magara} mağara ağzı adayını alır ve daha aday istiyorsa {@code true}
+     * döner. Kırılan blok sayısı.
      */
     int tick(ServerLevel l, long simdi, TsunamiSeviyesi sv, double taban, double kisma, Ayar a, boolean blokHasari,
             Predicate<BlockPos> magara) {
@@ -199,11 +229,14 @@ final class TsunamiYikimi {
                 ustDogal = dogal(s);
             }
         }
-        int kirilan = 0;
-        int efekt = 0;
-        int dusen = 0;
+        kirilan = 0;
+        efekt = 0;
+        dusen = 0;
+        kapOncelik = kapBekliyor;
+        kapBekliyor = false;
         bolumler.clear();
         birimler.clear();
+        ertelenen.clear();
         jeton = Math.min(a.blok(), jeton + a.blok());
         var birimIt = bolumIsleri.long2ObjectEntrySet().fastIterator();
         while (birimIt.hasNext() && jeton >= 0 && birimler.size() < a.birim()) {
@@ -227,29 +260,18 @@ final class TsunamiYikimi {
                     enErken = Math.min(enErken, is.hazir());
                     continue;
                 }
+                m.set(is.konum());
+                BlockState s = blokHasari && l.isLoaded(m) ? l.getBlockState(m) : null;
+                Sinif c = s == null ? null : kirilacak(l, m, s, sv);
+                if (c != null && !kir(l, m, s, c, sv, a)) {
+                    enErken = Math.min(enErken, simdi + 1);
+                    continue;
+                }
                 isIt.remove();
                 isSayisi--;
-                m.set(is.konum());
-                if (!l.isLoaded(m)) {
-                    continue;
+                if (c != null) {
+                    komsulariKir(l, m, sutun, sv, a);
                 }
-                BlockState s = l.getBlockState(m);
-                Sinif c = blokHasari ? sinif(l, m, s, sv) : null;
-                if (c == null) {
-                    continue;
-                }
-                if (c != Sinif.HAFIF && dusen < DUSURME_TICK && toplamDusen < 16 * sv.seviye()
-                        && l.getRandom().nextDouble() < a.esyaOrani()) {
-                    Block.dropResources(s, l, m);
-                    dusen++;
-                    toplamDusen++;
-                }
-                if (efekt++ < a.efekt()) {
-                    l.levelEvent(2001, m, Block.getId(s));
-                }
-                l.setBlock(m, Blocks.AIR.defaultBlockState(), BAYRAK);
-                bolumler.add(SectionPos.asLong(m.getX() >> 4, m.getY() >> 4, m.getZ() >> 4));
-                kirilan++;
             }
             b.enErken = kesildi ? simdi : enErken;
             if (b.isler.isEmpty()) {
@@ -257,9 +279,11 @@ final class TsunamiYikimi {
             }
             if (kirilan > once) {
                 birimler.add(birim);
-                degisenChunk.add(sutun);
                 jeton -= kirilan - once;
             }
+        }
+        for (int i = 0; i < ertelenen.size(); i++) {
+            isEkle(m.set(ertelenen.getLong(i)), simdi);
         }
         for (long c : degisenChunk) {
             SanalSu.chunkDegisti(l, new ChunkPos(c));
@@ -297,13 +321,97 @@ final class TsunamiYikimi {
         isSayisi++;
     }
 
-    /** Bloğun yıkım sınıfı; yıkılmazsa null. */
+    /**
+     * Bloğu kırar: eşya, efekt, hava, bölüm ve sütun kaydı. Kap tick'in bütün eşya bütçesini ister (içerik yığın başına bir
+     * {@code ItemEntity} doğurur; sınırı dağınık enkaz için değil, varlık başına yük için): bu tick eşya düştüyse kırılmaz,
+     * {@code false} döner ve sonraki tick öncelik alır. Kap afet başına {@code 16·seviye} sınırına takılmaz (o sınır enkaz
+     * içindir; takılsa kap zemini gidince havada kalırdı), ama sayaca girer. İçerik {@code setBlock} sırasında
+     * {@code onRemove} ile dökülür, blok eşyası (shulker'ın içeriği dahil) ondan önce ganimet tablosundan.
+     */
+    private boolean kir(ServerLevel l, BlockPos p, BlockState s, Sinif c, TsunamiSeviyesi sv, Ayar a) {
+        if (c == Sinif.KAP) {
+            if (dusen > 0) {
+                kapBekliyor = true;
+                return false;
+            }
+            Block.dropResources(s, l, p, l.getBlockEntity(p));
+            dusen = DUSURME_TICK;
+            toplamDusen++;
+        } else if (c != Sinif.HAFIF && !kapOncelik && dusen < DUSURME_TICK && toplamDusen < 16 * sv.seviye()
+                && l.getRandom().nextDouble() < a.esyaOrani()) {
+            BlockEntity be = s.hasBlockEntity() ? l.getBlockEntity(p) : null;
+            Block.dropResources(s, l, p, be);
+            dusen++;
+            toplamDusen++;
+        }
+        if (efekt++ < a.efekt()) {
+            l.levelEvent(2001, p, Block.getId(s));
+        }
+        l.setBlock(p, Blocks.AIR.defaultBlockState(), BAYRAK);
+        bolumler.add(SectionPos.asLong(p.getX() >> 4, p.getY() >> 4, p.getZ() >> 4));
+        degisenChunk.add(ChunkPos.asLong(p.getX() >> 4, p.getZ() >> 4));
+        kirilan++;
+        return true;
+    }
+
+    /**
+     * {@code p}'de kırılan bloğun dayanağı giden komşularını kırar ({@link #BAYRAK} onları havada bırakırdı). Birimin kendi
+     * sütunundaki ya da bu tick zaten değişen sütundaki komşu hemen kırılır (sütun bütçesi aşılmaz, aynı sütunun ışık
+     * değişimi tek derlemede birleşir); başka sütundaki komşu, bütçesi dolu kap ve hemen kırılan komşunun kendi dayanaksız
+     * komşuları tick sonunda iş olarak kuyruğa girer: zincir (kapının üst yarısı, üst üste halı) tick başına bir halka ilerler,
+     * özyineleme yok. Silinen blok başına altı blok okuması ve dolu komşuda {@code canSurvive}.
+     */
+    private void komsulariKir(ServerLevel l, BlockPos p, long sutun, TsunamiSeviyesi sv, Ayar a) {
+        komsular.clear();
+        AfetBloklari.dayanaksizKomsular(l, p, komsu, komsuEkle);
+        for (int i = 0; i < komsular.size(); i++) {
+            long k = komsular.getLong(i);
+            komsu.set(k);
+            BlockState s = l.getBlockState(komsu);
+            Sinif c = kirilacak(l, komsu, s, sv);
+            if (c == null) {
+                continue;
+            }
+            long ks = ChunkPos.asLong(komsu.getX() >> 4, komsu.getZ() >> 4);
+            if ((ks == sutun || degisenChunk.contains(ks)) && kir(l, komsu, s, c, sv, a)) {
+                AfetBloklari.dayanaksizKomsular(l, komsu, halka, ertele);
+            } else {
+                ertelenen.add(k);
+            }
+        }
+    }
+
+    /**
+     * İşin ya da komşunun yıkım sınıfı: sınıf tablosu ({@link #sinif}), yoksa dayanağı gitmiş ({@code canSurvive} yanlış), blok
+     * varlıksız, kırılabilir blok ({@link Sinif#DAYANAKSIZ}: ray, kızıltaş tozu; vanilla komşu güncellemesi onu da düşürürdü,
+     * sertliğe bakılmaz); değilse null.
+     */
+    static Sinif kirilacak(ServerLevel l, BlockPos p, BlockState s, TsunamiSeviyesi sv) {
+        Sinif c = sinif(l, p, s, sv);
+        if (c == null && !s.isAir() && s.getFluidState().isEmpty() && !s.hasBlockEntity() && !s.canSurvive(l, p)
+                && s.getDestroySpeed(l, p) >= 0) {
+            return Sinif.DAYANAKSIZ;
+        }
+        return c;
+    }
+
+    /**
+     * Bloğun yıkım sınıfı; yıkılmazsa null. Ortak rol önce ({@link AfetBloklari#rol}): dekor ve kap sertliğe bakılmadan
+     * {@link TsunamiSeviyesi#rolYikar} ile, diğer blok varlıklılar hiç; kalan bloklar sertlik sınırı ve malzeme tablosuyla.
+     */
     static Sinif sinif(ServerLevel l, BlockPos p, BlockState s, TsunamiSeviyesi sv) {
-        if (s.isAir() || !s.getFluidState().isEmpty() || s.hasBlockEntity() || dogal(s)) {
+        if (s.isAir() || !s.getFluidState().isEmpty() || dogal(s)) {
             return null;
         }
         float sert = s.getDestroySpeed(l, p);
-        if (sert < 0 || sert > sv.sertlik()) {
+        if (sert < 0) {
+            return null;
+        }
+        BlokRolu rol = AfetBloklari.rol(l, p, s);
+        if (rol != BlokRolu.DIGER) {
+            return !sv.rolYikar(rol) ? null : rol == BlokRolu.DEKOR ? Sinif.DEKOR : Sinif.KAP;
+        }
+        if (s.hasBlockEntity() || sert > sv.sertlik()) {
             return null;
         }
         if (s.is(BlockTags.LEAVES) || s.is(Tags.Blocks.GLASS) || s.is(Tags.Blocks.GLASS_PANES) || s.is(BlockTags.FENCES)
@@ -352,5 +460,6 @@ final class TsunamiYikimi {
         bolumIsleri.clear();
         isSayisi = 0;
         gorulen.clear();
+        kapBekliyor = false;
     }
 }

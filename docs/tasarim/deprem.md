@@ -81,3 +81,19 @@ sapmalar `.vibe/kararlar/deprem-sinkhole.md` §B: yeni ağ paketi yok, sarsınt�
 katmanı ve yarıktan toz; ana sarsıntı bitince yıkım, heyelan ve yakın hasar durur (`afet.deprem.mantik.ArtciPlani`, config
 `deprem.artci*`). Yapılmayanlar: kendi toz sprite dokusu (vanilla duman/toz parçacıkları kullanılıyor; artçı bitene kadar
 yarıktan istemci tozu süzlür), ayrı öncü gürleme dosyası (ana döngünün 1,5 sn'lik girişi).
+
+## Ek: afet-fizik (2026-11-07)
+
+- **İç yıkım (AF-D2…D5, `afet.deprem.IcYikici`, eşikler `mantik.IcYikimSeviyesi`).** Ana sarsıntı boyunca tick bütçesiyle
+  (`deprem.icYikimButcesi` 8 sütun/tick, S4 ölçeği; S2 ×0,5, S3 ×0,75, S5 ×1,75; TPS kademesiyle) sütun taraması: yarısı etki
+  alanındaki oyuncunun çevresinden (12 blok, oyuncunun 10 üstü–6 altı), yarısı alanın rastgele sütunlarından (yüzeyden 24 blok).
+  S1 içeriye dokunmaz. S2+: `#afet_dekor` (kapı/kapak/çit hariç) eşya olarak düşer, oyuncu çevresindeki eşya çerçevesi ve
+  tablolar saniyede bir düşer; S3+: yaprak dökülür (kırılma parçacığı, %10 eşya); S4+: altı hava olan zayıf blok
+  (`deprem_kirilgan` ya da sertliği S4 0,8 / S5 1,0 altında ve kazma/kürek/çapa ile kazılmayan; blok varlığı, iki parçalı blok
+  ve `deprem_dayanikli` hariç) düşen blok olur (vanilla düşen blok, hasar yok). `afetBlokHasari=false` iken hiçbiri olmaz.
+- **Artçı kuyruğu (AF-D1, `afet.deprem.ArtciKuyrugu`).** AKTIF artçıları beklemez: ana sarsıntı ve kazı bitince (en çok 30 sn
+  pay) deprem biter, afet yuvası boşalır. Kalan artçılar yuva dışında `deprem_artci` dönem sürecinde sürer (`stop`,
+  `depremAfeti` kuralı, `asama ileri` çekirdek §3a ile; durum `ekVeri`'de): afete bağlı olmayan kısa gürleme ve yarık boyunca
+  16 noktada toz. `asama ileri` ile biten depremde artçı yok. Kamera sarsıntısı (AF-D7, `mantik.ArtciSarsintisi`): yeni paket
+  yok; sunucu artçı genliğini (ana genlik × kesir, derece) gürleme eğrisinin tepesine (0,3 + genlik), etki yarıçapını katman
+  menziline (+32) yazar, istemci `deprem/artci` katmanından okur; zarf `SarsintiZarfi.artci`, uzaklık çarpanı ana sarsıntıyla aynı.
