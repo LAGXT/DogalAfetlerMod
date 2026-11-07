@@ -6,7 +6,7 @@ Harita (sırayla; bir yol `filtresiz` ise sonuç `filtresiz`, yoksa filtrelerin 
   <mod>/client/**                                                                                  → yok
   <mod>/core/**, <mod>/network/**, <mod>/DogalAfetler.java                                         → filtresiz
   <mod>/afet/<x>/**                                     → o klasördeki `*OyunTestleri` sınıfları (yoksa filtresiz)
-  src/*/resources/assets/**, src/test/**, tools/**, docs/**, kökteki *.md, LICENSE, .gitignore, gradlew* → yok
+  src/*/resources/assets/**, src/test/**, tools/**, docs/**, .vibe/**, kökteki *.md, LICENSE, .gitignore, gradlew* → yok
   diğer her yol (öteki paketler, src/*/resources/data, src/generated/**)                           → filtresiz (güvenli varsayılan)
 <mod> = src/main/java/io/github/kadirberkpolat1/dogalafetler. Filtresiz koşu yalnız `main` birleştirmesinde ve bir kez.
 
@@ -24,7 +24,7 @@ W = Path(__file__).resolve().parents[2]
 MOD = "src/main/java/io/github/kadirberkpolat1/dogalafetler/"
 FILTRESIZ_DOSYA = {"build.gradle", "settings.gradle", "gradle.properties"}
 YOK_KOK = {"LICENSE", ".gitignore", "gradlew", "gradlew.bat"}
-YOK_ON_EK = ("tools/", "docs/", "src/test/", "src/main/resources/assets/", "src/generated/resources/assets/")
+YOK_ON_EK = ("tools/", "docs/", ".vibe/", "src/test/", "src/main/resources/assets/", "src/generated/resources/assets/")
 
 
 def sinifla(yol):
