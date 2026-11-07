@@ -2,6 +2,8 @@ package io.github.kadirberkpolat1.dogalafetler.afet.orman_yangini;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.basarim.BasarimIpucuEvent;
+import io.github.kadirberkpolat1.dogalafetler.basarim.BasarimKimlikleri;
+import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.Basarimlar;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.Ipucu;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetAsamasi;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
@@ -11,12 +13,14 @@ import io.github.kadirberkpolat1.dogalafetler.yangin.YanginKayitlari;
 import io.github.kadirberkpolat1.dogalafetler.yangin.YanginYoneticisi;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import net.minecraft.advancements.Advancement;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.AfterBatch;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LeavesBlock;
@@ -46,6 +50,11 @@ public final class OrmanOyunTestleri {
 
     @AfterBatch(batch = "orman_ipucu")
     public static void ipucuSonrasi(ServerLevel level) {
+        OyunTestiTemizligi.batchSonu(level);
+    }
+
+    @AfterBatch(batch = "orman_basarim")
+    public static void basarimSonrasi(ServerLevel level) {
         OyunTestiTemizligi.batchSonu(level);
     }
 
@@ -109,6 +118,55 @@ public final class OrmanOyunTestleri {
             level.getServer().getPlayerList().remove(uzak);
             y.assertTrue(yakinIpucu.get() >= 2 && yakinIpucu.get() <= 4, "61 tick'te saniyede bir ipucu: " + yakinIpucu.get());
             y.assertTrue(uzakIpucu.get() == 0, "yangına uzak oyuncuya ipucu gitmemeli: " + uzakIpucu.get());
+            y.succeed();
+        });
+    }
+
+    /**
+     * Gerçek orman yangını → "Yanmadan Çıktım" uçtan uca (AOi-4, başarım §A.3 #5): yanan hücreye 8 blok yakın oyuncu 30 olay
+     * saniyesi biriktirip doğal bitişten sağ çıkınca başarımı alır; yangına 12–16 blok uzaktaki oyuncuya ipucu gitmez, almaz.
+     * Yangın {@code afetBlokHasari=false} ile veri olarak sürer; yakıt meşe kütüğü (hücre 444 tick yanar, yaprak 180 tick'te
+ * 30 sn dolmadan söner); sahte oyuncular yaratıcı.
+     */
+    @GameTest(template = SAHNE, batch = "orman_basarim", timeoutTicks = 900)
+    public static void dogalBitenOrmanYanginiYanmadanCiktimVerir(GameTestHelper y) {
+        ServerLevel level = y.getLevel();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(level.getServer());
+        yonetici.durdur();
+        OyunTestiTemizligi.blokHasari(level, false);
+        orman(y);
+        for (BlockPos p : BlockPos.betweenClosed(new BlockPos(1, 1, 1), new BlockPos(7, 3, 7))) {
+            y.setBlock(p, Blocks.OAK_LOG);
+        }
+        BlockPos yakinP = y.absolutePos(new BlockPos(4, 5, 4));
+        BlockPos uzakP = y.absolutePos(new BlockPos(4, 1, 21));
+        ServerPlayer yakin = OyunTestiTemizligi.oyuncu(y, yakinP.getX() + 0.5, yakinP.getY(), yakinP.getZ() + 0.5);
+        ServerPlayer uzak = OyunTestiTemizligi.oyuncu(y, uzakP.getX() + 0.5, uzakP.getY(), uzakP.getZ() + 0.5);
+        yakin.setGameMode(GameType.CREATIVE);
+        uzak.setGameMode(GameType.CREATIVE);
+        AtomicInteger yakinIpucu = new AtomicInteger();
+        AtomicInteger uzakIpucu = new AtomicInteger();
+        OyunTestiTemizligi.dinle(BasarimIpucuEvent.class, olay -> {
+            if (olay.ipucu() == Ipucu.YANGIN_ALANINDA) {
+                (olay.oyuncu() == yakin ? yakinIpucu : olay.oyuncu() == uzak ? uzakIpucu : new AtomicInteger()).incrementAndGet();
+            }
+        });
+        OrmanYangini afet = baslat(y, 2, y.absolutePos(new BlockPos(4, 3, 4)));
+        y.runAfterDelay(700, () -> {
+            for (int i = 0; i < 6 && yonetici.aktifAfet().isPresent(); i++) {
+                yonetici.asamaIleri();
+            }
+            Advancement yanmadan = level.getServer().getAdvancements()
+                    .getAdvancement(BasarimKimlikleri.basarim(Basarimlar.YANMADAN_CIKTIM));
+            y.assertTrue(yanmadan != null, "advancement yüklü değil (runData?)");
+            boolean yakinda = yakin.getAdvancements().getOrStartProgress(yanmadan).isDone();
+            boolean uzakta = uzak.getAdvancements().getOrStartProgress(yanmadan).isDone();
+            y.assertTrue(yakinIpucu.get() >= 30, "yakındaki oyuncu 30 olay saniyesi biriktirmedi: " + yakinIpucu.get());
+            y.assertTrue(uzakIpucu.get() == 0, "uzaktaki oyuncuya ipucu gitti: " + uzakIpucu.get());
+            y.assertTrue(yonetici.aktifAfet().isEmpty() && afet.sonlandi(), "orman yangını doğal bitmeli: " + afet.asama());
+            y.assertTrue(yakinda, "yangın alanında 30 sn kalıp sağ çıkan Yanmadan Çıktım almalı");
+            y.assertTrue(!uzakta, "yangına uzak oyuncu Yanmadan Çıktım almamalı");
+            DogalAfetler.LOGGER.info("Orman GameTest: Yanmadan Çıktım yakın ipucu={} uzak ipucu={}", yakinIpucu.get(), uzakIpucu.get());
             y.succeed();
         });
     }

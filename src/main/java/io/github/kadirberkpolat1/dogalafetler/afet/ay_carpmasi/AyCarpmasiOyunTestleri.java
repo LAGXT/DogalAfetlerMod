@@ -4,6 +4,7 @@ import com.mojang.authlib.GameProfile;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.basarim.BasarimKimlikleri;
+import io.github.kadirberkpolat1.dogalafetler.basarim.BasarimOlaylari;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.Basarimlar;
 import io.github.kadirberkpolat1.dogalafetler.core.Afet;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetAsamasi;
@@ -12,6 +13,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
 import io.github.kadirberkpolat1.dogalafetler.core.AyDurumu;
 import io.github.kadirberkpolat1.dogalafetler.core.CekirdekOyunTestleri;
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
+import io.github.kadirberkpolat1.dogalafetler.gokyuzu.Gokyuzu;
 import io.github.kadirberkpolat1.dogalafetler.komut.DogalAfetKomutu;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorAPI;
@@ -69,6 +71,11 @@ public final class AyCarpmasiOyunTestleri {
             AyCarpmasiAyarlari.meteorDakikaBasinaAyarla(oncekiMeteorSikligi);
             oncekiMeteorSikligi = null;
         }
+    }
+
+    private static boolean tamam(MinecraftServer server, ServerPlayer oyuncu, Basarimlar basarim) {
+        Advancement a = server.getAdvancements().getAdvancement(BasarimKimlikleri.basarim(basarim));
+        return a != null && oyuncu.getAdvancements().getOrStartProgress(a).isDone();
     }
 
     private static int komut(GameTestHelper y, String komut) {
@@ -324,6 +331,11 @@ public final class AyCarpmasiOyunTestleri {
         y.succeed();
     }
 
+    /**
+     * Gerçek ay çarpması zinciri → başarım (§A.3 #12–#14): doğal bitişte Ay Düştü; gerçek çarpmanın bıraktığı aysız gecede 10
+     * sn Yıldızlı Gece; deniz yükselmesi süreci tamamlanınca sağ olan Yükselen Sular. Sahte oyuncu tick almadığı için
+     * saniyelik denetim elle çağrılır.
+     */
     @GameTest(template = "bos", batch = "ay_carpmasi_basarim")
     public static void dogalBitenAyCarpmasiAyDustuVerir(GameTestHelper y) {
         AfetYoneticisi yonetici = temizBasla(y);
@@ -333,6 +345,7 @@ public final class AyCarpmasiOyunTestleri {
                 m.getX() + 0.5, m.getY() + 2, m.getZ() + 0.5);
         oyuncu.setGameMode(GameType.SURVIVAL);
         Advancement ayDustu = server.getAdvancements().getAdvancement(BasarimKimlikleri.basarim(Basarimlar.AY_DUSTU));
+        long oncekiSaat = y.getLevel().getDayTime();
         try {
             dogrula(y, ayDustu != null, "Ay Düştü başarımı yüklenmedi (runData?)");
             Afet afet = baslat(y, yonetici);
@@ -342,7 +355,22 @@ public final class AyCarpmasiOyunTestleri {
             dogrula(y, yonetici.aktifAfet().isEmpty() && afet.sonlandi(), "ay çarpması doğal bitmeli");
             dogrula(y, oyuncu.getAdvancements().getOrStartProgress(ayDustu).isDone(),
                     "gerçek ay çarpmasından sağ çıkan Ay Düştü alır (başarım §A.3 #12)");
+            // #13: gerçek çarpmanın bıraktığı aysız gecede kesintisiz 10 sn göğü gören oyuncu.
+            y.getLevel().setDayTime(18_000);
+            dogrula(y, Gokyuzu.yildizliGeceMi(oyuncu), "çarpmadan sonra ay yok, gece, oyuncu göğü görüyor olmalı");
+            for (int i = 0; i < 10; i++) {
+                BasarimOlaylari.saniyelikDenetim(oyuncu);
+            }
+            dogrula(y, tamam(server, oyuncu, Basarimlar.YILDIZLI_GECE), "gerçek zincirde Yıldızlı Gece (#13) verilmedi");
+            // #14: ay yok olunca kurulan deniz yükselmesi süreci atlanıp hedefe ulaştırılır.
+            komut(y, "dogalafet aysonrasi atla");
+            dogrula(y, !tamam(server, oyuncu, Basarimlar.YUKSELEN_SULAR), "yükseliş sürerken Yükselen Sular verildi");
+            komut(y, "dogalafet asama ileri");
+            dogrula(y, DunyaDonemi.al(server).deniz().mevcutArtis() == DunyaDonemi.al(server).deniz().hedefArtis(),
+                    "deniz yükselmesi hedefe ulaşmadı: " + DunyaDonemi.al(server).deniz());
+            dogrula(y, tamam(server, oyuncu, Basarimlar.YUKSELEN_SULAR), "gerçek zincirde Yükselen Sular (#14) verilmedi");
         } finally {
+            y.getLevel().setDayTime(oncekiSaat);
             server.getPlayerList().remove(oyuncu);
             yonetici.sifirla();
         }
