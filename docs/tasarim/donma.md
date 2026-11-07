@@ -26,7 +26,7 @@ Bu bölüm spike-donma kararlarına ve inceleme B2'ye (çözülme sırası) gör
 | Öğe | Donma: geldiği seviye | Çözülme: kalktığı seviye | Gerçek blok değişimi | Yalnız görsel (istemci) |
 |---|---|---|---|---|
 | Ayaz | %0 | — | — | Nefes buharı (2 sn'de bir), süzülen buz kristali parıltısı, sis mavimsi |
-| Kırağı | 10 | 50 | `grass_block` ↔ `dogalafetler:kiragili_cimen` | Yaprak ve çimen biyom rengi beyaz-maviye kayar (%0→%60) |
+| Kırağı | 10 | 50 | ~~`grass_block` ↔ `dogalafetler:kiragili_cimen`~~ yok (K-E52, "Görsel cila": varsayılan tabloda yüzey satırı yok, çimen çimen kalır) | Yaprak ve çimen biyom rengi beyaz-maviye kayar (%0→%60) |
 | İlk buz (kıyıya uzaklık `c` = 0–15) | `20 + 2c` (kıyıda 20, ortada 50) | `max(10, 45 − 3c)` (kıyıda 45, 12+ blok içeride 10) | su sütununun üst bloğu ↔ buz (ilk evre `ince_buz`, aşağıda) | İnce buz koyu ve yarı saydam, altındaki su görünür |
 | Buz katmanı 2 / 3 / 4 | ilk buz + 20 / 40 / 60 | ilk buz çözülmesi + 10 / 20 / 30 | buz sütunu aşağı kalınlaşır; en alt su bloğu hiç donmaz | Buz yüzeyinde parıltı noktaları |
 | Kar katmanı 1 / 2 / 3 / 4 / 5 | 25 / 55 / 70 / 85 / 95 | 55 / 65 / 75 / 85 / 95 | `#dogalafetler:donma/kar_zemini` köklü zeminin üstü; çimen/misel üstünde en çok 1 katman | — |

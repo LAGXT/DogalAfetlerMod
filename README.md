@@ -101,9 +101,11 @@ Güneş patlaması ve ay çarpması yalnız dünya yeterince yaşlanınca seçil
 ## Ortak sistemler
 
 - **Siren ve ses:** sirenler ve afet sesleri kısık tutulur; siren ses düzeyi istemci ayarıdır (varsayılan %28).
-- **Dünya dönemleri:** güneş (normal → büyüyen → süpernova → güneşsiz → kızıl cüce) ve ay (var/yok) birbirinden bağımsızdır ve
-  dünyaya kaydedilir; sonradan giren oyuncu aynı gökyüzünü görür. Güneşsiz dönemde dünya birkaç günde donar (kar, buz, kırağı;
-  donma uzaktaki chunk'lara oyuncu geldikçe yetişir). Kızıl cüce doğunca dünya kısmen çözülür; kalıcı kış bölgeleri donuk kalır.
+- **Dünya dönemleri:** güneş (normal → büyüyen → süpernova → güneşsiz → kızıl cüce ya da düşük olasılıkla pulsar) ve ay
+  (var/yok) birbirinden bağımsızdır ve dünyaya kaydedilir; sonradan giren oyuncu aynı gökyüzünü görür. Güneşsiz dönemde dünya
+  birkaç günde donar (çimenin üstüne kar katmanı, buz, kırağı rengi; donma uzaktaki chunk'lara oyuncu geldikçe yetişir). Kızıl
+  cüce doğunca dünya kısmen çözülür, kalıcı kış bölgeleri donuk kalır; pulsar dünyayı ısıtır, çimeni kavurur, yangın çıkarır ve
+  donmuş dünyayı çözer.
 - **Vücut sıcaklığı:** biyom, gün/gece, yükseklik, ısı kaynakları, yağmur ve dünya dönemi ortam sıcaklığını belirler; HUD'daki
   gösterge vücut sıcaklığını gösterir. Aşırı soğuk ve sıcak hasar verir. Zırha yün eklemek (yünlü zırh), tüy işlemek (parça
   başına en çok 30) ve Termostat Plakası eklemek (çok sıcakta aşırı ısınmayı azaltır) sıcaklığı dengeler.
@@ -614,7 +616,8 @@ Başarım sekmesi arka planı.
   dolar.
 - **Donma:** yaprak çıkıntısının altındaki su donmaz; oyuncunun koyduğu kar ve buz kalınlaştırılmaz. Buharlaşmada kuruyan
   suyun içindeki yosun/deniz çimi ilk komşu güncellemesine kadar havada kalabilir. Uçurum kenarında kış bölgesi sınırı keskin
-  olabilir. Yaratıcı modda konan Kırağılı Çimen çözülmede çimene döner.
+  olabilir. Eski dünyalardaki ve yaratıcı modda konan Kırağılı Çimen, sütunu bir sonraki donma/çözülme eşiğinde işlenince
+  çimene döner (varsayılan tablo artık çimeni kırağılı çimene çevirmez).
 - **`/dogalafet sifirla`:** kalıcı kış bölgelerini o anki config ile yeniden hesaplar; config dünya içinde değiştiyse eski kış
   bölgesi kayabilir.
 - **Başka gökyüzü modları:** gökyüzünü tamamen değiştiren bir mod varsa yaklaşan ay ve güneş evreleri vanilla ay/güneşin üstüne
