@@ -492,7 +492,8 @@ public final class BasarimOlaylari {
 
     /**
      * Config XP farkı (JSON varsayılanı verdi) ve sohbet duyurusu (A-37): bizim advancement'larda vanilla duyuru kapalı
-     * ({@code announce_to_chat=false}); duyuru {@code announceAdvancements} açıkken burada, ünvan önekiyle yapılır.
+     * ({@code announce_to_chat=false}); duyuru {@code announceAdvancements} açıkken burada, ünvan önekiyle yapılır. Veri
+     * paketi {@code announce_to_chat=true} yaparsa vanilla duyurur, mod susar (çift mesaj yok).
      */
     @SubscribeEvent
     public static void kazanildi(AdvancementEvent.AdvancementEarnEvent olay) {
@@ -503,7 +504,7 @@ public final class BasarimOlaylari {
                 if (fark != 0) {
                     oyuncu.giveExperiencePoints(fark);
                 }
-                if (advancement.getDisplay() != null
+                if (advancement.getDisplay() != null && !advancement.getDisplay().shouldAnnounceChat()
                         && oyuncu.level().getGameRules().getBoolean(GameRules.RULE_ANNOUNCE_ADVANCEMENTS)) {
                     oyuncu.server.getPlayerList().broadcastSystemMessage(
                             Unvanlar.duyuru(oyuncu, basarim.tur(), advancement.getChatComponent()), false);
