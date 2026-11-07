@@ -9,7 +9,9 @@ import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.SicaklikAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.SicaklikKancalari;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.SicaklikYoneticisi;
+import io.github.kadirberkpolat1.dogalafetler.sicaklik.SicaklikKapisi;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.VucutSicakligi;
+import io.github.kadirberkpolat1.dogalafetler.sicaklik.uyum.ColdSweatKoprusu;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Esikler;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Kademe;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.SureliEtki;
@@ -463,6 +465,49 @@ public final class YiyecekOyunTestleri {
             y.succeed();
         } finally {
             MinecraftForge.EVENT_BUS.unregister(dinleyici);
+            cikar(y, List.of(o));
+        }
+    }
+
+    /**
+     * F-18: Cold Sweat yüklüyken (kendi sistemimiz OTOMATIK kipte kapalı) sıcak yiyecek Cold Sweat çekirdek sıcaklığını etkinin
+     * toplamı kadar artırır, bizim vücut sıcaklığımız değişmez. Cold Sweat yüklü değilse (varsayılan GameTest) sınanacak yol
+     * yoktur: test bunu log'a yazıp geçer; kanıt {@code -Puyum=coldsweat} koşusundadır.
+     */
+    @GameTest(template = "bos", batch = "yiyecek_coldsweat")
+    public static void coldSweatYukluykenYiyecekCekirdegeGider(GameTestHelper y) {
+        if (!SicaklikKapisi.coldSweatYuklu()) {
+            DogalAfetler.LOGGER.info("Yiyecek GameTest: Cold Sweat yüklü değil, F-18 köprüsü sınanmadı (-Puyum=coldsweat ister)");
+            y.succeed();
+            return;
+        }
+        kuraliAc(y.getLevel().getServer());
+        ServerPlayer o = oyuncu(y, "coldsweat-test", 0);
+        try {
+            dogrula(y, !SicaklikKapisi.acikMi(y.getLevel().getServer()), "Cold Sweat yüklüyken kendi sistemimiz kapalı olmalı");
+            ColdSweatKoprusu.yiyecekEtkisi(o, -ColdSweatKoprusu.cekirdek(o));
+            double vucut = VucutSicakligi.al(o);
+            List<YiyecekYendiEvent> gelen = new ArrayList<>();
+            Consumer<YiyecekYendiEvent> dinleyici = olay -> {
+                if (olay.oyuncu() == o) {
+                    gelen.add(olay);
+                }
+            };
+            MinecraftForge.EVENT_BUS.addListener(EventPriority.NORMAL, false, YiyecekYendiEvent.class, dinleyici);
+            try {
+                ye(o, "atesli_guvec", 1);
+            } finally {
+                MinecraftForge.EVENT_BUS.unregister(dinleyici);
+            }
+            dogrula(y, gelen.size() == 1, "tek yeme olayı gelmeli: " + gelen.size());
+            double beklenen = gelen.get(0).etki().anlik() + gelen.get(0).etki().sureli();
+            double cekirdek = ColdSweatKoprusu.cekirdek(o);
+            dogrula(y, gelen.get(0).uygulandi() && beklenen > 0 && Math.abs(cekirdek - beklenen) < 1e-6,
+                    "Cold Sweat çekirdeği " + cekirdek + ", beklenen " + beklenen);
+            dogrula(y, VucutSicakligi.al(o) == vucut, "bizim vücut sıcaklığımız değişmemeli");
+            DogalAfetler.LOGGER.info("Yiyecek GameTest: F-18 Cold Sweat çekirdeği 0 -> {} (etki {})", cekirdek, beklenen);
+            y.succeed();
+        } finally {
             cikar(y, List.of(o));
         }
     }

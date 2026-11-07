@@ -4,6 +4,7 @@ import io.github.kadirberkpolat1.dogalafetler.sicaklik.SicaklikAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.SicaklikKapisi;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.SicaklikYoneticisi;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.VucutSicakligi;
+import io.github.kadirberkpolat1.dogalafetler.sicaklik.uyum.ColdSweatKoprusu;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Esikler;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Kademe;
 import io.github.kadirberkpolat1.dogalafetler.yiyecek.mantik.Buyukluk;
@@ -28,7 +29,7 @@ import net.minecraftforge.common.MinecraftForge;
  * azalan verim (oyuncu başına, tür başına son yeme zamanı, {@code PersistentData} {@value #ETIKET}), etki hesabı (kademe
  * miktarı config'ten; Ateşli Güveç sıcakta güçlenir), {@code VucutSicakligi.etkiEkle} ve gösterge durum efekti, sonra
  * {@link YiyecekYendiEvent}. Sıcaklık kapısı kapalıyken yalnız yemek değeri kalır: sıcaklık, efekt ve azalan verim
- * kaydı yazılmaz.
+ * kaydı yazılmaz; Cold Sweat yüklüyse etki ve verim yine hesaplanır ve toplam etki Cold Sweat çekirdeğine gider (F-18).
  */
 public final class YiyecekAPI {
     public static final String ETIKET = "dogalafetler_yiyecek";
@@ -47,7 +48,9 @@ public final class YiyecekAPI {
         Esikler esikler = SicaklikAyarlari.al().esikler();
         double once = VucutSicakligi.al(oyuncu);
         Kademe onceki = esikler.kademe(once);
-        if (!SicaklikKapisi.acikMi(oyuncu.server)) {
+        boolean kapiAcik = SicaklikKapisi.acikMi(oyuncu.server);
+        boolean coldSweat = !kapiAcik && SicaklikKapisi.coldSweatYuklu();
+        if (!kapiAcik && !coldSweat) {
             Etki yok = new Etki(0, 0, tanim.sureTick());
             MinecraftForge.EVENT_BUS.post(new YiyecekYendiEvent(oyuncu, tanim, onceki, onceki, 1.0, yok, false));
             return new Sonuc(false, 1.0, yok, onceki, onceki);
@@ -60,7 +63,13 @@ public final class YiyecekAPI {
         boolean sicakta = tanim.sicaktaGuclenir()
                 && Etki.sicakMi(once, SicaklikYoneticisi.analiz(oyuncu).ortamBirim(), ayarlar);
         Etki etki = Etki.hesapla(tanim, ayarlar, carpan, sicakta);
-        boolean uygulandi = VucutSicakligi.etkiEkle(oyuncu, etki.anlik(), etki.sureTick(), etki.sureli());
+        boolean uygulandi;
+        if (coldSweat) {
+            ColdSweatKoprusu.yiyecekEtkisi(oyuncu, etki.anlik() + etki.sureli());
+            uygulandi = etki.anlik() + etki.sureli() != 0;
+        } else {
+            uygulandi = VucutSicakligi.etkiEkle(oyuncu, etki.anlik(), etki.sureTick(), etki.sureli());
+        }
         if (uygulandi) {
             oyuncu.addEffect(new MobEffectInstance(YiyecekKayitlari.efekt(tanim.yon()), etki.sureTick(),
                     tanim.buyukluk().seviye(), false, false, true));

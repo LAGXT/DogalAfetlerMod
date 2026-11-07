@@ -54,6 +54,19 @@ public final class ColdSweatKoprusu {
                 + s.katki(Katki.KIS_BOLGESI);
     }
 
+    /**
+     * F-18: sıcaklık yiyeceğinin toplam etkisi (bizim vücut birimi) Cold Sweat çekirdek sıcaklığına bir kerede eklenir. İki
+     * ölçek aynı yerde kırılır (0 rahat, ±100 hasar eşiği); dağıtım Cold Sweat'in çekirdek hızına kalır.
+     */
+    public static void yiyecekEtkisi(ServerPlayer oyuncu, double vucutBirimi) {
+        Temperature.add(oyuncu, Temperature.Trait.CORE, vucutBirimi);
+    }
+
+    /** Cold Sweat çekirdek sıcaklığı (test ve log). */
+    public static double cekirdek(ServerPlayer oyuncu) {
+        return Temperature.get(oyuncu, Temperature.Trait.CORE);
+    }
+
     /** Cold Sweat dünya sıcaklığına dönem katkısını ekleyen değiştirici. */
     public static final class DonemDegistiricisi extends TempModifier {
         @Override
