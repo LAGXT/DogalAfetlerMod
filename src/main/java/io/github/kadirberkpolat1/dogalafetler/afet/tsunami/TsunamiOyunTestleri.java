@@ -110,6 +110,11 @@ public final class TsunamiOyunTestleri {
         temizlik(level);
     }
 
+    @AfterBatch(batch = "tsunami_blok_hasari")
+    public static void blokHasariSonrasi(ServerLevel level) {
+        temizlik(level);
+    }
+
     /**
      * Başarısız test de batch sonunda temizlenir (K-E15): testler afeti yöneticisiz sürdüğü için kalan dalga, çekilme ve mağara
      * boyuttan silinir, sabitlenen TPS kısması ve sahte oyuncu/dinleyici geri alınır.
@@ -520,6 +525,40 @@ public final class TsunamiOyunTestleri {
                             a.bekleyenYikim(), a.dogalBitti());
                     a.durdur(l, true);
                     a.magaralar().forEach(id -> SanalSu.magaraBitir(l, id));
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Madde 11 {@code afetBlokHasari=false} (izleme-inceleme-5 P2-1): S2 dalgası kıyıya vurup kendiliğinden biter, hiçbir blok
+     * kırılmaz; sahnenin (deniz, kara, cam, kalas, yaprak) blok hash'i baştakiyle aynı.
+     */
+    @GameTest(template = "su_alani", batch = "tsunami_blok_hasari", timeoutTicks = 900)
+    public static void blokHasariKapaliykenDalgaBlokKirmaz(GameTestHelper h) {
+        ServerLevel l = h.getLevel();
+        sahne(h, 2);
+        h.setBlock(9, 3, 6, Blocks.OAK_PLANKS);
+        for (int z = 4; z <= 12; z += 2) {
+            h.setBlock(8, 3, z, Blocks.GLASS);
+        }
+        h.setBlock(10, 3, 10, Blocks.OAK_LEAVES.defaultBlockState()
+                .setValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT, true));
+        OyunTestiTemizligi.blokHasari(l, false);
+        BlockPos a = m(h, 0, 0, 0);
+        BlockPos b = m(h, 15, 10, 15);
+        long once = SanalSu.bolgeHash(l, a.getX(), a.getY(), a.getZ(), b.getX(), b.getY(), b.getZ());
+        TsunamiAfeti t = baslat(h, 2);
+        h.startSequence()
+                .thenWaitUntil(() -> h.assertTrue(t.sonlandi(), "afet kendiliğinden bitmedi: " + t.asama()))
+                .thenExecute(() -> {
+                    long sonra = SanalSu.bolgeHash(l, a.getX(), a.getY(), a.getZ(), b.getX(), b.getY(), b.getZ());
+                    h.assertTrue(t.kirilan() == 0, "blok hasarı kapalıyken " + t.kirilan() + " blok kırıldı");
+                    h.assertTrue(sonra == once, "blok hasarı kapalıyken sahne değişti");
+                    h.assertBlockPresent(Blocks.OAK_PLANKS, 9, 3, 6);
+                    DogalAfetler.LOGGER.info("Tsunami GameTest: blok hasarı kapalı, doğal bitiş, kırılan {} hash {}", t.kirilan(),
+                            Long.toHexString(once));
+                    t.durdur(l, true);
+                    t.magaralar().forEach(id -> SanalSu.magaraBitir(l, id));
                 })
                 .thenSucceed();
     }
