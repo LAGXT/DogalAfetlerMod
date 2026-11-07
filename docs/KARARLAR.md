@@ -3712,15 +3712,46 @@ kalır: kareler ve girdi sayıları o satırdan önce yazılır, çıkış kodu 
 zaten başlamış ve asılı kalmış JVM'in SIGTERM'le çıkacağı varsayılamaz. (b)'ye bağlananlar: `kasirga`, `deprem`,
 `asit_orman_yangini`, `ay_carpmasi`, `gunes_patlamasi`, `basarim`, `radar`, `meteor` `_gorsel.py`. Faz 2b/3 betikleri
 (`yangin`, `donma`, `sicaklik`, `yiyecek`, `balikcilik` görsel, `uyari_istemci`, `su_istemci`) yalnız (a)'yı alır: asılı
-JVM en geç Gradle `timeout`'u + 90 sn'de ölür. Tsunaminin kendi bekçisi (`tsunami_gorsel.py`, `TsunamiOtomasyonu` 30 sn
-`Runtime.halt`) 6/6 birleştirmesinde (b)'ye bağlanır.
+JVM en geç Gradle `timeout`'u + 90 sn'de ölür. Tsunami: 6/6 birleştirmesinde `tsunami_gorsel.py` bekçisi (b)'ye bağlanır,
+`TsunamiOtomasyonu`'nun 30 sn `Runtime.halt` bekçisi kalır (yalnız `-Potomasyon=tsunami` ile etkin test kodu; JVM içi kapanış
+en güvenilir yol). Otomasyon sınıfları kendi yerel halt bekçisini tutabilir (tsunami örneği), zorunlu değil; ortak bekçi her
+koşuda yedek (şef kararı, 2026-11-07).
 Kanıt `.vibe/kanit/k-e27/`: `py_compile` 9/9, `test_runclient_kilit.py` 8/8, sahte süreçli deneme 22/22: bitiş satırından ve
 kilitten `KAPANIS_SN` sonra öldürme, başka worktree'nin JVM'ine ve daemon olmayan ana sürece dokunulmaması, `kos`'un kilidi
 JVM öldükten sonra bırakması, kendiliğinden çıkan JVM'de öldürme olmaması. runClient koşulmadı. Reddedilen: yalnız süreç
 grubuna (`killpg`) ya da `timeout --kill-after`'a dayanmak (`gorsel-12`'de `timeout`'un sinyalinden sonra daemon ve oyun yaşıyordu;
 ayrı grupta mıydılar, kapanış sırasında sinyali mi yok saydılar bilinmiyor; çalışma dizini + komut satırı denetimi ikisinden de
 bağımsız); her görsel betikte ayrı kapanış kopyası (tek yer); tsunaminin Java tarafındaki `Runtime.halt` bekçisini bütün
-otomasyonlara yaymak (istemci koduna zorla çıkış; dışarıdan öldürme aynı sonucu kodsuz verir).
+otomasyonlara zorunlu kılmak (her otomasyona ayrı zorla çıkış kodu; ortak dış bekçi hepsini kodsuz kapsar).
+
+**K-E28 `[yiyecek] declared twice`: yiyecek GameTest'i config dosyasına yazmaz (şef kararı, 2026-11-07; doğrulayıcı-2).**
+Belirti: Forge config izleyicisi `dogalafetler-server.toml`'u yeniden yüklerken `ParsingException: Table with path [yiyecek]
+has been declared twice` (`.vibe/kanit/tsunami-dogrulama-2/gametest-3.log:1754-1760`); test düşmüyor. Kanıt dizinlerinde
+`yiyecek_vanilla` batch'ini koşan 104 log'un 7'sinde görüldü, yedisinde de o batch'te (Faz 3'ten beri; tsunamiye özgü değil).
+Kök neden iki ayrı bölüm değil: kaynakta `yiyecek` bölümünü yalnız `YiyecekAyarlari.kaydet` açar, diskteki 16
+`dogalafetler-server.toml`'da yinelenen başlık yok. `YiyecekOyunTestleri.vanillaPismisYiyecekKucukIsinma` aynı tick'te
+`vanillaIsinma.set(false)` ve `finally`'de `set(true)` çağırıyordu. Forge 47.4.28 SERVER config'i nightconfig 3.6.4
+`sync().autosave()` + `WritingMode.REPLACE` ile kurar (javap `ConfigFileTypeHandler.lambda$reader$1`). `ConfigValue.set` →
+`AutosaveCommentedFileConfig.set` değeri kilitsiz yazar, sonra `save()` dosyayı yeniden yazar. Dosya değişince `FileWatcher`
+(gecikme sınırı yok, her `ENTRY_MODIFY` olayında) `ConfigWatcher.run` → `WriteSyncFileConfig.load()` (senkronize) config'i
+temizleyip (`ParsingMode.REPLACE`) aynı nesneye yeniden ayrıştırır. İkinci `set` bu sırada gelirse `yiyecek.vanillaIsinma`
+boşaltılmış config'e girer, ayrıştırıcı `[yiyecek]` başlığında tabloyu dolu bulur (`TomlParser.checkContainsOnlySubtables`).
+Sonraki dosya olayında Forge "is not correct. Correcting" ile dosyayı yedekleyip eksik değerleri varsayılanla doldurur
+(7 olayın 5'inde log'da). Yeniden üretim (repo dışı, aynı jar'lar, aynı kurulum; `.vibe/kanit/k-e28/Yaris.java`,
+`yaris.txt`): tek thread'de sırayla 2000 `set` + 2000 `load` → 0 hata; izleyici thread'i `load` çağırırken 300 `set` → üç
+koşuda 2 / 2 / 1 kez aynı ileti. Karar: test config dosyasına yazmaz. `YiyecekAyarlari.vanillaIsinma()` paket içi
+`vanillaIsinmaTesti(Boolean)` geçersiz kılmasını okur (`null` = config; `SanalSu.alanOkumasiDuraklat` deseni); test kapalı yolu
+onunla sınar ve `finally`'de `null`'a döner. Spec, bölüm, anahtar adları ve varsayılanlar değişmedi; mevcut toml'lar aynen
+okunur. Yalnız testin kullandığı `YiyecekAyarlari.bolum()` erişimcisi silindi, `vanillaIsinma` alanı yeniden `private`. Kanıt
+`.vibe/kanit/k-e28/`: `TEST_FILTRE=Yiyecek` → 12/194 test, `All 12 required tests passed`, `yiyecek_vanilla` koştu
+(`gametest-yiyecek.log:137, :152`); `declared twice` 0, `ConfigLoadingException` 0, `dogalafetler-server.toml` için
+"Correcting" 0 (tek "Correcting" satırı boş dünyanın `forge-server.toml`'u, her koşuda var); `build --rerun-tasks` çıkış 0,
+`warning:` 0, JUnit 89 sınıf 543/0/0/0. Aynı mekanizma (gözlenmedi): `AyCarpmasiAyarlari.meteorDakikaBasinaAyarla` (GameTest),
+`MeteorAyarlari.dusmeHiziAyarla` ve `AsitOrmanOtomasyonu` kalite adımı (görsel otomasyon) da `ConfigValue.set` kullanır;
+yazmaları arasında çok tick var, hata hiçbir log'da yok. Üretim kodu config'e yazmaz. Reddedilen: bölümleri birleştirmek (iki
+bölüm yok); yazmalar arasına tick beklemek ya da `ModConfigEvent.Reloading` saymak (izleyicide gecikme sınırı yok, bir kayıt
+birden çok yeniden yükleme üretebilir; yarış daralır ama kapanmaz); `WriteSyncFileConfig` kilidini yansımayla almak (Forge iç
+yapısına bağlanır).
 
 ### Yiyecek
 

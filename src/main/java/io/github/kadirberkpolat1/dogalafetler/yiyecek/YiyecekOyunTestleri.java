@@ -44,7 +44,6 @@ import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.common.ForgeConfigSpec;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.ForgeEventFactory;
 import net.minecraftforge.eventbus.api.EventPriority;
@@ -408,12 +407,14 @@ public final class YiyecekOyunTestleri {
         }
     }
 
-    /** Vanilla pişmiş yiyecek (kızarmış patates) çok küçük, kısa ısınma verir; çiğ patates vermez; config kapatır. */
+    /**
+     * Vanilla pişmiş yiyecek (kızarmış patates) çok küçük, kısa ısınma verir; çiğ patates vermez; {@code vanillaIsinma}
+     * kapalıyken ısıtmaz. Kapalı yol config dosyasına yazmadan sınanır (K-E28).
+     */
     @GameTest(template = "bos", batch = "yiyecek_vanilla")
     public static void vanillaPismisYiyecekKucukIsinma(GameTestHelper y) {
         kuraliAc(y.getLevel().getServer());
         ServerPlayer o = oyuncu(y, "vanilla-test", 0);
-        ForgeConfigSpec.BooleanValue ayar = YiyecekAyarlari.bolum().vanillaIsinma;
         try {
             EtkiAyarlari a = YiyecekAyarlari.etki();
             VucutSicakligi.ayarla(o, 0);
@@ -428,12 +429,12 @@ public final class YiyecekOyunTestleri {
             dogrula(y, efekt != null && efekt.getAmplifier() == 0 && efekt.getDuration() == 600, "İçten Isınma I 30 sn: " + efekt);
             vanillaYe(o, Items.POTATO);
             dogrula(y, VucutSicakligi.al(o) == vucut, "çiğ patates ısıtmamalı");
-            ayar.set(false);
+            YiyecekAyarlari.vanillaIsinmaTesti(false);
             vanillaYe(o, Items.COOKED_BEEF);
             dogrula(y, VucutSicakligi.al(o) == vucut, "vanillaIsinma=false iken ısıtmamalı");
             y.succeed();
         } finally {
-            ayar.set(true);
+            YiyecekAyarlari.vanillaIsinmaTesti(null);
             cikar(y, List.of(o));
         }
     }

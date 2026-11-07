@@ -23,6 +23,7 @@ public final class YiyecekAyarlari {
     private static AyarKaydi.Bolum<YiyecekAyarlari> bolum;
     private static volatile EtkiAyarlari etki;
     private static volatile Map<Item, YiyecekTanimi> vanilla;
+    private static volatile Boolean vanillaIsinmaTesti;
 
     private final ForgeConfigSpec.DoubleValue cokKucuk;
     private final ForgeConfigSpec.DoubleValue kucuk;
@@ -34,7 +35,7 @@ public final class YiyecekAyarlari {
     private final ForgeConfigSpec.DoubleValue azalanVerimOrani;
     private final ForgeConfigSpec.DoubleValue yanEtkiCarpani;
     private final ForgeConfigSpec.DoubleValue yanEtkiEsigi;
-    final ForgeConfigSpec.BooleanValue vanillaIsinma;
+    private final ForgeConfigSpec.BooleanValue vanillaIsinma;
     private final ForgeConfigSpec.ConfigValue<List<? extends String>> vanillaYiyecekler;
     private final ForgeConfigSpec.IntValue balikPismisSaniye;
     private final ForgeConfigSpec.IntValue balikCigSaniye;
@@ -89,10 +90,6 @@ public final class YiyecekAyarlari {
         }
     }
 
-    static YiyecekAyarlari bolum() {
-        return bolum.get();
-    }
-
     /** Config yüklendi mi (istemcide dünyaya girmeden önce değildir). */
     public static boolean yuklendiMi() {
         try {
@@ -121,7 +118,17 @@ public final class YiyecekAyarlari {
     }
 
     public static boolean vanillaIsinma() {
-        return bolum.get().vanillaIsinma.get();
+        Boolean test = vanillaIsinmaTesti;
+        return test != null ? test : bolum.get().vanillaIsinma.get();
+    }
+
+    /**
+     * Yalnız GameTest: {@code vanillaIsinma}'yı config dosyasına yazmadan değiştirir, {@code null} config'e döner.
+     * {@code ConfigValue.set} dosyayı yeniden yazar; Forge'un izleyici thread'i dosyayı yeniden yüklerken gelen ikinci
+     * {@code set} ayrıştırmayı bozar ({@code [yiyecek] declared twice}, K-E28).
+     */
+    static void vanillaIsinmaTesti(Boolean deger) {
+        vanillaIsinmaTesti = deger;
     }
 
     /** {@code vanillaYiyecekler} listesinin kayıtlı eşyalara çözülmüş hali; bilinmeyen kimlik WARN ile atlanır. */
