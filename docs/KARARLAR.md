@@ -3400,7 +3400,9 @@ GameTest `gercekGunesKuralKapanincaIptalKuralVeDevam`: ON_UYARI'da kural kapanı
 K-C26 ile NORMAL, doğal bitişten sonra güneş zinciri `KURAL` ile durur, 20 tick ×1000'de ilerlemez, kural açılınca sürer.
 Bulgu (bilinen küçük sınır, kod değişmedi): kural, süpernovanın başladığı tick'te kapanırsa zincirin ilk tick'i yeni döngüyü
 kaydeder (`donemSureciBasladi`, eski durdurma kaydını siler) ve bir sonraki 1 Hz kural denetimine kadar ilerler; denetim onu
-yeniden durdurur. Test kuralı iki tick sonra kapatır.
+yeniden durdurur. Test kuralı iki tick sonra kapatır. **Şef kabul (2026-11-07, inceleme-entegrasyon-5 §2):** sınır olduğu gibi
+kalır, düzeltme yok; kural denetimi zaten 1 Hz (her kural değişiminden sonra en çok 1 sn × hız ilerleme), ulaşılmış dönem geri
+alınmaz.
 
 **K-E34 Orman GameTest kararlılığı.** `dogalBitenOrmanYanginiYanmadanCiktimVerir` altı tam koşunun ikisinde 0 ipucuyla düştü. Kök
 neden: çevrim içi oyuncu varken `elleBaslat` merkezi bir oyuncunun yakınındaki rastgele yakıttan seçer (`OrmanYeri.sec`);
@@ -4440,8 +4442,10 @@ tek çarpan bunların hiçbirini doğru ölçeklemezdi. README config bölümün
 (b) **Faz 5 tek FPS kuralı (K0-33 revizyonu, TS-16 rev. 3 genellemesi), `5-matris` #10 bununla:** her afetin S5 Yüksek
 sahnesinde (i) afetsiz taban kare süresi ≥ 10 ms ise K0-33 oranı: afetli kare süresi ≤ 2 × taban ("≥ %50"); (ii) taban < 10 ms
 ise (maxFps/vsync tavanı ya da çok hızlı taban) mutlak ölçü: render thread CPU ms/kare ≤ 33,3 ve sunucu mspt < 50 ve ölçüm
-anında başka Gradle ≤ 1. Orman 0,48 ve asit emsalleri bununla kapanır (orman taban 120 FPS → 8,3 ms → mutlak ölçü; Düşük 8,01 /
-Yüksek 7,42 / Ultra 11,70 ms geçer). Duvar saati ≥ 30 FPS Faz 5 görünür koşu tetikleyicisidir (kullanıcı sorusu 1'e bağlı);
+anında başka Gradle ≤ 1. Orman 0,48 ve asit emsalleri bu kuralla `5-matris` #10'da ortak ölçüm satırıyla yeniden ölçülür (orman
+tabanı 120 FPS → 8,3 ms, yani mutlak ölçü dalı). Faz 4'ün "çizim ms/kare" değerleri (Düşük 8,01 / Yüksek 7,42 / Ultra 11,70; aynı
+tabloda orman S5 aktif 22,80 ms) yalnız göstergedir: render thread CPU ms/kare ile ölçü eşdeğerliği ve o koşudaki Gradle sayısı
+gösterilmedi (inceleme-entegrasyon-5 P2-7). Duvar saati ≥ 30 FPS Faz 5 görünür koşu tetikleyicisidir (kullanıcı sorusu 1'e bağlı);
 tutmazsa önce yağmur/parçacık, sonra köpük/duman bütçesi kırpılır. Ortak FPS ölçüm satırı duvar ms, CPU ms, taban ms, mspt,
 Gradle sayısı ve kademeyi yazar (`.vibe/gorev/5-gorsel-otomasyon.md` madde 1).
 
