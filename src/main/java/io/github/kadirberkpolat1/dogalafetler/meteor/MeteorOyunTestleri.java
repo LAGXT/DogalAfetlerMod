@@ -897,12 +897,14 @@ public final class MeteorOyunTestleri {
      * eski varsayılanda kalanlar yeniye (24 → 180 zincirle), elle değerler (300, 0,07, 120) korunur, sürüm güncellenir, tek
      * satır özet döner; ikinci açılış dosyaya dokunmaz. Sonra dosya Forge'un açılış düzeltmesinden ({@code correct}) geçirilir:
      * kalkan {@code dusmeHizi} silinir, eksik anahtarlar varsayılan alır, göçün değerleri kalır. Tablonun yeni değerleri
-     * spec'in varsayılanlarıdır. Canlı config'e yazılmaz (K-E28): geçici dosya.
+     * spec'in varsayılanlarıdır. Özgün dosya {@code .bak-ayarSurumu0} yedeğinde kalır (Mt27). Canlı config'e
+     * yazılmaz (K-E28): geçici dosya.
      */
     @GameTest(template = "bos", batch = "meteor_goc", timeoutTicks = 20)
     public static void eskiAyarDosyasiAcilistaGocEderElleDegerKorunur(GameTestHelper y) {
         Path klasor = null;
         Path dosya = null;
+        Path yedek = null;
         try {
             klasor = Files.createTempDirectory("dogalafetler-goc");
             dosya = klasor.resolve(AyarKaydi.SUNUCU_DOSYASI);
@@ -911,6 +913,9 @@ public final class MeteorOyunTestleri {
             DogalAfetler.LOGGER.info("meteor göç GameTest: {}", satir);
             dogrula(y, satir != null && satir.contains(MeteorAyarGocu.SURUM_YOLU + " 0 → " + MeteorAyarGocu.GUNCEL),
                     "göç satırı yok: " + satir);
+            yedek = klasor.resolve(AyarKaydi.SUNUCU_DOSYASI + ".bak-ayarSurumu0");
+            dogrula(y, Files.isRegularFile(yedek) && ESKI_AYAR.equals(Files.readString(yedek, StandardCharsets.UTF_8)),
+                    "özgün dosya yedekte kalmalı: " + yedek.getFileName());
             CommentedConfig dosyada = tomlOku(dosya);
             Map<String, Double> beklenen = new HashMap<>(Map.of(MeteorAyarGocu.SURUM_YOLU, (double) MeteorAyarGocu.GUNCEL,
                     "meteor.varlikTavani", 448.0, "meteor.girisYuksekligi", 200.0, "gunes_patlamasi.buyukMeteorOrani", 0.10,
@@ -944,6 +949,9 @@ public final class MeteorOyunTestleri {
             try {
                 if (dosya != null) {
                     Files.deleteIfExists(dosya);
+                }
+                if (yedek != null) {
+                    Files.deleteIfExists(yedek);
                 }
                 if (klasor != null) {
                     Files.deleteIfExists(klasor);
