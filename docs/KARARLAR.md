@@ -3751,6 +3751,8 @@ karesi 94 / 81. S5 çarpma/karada karelerinde kamera dalganın içinde (yüzeyin
   büyüyen depo sürücüde yeniden ayrılır. `SuRenderer.yukle` kurucuyu dörtgen kapasitesine kadar sıfır, saydam (rasterleşmeyen)
   dörtgenlerle doldurur; boy kapasite aşılana dek sabit, aşılınca %25 payla büyür (şef: kapasite payı, çift tampon değil). Sıralı
   indeks tamponu (`AutoStorageIndexBuffer`) zaten 2× büyür. `olcumOzeti` sonuna `tampon_buyume=<n>`; etkisi `5-matris` #10.
+  **Rev. (K-E48):** dolgu kalktı; GPU deposu yalnız büyür (`glBufferData(kapasite, null)`), kullanılan kısım `glBufferSubData`, çizim kullanılan
+  indeks sayısıyla (`client/su/KapasiteliTampon`).
 - **P2-2:** mağara parıltısı yalnız `bilesen > 1`; Düşük'te tavan yansıması ışını 12 blok (SU-17, SU-35 notları).
 - **P2-3:** şef kararıyla P1 düzeyinde (K-E42).
 - **P2-4:** Ts2-1 yakın/alçak köpük karesi `tsunami_gorsel.py kopuk` (SU-43 notu); `5-matris` #6.
@@ -4811,7 +4813,9 @@ yükleme 10,65 / 12,02 ms). Duvar saati `yakin_tick_en_cok` (3,37–19,02 ms: GC
 ≤ 2 ms + borç tutmazsa tampon yüklemesi dilimlenir (yeni tampon ayrılıp `glBufferSubData` ile tick başına bir dilim yüklenir,
 bu sırada eski tampon çizilir, son dilimde ikisi takas edilir). Kodda bütçe denetimi duvar saatiyle kalır (§D). SU-38
 kapandı. Protokol (şef kararı): mağara ve kurulum ölçüm koşuları `6828ff1`/`abf106b`'de alındı, `b1eb45c`'de yeniden koşulmadı;
-`client/su` o tarihten beri değişmediği için (`b1eb45c` yalnız köpüğün CPU ölçümü) ölçümler geçerlidir.
+`client/su` o tarihten beri değişmediği için (`b1eb45c` yalnız köpüğün CPU ölçümü) ölçümler geçerlidir. **Gerileme ve düzeltme (K-E48):** P2-1 dolgusuyla (`5934e30`)
+`su_istemci.py hepsi` ölçümü dalga 5,80 ms / mağara 7,88 ms verdi (bütçe aşan tick 16/93, 27/69; `.vibe/kanit/matris-5-ek/`); kabul
+edilmedi, dolgu kalktı. Yeniden ölçüm doğrulayıcıda (hedef üç sahnede ≤ 2,0 ms + borç, bütçe aşan tick ≈ 0).
 
 **K-E45 Kasırga görsel koşusunda S5 merkezi kara zeminde (şef kararı, 2026-11-07; `5-matris` P3; şefin metninde "K-E44", kimlik
 kullanıcının pc2 kararıyla dolu olduğu için K-E45).** `kasirga_gorsel.py` K-17 taban rengi denetimi iki koşuda tutmadı: S5 merkezi
@@ -4843,7 +4847,32 @@ from 192.168.1.0/24 to any port 25611:25660 proto tcp`); açılana dek istemci t
 karesi: otomasyon yok → bilinen sınır (karar 2 benzeri; davranış GameTest ve senaryoyla kanıtlı). #9 bulgusu (`-Puyum=coldsweat`'te 12
 test) K-E41 (`df37de7`) ile kapalı, kanıt `.vibe/rapor/dogrulama-entegrasyon-5-son.md` (`f1954dc`, 216/216); e4mc ve #5 installer dış
 ağ ister, kullanıcı sorusu 4. #10: duvar saati FPS bilinen sınır (karar 2), CPU ms ölçüleri (K-E29 (b), TS-16 rev. 3, SU-45) geçti;
-ay ve güneşin afetsiz taban sahnesi yok → "ön". TEST-RAPORU: 9 yeşil / 2 kısmi / 3 bilinen sınır / 2 bekliyor; IZLEME 247 / 21 / 0.
+ay ve güneşin afetsiz taban sahnesi yok → "ön". TEST-RAPORU: 9 yeşil / 2 kısmi / 3 bilinen sınır / 2 bekliyor; IZLEME 247 / 21 / 0. **Ek (inceleme-matris-5, kod P2'leri):** P2-2 Dalga Avcısı y −64'e konup dünyanın altına düşüyordu:
+`TsunamiOtomasyonu.avciAdimi` zemini artık entegre sunucuda chunk'ı yükleyerek (`getChunk` + `MOTION_BLOCKING_NO_LEAVES`) okur; istemci chunk'ı
+bu yükseklik haritasını tutmaz ve yüklü olmayan chunk dünya tabanını döner (`DonmaOtomasyonu.evKur` notuyla aynı kök). Zemin dünya
+tabanındaysa oyuncu yerleştirilmez, `AVCI GECERSIZ` yazılır; `tsunami_gorsel.py` bu satırda ya da "fell out of the world"da koşuyu
+geçersiz sayar. P2-7 #13 yetişme karesi zamana bağlıydı (%35 anında, bütün chunk'lar birlikte ilerlerken; vitrinle %0,2 fark):
+`DonmaOtomasyonu` artık gölün chunk'ı sunucuda boşalınca (`hasChunk` false, 640 blok uzakta) uzakta `donma 60` verir, geri döner ve
+kareyi olaya bağlar: yetişme kuyruğu doluyken dönüşten beri ≥ 2000 blok değişmiş (`yetisme_60_surerken`), sonra yetişme bitince aynı
+kameradan `yetisme_60_bitti`; eski `vitrin_35_yetisirken` kalktı.
+
+**K-E48 Su tamponu dolgusuz: GPU deposu yalnız büyür, CPU maliyeti sıfır (şef kararı, 2026-11-07; SU-45 gerilemesi; şefin metninde
+"K-E46").** `matris-5-ek` (`b5fd573`) `su_istemci.py hepsi` ölçümünde `kurulum_tick_cpu_en_cok` deniz 2,95 / dalga 5,80 / mağara 7,88 ms
+(bütçe aşan tick 0, 16/93, 27/69), `tampon_buyume=0`; SU-45 kabulündeki pencereler 1,85–2,76 ms idi. Kök neden kodda doğrulandı:
+inceleme-su-gorsel P2-1 düzeltmesi (`5934e30`) `SuRenderer.yukle`'de kurucuyu kapasiteye kadar sıfır, saydam dörtgenlerle
+dolduruyordu (`KAPASITE - dortgen` dörtgen × 4 köşe, BLOCK biçimi) ve kapasite hiç küçülmüyordu; `yukle` yakın halkanın son diliminde,
+CPU'su ölçülen `kurulumIlerlet` içinde çağrılır. `hepsi` sırasında deniz/dalga sahnesi kapasiteyi büyüttükten sonra küçük yapımlar
+(mağara) her seferinde ~14 000 dolgu dörtgeni yazıp yüklüyor ve çiziyordu. Karar (şef): dolgu hiç yazılmaz.
+`client/su/KapasiteliTampon` vanilla `VertexBuffer`'ı sarar: GPU deposu yalnız kapasite aşılınca `glBufferData(kapasite × 1,25, null)`
+ile ayrılır, her yüklemede kullanılan kısım `glBufferSubData` ile yazılır, sıralı indeks tamponu (`RenderSystem.getSequentialBuffer`)
+kullanılan indeks sayısına bağlanır ve çizim `VertexBuffer.drawWithShader` ile yalnız kullanılan indeks sayısıyla yapılır. Vanilla
+çizimin okuduğu özel alanlar (biçim, sıralı indeks, indeks tipi/sayısı, kip) bir kez bulunan `Field`'larla yazılır (SRG adları
+`f_85917_`, `f_166865_`, `f_166861_`, `f_166863_`, `f_166864_`, VBO `f_231217_`; `ObfuscationReflectionHelper`, `MouseHandler` deseni):
+sıcak yolda allocation ve boşa yazma yok. Sıralı olmayan çizim durumu vanilla `upload`'a düşer. Kapasite yalnız büyür, ama artık
+yalnız GPU belleğidir. Yalnız `client/su/**` değişti; K-E42 kapısı aynen. Kabul: pc2'de `build` ve `TEST_FILTRE=Su|Tsunami|Donma`
+(çalışma zamanı yolu GameTest'te yüklenmez: istemci sınıfı); yeniden ölçüm doğrulayıcının `su_istemci.py hepsi` koşusunda. Reddedilen:
+kapasiteyi küçültme eşiği (karmaşıklık, titreme; şef); çift tampon (P2-1 şef kararı); access transformer (decompile/kurulum yenilemesi
+ister, tek sınıf için yansıma yeterli).
 
 ## Açık noktalar (Faz 2b)
 
@@ -4983,9 +5012,8 @@ P2-9 `5-matris` kabulünde. Açık kalanlar:
 - **`5-matris` sonrası (K-E45…K-E47):** kasırga görsel koşusu K-E45 betiyle yeniden (#6); uyarı istemcili koşu K-E46 ile pc2 `ufw`
   portu açılınca (#7, kullanıcı `sudo`); #5 installer ve #9 e4mc kullanıcı sorusu 4; #6/#11–#13/#15 kareleri şef incelemesinde; birleşik HEAD
   istemci yeniden koşusu (#6/#10, Ts2-1 `kopuk`) şef kararını bekliyor.
-- **Su tampon kapasitesi küçülmüyor (doğrulayıcı-2 P2-2):** `SuRenderer.yukle` kapasiteyi yalnız büyütür; büyük bir yapımdan (tsunami)
-  sonra küçük yapımlar (mağara) da en büyük boyda yüklenir (~14 000 boş dolgu dörtgeni; rasterleşmez ama yükleme ve köşe işi sürer).
-  Küçültme kuralı (ör. kapasitenin < %40'ı birkaç yapım üst üste) `5-matris` #10 `tampon_buyume` ve yükleme ölçümünden sonra.
+- **Su tampon kapasitesi küçülmüyor (doğrulayıcı-2 P2-2):** kapandı (K-E48): kapasite yalnız GPU deposudur, dolgu yazılmaz; SU-45
+  yeniden ölçümü doğrulayıcının `su_istemci.py hepsi` koşusunda.
 - **Sanal su görseli (inceleme-su-gorsel):** P2-5 köpük paylaşılan kenar hesabı yapılmadı (isteğe bağlı); köpük CPU'su, tampon büyümesi
   (`tampon_buyume`) ve SU-45 duvar saati `5-matris` #10; Ts2-1 tam kare ve yeni `SuOtomasyon` kareleri `5-matris` #6 (bu turda runClient yok).
 
@@ -5348,7 +5376,7 @@ P2-9 `5-matris` kabulünde. Açık kalanlar:
 | su (kod) | mağara parıltı eşiği / alfa | 0,15 / (g − 0,05) · 1,2 | köşe yansıma gücü | duvar vuruşu soluk, kaynak vuruşu parlak leke (SU-42) |
 | su (kod) | gökyüzüsüz mağara suyu tonu / en az alfa | `0x2A6468` %50 / 0,72 | — | su ışıklı taş zeminden ayrı katman (SU-42) |
 | su (kod) | tavan yansıması ışın erimi, Düşük | 12 | blok | N13: SU-35 değeri; parıltı da Düşük'te kapalı (inceleme-su-gorsel P2-2) |
-| su (kod) | yakın/uzak tampon kapasite payı | 1,25 | × dörtgen | büyüme anında 10–12 ms yükleme seyrekleşsin (P2-1, şef: çift tampon değil) |
+| su (kod) | yakın/uzak tampon kapasite payı | 1,25 | × GPU depo boyu | depo yalnız aşılınca yeniden ayrılsın (P2-1); dolgu yok, yükleme ve çizim kullanılan kadar (K-E48) |
 
 Config dışı sabitler (oynanış değeri değil, sınır/biçim): siren 200/1200 tick (şartname, K0-19); son afet geçmişi 5
 (madde 13a); tek çarpan ≤ 100, toplam ≤ 1000 (K-C22); hız 0,1–1000; TPS ölçüm aralığı 20 tick; dönem kaydı sınırları

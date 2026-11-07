@@ -33,7 +33,8 @@ import net.minecraftforge.fml.common.Mod;
  * dünyasında çalışır; üretimde etkisizdir. Yakındaki bir gölü (yoksa nehir/kıyıyı) bulur, kıyısındaki tepeden ona bakar
  * ve sırayla: vitrin (güneşsiz evre, öğle, G 15'ten gerçek donma süreciyle {@code hiz 20} altında %35'e; kıyıdan
  * içeri donan göl %25'te açık havada, kar yağışı eşiğinde (30) yağmur açılır ve %35 kar yağışında, %35'te üstten), %100
- * donmuş göl (yan, üst), manzara, tahta çatılı evde yapı karı,
+ * donmuş göl (yan, üst), chunk yetişmesi (#13: gölün chunk'ları sunucuda boşalınca uzakta G 60, dönüşte yetişme sürerken ve
+ * bitince aynı kameradan iki kare), manzara, tahta çatılı evde yapı karı,
  * büyüyen güneşte buharlaşmış göl yatağı (kıyıdan dik, üstten) ve süpernovada geri dolması, kızıl cücede bir kalıcı
  * kış sınırı boyunca geniş planda çözülme (G=40). Güneş evresi entegre sunucuda doğrudan ayarlanır (evre komutu
  * gökyüzü dalında). Aralarda {@code /forge tps} ve {@code /dogalafet donma bilgi} çıktıları log'a düşer. Arayüz ve sohbet
@@ -60,6 +61,12 @@ public final class DonmaOtomasyonu {
     private static BlockPos sinir;
     private static double[] sinirYonu = {1, 0};
     private static int[] ev;
+    /** Dönüşten beri sunucu işçisinin değiştirdiği blok (istemci tick'i başına {@code sonTickDegisen} toplamı, yaklaşık). */
+    private static long donusDegisen;
+    /** Yetişme karesi: dönüşten sonra en az bu kadar blok değişmiş ve kuyruk hâlâ dolu (sınır kadrajda). */
+    private static final int YETISME_KARE_BLOK = 2000;
+    /** Uzaklaşma: gölden bu kadar blok (simülasyon ve görüş uzaklığının çok ötesi). */
+    private static final int UZAK_BLOK = 640;
 
     private DonmaOtomasyonu() {
     }
@@ -107,6 +114,7 @@ public final class DonmaOtomasyonu {
         }
         sayac++;
         bosTick = DonmaZamanlayici.kuyrukBos() ? bosTick + 1 : 0;
+        donusDegisen += DonmaZamanlayici.sonTickDegisen();
         if (adim < 0) {
             if (sayac < 200 || !mc.player.hasPermissions(2)) {
                 return;
@@ -189,18 +197,39 @@ public final class DonmaOtomasyonu {
         ekle("hiz 20 ile 25'e", () -> komut(mc, "dogalafet hiz 20"), gEnAz(25f), 1200);
         ekle("vitrin %25", () -> kare(mc, "vitrin_25"), gEnAz(30f), 1200);
         ekle("kar yağışı %30", () -> komut(mc, "weather rain 100000"), gEnAz(35f), 1200);
-        ekle("vitrin %35 yetişme sırasında", () -> {
-            kare(mc, "vitrin_35_yetisirken");
+        ekle("vitrin %35", () -> {
             komut(mc, "dogalafet stop");
             komut(mc, "dogalafet hiz 1");
-        }, bekle(1), 2);
-        ekle("vitrin %35", () -> { }, yetisti(20), 2400);
+        }, yetisti(20), 2400);
         ekle("vitrin kare", () -> {
             kare(mc, "vitrin_35");
             bilgi(mc);
         }, bekle(40), 60);
         ekle("üstten", () -> ustBak(mc), bekle(100), 120);
         ekle("üstten kare", () -> kare(mc, "vitrin_35_ust"), bekle(20), 30);
+        // #13 (inceleme-matris-5 P2-7): kare anı zamana değil yetişme olayına bağlı. Gölün chunk'ı sunucuda boşalınca uzakta G 60;
+        // dönüşte yüklenen chunk'lar 35'ten 60'a adım adım yetişir, kare yetişme başlayıp kuyruk doluyken alınır.
+        ekle("uzaklaş", () -> {
+            if (gol != null) {
+                komut(mc, "tp @s " + (gol[0] + UZAK_BLOK) + " 200 " + gol[1] + " 0 60");
+            }
+        }, () -> adimTick >= 40 && adimTick % 20 == 0 && !golChunkSunucuda(mc), 2400);
+        ekle("uzakta G 60", () -> komut(mc, "dogalafet donma 60 donma"), yetisti(60), 3000);
+        ekle("dön: yetişme başlasın", () -> {
+            donusDegisen = 0;
+            yanBak(mc);
+        }, () -> !DonmaZamanlayici.kuyrukBos() && donusDegisen >= YETISME_KARE_BLOK && golChunkIstemcide(mc), 600);
+        ekle("yetişme karesi", () -> {
+            DogalAfetler.LOGGER.info(ON + "yetişme sürüyor: dönüşten beri {} blok değişti, kuyruk {}", donusDegisen,
+                    DonmaZamanlayici.kuyrukBos() ? "BOŞ (yetişme kare anından önce bitti)" : "dolu");
+            kare(mc, "yetisme_60_surerken");
+        }, bekle(1), 2);
+        ekle("yetişme bitti", () -> { }, yetisti(20), 2400);
+        ekle("yetişme sonrası kare", () -> {
+            DogalAfetler.LOGGER.info(ON + "yetişme bitti: dönüşten beri {} blok değişti", donusDegisen);
+            kare(mc, "yetisme_60_bitti");
+            bilgi(mc);
+        }, bekle(40), 60);
         ekle("G 100", () -> {
             yanBak(mc);
             komut(mc, "dogalafet donma 100");
@@ -336,6 +365,21 @@ public final class DonmaOtomasyonu {
         MinecraftServer server = mc.getSingleplayerServer();
         server.submit(() -> DunyaDonemi.al(server).gunesEvresiAyarla(evre)).join();
         DogalAfetler.LOGGER.info(ON + "güneş evresi {}", evre.kimlik());
+    }
+
+    /** Göl merkezinin chunk'ı entegre sunucuda yüklü mü (uzaklaşınca boşalır; dönüşte yetişme bu chunk'larda başlar). */
+    private static boolean golChunkSunucuda(Minecraft mc) {
+        if (gol == null) {
+            return false;
+        }
+        MinecraftServer server = mc.getSingleplayerServer();
+        int cx = gol[0] >> 4;
+        int cz = gol[1] >> 4;
+        return server.submit(() -> server.overworld().hasChunk(cx, cz)).join();
+    }
+
+    private static boolean golChunkIstemcide(Minecraft mc) {
+        return gol == null || mc.level.hasChunk(gol[0] >> 4, gol[1] >> 4);
     }
 
     private static void kare(Minecraft mc, String ad) {

@@ -288,7 +288,11 @@ def main():
         if png.stat().st_mtime > duvar_baslangic:
             shutil.copy2(png, kanit / png.name)
             log(f"kopyalandı: {png.name}")
-    if alarm or girdi:
+    # inceleme-matris-5 P2-2: avcı dünyanın altına düşer ya da yerleştirilemezse sonraki kareler ve başarım denetimi anlamsız.
+    avci_hata = re.findall(r"fell out of the world|AVCI GECERSIZ", metin)
+    if avci_hata:
+        log(f"GEÇERSİZ: avcı satırı {avci_hata[0]!r} ({len(avci_hata)} kez)")
+    if alarm or girdi or avci_hata:
         return 1
     # Kapanışı asılı kalan istemcinin ölçümleri BITTI'den önce tamamdır; koşu geçerli, asılı kapanış log'da kalır.
     return 0 if bitti and cikis and (cikis.group(1) == "0" or asili) else 2

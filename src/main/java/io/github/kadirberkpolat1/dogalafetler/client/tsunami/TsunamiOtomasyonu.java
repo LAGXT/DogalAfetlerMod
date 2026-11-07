@@ -35,7 +35,10 @@ import net.minecraft.client.particle.BubbleParticle;
 import net.minecraft.client.particle.Particle;
 import net.minecraft.client.particle.ParticleEngine;
 import net.minecraft.client.particle.SplashParticle;
+import net.minecraft.client.server.IntegratedServer;
+import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -747,7 +750,10 @@ public final class TsunamiOtomasyonu {
 
     /**
      * Dalga Avcısı adımları: {@code yerles} oyuncuyu tsunaminin kıyı noktasından dalga yönünde 6 blok içeri, zemine, denize
-     * bakar koyar; {@code durum} oyuncunun canını, oyun modunu ve afet aşamasını yazar.
+     * bakar koyar; {@code durum} oyuncunun canını, oyun modunu ve afet aşamasını yazar. Zemin entegre sunucudan, chunk
+     * yüklenerek okunur ({@link #zemin}): istemci chunk'ı {@code MOTION_BLOCKING_NO_LEAVES} tutmaz ve yüklü olmayan chunk dünya
+     * tabanını döner (inceleme-matris-5 P2-2: oyuncu y −64'e konup dünyanın altına düştü). Zemin dünya tabanındaysa oyuncu
+     * yerleştirilmez, {@code AVCI GECERSIZ} yazılır (betik koşuyu geçersiz sayar).
      */
     private static void avciAdimi(Minecraft mc, String ne) {
         AfetDurumPaketi p = IstemciAfetDurumu.aktif().filter(d -> d.tur() == AfetTuru.TSUNAMI).orElse(null);
@@ -767,23 +773,42 @@ public final class TsunamiOtomasyonu {
         float yz = o.getFloat("yz");
         double x = o.getFloat("kx") + yx;
         double z = o.getFloat("kz") + yz;
-        int y = mc.level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, Mth.floor(x), Mth.floor(z));
+        int y = zemin(mc, x, z)[0];
         for (int i = 1; i <= 16; i++) {
             double xi = o.getFloat("kx") + yx * i;
             double zi = o.getFloat("kz") + yz * i;
-            int yi = mc.level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, Mth.floor(xi), Mth.floor(zi));
-            if (yi <= o.getFloat("tb") + 3 && mc.level.getFluidState(new net.minecraft.core.BlockPos(Mth.floor(xi), yi - 1,
-                    Mth.floor(zi))).isEmpty()) {
+            int[] zs = zemin(mc, xi, zi);
+            if (zs[0] <= o.getFloat("tb") + 3 && zs[1] == 0) {
                 x = xi;
                 z = zi;
-                y = yi;
+                y = zs[0];
                 break;
             }
+        }
+        if (y <= mc.level.getMinBuildHeight()) {
+            DogalAfetler.LOGGER.warn("TSUNAMI-OTOMASYON AVCI GECERSIZ zemin y {} dünya tabanında ({}, {}); oyuncu yerleştirilmedi", y,
+                    String.format(Locale.ROOT, "%.1f", x), String.format(Locale.ROOT, "%.1f", z));
+            return;
         }
         float yaw = (float) Math.toDegrees(Math.atan2(yx, -yz));
         String komut = String.format(Locale.ROOT, "tp @s %.2f %d %.2f %.1f 5", x, y, z, yaw);
         mc.player.connection.sendCommand(komut);
         log("AVCI yerlesti {} (kıyı {} {}, yön {} {})", komut, o.getFloat("kx"), o.getFloat("kz"), yx, yz);
+    }
+
+    /**
+     * Sütunun sunucudaki zemini {y, sıvı}: chunk sunucu thread'inde yüklenir ({@code getChunk}, tam üretim) ve
+     * {@code MOTION_BLOCKING_NO_LEAVES} yüksekliği ile zeminin hemen altındaki bloğun sıvı olup olmadığı (1 sıvı) okunur.
+     */
+    private static int[] zemin(Minecraft mc, double x, double z) {
+        IntegratedServer sunucu = mc.getSingleplayerServer();
+        int bx = Mth.floor(x);
+        int bz = Mth.floor(z);
+        return sunucu.submit(() -> {
+            ServerLevel l = sunucu.getLevel(mc.level.dimension());
+            int y = l.getChunk(bx >> 4, bz >> 4).getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, bx & 15, bz & 15) + 1;
+            return new int[] {y, l.getFluidState(new BlockPos(bx, y - 1, bz)).isEmpty() ? 0 : 1};
+        }).join();
     }
 
     /**

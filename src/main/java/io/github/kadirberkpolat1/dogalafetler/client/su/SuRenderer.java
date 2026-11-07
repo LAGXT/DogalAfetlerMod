@@ -113,11 +113,9 @@ public final class SuRenderer {
     private static final int[] DI = {1, -1, 0, 0};
     private static final int[] DJ = {0, 0, 1, -1};
     private static ClientLevel sonSeviye;
-    private static VertexBuffer vbYakin;
-    private static VertexBuffer vbUzak;
-    /** Tamponların dörtgen kapasitesi (yakın, uzak): yükleme hep bu boyda, aşılınca %25 payla büyür (P2-1). */
-    private static final int[] KAPASITE = new int[2];
-    private static final float KAPASITE_PAYI = 1.25f;
+    /** Yakın halka ve uzak LOD tamponları: GPU deposu yalnız büyür, yükleme ve çizim kullanılan kadar (K-E48). */
+    private static KapasiteliTampon vbYakin;
+    private static KapasiteliTampon vbUzak;
     private static boolean yakinBos = true;
     private static boolean uzakBos = true;
     private static VertexBuffer vbParilti;
@@ -396,13 +394,11 @@ public final class SuRenderer {
         Matrix4f mv = ps.last().pose();
         if (!uzakBos) {
             ofset(sh, uzakOx - cam.x, uzakOy - cam.y, uzakOz - cam.z);
-            vbUzak.bind();
-            vbUzak.drawWithShader(mv, proj, sh);
+            vbUzak.ciz(mv, proj, sh);
         }
         if (!yakinBos) {
             ofset(sh, yakinOx - cam.x, yakinOy - cam.y, yakinOz - cam.z);
-            vbYakin.bind();
-            vbYakin.drawWithShader(mv, proj, sh);
+            vbYakin.ciz(mv, proj, sh);
             if (!pariltiBos) {
                 RenderSystem.depthMask(false);
                 RenderSystem.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE);
@@ -1034,10 +1030,8 @@ public final class SuRenderer {
     }
 
     /**
-     * Kurucuyu ilgili tampona yükler; boşsa {@code false}. {@code VertexBuffer.upload} her yüklemede tam boyla
-     * {@code glBufferData} çağırır; depo büyüdüğünde sürücü yeniden ayırır (10–12 ms, inceleme-su-gorsel P2-1). Kurucu
-     * {@link #KAPASITE}'ye kadar alanı sıfır, saydam dörtgenlerle doldurulur: boy kapasite aşılana dek değişmez, aşılınca
-     * {@link #KAPASITE_PAYI} payıyla büyür (çift tampon değil, şef kararı). Boş dörtgen rasterleşmez.
+     * Kurucuyu ilgili tampona yükler; boşsa {@code false}. GPU deposu yalnız kapasite aşılınca {@link KapasiteliTampon#PAY}
+     * payıyla yeniden ayrılır (inceleme-su-gorsel P2-1); yükleme ve çizim kullanılan köşe kadardır, dolgu yazılmaz (K-E48).
      */
     private static boolean yukle(BufferBuilder kurucu, boolean yakin) {
         if (dortgen == 0) {
@@ -1045,29 +1039,18 @@ public final class SuRenderer {
             return false;
         }
         long t0 = System.nanoTime();
-        VertexBuffer vb = yakin ? vbYakin : vbUzak;
-        int k = yakin ? 0 : 1;
+        KapasiteliTampon vb = yakin ? vbYakin : vbUzak;
         if (vb == null) {
-            vb = new VertexBuffer(VertexBuffer.Usage.DYNAMIC);
-            KAPASITE[k] = 0;
+            vb = new KapasiteliTampon();
             if (yakin) {
                 vbYakin = vb;
             } else {
                 vbUzak = vb;
             }
         }
-        if (dortgen > KAPASITE[k]) {
-            KAPASITE[k] = (int) Math.ceil(dortgen * KAPASITE_PAYI);
+        if (vb.yukle(kurucu.end())) {
             olcBuyume++;
         }
-        for (int i = dortgen; i < KAPASITE[k]; i++) {
-            for (int q = 0; q < 4; q++) {
-                kurucu.vertex(0, 0, 0).color(0, 0, 0, 0).uv(0, 0).uv2(0).normal(0, 1, 0).endVertex();
-            }
-        }
-        vb.bind();
-        vb.upload(kurucu.end());
-        VertexBuffer.unbind();
         long g = System.nanoTime() - t0;
         olcEnCokYuklemeNs = Math.max(olcEnCokYuklemeNs, g);
         logEnCokYuklemeNs = Math.max(logEnCokYuklemeNs, g);
