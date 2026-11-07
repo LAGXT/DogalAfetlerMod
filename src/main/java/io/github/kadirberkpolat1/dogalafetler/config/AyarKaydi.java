@@ -1,5 +1,6 @@
 package io.github.kadirberkpolat1.dogalafetler.config;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -34,7 +35,8 @@ import net.minecraftforge.fml.config.ModConfig;
  * Kurucu, bölüm adıyla {@code push} edilmiş builder'ı alır ve ittiği alt bölümleri kendisi kapatır. Aynı bölüme birden
  * çok katkı eklenebilir (anahtarlar farklı olmalı). Spec'ler {@link #kaydet} ile mod kurucusunun sonunda kurulur; ondan
  * sonra eklenen bölüm reddedilir. Değerler config yüklendikten sonra (sunucu açılışı) okunur. Yeni dosyalar varsayılanlarla
- * yazılır ({@link VarsayilanYazanIsleyici}).
+ * yazılır ({@link VarsayilanYazanIsleyici}); var olan SERVER dosyasının eski varsayılanları {@link #sunucuGocu} ile
+ * kaydedilen göçlerle Forge okumadan önce yenisine çekilir ({@link AyarGocu}).
  */
 public final class AyarKaydi {
     public static final String SUNUCU_DOSYASI = "dogalafetler-server.toml";
@@ -67,8 +69,16 @@ public final class AyarKaydi {
     private record Katki(String bolum, String aciklama, Function<ForgeConfigSpec.Builder, ?> kurucu, Bolum<?> hedef) {
     }
 
+    /** SERVER config göçünün planı (MT2-31): dosyadaki sürümden (yoksa 0) güncele değişecek anahtarlar, yol → yeni değer. */
+    @FunctionalInterface
+    public interface GocPlani {
+        Map<String, ?> plan(int surum, Function<String, Object> oku);
+    }
+
     private static final List<Katki> SUNUCU = new ArrayList<>();
     private static final List<Katki> ISTEMCI = new ArrayList<>();
+    private static final List<AyarGocu.Kayit> SUNUCU_GOCLERI = new ArrayList<>();
+    private static volatile List<AyarGocu.Kayit> sunucuGocleri = List.of();
     private static boolean kuruldu;
 
     private AyarKaydi() {
@@ -84,6 +94,27 @@ public final class AyarKaydi {
     public static synchronized <T> Bolum<T> istemciBolumu(String ad, String aciklama,
             Function<ForgeConfigSpec.Builder, T> kurucu) {
         return ekle(ISTEMCI, ad, aciklama, kurucu);
+    }
+
+    /**
+     * SERVER config'e bir göç ekler: var olan dosyada {@code surumYolu} {@code guncel}'den küçükse (anahtar yoksa 0), Forge
+     * dosyayı okumadan önce {@code plan}'ın değerleri yazılır ve sürüm {@code guncel} olur. Sürüm anahtarı bölümün spec'inde
+     * varsayılanı {@code guncel} olarak tanımlanır: yeni dosya güncel sürümle yazılır, göç ettirilmez.
+     */
+    public static synchronized void sunucuGocu(String surumYolu, int guncel, GocPlani plan) {
+        if (kuruldu) {
+            throw new IllegalStateException("Config spec'leri kuruldu; göç mod kurucusunda eklenmeli: " + surumYolu);
+        }
+        SUNUCU_GOCLERI.add(new AyarGocu.Kayit(Objects.requireNonNull(surumYolu, "surumYolu"), guncel,
+                Objects.requireNonNull(plan, "plan")));
+    }
+
+    /**
+     * Var olan SERVER config dosyasını kayıtlı göçlerle günceller (dosya işleyicisi Forge'dan önce çağırır; GameTest geçici
+     * dosyayla). Değişiklik olduysa tek satırlık özeti, olmadıysa null döndürür.
+     */
+    public static String sunucuDosyasiniGocEt(Path dosya) {
+        return AyarGocu.uygula(dosya, sunucuGocleri);
     }
 
     private static <T> Bolum<T> ekle(List<Katki> liste, String ad, String aciklama,
@@ -106,6 +137,7 @@ public final class AyarKaydi {
             throw new IllegalStateException("Config spec'leri zaten kuruldu");
         }
         kuruldu = true;
+        sunucuGocleri = List.copyOf(SUNUCU_GOCLERI);
         ModContainer kapsayici = baglam.getContainer();
         kapsayici.addConfig(new VarsayilanliConfig(ModConfig.Type.SERVER, kur(SUNUCU), kapsayici, SUNUCU_DOSYASI));
         kapsayici.addConfig(new VarsayilanliConfig(ModConfig.Type.CLIENT, kur(ISTEMCI), kapsayici, ISTEMCI_DOSYASI));

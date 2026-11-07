@@ -1,6 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.meteor;
 
 import io.github.kadirberkpolat1.dogalafetler.config.AyarKaydi;
+import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.MeteorAyarGocu;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.MeteorOlcegi;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.OdulZamani;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.OdulZari;
@@ -20,6 +21,7 @@ public final class MeteorAyarlari {
     static void kaydet() {
         sunucu = AyarKaydi.sunucuBolumu("meteor", "Meteor, krater ve meteor ödülleri (madde 13c, bölüm D/H)", Sunucu::new);
         istemci = AyarKaydi.istemciBolumu("meteor", "Meteor efektleri (madde 13c, N13)", Istemci::new);
+        AyarKaydi.sunucuGocu(MeteorAyarGocu.SURUM_YOLU, MeteorAyarGocu.GUNCEL, MeteorAyarGocu::plan);
     }
 
     public static OdulZari.Sanslar sanslar() {
@@ -178,6 +180,9 @@ public final class MeteorAyarlari {
 
         private Sunucu(ForgeConfigSpec.Builder k) {
             OdulZari.Sanslar v = OdulZari.Sanslar.VARSAYILAN;
+            k.comment("Config göçünün sürümü (MT2-31): dosya bundan eskiyse açılışta eski varsayılanında kalan meteor ve yağmur "
+                    + "değerleri yeni varsayılana çekilir, elle değiştirilenlere dokunulmaz. Elle değiştirmeyin.")
+                    .defineInRange("ayarSurumu", MeteorAyarGocu.GUNCEL, 0, Integer.MAX_VALUE);
             parcaSansi = k.comment("Küçük meteorun kraterinde Meteorit Parçası çıkma olasılığı (madde 13c: %3).")
                     .defineInRange("parcaSansi", v.parca(), 0.0, 1.0);
             buyukParcaSansi = k.comment("Büyük meteorun kraterinde Meteorit Parçası olasılığı (madde 13c: %5).")

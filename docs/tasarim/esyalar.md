@@ -119,7 +119,7 @@ https://www.amsmeteors.org/fireballs/faqf/ (bolid renkleri, iz, ses).
 
 - **Meteor varlığı** (`MeteorVarligi`, sunucu otoriteli): 40–70° açıyla, hedefin 200 blok üstünden ~9 sn'de (MT2-25) düz
   inen dönen kaya kümesi (güneş: magma + karataş/bazalt; ay: kalsit + pürüzsüz bazalt/tüf), önünde additive plazma
-  kabuğu ve ışık halesi, arkasında iki katmanlı additive iz şeridi (40 / 72 blok; güneş: beyaz-sarı çekirdek + turuncu,
+  kabuğu ve ışık halesi, arkasında iki katmanlı additive iz şeridi (80–140 blok, MT2-32; güneş: beyaz-sarı çekirdek + turuncu,
   ay: mavi-beyaz çekirdek + mavi) ve 8 sn'de dağılan gri duman, düşen kıvılcımlar. İnişe 1,5 sn kala zeminde büyüyen
   turuncu/mavi parlama diski oyuncuya düşüş yerini gösterir. İz, kabuk ve disk sissiz çizilir (gece görüş sisi
   uzaktan gelen izi söndürmesin); 96 blok ötesinde blok kümesi gövde yerine yalnız plazma. Işık motoruna dokunulmaz. 192 blok ötesinde parçacık yok,
@@ -171,13 +171,14 @@ kısması) aynı; uçan meteor tavanı 48 → 96 (doluyken atılamayan meteor d�
 
 **Boyut değişkenliği (istek 27):** meteorun sürekli ölçeği (`meteor.mantik.MeteorOlcegi`, senkron varlık verisi ve çarpma
 paketinde): %60 küçük 0,5–0,9×, %30 orta 0,9–1,6×, %10 büyük 1,6–2,5×, bant içinde düzgün. Eski küçük/büyük config değerleri
-tipik ölçek 0,7 ve 2,0'daki referanslardır; arası ve uçları doğrusal: gövde çapı 1,1 → 2,6 (ölçek 2,5'te 3,2), iz 40 → 72 blok,
+tipik ölçek 0,7 ve 2,0'daki referanslardır; arası ve uçları doğrusal: gövde çapı 1,1 → 2,6 (ölçek 2,5'te 3,2), iz 86 → 125 blok (uçlarda 80–140),
 uçuş süresi ÷0,97 → ÷1,10 (uçlarda ÷0,95–1,12), krater yarıçapı 2,5 → 5,5 (2,5×'te 6,7), sarsıntı menzili 48 → 112, yangın yoğunluğu 0,45 → 0,85, patlama sesi
 96 → 128 blok ve %70 → %100 düzey, perde 1,0 → 0,85. Ödül sınıfı büyük banttır (Kozmik Çekirdek yalnız 1,6× ve üstünde).
 
 **Ödül sınırı (tur 2, şef kararı):** yağmur meteorları ödülü yalnız büyük bantta bırakır ve afet başına, hedef oyuncu başına
-en çok `meteor.odulTavaniAfetBasina` (8) eşya (`meteor.mantik.OdulTavani`); 10 dk'lık yağmurda oyuncu başına ~29 eşyalık
-enflasyon ~5'e (en çok 8) iner. Tek düşürülen meteor (komut) madde 13c şanslarıyla sınırsızdır.
+en çok `meteor.odulTavaniAfetBasina` (8) eşya (`meteor.mantik.OdulTavani`); 10 dk'lık 180/dk yağmurda oyuncu başına ~58 eşyalık
+enflasyon en çok 8'e iner (büyük bantın beklenen ~9,5'i; tavan afetlerin ~%70'inde dolar). Tek düşürülen meteor (komut)
+madde 13c şanslarıyla sınırsızdır; komut yağmurları ortak `komut` sayacını paylaşır (`meteor durdur` sıfırlar).
 
 **Uçuş süresi (tur 3, şef kararı MT2-25):** gerçek hızda gökte aynı anda ~5 meteor "aşırı fazla" isteğine yetmedi;
 sorun uçuşun ~3 sn sürmesiydi. Meteor hedefin 200 blok üstünden doğar (40–70°) ve hedefe `meteor.ucusSuresi`'nde (180 tick;
@@ -185,6 +186,12 @@ küçük 9,5 sn, büyük 8,0 sn) varır: hız yoldan çıkar (~1,0–1,9 blok/ti
 1,33/0,8 kalır (`SES_HIZI` 5,2). **Tur 4 (MT2-28):** afet yağmurları 180/dk: oyuncu başına gökte ~27 meteor, uçan meteor
 tavanı 448 (16 oyuncu); yağmur meteorunun çarpma noktası bakış yönüne ağırlıklı (2/3 ön yarı, 1/3 arka;
 `meteor.bakisYonuOrani`), komut meteoru yönsüz.
+
+**İz ve config göçü (tur 5, şef kararları MT2-31, MT2-32):** iz şeridi 80–140 blok, genişliği ve parlaklığı ×1,5, uzakta en
+az 2 piksel kalın (200 blok yukarıdaki küçük meteor da seçilir); plazma ve kıvılcım parçacıkları ×1,5 büyük, sayıları
+aynı. Var olan dünyanın SERVER config'i açılışta göç eder (`meteor.ayarSurumu`): eski varsayılanda kalan meteor ve
+yağmur değerleri (tavan, doğuş yüksekliği, yağmur yoğunluğu ve süresi, büyük meteor oranları) yeniye çekilir, elle
+değiştirilenler kalır.
 
 ## Buz altı balıkçılık (madde 15)
 

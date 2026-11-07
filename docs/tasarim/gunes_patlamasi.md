@@ -109,15 +109,18 @@ Kullanıcı: patlamadan önce ve patlama sırasında meteor az; istek 27 ("kosko
 10 dk, boyutlar farklı. Yoğunluk `mantik.MeteorYagmuruEgrisi`: ön-uyarının son `meteorYagmuruOncuSaniye` (90) saniyesinde öncü
 yağmur oyuncu başına 6/dk başlar, siren (güneş büyürken) boyunca doğrusal `meteorYagmuruOncuSonDakikaBasina` 24/dk'ya çıkar;
 AKTIF'in başında `meteorYagmuruSaniye` **600 sn (10 dk)**, sonraki her günün başında `meteorYagmuruGunlukSaniye` 180 sn
-`meteorYagmuruDakikaBasina` **90/dk** (1,5/sn) gerçek meteor yağmuru, arasında §2'nin 1/40 sn → 1/12 sn arka planı. Pencereler AKTIF
-sayacından ölçülür (uyku sayılmaz); afet erken biterse yağmur afetle biter. Afetin tek yağmuru eğriyi her tick izler
-(`MeteorAPI.yagmurYogunluguAyarla`). Dağılım (32–160 blok halka) ve krater bütçesi aynı; uçan meteor tavanı 48 → 96, doluyken
-atılamayan meteor düşmez. **Boyut:** her meteorun sürekli ölçeği (`meteor.mantik.MeteorOlcegi`): %60 küçük 0,5–0,9×, %30 orta
-0,9–1,6×, %10 büyük 1,6–2,5× (`buyukMeteorOrani` 0,10, `meteor.ortaMeteorOrani` 0,30); görünür boyut, hız (×0,9–1,2),
-iz, krater, yangın, sarsıntı ve patlama sesi ölçekle. Not: öncü meteorlar N7'nin gizli ön-uyarısını bilerek bozar (kullanıcı
+`meteorYagmuruDakikaBasina` **180/dk** (3/sn; ilk hâli 90) gerçek meteor yağmuru, arasında §2'nin 1/40 sn → 1/12 sn arka planı.
+Pencereler AKTIF sayacından ölçülür (uyku sayılmaz); afet erken biterse yağmur afetle biter. Afetin tek yağmuru eğriyi her
+tick izler (`MeteorAPI.yagmurYogunluguAyarla`). Dağılım (32–160 blok halka) ve krater bütçesi aynı; uçan meteor tavanı
+48 → 448, doluyken atılamayan meteor düşmez. **Boyut:** her meteorun sürekli ölçeği (`meteor.mantik.MeteorOlcegi`): %60
+küçük 0,5–0,9×, %30 orta 0,9–1,6×, %10 büyük 1,6–2,5× (`buyukMeteorOrani` 0,10, `meteor.ortaMeteorOrani` 0,30); görünür
+boyut, uçuş süresi, iz, krater, yangın, sarsıntı ve patlama sesi ölçekle. Not: öncü meteorlar N7'nin gizli ön-uyarısını bilerek bozar (kullanıcı
 isteği; radar yine göstermez).
 
 **Tur 3–4 (şef kararları MT2-25, MT2-28):** uçuş 8–10 sn (200 blok yükseklik, `meteor.ucusSuresi`), AKTIF başı ve günlük
 yağmur `meteorYagmuruDakikaBasina` **180/dk** (3/sn; öncü 6 → 24 aynı): oyuncu başına gökte ~27 meteor, uçan meteor tavanı
 448. Yağmur göründüğü yerde yoğundur, arkada da düşer: çarpma noktasının 2/3'ü oyuncunun baktığı yönün ±90° ön yarısında,
 1/3'ü arkada (`meteor.bakisYonuOrani` 0,667; geliş yönü rastgele). Kadrajda ~10–13 iz. Krater bütçesi ve TPS kısması aynı.
+
+**Tur 5 (MT2-31, MT2-32):** iz şeridi 80–140 blok (§2'nin 30–80'i yerine), genişliği ve parlaklığı ×1,5, uzakta en az
+2 piksel; var olan dünyanın config'i açılışta göç eder (eski varsayılanda kalan 24/90 → 180, tavan → 448; elle değerler kalır).

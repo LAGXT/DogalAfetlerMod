@@ -316,7 +316,9 @@ public final class MeteorOtomasyonu {
      * çarpma ses denemesi, sonra ay parçası yağmuru. {@code _gercek} kareleri gerçek hızda ({@code meteor.ucusSuresi}), ötekiler
      * vitrindeki gibi 2× yavaş çekimde ({@value #YAVAS_CEKIM} tick uçuş: kadrajda aynı anda 2 kat çok iz; yoğunluk
      * değişmez). Gerçek hız karesi yavaş meteorlar indikten sonra (400 tick) alınır. Kamera göğe {@value #YAGMUR_EGIMI}°
-     * bakar (meteorlar 200 blok yükseklikten iner). Kare isteyen tick'te bekleyen kare alınana kadar sayaç ilerlemez.
+     * bakar (meteorlar 200 blok yükseklikten iner); {@code gunes_aktif_duz} gerçek hızda düz bakıştır (0°, MT2-32): 35°
+     * karesinden sonra, kamera dönüşünden 4 sn sonra alınır (dönüşte açılan zemin bölümleri yeniden derlenir, o anki FPS
+     * 35° karesine karışmasın). Kare isteyen tick'te bekleyen kare alınana kadar sayaç ilerlemez.
      */
     private static void yagmurBolumu(IntegratedServer server) {
         switch (sayac) {
@@ -324,9 +326,8 @@ public final class MeteorOtomasyonu {
                 server.execute(() -> {
                     eskiSure = MeteorAyarlari.ucusSuresi();
                     MeteorAyarlari.ucusSuresiAyarla(YAVAS_CEKIM);
-                    ServerPlayer o = server.getPlayerList().getPlayers().get(0);
-                    o.teleportTo(server.overworld(), o.getX(), o.getY(), o.getZ(), -90F, -YAGMUR_EGIMI);
                 });
+                egim(server, YAGMUR_EGIMI);
                 komut(server, "dogalafet sifirla", "dogalafet start gunes_patlamasi");
             }
             case 600 -> {
@@ -351,7 +352,15 @@ public final class MeteorOtomasyonu {
                 kare("gunes_aktif_gercek");
                 sayim(server, "güneş AKTIF gerçek hız");
             }
-            case 1801 -> server.execute(() -> MeteorAyarlari.ucusSuresiAyarla(YAVAS_CEKIM));
+            case 1801 -> egim(server, 0F);
+            case 1880 -> {
+                kare("gunes_aktif_duz");
+                sayim(server, "güneş AKTIF düz bakış");
+            }
+            case 1881 -> {
+                egim(server, YAGMUR_EGIMI);
+                server.execute(() -> MeteorAyarlari.ucusSuresiAyarla(YAVAS_CEKIM));
+            }
             case 2100 -> {
                 kare("gunes_aktif");
                 sayim(server, "güneş AKTIF");
@@ -389,6 +398,14 @@ public final class MeteorOtomasyonu {
             default -> {
             }
         }
+    }
+
+    /** Yağmur kamerasının göğe eğimi (derece; 0 düz bakış), yönü değişmez. */
+    private static void egim(IntegratedServer server, float derece) {
+        server.execute(() -> {
+            ServerPlayer o = server.getPlayerList().getPlayers().get(0);
+            o.teleportTo(server.overworld(), o.getX(), o.getY(), o.getZ(), -90F, -derece);
+        });
     }
 
     private static void komut(IntegratedServer server, String... komutlar) {
