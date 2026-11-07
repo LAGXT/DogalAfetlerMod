@@ -35,6 +35,7 @@ Ortak komut satırı ve kapı (K-E13, diğer `*_sunucu.py` betikleri de kullanı
 başka süreç dinlemiyor; 60 sn'de bir, en çok 20 dk bekler.
 """
 import argparse
+import fcntl
 import os
 import re
 import shutil
@@ -200,15 +201,43 @@ def port_bos(port):
     return True
 
 
+_senaryo_kilidi = None
+
+
+def senaryo_kilidi_al():
+    """`run-server/` tek senaryonundur: bütün senaryolar aynı `server.properties`'i kendi dünyasına çevirip geri yazar. Kilit
+    (`run-server/.senaryo.lock`, `flock`) süreç bitene kadar tutulur, süreç ölünce çekirdek bırakır. Alındıysa ya da zaten
+    tutuluyorsa True."""
+    global _senaryo_kilidi
+    if _senaryo_kilidi is not None:
+        return True
+    SUNUCU_KLASORU.mkdir(parents=True, exist_ok=True)
+    dosya = (SUNUCU_KLASORU / ".senaryo.lock").open("a+")
+    try:
+        fcntl.flock(dosya, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        dosya.close()
+        return False
+    dosya.seek(0)
+    dosya.truncate()
+    dosya.write(f"{os.getpid()} {' '.join(sys.argv)}\n")
+    dosya.flush()
+    _senaryo_kilidi = dosya
+    return True
+
+
 def agir_surec_kapisi(port, log=print, en_cok_dk=20, ram_mb=4096):
-    """Gradle < 2, boş RAM >= `ram_mb` ve `port` boş olana dek 60 sn'de bir bekler; `en_cok_dk` dakikada açılmazsa False."""
+    """Gradle < 2, boş RAM >= `ram_mb`, `port` boş ve senaryo kilidi alınana dek 60 sn'de bir bekler; `en_cok_dk` dakikada
+    açılmazsa False."""
     for deneme in range(en_cok_dk + 1):
         gradle = int(subprocess.run(["pgrep", "-fc", "GradleWrapperMain"], capture_output=True, text=True).stdout.strip()
                      or 0)
         bos = int(Path("/proc/meminfo").read_text().split("MemAvailable:")[1].split()[0]) // 1024
         port_uygun = port_bos(port)
-        log(f"kapı: gradle={gradle} bos={bos} MB port {port} {'boş' if port_uygun else 'DOLU'}")
-        if gradle < 2 and bos >= ram_mb and port_uygun:
+        kilit = gradle < 2 and bos >= ram_mb and port_uygun and senaryo_kilidi_al()
+        log(f"kapı: gradle={gradle} bos={bos} MB port {port} {'boş' if port_uygun else 'DOLU'} "
+            f"senaryo kilidi {'alındı' if kilit else 'bekleniyor'}")
+        if kilit:
             return True
         if deneme < en_cok_dk:
             time.sleep(60)
