@@ -1,9 +1,11 @@
 package io.github.kadirberkpolat1.dogalafetler.komut;
 
+import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.tree.CommandNode;
 import io.github.kadirberkpolat1.dogalafetler.core.Afet;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetBaglami;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetKaydi;
@@ -15,6 +17,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.DonemSureci;
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import io.github.kadirberkpolat1.dogalafetler.core.EtkiAlani;
 import io.github.kadirberkpolat1.dogalafetler.core.GecmisKaydi;
+import io.github.kadirberkpolat1.dogalafetler.core.SiklikBilgisi;
 import io.github.kadirberkpolat1.dogalafetler.core.TpsOlcer;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.GeciciCarpan;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.GunSaatiPenceresi;
@@ -36,7 +39,7 @@ import net.minecraft.server.level.ServerPlayer;
 
 /**
  * Çekirdeğin {@code /dogalafet} alt komutlarının işleri: {@code durum}, {@code start}, {@code stop}, {@code gun}, {@code hiz},
- * {@code sifirla}, {@code asama ileri} (KOMUTLAR, N18). {@code stop} ve {@code asama ileri} aktif afet yokken dönem
+ * {@code siklik}, {@code sifirla}, {@code asama ileri} (KOMUTLAR, N18) ve alt komutsuz kökün kullanım listesi. {@code stop} ve {@code asama ileri} aktif afet yokken dönem
  * süreçlerine ({@link DonemSureci}) gider; {@code stop} afeti durdururken süren süreçleri yalnız hatırlatır (ikinci
  * {@code stop} onları durdurur). Çıktılar yalnız komutu yazan OP'ye gider (N6) ve dil anahtarlarıyla yazılır. Başarılı
  * komut 1, reddedilen 0 döner.
@@ -76,6 +79,7 @@ public final class CekirdekKomutlari {
     public static final String STOP_SURECLER_SURUYOR = ON + "stop.surecler_suruyor";
     public static final String GUN_AYARLANDI = ON + "gun.ayarlandi";
     public static final String HIZ_AYARLANDI = ON + "hiz.ayarlandi";
+    public static final String YARDIM_BASLIK = ON + "yardim.baslik";
     public static final String SIFIRLA_TAMAM = ON + "sifirla.tamam";
     public static final String ASAMA_AFET = ON + "asama.afet";
     public static final String ASAMA_AFET_BITTI = ON + "asama.afet_bitti";
@@ -121,6 +125,7 @@ public final class CekirdekKomutlari {
         satirlar.add(Component.translatable(DURUM_GUN, gun, donem.gunOfseti(), sayi(yonetici.zamanOlcegi().carpan()),
                 sayi(TpsOlcer.tps()), sayi(TpsOlcer.kismaCarpani())));
         satirlar.add(Component.translatable(DURUM_BEKLEME, sure(donem.genelBeklemeKalan()), turBeklemeleri(donem)));
+        satirlar.add(SiklikBilgisi.sonrakiSatiri(yonetici));
         satirlar.add(Component.translatable(DURUM_CARPANLAR, carpanlar(donem)));
         satirlar.add(Component.translatable(DURUM_SEVIYELER, gun, Kurallar.maksSiddet(server.getGameRules()),
                 seviyeOlasiliklari(yonetici.seviyeOlasiliklari(gun))));
@@ -215,6 +220,44 @@ public final class CekirdekKomutlari {
         yonetici.hizAyarla(DoubleArgumentType.getDouble(baglam, "carpan"));
         double carpan = yonetici.zamanOlcegi().carpan();
         kaynak.sendSuccess(() -> Component.translatable(HIZ_AYARLANDI, sayi(carpan)), false);
+        return 1;
+    }
+
+    /**
+     * {@code siklik [yüzde]}: {@code afetSikligi} gamerule'ünü (kalıcı, dünya verisinde) okur ya da yazar. Yazınca süren
+     * beklemeler hemen yeni sıklığa ölçeklenir ve sonraki afet tahmini gösterilir; {@code /gamerule afetSikligi} ile aynı
+     * değerdir.
+     */
+    static int siklik(CommandContext<CommandSourceStack> baglam, Integer yuzde) {
+        CommandSourceStack kaynak = baglam.getSource();
+        MinecraftServer server = kaynak.getServer();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(server);
+        List<Component> satirlar = new ArrayList<>();
+        if (yuzde == null) {
+            SiklikBilgisi.sinirUyarisi(yonetici).ifPresent(satirlar::add);
+            satirlar.add(SiklikBilgisi.sonrakiSatiri(yonetici));
+        } else {
+            server.getGameRules().getRule(Kurallar.AFET_SIKLIGI).set(yuzde, server);
+            yonetici.siklikDenetle(false);
+            satirlar.addAll(SiklikBilgisi.degisimSatirlari(yonetici));
+        }
+        for (Component satir : satirlar) {
+            kaynak.sendSuccess(() -> satir, false);
+        }
+        return 1;
+    }
+
+    /** Alt komutsuz {@code /dogalafet}: kaynakın kullanabildiği alt komutların kullanımı, alfabetik. */
+    static int yardim(CommandContext<CommandSourceStack> baglam) {
+        CommandSourceStack kaynak = baglam.getSource();
+        CommandDispatcher<CommandSourceStack> dagitici = kaynak.getServer().getCommands().getDispatcher();
+        CommandNode<CommandSourceStack> kok = dagitici.getRoot().getChild(DogalAfetKomutu.KOK);
+        List<String> kullanimlar = new ArrayList<>(dagitici.getSmartUsage(kok, kaynak).values());
+        kullanimlar.sort(null);
+        kaynak.sendSuccess(() -> Component.translatable(YARDIM_BASLIK), false);
+        for (String kullanim : kullanimlar) {
+            kaynak.sendSuccess(() -> Component.literal("/" + DogalAfetKomutu.KOK + " " + kullanim), false);
+        }
         return 1;
     }
 
@@ -430,6 +473,8 @@ public final class CekirdekKomutlari {
                 "Süren dönem süreçleri: %s; durdurmak için yeniden /dogalafet stop.");
         y.ekle(GUN_AYARLANDI, "Game day set to %s. Level weights: %s", "Oyun günü %s olarak ayarlandı. Seviye ağırlıkları: %s");
         y.ekle(HIZ_AYARLANDI, "Disaster and era timers run at x%s.", "Afet ve dönem zamanlayıcıları x%s hızında.");
+        y.ekle(YARDIM_BASLIK, "Natural Disasters commands (OP):", "Doğal Afetler komutları (OP):");
+        SiklikBilgisi.cevirileriYaz(y);
         y.ekle(SIFIRLA_TAMAM, "The world's disaster and era state was reset.",
                 "Dünyanın afet ve dönem durumu ilk hâline döndürüldü.");
         y.ekle(ASAMA_AFET, "%s phase: %s", "%s aşaması: %s");

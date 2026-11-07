@@ -121,7 +121,8 @@ public final class Kurallar {
                 "Allows the moon impact to be chosen. Turning it off stops an unfinished process; reached eras stay.",
                 "Ay çarpmasının seçilmesine izin verir. Kapatılınca bitmemiş süreç durur; ulaşılmış dönemler kalır.");
         kural(y, AFET_SIKLIGI, "Disaster frequency (%)", "Afet sıklığı (%)",
-                "100 = normal, 50 = half, 200 = double (0-1000).", "100 = normal, 50 = yarı, 200 = iki katı (0-1000).");
+                "100 = normal, 50 = half, 200 = double (0-1000); waits scale too. Effect: /dogalafet siklik",
+                "100 = normal, 50 = yarı, 200 = iki katı (0-1000); beklemeler de ölçeklenir. Etkisi: /dogalafet siklik");
         kural(y, AFET_MAKS_SIDDET, "Maximum disaster level", "En yüksek afet seviyesi",
                 "Highest level a disaster can reach (1-5).", "Bir afetin çıkabileceği en yüksek seviye (1-5).");
         kural(y, AFET_BLOK_HASARI, "Disaster block damage", "Afet blok hasarı",

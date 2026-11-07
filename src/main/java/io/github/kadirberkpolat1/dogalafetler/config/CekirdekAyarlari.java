@@ -85,14 +85,15 @@ public final class CekirdekAyarlari {
                 .defineInRange("gunlukAfetOrani", z.gunlukAfetOrani(), 0.0, 100.0);
         kontrolAraligiTick = k.comment("Zamanlayıcının kaç tick'te bir zar attığı (olasılık aralığa göre ölçeklenir).")
                 .defineInRange("kontrolAraligiTick", 20, 1, 1200);
-        genelBeklemeTick = k.comment("Bir afet bittikten sonra yenisi seçilmeden geçmesi gereken en az süre.")
+        genelBeklemeTick = k.comment("Bir afet bittikten sonra yenisi seçilmeden geçmesi gereken en az süre (afetSikligi %100'de;",
+                "süre afetSikligi çarpanına bölünür: %200 → yarısı, %50 → iki katı). Afet başına beklemeler de böyledir.")
                 .defineInRange("genelBeklemeTick", z.genelBeklemeTick(), 0L, 100_000_000L);
         siddetBeklemeCarpani = k.comment("Şiddetli afetten sonra bekleme uzaması: çarpan = 1 + bu × max(0, seviye - 2);",
                 "seviyesiz güneş patlaması ve ay çarpması seviye 5 sayılır.")
                 .defineInRange("siddetBeklemeCarpani", z.siddetBeklemeCarpani(), 0.0, 10.0);
         ertelemeTick = k.comment("Hedefte uygun yer yoksa (N14) türün yeniden denenmesi için beklenen süre.")
                 .defineInRange("ertelemeTick", z.ertelemeTick(), 0L, 100_000_000L);
-        baslangicBeklemeTick = k.comment("Yeni dünyada ilk afetten önce geçmesi gereken süre.")
+        baslangicBeklemeTick = k.comment("Yeni dünyada ilk afetten önce geçmesi gereken süre (afetSikligi çarpanına bölünür).")
                 .defineInRange("baslangicBeklemeTick", z.baslangicBeklemeTick(), 0L, 100_000_000L);
         k.pop();
 

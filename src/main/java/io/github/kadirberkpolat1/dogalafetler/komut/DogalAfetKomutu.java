@@ -10,6 +10,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
 import io.github.kadirberkpolat1.dogalafetler.core.DonemSureci;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.ZamanOlcegi;
+import io.github.kadirberkpolat1.dogalafetler.kural.KuralSinirlari;
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.Set;
@@ -24,7 +25,8 @@ import net.minecraftforge.fml.common.Mod;
 
 /**
  * {@code /dogalafet} kök komutu. Yalnız OP (yetki seviyesi 2) kullanabilir (madde 3, KOMUTLAR). Çekirdeğin alt komutları
- * burada kurulur; diğer alt komutlar sahipleri tarafından {@link KomutKaydi#ekle} ile gelir.
+ * burada kurulur; diğer alt komutlar sahipleri tarafından {@link KomutKaydi#ekle} ile gelir. Alt komutsuz {@code /dogalafet}
+ * kullanım listesini verir.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID)
 public final class DogalAfetKomutu {
@@ -36,12 +38,14 @@ public final class DogalAfetKomutu {
     public static final String STOP = "stop";
     public static final String GUN = "gun";
     public static final String HIZ = "hiz";
+    public static final String SIKLIK = "siklik";
     public static final String SIFIRLA = "sifirla";
     public static final String ASAMA = "asama";
     public static final String ILERI = "ileri";
 
     /** Çekirdeğin alt komut adları; başka paket bunları kaydedemez. */
-    public static final Set<String> CEKIRDEK_ALT_KOMUTLARI = Set.of(DURUM, START, STOP, GUN, HIZ, SIFIRLA, ASAMA);
+    public static final Set<String> CEKIRDEK_ALT_KOMUTLARI = Set.of(DURUM, START, STOP, GUN, HIZ, SIKLIK, SIFIRLA,
+            ASAMA);
 
     /** N18 afet adları (kayıtlı olsun olmasın; kayıtlı olmayan için komut "henüz kayıtlı değil" der). */
     private static final SuggestionProvider<CommandSourceStack> AFET_ADLARI = (baglam, kurucu) ->
@@ -60,7 +64,8 @@ public final class DogalAfetKomutu {
     @SubscribeEvent
     public static void komutlariKaydet(RegisterCommandsEvent olay) {
         LiteralArgumentBuilder<CommandSourceStack> kok = Commands.literal(KOK)
-                .requires(kaynak -> kaynak.hasPermission(YETKI_SEVIYESI));
+                .requires(kaynak -> kaynak.hasPermission(YETKI_SEVIYESI))
+                .executes(CekirdekKomutlari::yardim);
         kok.then(Commands.literal(DURUM).executes(CekirdekKomutlari::durum));
         kok.then(Commands.literal(START)
                 .then(Commands.argument("afet", StringArgumentType.word()).suggests(AFET_ADLARI)
@@ -79,6 +84,10 @@ public final class DogalAfetKomutu {
         kok.then(Commands.literal(HIZ)
                 .then(Commands.argument("carpan", DoubleArgumentType.doubleArg(ZamanOlcegi.EN_AZ, ZamanOlcegi.EN_COK))
                         .executes(CekirdekKomutlari::hiz)));
+        kok.then(Commands.literal(SIKLIK).executes(b -> CekirdekKomutlari.siklik(b, null))
+                .then(Commands.argument("yuzde", IntegerArgumentType.integer(KuralSinirlari.SIKLIK_EN_AZ,
+                        KuralSinirlari.SIKLIK_EN_COK))
+                        .executes(b -> CekirdekKomutlari.siklik(b, IntegerArgumentType.getInteger(b, "yuzde")))));
         kok.then(Commands.literal(SIFIRLA).executes(CekirdekKomutlari::sifirla));
         kok.then(Commands.literal(ASAMA).then(Commands.literal(ILERI)
                 .executes(b -> CekirdekKomutlari.asamaIleri(b, Optional.empty()))
