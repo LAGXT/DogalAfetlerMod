@@ -140,7 +140,7 @@ public final class IstemciAsitYagmuru {
             sesler(level, goz, r);
         }
         asinanlar(level, goz, ayar, r);
-        hasarIzle(mc.player, level);
+        hasarIzle(mc.player);
     }
 
     /** Paketten durumu okur, 1 Hz arasında yumuşatır; bu boyutta asit yağmuru yoksa sıfırlar. */
@@ -279,14 +279,17 @@ public final class IstemciAsitYagmuru {
         }
     }
 
-    /** Asit canını azalttığı an (açıkta, AKTIF alanda) ekran efektini tetikler. */
-    private static void hasarIzle(LocalPlayer oyuncu, ClientLevel level) {
+    /**
+     * Canı azaltan hasarın kaynağı {@code dogalafetler:asit} ise ekran efektini tetikler. İstemci kaynağı sunucunun hasar
+     * paketinden bilir ({@code LivingEntity.handleDamageEvent} {@code lastDamageSource}'u yazar; can paketi ondan sonra gelir).
+     */
+    private static void hasarIzle(LocalPlayer oyuncu) {
         if (oyuncu == null) {
             return;
         }
         float can = oyuncu.getHealth();
-        if (oncekiCan >= 0 && can < oncekiCan && yogunluk >= AsitKurallari.ETKI_ESIGI
-                && alanAgirligi(oyuncu.getX(), oyuncu.getZ()) > 0 && acikta(level, oyuncu.getX(), oyuncu.getEyeY(), oyuncu.getZ())) {
+        if (oncekiCan >= 0 && can < oncekiCan && oyuncu.getLastDamageSource() != null
+                && oyuncu.getLastDamageSource().is(AsitKayitlari.ASIT)) {
             AsitEkranEfekti.tetikle();
         }
         oncekiCan = can;
