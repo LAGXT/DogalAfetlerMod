@@ -107,3 +107,24 @@ Kaynak: `.vibe/kararlar/ay-carpmasi.md` AY-01…AY-11, rapor `.vibe/rapor/ay-car
 - "Toz perdesi" parçacıkları ve "plajlarda ıslak kum parlaması" yapılmadı (rapor "yapılmadı"); tsunami çekilmesinin ×1,5'i
   tsunami işçisinindir (çarpan dönemi `DunyaDonemi.carpan(TSUNAMI) > 1` ile okunur).
 - Meteor sesi perdesi %10 tiz meteor sisteminin görünüm dalındadır (M-10); burada ayrıca yapılmadı.
+
+## Gökyüzü-2 güncellemesi, 2026-11-07 (3 boyutlu patlama, dünya parlaması)
+
+Kaynak: `.vibe/kararlar/gokyuzu-2.md` G2-2…G2-4.
+
+**Mantar sütunu kaldırıldı.** Kök neden: gök küresine yapışık düz kareler (kamera konumu yok → oyuncuyla kayar, 2B) ve bir
+MC günü süren alfa (90 sn tam, 300 sn'den sonra %35 kalıntı → "hiç gitmiyor").
+
+**Yerine: havada 3 boyutlu patlama, 7 sn.** Dünyada sabit nokta (istemcinin ilk karesinde kameradan yaklaşma yönünde, 9°
+yükseklikte, 900 blok), kamera merkezli ölçekle göğe sığdırılır: uçan/yürüyen oyuncuda paralaks, arazi önüne geçer.
+
+| An | Görünüm |
+|---|---|
+| 0–0,5 sn | beyaz-sarı ateş topu hızla açılır, mavi-beyaz şok kabuğu, ekran %70 mavi-beyaz, gök + arazi parlar |
+| 0,5–2 sn | ateş topu tepe yarıçapına (360 blok, ~22°) yaklaşır, turuncuya döner, topaklar kaynar; enkaz sıcak izlerle savrulur |
+| 2–4,5 sn | ateş topu koyu kızıla söner, duman topakları öne çıkar; dünya parlaması biter |
+| 4,5–7 sn | enkaz ve duman saydamlaşır; 7. sn'de hiçbir şey kalmaz (8. sn karesi: yok) |
+
+Kademe: enkaz 12 / 24 / 40 / 64, duman 4 / 7 / 10 / 14, küre enlem dilimi 8 / 10 / 14 / 18. Dünya parlaması: 0,1 sn'de tam,
+0,5 sn tutar, τ 0,9 sn, 4,5 sn'de 0; gök örtüsü %60, sis %60, ışık haritası %85 mavi-beyaza; `ay_carpmasi.parlama` hepsini çarpar
+(0 kapalı). Enkaz halkası ve kayan yıldızlar değişmedi.

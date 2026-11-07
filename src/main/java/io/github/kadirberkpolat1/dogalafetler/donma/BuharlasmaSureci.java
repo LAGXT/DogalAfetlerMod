@@ -40,7 +40,8 @@ final class BuharlasmaSureci implements DonemSureci {
     @Override
     public boolean aktifMi(ServerLevel ustDunya) {
         DunyaDonemi d = DunyaDonemi.al(ustDunya);
-        return d.gunesEvresi() == GunesEvresi.BUYUYEN && d.buharlasmaDerinligi() < DonmaAyarlari.buharlasmaEnCok() - 1e-3;
+        return (d.gunesEvresi() == GunesEvresi.BUYUYEN || d.gunesEvresi() == GunesEvresi.PULSAR)
+                && d.buharlasmaDerinligi() < DonmaAyarlari.buharlasmaEnCok() - 1e-3;
     }
 
     void tick(MinecraftServer server) {

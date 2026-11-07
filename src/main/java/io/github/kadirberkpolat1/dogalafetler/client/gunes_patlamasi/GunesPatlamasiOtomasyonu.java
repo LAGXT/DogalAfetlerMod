@@ -5,6 +5,7 @@ import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.client.core.GorselOtomasyon;
 import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciAfetDurumu;
 import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciDonem;
+import io.github.kadirberkpolat1.dogalafetler.client.gokyuzu.IstemciGokyuzu;
 import io.github.kadirberkpolat1.dogalafetler.config.EfektKalitesi;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetAsamasi;
@@ -189,7 +190,32 @@ public final class GunesPatlamasiOtomasyonu {
                 komut(s, "dogalafet hiz 1", "dogalafet asama ileri gunes_zinciri", "time set 3000");
                 kamera(s, -90f, -35f);
             }, () -> sayac >= 140 && evre(GunesEvresi.KIZIL_CUCE) && donem().evreIlerlemesi() >= 1f,
-                    "kizil_cuce_gunduz", 400));
+                    "kizil_cuce_gunduz", 400),
+            // Gökyüzü-2: canlı uzay (iki ardışık kare: yavaş dönüş ve kırpışma), kara delik yakın kadrajı, pulsar.
+            new Adim("yıldızlı gök 1", s -> {
+                komut(s, "time set 18000");
+                kamera(s, -90f, -60f);
+            }, () -> sayac >= 60, "uzay_yildiz_1", 200),
+            new Adim("yıldızlı gök 2 (~3 sn sonra, aynı kamera)", s -> {
+            }, () -> sayac >= 60, "uzay_yildiz_2", 200),
+            new Adim("kara delik yakın kadraj", GunesPatlamasiOtomasyonu::karaDelikBak, () -> sayac >= 40,
+                    "kara_delik_yakin", 200),
+            new Adim("pulsar akşam", s -> {
+                gorusAcisi(-1);
+                komut(s, "dogalafet pulsar baslat", "dogalafet asama ileri pulsar", "time set 11600");
+                gunesBak(s);
+            }, () -> sayac >= 80 && evre(GunesEvresi.PULSAR), "pulsar_aksam", 300),
+            new Adim("pulsar kavurma (hız 30)", s -> {
+                komut(s, "time set 6000", "dogalafet hiz 30");
+                kamera(s, kavrulmaKamerasi);
+            }, () -> sayac >= 400, null, 500),
+            new Adim("pulsar yanan dünya", s -> {
+                komut(s, "dogalafet hiz 1");
+                kavrulmaSay(s);
+            }, () -> sayac >= 40, "pulsar_yanan_dunya", 200));
+
+    /** Yakın kadraj için değiştirilen görüş açısının eski değeri (-1: değişmedi); config dosyasına yazılmaz. */
+    private static volatile int eskiGorusAcisi = -1;
 
     private GunesPatlamasiOtomasyonu() {
     }
@@ -328,6 +354,49 @@ public final class GunesPatlamasiOtomasyonu {
                 String.format(Locale.ROOT, "%.3f", d.evreIlerlemesi()), String.format(Locale.ROOT, "%.1f", evreSaniyesi()),
                 ucanMeteor, mc.particleEngine.countParticles(), KavrulmaRengi.basamak(),
                 String.format(Locale.ROOT, "%.1f", k.beklemeSn()));
+    }
+
+    /** İstemci thread'inde görüş açısını ayarlar; {@code -1} eski değere döner. */
+    private static void gorusAcisi(int derece) {
+        Minecraft.getInstance().execute(() -> {
+            Minecraft mc = Minecraft.getInstance();
+            if (derece < 0) {
+                if (eskiGorusAcisi >= 0) {
+                    mc.options.fov().set(eskiGorusAcisi);
+                    eskiGorusAcisi = -1;
+                }
+                return;
+            }
+            if (eskiGorusAcisi < 0) {
+                eskiGorusAcisi = mc.options.fov().get();
+            }
+            mc.options.fov().set(derece);
+        });
+    }
+
+    /**
+     * Kamera göğün en yüksekteki kara deliğine döner, görüş açısı 30° (yakın kadraj). Yön çizimle aynı hesaptan (gün
+     * dönüşü + yavaş dönüş; ana thread'den okunan istemci dünyasıyla).
+     */
+    private static void karaDelikBak(IntegratedServer s) {
+        Minecraft.getInstance().execute(() -> {
+            Minecraft mc = Minecraft.getInstance();
+            org.joml.Vector3f en = null;
+            for (int i = 0; i < 3; i++) {
+                org.joml.Vector3f y = IstemciGokyuzu.karaDelikYonu(i, mc.level, 1f);
+                if (en == null || y.y > en.y) {
+                    en = y;
+                }
+            }
+            float yaw = (float) Math.toDegrees(Math.atan2(-en.x, en.z));
+            float pitch = (float) -Math.toDegrees(Math.asin(Math.max(-1f, Math.min(1f, en.y))));
+            gorusAcisi(30);
+            float ky = yaw;
+            float kp = pitch;
+            s.execute(() -> kamera(s, ky, kp));
+            DogalAfetler.LOGGER.info(ON + "kara delik kadrajı: yaw {}, pitch {}", String.format(Locale.ROOT, "%.1f", yaw),
+                    String.format(Locale.ROOT, "%.1f", pitch));
+        });
     }
 
     private static void sonraki() {

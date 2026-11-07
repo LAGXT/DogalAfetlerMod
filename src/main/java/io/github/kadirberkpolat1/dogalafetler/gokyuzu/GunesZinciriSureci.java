@@ -8,6 +8,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
 import io.github.kadirberkpolat1.dogalafetler.core.OyunTestiSureci;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.GunesZinciri;
+import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.PulsarSecimi;
 import java.util.Optional;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -21,10 +22,11 @@ import net.minecraftforge.eventbus.api.EventPriority;
 /**
  * Güneş zinciri dönem süreci (bölüm D, madde 9, çekirdek sözleşmesi §3a): güneş patlaması afeti doğal bitip evreyi
  * SÜPERNOVA yaptıktan sonra süpernovayı config süresinde söndürür, GÜNEŞSİZ dönemde kalıntı nebulasını genişletir,
- * donma %100 olduktan {@code kizilCuceGecikmeGun} sonra ilk şafakta KIZIL CÜCE'yi doğurur ve doğuşu tamamlar. Evre
- * ilerlemesi her evrede bu sürecindir (BÜYÜYEN'inki afetin). Durdurma kaydı çekirdektedir; döngü kimliği (SÜPERNOVA'nın
- * {@code evreBaslangicSaati}) ve kızıl cüce kapı sayacı {@code ekVeri("gunes_zinciri")}'ndedir. İlerleme
- * {@code zamanAdimi()} ile biriktiği için {@link #devamEt} boştur.
+ * donma %100 olduktan {@code kizilCuceGecikmeGun} sonra ilk şafakta yeni yıldızı doğurur: KIZIL CÜCE ya da
+ * {@code pulsarOlasiligi} ile PULSAR ({@link PulsarSecimi}, dünya tohumu + döngü); kızıl cücenin doğuşunu tamamlar, pulsarı
+ * {@link PulsarSureci}'ne bırakır. Evre ilerlemesi PULSAR dışındaki evrelerde bu sürecindir (BÜYÜYEN'inki afetin). Durdurma
+ * kaydı çekirdektedir; döngü kimliği (SÜPERNOVA'nın {@code evreBaslangicSaati}) ve kızıl cüce kapı sayacı
+ * {@code ekVeri("gunes_zinciri")}'ndedir. İlerleme {@code zamanAdimi()} ile biriktiği için {@link #devamEt} boştur.
  */
 public final class GunesZinciriSureci implements DonemSureci {
     public static final String KIMLIK = "gunes_zinciri";
@@ -96,9 +98,27 @@ public final class GunesZinciriSureci implements DonemSureci {
         });
     }
 
-    /** {@code /dogalafet kizilcuce baslat} ve zincirin kendi doğuşu: kızıl cüce şimdi doğar (herkese aynı anda). */
+    /** {@code /dogalafet kizilcuce baslat} ve {@code asama ileri}: kızıl cüce şimdi doğar (herkese aynı anda). */
     static void dogusBaslat(DunyaDonemi donem, String neden) {
         evreDegistir(donem, GunesEvresi.KIZIL_CUCE, neden);
+    }
+
+    /** {@code /dogalafet pulsar baslat}: pulsar şimdi doğar. */
+    static void pulsarBaslat(DunyaDonemi donem, String neden) {
+        evreDegistir(donem, GunesEvresi.PULSAR, neden);
+    }
+
+    /**
+     * Zincirin doğal doğuşunda doğacak yıldız: dünya tohumu ve bu döngünün süpernova başlangıcından belirlenir (yeniden
+     * başlatmada ve tekrar sorguda aynı); olasılık config'den.
+     */
+    public static GunesEvresi dogacakYildiz(ServerLevel ust, DunyaDonemi donem) {
+        long tohum = PulsarSecimi.tohum(ust.getSeed(), donem.ekVeri(KIMLIK).getLong(DONGU));
+        return PulsarSecimi.pulsarMi(GokyuzuAyarlari.pulsarOlasiligi(), tohum) ? GunesEvresi.PULSAR : GunesEvresi.KIZIL_CUCE;
+    }
+
+    private static void yildizDogar(ServerLevel ust, DunyaDonemi donem, String neden) {
+        evreDegistir(donem, dogacakYildiz(ust, donem), neden);
     }
 
     private static void evreDegistir(DunyaDonemi donem, GunesEvresi yeni, String neden) {
@@ -174,11 +194,11 @@ public final class GunesZinciriSureci implements DonemSureci {
         GunesZinciri.DogusNedeni neden = GunesZinciri.dogusNedeni(GunesZinciri.kapiAcik(gecen, ayar), oncekiGunSaati,
                 gunSaati, ust.getGameRules().getBoolean(GameRules.RULE_DAYLIGHT));
         switch (neden) {
-            case SAFAK -> dogusBaslat(donem, "ilk şafak");
-            case SAFAK_GECILDI -> dogusBaslat(donem, "şafak geçildi");
+            case SAFAK -> yildizDogar(ust, donem, "ilk şafak");
+            case SAFAK_GECILDI -> yildizDogar(ust, donem, "şafak geçildi");
             case GUN_DONGUSU_KAPALI -> {
-                DogalAfetler.LOGGER.info("Kızıl cüce: gün döngüsü kapalı, şafak beklenmedi (gün saati {})", gunSaati);
-                dogusBaslat(donem, "gün döngüsü kapalı");
+                DogalAfetler.LOGGER.info("Yeni yıldız: gün döngüsü kapalı, şafak beklenmedi (gün saati {})", gunSaati);
+                yildizDogar(ust, donem, "gün döngüsü kapalı");
             }
             case BEKLE -> {
             }

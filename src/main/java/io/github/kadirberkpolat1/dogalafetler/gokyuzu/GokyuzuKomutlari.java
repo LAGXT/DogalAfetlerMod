@@ -27,9 +27,9 @@ import net.minecraft.world.level.GameRules;
 import net.minecraftforge.fml.loading.FMLEnvironment;
 
 /**
- * {@code /dogalafet kizilcuce baslat|bilgi} (KOMUTLAR, N18). Geliştirme ortamında (üretim jar'ında yok) görsel kanıt için
- * {@code /dogalafet gokyuzutest evre <evre> [ilerleme] | ay <var|yok> | donma <yüzde>} de kaydedilir. Çıktılar yalnız
- * komutu yazana gider (N6); başarılı komut 1, reddedilen 0 döner.
+ * {@code /dogalafet kizilcuce baslat|bilgi} ve {@code /dogalafet pulsar baslat} (KOMUTLAR, N18; pulsar gökyüzü-2). Geliştirme
+ * ortamında (üretim jar'ında yok) görsel kanıt için {@code /dogalafet gokyuzutest evre <evre> [ilerleme] | ay <var|yok> |
+ * donma <yüzde>} de kaydedilir. Çıktılar yalnız komutu yazana gider (N6); başarılı komut 1, reddedilen 0 döner.
  */
 public final class GokyuzuKomutlari {
     private static final String ON = "commands.dogalafetler.kizilcuce.";
@@ -62,6 +62,10 @@ public final class GokyuzuKomutlari {
     static final String HAYIR = ON + "hayir";
     static final String ASAMA_EVRE = "commands.dogalafetler.gokyuzu.asama";
     static final String ASAMA_DOGUS_TAMAM = "commands.dogalafetler.gokyuzu.dogus_tamam";
+    static final String ASAMA_PULSAR_TAMAM = "commands.dogalafetler.gokyuzu.pulsar_tamam";
+    static final String PULSAR_BASLADI = "commands.dogalafetler.pulsar.basladi";
+    static final String PULSAR_ZATEN = "commands.dogalafetler.pulsar.zaten";
+    static final String KALAN_PULSAR = ON + "bilgi.kalan.pulsar";
 
     private static final List<KizilCuceBilgiKatkisi> KATKILAR = new CopyOnWriteArrayList<>();
 
@@ -76,6 +80,8 @@ public final class GokyuzuKomutlari {
         KomutKaydi.ekle(Commands.literal("kizilcuce")
                 .then(Commands.literal("baslat").executes(GokyuzuKomutlari::baslat))
                 .then(Commands.literal("bilgi").executes(GokyuzuKomutlari::bilgi)));
+        KomutKaydi.ekle(Commands.literal("pulsar")
+                .then(Commands.literal("baslat").executes(GokyuzuKomutlari::pulsarBaslat)));
         if (!FMLEnvironment.production) {
             KomutKaydi.ekle(Commands.literal("gokyuzutest")
                     .then(Commands.literal("evre").then(Commands.argument("evre", StringArgumentType.word())
@@ -115,6 +121,23 @@ public final class GokyuzuKomutlari {
             return yaz(kaynak, Component.translatable(BASLADI_DURMUS));
         }
         return yaz(kaynak, Component.translatable(BASLADI));
+    }
+
+    /** Pulsarı şimdi doğurur (olasılık, donma ve şafak beklenmez); zaten pulsarsa ya da güneş patlaması sürüyorsa 0. */
+    static int pulsarBaslat(CommandContext<CommandSourceStack> baglam) {
+        CommandSourceStack kaynak = baglam.getSource();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(kaynak.getServer());
+        DunyaDonemi donem = yonetici.donem();
+        if (donem.gunesEvresi() == GunesEvresi.PULSAR) {
+            kaynak.sendFailure(Component.translatable(PULSAR_ZATEN));
+            return 0;
+        }
+        if (yonetici.aktifAfet().filter(a -> a.tur() == AfetTuru.GUNES_PATLAMASI).isPresent()) {
+            kaynak.sendFailure(Component.translatable(AFET_SURUYOR));
+            return 0;
+        }
+        GunesZinciriSureci.pulsarBaslat(donem, "komut");
+        return yaz(kaynak, Component.translatable(PULSAR_BASLADI));
     }
 
     static int bilgi(CommandContext<CommandSourceStack> baglam) {
@@ -174,6 +197,7 @@ public final class GokyuzuKomutlari {
             }
             case KIZIL_CUCE -> p < 1f ? Component.translatable(KALAN_DOGUS, yuzde(p * 100f))
                     : Component.translatable(KALAN_TAMAM);
+            case PULSAR -> Component.translatable(KALAN_PULSAR, yuzde(p * 100f));
             default -> Component.translatable(KALAN_BASLAMADI);
         };
     }
@@ -246,5 +270,10 @@ public final class GokyuzuKomutlari {
         y.ekle(HAYIR, "no", "hayır");
         y.ekle(ASAMA_EVRE, "%s: %s", "%s: %s");
         y.ekle(ASAMA_DOGUS_TAMAM, "%s: red dwarf dawn completed", "%s: kızıl cüce doğuşu tamamlandı");
+        y.ekle(ASAMA_PULSAR_TAMAM, "%s: pulsar at full strength", "%s: pulsar tam güçte");
+        y.ekle(PULSAR_BASLADI, "A pulsar is born: the world begins to burn.", "Pulsar doğdu: dünya kavrulmaya başlıyor.");
+        y.ekle(PULSAR_ZATEN, "The pulsar era has already begun.", "Pulsar dönemi zaten başladı.");
+        y.ekle(KALAN_PULSAR, "Pulsar era: heating %s%%", "Pulsar dönemi: ısınma %%%s");
+        y.ekle(PulsarSureci.AD_ANAHTARI, "Pulsar era (scorching world)", "Pulsar dönemi (kavrulan dünya)");
     }
 }

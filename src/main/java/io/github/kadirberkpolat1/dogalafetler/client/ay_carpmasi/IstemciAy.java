@@ -9,7 +9,7 @@ import java.util.function.DoubleSupplier;
 
 /**
  * İstemcinin gördüğü ay çarpması: {@link IstemciDonem}'deki ay durumu ve olay saatinden (G8). Yaklaşma, parlama, sarsıntı,
- * mantar sütunu ve enkaz halkası bu saatten hesaplandığı için sonradan giren oyuncu aynı kareyi görür; ek paket yoktur.
+ * 3 boyutlu patlama ve enkaz halkası bu saatten hesaplandığı için sonradan giren oyuncu aynı kareyi görür; ek paket yoktur.
  * Gökyüzü sarmalayıcısı ({@code client.gokyuzu}) {@link #gokyuzuEtkin()} ve {@link #ayiGizle()} ile sorar. Yalnız istemci
  * ana thread'inde.
  */
@@ -39,7 +39,7 @@ public final class IstemciAy {
 
     /**
      * Gökyüzünü vanilla yerine ortak çizici çizmeli mi: ay yaklaşırken (vanilla ay gizlenir, gündüz de) ve çarpmadan sonra
-     * mantar sütunu ya da enkaz halkası sürerken.
+     * patlama ya da enkaz halkası sürerken.
      */
     public static boolean gokyuzuEtkin() {
         Durum d = durum(0f);

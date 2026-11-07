@@ -8,27 +8,33 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.afet.ay_carpmasi.AyCarpmasiAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.afet.ay_carpmasi.mantik.AyEgrileri;
+import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciDonem;
 import io.github.kadirberkpolat1.dogalafetler.config.EfektKalitesi;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.FogRenderer;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
+import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 /**
  * Ay çarpmasının gök çizimi (ay_carpmasi.md §2, §5; gökyüzü §A.5): ortak gökyüzü çizicisi zaman dönüşünden sonra,
  * ufuk altı diskinden önce çağırır. Yaklaşan ay gökte dünyaya göre sabit bir yönde (doğu-güneydoğu, ufkun 35°
  * üstü) büyür, çatlakları parlar, kopan parçalar yörünge yayı boyunca uzar, son 10 sn'de ufka inip alttan kızarır.
- * Çarpmadan sonra ufuk parlaması, ufkun ötesinden yükselen mantar sütunu (bir günde söner), 3 günlük enkaz halkası
- * ve kayan yıldızlar. Hepsi gök küresinde dokulu karelerdir (dünya geometrisi yok, sabit maliyet).
+ * Çarpma anında havada 3 boyutlu patlama (gökyüzü-2): dünyada sabit bir noktada genişleyen topaklı ateş topu, şok kabuğu,
+ * savrulan enkaz ve duman; {@link AyEgrileri#PATLAMA_SN} sn'de tamamen kaybolur. Sonra 3 günlük enkaz halkası ve kayan
+ * yıldızlar. Yaklaşan ay ve halka gök küresinde dokulu karelerdir; patlama kamera konumuyla paralaks yapar.
  */
 public final class AyCarpmasiGokyuzu {
     private static final ResourceLocation YUZEY = doku("ay_yuzey");
@@ -36,7 +42,6 @@ public final class AyCarpmasiGokyuzu {
     private static final ResourceLocation KIZIL = doku("ay_kizil");
     private static final ResourceLocation PARCA = doku("ay_parca");
     private static final ResourceLocation HARE = doku("ay_hare");
-    private static final ResourceLocation MANTAR = doku("mantar");
     private static final ResourceLocation HALKA = doku("enkaz_halkasi");
 
     /** Vanilla ay diskinin 100 birimdeki yarı çapı ~10; dokumuzda disk karenin 0,92'si. */
@@ -54,7 +59,12 @@ public final class AyCarpmasiGokyuzu {
     private record Parca(float konum, float sapma, float boy, float donus, float hiz, boolean onde) {
     }
 
-    private record Bulut(float yukseklik, float yanal, float boy, float donus, boolean duvar) {
+    /** Enkaz parçası: çıkış yönü, hızı (yarıçap katı), boyu (blok), dönüş ekseni ve hızı. */
+    private record Enkaz(Vector3f yon, float hiz, float boy, Vector3f eksen, float donus) {
+    }
+
+    /** Duman topağı: merkezden yönü, boy katı, topak tohumu. */
+    private record Duman(Vector3f yon, float boy, float tohum) {
     }
 
     private record Kayan(Vector3f bas, Vector3f yon, int dogus) {
@@ -62,7 +72,15 @@ public final class AyCarpmasiGokyuzu {
 
     private static EfektKalitesi kurulanKalite;
     private static Parca[] parcalar = new Parca[0];
-    private static Bulut[] bulutlar = new Bulut[0];
+    private static Enkaz[] enkazlar = new Enkaz[0];
+    private static Duman[] dumanlar = new Duman[0];
+    private static int kureDilimi = 8;
+    /**
+     * Patlamanın dünyadaki merkezi: istemcinin patlamayı ilk çizdiği karede kameradan yaklaşma yönünde
+     * {@link AyEgrileri#PATLAMA_UZAKLIK} blok öte; sonra sabit (oyuncu uçunca/yürüyünce paralaks yapar).
+     */
+    private static Vec3 patlamaMerkezi;
+    private static long patlamaOlayi = Long.MIN_VALUE;
     private static final List<Kayan> KAYANLAR = new ArrayList<>();
     private static int istemciTick;
 
@@ -87,12 +105,21 @@ public final class AyCarpmasiGokyuzu {
                     0.035f + 0.09f * r.nextFloat() * r.nextFloat(), r.nextFloat() * 360f, (r.nextFloat() - 0.5f) * 40f,
                     r.nextFloat() < 0.6f);
         }
-        bulutlar = new Bulut[AyEgrileri.mantarSayisi(k.ordinal())];
-        for (int i = 0; i < bulutlar.length; i++) {
-            boolean duvar = i % 5 == 4;
-            float h = duvar ? 0.08f * r.nextFloat() : (float) Math.sqrt(r.nextFloat());
-            bulutlar[i] = new Bulut(h, (float) r.nextGaussian(), 0.7f + 0.6f * r.nextFloat(), r.nextFloat() * 360f, duvar);
+        enkazlar = new Enkaz[AyEgrileri.enkazSayisi(k.ordinal())];
+        for (int i = 0; i < enkazlar.length; i++) {
+            Vector3f y = new Vector3f((float) r.nextGaussian(), (float) r.nextGaussian(), (float) r.nextGaussian()).normalize();
+            Vector3f eksen = new Vector3f((float) r.nextGaussian(), (float) r.nextGaussian(), (float) r.nextGaussian())
+                    .normalize();
+            enkazlar[i] = new Enkaz(y, 0.7f + 0.8f * r.nextFloat(), 6f + 16f * r.nextFloat() * r.nextFloat(), eksen,
+                    (r.nextFloat() - 0.5f) * 6f);
         }
+        dumanlar = new Duman[AyEgrileri.dumanSayisi(k.ordinal())];
+        for (int i = 0; i < dumanlar.length; i++) {
+            Vector3f y = new Vector3f((float) r.nextGaussian(), (float) r.nextGaussian() * 0.6f + 0.3f,
+                    (float) r.nextGaussian()).normalize();
+            dumanlar[i] = new Duman(y, 0.35f + 0.25f * r.nextFloat(), r.nextFloat() * 40f);
+        }
+        kureDilimi = AyEgrileri.kureDilimi(k.ordinal());
         kurulanKalite = k;
     }
 
@@ -197,19 +224,12 @@ public final class AyCarpmasiGokyuzu {
     // ------------------------------------------------------------------ çarpmadan sonra
 
     private static void carpmaSonrasi(Matrix4f m, float s, float a, float gecelik, float oyunSn) {
-        float isik = AyEgrileri.ufukIsigi(s);
-        Vector3f ufuk = yon(1f, 0f);
-        Vector3f sag = new Vector3f(ufuk).cross(0f, 1f, 0f).normalize();
-        Vector3f ust = new Vector3f(sag).cross(ufuk).normalize();
-        toplamali();
-        if (isik > 0.003f) {
-            kuad(m, HARE, ufuk, sag, ust, 90f * (0.6f + 0.4f * isik), 1f, 0.55f + 0.45f * isik, 0.3f + 0.7f * isik,
-                    a * isik);
-            kuad(m, HARE, ufuk, sag, ust, 28f, 1f, 1f, 1f, a * isik);
-        }
-        float ma = AyEgrileri.mantarAlfa(s);
-        if (ma > 0.003f) {
-            mantar(m, s, a * ma, isik);
+        if (AyEgrileri.patlamaGorunur(s)) {
+            float isik = AyEgrileri.dunyaParlamasi(s) * (float) IstemciAy.ayar(AyCarpmasiAyarlari::parlamaOlcegi);
+            if (isik > 0.003f) {
+                gokParlamasi(m, isik);
+            }
+            patlama(m, s, a);
         }
         if (IstemciAy.halkaAcik()) {
             float ha = AyEgrileri.halkaAlfa(s) * (0.3f + 0.7f * gecelik) * a;
@@ -219,50 +239,177 @@ public final class AyCarpmasiGokyuzu {
         }
     }
 
-    /** Ufkun ötesinden yükselen kızgın sütun ve iki yana yayılan toz duvarı. */
-    private static void mantar(Matrix4f m, float s, float a, float isik) {
-        float h = AyEgrileri.mantarYuksekligi(s);
-        float buyume = AyEgrileri.sinirla((s - AyEgrileri.MANTAR_BAS_SN) / AyEgrileri.MANTAR_BUYUME_SN);
-        float sicak = 1f - AyEgrileri.yumusak(s / 40f);
-        float yayilma = Math.min(1f, s / 90f);
-        normal();
-        for (Bulut b : bulutlar) {
-            float egim;
-            float yanal;
-            float boy;
-            if (b.duvar()) {
-                egim = -0.5f + 3f * b.yukseklik() * (0.4f + 0.6f * buyume);
-                yanal = b.yanal() * (6f + 22f * yayilma);
-                boy = (2.5f + 2f * b.boy()) * (0.4f + 0.6f * yayilma);
-            } else {
-                float hy = b.yukseklik();
-                egim = hy * h - 1.5f;
-                // Gövde dar, tepe (şapka) genişler.
-                float sapka = AyEgrileri.yumusak((hy - 0.62f) / 0.3f);
-                yanal = b.yanal() * (1.2f + (3.5f + 5f * buyume) * sapka);
-                boy = (1.4f + 3.6f * hy) * b.boy() * (0.45f + 0.55f * buyume);
+    /** Gök küresine sığdırma yarıçapı: patlama kamera merkezli tek ölçekle bunun içine küçültülür (açılar korunur). */
+    private static final float SIGDIRMA = 90f;
+
+    /** Çarpma anında bütün göğe toplamalı mavi-beyaz örtü (kamera merkezli kutu). */
+    private static void gokParlamasi(Matrix4f m, float isik) {
+        toplamali();
+        RenderSystem.setShader(GameRenderer::getPositionColorShader);
+        BufferBuilder bb = Tesselator.getInstance().getBuilder();
+        bb.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+        float a = Math.min(1f, 0.6f * isik);
+        float d = 50f;
+        for (int eksen = 0; eksen < 3; eksen++) {
+            for (int yan = -1; yan <= 1; yan += 2) {
+                for (int k = 0; k < 4; k++) {
+                    float u = k == 0 || k == 3 ? -d : d;
+                    float v = k < 2 ? -d : d;
+                    float w = yan * d;
+                    float x = eksen == 0 ? w : u;
+                    float y = eksen == 0 ? u : eksen == 1 ? w : v;
+                    float z = eksen == 2 ? w : v;
+                    bb.vertex(m, x, y, z).color(0.75f, 0.85f, 1f, a).endVertex();
+                }
             }
-            Vector3f y = yon(egim, yanal);
-            Vector3f sag = new Vector3f(y).cross(0f, 1f, 0f).normalize();
-            Vector3f ust = new Vector3f(sag).cross(y).normalize();
-            float donus = (float) Math.toRadians(b.donus() + s * 0.6f);
-            Vector3f dsag = new Vector3f(sag).mul(Mth.cos(donus)).add(new Vector3f(ust).mul(Mth.sin(donus)));
-            Vector3f dust = new Vector3f(ust).mul(Mth.cos(donus)).sub(new Vector3f(sag).mul(Mth.sin(donus)));
-            float kor = b.duvar() ? 0f : sicak * (1f - b.yukseklik());
-            float r = Mth.lerp(kor, 0.46f, 1f);
-            float g = Mth.lerp(kor, 0.38f, 0.55f);
-            float bl = Mth.lerp(kor, 0.33f, 0.22f);
-            float yariBoy = 100f * (float) Math.tan(Math.toRadians(boy) / 2);
-            kuad(m, MANTAR, y, dsag, dust, yariBoy, r, g, bl, a * (b.duvar() ? 0.7f : 0.9f));
         }
-        if (sicak > 0.01f) {
-            // Kızgın çekirdek: sütunun altında toplamalı turuncu ışıma.
-            toplamali();
-            Vector3f y = yon(h * 0.25f, 0f);
-            Vector3f sag = new Vector3f(y).cross(0f, 1f, 0f).normalize();
-            Vector3f ust = new Vector3f(sag).cross(y).normalize();
-            kuad(m, HARE, y, sag, ust, 6f + 10f * buyume, 1f, 0.5f + 0.3f * isik, 0.2f, a * sicak * 0.8f);
+        BufferUploader.drawWithShader(bb.end());
+    }
+
+    /**
+     * 3 boyutlu patlama: duman (normal karışım) → iki katmanlı topaklı ateş topu → şok kabuğu → enkaz izleri ve
+     * takılan kaya parçaları. Konumlar dünya bloklarında hesaplanır, sonra kamera merkezli tek ölçekle göğe sığdırılır.
+     */
+    private static void patlama(Matrix4f m, float s, float a) {
+        Vec3 goz = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
+        long olay = IstemciDonem.durum().ayOlaySaati();
+        if (patlamaMerkezi == null || patlamaOlayi != olay) {
+            Vector3f y = yon(AyEgrileri.PATLAMA_EGIMI, 0f).mul(AyEgrileri.PATLAMA_UZAKLIK);
+            patlamaMerkezi = goz.add(y.x, y.y, y.z);
+            patlamaOlayi = olay;
+            DogalAfetler.LOGGER.info("[ay_carpmasi] patlama merkezi {} (kamera {}), ömür {} sn", patlamaMerkezi, goz,
+                    AyEgrileri.PATLAMA_SN);
         }
+        Vector3f rel = new Vector3f((float) (patlamaMerkezi.x - goz.x), (float) (patlamaMerkezi.y - goz.y),
+                (float) (patlamaMerkezi.z - goz.z));
+        float k = SIGDIRMA / (rel.length() + AyEgrileri.PATLAMA_YARICAP * 2.2f);
+        Vector3f c = rel.mul(k);
+        Vector3f bakis = new Vector3f(c).negate().normalize();
+        float r = AyEgrileri.PATLAMA_YARICAP * k;
+        float buyume = AyEgrileri.patlamaBuyume(s);
+        float sicak = AyEgrileri.patlamaSicakligi(s);
+        float duman = AyEgrileri.dumanAlfa(s) * a;
+        if (duman > 0.003f) {
+            normal();
+            float[] gri = {Mth.lerp(sicak, 0.24f, 0.62f), Mth.lerp(sicak, 0.21f, 0.3f), Mth.lerp(sicak, 0.19f, 0.14f)};
+            float[] koyu = {gri[0] * 0.45f, gri[1] * 0.45f, gri[2] * 0.45f};
+            for (Duman d : dumanlar) {
+                Vector3f dm = new Vector3f(d.yon()).mul(r * (0.35f + 0.55f * buyume)).add(c);
+                kure(m, dm, r * d.boy() * (0.5f + 0.7f * buyume), Math.max(5, kureDilimi / 2), d.tohum() + s * 0.3f,
+                        0.22f, bakis, gri, koyu, duman * 0.6f, false);
+            }
+        }
+        toplamali();
+        float ates = AyEgrileri.atesTopuAlfa(s) * a;
+        if (ates > 0.003f) {
+            float[] ic = {1f, Mth.lerp(sicak, 0.55f, 0.97f), Mth.lerp(sicak, 0.2f, 0.85f)};
+            float[] dis = {Mth.lerp(sicak, 0.55f, 1f), Mth.lerp(sicak, 0.12f, 0.45f), Mth.lerp(sicak, 0.04f, 0.12f)};
+            kure(m, c, r * (0.2f + 0.8f * buyume), kureDilimi, 3.1f + s * 0.9f, 0.28f, bakis, ic, dis, ates * 0.55f, false);
+            kure(m, c, r * 0.55f * (0.25f + 0.75f * buyume), kureDilimi, 11.7f + s * 1.4f, 0.2f, bakis, ic, ic,
+                    ates * sicak, false);
+        }
+        float kabuk = AyEgrileri.kabukAlfa(s) * a;
+        if (kabuk > 0.003f) {
+            float[] mavi = {0.8f, 0.88f, 1f};
+            kure(m, c, r * 1.6f * AyEgrileri.kabukBuyume(s), kureDilimi, 0f, 0.04f, bakis, mavi, mavi, kabuk, true);
+        }
+        float enkaz = AyEgrileri.enkazAlfa(s) * a;
+        if (enkaz > 0.003f) {
+            enkaz(m, c, k, s, sicak, enkaz);
+        }
+    }
+
+    /**
+     * Topaklı küre (enlem-boylam ağı): köşe rengi bakışa dönüklükten gelir. Hacim kipinde merkez {@code ic}, kenar
+     * {@code dis} ve daha saydam (dolu top hissi); kabuk kipinde yalnız kenar görünür (ince şok kabuğu).
+     */
+    private static void kure(Matrix4f m, Vector3f c, float r, int dilim, float tohum, float topak, Vector3f bakis,
+            float[] ic, float[] dis, float alfa, boolean kabuk) {
+        RenderSystem.setShader(GameRenderer::getPositionColorShader);
+        BufferBuilder bb = Tesselator.getInstance().getBuilder();
+        bb.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+        int boylam = dilim * 2;
+        for (int i = 0; i < dilim; i++) {
+            for (int j = 0; j < boylam; j++) {
+                for (int q = 0; q < 4; q++) {
+                    float teta = Mth.PI * (i + (q == 1 || q == 2 ? 1 : 0)) / dilim;
+                    float fi = Mth.TWO_PI * (j + (q >= 2 ? 1 : 0)) / boylam;
+                    float nx = Mth.sin(teta) * Mth.cos(fi);
+                    float ny = Mth.cos(teta);
+                    float nz = Mth.sin(teta) * Mth.sin(fi);
+                    float rr = r * (1f + topak * (2f * topak(nx, ny, nz, tohum) - 1f));
+                    float f = Math.max(0f, nx * bakis.x + ny * bakis.y + nz * bakis.z);
+                    float t = kabuk ? 1f : (float) Math.sqrt(f);
+                    float e = 1f - f;
+                    float ca = kabuk ? alfa * e * e * e : alfa * (0.2f + 0.8f * t);
+                    bb.vertex(m, c.x + nx * rr, c.y + ny * rr, c.z + nz * rr).color(Mth.lerp(t, dis[0], ic[0]),
+                            Mth.lerp(t, dis[1], ic[1]), Mth.lerp(t, dis[2], ic[2]), Math.min(1f, ca)).endVertex();
+                }
+            }
+        }
+        BufferUploader.drawWithShader(bb.end());
+    }
+
+    /** Düzgün, ucuz yön gürültüsü (0–1): ateş topunun topakları; {@code t} ilerledikçe topaklar kaynar. */
+    private static float topak(float x, float y, float z, float t) {
+        return 0.5f + 0.2f * Mth.sin(x * 5.1f + t) * Mth.cos(y * 4.3f - t * 0.7f)
+                + 0.15f * Mth.sin(z * 7.7f + x * 3.1f + t * 1.3f) + 0.15f * Mth.sin((y + z) * 9.3f - t);
+    }
+
+    /** Enkaz: sıcak izler (toplamalı, kuyruğu saydam) ve ateş topunun ışığıyla iç yüzü aydınlanan, takılan kaya küpleri. */
+    private static void enkaz(Matrix4f m, Vector3f c, float k, float s, float sicak, float a) {
+        float sOnce = Math.max(0f, s - 0.45f);
+        RenderSystem.setShader(GameRenderer::getPositionColorShader);
+        BufferBuilder bb = Tesselator.getInstance().getBuilder();
+        bb.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+        float g = 0.5f + 0.3f * sicak;
+        for (Enkaz e : enkazlar) {
+            Vector3f bas = enkazKonumu(e, s, c, k);
+            Vector3f son = enkazKonumu(e, sOnce, c, k);
+            Vector3f en = new Vector3f(bas).sub(son).cross(bas);
+            if (en.lengthSquared() < 1e-12f) {
+                continue;
+            }
+            en.normalize().mul(e.boy() * k * 0.35f);
+            bb.vertex(m, son.x - en.x, son.y - en.y, son.z - en.z).color(1f, g, 0.2f, 0f).endVertex();
+            bb.vertex(m, son.x + en.x, son.y + en.y, son.z + en.z).color(1f, g, 0.2f, 0f).endVertex();
+            bb.vertex(m, bas.x + en.x, bas.y + en.y, bas.z + en.z).color(1f, g, 0.2f, a * 0.8f).endVertex();
+            bb.vertex(m, bas.x - en.x, bas.y - en.y, bas.z - en.z).color(1f, g, 0.2f, a * 0.8f).endVertex();
+        }
+        BufferUploader.drawWithShader(bb.end());
+        normal();
+        bb.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+        float kor = 0.8f * sicak;
+        for (Enkaz e : enkazlar) {
+            Vector3f p = enkazKonumu(e, s, c, k);
+            Quaternionf q = new Quaternionf().rotationAxis(e.donus() * s, e.eksen());
+            float h = e.boy() * k * 0.5f;
+            for (int eksen = 0; eksen < 3; eksen++) {
+                for (int yan = -1; yan <= 1; yan += 2) {
+                    Vector3f n = q.transform(new Vector3f(eksen == 0 ? yan : 0, eksen == 1 ? yan : 0, eksen == 2 ? yan : 0));
+                    float isik = 0.35f + 0.65f * Math.max(0f, -n.dot(e.yon()));
+                    float cr = Mth.lerp(kor, 0.27f, 1f) * isik;
+                    float cg = Mth.lerp(kor, 0.24f, 0.5f) * isik;
+                    float cb = Mth.lerp(kor, 0.22f, 0.18f) * isik;
+                    for (int i = 0; i < 4; i++) {
+                        float u = (i == 0 || i == 3 ? -h : h);
+                        float v = (i < 2 ? -h : h);
+                        float w = yan * h;
+                        Vector3f yerel = new Vector3f(eksen == 0 ? w : u, eksen == 0 ? u : eksen == 1 ? w : v,
+                                eksen == 2 ? w : v);
+                        Vector3f d = q.transform(yerel).add(p);
+                        bb.vertex(m, d.x, d.y, d.z).color(cr, cg, cb, a).endVertex();
+                    }
+                }
+            }
+        }
+        BufferUploader.drawWithShader(bb.end());
+    }
+
+    /** Enkazın {@code s} saniyedeki yeri: dışa yavaşlayarak savrulur, hafifçe düşer (bloklarda), sonra ölçeklenir. */
+    private static Vector3f enkazKonumu(Enkaz e, float s, Vector3f c, float k) {
+        return new Vector3f(e.yon()).mul(AyEgrileri.PATLAMA_YARICAP * e.hiz() * AyEgrileri.enkazYolu(s))
+                .add(0f, -4f * s * s, 0f).mul(k).add(c);
     }
 
     /** Soluk gri-beyaz enkaz halkası ve içinde yavaş kayan parıltılar. */
@@ -336,6 +483,8 @@ public final class AyCarpmasiGokyuzu {
 
     static void sifirla() {
         KAYANLAR.clear();
+        patlamaMerkezi = null;
+        patlamaOlayi = Long.MIN_VALUE;
     }
 
     static int kayanSayisi() {

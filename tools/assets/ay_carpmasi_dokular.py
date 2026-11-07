@@ -14,7 +14,6 @@ Aynı tohumla her çalıştırmada aynı baytlar üretilir. RGB rengi, alfa yoğ
 | ay_kizil.png | 256x256 | toplamalı | atmosfere giren alt kenarın kızarması (alttan yukarı sönen disk) |
 | ay_parca.png | 64x64 | normal | düzensiz kenarlı, soldan-üstten aydınlanan kaya parçası |
 | ay_hare.png | 128x128 | toplamalı | yumuşak ışıma (toz haresi, ufuk parlaması, kızgın çekirdek, halka parıltısı) |
-| mantar.png | 128x128 | normal | kabarık toz/duman topağı (mantar sütunu ve toz duvarı sprite'ı) |
 | enkaz_halkasi.png | 512x32 | toplamalı | yatay tekrarlanan ince enkaz şeridi (u yönünde periyodik) |
 """
 from __future__ import annotations
@@ -164,17 +163,6 @@ def hare() -> None:
     kaydet("ay_hare", np.ones((n, n, 3), np.float32), alfa)
 
 
-def mantar() -> None:
-    n = 128
-    rng = np.random.default_rng(20261109)
-    x, y, r = koordinat(n)
-    kabarma = fbm(n, n, 4, 4, 4, rng)
-    alfa = np.clip((0.42 - r + 0.18 * (kabarma - 0.5)) / 0.12, 0, 1) * (0.55 + 0.45 * kabarma)
-    golge = np.clip(0.78 - 0.55 * y + 0.25 * (kabarma - 0.5), 0.25, 1)
-    rgb = np.dstack([golge, golge * 0.97, golge * 0.94])
-    kaydet("mantar", rgb, alfa)
-
-
 def enkaz_halkasi() -> None:
     w, h = 512, 32
     rng = np.random.default_rng(20261110)
@@ -194,7 +182,6 @@ def main() -> None:
     kizil()
     parca()
     hare()
-    mantar()
     enkaz_halkasi()
 
 

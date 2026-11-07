@@ -188,7 +188,7 @@ public final class GunesPatlamasi extends Afet {
      * çevirir (yangın sistemi dışı, {@code afetBlokHasari} ile); değişen chunk sanal suya bildirilir. Yükseklik haritası
      * blok değişiminde eşzamanlı güncellenir; gökyüzü ışığı gecikebilir. Değişti mi.
      */
-    static boolean kavur(ServerLevel level, BlockPos konum) {
+    public static boolean kavur(ServerLevel level, BlockPos konum) {
         if (!Kurallar.blokHasariAcik(level.getGameRules()) || !level.getBlockState(konum).is(Blocks.GRASS_BLOCK)
                 || level.getHeight(Heightmap.Types.MOTION_BLOCKING, konum.getX(), konum.getZ()) > konum.getY() + 1) {
             return false;

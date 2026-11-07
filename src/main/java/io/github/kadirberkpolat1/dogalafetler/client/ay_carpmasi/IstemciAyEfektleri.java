@@ -99,10 +99,10 @@ public final class IstemciAyEfektleri {
         RenderSystem.setShader(GameRenderer::getPositionColorShader);
         BufferBuilder tampon = Tesselator.getInstance().getBuilder();
         tampon.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
-        tampon.vertex(-1, -1, 0).color(1f, 0.97f, 0.93f, guc).endVertex();
-        tampon.vertex(1, -1, 0).color(1f, 0.97f, 0.93f, guc).endVertex();
-        tampon.vertex(1, 1, 0).color(1f, 0.97f, 0.93f, guc).endVertex();
-        tampon.vertex(-1, 1, 0).color(1f, 0.97f, 0.93f, guc).endVertex();
+        tampon.vertex(-1, -1, 0).color(0.9f, 0.95f, 1f, guc).endVertex();
+        tampon.vertex(1, -1, 0).color(0.9f, 0.95f, 1f, guc).endVertex();
+        tampon.vertex(1, 1, 0).color(0.9f, 0.95f, 1f, guc).endVertex();
+        tampon.vertex(-1, 1, 0).color(0.9f, 0.95f, 1f, guc).endVertex();
         BufferUploader.drawWithShader(tampon.end());
         RenderSystem.disableBlend();
         RenderSystem.enableCull();
@@ -132,10 +132,11 @@ public final class IstemciAyEfektleri {
             g = 0.45f;
             b = 0.2f;
         } else if (d.carpti()) {
-            k = 0.45f * AyEgrileri.ufukIsigi(d.saniye());
-            r = 1f;
-            g = 0.8f;
-            b = 0.6f;
+            k = 0.6f * AyEgrileri.dunyaParlamasi(d.saniye())
+                    * (float) IstemciAy.ayar(AyCarpmasiAyarlari::parlamaOlcegi);
+            r = 0.85f;
+            g = 0.92f;
+            b = 1f;
         } else {
             return;
         }
@@ -145,6 +146,24 @@ public final class IstemciAyEfektleri {
         olay.setRed(Mth.lerp(k, olay.getRed(), r));
         olay.setGreen(Mth.lerp(k, olay.getGreen(), g));
         olay.setBlue(Mth.lerp(k, olay.getBlue(), b));
+    }
+
+    /**
+     * Ay patlamasının dünya parlaması (gökyüzü-2): ışık haritasının her hanesi (gök ve blok ışığı) birkaç saniye mavi-beyaza
+     * çekilir; arazi, yapı ve yaratıklar aydınlanır. Yalnız renk dokusu: ışık seviyeleri ve spawn kuralları değişmez (madde
+     * 16). {@code ay_carpmasi.parlama} 0 iken kapalı. Gökyüzü sarmalayıcısının {@code adjustLightmapColors}'ı çağırır.
+     */
+    public static void isikHaritasi(float kismiTick, org.joml.Vector3f renk) {
+        IstemciAy.Durum d = IstemciAy.durum(kismiTick);
+        if (!d.carpti()) {
+            return;
+        }
+        float t = 0.85f * AyEgrileri.dunyaParlamasi(d.saniye())
+                * (float) IstemciAy.ayar(AyCarpmasiAyarlari::parlamaOlcegi);
+        if (t > 0.002f) {
+            renk.set(Math.max(renk.x, Mth.lerp(t, renk.x, 0.92f)), Math.max(renk.y, Mth.lerp(t, renk.y, 0.96f)),
+                    Math.max(renk.z, Mth.lerp(t, renk.z, 1f)));
+        }
     }
 
     @SubscribeEvent

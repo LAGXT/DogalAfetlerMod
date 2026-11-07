@@ -2,6 +2,7 @@ package io.github.kadirberkpolat1.dogalafetler.client.gokyuzu;
 
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.GokyuzuEgrileri;
+import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.PulsarEgrileri;
 import net.minecraft.util.Mth;
 import org.joml.Vector3f;
 
@@ -24,6 +25,11 @@ final class GokyuzuRenkleri {
     private static final int KC_GUNDUZ_SIS = 0xC08870;
     private static final int KC_GECE_GOK = 0x120A10;
     private static final int KC_GECE_SIS = 0x1A0E12;
+    /** Pulsar: gece koyu lacivert uzay, gündüz ısınmayla koyulaşan kızıl-sıcak pus (gökyüzü-2). */
+    private static final int PULSAR_GECE_GOK = 0x060A1C;
+    private static final int PULSAR_GECE_SIS = 0x120C16;
+    private static final int PULSAR_GUNDUZ_GOK = 0x8A3A22;
+    private static final int PULSAR_GUNDUZ_SIS = 0xB0522C;
 
     private GokyuzuRenkleri() {
     }
@@ -56,6 +62,8 @@ final class GokyuzuRenkleri {
             case SUPERNOVA -> GokyuzuEgrileri.karistir(SN_KARANLIK_GOK, SN_PARLAK_GOK, supernovaAydinlatma(p, saniye, gun));
             case GUNESSIZ -> GokyuzuEgrileri.rgb(GUNESSIZ_GOK);
             case KIZIL_CUCE -> GokyuzuEgrileri.karistir(v, GokyuzuEgrileri.karistir(KC_GECE_GOK, KC_GUNDUZ_GOK, gun), kc);
+            case PULSAR -> GokyuzuEgrileri.karistir(PULSAR_GECE_GOK, PULSAR_GUNDUZ_GOK,
+                    gun * (0.45f + 0.55f * PulsarEgrileri.yogunluk(p)));
         };
     }
 
@@ -70,6 +78,8 @@ final class GokyuzuRenkleri {
             case SUPERNOVA -> GokyuzuEgrileri.karistir(SN_KARANLIK_SIS, SN_PARLAK_SIS, supernovaAydinlatma(p, saniye, gun));
             case GUNESSIZ -> GokyuzuEgrileri.rgb(GUNESSIZ_SIS);
             case KIZIL_CUCE -> GokyuzuEgrileri.karistir(v, GokyuzuEgrileri.karistir(KC_GECE_SIS, KC_GUNDUZ_SIS, gun), kc);
+            case PULSAR -> GokyuzuEgrileri.karistir(PULSAR_GECE_SIS, PULSAR_GUNDUZ_SIS,
+                    gun * (0.45f + 0.55f * PulsarEgrileri.yogunluk(p)));
         };
     }
 
@@ -100,6 +110,7 @@ final class GokyuzuRenkleri {
                     - 0.6f * GokyuzuEgrileri.supernovaFlas(saniye), 0.15f, 1f);
             case GUNESSIZ -> 1f;
             case KIZIL_CUCE -> Mth.lerp(gun, 1f, 0.45f);
+            case PULSAR -> Mth.lerp(gun, 1f, 0.55f);
         };
     }
 
@@ -121,7 +132,7 @@ final class GokyuzuRenkleri {
         return switch (evre) {
             case SUPERNOVA -> GokyuzuEgrileri.kalintiBelirme(p);
             case GUNESSIZ -> 1f;
-            case KIZIL_CUCE -> 0.85f;
+            case KIZIL_CUCE, PULSAR -> 0.85f;
             default -> 0f;
         };
     }
@@ -136,6 +147,7 @@ final class GokyuzuRenkleri {
             case GUNESSIZ -> new float[] {0.35f, 0.75f, 0.85f, 1.15f};
             case SUPERNOVA -> new float[] {Mth.lerp(GokyuzuEgrileri.supernovaParlaklik(p), 0.4f, 1.1f), 0.9f, 0.95f, 1.1f};
             case KIZIL_CUCE -> new float[] {0.75f, 1.1f, 0.82f, 0.68f};
+            case PULSAR -> new float[] {Mth.lerp(PulsarEgrileri.yogunluk(p), 0.8f, 1.05f), 1.2f, 0.82f, 0.7f};
             default -> new float[] {1f, 1f, 1f, 1f};
         };
     }

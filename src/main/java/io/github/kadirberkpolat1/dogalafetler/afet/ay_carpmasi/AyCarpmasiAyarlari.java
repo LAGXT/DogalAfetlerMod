@@ -101,7 +101,8 @@ public final class AyCarpmasiAyarlari {
         private Istemci(ForgeConfigSpec.Builder k) {
             ekranSarsintisi = k.comment("Çarpma sarsıntısının kamera genliği çarpanı (0 kapalı).")
                     .defineInRange("ekranSarsintisi", 1.0, 0.0, 2.0);
-            parlama = k.comment("Çarpma parlamasının ekran beyazlığı çarpanı (0 kapalı).")
+            parlama = k.comment("Çarpma parlamasının gücü: ekran beyazlığı, gök ve sis, arazi ışığı (ışık haritası) çarpanı "
+                    + "(0 kapalı; erişilebilirlik).")
                     .defineInRange("parlama", 1.0, 0.0, 1.0);
         }
     }
