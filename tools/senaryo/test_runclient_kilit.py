@@ -13,6 +13,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import runclient_kilit as rk  # noqa: E402
 
+os.environ["SIRA_SERBEST"] = "1"  # `kos` sınaması kuyruğa girmez (K-E60)
+
 
 def sessiz(_):
     pass

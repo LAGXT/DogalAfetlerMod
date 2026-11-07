@@ -5795,6 +5795,60 @@ edilir, Af13…Af17 P2'leri o turda.
   entegrasyon dalındaki filtresiz GameTest ve JUnit (K-E59) kapatır. `kasirga_sunucu @3ebe4b57df9d` (7,41 ms) defterde `gecti`:
   betik %20 sınırını denetlemez, yeşil satır kabul değildir (AF-23 rev. 4,25 ms ile geçti).
 
+## Teslim sonrası — hızlandırma (devam: kuyruk)
+
+**K-E60 Tek giriş kuyruk: ağır iş kendini kuyruğa ekler, kuyruk dışı Gradle panoda (şef kararı, kullanıcı şikayeti üzerine,
+2026-11-07; dal `is/sira-4`; şefin metninde "K-E55", sayaç K-E60 verdi).** Şikayet: "pc2'de 1 test çalışıyor, ana makinede hiç
+çalışmıyor"; pano 22:45:58 `Yuva: ana 0/2 · pc2 0/2 · oto bekleyen 0` gösterirken pc2'de test koşuyordu. Teşhis (22:48): pc2'deki
+Gradle afet-fizik'in `gradle_kapisi.sh … junit-6.log test`'iydi; ebeveyn zinciri `omp` (işçi oturumu) → `gradle_kapisi.sh` → `uzak.sh` →
+`ssh pc2`, kuyruk kaydı yok. İşçiler betikleri kabuktan doğrudan çağırıyor; K-E51'in kapısı boşken iş yerinde (ekransızsa pc2'de)
+koşuyor, kuyruğa yalnız kapı doluyken düşüyordu. Defter kanıtı: 19:00'dan sonraki 42 koşunun pc2'deki 15'inin 12'si kuyruğu
+atlamış (3'ü kuyruktan), ana makinedeki 27'nin 26'sı kuyruktan. Pano yalnız kuyruk kayıtlarını saydığı ve kayıt değişmedikçe
+yenilenmediği için bunu göremiyordu. İkinci bulgu: ana makinedeki istemci işi (afet-fizik `tsunami-yagmur-2`, çıkış 2) eksik değil
+**eski** `HYPRLAND_INSTANCE_SIGNATURE` taşıyordu: işçi kabukları 11-06'da açılan `herdr` sunucusundan bir önceki Hyprland örneğinin
+imzasını miras alıyor (soket dosyası duruyor, dinlenmiyor; `hyprctl` "Couldn't connect"). Karar: (1) **Tek giriş:** ağır süreç
+açan her betik (`gradle_kapisi.sh`, `uzak.sh`, `pc2_istemci.sh`, `*_sunucu.py` — `cekirdek_sunucu.defterli_kos`, `*_gorsel.py`/
+`*_istemci.py` — `defter.sarmala`, `runclient_kilit.py kos`) bir kuyruk işinin içinde değilse (koşturucunun `SIRA_IS`'i; pc2'de
+`UZAK_ICINDE`) defter bakışından sonra kendini `sira.py ekle --bekle --makine oto -- <aynı argv>` ile kuyruğa ekler ve bekler
+(`sira.kuyruga_gir`, exec): işin log'u akar, çıkış kodu işinki, bekleyen TERM/INT/HUP alırsa iş iptal (sinyal yakalayıcı iş kaydı
+yazılmadan kurulur). "Kapı boşsa yerinde koş" yolu, `KAPI_BLOKLA`, `kapi_bekle` ve `sira.py dolu-mu` kalktı. `gradlew` iş dışında
+reddeder (çıkış 3, `sira.py ekle -- ./gradlew …` iletisi); `SIRA_SERBEST=1` bilerek atlar. Hyprland exec kuralı çocuk sürece ortamı
+geçirmediğinden `runclient_kilit.istemci_baslat` `SIRA_IS`/`SIRA_SERBEST`'i `env` ile verir (`kos` işin içinde kalır). Ana makinenin
+her işi `UZAK=0` taşır (makine = koşan makine; eskiden yalnız oto'dan gelen). `sira.py ekle`'de `--makine` verilmezse komuttan seçilir
+(türsüz komut ana), `--makine oto` türsüz komutu da oto'ya koyar (pc2 alırsa uzak.sh ile sarılır); görsel/istemci betikleri ve
+`runclient_kilit.py` bayraksız da istemci sayılır. (2) **Kuyruk dışı görünür ve sayılır:** ana makinede işe ait olmayan Gradle
+istemcisi (`org.gradle.wrapper.GradleWrapperMain`, süreç ortamında ana makinede koşan bir işin `SIRA_IS`'i yok; eski ata zinciri
+sayımının yerine), pc2'de pc2 koşucusunun 5 sn'de bir ssh ile okuduğu `ps` + uzak.sh oturum dosyaları (`/tmp/uzak-<yerel pid>-<yuva>.pid`;
+atası bir kuyruk işinin uzak.sh'sine bağlanmayan Gradle; `pc2/surecler.json`, 60 sn'den eskiyse "bilinmiyor"). Pano `kuyruk dışı`
+satırı (pid, makine, başlangıç, süre, proje + görevler) yazar; `Yuva:` ve koşucular onları sayar (pc2'de uzak.sh kilidi tutan dış iş
+kilit sayımında, kilitsiz elle ssh üstüne). Pano değişiklikte (kuyruk ya da dış süreç) ve 30 sn'de bir yenilenir. (3) **Dağıtım:**
+K-E53'ün pc2 önceliği kalır (ana makine kullanıcınındır); kural "sırada iş varken boş yuvalı makine kalmaz": pc2 işi alamıyorsa ana
+hemen alır. Aynı klasör: makine başına tek iş (ana makinede de, spool fark etmeksizin); iki makinede birer iş olur — uzak.sh
+`build/`, `.gradle/`, `run*/`, `logs/`, `.vibe/` eşitlemez ve pc2'de korur, iş pc2'de kendi kopyasında koşar, geri yalnız `-g` yolları
+(log, kanıt klasörü) gelir — tek istisna pc2'deki doğrudan `./gradlew` işi: kanca `build/reports|test-results|libs`'i aynı klasöre
+geri çeker, ana makinedeki Gradle'ın yazdığı yere; onunla yan yana koşmaz. (4) **İstemci ana makinede:** koşturucu ana makinenin
+işine kullanıcı oturumunun ekranını verir (`runclient_kilit.oturum_ekrani`: `systemctl --user show-environment` + soketi bağlantı kabul
+eden Hyprland imzası, `canli_hyprland`); yaşayan Hyprland yoksa ana koşucu istemci işi almaz, oto istemci işi pc2'ye kalır.
+`_hypr_ortam` da ilk dizin yerine yaşayan imzayı seçer. İşçi kural metni `KÖK/.vibe/KUYRUK-KURALI.md` (25 satır). Reddedilen: kapıyı
+koruyup panoya yalnız dış süreç eklemek (işçi atlamaya devam eder, ana makine yine boş kalır), her işi eşit dağıtmak (K-E53'ü
+bozar). Sınama `tools/senaryo/test_sira.py` 17/17 (öz-kuyruklama: altı giriş noktası iş dışından kuyruğa düşer, kesilince iptal;
+`gradlew` reddi; `--bekle` log akışı ve çıkış kodu; ana ve pc2 kuyruk dışı sayımı; yaşayan Hyprland seçimi; Hyprland yokken istemci
+ana'ya verilmez; iki makinede aynı klasör kuralı), `test_runclient_kilit.py` 8/8. Canlı kanıt `.vibe/kanit/sira-4/`. Eski
+worktree'lerin betikleri `main`'i alana dek kuyruğu atlar; atladıkları iş panoda `kuyruk dışı` görünür ve yuva tutar.
+
+**K-E60 rev. Dağıtım: boş yuvası çok olan makine alır, eşitlikte pc2 (şef kararı, 2026-11-07; dal `is/sira-5`).** Kullanıcı şikayeti:
+2 iş varken ikisi pc2'ye gidiyor, ana makine boş kalıyordu (K-E53'ün "pc2 öncelikli, taşan iş ana makineye" kuralı ve 60 sn bekleme).
+Karar: oto işi, onu alabilen makinelerden boş yuvası en çok olana gider (boş yuva = 2 − koşan kuyruk işleri − kuyruk dışı ağır
+süreçler; pc2'de uzak.sh yuva kilitleri de), eşitlikte pc2: 2/2 yuvayla 1. iş pc2, 2. ana, 3. pc2, 4. ana. Bir makine alamıyorsa
+(boş yuvası yetmiyor, aynı klasörden işi koşuyor, koşucusu yok, ana makinede boş RAM < `KAPI_RAM_MB`) öteki alır. İstemci işi aynı
+kurala uyar; ana makinede yaşayan Hyprland yoksa ya da istemci zaten koşuyorsa pc2. `--olcum` yalnız ana (değişmez); makine başına
+klasör başına tek iş kalır. `SIRA_OTO_BEKLE_SN` (60 sn) ve "pc2 alamıyorsa ana alır" kuralı kalktı. Uygulama: her koşucu oto işini
+yalnız `oto_hedefi` kendi makinesiyse alır (`sira_kosucu.engel`/`bos`; iki koşucu aynı hesabı yapar, `rename` yarışı kazananı seçer).
+Sınama `test_sira.py` 18/18 (`test_dagitim_bos_yuvasi_cok_olana_esitlikte_pc2`: 2 iş → pc2, ana, `Yuva: ana 1/2 · pc2 1/2`; 4 iş →
+pc2, ana, pc2, ana, `2/2 · 2/2`; `test_dagitim_dolu_makine_atlanir`: pc2 dolu → ana, ana dolu → pc2). Canlı kanıt
+`.vibe/kanit/sira-4/dagitim-2.md`.
+#
+
 ## Açık noktalar (Faz 2b)
 
 Entegratöre bırakılan notlardan işlenenler: kancalar (K-E1), protokol (K-C47), `asama ileri [süreç]` (K-C48), sanal su §3a istisnası
