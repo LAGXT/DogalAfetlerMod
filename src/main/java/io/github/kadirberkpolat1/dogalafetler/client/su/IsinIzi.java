@@ -3,7 +3,7 @@ package io.github.kadirberkpolat1.dogalafetler.client.su;
 /**
  * Izgarada ışın yürüyüşü (Amanatides–Woo): başlangıç noktasının hücresinden çıkıp ışının kestiği birim küpleri sırayla,
  * köşe atlamadan verir; her adım tek eksende bir hücre ilerler ve ışın {@code erim} bloğu aşınca durur. Mağara suyunun
- * tavan yansıması bununla izlenir (SU-41): sabit yarım blok adım ince tavan yamalarını ve köşeleri atlıyordu, 12 blokluk
+ * tavan yansıması bununla izlenir (SU-42): sabit yarım blok adım ince tavan yamalarını ve köşeleri atlıyordu, 12 blokluk
  * erim de uzak yüzeyin yansımasını tavana ulaştırmıyordu. Tahsissiz ve yeniden kullanılır; saf mantık, tek thread.
  */
 final class IsinIzi {

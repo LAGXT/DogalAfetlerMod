@@ -68,11 +68,15 @@ public final class SuRenderer {
     private static final int ISIK_RENGI = 0xBFE6FF;
     /** Gökyüzü görmeyen suda (mağara) demetler fener/ışıltaşı ışığının sıcak rengini alır. */
     private static final int SICAK_ISIK_RENGI = 0xFFC27A;
-    /** Tavan yansıması ışın erimi (blok; tavanı uzak yüzeyden de bulsun) ve yürüyücüsü (SU-41). */
+    /** Tavan yansıması ışın erimi (blok; tavanı uzak yüzeyden de bulsun) ve yürüyücüsü (SU-42). */
     private static final double YANSIMA_ERIM = 24;
     private static final IsinIzi IZ = new IsinIzi();
-    /** Gökyüzü görmeyen mağara suyunun taban tonu: biyom mavisi koyulaşır, sıcak yansıma onun üstünde seçilir (SU-41). */
-    private static final int MAGARA_TONU = 0x1C3A40;
+    /**
+     * Gökyüzü görmeyen mağara suyunun taban tonu ve en az saydamsızlığı: serin turkuaz, belirgin bir katman; sıcak ışıklı
+     * taş zeminden ayrı seçilir, sıcak yansıma lekeleri onun üstünde (SU-42).
+     */
+    private static final int MAGARA_TONU = 0x2A6468;
+    private static final float MAGARA_ALFA = 0.72f;
     private static final int N = 2 * YAKIN + 1;
     private static final float[] UST = new float[N * N];
     private static final float[] ALT = new float[N * N];
@@ -92,6 +96,10 @@ public final class SuRenderer {
     private static final BufferBuilder BB_YAKIN = new BufferBuilder(1 << 21);
     /** Su altı ışık demetleri (her kare, birkaç dörtgen). */
     private static final BufferBuilder BB_ISIK = new BufferBuilder(1 << 16);
+    /** Mağara yansımasının toplamalı parıltısı (yakın halkayla aynı yapımda kurulur, SU-42). */
+    private static final BufferBuilder BB_PARILTI = new BufferBuilder(1 << 18);
+    /** Parıltının çizildiği en küçük köşe yansıma gücü. */
+    private static final float PARILTI_ESIK = 0.15f;
     /** Köşelerin yazıldığı kurucu. */
     private static BufferBuilder bb = BB;
     private static VertexBuffer vbIsik;
@@ -107,6 +115,10 @@ public final class SuRenderer {
     private static VertexBuffer vbUzak;
     private static boolean yakinBos = true;
     private static boolean uzakBos = true;
+    private static VertexBuffer vbParilti;
+    private static boolean pariltiBos = true;
+    private static int yapParilti;
+    private static int sonParilti;
     private static long kurulanTick = Long.MIN_VALUE;
     private static long uzakTick = Long.MIN_VALUE;
     private static int yakinOx;
@@ -231,6 +243,11 @@ public final class SuRenderer {
     private static long logEnCokTickCpuNs;
     private static long logEnCokParcaNs;
     private static long logEnCokYuklemeNs;
+    /** Ölçüm penceresinde kurulum işi yapılan tick ve bütçeyi 0,5 ms'den fazla aşanlar (duvar saati / CPU). */
+    private static int olcKurulumTick;
+    private static int olcAsanDuvar;
+    private static int olcAsanCpu;
+    private static long tickButceNs;
     /** Mağara tavan yansıması (tanı): bu yapımda ve son biten yapımda hesaplanan köşe, güçlü (> 0,3) köşe, güç toplamı. */
     private static int yansimaKose;
     private static int yansimaGuclu;
@@ -256,6 +273,9 @@ public final class SuRenderer {
         olcEnCokTickCpuNs = 0;
         olcEnCokParcaNs = 0;
         olcEnCokYuklemeNs = 0;
+        olcKurulumTick = 0;
+        olcAsanDuvar = 0;
+        olcAsanCpu = 0;
     }
 
     /** Son sıfırlamadan beri kare başına ortalama CPU maliyeti ve kurulum ortalamaları. */
@@ -264,17 +284,18 @@ public final class SuRenderer {
         return String.format(Locale.ROOT,
                 "kare=%d su_cpu_kare_basina=%.2fms (yakin_kurulum_ort=%.2fms x%d, yakin_tick_en_cok=%.2fms yayilma=%.1f tick, "
                         + "uzak_kurulum_ort=%.2fms x%d, uzak_yayilma=%.1f tick, cizim_ort=%.3fms) dortgen yakin=%d uzak=%d "
-                        + "kurulum_tick_cpu_en_cok=%.2fms dilim_en_cok=%.2fms yukleme_en_cok=%.2fms",
+                        + "kurulum_tick_cpu_en_cok=%.2fms dilim_en_cok=%.2fms yukleme_en_cok=%.2fms kurulum_tick=%d "
+                        + "butce_asan_tick_duvar=%d butce_asan_tick_cpu=%d",
                 olcKare, (olcYakinNs + olcUzakNs + olcCizimNs) / kare / 1e6, olcYakinNs / Math.max(1.0, olcYakin) / 1e6,
                 olcYakin, olcEnCokTickNs / 1e6, olcTickToplam / Math.max(1.0, olcYakin), olcUzakNs / Math.max(1.0, olcUzak) / 1e6,
                 olcUzak, olcUzakTickToplam / Math.max(1.0, olcUzak), olcCizimNs / kare / 1e6, yakinDortgen, uzakDortgen,
-                olcEnCokTickCpuNs / 1e6, olcEnCokParcaNs / 1e6, olcEnCokYuklemeNs / 1e6);
+                olcEnCokTickCpuNs / 1e6, olcEnCokParcaNs / 1e6, olcEnCokYuklemeNs / 1e6, olcKurulumTick, olcAsanDuvar, olcAsanCpu);
     }
 
-    /** Son biten yakın halka yapımında mağara tavan yansıması: güçlü / hesaplanan köşe ve ortalama güç (SU-41 tanı). */
+    /** Son biten yakın halka yapımında mağara tavan yansıması: güçlü / hesaplanan köşe ve ortalama güç (SU-44 tanı). */
     static String yansimaOzeti() {
-        return String.format(Locale.ROOT, "yansima_kose=%d/%d yansima_ort=%.2f", sonYansimaGuclu, sonYansimaKose,
-                sonYansimaToplam / Math.max(1, sonYansimaKose));
+        return String.format(Locale.ROOT, "yansima_kose=%d/%d yansima_ort=%.2f parilti=%d", sonYansimaGuclu, sonYansimaKose,
+                sonYansimaToplam / Math.max(1, sonYansimaKose), sonParilti);
     }
 
     @SubscribeEvent
@@ -289,12 +310,14 @@ public final class SuRenderer {
         if (d == null) {
             yapIptal();
             yakinBos = true;
+            pariltiBos = true;
             uzakBos = true;
             return;
         }
         if (l != sonSeviye) {
             yapIptal();
             yakinBos = true;
+            pariltiBos = true;
             uzakBos = true;
             RENK.clear();
             ISIK.clear();
@@ -368,6 +391,14 @@ public final class SuRenderer {
             ofset(sh, yakinOx - cam.x, yakinOy - cam.y, yakinOz - cam.z);
             vbYakin.bind();
             vbYakin.drawWithShader(mv, proj, sh);
+            if (!pariltiBos) {
+                RenderSystem.depthMask(false);
+                RenderSystem.blendFunc(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE);
+                vbParilti.bind();
+                vbParilti.drawWithShader(mv, proj, sh);
+                RenderSystem.defaultBlendFunc();
+                RenderSystem.depthMask(true);
+            }
         }
         if (bilesen > 1 && IstemciSu.kameraSuda(e.getCamera())) {
             isinlariCiz(d, cam, mv, proj, sh);
@@ -540,14 +571,19 @@ public final class SuRenderer {
         yansimaRengi = ufukRengi;
     }
 
-    /** Mağara suyu: gök yansıması yok; tavandaki ışık kaynaklarının sıcak parıltısı, gücü blok ışığıyla. */
+    /**
+     * Mağara suyu: gök yansıması yok; tavandaki ışık kaynaklarının sıcak parıltısı, gücü blok ışığıyla. Gökyüzü görmeyen
+     * mağarada yatık bakışın genel yansıması karanlık tavandır: sabit sıcak gri yansıma yüzeyi ışıklı taş zemin tonuna
+     * getiriyor, su seçilmiyordu; sıcak lekeleri ışın izi ({@link #tavanYansimasi}) verir (SU-42).
+     */
     private static void magaraKipi(int isik) {
         float b = LightTexture.block(isik) / 15f;
         glX = 0.25;
         glY = 0.97;
         glGuc = 0.9f * b;
         glRenk = 0xFFE2B0;
-        yansimaRengi = karistir(0x23272B, 0xFFCF8E, 0.45f * b);
+        yansimaRengi = LightTexture.sky(isik) < 8 ? karistir(0x0A1216, 0x5C4630, 0.3f * b)
+                : karistir(0x23272B, 0xFFCF8E, 0.45f * b);
     }
 
     private static long chunkAnahtari(int x, int z) {
@@ -614,6 +650,7 @@ public final class SuRenderer {
     private static void yapIptal() {
         if (yapAsama == 2) {
             BB_YAKIN.end().release();
+            BB_PARILTI.end().release();
         }
         yapAsama = 0;
         if (uzakYapiyor) {
@@ -631,12 +668,19 @@ public final class SuRenderer {
      * tampon çizilir.
      */
     private static void kurulumIlerlet(ClientLevel l, SanalSuDunyasi d, long tick) {
-        BUTCE.tickBasla(tick, (long) (SuAyarlari.istemci().yakinKurulumButcesiMs.get() * 1e6));
+        long butceNs = (long) (SuAyarlari.istemci().yakinKurulumButcesiMs.get() * 1e6);
+        BUTCE.tickBasla(tick, butceNs);
         if (yapAsama == 0 && !uzakYapiyor || !BUTCE.calisabilir()) {
             return;
         }
         if (tickIsTick != tick) {
+            if (tickIsTick != Long.MIN_VALUE) {
+                olcKurulumTick++;
+                olcAsanDuvar += tickIsNs > tickButceNs + 500_000 ? 1 : 0;
+                olcAsanCpu += tickCpuNs > tickButceNs + 500_000 ? 1 : 0;
+            }
             tickIsTick = tick;
+            tickButceNs = butceNs;
             tickIsNs = 0;
             tickCpuNs = 0;
         }
@@ -733,16 +777,21 @@ public final class SuRenderer {
         if (yapAsama == 1) {
             if (yapVar) {
                 BB_YAKIN.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
+                BB_PARILTI.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
+                yapParilti = 0;
                 dortgen = 0;
                 yapAsama = 2;
             } else {
                 yakinDortgen = 0;
                 yakinBos = true;
+                pariltiBos = true;
                 yapAsama = 0;
             }
         } else {
             yakinDortgen = dortgen;
             yakinBos = !yukle(BB_YAKIN, true);
+            pariltiBos = !pariltiYukle();
+            sonParilti = yapParilti;
             yakinOx = yapOx;
             yakinOy = yapOy;
             yakinOz = yapOz;
@@ -955,6 +1004,21 @@ public final class SuRenderer {
         }
     }
 
+    /** Parıltı kurucusunu yükler; parıltı yoksa {@code false}. */
+    private static boolean pariltiYukle() {
+        if (yapParilti == 0) {
+            BB_PARILTI.end().release();
+            return false;
+        }
+        if (vbParilti == null) {
+            vbParilti = new VertexBuffer(VertexBuffer.Usage.DYNAMIC);
+        }
+        vbParilti.bind();
+        vbParilti.upload(BB_PARILTI.end());
+        VertexBuffer.unbind();
+        return true;
+    }
+
     /** Kurucuyu ilgili tampona yükler; boşsa {@code false}. */
     private static boolean yukle(BufferBuilder kurucu, boolean yakin) {
         if (dortgen == 0) {
@@ -1072,7 +1136,8 @@ public final class SuRenderer {
         }
         float a = Math.max(kopuk * 0.6f, derin < 1 ? 0.25f + 0.15f * derin : Math.min(0.85f, 0.4f + 0.06f * derin));
         if (tur == 2 && LightTexture.sky(isik) < 8) {
-            renk = karistir(renk, MAGARA_TONU, 0.45f);
+            renk = karistir(renk, MAGARA_TONU, 0.5f);
+            a = Math.max(a, MAGARA_ALFA);
         }
         int tabanRenk = karistir(renk, 0xFFFFFF, kopuk * 0.5f);
         if (tur == 2) {
@@ -1125,6 +1190,7 @@ public final class SuRenderer {
             tavanYansimasi(l, 2, x + 1, y11, z + 1, v11);
             tavanYansimasi(l, 3, x + 1, y10, z, v10);
             dortgenSerbest(rx, y00, rz, rx, y01, rz + 1, rx + 1, y11, rz + 1, rx + 1, y10, rz, false, x, z);
+            parilti(rx, rz, y00, y01, y11, y10, v00, v01, v11, v10, x, z);
             if (kopuk > 0.08f) {
                 for (int q = 0; q < 4; q++) {
                     QC[q] = 0xFFF4E0;
@@ -1197,7 +1263,7 @@ public final class SuRenderer {
     }
 
     /**
-     * Mağara suyunda tavan yansıması (SU-35, SU-41; şader'siz): köşeden kameraya bakış dalgacık normaline göre yansıtılır,
+     * Mağara suyunda tavan yansıması (SU-35, SU-42; şader'siz): köşeden kameraya bakış dalgacık normaline göre yansıtılır,
      * ışın ızgarada hücre hücre ({@link IsinIzi}) en çok {@link #YANSIMA_ERIM} blok izlenir. Işık kaynağına (ışıltaşı, fener)
      * vuran ışın kaynağın sıcak rengini neredeyse tam alır (biyom mavisini örter), başka bloka vuran o noktanın blok ışığıyla
      * amber; Fresnel ile yatık bakışta güçlenir. Dalgacık ışını oynattığı için yansıma titrer. Köşe başına yapım başına bir
@@ -1262,8 +1328,10 @@ public final class SuRenderer {
                 if (ilk) {
                     return 0;
                 }
+                // Aydınlatılmış duvar ve tavan hafif amber (ışıkla doğrusal); güçlü olursa yüzey sıcak zeminden ayrılmaz, parlak
+                // sıcak lekeleri ışık kaynakları verir.
                 double bl = l.getBrightness(LightLayer.BLOCK, P.set(ox, oy, oz)) / 15.0;
-                return (float) (fresnel * bl * bl * 0.6);
+                return (float) (fresnel * bl * 0.45);
             }
             ilk = false;
             ox = IZ.x();
@@ -1317,6 +1385,36 @@ public final class SuRenderer {
     }
 
     /**
+     * Mağara yansımasının parıltısı (SU-42): köşe yansıması {@link #PARILTI_ESIK}'i geçen hücreye köpük dokusuyla sıcak
+     * dörtgen, ayrı tamponda ({@link #BB_PARILTI}) toplamalı karışımla çizilir. Normal karışımda yansıma rengi doku ve ışık
+     * haritasıyla çarpıldığı için leke aydınlatılmış taş zeminden parlak olamıyordu; ışık eklenince yamalar suda parlar.
+     */
+    private static void parilti(float rx, float rz, float y00, float y01, float y11, float y10, int v00, int v01, int v11,
+            int v10, int x, int z) {
+        if (Math.max(Math.max(YANSIMA[v00], YANSIMA[v01]), Math.max(YANSIMA[v11], YANSIMA[v10])) < PARILTI_ESIK) {
+            return;
+        }
+        int tam = LightTexture.pack(15, 15);
+        pariltiKosesi(0, YANSIMA[v00], tam);
+        pariltiKosesi(1, YANSIMA[v01], tam);
+        pariltiKosesi(2, YANSIMA[v11], tam);
+        pariltiKosesi(3, YANSIMA[v10], tam);
+        int ana = dortgen;
+        bb = BB_PARILTI;
+        dortgenSerbest(rx, y00 + 0.02f, rz, rx, y01 + 0.02f, rz + 1, rx + 1, y11 + 0.02f, rz + 1, rx + 1, y10 + 0.02f, rz, true,
+                x, z);
+        bb = BB_YAKIN;
+        dortgen = ana;
+        yapParilti++;
+    }
+
+    private static void pariltiKosesi(int q, float g, int isik) {
+        QC[q] = SICAK_ISIK_RENGI;
+        QA[q] = Math.max(0f, Math.min(1f, (g - 0.05f) * 1.2f));
+        QI[q] = isik;
+    }
+
+    /**
      * Serbest dörtgen; köşe renk/alfa/ışığı {@link #QC}, {@link #QA}, {@link #QI}. {@code kopukDoku} ise köpük dokusunun
      * {@code (bx, bz)} hücresine düşen yarısı (2 blokta bir tekrar), değilse su dokusu.
      */
@@ -1350,7 +1448,8 @@ public final class SuRenderer {
      * Su altı ışık demetleri (SU-28): kamera sanal suyun içindeyken yüzeyden aşağı inen, kameraya dönük, alt ucu güneşten
      * uzağa kayan, yavaşça salınan saydam huzmeler; toplamalı karışım, derinlik yazılmaz. Her huzme enine üç bant: dış
      * köşelerde alfa 0 (sert kenar yok), aşağı doğru %60 genişler, genişliği yavaşça dalgalanır. Gökyüzü ışığı düşükse
-     * (mağara) renk sıcak. Kalite: Orta 10, Yüksek 18, Ultra 26 huzme.
+     * (mağara) renk sıcak. Huzme kendi sütununun su yüzeyinden iner ve o sütunun derinliğinden uzun olmaz (sığ mağara cebinde
+     * dibe kadar görünür, SU-42); su olmayan sütunda huzme yok. Kalite: Orta 10, Yüksek 18, Ultra 26 huzme.
      */
     private static void isinlariCiz(SanalSuDunyasi d, Vec3 cam, Matrix4f mv, Matrix4f proj, ShaderInstance sh) {
         double yuzey = d.ustu(cam.x, cam.y, cam.z, saat);
@@ -1387,11 +1486,15 @@ public final class SuRenderer {
                 if (dl > 15 || dl < 0.8) {
                     continue;
                 }
+                d.araliklar((int) Math.floor(px), (int) Math.floor(pz), saat, A);
+                if (A.adet() == 0) {
+                    continue;
+                }
                 double gen = (0.4 + ((h >>> 20) & 15) / 15.0 * 0.6) * (1 + 0.18 * Math.sin(saat * 0.035 + (h & 511)));
                 double wx = -dz / dl * gen;
                 double wz = dx / dl * gen;
-                double ust = yuzey - 0.15;
-                double boy = 9 + ((h >>> 24) & 7);
+                double ust = A.ust(A.adet() - 1) - 0.15;
+                double boy = Math.max(1.5, Math.min(9 + ((h >>> 24) & 7), ust - A.alt(A.adet() - 1)));
                 double kx = -gunesX * boy * 0.25 + 0.4 * Math.sin(saat * 0.02 + (h & 255));
                 double kz = 0.3 * Math.cos(saat * 0.017 + (h & 127));
                 float a = (float) (0.3 * (0.6 + 0.4 * Math.sin(saat * 0.05 + (h & 63))));

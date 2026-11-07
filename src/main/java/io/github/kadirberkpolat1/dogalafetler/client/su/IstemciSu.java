@@ -322,7 +322,7 @@ public final class IstemciSu {
 
     /**
      * Su altı sisinin sıcak payı 0..0,85: blok ışığı var, gökyüzü ışığı yok (mağara, fener). Biyom suyu maviyken 0,5 tavanı sisi
-     * ancak mavi-griye çekiyordu (SU-41); blok ışığı ~12'de pay doyar.
+     * ancak mavi-griye çekiyordu (SU-42); blok ışığı ~12'de pay doyar.
      */
     private static float sicaklik(ClientLevel l, BlockPos kp) {
         return Math.min(1f, l.getBrightness(LightLayer.BLOCK, kp) / 15f * 1.3f) * (1 - l.getBrightness(LightLayer.SKY, kp) / 15f)

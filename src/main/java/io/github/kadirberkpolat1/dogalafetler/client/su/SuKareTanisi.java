@@ -19,7 +19,7 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 /**
- * Kare tanısı (SU-41): her ekran görüntüsünde (Forge {@link ScreenshotEvent}, otomasyondan bağımsız) kameranın sanal su
+ * Kare tanısı (SU-44): her ekran görüntüsünde (Forge {@link ScreenshotEvent}, otomasyondan bağımsız) kameranın sanal su
  * yüzeyine göre konumu, blok ve gök ışığı, su altı sisinin sıcak payı ve uzak düzlemi, son yapımın mağara tavan
  * yansıması ve kare kapısı bilgisi (FPS, son 20 tick'te çizilen kare; A-34) {@code SU-TANI} satırı olarak log'a yazılır.
  */
