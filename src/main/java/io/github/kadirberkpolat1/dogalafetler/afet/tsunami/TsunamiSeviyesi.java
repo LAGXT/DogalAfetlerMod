@@ -1,5 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.afet.tsunami;
 
+import io.github.kadirberkpolat1.dogalafetler.afet.ortak.mantik.BlokRolu;
+
 /**
  * Seviye tablosu (madde 10.4, {@code docs/tasarim/tsunami.md} §6): dalga yüksekliği (blok), hız (blok/sn), karaya giriş (blok),
  * cephe genişliği (blok), çekilme mesafesi (blok), sürükleme ivmesi (blok/tick², tam batmış varlık), su hasarı (can/sn,
@@ -45,6 +47,23 @@ public record TsunamiSeviyesi(int seviye, double yukseklik, double hizBlokSn, do
     /** Kırıktaş ve taş yapı blokları yalnız S4–5'te yıkılır. */
     public boolean tasYikar() {
         return seviye >= 4;
+    }
+
+    /** Envanterli kaplar (fıçı, sandık, fırın) S3+'ta içerikleri dökülerek yıkılır. */
+    public boolean kapYikar() {
+        return seviye >= 3;
+    }
+
+    /**
+     * Ortak blok rolünün sertliğe bakmayan yıkım kararı: dekor ({@code #dogalafetler:afet_dekor}) her seviyede, kap
+     * {@link #kapYikar} ile; {@link BlokRolu#DIGER} burada yıkılmaz, sınıf tablosu (sertlik, malzeme) karar verir.
+     */
+    public boolean rolYikar(BlokRolu rol) {
+        return switch (rol) {
+            case DEKOR -> true;
+            case KAP -> kapYikar();
+            case DIGER -> false;
+        };
     }
 
     /** Tick başına yıkılan en çok blok (TPS kısmasından önce): S1 16 … S5 48. */

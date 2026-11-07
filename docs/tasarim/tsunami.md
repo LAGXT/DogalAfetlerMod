@@ -108,3 +108,16 @@ Ayrıntı ve gerekçeler `.vibe/kararlar/tsunami.md` TS-01…TS-14.
 - **Köpük:** ortak su renderer'ının üstüne tsunaminin kendi katmanı (`client.tsunami.TsunamiKopugu`): tepe boyunca beyaz şerit, ön yüzde kesik köpük çizgileri, tabanda yuvarlanan bore.
 - **Yağmur:** kendi damla havuzu (çizgi + zemin/sanal su halkası), iki katman, 25° eğik; sanal su yüzeyindeki halka normal haritası bozulması yerine çizilen halkadır.
 - **Faz 5 cilası (şef kararı, Faz 4'te yapılmaz):** ekran kenarındaki su perdesi ve istemcide yüzen görsel enkaz (`SuruklenenBlokVarligi`).
+
+## Ek: afet-fizik (2026-11-07)
+
+Kullanıcı istekleri 2 ("yağmur havada patlıyor") ve 3 ("evler yıkılınca fenerler havada kalıyor"); ayrıntı
+`.vibe/kararlar/afet-fizik.md`.
+
+- **Yağmur halkası:** damla yükseklik haritasına değil, yolundaki gerçek yüzeye çarpar: bloğun çarpışma şeklinin o noktadaki
+  tepesi, görünen gerçek sıvı (çekilmenin gizlediği su sayılmaz) ya da sanal su yüzeyi, hangisi yüksekse. Çit direğinin yanından
+  geçen damla yere iner, bloka yandan giren damla halkasız söner; çatı, ağaç ve çıkıntı altında damla doğmaz.
+- **Dekor:** ortak `#dogalafetler:afet_dekor` bloğu (fener, zincir, meşale, tabela, bayrak, saksı, mum, halı, ahşap kapı/kapak/çit, basınç plakası) her seviyede sertliğe bakılmadan, camla birlikte anında kırılır (tavandan önce).
+- **Kap:** fıçı, sandık, fırın gibi envanterli bloklar S3+'ta ahşapla birlikte kırılır; içerik ve blok eşyası her zaman düşer. Kap tick'in bütün eşya bütçesini (2) kullanır, bütçe doluysa sonraki tick'e kalır ve o tick rastgele enkaz düşmez; afet başına enkaz sınırı (`16·seviye`) kabı durdurmaz. Diğer blok varlıklılar (yatak) yıkılmaz.
+- **Dayanağı giden komşu:** blok komşu güncellemesiz silindiği için (TS-12) kırılan her bloğun altı komşusuna `canSurvive` bakılır; duvar meşalesi, asılı fener, halı, ray, kapının üst yarısı aynı birimin jetonundan kırılır. Başka chunk sütunundaki komşu ve zincirin sonraki halkası iş olarak kuyruğa girer (sütun bütçesi ve birim bütünlüğü korunur, özyineleme yok).
+- Dekor, ahşap, taş ve dayanaksız blok aynı `yikimEsyaOrani` (0,3) ve tick/afet bütçesiyle eşya bırakır; `afetBlokHasari=false` iken hiçbiri değişmez.
