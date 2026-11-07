@@ -3510,7 +3510,8 @@ silinirdi). K-E19 iki Gradle tavanı ana makinedeki yerel iş için sürer; K-E4
 geçerlidir (pc2'nin kendi `run-server/`'ı). Kanıt `.vibe/kanit/uzak-pc2/`: `cleanTest test` 56 sn, filtresiz `runGameTestServer`
 216/216, 2 dk (ana makine 2–2,5 dk; testler tick'e bağlı). Reddedilen: ajanı pc2'de çalıştırmak (`runClient` ve hypruse ana
 makinenin masaüstünde, 8 GB istemciye yetmez); kapalı pc2'de yerele sessiz düşmek; Gradle'ı pc2'de `-Xmx2g`'ye indirmek
-(decompile en az 3 GB ister, `gradle.properties`).
+(decompile en az 3 GB ister, `gradle.properties`). **Onay (2026-11-07):** kullanıcı `f1954dc`'yi kendisinin
+yazdığını doğruladı; inceleme-entegrasyon-5-son P1-1 kapandı.
 
 ## Faz 5 — Görsel otomasyon
 
@@ -4925,6 +4926,8 @@ P2-9 `5-matris` kabulünde. Açık kalanlar:
 - **K-E33 (P2-6):** şef kabul, düzeltme yok (K-E33 notu).
 - **Görsel otomasyon §E:** kapandı — `SuOtomasyon` ortak `GorselOtomasyon`'a çevrildi, `TsunamiOtomasyonu` kendiliğinden birleşti
   (`af87dd1` ve sonrası, SU-44 notu). Kadrajlar ve `5-matris` #6/#10 ölçümleri yeni HEAD'de.
+- **`uzak.sh -g` geri çekmesinin yol sınırı yok (inceleme-entegrasyon-5-son P2-4; P1-1 kullanıcı onayıyla kapandı):** `rsync -a` ile geri çekilen
+  `-g src/` ya da `-g ./` yerel düzenlemeleri pc2'deki eski kopyayla ezebilir; `-g` `.vibe/` altıyla sınırlanacak (ya da `--update`).
 - **Su tampon kapasitesi küçülmüyor (doğrulayıcı-2 P2-2):** `SuRenderer.yukle` kapasiteyi yalnız büyütür; büyük bir yapımdan (tsunami)
   sonra küçük yapımlar (mağara) da en büyük boyda yüklenir (~14 000 boş dolgu dörtgeni; rasterleşmez ama yükleme ve köşe işi sürer).
   Küçültme kuralı (ör. kapasitenin < %40'ı birkaç yapım üst üste) `5-matris` #10 `tampon_buyume` ve yükleme ölçümünden sonra.
