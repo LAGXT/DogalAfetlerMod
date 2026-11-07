@@ -214,17 +214,19 @@ def main():
         time.sleep(2)
     metin = oyun_log.read_text(encoding="utf-8", errors="replace")
     girdi = len(re.findall(r"SU-OTOMASYON GIRDI", metin))
+    kapi_uyari = len(re.findall(r"SU-OTOMASYON KAPI \S+ UYARI", metin))
     bitti = re.search(r"SU-OTOMASYON BITTI girdi tus=(\d+) fare=(\d+) teker=(\d+)", metin)
     cikis = re.search(r"cikis=(\d+)", metin)
-    log(f"bitti: yoklama={yoklama} ALARM={alarm} girdi_satiri={girdi} "
+    log(f"bitti: yoklama={yoklama} ALARM={alarm} girdi_satiri={girdi} kapi_uyari={kapi_uyari} "
         f"otomasyon_ozeti={bitti.groups() if bitti else None} gradle_{cikis.group(0) if cikis else 'cikis=?'}")
-    for satir in re.findall(r".*SU-OTOMASYON (?:FPS|FOTO|OYUNCU).*", metin):
-        log("  " + satir.split("SU-OTOMASYON ", 1)[1])
+    for satir in re.findall(r".*(?:SU-OTOMASYON (?:FPS|FOTO|OYUNCU|KAPI)|SU-TANI |Sanal su: kurulum).*", metin):
+        log("  " + re.split(r"SU-OTOMASYON |DogalAfetler/\]: ", satir, maxsplit=1)[-1])
     for png in (RUN / "screenshots").glob("sanal-su-*.png"):
         if png.stat().st_mtime > duvar_baslangic:
             shutil.copy2(png, kanit / png.name)
             log(f"kopyalandı: {png.name}")
-    if alarm or girdi:
+    # A-34: kapısı açılmadan alınan kare geçersiz, koşu da.
+    if alarm or girdi or kapi_uyari:
         return 1
     return 0 if bitti and cikis and cikis.group(1) == "0" else 2
 

@@ -33,7 +33,8 @@ import runclient_kilit  # noqa: E402
 KOK = Path(__file__).resolve().parents[2]
 RUN = KOK / "run"
 JAVA_HOME = "/home/lagxt/.jdks/jdk-17.0.21+9"
-WS = 94
+# Workspace ortamdan değişir (aynı anda çalışan işçiler ayrı gizli workspace kullanır; K0-21 rev. 2).
+WS = int(os.environ.get("DOGALAFETLER_WS", "94"))
 KURAL = f"[workspace {WS} silent; no_initial_focus; no_focus on; focus_on_activate off]"
 
 
@@ -275,8 +276,8 @@ def main():
     cikis = re.search(r"cikis=(\d+)", metin)
     log(f"bitti: yoklama={yoklama} ALARM={alarm} girdi_satiri={girdi} kapanis_asili={'E' if asili else 'H'} "
         f"otomasyon_ozeti={bitti.groups() if bitti else None} gradle_{cikis.group(0) if cikis else 'cikis=?'}")
-    desen = (r".*(?:TSUNAMI-OTOMASYON (?:FPS|FOTO|KARE|KALITE|AVCI|AYAR|KAPANIS|PROFIL)|Tsunami: |\[CHAT\]|"
-             r"has (?:made|reached|completed) the).*")
+    desen = (r".*(?:TSUNAMI-OTOMASYON (?:FPS|FOTO|KARE|KALITE|AVCI|AYAR|KAPANIS|PROFIL)|Tsunami: |\[CHAT\]|SU-TANI |"
+             r"Sanal su: kurulum|has (?:made|reached|completed) the).*")
     for satir in re.findall(desen, metin):
         log("  " + re.split(r"TSUNAMI-OTOMASYON |DogalAfetler/\]: |\]: ", satir, maxsplit=1)[-1])
     fps_tablosu(metin, log)

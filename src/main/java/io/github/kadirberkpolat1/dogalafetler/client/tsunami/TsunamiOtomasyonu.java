@@ -757,7 +757,8 @@ public final class TsunamiOtomasyonu {
     /**
      * Mağara sahnesi (SU-40 yeniden puanlama): oyuncunun altında taş oda (hava y 10..16), damlataş tavanda ışıltaşı yamaları,
      * duvarda deniz fenerleri; tsunaminin kullandığı aynı {@code magaraDoldur} yoluyla dolar; kamera dolu cebin yüzeyinin
-     * üstünde (y 14) ve sonra suyun altında.
+     * üstünde (y 14) ve sonra suyun altında. İzleyici kipi kamerayı dünyanın kayıtlı kipinden bağımsız kılar: hayatta kalma
+     * kipinde oyuncu çakıla düşer, gözü yüzeyin altında kalır ve tavan yansıması çalışmaz (SU-41).
      */
     private static void magara(Minecraft mc, String ne) {
         if ("kur".equals(ne)) {
@@ -775,6 +776,7 @@ public final class TsunamiOtomasyonu {
                 k.add("setblock %d 13 %d sea_lantern".formatted(ox + d, oz - 9));
             }
             k.add("time set 6000");
+            k.add("gamemode spectator");
             k.add("tp @s %d 14.0 %d -45 27".formatted(ox - 7, oz - 7));
             k.forEach(mc.player.connection::sendCommand);
         } else if ("icine".equals(ne)) {

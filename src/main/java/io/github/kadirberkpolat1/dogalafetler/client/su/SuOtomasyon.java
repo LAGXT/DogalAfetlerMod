@@ -1,14 +1,20 @@
 package io.github.kadirberkpolat1.dogalafetler.client.su;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadMXBean;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.MouseHandler;
 import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraftforge.api.distmarker.Dist;
@@ -17,11 +23,14 @@ import net.minecraftforge.client.event.InputEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.util.ObfuscationReflectionHelper;
 
 /**
  * Görsel kanıt otomasyonu (K0-21 rev. 2): yalnız {@code -Potomasyon=su} (JVM {@code dogalafetler.otomasyon=su}) ile açılır.
  * Girişten sonra sahneleri sırayla kurar (komut), ortanca kare süresini ölçer, ekran görüntüsü alır ve oyunu kapatır.
- * Kurulumdan kapanışa kadar bütün tuş, fare ve tekerlek olayları log'a yazılır (sıfırdan farklıysa koşu geçersiz).
+ * Kareler A-34 kapısından sonra alınır: FPS en az {@value #AKICI_FPS} ve istekten sonra en az iki yeni çizilmiş kare, iç
+ * imleç köşede; kare sonraki çizilmiş karenin sonunda alınır (gizli workspace'te bayat framebuffer olmasın). Kurulumdan
+ * kapanışa kadar bütün tuş, fare ve tekerlek olayları log'a yazılır (sıfırdan farklıysa koşu geçersiz).
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class SuOtomasyon {
@@ -29,6 +38,11 @@ public final class SuOtomasyon {
     private static final String BOLUM = System.getProperty("dogalafetler.otomasyon.bolum", "hepsi");
     private static final Deque<String> ADIMLAR = new ArrayDeque<>();
     private static final List<Long> KARELER = new ArrayList<>();
+    private static final int AKICI_FPS = 15;
+    /** A-34 kapısı en çok 60 sn bekler; açılmazsa kare yine alınır ama geçersizdir ({@code UYARI}). */
+    private static final int KAPI_TICK = 1200;
+    private static final ThreadMXBean IPLIK = ManagementFactory.getThreadMXBean();
+    private static final List<Long> KARE_CPU = new ArrayList<>();
     private static int tus;
     private static int fare;
     private static int teker;
@@ -43,6 +57,13 @@ public final class SuOtomasyon {
     private static double basZ;
     private static double yonX;
     private static double yonZ;
+    private static long sonCpu;
+    private static double tabanMs = Double.NaN;
+    private static long cizilen;
+    private static String bekleyenKare;
+    private static long kapiKare;
+    private static int kapiTick;
+    private static boolean kareAl;
 
     private SuOtomasyon() {
     }
@@ -114,12 +135,29 @@ public final class SuOtomasyon {
 
     @SubscribeEvent
     public static void kare(TickEvent.RenderTickEvent e) {
-        if (ACIK && e.phase == TickEvent.Phase.START && olcum != null) {
-            long simdi = System.nanoTime();
-            if (sonKare != 0) {
-                KARELER.add(simdi - sonKare);
+        if (!ACIK) {
+            return;
+        }
+        if (e.phase == TickEvent.Phase.START) {
+            if (olcum != null) {
+                long simdi = System.nanoTime();
+                long cpu = IPLIK.getCurrentThreadCpuTime();
+                if (sonKare != 0) {
+                    KARELER.add(simdi - sonKare);
+                    KARE_CPU.add(cpu - sonCpu);
+                }
+                sonKare = simdi;
+                sonCpu = cpu;
             }
-            sonKare = simdi;
+            return;
+        }
+        cizilen++;
+        if (kareAl) {
+            kareAl = false;
+            String ad = bekleyenKare;
+            bekleyenKare = null;
+            Minecraft mc = Minecraft.getInstance();
+            Screenshot.grab(mc.gameDirectory, ad + ".png", mc.getMainRenderTarget(), m -> log("FOTO {} {}", ad, m.getString()));
         }
     }
 
@@ -136,17 +174,33 @@ public final class SuOtomasyon {
         if (mc.player == null || mc.level == null) {
             return;
         }
+        if (bekleyenKare != null) {
+            if (!kareAl) {
+                kapiAc(mc);
+            }
+            return;
+        }
         if (olcum != null) {
             if (++olcumTick >= 100) {
                 List<Long> s = new ArrayList<>(KARELER);
                 Collections.sort(s);
-                double ortanca = s.isEmpty() ? Double.NaN : s.get(s.size() / 2) / 1e6;
+                List<Long> c = new ArrayList<>(KARE_CPU);
+                Collections.sort(c);
+                double duvar = s.isEmpty() ? Double.NaN : s.get(s.size() / 2) / 1e6;
+                double cpu = c.isEmpty() ? Double.NaN : c.get(c.size() / 2) / 1e6;
+                if (olcum.endsWith("-afetsiz")) {
+                    tabanMs = duvar;
+                }
                 var sunucu = mc.getSingleplayerServer();
                 float mspt = sunucu == null ? Float.NaN : sunucu.getAverageTickTime();
-                log("FPS {} ortanca_kare_ms={} fps_ortanca={} kare={} mc_fps={} sunucu_mspt={} tps={} su={}", olcum,
-                        String.format(Locale.ROOT, "%.2f", ortanca), String.format(Locale.ROOT, "%.1f", 1000 / ortanca),
-                        s.size(), mc.getFps(), String.format(Locale.ROOT, "%.2f", mspt),
-                        String.format(Locale.ROOT, "%.1f", Math.min(20, 1000 / mspt)), SuRenderer.olcumOzeti());
+                // K-E29 (b) ölçüm satırı: duvar saati ve render thread CPU ortanca kare ms, aynı sahnenin afetsiz tabanı, mspt,
+                // Gradle sayısı (yabancı = bu istemcinin atası olmayan), efekt kademesi.
+                log("FPS {} kademe={} duvar_ms={} cpu_ms={} taban_ms={} mspt={} gradle=[{}] fps_ortanca={} kare={} mc_fps={} tps={} "
+                        + "su={}", olcum, kademe(), String.format(Locale.ROOT, "%.2f", duvar),
+                        String.format(Locale.ROOT, "%.2f", cpu), String.format(Locale.ROOT, "%.2f", tabanMs),
+                        String.format(Locale.ROOT, "%.2f", mspt), gradle(), String.format(Locale.ROOT, "%.1f", 1000 / duvar),
+                        s.size(), mc.getFps(), String.format(Locale.ROOT, "%.1f", Math.min(20, 1000 / mspt)),
+                        SuRenderer.olcumOzeti());
                 olcum = null;
             }
             return;
@@ -169,10 +223,15 @@ public final class SuOtomasyon {
                 olcumTick = 0;
                 sonKare = 0;
                 KARELER.clear();
+                KARE_CPU.clear();
                 SuRenderer.olcumSifirla();
             }
-            case 's' -> Screenshot.grab(mc.gameDirectory, deger + ".png", mc.getMainRenderTarget(),
-                    m -> log("FOTO {} {}", deger, m.getString()));
+            case 's' -> {
+                imleciKenaraAl(mc);
+                bekleyenKare = deger;
+                kapiKare = cizilen;
+                kapiTick = 0;
+            }
             case 'm' -> magara(mc, deger);
             case 'o' -> oyuncu(mc, deger);
             case 'x' -> {
@@ -181,6 +240,55 @@ public final class SuOtomasyon {
             }
             default -> log("bilinmeyen adım {}", adim);
         }
+    }
+
+    /** A-34: FPS en az {@value #AKICI_FPS} ve istekten sonra en az iki yeni çizilmiş kare; süre dolarsa kare geçersiz sayılır. */
+    private static void kapiAc(Minecraft mc) {
+        long yeni = cizilen - kapiKare;
+        boolean acik = mc.getFps() >= AKICI_FPS && yeni >= 2;
+        if (acik || ++kapiTick >= KAPI_TICK) {
+            log(acik ? "KAPI {} açık fps={} yeni_kare={} tick={}"
+                    : "KAPI {} UYARI açılmadı fps={} yeni_kare={} tick={} (kare geçersiz)", bekleyenKare, mc.getFps(), yeni, kapiTick);
+            kareAl = true;
+        }
+    }
+
+    /**
+     * İstemcinin iç imleç konumunu pencerenin sol üst köşesine alır (A-34): gerçek imlece ve sahibin oturumuna dokunmaz
+     * (yalnız {@code MouseHandler} alanı; SRG adları {@code build/createSrgToMcp/output.srg}).
+     */
+    private static void imleciKenaraAl(Minecraft mc) {
+        ObfuscationReflectionHelper.setPrivateValue(MouseHandler.class, mc.mouseHandler, 0.0, "f_91507_");
+        ObfuscationReflectionHelper.setPrivateValue(MouseHandler.class, mc.mouseHandler, 0.0, "f_91508_");
+    }
+
+    private static String kademe() {
+        return switch (IstemciAyarlari.efektKalitesi()) {
+            case DUSUK -> "Düşük";
+            case ORTA -> "Orta";
+            case YUKSEK -> "Yüksek";
+            case ULTRA -> "Ultra";
+        };
+    }
+
+    /**
+     * Ölçüm geçerliliği (TS-16 rev. 3): komut satırında {@code GradleWrapperMain} geçen süreçler; {@code yabanci} bu istemciyi
+     * başlatan kendi {@code runClient} sarmalayıcısı (ata süreç) dışındakiler.
+     */
+    private static String gradle() {
+        Set<Long> ata = new HashSet<>();
+        for (ProcessHandle p = ProcessHandle.current().parent().orElse(null); p != null; p = p.parent().orElse(null)) {
+            ata.add(p.pid());
+        }
+        long[] n = new long[2];
+        ProcessHandle.allProcesses().filter(h -> h.info().commandLine().orElse("").contains("GradleWrapperMain"))
+                .forEach(h -> {
+                    n[0]++;
+                    if (!ata.contains(h.pid())) {
+                        n[1]++;
+                    }
+                });
+        return "toplam=" + n[0] + " yabanci=" + n[1];
     }
 
     /**

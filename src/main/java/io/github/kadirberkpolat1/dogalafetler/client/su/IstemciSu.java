@@ -50,6 +50,9 @@ public final class IstemciSu {
     private static Cekilme[] derlenen = new Cekilme[0];
     private static Cekilme[] hedef = new Cekilme[0];
     private static long hedefGelis;
+    /** Son su altı sisi (kare tanısı): sıcak pay ve uzak düzlem; kamera suda değilse NaN. */
+    private static float sonSicak = Float.NaN;
+    private static float sonSisUzak = Float.NaN;
 
     private IstemciSu() {
     }
@@ -292,18 +295,38 @@ public final class IstemciSu {
     @SubscribeEvent
     public static void sis(ViewportEvent.RenderFog e) {
         if (kameraSuda(e.getCamera())) {
-            // Mağara 10-20 blok: 56 blokluk sis orada renk vermez, sıcak sis yakına çekilir (SU-40: 56 -> en yakın 24 blok).
-            float sicak = sicaklik(Minecraft.getInstance().level, e.getCamera().getBlockPosition());
+            sonSicak = sicaklik(Minecraft.getInstance().level, e.getCamera().getBlockPosition());
+            sonSisUzak = sisUzakligi(sonSicak);
             e.setNearPlaneDistance(-8f);
-            e.setFarPlaneDistance(56f - 64f * sicak);
+            e.setFarPlaneDistance(sonSisUzak);
             e.setFogShape(FogShape.SPHERE);
             e.setCanceled(true);
+        } else {
+            sonSicak = Float.NaN;
+            sonSisUzak = Float.NaN;
         }
     }
 
-    /** Su altı sisinin sıcak payı 0..0,5: blok ışığı var, gökyüzü ışığı yok (mağara, fener). */
+    /** Su altı sisinin uzak düzlemi: açık suda 56 blok; mağara 10-20 blok olduğu için sıcak suda yakına, en yakın 24 blok (SU-40). */
+    static float sisUzakligi(float sicak) {
+        return Math.max(24f, 56f - 64f * sicak);
+    }
+
+    static float sonSicak() {
+        return sonSicak;
+    }
+
+    static float sonSisUzak() {
+        return sonSisUzak;
+    }
+
+    /**
+     * Su altı sisinin sıcak payı 0..0,85: blok ışığı var, gökyüzü ışığı yok (mağara, fener). Biyom suyu maviyken 0,5 tavanı sisi
+     * ancak mavi-griye çekiyordu (SU-41); blok ışığı ~12'de pay doyar.
+     */
     private static float sicaklik(ClientLevel l, BlockPos kp) {
-        return l.getBrightness(LightLayer.BLOCK, kp) / 15f * (1 - l.getBrightness(LightLayer.SKY, kp) / 15f) * 0.5f;
+        return Math.min(1f, l.getBrightness(LightLayer.BLOCK, kp) / 15f * 1.3f) * (1 - l.getBrightness(LightLayer.SKY, kp) / 15f)
+                * 0.85f;
     }
 
     @SubscribeEvent

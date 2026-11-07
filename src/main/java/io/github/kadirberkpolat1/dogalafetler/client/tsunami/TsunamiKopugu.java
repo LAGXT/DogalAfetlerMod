@@ -2,6 +2,7 @@ package io.github.kadirberkpolat1.dogalafetler.client.tsunami;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
+import com.mojang.blaze3d.vertex.BufferUploader;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
@@ -16,7 +17,10 @@ import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSuDunyasi;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
+import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
@@ -26,17 +30,25 @@ import org.joml.Matrix4f;
 
 /**
  * Tsunami dalgasının köpük katmanı (tasarım notu §2 "Köpük"): ortak su renderer'ının üstüne, tsunami sürerken her dalganın
- * cephesi boyunca üç şerit çizilir: tepe boyunca beyaz şerit, ön yüzden aşağı akan kesik köpük çizgileri ve cephe tabanında
- * yuvarlanan beyaz bore. Yükseklik dalganın analitik yüzeyinden ({@link Dalga#yuzey}) alınır; parçacık değil geometri
- * olduğu için maliyeti cephe uzunluğuyla doğrusaldır. Kalite (N13): Düşük'te yalnız tepe şeridi, 2 blok adım; diğerlerinde
- * üç şerit, 1 blok adım (kameradan 64 blok ötede 2). Renk gün ışığıyla ölçeklenir.
+ * cephesi boyunca üç şerit çizilir: tepe boyunca {@code su_kopuk} dokulu şerit (Ts2-1), ön yüzden aşağı akan kesik köpük
+ * çizgileri ve cephe tabanında yuvarlanan beyaz bore. Yükseklik dalganın analitik yüzeyinden ({@link Dalga#yuzey}) alınır;
+ * parçacık değil geometri olduğu için maliyeti cephe uzunluğuyla doğrusaldır. Kalite (N13): Düşük'te yalnız tepe şeridi,
+ * 2 blok adım; diğerlerinde üç şerit, 1 blok adım (kameradan 64 blok ötede 2). Renk gün ışığıyla ölçeklenir.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class TsunamiKopugu {
     /** Tepe: yüzey bu {@code s} aralığında en yüksek ({@code Dalga} ön yüzü 2,5 blok). */
     private static final double TEPE_ON = 1.4;
+    private static final double TEPE_ORTA = TEPE_ON + 1.1;
     private static final double TEPE_ARKA = 4.5;
+    /** Tepe şeridinin dokusu (animasyonlu, blok atlası) ve kendi kurucusu: renkli şeritlerden ayrı biçimde çizilir. */
+    private static final ResourceLocation KOPUK = DogalAfetler.konum("block/su_kopuk");
+    private static final BufferBuilder DOKULU = new BufferBuilder(1 << 16);
     private static int sonSegment;
+    private static float ku0;
+    private static float ku1;
+    private static float kv0;
+    private static float kv1;
 
     private TsunamiKopugu() {
     }
@@ -64,7 +76,11 @@ public final class TsunamiKopugu {
         boolean dusuk = IstemciAyarlari.efektKalitesi() == EfektKalitesi.DUSUK;
         float isik = Mth.clamp(mc.level.getSkyDarken(pt), 0.3f, 1f);
         Matrix4f m = e.getPoseStack().last().pose();
-        RenderSystem.setShader(GameRenderer::getPositionColorShader);
+        TextureAtlasSprite sp = mc.getTextureAtlas(InventoryMenu.BLOCK_ATLAS).apply(KOPUK);
+        ku0 = sp.getU0();
+        ku1 = sp.getU1();
+        kv0 = sp.getV0();
+        kv1 = sp.getV1();
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.enableDepthTest();
@@ -72,6 +88,7 @@ public final class TsunamiKopugu {
         RenderSystem.disableCull();
         BufferBuilder b = Tesselator.getInstance().getBuilder();
         b.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+        DOKULU.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
         int segment = 0;
         for (Dalga w : d.dalgaDizisi()) {
             if (w.bitti(t) || w.yukseklik() < 1.5) {
@@ -79,11 +96,12 @@ public final class TsunamiKopugu {
             }
             segment += dalga(b, m, w, t, kam, dusuk, isik);
         }
-        if (segment > 0) {
-            Tesselator.getInstance().end();
-        } else {
-            b.end().release();
-        }
+        // Boş tamponları BufferUploader çizmeden bırakır (Düşük'te renkli şerit yok).
+        RenderSystem.setShader(GameRenderer::getPositionColorShader);
+        BufferUploader.drawWithShader(b.end());
+        RenderSystem.setShader(GameRenderer::getPositionTexColorShader);
+        RenderSystem.setShaderTexture(0, InventoryMenu.BLOCK_ATLAS);
+        BufferUploader.drawWithShader(DOKULU.end());
         sonSegment = segment;
         RenderSystem.depthMask(true);
         RenderSystem.enableCull();
@@ -115,15 +133,13 @@ public final class TsunamiKopugu {
     /** Yanal {@code [u0, u1]} aralığında üç şerit; yüzeyi olmayan (yan kenar) aralık atlanır. */
     private static int serit(BufferBuilder b, Matrix4f m, Dalga w, double t, double c, double u0, double u1, Vec3 kam,
             boolean dusuk, float isik) {
-        double h0 = yukseklik(w, t, c, TEPE_ON + 1.1, u0);
-        double h1 = yukseklik(w, t, c, TEPE_ON + 1.1, u1);
+        double h0 = yukseklik(w, t, c, TEPE_ORTA, u0);
+        double h1 = yukseklik(w, t, c, TEPE_ORTA, u1);
         if (Double.isNaN(h0) || Double.isNaN(h1)) {
             return 0;
         }
         float k = isik;
-        // Tepe şeridi: yüzeyin 0,12 blok üstünde, önde opak beyaz, arkaya doğru saydamlaşır.
-        dortgen(b, m, w, t, c, u0, u1, TEPE_ON, TEPE_ON + 1.1, 0.12, kam, k, 0.92f, 0.92f);
-        dortgen(b, m, w, t, c, u0, u1, TEPE_ON + 1.1, TEPE_ARKA, 0.10, kam, k, 0.92f, 0f);
+        tepe(m, w, t, c, u0, u1, h0, h1, kam, k);
         if (dusuk) {
             return 1;
         }
@@ -159,6 +175,52 @@ public final class TsunamiKopugu {
         return 1;
     }
 
+    /**
+     * Tepe şeridi (Ts2-1): {@code su_kopuk} dokusu iki katman (dokunun ortalama alfasıyla tek katman ~%43 örter, aynalı ikinci
+     * katmanla ~%67), yüzeyin 0,12 / 0,10 blok üstünde; önde opak, arkaya doğru saydamlaşır. Ön kenarın ve orta çizginin alfası ile arka
+     * kenarın yeri yanal gürültüyle değişir; aynı {@code u}'da komşu segmentler aynı değeri alır (dikiş yok). Doku her
+     * segmentte bir kez döşenir (döşenebilir desen).
+     */
+    private static void tepe(Matrix4f m, Dalga w, double t, double c, double u0, double u1, double ym0, double ym1, Vec3 kam,
+            float k) {
+        float on0 = (float) (0.95 * (0.6 + 0.4 * gurultu(u0, t, 0)));
+        float on1 = (float) (0.95 * (0.6 + 0.4 * gurultu(u1, t, 0)));
+        float orta0 = (float) (0.95 * (0.75 + 0.25 * gurultu(u0, t, 2)));
+        float orta1 = (float) (0.95 * (0.75 + 0.25 * gurultu(u1, t, 2)));
+        double arka0 = TEPE_ARKA + 1.2 * (gurultu(u0, t, 4) - 0.5);
+        double arka1 = TEPE_ARKA + 1.2 * (gurultu(u1, t, 4) - 0.5);
+        double yo0 = yukseklik(w, t, c, TEPE_ON, u0);
+        double yo1 = yukseklik(w, t, c, TEPE_ON, u1);
+        double ya0 = yukseklik(w, t, c, arka0, u0);
+        double ya1 = yukseklik(w, t, c, arka1, u1);
+        boolean on = !Double.isNaN(yo0) && !Double.isNaN(yo1);
+        boolean arka = !Double.isNaN(ya0) && !Double.isNaN(ya1);
+        for (int katman = 0; katman < 2; katman++) {
+            float a = katman == 0 ? 1f : 0.8f;
+            float ua = katman;
+            float ub = 1 - katman;
+            float vOn = katman;
+            float vArka = 1 - katman;
+            if (on) {
+                dokuluKose(m, w, c - TEPE_ON, u0, yo0 + 0.12, kam, k, on0 * a, ua, vOn);
+                dokuluKose(m, w, c - TEPE_ON, u1, yo1 + 0.12, kam, k, on1 * a, ub, vOn);
+                dokuluKose(m, w, c - TEPE_ORTA, u1, ym1 + 0.12, kam, k, orta1 * a, ub, 0.5f);
+                dokuluKose(m, w, c - TEPE_ORTA, u0, ym0 + 0.12, kam, k, orta0 * a, ua, 0.5f);
+            }
+            if (arka) {
+                dokuluKose(m, w, c - TEPE_ORTA, u0, ym0 + 0.10, kam, k, orta0 * a, ua, 0.5f);
+                dokuluKose(m, w, c - TEPE_ORTA, u1, ym1 + 0.10, kam, k, orta1 * a, ub, 0.5f);
+                dokuluKose(m, w, c - arka1, u1, ya1 + 0.10, kam, k, 0f, ub, vArka);
+                dokuluKose(m, w, c - arka0, u0, ya0 + 0.10, kam, k, 0f, ua, vArka);
+            }
+        }
+    }
+
+    /** Yanal gürültü 0..1: iki sürüklenen sinüs; {@code faz} ayrı kenarların desenlerini ayırır. */
+    private static double gurultu(double u, double t, double faz) {
+        return 0.5 + 0.3 * Math.sin(u * 0.83 + t * 0.05 + faz) + 0.2 * Math.sin(u * 2.31 - t * 0.08 + 1.7 * faz);
+    }
+
     /** Cephenin {@code s} blok arkasında, yanal {@code u}'daki yüzey (mutlak Y); su yoksa NaN. */
     private static double yukseklik(Dalga w, double t, double c, double s, double u) {
         double x = w.x0() + w.yonX() * (c - s) - w.yonZ() * u;
@@ -186,5 +248,13 @@ public final class TsunamiKopugu {
             float a) {
         b.vertex(m, (float) (w.x0() + w.yonX() * boyuna - w.yonZ() * u - kam.x), (float) (y - kam.y),
                 (float) (w.z0() + w.yonZ() * boyuna + w.yonX() * u - kam.z)).color(k, k, k, a).endVertex();
+    }
+
+    /** Dokulu köşe: {@code (tu, tv)} köpük sprite'ı içinde 0..1. */
+    private static void dokuluKose(Matrix4f m, Dalga w, double boyuna, double u, double y, Vec3 kam, float k, float a, float tu,
+            float tv) {
+        DOKULU.vertex(m, (float) (w.x0() + w.yonX() * boyuna - w.yonZ() * u - kam.x), (float) (y - kam.y),
+                (float) (w.z0() + w.yonZ() * boyuna + w.yonX() * u - kam.z)).uv(ku0 + (ku1 - ku0) * tu, kv0 + (kv1 - kv0) * tv)
+                .color(k, k, k, a).endVertex();
     }
 }
