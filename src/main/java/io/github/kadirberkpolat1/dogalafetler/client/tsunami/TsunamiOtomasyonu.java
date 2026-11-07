@@ -1,11 +1,13 @@
 package io.github.kadirberkpolat1.dogalafetler.client.tsunami;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.afet.tsunami.TsunamiAfeti;
 import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciAfetDurumu;
 import io.github.kadirberkpolat1.dogalafetler.client.su.SuRenderer;
 import io.github.kadirberkpolat1.dogalafetler.config.EfektKalitesi;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
+import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
 import io.github.kadirberkpolat1.dogalafetler.network.AfetDurumPaketi;
 import java.lang.reflect.Field;
 import java.util.ArrayDeque;
@@ -105,6 +107,8 @@ public final class TsunamiOtomasyonu {
     private static int profilTick;
     private static long profilBas;
     private static Ornekleyici ornekleyici;
+    /** Pencere başındaki yıkım sayacı (kırılan, değişen bölüm, kirletilen bölüm); tsunami yoksa {@code null}. */
+    private static long[] yikimBas;
 
     private TsunamiOtomasyonu() {
     }
@@ -238,6 +242,17 @@ public final class TsunamiOtomasyonu {
             for (int i = 1; i <= 4; i++) {
                 a.addAll(olcum("tsunami-kabul-" + i, EfektKalitesi.YUKSEK, List.of(), List.of()));
             }
+        }
+        if (BOLUM.contains("deney")) {
+            // Ts3-1 ve Karar 3 ayrıştırması: sahne 1 eşyasız (yıkım eşya düşürmez), sahne 2 ve 4 sütun birimi, sahne 3 bölüm birimi.
+            a.addAll(List.of("k:dogalafet su vitrin", "b:300", "k:dogalafet su vitrin kamera tepe", "b:600"));
+            a.addAll(olcum("tsunami-deney-1-esyasiz", EfektKalitesi.YUKSEK, List.of("c:tsunami.yikimEsyaOrani=0"),
+                    List.of("c:tsunami.yikimEsyaOrani=0.3")));
+            a.addAll(olcum("tsunami-deney-2-sutun", EfektKalitesi.YUKSEK, List.of("c:tsunami.yikimSutunBirimi=true"),
+                    List.of("c:tsunami.yikimSutunBirimi=false")));
+            a.addAll(olcum("tsunami-deney-3-bolum", EfektKalitesi.YUKSEK, List.of(), List.of()));
+            a.addAll(olcum("tsunami-deney-4-sutun", EfektKalitesi.YUKSEK, List.of("c:tsunami.yikimSutunBirimi=true"),
+                    List.of("c:tsunami.yikimSutunBirimi=false")));
         }
         if (hepsi || BOLUM.contains("avci")) {
             a.addAll(avci());
@@ -474,6 +489,25 @@ public final class TsunamiOtomasyonu {
                 sicramaBirim == 0 ? 0.0 : 20 * yeniBubble / sicramaBirim);
     }
 
+    /**
+     * Entegre sunucudaki tsunaminin yıkım sayacı (kırılan, değişen bölüm, kirletilen bölüm); yoksa {@code null}. Render
+     * thread'inden okunur: yalnız ölçüm, sunucu tick'iyle yarışır (tek tick'lik kayma).
+     */
+    private static long[] yikimSayaci(Minecraft mc) {
+        var sunucu = mc.getSingleplayerServer();
+        return sunucu == null ? null : AfetYoneticisi.al(sunucu).aktifAfet().filter(TsunamiAfeti.class::isInstance)
+                .map(a -> ((TsunamiAfeti) a).yikimSayaci()).orElse(null);
+    }
+
+    /** Pencere boyunca kırılan blok, değişen ve kirletilen bölüm (TS-15b birim karşılaştırması). */
+    private static String yikimFarki(Minecraft mc) {
+        long[] son = yikimSayaci(mc);
+        if (son == null || yikimBas == null) {
+            return "yok";
+        }
+        return "kirilan=" + (son[0] - yikimBas[0]) + " bolum=" + (son[1] - yikimBas[1]) + " kirli=" + (son[2] - yikimBas[2]);
+    }
+
     private static String varlikTurleri(Minecraft mc) {
         Map<String, Integer> say = new HashMap<>();
         int suda = 0;
@@ -541,14 +575,15 @@ public final class TsunamiOtomasyonu {
                 float mspt = sunucu == null ? Float.NaN : sunucu.getAverageTickTime();
                 log("FPS {} ortanca_kare_ms={} fps_ortanca={} cpu_kare_ms={} en_uzun_kare_ms={} kare={} yuk=[{}] sunucu_mspt={} "
                         + "tps={} gradle=[{}] su={} yagmur={} bolum=[{}] parcacik={} varlik={} kopuk={} asama_cpu_ms=[{}] "
-                        + "parcacik_tur=[{}] varlik_tur=[{}] sicrama=[{}]", olcum,
+                        + "parcacik_tur=[{}] varlik_tur=[{}] sicrama=[{}] yikim=[{}]", olcum,
                         String.format(Locale.ROOT, "%.2f", ortanca), String.format(Locale.ROOT, "%.1f", 1000 / ortanca),
                         String.format(Locale.ROOT, "%.2f", cpuOrtanca), String.format(Locale.ROOT, "%.1f", enUzun), s.size(),
                         yuk(), String.format(Locale.ROOT, "%.2f", mspt),
                         String.format(Locale.ROOT, "%.1f", Math.min(20, 1000 / mspt)), gradle(),
                         SuRenderer.olcumOzeti(), TsunamiYagmuru.ozet(), mc.levelRenderer.getChunkStatistics(),
                         mc.particleEngine.countParticles(), mc.level.getEntityCount(), TsunamiKopugu.sonSegment(),
-                        asamaOzeti(c.size()), parcacikTurleri(mc.particleEngine), varlikTurleri(mc), sicramaOzeti(olcumTick));
+                        asamaOzeti(c.size()), parcacikTurleri(mc.particleEngine), varlikTurleri(mc), sicramaOzeti(olcumTick),
+                        yikimFarki(mc));
                 olcum = null;
             }
             return;
@@ -591,6 +626,7 @@ public final class TsunamiOtomasyonu {
                 yeniBubble = 0;
                 sudaTick = 0;
                 sicramaBirim = 0;
+                yikimBas = yikimSayaci(mc);
                 SuRenderer.olcumSifirla();
             }
             case 's' -> {
@@ -666,6 +702,8 @@ public final class TsunamiOtomasyonu {
                     ((ForgeConfigSpec.ConfigValue<Integer>) v).set(Integer.parseInt(deger));
                 } else if (v.get() instanceof Double) {
                     ((ForgeConfigSpec.ConfigValue<Double>) v).set(Double.parseDouble(deger));
+                } else if (v.get() instanceof Boolean) {
+                    ((ForgeConfigSpec.ConfigValue<Boolean>) v).set(Boolean.parseBoolean(deger));
                 }
                 log("AYAR {}={} etkin={}", yol, deger, v.get());
                 return;

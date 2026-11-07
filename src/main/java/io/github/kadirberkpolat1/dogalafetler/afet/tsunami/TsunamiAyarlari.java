@@ -16,6 +16,8 @@ public final class TsunamiAyarlari {
     final ForgeConfigSpec.IntValue yikimBolumTick;
     final ForgeConfigSpec.IntValue yikimChunkTick;
     final ForgeConfigSpec.IntValue yikimEfektTick;
+    final ForgeConfigSpec.DoubleValue yikimEsyaOrani;
+    final ForgeConfigSpec.BooleanValue yikimSutunBirimi;
     final ForgeConfigSpec.IntValue magaraHacmi;
 
     private TsunamiAyarlari(ForgeConfigSpec.Builder k) {
@@ -36,6 +38,10 @@ public final class TsunamiAyarlari {
                 + "bölümleri istemcide yeniden derletir).").defineInRange("yikimChunkTick", 1, 1, 64);
         yikimEfektTick = k.comment("Tick başına kırılma efekti (vanilla kırılma sesi + ~64 blok parçacığı); 0 kapalı.")
                 .defineInRange("yikimEfektTick", 1, 0, 6);
+        yikimEsyaOrani = k.comment("Kırılan ahşap/taş bloğun eşya bırakma olasılığı (tick başına en çok 2, afet başına 16·seviye).")
+                .defineInRange("yikimEsyaOrani", 0.3, 0.0, 1.0);
+        yikimSutunBirimi = k.comment("Yıkım birimi: true ise chunk sütunu (aynı sütunun hazır blokları aynı tick'te), false ise "
+                + "16x16x16 bölüm.").define("yikimSutunBirimi", false);
         magaraHacmi = k.comment("Seviye başına bir mağara cebine dolan en çok hücre (su.magaraMaksHacim ile sınırlı).")
                 .defineInRange("magaraHacmi", 400, 16, 4000);
     }

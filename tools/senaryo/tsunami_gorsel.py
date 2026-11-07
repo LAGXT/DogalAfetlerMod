@@ -142,9 +142,9 @@ def fps_tablosu(metin, log):
     çok bölüm karada penceresinden sonraki ilk `Tsunami: temizlendi` satırından. K26-1: karada `sicrama_varlik_sn` > 1 ise
     sahne "K-E26b bekliyor" (kabulde bekleyen sahne dışındakiler sayılır). Sonuç (geçerli, hepsi geçti)."""
     sahne = {}
-    temiz = [(m.start(), m.group(1), m.group(2), m.group(3), m.group(4)) for m in re.finditer(
+    temiz = [(m.start(), m.group(1), m.group(2), m.group(3), m.group(4), m.group(5)) for m in re.finditer(
         r"Tsunami: temizlendi \(temiz=\w+, doğal=\w+\): kırılan (\d+) blok, değişen bölüm (\d+) "
-        r"\(tick başına en çok (\d+)\), taranan \d+ sütun, bekleyen yıkım (\d+)", metin)]
+        r"\(tick başına en çok (\d+) birim\), kirletilen bölüm (\d+), taranan \d+ sütun, bekleyen yıkım (\d+)", metin)]
     for m in re.finditer(r"TSUNAMI-OTOMASYON FPS (\S+)-(afetsiz|karada|sonra) (.*)", metin):
         a = m.group(3)
         w = sahne.setdefault(m.group(1), {})[m.group(2)] = {
@@ -153,11 +153,12 @@ def fps_tablosu(metin, log):
             "bolum": _sayi(r"bolum=\[C: (\d+)/", a, int), "parcacik": _sayi(r"parcacik=(\d+)", a, int),
             "varlik": _sayi(r"varlik=(\d+)", a, int), "suda": _sayi(r"suda_ort=([\d.]+)", a),
             "sicrama": _sayi(r"sicrama_varlik_sn=([\d.]+)", a), "bubble": _sayi(r"bubble_varlik_tick=([\d.]+)", a),
-            "splash": _sayi(r"splash_varlik_tick=([\d.]+)", a),
+            "splash": _sayi(r"splash_varlik_tick=([\d.]+)", a), "pc": _sayi(r"pC: (\d+)", a, int),
+            "pencere": (re.search(r"yikim=\[([^]]*)\]", a) or [None, None])[1],
             "parcacik_tur": (re.search(r"parcacik_tur=\[([^]]*)\]", a) or [None, None])[1]}
         if m.group(2) == "karada":
             sonraki = next((t for t in temiz if t[0] > m.start()), None)
-            w["yikim"] = f"{sonraki[1]}/{sonraki[2]}/{sonraki[3]}/{sonraki[4]}" if sonraki else None
+            w["yikim"] = "/".join(sonraki[1:]) if sonraki else None
     hepsi_gecerli = hepsi_gecti = bool(sahne)
     bekleyen_disi = bool(sahne)
     for ad, p in sahne.items():
@@ -180,10 +181,12 @@ def fps_tablosu(metin, log):
         hepsi_gecti &= gecti
         bekleyen_disi &= gecti or k26b
         log(f"TABLO {ad} once={o['ms']:.2f}ms karada={k['ms']:.2f}ms ({1000 / k['ms']:.1f} FPS) sonra={s['ms']:.2f}ms "
+            f"cpu={o['cpu']}/{k['cpu']}/{s['cpu']}ms "
             f"olcu={'mutlak>=30FPS' if mutlak else 'oran_sonra>=50%'} oran_sonra={oran:.0%} "
             f"cpu_oran_sonra={s['cpu'] / k['cpu']:.0%} oran_once={o['ms'] / k['ms']:.0%} "
             f"mspt={o['mspt']}/{k['mspt']}/{s['mspt']} yabanci_gradle={o['yabanci']}/{k['yabanci']}/{s['yabanci']} "
-            f"kirilan/bolum/bolum_tick_encok/bekleyen={k.get('yikim')} "
+            f"afet_kirilan/bolum/birim_tick_encok/kirli/bekleyen={k.get('yikim')} pencere=[{k['pencere']}] "
+            f"bekleyen_derleme_karada={k['pc']} "
             f"bolum={o['bolum']}->{k['bolum']}->{s['bolum']} parcacik={o['parcacik']}->{k['parcacik']}->{s['parcacik']} "
             f"varlik={o['varlik']}->{k['varlik']}->{s['varlik']} suda_ort={k['suda']} sicrama_varlik_sn={k['sicrama']} "
             f"bubble_varlik_tick={k['bubble']} splash_varlik_tick={k['splash']} "

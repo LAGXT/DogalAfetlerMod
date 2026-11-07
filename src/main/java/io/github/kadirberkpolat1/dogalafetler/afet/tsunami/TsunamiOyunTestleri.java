@@ -14,6 +14,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.mantik.SonumTipi;
 import io.github.kadirberkpolat1.dogalafetler.su.Dalga;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSuDunyasi;
+import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.util.ArrayList;
 import java.util.List;
@@ -207,7 +208,7 @@ public final class TsunamiOyunTestleri {
             if (kirildi[1] < 0 && l.getBlockState(m(h, 9, 3, 6)).isAir()) {
                 kirildi[1] = t;
             }
-            enCokBolum[0] = Math.max(enCokBolum[0], a.sonTickBolum());
+            enCokBolum[0] = Math.max(enCokBolum[0], a.sonTickBirim());
         });
         h.startSequence()
                 .thenWaitUntil(() -> h.assertTrue(kirildi[0] >= 0 && kirildi[1] >= 0
@@ -229,6 +230,80 @@ public final class TsunamiOyunTestleri {
                     a.durdur(l, true);
                 })
                 .thenSucceed();
+    }
+
+    /**
+     * Ts3-1 jetonlu hız (S5, blok jetonu {@code 48 × kısma}): iki cam yığını (her biri 3×8×7) sırayla yıkılır. Birinci yığının
+     * bölümü tek tick'te kırılır ve jeton borçlanır; ikinci yığın borç kapanınca başlar: 1/4 TPS kısmasında (jeton 12) tam
+     * hızdan (48) geç. Her tick'te en çok bir bölüm başlar, başlayan bölümün kalan bütün camı aynı tick'te kırılır, toplam
+     * kırılan {@code jeton × tick + en büyük bölüm}ü aşmaz.
+     */
+    @GameTest(template = "su_alani", batch = "tsunami_jeton", timeoutTicks = 100)
+    public static void yikimJetonuKismadaYavaslarBolumBolunmez(GameTestHelper h) {
+        TsunamiSeviyesi sv = TsunamiSeviyesi.al(5);
+        int tam = ikinciYiginGecikmesi(h, sv, 1.0);
+        int kisma = ikinciYiginGecikmesi(h, sv, 0.25);
+        h.assertTrue(kisma > tam, "TPS kısmasında yıkım yavaşlamadı: ikinci yığın tam hızda " + tam + ", kısmada " + kisma
+                + " tick sonra");
+        DogalAfetler.LOGGER.info("Tsunami GameTest: jeton ikinci yığın gecikmesi tam {} tick, kısma (x0,25) {} tick", tam, kisma);
+        h.succeed();
+    }
+
+    /** İki cam yığınını sırayla tek yıkım kuyruğuyla yıkar, her tick'i denetler; ikinci yığının ilk kırıldığı tick (başından). */
+    private static int ikinciYiginGecikmesi(GameTestHelper h, TsunamiSeviyesi sv, double kisma) {
+        ServerLevel l = h.getLevel();
+        sahne(h, 2);
+        int ust = m(h, 0, 10, 0).getY();
+        double taban = m(h, 0, 3, 0).getY();
+        TsunamiGeometrisi g = geometri(h);
+        TsunamiYikimi y = new TsunamiYikimi();
+        TsunamiYikimi.Ayar ayar = new TsunamiYikimi.Ayar(TsunamiYikimi.blokButcesi(sv, 1.0, kisma), 1, 1, 0, 0, false);
+        long simdi = DunyaDonemi.al(l).saat();
+        int tick = 0;
+        int toplam = 0;
+        int ikinci = -1;
+        int enBuyuk = 0;
+        for (int yigin = 0; yigin < 2; yigin++) {
+            int x0 = 7 + 4 * yigin;
+            kutu(h, x0, 3, 5, x0 + 2, 10, 11, Blocks.GLASS.defaultBlockState());
+            List<BlockPos> camlar = new ArrayList<>();
+            Long2IntOpenHashMap kalan = new Long2IntOpenHashMap();
+            for (BlockPos p : BlockPos.betweenClosed(m(h, x0, 3, 5), m(h, x0 + 2, 10, 11))) {
+                camlar.add(p.immutable());
+                kalan.addTo(SectionPos.asLong(p.getX() >> 4, p.getY() >> 4, p.getZ() >> 4), 1);
+            }
+            enBuyuk = Math.max(enBuyuk, kalan.values().intStream().max().orElse(0));
+            for (double b = x0 - 6 + 0.1; b < x0 - 6 + 3; b += 0.7) {
+                y.satirEkle(g, b, 8, ust);
+            }
+            int bas = tick;
+            while (!camlar.isEmpty() && tick - bas < 100) {
+                y.tick(l, simdi + tick, sv, taban, kisma, ayar, true, p -> false);
+                tick++;
+                Long2IntOpenHashMap kirilan = new Long2IntOpenHashMap();
+                camlar.removeIf(p -> {
+                    if (!l.getBlockState(p).isAir()) {
+                        return false;
+                    }
+                    kirilan.addTo(SectionPos.asLong(p.getX() >> 4, p.getY() >> 4, p.getZ() >> 4), 1);
+                    return true;
+                });
+                h.assertTrue(kirilan.size() <= 1, "bir tick'te " + kirilan.size() + " bölüm başladı");
+                for (var e : kirilan.long2IntEntrySet()) {
+                    h.assertTrue(e.getIntValue() == kalan.get(e.getLongKey()), "bölüm bölündü: " + e.getIntValue() + " / "
+                            + kalan.get(e.getLongKey()));
+                    kalan.addTo(e.getLongKey(), -e.getIntValue());
+                    toplam += e.getIntValue();
+                }
+                if (yigin == 1 && ikinci < 0 && !kirilan.isEmpty()) {
+                    ikinci = tick - bas;
+                }
+                h.assertTrue(toplam <= ayar.blok() * tick + enBuyuk, "ortalama hız jetonu aştı: " + toplam + " blok / " + tick
+                        + " tick (jeton " + ayar.blok() + ")");
+            }
+            h.assertTrue(camlar.isEmpty(), "cam yığını 100 tick'te bitmedi: kalan " + camlar.size());
+        }
+        return ikinci;
     }
 
     /**

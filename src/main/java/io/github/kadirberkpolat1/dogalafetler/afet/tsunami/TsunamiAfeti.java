@@ -272,12 +272,12 @@ public final class TsunamiAfeti extends Afet {
         }
         TsunamiAyarlari a = TsunamiAyarlari.al();
         double kisma = TpsOlcer.kismaCarpani();
-        int butce = Math.max(1, (int) Math.round(sv.yikimButcesi() * a.yikimCarpani.get() * kisma));
         int hacim = Math.min(a.magaraHacmi.get() * seviye(), SuAyarlari.sunucu().magaraMaksHacim.get());
         long kalis = SuAyarlari.sunucu().magaraKalisSn.get() * 20L;
-        int bolum = Math.max(1, (int) Math.round(a.yikimBolumTick.get() * kisma));
-        yikim.tick(level, simdi, sv, taban, kisma, butce, bolum, a.yikimChunkTick.get(), a.yikimEfektTick.get(),
-                Kurallar.blokHasariAcik(level.getGameRules()),
+        TsunamiYikimi.Ayar ayar = new TsunamiYikimi.Ayar(TsunamiYikimi.blokButcesi(sv, a.yikimCarpani.get(), kisma),
+                Math.max(1, (int) Math.round(a.yikimBolumTick.get() * kisma)), a.yikimChunkTick.get(), a.yikimEfektTick.get(),
+                a.yikimEsyaOrani.get(), a.yikimSutunBirimi.get());
+        yikim.tick(level, simdi, sv, taban, kisma, ayar, Kurallar.blokHasariAcik(level.getGameRules()),
                 p -> magaraDene(level, sv, p, hacim, kalis));
     }
 
@@ -449,11 +449,11 @@ public final class TsunamiAfeti extends Afet {
         SanalSu.bolgeBirak(level);
         OrtamSesi.durdur(level.getServer(), KATMAN, temiz ? 20 : 60);
         var d = SanalSu.dunya(level);
-        DogalAfetler.LOGGER.info("Tsunami: temizlendi (temiz={}, doğal={}): kırılan {} blok, değişen bölüm {} (tick başına en çok {}), "
-                + "taranan {} sütun, bekleyen yıkım {}, mağara {}; boyutta kalan dalga {}, çekilme {}, mağara {}", temiz,
-                dogalBitti, yikim.toplamKirilan(), yikim.toplamBolum(), yikim.enCokBolumTick(), yikim.toplamTaranan(), bekleyen,
-                magaralar.size(), d == null ? 0 : d.dalgalar().size(), d == null ? 0 : d.cekilmeler().size(),
-                d == null ? 0 : d.magaralar().size());
+        DogalAfetler.LOGGER.info("Tsunami: temizlendi (temiz={}, doğal={}): kırılan {} blok, değişen bölüm {} (tick başına en çok {} "
+                + "birim), kirletilen bölüm {}, taranan {} sütun, bekleyen yıkım {}, mağara {}; boyutta kalan dalga {}, çekilme {}, "
+                + "mağara {}", temiz, dogalBitti, yikim.toplamKirilan(), yikim.toplamBolum(), yikim.enCokBirimTick(),
+                yikim.toplamKirli(), yikim.toplamTaranan(), bekleyen, magaralar.size(), d == null ? 0 : d.dalgalar().size(),
+                d == null ? 0 : d.cekilmeler().size(), d == null ? 0 : d.magaralar().size());
     }
 
     /** Sanal su dalgaları bundan sonra ({@code ServerStartedEvent}) kayıttan döner: süreklilik ilk tick'te log'lanır. */
@@ -570,9 +570,14 @@ public final class TsunamiAfeti extends Afet {
         return yikim.toplamBolum();
     }
 
-    /** Son yıkım tick'inde değişen farklı 16³ bölüm sayısı. */
-    int sonTickBolum() {
-        return yikim.sonTickBolum();
+    /** Son yıkım tick'inde başlatılan birim (bölüm ya da sütun) sayısı. */
+    int sonTickBirim() {
+        return yikim.sonTickBirim();
+    }
+
+    /** Ölçüm otomasyonu için yıkım sayacı toplamları: kırılan blok, değişen bölüm, kirletilen bölüm. */
+    public long[] yikimSayaci() {
+        return new long[] {yikim.toplamKirilan(), yikim.toplamBolum(), yikim.toplamKirli()};
     }
 
     TsunamiGeometrisi geometri() {
