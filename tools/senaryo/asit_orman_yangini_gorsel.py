@@ -113,9 +113,10 @@ def hazirla():
     satirlar = [s for s in satirlar if not s.startswith(("tutorialStep:", "pauseOnLostFocus:", "renderDistance:",
                                                          "simulationDistance:", "enableVsync:", "maxFps:"))]
     # Orman yangını hedefin 40–90 blok uzağında: simülasyon 10 chunk. Gizli workspace'te vsync takası kareyi bekleyip FPS'i
-    # 1'e düşürüyordu (koşu 2; kasırga K-13): vsync kapalı, üst sınır 120.
+    # 1'e düşürüyordu (koşu 2; kasırga K-13): vsync kapalı. Üst sınır 260: FPS tabanı 120 tavanında kalıyordu (AOi-3); otomasyon
+    # açılışta aynı ayarı çalışma anında da verir (`GorselOtomasyon.cizimAyari`).
     yol.write_text("\n".join(satirlar + ["tutorialStep:none", "pauseOnLostFocus:false", "renderDistance:12",
-                                         "simulationDistance:10", "enableVsync:false", "maxFps:120"]) + "\n")
+                                         "simulationDistance:10", "enableVsync:false", "maxFps:260"]) + "\n")
     for eski in (run / "screenshots").glob("ao_*.png"):
         eski.unlink()
     latest = run / "logs/latest.log"

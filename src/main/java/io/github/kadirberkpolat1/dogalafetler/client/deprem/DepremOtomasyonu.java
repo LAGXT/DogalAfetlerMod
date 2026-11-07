@@ -6,9 +6,11 @@ import io.github.kadirberkpolat1.dogalafetler.afet.deprem.Deprem;
 import io.github.kadirberkpolat1.dogalafetler.afet.deprem.DepremAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.afet.sinkhole.SinkholeAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.afet.sinkhole.mantik.SinkholeSeviyesi;
+import io.github.kadirberkpolat1.dogalafetler.client.core.GorselOtomasyon;
 import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciAfetDurumu;
 import io.github.kadirberkpolat1.dogalafetler.client.esya.sismograf.IstemciSismograf;
 import io.github.kadirberkpolat1.dogalafetler.core.Afet;
+import io.github.kadirberkpolat1.dogalafetler.core.AfetAsamasi;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
 import io.github.kadirberkpolat1.dogalafetler.network.AfetDurumPaketi;
@@ -19,8 +21,6 @@ import java.util.Optional;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.MouseHandler;
-import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.core.BlockPos;
@@ -39,27 +39,38 @@ import net.minecraftforge.client.event.InputEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.util.ObfuscationReflectionHelper;
 
 /**
  * Deprem ve sinkhole görsel kanıt otomasyonu (K0-21 rev. 2). Yalnız {@code -Ddogalafetler.otomasyon=deprem} ile, tek oyunculu
- * Quick Play dünyasında çalışır; üretimde etkisizdir. Dört ayrı düzülük (doğuştan ve 600 blok ötesinden en yakın ova)
+ * Quick Play dünyasında çalışır; üretimde etkisizdir. Dört ayrı düzlük (doğuştan ve 600 blok ötesinden en yakın ova)
  * sahne olur: deprem S1 (Hassas Sismograf'ın ön-uyarı action bar'ı, siren alt yazısı, sarsıntı anı, bitiş), deprem S5 (vitrin:
- * yarığın uzantısında 30 blok ötede kameraya doğru açılış; S1 ile aynı göreli yan bakış; geniş bakış; bitiş), sinkhole S1
- * (çatlama, çukur) ve sinkhole S5 (çatlama, çöküş vitrini, üstten çukur, bitiş). Afet merkezi oyuncuya göre seçildiği için
- * kamera başlatmadan sonra sunucudan okunan merkeze (depremde fay doğrultusuna) göre seyirci modda konur; sahneye ahşap ev
- * ve ağaç kurulur. Her kare öncesi istemci en az {@value #AKICI_FPS} FPS çizip adım başından beri en az 20 kare çizmiş olmalı
- * (A-34); gizli workspace'te compositor istemciyi ~1 FPS'e kısar (GP17): kapı {@value #KAPI_PAYI} tick sonra en az iki yeni
- * çizilmiş kareyle geçer. Zamanlaması dar kareler (vitrin, sarsıntı) kapıyı eylemden önce geçer. Kare log'u FPS, parçacık,
- * düşen blok, sarsıntı genliği ve afet durumunu yazar. Klavye, fare ve tekerlek girdileri kapanışa kadar sayılır; iç imleç
- * köşeye alınır.
+ * yarığın uzantısında 30 blok ötede kameraya doğru açılış; S1 ile aynı göreli yan bakış; sarsıntı kare dizisi; geniş bakış;
+ * bitiş), sinkhole S1 (çatlama, çukur) ve sinkhole S5 (çatlama, çöküş vitrini, üstten çukur, bitiş). Afet merkezi oyuncuya
+ * göre seçildiği için kamera başlatmadan sonra sunucudan okunan merkeze (depremde fay doğrultusuna) göre seyirci modda konur;
+ * sahneye ahşap ev ve ağaç kurulur. {@code -PotomasyonBolum} (sistem özelliği {@code dogalafetler.otomasyon.bolum}) {@code hepsi}
+ * ya da virgülle {@code deprem_s1}, {@code deprem_s5}, {@code sinkhole_s1}, {@code sinkhole_s5}; kurulum ve kapanış her zaman.
+ *
+ * <p>Kareler A-34 kapısından ({@link GorselOtomasyon#kareIste}) geçer; kapı beklerken adım motoru ve adım tick'i durur. Adım
+ * koşulları da istemcinin akıcı (≥ {@value GorselOtomasyon#AKICI_FPS} FPS, adım başından ≥ 20 kare) çizmesini bekler; gizli
+ * workspace'te compositor istemciyi ~1 FPS'e kısar (GP17): adım koşulu {@value #KAPI_PAYI} tick sonra en az iki yeni çizilmiş
+ * kareyle geçer. Zamanlaması dar kareler (vitrin, sarsıntı, çatlama, çöküş) kapıyı eylemden önce geçer. Deprem S1'in siren ve
+ * sarsıntısı, sinkhole S1 çatlaması ve sinkhole S5 çöküşü yavaş çekimde ({@code dogalafet hiz 0.2}) alınır; kare adı içeriğine
+ * uysun diye koşul afetin aşamasını ve alt aşamasını da bekler. Kare log'u FPS, parçacık, düşen blok, sarsıntı genliği ve afet
+ * durumunu yazar.
+ *
+ * <p>FPS (K-E29 (b)): deprem S5 sarsıntısı sürerken geniş kamerada {@code s5_deprem_yuksek}, sinkhole S5 çöküşü ve geri
+ * çekilmesi sırasında çukur kamerasında {@code s5_sinkhole_yuksek}; kameralar afet merkezine bağlı olduğundan tabanlar
+ * ({@code s5_deprem_taban}, {@code s5_sinkhole_taban}) afet bittikten sonra aynı kamerada ölçülür. Her pencere hız 1'de,
+ * FPS kapısından sonra {@value #OLCUM_TICK} tick. Klavye, fare ve tekerlek girdileri kapanışa kadar sayılır.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class DepremOtomasyonu {
     private static final String MOD = System.getProperty("dogalafetler.otomasyon", "");
+    private static final String BOLUM = System.getProperty("dogalafetler.otomasyon.bolum", "hepsi");
     private static final String ON = "DEPREM_OTOMASYON ";
-    private static final int AKICI_FPS = 15;
     private static final int KAPI_PAYI = 60;
+    private static final int OLCUM_TICK = 100;
+    private static final int SARSINTI_KARESI = 5;
     private static final int ARALIK = 600;
     private static final int TOPLAM_TAVAN = 20 * 1500;
 
@@ -82,14 +93,14 @@ public final class DepremOtomasyonu {
     private static int toplam;
     private static int adim = -1;
     private static int adimTick;
-    private static int kareSayaci;
-    private static int adimKaresi;
-    private static int oncekiAdimKaresi;
+    private static long adimKaresi;
     private static int actionBarBasi;
     private static int artciSayisi;
     private static int sonAltAsama;
     private static int kareAdedi;
     private static Sahne sahne;
+    private static Kamera genisKamera;
+    private static Kamera cukurKamera;
 
     private DepremOtomasyonu() {
     }
@@ -123,13 +134,6 @@ public final class DepremOtomasyonu {
     }
 
     @SubscribeEvent
-    public static void cizildi(TickEvent.RenderTickEvent olay) {
-        if (aktif() && olay.phase == TickEvent.Phase.END) {
-            kareSayaci++;
-        }
-    }
-
-    @SubscribeEvent
     public static void tick(TickEvent.ClientTickEvent olay) {
         if (!aktif() || olay.phase != TickEvent.Phase.END) {
             return;
@@ -151,12 +155,15 @@ public final class DepremOtomasyonu {
             plan(mc);
             adim = 0;
             adimTick = 0;
-            adimKaresi = kareSayaci;
-            DogalAfetler.LOGGER.info(ON + "başlıyor: {} adım", ADIMLAR.size());
+            adimKaresi = GorselOtomasyon.cizilenKare();
+            DogalAfetler.LOGGER.info(ON + "başlıyor: {} adım, bölüm {}", ADIMLAR.size(), BOLUM);
             ADIMLAR.get(0).is().run();
             return;
         }
         if (adim >= ADIMLAR.size()) {
+            return;
+        }
+        if (GorselOtomasyon.kareBekliyor()) {
             return;
         }
         if (++toplam > TOPLAM_TAVAN && adim < ADIMLAR.size() - 1) {
@@ -175,8 +182,7 @@ public final class DepremOtomasyonu {
             }
             adim++;
             adimTick = 0;
-            oncekiAdimKaresi = kareSayaci - adimKaresi;
-            adimKaresi = kareSayaci;
+            adimKaresi = GorselOtomasyon.cizilenKare();
             if (adim < ADIMLAR.size()) {
                 DogalAfetler.LOGGER.info(ON + "adım {}: {}", adim, ADIMLAR.get(adim).ad());
                 ADIMLAR.get(adim).is().run();
@@ -201,16 +207,46 @@ public final class DepremOtomasyonu {
 
     private static void plan(Minecraft mc) {
         ekle("kurulum", () -> {
+            GorselOtomasyon.cizimAyari();
             mc.options.hideGui = true;
-            imleciKenaraAl(mc);
+            GorselOtomasyon.imleciKenaraAl();
             komut(mc, "gamerule sendCommandFeedback false", "gamerule doDaylightCycle false", "time set 5000",
                     "weather clear 100000", "gamerule doWeatherCycle false", "gamerule doMobSpawning false",
                     "gamerule afetBlokHasari true", "dogalafet stop", "dogalafet hiz 1", "clear @s",
                     "gamemode spectator @s");
             yerleriBul(mc);
         }, bekle(40), 60);
+        if (secili("deprem_s1")) {
+            depremS1(mc);
+        }
+        if (secili("deprem_s5")) {
+            depremS5(mc);
+        }
+        if (secili("sinkhole_s1")) {
+            sinkholeS1(mc);
+        }
+        if (secili("sinkhole_s5")) {
+            sinkholeS5(mc);
+        }
+        ekle("kapanış", () -> {
+            mc.options.hideGui = false;
+            mc.options.showSubtitles().set(false);
+            komut(mc, "dogalafet hiz 1", "dogalafet stop");
+            DogalAfetler.LOGGER.info(ON + "bitti; {} kare, istemcide artçı {}, FPS {}", kareAdedi, artciSayisi, mc.getFps());
+        }, bekle(40), 60);
+        ekle("çıkış", () -> {
+            GorselOtomasyon.kareOzetiYaz("deprem");
+            DogalAfetler.LOGGER.info(ON + "kapanıyor; girdi sayıları: tuş={} fare={} tekerlek={}", tus, fare, teker);
+            mc.stop();
+        }, bekle(1), 2);
+    }
 
-        // Deprem S1: ön-uyarı, siren, sarsıntı, bitiş.
+    private static boolean secili(String bolum) {
+        return "hepsi".equals(BOLUM) || BOLUM.contains(bolum);
+    }
+
+    /** Ön-uyarı, siren, sarsıntı (siren ve sarsıntı hız 0.2'de: kareler kendi aşamalarının içinde), bitiş. */
+    private static void depremS1(Minecraft mc) {
         ekle("S1 deprem yerine git", () -> git(mc, 0), yuklendi(mc, 0, 48), 2400);
         ekle("deprem S1 başlat", () -> {
             komut(mc, "gamemode survival @s", "effect give @s minecraft:resistance infinite 255 true",
@@ -224,91 +260,121 @@ public final class DepremOtomasyonu {
             mc.options.hideGui = false;
             oyuncuyuMerkezeCevir(mc);
             actionBarBasi = IstemciSismograf.actionBarSayisi();
-        }, () -> akici(mc, 40, 20) && IstemciSismograf.durum().algilandi() && IstemciSismograf.durum().hassas()
+        }, () -> akici(40, 20) && IstemciSismograf.durum().algilandi() && IstemciSismograf.durum().hassas()
                 && IstemciSismograf.actionBarSayisi() > actionBarBasi, 1600);
         ekle("kare ön-uyarı", () -> kare(mc, "deprem_onuyari_sismograf"), bekle(2), 4);
-        ekle("siren", () -> {
+        ekle("siren (hız 0.2)", () -> {
             komut(mc, "clear @s", "gamemode spectator @s");
             mc.options.showSubtitles().set(true);
             kamera(mc, yan(mc, sahne));
-            komut(mc, "dogalafet asama ileri");
-        }, () -> akici(mc, 60, 20), 1200);
+            komut(mc, "dogalafet hiz 0.2", "dogalafet asama ileri");
+        }, () -> akici(60, 20) && depremAsamasi(AfetAsamasi.SIREN), 900);
         ekle("kare siren", () -> kare(mc, "deprem_siren"), bekle(2), 4);
-        ekle("deprem S1 aktif", () -> {
+        ekle("deprem S1 aktif (hız 0.2)", () -> {
             mc.options.hideGui = true;
             komut(mc, "dogalafet asama ileri");
-        }, () -> adimTick >= 90 && (mc.getFps() >= AKICI_FPS || kareSayaci - adimKaresi >= 2), 125);
+        }, () -> akici(250, 20) && depremAsamasi(AfetAsamasi.AKTIF), 700);
         ekle("kare S1", () -> kare(mc, "deprem_s1"), bekle(2), 4);
-        ekle("deprem S1 bitsin", () -> { }, afetYok(mc), 1200);
-        ekle("S1 bitiş kamerası", () -> kamera(mc, yakin(mc, sahne)), () -> akici(mc, 40, 20), 1200);
+        ekle("deprem S1 bitsin (hız 1)", () -> komut(mc, "dogalafet hiz 1"), afetYok(mc), 1200);
+        ekle("S1 bitiş kamerası", () -> kamera(mc, yakin(mc, sahne)), () -> akici(40, 20), 1200);
         ekle("kare deprem bitiş", () -> kare(mc, "deprem_bitis"), bekle(2), 4);
+    }
 
-        // Deprem S5: vitrin, S1 ile aynı göreli yan bakış, geniş bakış, artçılar (hızlı), bitiş.
+    /**
+     * Vitrin, S1 ile aynı göreli yan bakış, sarsıntı kare dizisi (C.4), geniş bakışta ölçüm, artçılar (hızlı), aynı geniş
+     * kamerada taban ölçümü ve bitiş.
+     */
+    private static void depremS5(Minecraft mc) {
         ekle("S5 deprem yerine git", () -> git(mc, 1), yuklendi(mc, 1, 144), 3000);
         ekle("deprem S5 başlat", () -> komut(mc, "dogalafet start deprem 5 @s"), bekle(20), 30);
         ekle("deprem S5 sahnesi, vitrin kamerası", () -> {
             sahne = depremSahnesi(mc);
             kamera(mc, vitrin(mc, sahne));
-        }, () -> akici(mc, 80, 20), 1200);
+        }, () -> akici(80, 20), 1200);
         ekle("deprem S5 aktif", () -> komut(mc, "dogalafet asama ileri", "dogalafet asama ileri"), bekle(40), 50);
         ekle("kare vitrin", () -> kare(mc, "deprem_vitrin"), bekle(20), 25);
         ekle("kare vitrin b", () -> kare(mc, "deprem_vitrin_b"), bekle(2), 4);
         ekle("S5 yan kamera", () -> kamera(mc, yan(mc, sahne)), bekle(240), 260);
         ekle("kare S5", () -> kare(mc, "deprem_s5"), bekle(2), 4);
-        ekle("S5 geniş kamera", () -> kamera(mc, genis(mc, sahne)), bekle(150), 170);
+        for (int i = 1; i <= SARSINTI_KARESI; i++) {
+            String ad = "deprem_s5_sarsinti_" + i;
+            ekle("kare S5 sarsıntı " + i, () -> kare(mc, ad), bekle(2), 4);
+        }
+        ekle("S5 geniş kamera", () -> {
+            genisKamera = genis(mc, sahne);
+            kamera(mc, genisKamera);
+        }, olcumKapisi(40), olcumKapisiTavani(40));
+        olcum("s5_deprem_yuksek", "s5_deprem_taban");
         ekle("kare aktif", () -> kare(mc, "deprem_aktif"), bekle(2), 4);
         ekle("S5 artçılar (hız 20)", () -> komut(mc, "dogalafet hiz 20"), afetYok(mc), 2400);
-        ekle("hız 1", () -> komut(mc, "dogalafet hiz 1"), () -> akici(mc, 60, 20), 1200);
+        ekle("hız 1, aynı geniş kamera", () -> {
+            komut(mc, "dogalafet hiz 1");
+            kamera(mc, genisKamera);
+        }, olcumKapisi(40), olcumKapisiTavani(40));
+        olcum("s5_deprem_taban", null);
         ekle("kare S5 bitiş", () -> kare(mc, "deprem_s5_bitis"), bekle(2), 4);
+    }
 
-        // Sinkhole S1: çatlama, çukur.
+    /** Çatlama (hız 0.2, çatlama alt aşamasında), çukur. */
+    private static void sinkholeS1(Minecraft mc) {
         ekle("S1 sinkhole yerine git", () -> git(mc, 2), yuklendi(mc, 2, 64), 3000);
         ekle("sinkhole S1 başlat", () -> komut(mc, "dogalafet start sinkhole 1 @s"), bekle(20), 30);
         ekle("sinkhole S1 sahnesi", () -> {
             sahne = sinkholeSahnesi(mc);
             kamera(mc, cukurKamerasi(mc, sahne));
-        }, () -> akici(mc, 60, 20), 1200);
-        ekle("sinkhole S1 aktif", () -> komut(mc, "dogalafet asama ileri", "dogalafet asama ileri"), bekle(55), 60);
+        }, () -> akici(60, 20), 1200);
+        ekle("sinkhole S1 aktif (hız 0.2)", () -> komut(mc, "dogalafet hiz 0.2", "dogalafet asama ileri",
+                "dogalafet asama ileri"), () -> akici(250, 20) && altAsama() == SinkholeSeviyesi.CATLAMA, 390);
         ekle("kare S1 çatlama", () -> kare(mc, "sinkhole_s1_catlama"), bekle(2), 4);
-        ekle("sinkhole S1 durulma", () -> { }, () -> altAsama() == SinkholeSeviyesi.DURULMA && adimTick >= 2, 1200);
-        ekle("çukura yerleşsin", () -> { }, () -> akici(mc, 40, 20), 600);
+        ekle("sinkhole S1 durulma (hız 1)", () -> komut(mc, "dogalafet hiz 1"),
+                () -> altAsama() == SinkholeSeviyesi.DURULMA && adimTick >= 2, 1200);
+        ekle("çukura yerleşsin", () -> { }, () -> akici(40, 20), 600);
         ekle("kare sinkhole S1", () -> kare(mc, "sinkhole_s1"), bekle(2), 4);
         ekle("sinkhole S1 bitsin (hız 20)", () -> komut(mc, "dogalafet hiz 20"), afetYok(mc), 1200);
         ekle("hız 1 (S1)", () -> komut(mc, "dogalafet hiz 1"), bekle(10), 20);
+    }
 
-        // Sinkhole S5: çatlama, çöküş vitrini, üstten çukur, bitiş.
+    /**
+     * Çatlama, çöküş vitrini (hız 0.2), çöküş ve geri çekilmede ölçüm, üstten çukur, aynı çukur kamerasında taban ölçümü ve
+     * bitiş.
+     */
+    private static void sinkholeS5(Minecraft mc) {
         ekle("S5 sinkhole yerine git", () -> git(mc, 3), yuklendi(mc, 3, 64), 3000);
         ekle("sinkhole S5 başlat", () -> komut(mc, "dogalafet start sinkhole 5 @s"), bekle(20), 30);
         ekle("sinkhole S5 sahnesi", () -> {
             sahne = sinkholeSahnesi(mc);
-            kamera(mc, cukurKamerasi(mc, sahne));
-        }, () -> akici(mc, 60, 20), 1200);
-        ekle("sinkhole S5 aktif", () -> komut(mc, "dogalafet asama ileri", "dogalafet asama ileri"), bekle(100), 110);
+            cukurKamera = cukurKamerasi(mc, sahne);
+            kamera(mc, cukurKamera);
+        }, () -> akici(60, 20), 1200);
+        ekle("sinkhole S5 aktif", () -> komut(mc, "dogalafet asama ileri", "dogalafet asama ileri"),
+                () -> akici(80, 20) && altAsama() == SinkholeSeviyesi.CATLAMA, 130);
         ekle("kare S5 çatlama", () -> kare(mc, "sinkhole_s5_catlama"), bekle(2), 4);
-        ekle("çekirdek çöküşü", () -> { }, () -> altAsama() >= SinkholeSeviyesi.COKUS && dusenSayisi(mc) >= 20, 900);
+        ekle("çekirdek çöküşü (hız 0.2)", () -> komut(mc, "dogalafet hiz 0.2"),
+                () -> altAsama() >= SinkholeSeviyesi.COKUS && dusenSayisi(mc) >= 20 && GorselOtomasyon.akici(), 1500);
         ekle("düşüş başladı", () -> { }, bekle(6), 8);
         ekle("kare çöküş vitrini", () -> kare(mc, "sinkhole_cokus_vitrin"), bekle(14), 16);
         ekle("kare çöküş vitrini b", () -> kare(mc, "sinkhole_cokus_vitrin_b"), bekle(2), 4);
+        ekle("hız 1 (çöküş ölçümü)", () -> komut(mc, "dogalafet hiz 1"), olcumKapisi(10), olcumKapisiTavani(10));
+        olcum("s5_sinkhole_yuksek", "s5_sinkhole_taban");
         ekle("sinkhole S5 durulma", () -> { }, () -> altAsama() == SinkholeSeviyesi.DURULMA && adimTick >= 2, 1200);
-        ekle("üstten kamera", () -> kamera(mc, ustten(mc, sahne)), () -> akici(mc, 60, 20), 1200);
+        ekle("üstten kamera", () -> kamera(mc, ustten(mc, sahne)), () -> akici(60, 20), 1200);
         ekle("kare sinkhole S5", () -> kare(mc, "sinkhole_s5"), bekle(2), 4);
         ekle("sinkhole S5 bitsin (hız 20)", () -> komut(mc, "dogalafet hiz 20"), afetYok(mc), 1200);
-        ekle("bitiş kamerası", () -> {
+        ekle("bitiş kamerası (aynı çukur kamerası)", () -> {
             komut(mc, "dogalafet hiz 1");
-            kamera(mc, cukurKamerasi(mc, sahne));
-        }, () -> akici(mc, 60, 20), 1200);
+            kamera(mc, cukurKamera);
+        }, olcumKapisi(40), olcumKapisiTavani(40));
+        olcum("s5_sinkhole_taban", null);
         ekle("kare sinkhole bitiş", () -> kare(mc, "sinkhole_bitis"), bekle(2), 4);
+    }
 
-        ekle("kapanış", () -> {
-            mc.options.hideGui = false;
-            mc.options.showSubtitles().set(false);
-            komut(mc, "dogalafet hiz 1", "dogalafet stop");
-            DogalAfetler.LOGGER.info(ON + "bitti; {} kare, istemcide artçı {}, FPS {}", kareAdedi, artciSayisi, mc.getFps());
-        }, bekle(40), 60);
-        ekle("çıkış", () -> {
-            DogalAfetler.LOGGER.info(ON + "kapanıyor; girdi sayıları: tuş={} fare={} tekerlek={}", tus, fare, teker);
-            mc.stop();
-        }, bekle(1), 2);
+    /**
+     * K-E29 (b) ölçüm penceresi ({@value #OLCUM_TICK} tick); {@code taban} aynı kameranın afetsiz sahnesi ya da {@code null}.
+     */
+    private static void olcum(String sahneAdi, String taban) {
+        ekle("ölçüm " + sahneAdi, () -> GorselOtomasyon.olcumBasla("deprem", sahneAdi, taban), bekle(OLCUM_TICK),
+                OLCUM_TICK + 1);
+        ekle("ölçüm " + sahneAdi + " bitti", GorselOtomasyon::olcumBitir, bekle(1), 2);
     }
 
     // ---------------------------------------------------------------- koşullar
@@ -318,13 +384,22 @@ public final class DepremOtomasyonu {
     }
 
     /**
-     * En az {@code tick} tick geçti ve istemci akıcı (≥ {@value #AKICI_FPS} FPS, adım başından ≥ {@code kare} kare) çiziyor; ya da
-     * {@value #KAPI_PAYI} tick daha geçti ve en az iki yeni kare çizildi (gizli workspace, GP17).
+     * En az {@code tick} tick geçti ve istemci akıcı (≥ {@value GorselOtomasyon#AKICI_FPS} FPS, adım başından ≥ {@code kare} kare)
+     * çiziyor; ya da {@value #KAPI_PAYI} tick daha geçti ve en az iki yeni kare çizildi (gizli workspace, GP17).
      */
-    private static boolean akici(Minecraft mc, int tick, int kare) {
-        int cizilen = kareSayaci - adimKaresi;
-        return adimTick >= tick && (cizilen >= kare && mc.getFps() >= AKICI_FPS
+    private static boolean akici(int tick, int kare) {
+        long cizilen = GorselOtomasyon.cizilenKare() - adimKaresi;
+        return adimTick >= tick && (cizilen >= kare && GorselOtomasyon.akici()
                 || adimTick >= tick + KAPI_PAYI && cizilen >= 2);
+    }
+
+    /** Ölçümden önceki FPS kapısı: GP17 kaçışı yok; {@link #olcumKapisiTavani} dolarsa adım WARN ile geçer. */
+    private static BooleanSupplier olcumKapisi(int tick) {
+        return () -> adimTick >= tick && GorselOtomasyon.akici();
+    }
+
+    private static int olcumKapisiTavani(int tick) {
+        return tick + GorselOtomasyon.KAPI_SN * 20;
     }
 
     private static BooleanSupplier afetYok(Minecraft mc) {
@@ -335,7 +410,7 @@ public final class DepremOtomasyonu {
     /** Sahne yerinin çevresindeki chunk'lar sunucuda ve merkez chunk istemcide yüklü, istemci akıcı. */
     private static BooleanSupplier yuklendi(Minecraft mc, int yer, int yaricap) {
         return () -> {
-            if (adimTick < 100 || adimTick % 20 != 0 || !akici(mc, 100, 20)) {
+            if (adimTick < 100 || adimTick % 20 != 0 || !akici(100, 20)) {
                 return false;
             }
             BlockPos p = YERLER[yer];
@@ -356,9 +431,14 @@ public final class DepremOtomasyonu {
         };
     }
 
+    /** Sinkhole'un AKTIF alt aşaması; yoksa -1 (ON_UYARI ve SIREN paketleri de alt aşama 0 taşır). */
     private static int altAsama() {
-        return IstemciAfetDurumu.aktif().filter(p -> p.tur() == AfetTuru.SINKHOLE).map(AfetDurumPaketi::altAsama)
-                .orElse(-1);
+        return IstemciAfetDurumu.aktif().filter(p -> p.tur() == AfetTuru.SINKHOLE && p.asama() == AfetAsamasi.AKTIF)
+                .map(AfetDurumPaketi::altAsama).orElse(-1);
+    }
+
+    private static boolean depremAsamasi(AfetAsamasi asama) {
+        return IstemciAfetDurumu.aktif().filter(p -> p.tur() == AfetTuru.DEPREM && p.asama() == asama).isPresent();
     }
 
     private static int dusenSayisi(Minecraft mc) {
@@ -603,25 +683,18 @@ public final class DepremOtomasyonu {
         });
     }
 
-    /**
-     * İstemcinin iç imleç konumunu pencerenin sol üst köşesine alır (A-34): gerçek imlece ve sahibin oturumuna dokunmaz
-     * (yalnız {@code MouseHandler} alanı; SRG adları {@code build/createSrgToMcp/output.srg}).
-     */
-    private static void imleciKenaraAl(Minecraft mc) {
-        ObfuscationReflectionHelper.setPrivateValue(MouseHandler.class, mc.mouseHandler, 0.0, "f_91507_");
-        ObfuscationReflectionHelper.setPrivateValue(MouseHandler.class, mc.mouseHandler, 0.0, "f_91508_");
-    }
-
+    /** A-34 kare isteği; satır kare alındığı anda (kapı açılınca) o anki sahne durumuyla yazılır. */
     private static void kare(Minecraft mc, String ad) {
-        String dosya = "ds_" + ad + ".png";
-        Screenshot.grab(mc.gameDirectory, dosya, mc.getMainRenderTarget(), mesaj -> { });
-        kareAdedi++;
-        Optional<AfetDurumPaketi> durum = IstemciAfetDurumu.aktif();
-        String afet = durum.map(p -> String.format(Locale.ROOT, "%s S%d %s/%d", p.tur().kimlik(), p.seviye(),
-                p.asama().kimlik(), p.altAsama())).orElse("yok");
-        DogalAfetler.LOGGER.info(ON + "kare {} (FPS {}, önceki adımda çizilen kare {}, parçacık {}, düşen blok {}, sarsıntı "
-                + "{}°, afet {}, oyuncu {} {} {})", dosya, mc.getFps(), oncekiAdimKaresi, mc.particleEngine.countParticles(),
-                dusenSayisi(mc), String.format(Locale.ROOT, "%.2f", IstemciSarsinti.genlik(mc.player, 0)[0]), afet,
-                Math.round(mc.player.getX()), Math.round(mc.player.getY()), Math.round(mc.player.getZ()));
+        GorselOtomasyon.kareIste("deprem", "ds_" + ad + ".png", k -> {
+            kareAdedi++;
+            Optional<AfetDurumPaketi> durum = IstemciAfetDurumu.aktif();
+            String afet = durum.map(p -> String.format(Locale.ROOT, "%s S%d %s/%d", p.tur().kimlik(), p.seviye(),
+                    p.asama().kimlik(), p.altAsama())).orElse("yok");
+            DogalAfetler.LOGGER.info(ON + "kare {} (FPS {}, istekten sonra çizilen kare {}, parçacık {}, düşen blok {}, "
+                    + "sarsıntı {}°, afet {}, oyuncu {} {} {})", k.dosya(), k.fps(), k.yeniKare(),
+                    mc.particleEngine.countParticles(), dusenSayisi(mc),
+                    String.format(Locale.ROOT, "%.2f", IstemciSarsinti.genlik(mc.player, 0)[0]), afet,
+                    Math.round(mc.player.getX()), Math.round(mc.player.getY()), Math.round(mc.player.getZ()));
+        });
     }
 }

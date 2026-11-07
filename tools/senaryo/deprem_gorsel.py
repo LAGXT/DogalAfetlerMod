@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 """Deprem ve sinkhole görsel kanıtı (K0-21 rev. 2 ekran protokolü, kilit (k); bekleyen Faz 4 görsel kabulü).
 
-Kullanım (worktree kökünden): python3 tools/senaryo/deprem_gorsel.py
+Kullanım (worktree kökünden): python3 tools/senaryo/deprem_gorsel.py [--bolum deprem_s5,sinkhole_s5] [--kanit DİZİN]
+
+`--bolum` otomasyona `-PotomasyonBolum` olarak gider (`hepsi` ya da virgülle `deprem_s1`, `deprem_s5`, `sinkhole_s1`,
+`sinkhole_s5`); `--kanit` kanıt dizinini değiştirir (duman koşusu, 5-matris tekrarları). Ortak `OLCUM` satırları koşu sonunda
+`olcum_tablosu.py` ile `<kanıt>/olcum-<n>.tsv`'ye yazılır.
 
 Tek oyunculu Quick Play dünyası `run/saves/deprem` her koşuda KOK/run/saves/test'ten (seed 20261105, allowCommands=1) taze
 kopyalanır; istemci `-Potomasyon=deprem` ile açılır ve `client.deprem.DepremOtomasyonu` adımları yürütür: deprem S1 (Hassas
 Sismograf ön-uyarısı, siren, sarsıntı, bitiş), deprem S5 (vitrin, S1 ile aynı göreli bakış, geniş bakış, artçılar, bitiş),
 sinkhole S1 (çatlama, çukur) ve sinkhole S5 (çatlama, çöküş vitrini, üstten çukur, bitiş). Her kare FPS ile log'a düşer;
-kareler.txt kare/FPS tablosudur. Tepe TPS dedicated senaryodan gelir (`deprem_sunucu.py`, `<kanıt>/tps.txt`).
+kareler.txt kare/FPS tablosudur. Tepe TPS dedicated senaryodan gelir (`deprem_sunucu.py`, `<kanıt>/tps.txt`). Vsync kapalı,
+`maxFps` 260 (gizli workspace'te vsync takası istemciyi 1 FPS'e kısar, K-13; FPS tabanı tavana yapışmaz, AOi-3).
 
 Protokol: (a) açılış yalnız Hyprland exec kuralıyla ([workspace 92 silent; no_initial_focus; no_focus on;
 focus_on_activate off]); (b) JVM'de HL_EXEC_RULE_TOKEN yoksa öldürülür; (c) pencere no_focus=true ve ws 92 doğrulanır,
@@ -17,6 +22,7 @@ Sahibin oturumunda tıklama/odak/workspace değişimi yok. Aynı anda tek runCli
 protokole kopyalanır); ağır süreç kapısı (en çok 60 dk: altı Faz 4 işçisi aynı anda Gradle/runClient koşuyor). Sayılar ve adımlar
 KOK/.vibe/kanit/deprem-sinkhole/gorsel/protokol.log'a, kareler KOK/.vibe/kanit/deprem-sinkhole/gorsel/kareler/'e.
 """
+import argparse
 import hashlib
 import json
 import os
@@ -29,12 +35,18 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import olcum_tablosu  # noqa: E402
 import runclient_kilit  # noqa: E402
+
+_ap = argparse.ArgumentParser(description="Deprem ve sinkhole görsel kanıtı (K0-21 rev. 2).")
+_ap.add_argument("--bolum", default="hepsi", help="hepsi ya da virgülle deprem_s1,deprem_s5,sinkhole_s1,sinkhole_s5")
+_ap.add_argument("--kanit", type=Path, help="kanıt dizini (varsayılan KOK/.vibe/kanit/deprem-sinkhole/gorsel)")
+ARG = _ap.parse_args()
 
 WS = 92
 W = Path(__file__).resolve().parents[2]
 KOK = W.parents[1] if W.parent.name == ".worktrees" else W
-KANIT = KOK / ".vibe/kanit/deprem-sinkhole/gorsel"
+KANIT = ARG.kanit.resolve() if ARG.kanit else KOK / ".vibe/kanit/deprem-sinkhole/gorsel"
 KARELER = KANIT / "kareler"
 JAVA_HOME = "/home/lagxt/.jdks/jdk-17.0.21+9"
 ISARET = "DEPREM_OTOMASYON"
@@ -115,10 +127,10 @@ def hazirla():
     yol = run / "options.txt"
     satirlar = yol.read_text().splitlines() if yol.exists() else []
     satirlar = [s for s in satirlar if not s.startswith(("tutorialStep:", "pauseOnLostFocus:", "renderDistance:",
-                                                         "simulationDistance:"))]
+                                                         "simulationDistance:", "enableVsync:", "maxFps:"))]
     # S5 yarığı merkezden 128 blok: görüş 12 chunk (192 blok) kameradan uçları kapsar.
     yol.write_text("\n".join(satirlar + ["tutorialStep:none", "pauseOnLostFocus:false", "renderDistance:12",
-                                         "simulationDistance:10"]) + "\n")
+                                         "simulationDistance:10", "enableVsync:false", "maxFps:260"]) + "\n")
     for eski in (run / "screenshots").glob("ds_*.png"):
         eski.unlink()
     latest = run / "logs/latest.log"
@@ -163,10 +175,11 @@ def main():
                      f"export JAVA_HOME='{JAVA_HOME}'\n"
                      f"exec python3 tools/senaryo/runclient_kilit.py kos '{W}' --bekle 1800 -- "
                      "timeout 3000 ./gradlew runClient --offline --no-daemon --console=plain -PquickPlay=deprem -Potomasyon=deprem "
-                     f"> '{istemci_log}' 2>&1\n")
+                     f"-PotomasyonBolum={ARG.bolum} > '{istemci_log}' 2>&1\n")
     sahip = hypr_json("activewindow")
     sahip_adres = sahip.get("address") if isinstance(sahip, dict) else None
-    log(f"koşu {no}: sahibin etkin penceresi {sahip_adres} ({sahip.get('class') if isinstance(sahip, dict) else None})")
+    log(f"koşu {no} (bölüm {ARG.bolum}): sahibin etkin penceresi {sahip_adres} "
+        f"({sahip.get('class') if isinstance(sahip, dict) else None})")
     kural = f"[workspace {WS} silent; no_initial_focus; no_focus on; focus_on_activate off] sh {betik}"
     log("exec:", hypr("dispatch", f'hl.dsp.exec_cmd("{kural}")'))
     baslangic = time.time()
@@ -218,6 +231,9 @@ def main():
     if latest.exists():
         shutil.copy2(latest, KANIT / f"latest-{no}.log")
         kare_tablosu(latest, no)
+        satirlar, ozet = olcum_tablosu.tablo([KANIT / f"latest-{no}.log"])
+        (KANIT / f"olcum-{no}.tsv").write_text("\n".join(satirlar) + "\n", encoding="utf-8")
+        log(f"OLCUM tablosu: {len(satirlar) - 1} satır → olcum-{no}.tsv", *ozet)
     if istemci_log.exists():
         for satir in istemci_log.read_text(errors="replace").splitlines():
             if re.search(r"runClient kilidi|kilit sahibi|kilit başkasının|^kos: ", satir):
