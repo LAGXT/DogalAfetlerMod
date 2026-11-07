@@ -186,7 +186,21 @@ def argumanlar(aciklama=None, varsayilan_port=VARSAYILAN_PORT, varsayilan_kanit=
     if not 1024 <= a.port <= 65535:
         ayristirici.error(f"geçersiz port {a.port}")
     PORT = a.port
+    if (Path(sys.argv[0]).name.endswith("_sunucu.py") and not getattr(a, "istemci", False)
+            and not os.environ.get("UZAK_ICINDE") and os.environ.get("UZAK", "1") != "0"):
+        uzaga_gec(ayristirici, a.kanit)
     return a
+
+
+def uzaga_gec(ayristirici, kanit):
+    """K-E44: dedicated senaryo bütünüyle pc2'de koşar; bu süreç `tools/senaryo/uzak.sh`'e dönüşür (kanıt klasörü geri çekilir,
+    çıkış kodu senaryonunkidir; pc2 kapalıysa 4). İstemcili koşu (`--istemci`) ve `UZAK=0` yerelde kalır."""
+    if Path.cwd().resolve() != KOK:
+        ayristirici.error(f"pc2'ye göndermek için worktree kökünden çalıştır ({KOK})")
+    betik = Path(sys.argv[0]).resolve().relative_to(KOK)
+    uzak = str(KOK / "tools" / "senaryo" / "uzak.sh")
+    sys.stdout.flush()
+    os.execv(uzak, [uzak, "-g", f"{Path(kanit).resolve()}/", "python3", str(betik), *sys.argv[1:]])
 
 
 def port_bos(port):
@@ -237,9 +251,10 @@ def port_araligi_denetimi(port, log=print):
             "entegratör 25651–25660, işçiler 25641+ws")
 
 
-def agir_surec_kapisi(port, log=print, en_cok_dk=20, ram_mb=4096):
-    """Gradle < 2, boş RAM >= `ram_mb`, `port` boş ve senaryo kilidi alınana dek 60 sn'de bir bekler; `en_cok_dk` dakikada
-    açılmazsa False."""
+def agir_surec_kapisi(port, log=print, en_cok_dk=20, ram_mb=None):
+    """Gradle < 2, boş RAM >= `ram_mb` (vars. `KAPI_RAM_MB` ya da 4096), `port` boş ve senaryo kilidi alınana dek 60 sn'de bir
+    bekler; `en_cok_dk` dakikada açılmazsa False."""
+    ram_mb = ram_mb or int(os.environ.get("KAPI_RAM_MB", "4096"))
     port_araligi_denetimi(port, log)
     for deneme in range(en_cok_dk + 1):
         gradle = int(subprocess.run(["pgrep", "-fc", "GradleWrapperMain"], capture_output=True, text=True).stdout.strip()

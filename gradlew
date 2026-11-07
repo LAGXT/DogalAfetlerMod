@@ -85,6 +85,11 @@ done
 APP_BASE_NAME=${0##*/}
 APP_HOME=$( cd "${APP_HOME:-./}" && pwd -P ) || exit
 
+# K-E44: ekransız görevler (test, build, runGameTestServer...) ikinci makinede (pc2) koşar; UZAK=0 yerelde zorlar.
+if [ -z "${UZAK_ICINDE-}" ] && [ "${UZAK-1}" != 0 ] && [ -x "$APP_HOME/tools/senaryo/uzak.sh" ]; then
+    exec "$APP_HOME/tools/senaryo/uzak.sh" --gradle "$APP_HOME" "$@"
+fi
+
 # Use the maximum available, or set MAX_FD != -1 to use that value.
 MAX_FD=maximum
 

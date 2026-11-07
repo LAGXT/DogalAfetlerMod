@@ -1,17 +1,60 @@
 #!/usr/bin/env bash
-# Ekransız ağır işi ikinci makinede (pc2: FX-4100, 8 GB; docs/MAKINE.md) koşar, ana makine yalnız dosya eşitler (K-E43).
+# Ekransız ağır işi ikinci makinede (pc2: FX-4100, 8 GB; docs/MAKINE.md) koşar, ana makine yalnız dosya eşitler (K-E43, K-E44).
 # Kullanım (proje ya da worktree kökünden): tools/senaryo/uzak.sh [-g <yol>]... <komut...>
 #   tools/senaryo/uzak.sh -g <log> tools/senaryo/gradle_kapisi.sh <log> test
 #   tools/senaryo/uzak.sh -g <kanıt>/ python3 tools/senaryo/deprem_sunucu.py --kanit <kanıt> --port 25651
-# pc2'ye ulaşılamıyorsa çıkış 4: iş yerelde başlatılmaz. Ana makinedeki kilitle aynı anda tek uzak iş (8 GB); kilit
-# UZAK_BEKLE_DK (vars. 60) dakikada alınamazsa çıkış 3. Geçerli klasör pc2'de aynı yola rsync'lenir (build/, .gradle/, run*/,
-# logs/, .vibe/, .venv/, .worktrees/, .git hariç; hariçler pc2'de korunur), komut orada aynı klasörde koşar, çıktısı buraya
-# akar. Bitince (hata ya da kesmede de) her -g yolu buraya geri çekilir; sonu / olan yol klasördür. Komutun çıkış kodu döner.
-# Geçen ortam: TEST_FILTRE, KAPI_PORT, KAPI_DK, VIBE_OTURUM; KAPI_SURE verilmezse 4500 sn (FX-4100'ün derleme payı).
-# UZAK_MAKINE ssh adı (vars. pc2).
+# Elle çağırmak gerekmez: ./gradlew (ekransız görevler), gradle_kapisi.sh ve *_sunucu.py kendileri buraya döner (K-E44).
+#   uzak.sh --gradle <proje> <gradle argümanları>  ./gradlew kancası: görevlerin hepsi ekransızsa pc2'de, değilse yerelde
+#   uzak.sh --uzak-mi <gradle argümanları>         çıkış 0: görevlerin hepsi ekransız (pc2'ye gider)
+# pc2'ye ulaşılamıyorsa çıkış 4: iş yerelde başlatılmaz. pc2'de aynı anda UZAK_YUVA (vars. 2) iş ve aynı klasörden tek iş
+# (ana makinedeki ~/.cache/uzak-<makine>/ flock'ları); UZAK_BEKLE_DK (vars. 60) dakikada yer açılmazsa çıkış 3. Geçerli klasör pc2'de
+# aynı yola rsync'lenir (build/, .gradle/, run*/, logs/, .vibe/, .venv/, .worktrees/, .git hariç; hariçler pc2'de korunur), komut
+# orada aynı klasörde koşar, çıktısı buraya akar. Bitince (hata ya da kesmede de) her -g yolu buraya geri çekilir; sonu / olan yol
+# klasördür. -g yolu klasörün dışında ya da .vibe/, build/, logs/, run*/ altında olmalı (eşitlenen kaynak geri ezilmez).
+# Geçen ortam: TEST_FILTRE, KAPI_PORT, KAPI_DK, VIBE_OTURUM, JAVA_HOME, LC_ALL, GRADLE_OPTS; KAPI_SURE vars. 4500 sn,
+# KAPI_RAM_MB vars. 2500 (pc2'de iki iş yan yana sığsın diye; K-E44). UZAK_MAKINE ssh adı (vars. pc2).
 set -u
 makine=${UZAK_MAKINE:-pc2}
 ssh_ac=(ssh -o BatchMode=yes -o ConnectTimeout=5 "$makine")
+
+# Ekransız görevler: pc2'de koşar. Başka her görev (runClient, runData, runServer, wrapper, tasks...) yerelde kalır.
+gradle_uzak_mi() {
+    local atla=0 gorev=0 g
+    for g in "$@"; do
+        if [ $atla = 1 ]; then atla=0; continue; fi
+        case $g in
+            -x|--exclude-task|-p|--project-dir|-I|--init-script|-g|--gradle-user-home|-c|--settings-file|-b|--build-file|\
+            --include-build|-P|--project-prop|-D|--system-prop) atla=1 ;;
+            -*) ;;
+            *)
+                gorev=1
+                case ${g##*:} in
+                    test|cleanTest|build|assemble|check|clean|compileJava|compileTestJava|classes|testClasses|jar|reobfJar|\
+                    runGameTestServer) ;;
+                    *) return 1 ;;
+                esac ;;
+        esac
+    done
+    [ $gorev = 1 ]
+}
+
+case ${1:-} in
+    --uzak-mi)
+        shift
+        gradle_uzak_mi "$@"
+        exit ;;
+    --gradle)
+        dizin=$2
+        shift 2
+        if ! gradle_uzak_mi "$@"; then
+            UZAK_ICINDE=1 exec "$dizin/gradlew" "$@"
+        fi
+        cd "$dizin" || exit 2
+        set -- -g "$PWD/build/reports/" -g "$PWD/build/test-results/" -g "$PWD/build/libs/" ./gradlew "$@" ;;
+esac
+
+[ -x ./gradlew ] || { echo "UZAK: proje ya da worktree kökünden çalıştır (./gradlew yok)" >&2; exit 2; }
+kok=$PWD
 
 geri=()
 while [ $# -gt 0 ]; do
@@ -19,6 +62,11 @@ while [ $# -gt 0 ]; do
         -g)
             [ $# -ge 2 ] || { echo "UZAK: -g yol ister" >&2; exit 2; }
             yol=$(realpath -m -- "$2")
+            case $yol/ in
+                "$kok"/.vibe/*|"$kok"/build/*|"$kok"/logs/*|"$kok"/run*/*) ;;
+                "$kok"/*) echo "UZAK: -g $2 eşitlenen kaynağın içinde; .vibe/, build/, logs/, run*/ altı ya da klasör dışı olmalı" >&2
+                           exit 2 ;;
+            esac
             [[ $2 == */ ]] && yol+=/
             geri+=("$yol")
             shift 2 ;;
@@ -27,21 +75,35 @@ while [ $# -gt 0 ]; do
     esac
 done
 [ $# -gt 0 ] || { echo "kullanım: tools/senaryo/uzak.sh [-g <yol>]... <komut...>" >&2; exit 2; }
-[ -x ./gradlew ] || { echo "UZAK: proje ya da worktree kökünden çalıştır (./gradlew yok)" >&2; exit 2; }
-kok=$PWD
 
 if ! "${ssh_ac[@]}" true 2>/dev/null; then
-    echo "UZAK: $makine'ye ulaşılamadı (kapalı ya da Windows açık); iş başlatılmadı, çıkış 4" >&2
+    echo "UZAK: $makine'ye ulaşılamadı (kapalı ya da Windows açık); iş başlatılmadı, çıkış 4 (UZAK=0 yerelde zorlar)" >&2
     exit 4
 fi
 
-mkdir -p "$HOME/.cache"
-exec 9>"$HOME/.cache/uzak-$makine.kilit"
-if ! flock -n 9; then
-    dk=${UZAK_BEKLE_DK:-60}
-    echo "UZAK: $makine'de başka bir uzak iş var, kilit bekleniyor (en çok $dk dk)"
-    flock -w $((dk * 60)) 9 || { echo "UZAK: kilit $dk dk'da açılmadı, çıkış 3" >&2; exit 3; }
+kilitler=$HOME/.cache/uzak-$makine
+mkdir -p "$kilitler"
+dk=${UZAK_BEKLE_DK:-60}
+bitis=$((SECONDS + dk * 60))
+exec 8>"$kilitler/klasor-$(printf %s "$kok" | md5sum | cut -c1-12)"
+if ! flock -n 8; then
+    echo "UZAK: bu klasörden $makine'de başka bir iş var, bekleniyor (en çok $dk dk)"
+    flock -w $((dk * 60)) 8 || { echo "UZAK: klasör kilidi $dk dk'da açılmadı, çıkış 3" >&2; exit 3; }
 fi
+yuva_sayisi=${UZAK_YUVA:-2}
+yuva=0
+while [ $yuva = 0 ]; do
+    for ((n = 1; n <= yuva_sayisi; n++)); do
+        exec 9>"$kilitler/yuva-$n"
+        if flock -n 9; then yuva=$n; break; fi
+        exec 9>&-
+    done
+    [ $yuva != 0 ] && break
+    [ $SECONDS -ge $bitis ] && { echo "UZAK: $makine'de $dk dk'da yuva açılmadı, çıkış 3" >&2; exit 3; }
+    [ -n "${bekleme_yazildi:-}" ] || echo "UZAK: $makine'nin $yuva_sayisi yuvası dolu, bekleniyor (en çok $dk dk)"
+    bekleme_yazildi=1
+    sleep 5
+done
 
 klasorler=("$kok")
 for y in "${geri[@]}"; do
@@ -53,13 +115,13 @@ done
     --exclude=/.worktrees/ --exclude=/.git --exclude=/cikti/ --exclude='/_eski-surum-*/' --exclude=__pycache__/ \
     "$kok/" "$makine:$kok/" || { echo "UZAK: rsync başarısız, iş başlatılmadı" >&2; exit 4; }
 
-pid_dosyasi=/tmp/uzak-$$.pid
+pid_dosyasi=/tmp/uzak-$$-$yuva.pid
 betik=$(
     printf 'cd %q || exit 125\n' "$kok"
-    for v in TEST_FILTRE KAPI_PORT KAPI_DK VIBE_OTURUM; do
+    for v in TEST_FILTRE KAPI_PORT KAPI_DK VIBE_OTURUM JAVA_HOME LC_ALL GRADLE_OPTS; do
         if [ -n "${!v:-}" ]; then printf 'export %s=%q\n' "$v" "${!v}"; fi
     done
-    printf 'export KAPI_SURE=%q\n' "${KAPI_SURE:-4500}"
+    printf 'export KAPI_SURE=%q KAPI_RAM_MB=%q UZAK_ICINDE=1\n' "${KAPI_SURE:-4500}" "${KAPI_RAM_MB:-2500}"
     printf 'setsid'
     printf ' %q' "$@"
     printf ' </dev/null &\n'
@@ -67,7 +129,7 @@ betik=$(
     printf 'wait $!; kod=$?; rm -f %q; exit $kod\n' "$pid_dosyasi"
 )
 
-echo "UZAK: $makine:$kok →$(printf ' %q' "$@")"
+echo "UZAK: $makine yuva $yuva/$yuva_sayisi:$kok →$(printf ' %q' "$@")"
 baslangic=$SECONDS
 iptal=0
 trap 'iptal=1' INT TERM HUP
@@ -85,7 +147,7 @@ fi
 for y in "${geri[@]}"; do
     if [[ $y == */ ]]; then hedef=$y; else hedef=$(dirname -- "$y")/; fi
     mkdir -p -- "$hedef"
-    /usr/bin/rsync -a -e "ssh -o BatchMode=yes" "$makine:$y" "$hedef" || echo "UZAK: $y geri çekilemedi" >&2
+    /usr/bin/rsync -a --ignore-missing-args -e "ssh -o BatchMode=yes" "$makine:$y" "$hedef" || echo "UZAK: $y geri çekilemedi" >&2
 done
 echo "UZAK: çıkış=$kod süre=$((SECONDS - baslangic)) sn"
 exit "$kod"
