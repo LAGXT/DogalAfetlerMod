@@ -507,8 +507,9 @@ public final class DepremOyunTestleri {
                 + deprem.icYikimAsililari(level, kutu(y));
     }
 
+    /** Kutudaki eşya varlıkları. Komşu sahnelerin (tsunami dalgasının sürüklediği) eşyası sayılmasın: testler farkı sınar. */
     private static int esyaSayisi(GameTestHelper y) {
-        return y.getLevel().getEntitiesOfClass(ItemEntity.class, kutu(y).inflate(4)).size();
+        return y.getLevel().getEntitiesOfClass(ItemEntity.class, kutu(y)).size();
     }
 
     /**
@@ -521,15 +522,19 @@ public final class DepremOyunTestleri {
         zemin(y, YUZEY);
         blokHasari(y, true);
         IcSahne s = icSahne(y);
+        int dusenOnce = dusenSayisi(y);
+        int esyaOnce = esyaSayisi(y);
         AfetYoneticisi yonetici = AfetYoneticisi.al(y.getLevel().getServer());
         int etki1 = icYikimUygula(y, baslat(y, 1), s);
         yonetici.durdur();
-        y.assertTrue(etki1 == 0 && s.yerinde(y) && dusenSayisi(y) == 0, "S1 iç yıkım yapmamalı (etki " + etki1 + ")");
+        y.assertTrue(etki1 == 0 && s.yerinde(y) && dusenSayisi(y) == dusenOnce,
+                "S1 iç yıkım yapmamalı (etki " + etki1 + ")");
         int etki4 = icYikimUygula(y, baslat(y, 4), s);
-        y.assertTrue(y.getBlockState(s.tavan()).isAir() && dusenSayisi(y) >= 1, "S4 tavan bloğu düşmedi");
+        y.assertTrue(y.getBlockState(s.tavan()).isAir() && dusenSayisi(y) > dusenOnce, "S4 tavan bloğu düşmedi");
         y.assertTrue(y.getBlockState(s.fener()).isAir(), "S4 fener düşmedi");
         y.assertTrue(!s.cerceve().isAlive(), "S4 eşya çerçevesi düşmedi");
-        y.assertTrue(esyaSayisi(y) >= 3, "fener, çerçeve ve elmas eşya olarak düşmeli: " + esyaSayisi(y));
+        int esya = esyaSayisi(y) - esyaOnce;
+        y.assertTrue(esya >= 3, "fener, çerçeve ve elmas eşya olarak düşmeli: " + esya);
         y.assertTrue(etki4 == 3, "S4 etki sayısı " + etki4);
         sahneyiTemizle(y);
         y.succeed();
@@ -542,12 +547,17 @@ public final class DepremOyunTestleri {
         blokHasari(y, false);
         IcSahne s = icSahne(y);
         long once = kutuHash(y);
+        int dusenOnce = dusenSayisi(y);
+        int esyaOnce = esyaSayisi(y);
         int etki = icYikimUygula(y, baslat(y, 5), s);
         AfetYoneticisi.al(y.getLevel().getServer()).durdur();
         boolean yerinde = s.yerinde(y);
         s.cerceve().discard();
         y.assertTrue(etki == 0 && yerinde, "blok hasarı kapalıyken iç yıkım oldu (etki " + etki + ")");
-        y.assertTrue(dusenSayisi(y) == 0 && esyaSayisi(y) == 0 && kutuHash(y) == once, "blok hasarı kapalıyken kutu değişti");
+        y.assertTrue(kutuHash(y) == once, "blok hasarı kapalıyken kutunun blokları değişti");
+        int dusen = dusenSayisi(y) - dusenOnce;
+        int esya = esyaSayisi(y) - esyaOnce;
+        y.assertTrue(dusen == 0 && esya == 0, "blok hasarı kapalıyken düşen blok " + dusen + ", eşya " + esya);
         sahneyiTemizle(y);
         y.succeed();
     }
