@@ -62,6 +62,40 @@ public final class AsitOyunTestleri {
         OyunTestiTemizligi.batchSonu(level);
     }
 
+    @AfterBatch(batch = "asit_hiz")
+    public static void hizSonrasi(ServerLevel level) {
+        AfetYoneticisi.al(level.getServer()).hizAyarla(1);
+        OyunTestiTemizligi.batchSonu(level);
+    }
+
+    /**
+     * AOi-6 (K-C11): maruziyet ölçekli afet saatiyle birikir. S3'te hasar aralığı 40 ölçekli tick; {@code hiz 10} altında 40
+     * gerçek tick'te açıktaki oyuncu her denetimde (4 tick) hasar alır. Gerçek tick'le biriken eski maruziyet en çok bir hasar
+     * verirdi.
+     */
+    @GameTest(template = SAHNE, batch = "asit_hiz", timeoutTicks = 120)
+    public static void maruziyetOlcekliSaatleBirikir(GameTestHelper y) {
+        ServerLevel level = y.getLevel();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(level.getServer());
+        yonetici.durdur();
+        zemin(y);
+        BlockPos acikP = y.absolutePos(new BlockPos(2, 1, 2));
+        ServerPlayer acik = OyunTestiTemizligi.oyuncu(y, acikP.getX() + 0.5, acikP.getY(), acikP.getZ() + 0.5);
+        acik.setGameMode(GameType.SURVIVAL);
+        acik.setHealth(20f);
+        baslat(y, 3, acikP);
+        yonetici.hizAyarla(10);
+        y.onEachTick(() -> hasarAlabilir(acik));
+        y.runAfterDelay(40, () -> {
+            float can = acik.getHealth();
+            yonetici.hizAyarla(1);
+            yonetici.durdur();
+            cikar(level, List.of(acik));
+            y.assertTrue(can <= 17f, "hiz 10 altında 40 tick'te en az 6 hasar (0,5) beklenirdi: can " + can);
+            y.succeed();
+        });
+    }
+
     /** Dönüşüm tablosu (tasarım §2): yumuşak bloklar aşınır, {@code asit_dayanikli} (taş, cam) hiç değişmez. */
     @GameTest(template = SAHNE, batch = "asit_asindirma")
     public static void asitDayanikliBlokBozulmazYumusakBlokAsinir(GameTestHelper y) {
