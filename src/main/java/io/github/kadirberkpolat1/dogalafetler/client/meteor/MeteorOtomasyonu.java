@@ -57,7 +57,7 @@ import net.minecraftforge.fml.common.Mod;
  * {@code s5_meteor_yuksek} (her biri 100 tick; öncesinde FPS kapısı, {@link GorselOtomasyon#akici}).
  * {@code -PotomasyonBolum=odul} (M-22): yalnız ödül ve ipucu kareleri, öğlen ışığında; her ipucu kendi karesinde, satırlar
  * ekran genişliğine göre sarılır (tooltip'ler üst üste binmez). {@code -PotomasyonBolum=yagmur} (meteor-2): aynı kamerada
- * gerçek güneş patlamasının ön-uyarı, siren ve AKTIF başı (90/dk, karma boyut) yağmuru, yakın/uzak çarpma ses denemesi ve
+ * gerçek güneş patlamasının ön-uyarı, siren ve AKTIF başı (180/dk, karma boyut, bakış yönüne ağırlıklı) yağmuru, yakın/uzak çarpma ses denemesi ve
  * ay parçası yağmuru karelenir; ses kararları {@code METEOR_SES}, uçan meteorun bantları {@code sayım} satırlarıdır
  * ({@link MeteorSesi}).
  */

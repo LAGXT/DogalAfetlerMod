@@ -79,9 +79,9 @@ public final class AyCarpmasiAyarlari {
             meteorSuresiSn = k.comment("Çarpmadan 10 sn sonra başlayan ay parçası yağmurunun süresi (sn; bölüm H 1-2 dk, kullanıcı "
                     + "isteği 27: 10 dk); afet yağmurla biter.")
                     .defineInRange("meteorSuresiSn", 600, 60, 900);
-            meteorDakikaBasina = k.comment("Oyuncu başına dakikada düşen ay parçası (90 = 1,5/sn; 10 dk'da oyuncu başına 900); "
+            meteorDakikaBasina = k.comment("Oyuncu başına dakikada düşen ay parçası (180 = 3/sn; 10 dk'da oyuncu başına 1800); "
                     + "tavan doluyken atılamayan parça düşmez.")
-                    .defineInRange("meteorDakikaBasina", 90.0, 0.0, 300.0);
+                    .defineInRange("meteorDakikaBasina", 180.0, 0.0, 300.0);
             meteorBuyukOrani = k.comment("Ay parçası yağmurunda büyük bant (1,6–2,5×) olasılığı; orta bant meteor.ortaMeteorOrani.")
                     .defineInRange("meteorBuyukOrani", 0.10, 0.0, 1.0);
             sarsintiBlokSayisi = k.comment("Çarpma sarsıntısında (12 sn) oyuncu başına en çok düşen blok "

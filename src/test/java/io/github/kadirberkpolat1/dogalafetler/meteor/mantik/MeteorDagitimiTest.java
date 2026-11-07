@@ -66,4 +66,45 @@ class MeteorDagitimiTest {
         assertEquals(0, topX / n, 3.0, "yön yanlılığı yok (x)");
         assertEquals(0, topZ / n, 3.0, "yön yanlılığı yok (z)");
     }
+
+    /** MT2-28: varsayılan 2/3 ön yarıda; bakışa göre 45°'lik 8 dilimde ön dilimler 1/6, arka 1/12 (±%2), halka aynı. */
+    @Test
+    void bakisYonuAgirlikliOfsetHistogrami() {
+        Random r = new Random(20261107L);
+        int n = 100_000;
+        double bakis = MeteorDagitimi.bakisAcisi(30F);
+        int[] dilim = new int[8];
+        int on = 0;
+        for (int i = 0; i < n; i++) {
+            double[] o = MeteorDagitimi.ofset(r, 32, 160, bakis, 2.0 / 3);
+            double m = Math.hypot(o[0], o[1]);
+            assertTrue(m >= 32 - 1e-9 && m <= 160 + 1e-9, "halka dışında: " + m);
+            double fark = (Math.toDegrees(Math.atan2(o[1], o[0]) - bakis) % 360 + 540) % 360 - 180;
+            if (Math.abs(fark) < 90) {
+                on++;
+            }
+            dilim[(int) Math.floor((fark + 180) / 45) % 8]++;
+        }
+        assertEquals(2.0 / 3, on / (double) n, 0.02, "ön yarı");
+        for (int k = 0; k < 8; k++) {
+            double beklenen = k >= 2 && k <= 5 ? 1.0 / 6 : 1.0 / 12;
+            assertEquals(beklenen, dilim[k] / (double) n, 0.02, "dilim " + (k * 45 - 180) + "°");
+        }
+    }
+
+    @Test
+    void yawEkseniVeYonsuzUc() {
+        Random r = new Random(5);
+        for (int i = 0; i < 1000; i++) {
+            assertTrue(MeteorDagitimi.ofset(r, 32, 160, MeteorDagitimi.bakisAcisi(0F), 1.0)[1] > 0, "yaw 0: +Z önü");
+            assertTrue(MeteorDagitimi.ofset(r, 32, 160, MeteorDagitimi.bakisAcisi(90F), 1.0)[0] < 0, "yaw 90: −X önü");
+            assertTrue(MeteorDagitimi.ofset(r, 32, 160, MeteorDagitimi.bakisAcisi(-90F), 0.0)[0] < 0, "oran 0: hepsi arkada");
+        }
+        int on = 0;
+        int n = 50_000;
+        for (int i = 0; i < n; i++) {
+            on += MeteorDagitimi.ofset(r, 32, 160, MeteorDagitimi.bakisAcisi(0F), 0.5)[1] > 0 ? 1 : 0;
+        }
+        assertEquals(0.5, on / (double) n, 0.02, "oran 0,5 yönsüz");
+    }
 }

@@ -69,6 +69,10 @@ public final class MeteorAyarlari {
         return sunucu.get().dagitimDisYaricap.get();
     }
 
+    public static double bakisYonuOrani() {
+        return sunucu.get().bakisYonuOrani.get();
+    }
+
     public static int girisYuksekligi() {
         return sunucu.get().girisYuksekligi.get();
     }
@@ -155,6 +159,7 @@ public final class MeteorAyarlari {
         private final ForgeConfigSpec.IntValue varlikTavani;
         private final ForgeConfigSpec.IntValue dagitimIcYaricap;
         private final ForgeConfigSpec.IntValue dagitimDisYaricap;
+        private final ForgeConfigSpec.DoubleValue bakisYonuOrani;
         private final ForgeConfigSpec.IntValue girisYuksekligi;
         private final ForgeConfigSpec.IntValue ucusSuresi;
         private final ForgeConfigSpec.IntValue girisAcisiEnAz;
@@ -196,11 +201,14 @@ public final class MeteorAyarlari {
             kraterBlokButcesi = k.comment("Tick başına krater blok işlemi (bütün kraterler); TPS kısmasıyla çarpılır.")
                     .defineInRange("kraterBlokButcesi", 512, 16, 8192);
             varlikTavani = k.comment("Boyut başına aynı anda uçan en çok meteor; doluyken atılmak istenen meteor düşmez (kuyruk yok).")
-                    .defineInRange("varlikTavani", 240, 1, 512);
+                    .defineInRange("varlikTavani", 448, 1, 512);
             dagitimIcYaricap = k.comment("Yağmurda meteor oyuncunun en az bu kadar uzağına düşer (blok).")
                     .defineInRange("dagitimIcYaricap", 32, 0, 256);
             dagitimDisYaricap = k.comment("Yağmurda meteor oyuncunun en çok bu kadar uzağına düşer (blok).")
                     .defineInRange("dagitimDisYaricap", 160, 8, 512);
+            bakisYonuOrani = k.comment("Yağmur meteorlarının oyuncunun baktığı yönün ±90° ön yarısına düşen payı (kalanı arkaya; 0,5 yönsüz). "
+                    + "Komut meteoru ve oyuncusuz sunucunun doğuş noktası hedefi yönsüzdür.")
+                    .defineInRange("bakisYonuOrani", 0.667, 0.0, 1.0);
             girisYuksekligi = k.comment("Meteor hedefin bu kadar blok üstünden başlar.").defineInRange("girisYuksekligi", 200, 40, 300);
             ucusSuresi = k.comment("Doğuştan çarpmaya uçuş süresi (tick, orta ölçek; küçük en çok ÷0,95 uzun, büyük ÷1,12 kısa). Hız "
                     + "yol uzunluğundan çıkar, en çok 3,8 blok/tick (eksen başına paket sınırı 3,9).")
