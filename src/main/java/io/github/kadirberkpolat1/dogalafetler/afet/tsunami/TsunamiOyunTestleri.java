@@ -179,7 +179,8 @@ public final class TsunamiOyunTestleri {
      * B.5 yıkım sırası (S2): aynı cephe satırındaki cam anında, ahşap 0,3 sn sonra kırılır; yaprak kırılır; kırıktaş (yalnız
      * S4–5) ve doğal arazi (toprak, taş taban) kalır. TS-15b: satır boyu cam şeridi (z 3..14) iki chunk'a taşabilir; tick
      * başına başlatılan birim (varsayılan chunk sütunu) {@code tsunami.yikimBolumTick} (1) aşılmaz, şeridin her bölümü yine
-     * de kırılır.
+     * de kırılır. Tick başına birim afetin kendi biriktirdiği en büyük değerden okunur (TS-17): {@code onEachTick}
+     * gözlemcisinin afet tick'ine göre aynı oyun tick'indeki sırası belirsizdir.
      */
     @GameTest(template = "su_alani", batch = "tsunami_yikim", timeoutTicks = 300)
     public static void dalgaOnceCamSonraAhsapYikarAraziKalir(GameTestHelper h) {
@@ -200,7 +201,6 @@ public final class TsunamiOyunTestleri {
         TsunamiAfeti a = baslat(h, 2);
         int butce = TsunamiAyarlari.al().yikimBolumTick.get();
         long[] kirildi = {-1, -1};
-        int[] enCokBolum = {0};
         h.onEachTick(() -> {
             long t = DunyaDonemi.al(l).saat();
             if (kirildi[0] < 0 && l.getBlockState(m(h, 9, 3, 8)).isAir()) {
@@ -209,7 +209,6 @@ public final class TsunamiOyunTestleri {
             if (kirildi[1] < 0 && l.getBlockState(m(h, 9, 3, 6)).isAir()) {
                 kirildi[1] = t;
             }
-            enCokBolum[0] = Math.max(enCokBolum[0], a.sonTickBirim());
         });
         h.startSequence()
                 .thenWaitUntil(() -> h.assertTrue(kirildi[0] >= 0 && kirildi[1] >= 0
@@ -218,7 +217,8 @@ public final class TsunamiOyunTestleri {
                 .thenExecute(() -> {
                     h.assertTrue(kirildi[1] - kirildi[0] >= 5, "ahşap camdan sonra kırılmadı: " + kirildi[0] + ", "
                             + kirildi[1]);
-                    h.assertTrue(enCokBolum[0] >= 1 && enCokBolum[0] <= butce, "tick başına değişen bölüm " + enCokBolum[0]
+                    int enCokBirim = a.enCokBirimTick();
+                    h.assertTrue(enCokBirim >= 1 && enCokBirim <= butce, "tick başına başlatılan birim en çok " + enCokBirim
                             + " (bütçe " + butce + ")");
                     h.assertTrue(a.toplamBolum() >= camBolumleri.size(), "cam şeridinin bölümleri " + camBolumleri.size()
                             + ", değişen " + a.toplamBolum());
@@ -227,7 +227,7 @@ public final class TsunamiOyunTestleri {
                     h.assertBlockPresent(Blocks.STONE, 9, 0, 8);
                     DogalAfetler.LOGGER.info("Tsunami GameTest: yıkım cam t={} ahşap t={} kırılan={} cam bölümü={} değişen "
                             + "bölüm={} tick başına en çok={}", kirildi[0], kirildi[1], a.kirilan(), camBolumleri.size(),
-                            a.toplamBolum(), enCokBolum[0]);
+                            a.toplamBolum(), enCokBirim);
                     a.durdur(l, true);
                 })
                 .thenSucceed();

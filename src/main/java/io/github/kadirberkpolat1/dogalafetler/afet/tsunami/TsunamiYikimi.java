@@ -85,7 +85,6 @@ final class TsunamiYikimi {
     private long toplamTaranan;
     private long toplamBolum;
     private long toplamKirli;
-    private int sonTickBirim;
     private int enCokBirimTick;
     private int toplamDusen;
 
@@ -115,11 +114,7 @@ final class TsunamiYikimi {
         return toplamKirli;
     }
 
-    /** Son tick'te başlatılan birim (bölüm ya da sütun) sayısı (TS-15b: en çok {@code Ayar.birim}). */
-    int sonTickBirim() {
-        return sonTickBirim;
-    }
-
+    /** Bir tick'te başlatılan en çok birim (bölüm ya da sütun; TS-15b: en çok {@code Ayar.birim}). */
     int enCokBirimTick() {
         return enCokBirimTick;
     }
@@ -249,8 +244,7 @@ final class TsunamiYikimi {
         toplamKirilan += kirilan;
         toplamBolum += bolumler.size();
         toplamKirli += kirli.size();
-        sonTickBirim = birimler.size();
-        enCokBirimTick = Math.max(enCokBirimTick, sonTickBirim);
+        enCokBirimTick = Math.max(enCokBirimTick, birimler.size());
         return kirilan;
     }
 

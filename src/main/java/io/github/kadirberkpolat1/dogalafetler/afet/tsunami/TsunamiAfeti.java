@@ -570,9 +570,9 @@ public final class TsunamiAfeti extends Afet {
         return yikim.toplamBolum();
     }
 
-    /** Son yıkım tick'inde başlatılan birim (bölüm ya da sütun) sayısı. */
-    int sonTickBirim() {
-        return yikim.sonTickBirim();
+    /** Afet boyunca bir tick'te başlatılan en çok birim (bölüm ya da sütun). */
+    int enCokBirimTick() {
+        return yikim.enCokBirimTick();
     }
 
     /** Ölçüm otomasyonu için yıkım sayacı toplamları: kırılan blok, değişen bölüm, kirletilen bölüm. */
