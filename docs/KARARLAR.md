@@ -5056,6 +5056,36 @@ kuyruğundan (iş `1107-192207410-83`): `FILTRE=yok`, 216/216, Gradle 1 dk 53 sn
 **Açık:** iki makinede de `Linger=no`: oturum kapanınca ana makinedeki koşucular ve pc2'deki daemon durur (kalıcı için kullanıcı ana
 makinede ve pc2'de `sudo loginctl enable-linger lagxt`).
 
+**K-E53 Kuyruk iki makineye dağılır: ortak `oto` kuyruğu ve backfill (şef kararı, kullanıcı adına, 2026-11-07; dal `is/sira-2`;
+şefin metninde "K-E52", sayaç K-E53 verdi).** Kanıt (pano 20:27, kullanıcı gözlemi): pc2'de tek iş koşuyordu (2 yuvalı
+`pc2_istemci.sh`, ~18 dk), pc2 kuyruğunda 15 iş bekliyordu (9'u 1 yuvalı `gradle_kapisi.sh`/`*_sunucu.py`, başta 2 yuvalı istemci
+işleri), ana makinenin kuyruğu boş, iki yuvası boştaydı. İki kök neden: `sira.py --makine oto` ekransız işi hep pc2'ye koyuyordu
+(K-E44 "hep pc2") ve `sira_kosucu.py` katı FIFO'ydu (baştaki iş sığmayınca arkadakiler beklerdi). Karar: (1) **pc2 öncelikli, taşan
+iş ana makineye** (K-E44'ün "hep pc2"si yerine): `sira.py ekle` varsayılanı `--makine oto` ekransız işi (`gradle_kapisi.sh`,
+`./gradlew` ekransız görevler, `*_sunucu.py`) ortak `~/.cache/dogalafet-sira/oto/` kuyruğuna koyar; iki koşucu da önce kendi
+kuyruğuna, sonra `oto`'ya bakar, işi `rename` ile kendi `kosan/`'ına alır (kayıtta `makine` koşan makine, `kaynak: oto`; kimlik
+değişmez, `bekle`/`durum` makineden bağımsız arar). Ana koşucu `oto` işini yalnız pc2 alamıyorsa (pc2'de koşan + uzak.sh yuvaları
++ pc2'de bekleyen yük işe yer bırakmıyor, aynı klasörden pc2 işi koşuyor ya da pc2 koşucusu yok) ya da iş 60 sn
+(`SIRA_OTO_BEKLE_SN`) beklediyse alır; ana makinede `UZAK=0` ile yerelde koşar: ağır süreç ≤ 2 (kuyruğun işleri + kuyruk dışı
+`GradleWrapperMain`, K-E19 a), boş RAM ≥ `KAPI_RAM_MB` (4096), iki oto işi arasında 60 sn (`SIRA_ANA_ARA_SN`; RAM ölçümü otursun), aynı
+klasörden tek oto işi. (2) **İstemci işi makineden bağımsız:** `sira.py ekle --istemci -- python3 tools/senaryo/x_gorsel.py
+<kanıt/> …` (kanıt klasörü betiğin ilk argümanı, `--kanit` argümanı ya da `sira.py ekle --kanit`) `oto`'da saklanır; pc2 alırsa
+`pc2_istemci.sh <kanıt/> <betik> …` ile iki yuva, ana alırsa betiğin kendisi (gizli workspace, `runclient_kilit`) tek yuva ve tek
+istemci (kuyruğun istemci işi ya da yaşayan runClient kilidi varken alınmaz). `--olcum` (FPS/CPU, K0-33, K-E29 b) yalnız ana;
+`pc2_istemci.sh` doğrudan verilirse pc2'ye sabit (geriye uyum); kanıtı belirsiz istemci işi ana. (3) **Backfill:** koşucu
+bekleyenleri sırayla gezer, sığan ilk işi alır (tek yuvalı iş sığmayan iki yuvalının önüne geçer); açlık koruması: sığmayan iki
+yuvalı iş 10 dk'dan (`SIRA_ACLIK_SN`) uzun bekliyorsa o makine arkasından iş almaz, iki yuva boşalınca onu koşar; pc2'de aynı
+klasörün ikinci işi atlanmaya devam eder. (4) **Geçiş:** pc2 koşucusu eski `sira.py`'nin (`surum` alanı yok; işçilerin eski
+worktree'lerindeki `gradle_kapisi.sh`/`cekirdek_sunucu` hep `--makine pc2` verir) pc2'ye koyduğu tek yuvalı ekransız işi sürekli
+`oto`'ya taşır; eski `sira.py bekle` `oto`'yu aramadığı için `pc2/bekleyen/<id>.json` `oto`'daki kayda bağ (symlink) olarak kalır, iş
+başlayınca sarkan bağ silinir. Yeni `gradle_kapisi.sh`/`cekirdek_sunucu` kapı doluyken ekransız işi doğrudan `oto`'ya atar; pc2'nin
+`dolu-mu`'su `oto` bekleyenini de sayar. (5) Pano başlığına `Yuva: ana n/2 · pc2 n/2 · oto bekleyen N`; oto'dan gelen koşan iş
+`ana (oto)`. Reddedilen: oto işini pc2 kuyruğunda bayrakla tutmak (karar `oto` spool'unu istedi; eski istemciler bağla çözüldü),
+ana makinenin oto işini hemen alması (ana makine kullanıcınındır). Sınama `tools/senaryo/test_sira.py` 8/8 (`sleep` işleri: backfill,
+`SIRA_ACLIK_SN=2` açlık, pc2 dolu → ana alır, 60 sn bekleyeni ana alır, ana aralığı, tek istemci, eski işin taşınması ve kimliğin
+`bekle` ile bulunması, makine seçimi ve istemci çevirisi). Canlı geçiş 20:36:04 (`restart`, koşan `1107-200450560-e7` sürdü): 9 eski
+iş `oto`'ya taşındı, ana makine 20:36:05'te ilkini (`1107-200716577-44`, `gradle_kapisi.sh compileJava test`) aldı.
+
 ## Açık noktalar (Faz 2b)
 
 Entegratöre bırakılan notlardan işlenenler: kancalar (K-E1), protokol (K-C47), `asama ileri [süreç]` (K-C48), sanal su §3a istisnası

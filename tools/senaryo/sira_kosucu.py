@@ -1,16 +1,22 @@
 #!/usr/bin/env python3
-"""İş kuyruğu koşucusu (K-E51): bir makinenin spool'unu (`sira.py`) izler, en çok --yuva iş koşar, biten işi biten/'e
-yazar ve KÖK/.vibe/pano.md'yi günceller (pc2 koşucusu panoyu pc2'deki aynı yola da kopyalar: pc2'de `watch cat`).
+"""İş kuyruğu koşucusu (K-E51, K-E53): bir makinenin spool'unu ve ortak `oto` spool'unu (`sira.py`) izler, en çok --yuva
+iş koşar, biten işi biten/'e yazar ve KÖK/.vibe/pano.md'yi günceller (pc2 koşucusu panoyu pc2'deki aynı yola da kopyalar:
+pc2'de `watch cat`).
 
 Kullanım: sira_kosucu.py --makine ana|pc2 [--yuva 2]
 Ayakta kalma: systemd --user `dogalafet-sira@<makine>` (tools/senaryo/dogalafet-sira@.service, KillMode=process: koşucu
-yeniden başlarken koşan işler sürer). İki koşucu da ana makinede koşar: pc2'de depo (.git, .vibe) ve spool yok, işi
-komutun kendisi K-E44 ile pc2'ye taşır (uzak.sh eşitler, yuva/klasör kilidi alır, log ve kanıtı geri çeker).
-Sıra eklenme sırasıdır; baştaki iş sığmıyorsa arkadakiler öne geçmez (iki yuvalı istemci işi aç kalmasın); yalnız
-pc2'de koşan bir işle aynı klasörden gelen iş (uzak.sh klasör kilidi) atlanır. pc2 kuyruğu kuyruk dışından tutulan uzak.sh
-yuvalarını da sayar (iş uzak.sh içinde bekleyip UZAK_BEKLE_DK'da düşmesin). Her iş kendi oturumunda `--kos` kipindeki
-koşturucuyla koşar; koşturucu çıkışı kendisi yazar, koşucu ölse de kayıt tamamlanır. pc2'nin `--istemci` işi süresince
-koşturucu ana makinedeki uzak.sh yuva kilitlerinin hepsini tutar ve işe UZAK_YUVA_TUTULU=1 verir.
+yeniden başlarken koşan işler sürer; başlayınca kosan/'daki kayıtlar koşturucu süreçleriyle bağdaştırılır). İki koşucu da
+ana makinede koşar: pc2'de depo (.git, .vibe) ve spool yok, işi komutun kendisi K-E44 ile pc2'ye taşır (uzak.sh eşitler,
+yuva/klasör kilidi alır, log ve kanıtı geri çeker).
+Sıra (K-E53): adaylar önce bu makinenin bekleyenleri, sonra oto'nunkiler (ikisi de eklenme sırasıyla); koşucu sırayı gezer
+ve sığan işi alır (backfill: sığmayan iki yuvalı işin arkasındaki tek yuvalı iş öne geçer). Açlık koruması: sığmayan
+iki yuvalı iş SIRA_ACLIK_SN (600) sn'den uzun bekliyorsa arkasındaki hiçbir iş alınmaz, yuvalar boşalınca o koşar. pc2'de
+koşan bir işle aynı klasörden gelen iş (uzak.sh klasör kilidi) atlanır; pc2 kuyruğu kuyruk dışından tutulan uzak.sh
+yuvalarını da sayar. oto işinin dağıtımı (pc2 öncelikli, ana taşanı alır) `sira.py` başındaki açıklamada. Her iş kendi
+oturumunda `--kos` kipindeki koşturucuyla koşar; koşturucu çıkışı kendisi yazar, koşucu ölse de kayıt tamamlanır. pc2'nin
+`--istemci` işi süresince koşturucu ana makinedeki uzak.sh yuva kilitlerinin hepsini tutar ve işe UZAK_YUVA_TUTULU=1 verir.
+Geçiş: pc2 koşucusu eski sira.py'nin (`surum` alanı yok) pc2'ye koyduğu tek yuvalı ekransız işi oto'ya taşır (kimlik ve log
+aynı); eski `sira.py bekle` oto'yu aramadığı için pc2/bekleyen'de oto'daki kayda bağ kalır, iş başlayınca bağ silinir.
 """
 import argparse
 import fcntl
@@ -24,6 +30,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import runclient_kilit  # noqa: E402
 import sira  # noqa: E402
 
 PANO_YENILEME_SN = 30
@@ -90,6 +97,7 @@ class Kosucu:
         self.dur = False
         self.pc2_metin = None
         self.pc2_olay = threading.Event()
+        self.tasinmaz = set()
 
     def kilitle(self):
         self.kilit = open(sira.dizin(self.makine) / "kosucu.lock", "a")
@@ -116,30 +124,109 @@ class Kosucu:
         for kimlik in [k for k, s in self.cocuklar.items() if s.poll() is not None]:
             del self.cocuklar[kimlik]
 
+    def eski_pc2_islerini_tasi(self):
+        """K-E53 geçişi (yalnız pc2 koşucusu; pc2/bekleyen'den iş alan tek süreç o): eski sira.py'nin pc2'ye koyduğu tek
+        yuvalı ekransız iş oto'ya, yerine oto'daki kayda bağ. Sarkan bağlar (iş başladı) silinir."""
+        bekleyen = sira.dizin("pc2", "bekleyen")
+        for yol in bekleyen.glob("[!.]*.json"):
+            if yol.is_symlink():
+                if not yol.exists():
+                    yol.unlink(missing_ok=True)
+                continue
+            if yol.name in self.tasinmaz:
+                continue
+            veri = sira.json_oku(yol)
+            if not veri:
+                continue
+            if ("surum" in veri or veri.get("istemci") or veri.get("yuva", 1) != 1 or veri["env"].get("UZAK") == "0"
+                    or sira.kendiliginden(veri["komut"])[0] not in ("gradle", "sunucu")
+                    or not sira.ekransiz_mi(veri["komut"])):
+                self.tasinmaz.add(yol.name)
+                continue
+            veri.update(makine="oto", tasindi=time.time())
+            hedef = sira.dizin("oto", "bekleyen") / yol.name
+            sira.json_yaz(hedef, veri)
+            bag = yol.with_name(f".{yol.name}.bag")
+            bag.unlink(missing_ok=True)
+            os.symlink(hedef, bag)
+            os.replace(bag, yol)
+            print(f"SIRA: {veri['id']} pc2 → oto taşındı (eski kayıt)", flush=True)
+
+    def pc2_alamaz(self, veri):
+        """pc2 bu oto işini şimdi alamaz: koşucusu yok, aynı klasörden işi koşuyor ya da yükü (koşan + uzak.sh yuvaları +
+        pc2'de bekleyen) işe yer bırakmıyor."""
+        if not sira.kosucu_canli("pc2"):
+            return True
+        kosan = [v for _, v in sira.isler("pc2", "kosan")]
+        if veri["cwd"] in {v["cwd"] for v in kosan} or sira.uzak_klasor_dolu(veri["cwd"]):
+            return True
+        yuk = sira.doluluk("pc2") + sum(sira.gerek(v, "pc2") for _, v in sira.isler("pc2", "bekleyen"))
+        return yuk + sira.gerek(veri, "pc2") > sira.YUVA
+
+    def ana_engeli(self, veri, kosan, simdi):
+        """Ana makine bu işi şimdi neden alamaz (None: alır). İstemci işi: ana makinede tek istemci. oto işi: pc2 öncelikli,
+        ağır süreç ≤ 2 (kuyruk dışı Gradle da), boş RAM >= KAPI_RAM_MB, aynı klasörden koşan oto işi yok, son oto işi
+        SIRA_ANA_ARA_SN önce başladı."""
+        if veri.get("istemci"):
+            if any(v.get("istemci") for v in kosan):
+                return "kuyruğun istemci işi koşuyor"
+            kayit = runclient_kilit.oku()
+            if kayit and runclient_kilit.yasiyor(kayit):
+                return "runClient kilidi tutuluyor"
+        if veri.get("makine") != "oto":
+            return None
+        if simdi - veri.get("eklendi", simdi) < sira.OTO_BEKLE_SN and not self.pc2_alamaz(veri):
+            return "pc2 öncelikli"
+        oto_kosan = [v for v in kosan if v.get("kaynak") == "oto"]
+        if veri["cwd"] in {v["cwd"] for v in oto_kosan}:
+            return "aynı klasörden oto işi koşuyor"
+        if any(time.time() - v.get("baslangic", 0) < sira.ANA_ARA_SN for v in oto_kosan):
+            return "az önce oto işi başladı (RAM ölçümü otursun)"
+        oturumlar = {v.get("kosturucu") for v in kosan}
+        agir = sum(sira.gerek(v, "ana") for v in kosan) + sum(o not in oturumlar for o in sira.gradle_oturumlari())
+        if agir + sira.gerek(veri, "ana") > sira.YUVA:
+            return f"ana makinede {agir} ağır süreç"
+        if sira.bos_ram_mb() < int(os.environ.get("KAPI_RAM_MB", "4096")):
+            return "boş RAM az"
+        return None
+
+    def adaylar(self):
+        return [*sira.isler(self.makine, "bekleyen"), *sira.isler("oto", "bekleyen")]
+
     def baslat(self):
+        simdi = time.time()
         kosan = [v for _, v in sira.isler(self.makine, "kosan")]
-        dolu = sum(v.get("yuva", 1) for v in kosan)
+        dolu = sira.doluluk(self.makine)
         klasorler = {v["cwd"] for v in kosan}
-        uzak_dolu = sira.uzak_dolu_yuva() if self.makine == "pc2" else 0
-        for yol, veri in sira.isler(self.makine, "bekleyen"):
-            gerek = min(veri.get("yuva", 1), self.yuva)
+        for yol, veri in self.adaylar():
+            if veri.get("tasindi") and (sira.dizin("pc2", "biten") / yol.name).exists():
+                yol.unlink(missing_ok=True)
+                continue
+            gerek = sira.gerek(veri, self.makine)
             if self.makine == "pc2" and (veri["cwd"] in klasorler or sira.uzak_klasor_dolu(veri["cwd"])):
                 continue
-            if max(dolu, uzak_dolu) + gerek > self.yuva:
-                break
+            if dolu + gerek > self.yuva:
+                if gerek > 1 and simdi - veri.get("eklendi", simdi) > sira.ACLIK_SN:
+                    break
+                continue
+            if self.makine == "ana" and self.ana_engeli(veri, kosan, simdi):
+                continue
             hedef = sira.dizin(self.makine, "kosan") / yol.name
             try:
                 os.rename(yol, hedef)
             except FileNotFoundError:
                 continue
+            sira.makineye_hazirla(veri, self.makine)
             veri.update(durum="basliyor", baslangic=time.time())
             sira.json_yaz(hedef, veri)
             self.cocuklar[veri["id"]] = subprocess.Popen(
                 [sys.executable, str(Path(__file__).resolve()), "--kos", str(hedef)], start_new_session=True,
                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            print(f"SIRA: {veri['id']} başladı ({self.makine}, {gerek} yuva, kaynak {veri.get('kaynak', self.makine)})",
+                  flush=True)
             dolu += gerek
-            uzak_dolu += gerek if self.makine == "pc2" else 0
             klasorler.add(veri["cwd"])
+            kosan.append(veri)
 
     def imza(self):
         return tuple(sorted(str(p.relative_to(sira.SPOOL)) for p in sira.SPOOL.glob("*/*/[!.]*.json")))
@@ -171,6 +258,8 @@ class Kosucu:
               flush=True)
         while not self.dur:
             self.yetimleri_topla()
+            if self.makine == "pc2":
+                self.eski_pc2_islerini_tasi()
             self.baslat()
             imza = self.imza()
             kosan_var = any(sira.dizin(m, "kosan").glob("[!.]*.json") for m in sira.MAKINELER)

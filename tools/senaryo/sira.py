@@ -1,20 +1,28 @@
 #!/usr/bin/env python3
-"""İş kuyruğu (K-E51): ağır iş kuyruğa atılır, ekleyen bloklanmaz; koşucu (`sira_kosucu.py`) yuva açılınca koşar.
+"""İş kuyruğu (K-E51, K-E53): ağır iş kuyruğa atılır, ekleyen bloklanmaz; koşucu (`sira_kosucu.py`) yuva açılınca koşar.
 
-Spool: ~/.cache/dogalafet-sira/<makine>/{bekleyen,kosan,biten}/<id>.json (SIRA_KOK değiştirir), işin çıktısı
-<makine>/log/<id>.log (ya da --log). Her iş: komut, cwd, env (TEST_FILTRE, KAPI_*, UZAK*, DEFTER_ZORLA, VIBE_OTURUM,
+Spool: ~/.cache/dogalafet-sira/<spool>/{bekleyen,kosan,biten}/<id>.json (SIRA_KOK değiştirir), işin çıktısı
+<spool>/log/<id>.log (ya da --log). Her iş: komut, cwd, env (TEST_FILTRE, KAPI_*, UZAK*, DEFTER_ZORLA, VIBE_OTURUM,
 JAVA_HOME, LC_ALL, GRADLE_OPTS; ana kuyrukta ekran değişkenleri de), yuva, eklenme/başlangıç/bitiş, çıkış, süre, log.
-Makineler (ikisinin de koşucusu ana makinede, ikisi de 2 yuva; `--istemci` iki yuva tutar):
-  ana  ekranlı iş: runClient, *_gorsel.py, *_istemci.py, runData, UZAK=0
-  pc2  ekransız iş: komutun kendisi pc2'ye gider (K-E44: gradle_kapisi.sh, ./gradlew, *_sunucu.py, uzak.sh,
-       pc2_istemci.sh); kendiliğinden gitmeyen komut `tools/senaryo/uzak.sh` ile sarılır. Aynı klasörün ikinci işi
-       (uzak.sh klasör kilidi) arkadaki işlere sıra verir.
-  oto  (varsayılan) ekransızsa ya da pc2_istemci.sh ise pc2, değilse (ya da UZAK=0) ana. pc2_istemci.sh işi kendiliğinden
-       --istemci (iki yuva; koşturucu uzak.sh yuva kilitlerini tutar, UZAK_YUVA_TUTULU=1)
+İki koşucu da ana makinede, makine başına 2 yuva. Spool'lar:
+  oto  (varsayılan, K-E53) iki makinede de koşabilen iş: ekransız ağır iş (gradle_kapisi.sh, ./gradlew ekransız görevler,
+       *_sunucu.py) ve makineden bağımsız istemci işi (`--istemci -- python3 tools/senaryo/x_gorsel.py <kanıt/> …`; kanıt
+       klasörü betiğin ilk argümanı, `--kanit` argümanı ya da `sira.py ekle --kanit`). Koşucu önce kendi spool'una, sonra
+       oto'ya bakar ve işi `rename` ile kendi kosan/'ına alır (kayıttaki `makine` koşan makine olur, `kaynak` oto; kimlik
+       değişmez). pc2 öncelikli: ana koşucu oto işini pc2 alamıyorsa (pc2'nin koşan + bekleyen yükü işe yer bırakmıyor, iş
+       pc2'de koşan bir işle aynı klasörden ya da pc2 koşucusu yok) ya da iş SIRA_OTO_BEKLE_SN (60) sn beklediyse alır. Ana
+       makinede ekransız iş UZAK=0 ile yerelde koşar (ağır süreç ≤ 2: kuyruğun işleri + kuyruk dışı Gradle; boş RAM >=
+       KAPI_RAM_MB, vars. 4096, ölçüm otursun diye iki oto işi arasında SIRA_ANA_ARA_SN, vars. 60 sn); istemci işi betiğin kendisiyle, 1 yuva (ana makinede tek istemci: kuyruğun istemci işi ya da
+       yaşayan runClient kilidi varken alınmaz). pc2 istemci işini `pc2_istemci.sh <kanıt/> <betik> …` ile iki yuvada koşar.
+  ana  ekranlı iş (runClient, runData, UZAK=0, --olcum, kanıtı belirsiz istemci işi) ya da `--makine ana`.
+  pc2  `--makine pc2`, pc2_istemci.sh ve uzak.sh işi: komutun kendisi pc2'ye gider (K-E44); kendiliğinden gitmeyen komut
+       `tools/senaryo/uzak.sh` ile sarılır. pc2_istemci.sh işi kendiliğinden --istemci (koşturucu uzak.sh yuva kilitlerini
+       tutar, UZAK_YUVA_TUTULU=1).
 
 Kullanım:
-  sira.py ekle [--makine ana|pc2|oto] [--yuva 1|2] [--istemci] [--log <yol>] -- <komut...>
-                                    iş kimliğini basar ve hemen döner (koşucu yoksa systemd ile başlatmayı dener)
+  sira.py ekle [--makine oto|ana|pc2] [--yuva 1|2] [--istemci] [--kanit <dizin/>] [--olcum] [--log <yol>] -- <komut...>
+                                    iş kimliğini basar ve hemen döner (koşucu yoksa systemd ile başlatmayı dener);
+                                    --olcum: FPS/CPU ölçümü, yalnız ana makine (K0-33, K-E29 b)
   sira.py durum [<id>]              pano (bütün işler) ya da tek işin kaydı
   sira.py bekle <id> [--zaman <sn>] iş bitince onun çıkış koduyla döner; yalnız yapılacak başka iş kalmayınca
   sira.py iptal <id>                bekleyeni düşürür, koşanın oturumuna TERM gönderir
@@ -40,10 +48,16 @@ KOK = W.parents[1] if W.parent.name == ".worktrees" else W
 SPOOL = Path(os.environ.get("SIRA_KOK") or Path.home() / ".cache" / "dogalafet-sira")
 PANO = Path(os.environ.get("SIRA_PANO") or KOK / ".vibe" / "pano.md")
 MAKINELER = ("ana", "pc2")
+SPOOLLAR = (*MAKINELER, "oto")
 YUVA = 2
+SURUM = 2
+OTO_BEKLE_SN = float(os.environ.get("SIRA_OTO_BEKLE_SN", "60"))
+ACLIK_SN = float(os.environ.get("SIRA_ACLIK_SN", "600"))
+ANA_ARA_SN = float(os.environ.get("SIRA_ANA_ARA_SN", "60"))
 ENV_ANAHTARI = re.compile(r"(TEST_FILTRE|KAPI_\w+|UZAK\w*|DEFTER_ZORLA|VIBE_OTURUM|JAVA_HOME|LC_ALL|GRADLE_OPTS)")
 EKRAN_ENV = ("DISPLAY", "WAYLAND_DISPLAY", "HYPRLAND_INSTANCE_SIGNATURE", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS")
 KENDILIGINDEN_UZAK = ("uzak.sh", "pc2_istemci.sh")
+ISTEMCI_BETIGI = ("_gorsel.py", "_istemci.py")
 UZAK_KILITLERI = Path.home() / ".cache" / f"uzak-{os.environ.get('UZAK_MAKINE', 'pc2')}"
 
 
@@ -67,9 +81,11 @@ def json_oku(yol):
 
 
 def isler(makine, durum):
-    """[(yol, kayıt)], eklenme sırasıyla."""
+    """[(yol, kayıt)], eklenme sırasıyla. Bağlar (eski sira.py için pc2/bekleyen'de oto'ya taşınan işin izi) sayılmaz."""
     liste = []
     for yol in dizin(makine, durum).glob("[!.]*.json"):
+        if yol.is_symlink():
+            continue
         veri = json_oku(yol)
         if veri:
             liste.append((yol, veri))
@@ -77,11 +93,14 @@ def isler(makine, durum):
 
 
 def bul(kimlik):
-    for makine in MAKINELER:
-        for durum in ("bekleyen", "kosan", "biten"):
-            yol = dizin(makine, durum) / f"{kimlik}.json"
-            if yol.exists():
-                return makine, durum, yol
+    """(spool, durum, yol); makineden bağımsız. İş spool'lar arasında `rename` edilirken kaçmasın diye üç kez bakar."""
+    for _ in range(3):
+        for makine in SPOOLLAR:
+            for durum in ("bekleyen", "kosan", "biten"):
+                yol = dizin(makine, durum) / f"{kimlik}.json"
+                if yol.exists() and not yol.is_symlink():
+                    return makine, durum, yol
+        time.sleep(0.05)
     return None, None, None
 
 
@@ -138,22 +157,81 @@ def ekransiz_mi(komut):
     return tur == "uzak"
 
 
+def istemci_betigi(komut):
+    """Komuttaki görsel/istemci betiğinin sırası (`*_gorsel.py`, `*_istemci.py`) ya da None."""
+    return next((i for i, a in enumerate(komut) if Path(a).name.endswith(ISTEMCI_BETIGI)), None)
+
+
+def istemci_kaniti(komut, kanit=None):
+    """Makineden bağımsız istemci işinin kanıt klasörü (sonu /): `kanit`, betiğin `--kanit` argümanı ya da ilk argümanı.
+    Betik yoksa ya da klasör belirsizse None (iş pc2'ye taşınamaz)."""
+    i = istemci_betigi(komut)
+    if i is None:
+        return None
+    arglar = komut[i + 1:]
+    if not kanit and "--kanit" in arglar[:-1]:
+        kanit = arglar[arglar.index("--kanit") + 1]
+    if not kanit and arglar and not arglar[0].startswith("-"):
+        kanit = arglar[0]
+    return kanit.rstrip("/") + "/" if kanit else None
+
+
+def gerek(veri, makine):
+    """İşin `makine`de tuttuğu yuva: istemci işi pc2'de iki (runClient ~5–6 GiB), ana makinede bir (tek istemci ayrıca)."""
+    if veri.get("istemci") and makine == "ana":
+        return 1
+    return min(veri.get("yuva", 1), YUVA)
+
+
+def makineye_hazirla(veri, makine):
+    """Kaydı `makine`de koşacak biçime getirir (yerinde): `makine` alanı; oto'dan ana makineye gelen işe UZAK=0 ve ekran
+    ortamı; pc2'de makineden bağımsız istemci işi `pc2_istemci.sh <kanıt/> <betik> …` olur (özgün komut `ozgun_komut`)."""
+    if veri["makine"] == "oto":
+        veri["kaynak"] = "oto"
+    veri["makine"] = makine
+    if makine == "ana" and veri.get("kaynak") == "oto":
+        veri["env"] = {**veri["env"], **veri.get("ekran_env", {}), "UZAK": "0"}
+    i = istemci_betigi(veri["komut"])
+    if makine == "pc2" and veri.get("istemci") and veri.get("kanit") and i is not None \
+            and kendiliginden(veri["komut"])[0] != "uzak":
+        veri["ozgun_komut"] = veri["komut"]
+        veri["komut"] = ["tools/senaryo/pc2_istemci.sh", veri["kanit"], Path(veri["komut"][i]).name,
+                         *veri["komut"][i + 1:]]
+    return veri
+
+
 def yeni_kimlik():
     simdi = time.time()
     return time.strftime("%m%d-%H%M%S", time.localtime(simdi)) + f"{int(simdi * 1000) % 1000:03d}-{secrets.token_hex(1)}"
 
 
-def ekle(makine, komut, yuva=1, istemci=False, log=None, cwd=None, cikti=print):
-    """İşi kuyruğa yazar, kimliğini döner. `makine` oto ise komuttan seçilir."""
+def ekle(makine, komut, yuva=1, istemci=False, log=None, cwd=None, olcum=False, kanit=None, cikti=print):
+    """İşi kuyruğa yazar, kimliğini döner. `makine` oto ise komuttan seçilir (oto spool'u, ana ya da pc2)."""
     cwd = str(Path(cwd or os.getcwd()).resolve())
     env = {k: v for k, v in os.environ.items() if ENV_ANAHTARI.fullmatch(k)}
-    if any(Path(a).name == "pc2_istemci.sh" for a in komut):
-        istemci = True
+    ekran = {k: os.environ[k] for k in EKRAN_ENV if k in os.environ}
+    tur = kendiliginden(komut)[0]
+    pc2_istemci = any(Path(a).name == "pc2_istemci.sh" for a in komut)
+    istemci = istemci or pc2_istemci
+    if olcum:
+        if makine == "pc2" or tur == "uzak":
+            raise ValueError("--olcum işi yalnız ana makinede koşar (K0-33, K-E29 b)")
+        makine = "ana"
+    kanit = istemci_kaniti(komut, kanit) if istemci and not pc2_istemci else None
     if makine == "oto":
-        makine = "pc2" if env.get("UZAK") != "0" and ekransiz_mi(komut) else "ana"
+        if tur == "uzak":
+            makine = "pc2"
+        elif env.get("UZAK") == "0":
+            makine = "ana"
+        elif istemci:
+            makine = "oto" if kanit else "ana"
+        else:
+            makine = "oto" if ekransiz_mi(komut) else "ana"
     if makine == "ana":
-        env.update({k: os.environ[k] for k in EKRAN_ENV if k in os.environ})
-    elif not istemci and kendiliginden(komut)[0] is None:
+        env.update(ekran)
+    elif makine == "pc2" and istemci and not pc2_istemci and not kanit:
+        raise ValueError("pc2 istemci işinin kanıt klasörü belirsiz: `--kanit <dizin/>` ya da betiğin ilk argümanı")
+    elif makine == "pc2" and not istemci and tur is None:
         if not (Path(cwd) / "gradlew").exists():
             raise ValueError(f"pc2 işi uzak.sh ile sarılacak ama {cwd} proje/worktree kökü değil")
         komut = [str(Path(cwd) / "tools/senaryo/uzak.sh"), *komut]
@@ -162,19 +240,27 @@ def ekle(makine, komut, yuva=1, istemci=False, log=None, cwd=None, cikti=print):
         "id": kimlik, "makine": makine, "komut": list(komut), "cwd": cwd, "env": env,
         "yuva": min(2 if istemci else yuva, YUVA), "istemci": istemci, "eklendi": time.time(), "durum": "bekliyor",
         "log": str(Path(log).resolve()) if log else str(dizin(makine, "log") / f"{kimlik}.log"),
-        "ekleyen": os.environ.get("VIBE_OTURUM", ""),
+        "ekleyen": os.environ.get("VIBE_OTURUM", ""), "surum": SURUM,
     }
+    if kanit:
+        veri["kanit"] = kanit
+    if olcum:
+        veri["olcum"] = True
+    if makine == "oto" and istemci:
+        veri["ekran_env"] = ekran
     json_yaz(dizin(makine, "bekleyen") / f"{kimlik}.json", veri)
     onde = len(isler(makine, "bekleyen")) - 1 + len(isler(makine, "kosan"))
     cikti(f"SIRA: {kimlik} {makine} kuyruğunda (önünde {onde} iş); sonuç: tools/senaryo/sira.py bekle {kimlik}",
           file=sys.stderr)
-    if not kosucu_canli(makine):
+    for m in MAKINELER if makine == "oto" else (makine,):
+        if kosucu_canli(m):
+            continue
         if "SIRA_KOK" not in os.environ:
-            subprocess.run(["systemctl", "--user", "start", f"dogalafet-sira@{makine}.service"], capture_output=True,
+            subprocess.run(["systemctl", "--user", "start", f"dogalafet-sira@{m}.service"], capture_output=True,
                            timeout=10)
-        if not kosucu_canli(makine):
-            cikti(f"SIRA: UYARI {makine} koşucusu çalışmıyor; iş bekler. Başlat: systemctl --user start "
-                  f"dogalafet-sira@{makine} (ya da nohup python3 tools/senaryo/sira_kosucu.py --makine {makine} &)",
+        if not kosucu_canli(m):
+            cikti(f"SIRA: UYARI {m} koşucusu çalışmıyor; iş bekler. Başlat: systemctl --user start "
+                  f"dogalafet-sira@{m} (ya da nohup python3 tools/senaryo/sira_kosucu.py --makine {m} &)",
                   file=sys.stderr)
     return kimlik
 
@@ -190,13 +276,36 @@ def uzak_klasor_dolu(cwd):
     return kilit_dolu(UZAK_KILITLERI / f"klasor-{hashlib.md5(klasor.encode()).hexdigest()[:12]}")
 
 
+def doluluk(makine):
+    """Makinenin dolu yuvası: kuyruğun koşan işleri; pc2'de kuyruk dışından tutulan uzak.sh yuvaları da."""
+    dolu = sum(gerek(v, makine) for _, v in isler(makine, "kosan"))
+    return max(dolu, uzak_dolu_yuva()) if makine == "pc2" else dolu
+
+
+def gradle_oturumlari():
+    """Ana makinede çalışan Gradle istemcilerinin (GradleWrapperMain) oturum kimlikleri."""
+    oturumlar = []
+    for yol in Path("/proc").glob("[0-9]*/cmdline"):
+        try:
+            if b"GradleWrapperMain" not in yol.read_bytes():
+                continue
+            oturumlar.append(int((yol.parent / "stat").read_text().rsplit(")", 1)[1].split()[3]))
+        except (OSError, IndexError, ValueError):
+            continue
+    return oturumlar
+
+
+def bos_ram_mb():
+    return int(Path("/proc/meminfo").read_text().split("MemAvailable:")[1].split()[0]) // 1024
+
+
 def dolu_mu(makine, cwd=None):
-    """Kapı doluysa gerekçe, değilse None. pc2: kuyrukta bekleyen, kuyruğun yuvaları, uzak.sh yuva ve klasör kilitleri;
-    ana: kuyrukta bekleyen, Gradle >= 2, boş RAM < KAPI_RAM_MB (vars. 4096), KAPI_PORT dinleniyor."""
-    bekleyen = len(isler(makine, "bekleyen"))
+    """Kapı doluysa gerekçe, değilse None. pc2: kuyrukta bekleyen (pc2 ve oto), kuyruğun yuvaları, uzak.sh yuva ve klasör
+    kilitleri; ana: kuyrukta bekleyen, Gradle >= 2, boş RAM < KAPI_RAM_MB (vars. 4096), KAPI_PORT dinleniyor."""
+    bekleyen = len(isler(makine, "bekleyen")) + (len(isler("oto", "bekleyen")) if makine == "pc2" else 0)
     if bekleyen:
-        return f"{makine} kuyruğunda {bekleyen} bekleyen iş"
-    if sum(v.get("yuva", 1) for _, v in isler(makine, "kosan")) >= YUVA:
+        return f"{makine}{'+oto' if makine == 'pc2' else ''} kuyruğunda {bekleyen} bekleyen iş"
+    if sum(gerek(v, makine) for _, v in isler(makine, "kosan")) >= YUVA:
         return f"{makine} kuyruğunun {YUVA} yuvası dolu"
     if makine == "pc2":
         yuvalar = int(os.environ.get("UZAK_YUVA", "2"))
@@ -205,10 +314,10 @@ def dolu_mu(makine, cwd=None):
         if uzak_klasor_dolu(cwd or os.getcwd()):
             return f"bu klasörden pc2'de koşan iş var ({Path(cwd or os.getcwd()).resolve()})"
         return None
-    gradle = subprocess.run(["pgrep", "-fc", "GradleWrapperMain"], capture_output=True, text=True).stdout.strip()
-    if int(gradle or 0) >= 2:
+    gradle = len(gradle_oturumlari())
+    if gradle >= 2:
         return f"ana makinede {gradle} Gradle çalışıyor"
-    bos = int(Path("/proc/meminfo").read_text().split("MemAvailable:")[1].split()[0]) // 1024
+    bos = bos_ram_mb()
     if bos < int(os.environ.get("KAPI_RAM_MB", "4096")):
         return f"boş RAM {bos} MB"
     port = os.environ.get("KAPI_PORT")
@@ -297,22 +406,29 @@ def komut_metni(veri):
     return (metin[:97] + "…" if len(metin) > 98 else metin).replace("|", "\\|")
 
 
+def makine_metni(veri):
+    return f"{veri['makine']} (oto)" if veri.get("kaynak") == "oto" else veri["makine"]
+
+
 def pano_metni(son_biten=10):
     simdi = time.time()
-    kosucular = []
+    kosucular, yuvalar = [], []
     for makine in MAKINELER:
         bilgi = json_oku(dizin(makine) / "kosucu.json") or {}
-        kosucular.append(f"{makine} {'çalışıyor' if kosucu_canli(makine) else 'YOK'} ({bilgi.get('yuva', YUVA)} yuva)")
+        kosucular.append(f"{makine} {'çalışıyor' if kosucu_canli(makine) else 'YOK'}")
+        yuvalar.append(f"{makine} {doluluk(makine)}/{bilgi.get('yuva', YUVA)}")
+    yuvalar.append(f"oto bekleyen {len(isler('oto', 'bekleyen'))}")
     satirlar = ["# DogalAfetlerMod iş panosu", "",
                 f"Güncellendi {time.strftime('%Y-%m-%d %H:%M:%S')} · koşucu: {' · '.join(kosucular)}", "",
+                f"Yuva: {' · '.join(yuvalar)}", "",
                 "| iş | makine | başlangıç | durum | süre | yuva | komut | log |", "|---|---|---|---|---|---|---|---|"]
     biten = []
     for makine in MAKINELER:
         for _, v in isler(makine, "kosan"):
             bas = v.get("baslangic", simdi)
-            satirlar.append(f"| {v['id']} | {makine} | {time.strftime('%H:%M:%S', time.localtime(bas))} | koşuyor | "
-                            f"{sure_metni(simdi - bas)} | {v['yuva']} | {komut_metni(v)} | {v['log']} |")
-    for makine in MAKINELER:
+            satirlar.append(f"| {v['id']} | {makine_metni(v)} | {time.strftime('%H:%M:%S', time.localtime(bas))} | "
+                            f"koşuyor | {sure_metni(simdi - bas)} | {gerek(v, makine)} | {komut_metni(v)} | {v['log']} |")
+    for makine in SPOOLLAR:
         for sira, (_, v) in enumerate(isler(makine, "bekleyen"), 1):
             satirlar.append(f"| {v['id']} | {makine} | - | bekliyor ({sira}.) | {sure_metni(simdi - v['eklendi'])} | "
                             f"{v['yuva']} | {komut_metni(v)} | {v['log']} |")
@@ -320,8 +436,9 @@ def pano_metni(son_biten=10):
     for v in sorted(biten, key=lambda v: v.get("bitti", 0), reverse=True)[:son_biten]:
         durum = f"bitti, çıkış {v.get('cikis')}" if v["durum"] == "bitti" else v["durum"]
         bas = v.get("baslangic")
-        satirlar.append(f"| {v['id']} | {v['makine']} | {time.strftime('%H:%M:%S', time.localtime(bas)) if bas else '-'} | "
-                        f"{durum} | {sure_metni(v.get('sure', 0))} | {v['yuva']} | {komut_metni(v)} | {v['log']} |")
+        satirlar.append(f"| {v['id']} | {makine_metni(v)} | "
+                        f"{time.strftime('%H:%M:%S', time.localtime(bas)) if bas else '-'} | {durum} | "
+                        f"{sure_metni(v.get('sure', 0))} | {gerek(v, v['makine'])} | {komut_metni(v)} | {v['log']} |")
     return "\n".join(satirlar) + "\n"
 
 
@@ -346,7 +463,9 @@ def main():
     e = alt.add_parser("ekle")
     e.add_argument("--makine", choices=("ana", "pc2", "oto"), default="oto")
     e.add_argument("--yuva", type=int, choices=(1, 2), default=1)
-    e.add_argument("--istemci", action="store_true", help="runClient işi: iki yuva")
+    e.add_argument("--istemci", action="store_true", help="runClient işi: pc2'de iki yuva, ana makinede bir (tek istemci)")
+    e.add_argument("--kanit", help="istemci işinin kanıt klasörü (pc2'de geri çekilir); vars. betiğin ilk argümanı")
+    e.add_argument("--olcum", action="store_true", help="FPS/CPU ölçümü: yalnız ana makine")
     e.add_argument("--log")
     alt.add_parser("durum").add_argument("id", nargs="?")
     b = alt.add_parser("bekle")
@@ -361,7 +480,7 @@ def main():
         if not komut:
             ayr.error("ekle: komut `--`'dan sonra verilir")
         try:
-            print(ekle(a.makine, komut, a.yuva, a.istemci, a.log))
+            print(ekle(a.makine, komut, a.yuva, a.istemci, a.log, olcum=a.olcum, kanit=a.kanit))
         except ValueError as hata:
             print(f"SIRA: {hata}", file=sys.stderr)
             return 2

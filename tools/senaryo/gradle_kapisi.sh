@@ -6,7 +6,8 @@
 #  2. Görevlerin hepsi ekransızsa (uzak.sh --uzak-mi) iş pc2'de koşar, log geri gelir (K-E44); değilse ya da UZAK=0 ise yerelde.
 #  3. Kapı doluysa (sira.py dolu-mu: pc2'nin iki yuvası ya da bu klasörün pc2 işi; yerelde Gradle >= 2, boş RAM < KAPI_RAM_MB
 #     (vars. 4096) ya da KAPI_PORT dinleniyor; ya da o makinenin kuyruğunda bekleyen iş) beklemez: iş `sira.py ekle` ile kuyruğa
-#     girer, log'a ve çıktıya "SIRA: ... kuyrukta <id>", çıkış 0 (sonuç `tools/senaryo/sira.py bekle <id>`, pano, defter).
+#     girer (ekransız iş ortak `oto` kuyruğuna: pc2 öncelikli, taşanı ana makine UZAK=0 ile alır, K-E53), log'a ve çıktıya
+#     "SIRA: ... kuyrukta <id>", çıkış 0 (sonuç `tools/senaryo/sira.py bekle <id>`, pano, defter).
 #     KAPI_BLOKLA=1 eski davranış: kapı 60 sn'de bir, en çok KAPI_DK (vars. 20) dk beklenir; açılmazsa "KAPI: açılmadı", çıkış 3
 #     (K-E23). Kuyruğun koştuğu iş (SIRA_ICINDE) ve defterli bir betik içinden çağrı (DEFTER_ICINDE) da kuyruğa atmaz, yerelde
 #     böyle bekler; pc2'de (UZAK_ICINDE) kapı uzak.sh yuvasıdır, ayrıca beklenmez.
@@ -74,8 +75,10 @@ else
 fi
 blokla=${KAPI_BLOKLA-0}
 [ -n "${SIRA_ICINDE-}${DEFTER_ICINDE-}" ] && blokla=1
+kuyruk=$makine
+[ $makine = pc2 ] && kuyruk=oto
 if [ "$blokla" != 1 ] && neden=$($py tools/senaryo/sira.py dolu-mu --makine $makine); then
-    is=$($py tools/senaryo/sira.py ekle --makine $makine -- tools/senaryo/gradle_kapisi.sh "$log" "$@") || exit 2
+    is=$($py tools/senaryo/sira.py ekle --makine $kuyruk -- tools/senaryo/gradle_kapisi.sh "$log" "$@") || exit 2
     echo "SIRA: kapı dolu ($neden); kuyrukta $is — sonuç: tools/senaryo/sira.py bekle $is" | tee "$log"
     exit 0
 fi
