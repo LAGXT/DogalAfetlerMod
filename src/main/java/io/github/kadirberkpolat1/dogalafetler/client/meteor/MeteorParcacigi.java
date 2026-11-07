@@ -51,7 +51,7 @@ final class MeteorParcacigi extends TextureSheetParticle {
         switch (tur) {
             case PLAZMA, PLAZMA_AY -> {
                 lifetime = 10 + random.nextInt(12);
-                quadSize = 0.45F + random.nextFloat() * 0.5F;
+                quadSize = 0.675F + random.nextFloat() * 0.75F;
                 friction = 0.9F;
             }
             case DUMAN -> {
@@ -66,7 +66,7 @@ final class MeteorParcacigi extends TextureSheetParticle {
             }
             case KIVILCIM, KIVILCIM_AY -> {
                 lifetime = 18 + random.nextInt(24);
-                quadSize = 0.06F + random.nextFloat() * 0.07F;
+                quadSize = 0.09F + random.nextFloat() * 0.105F;
                 friction = 0.95F;
                 gravity = 0.35F;
                 hasPhysics = true;

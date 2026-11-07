@@ -1,7 +1,11 @@
 package io.github.kadirberkpolat1.dogalafetler.meteor;
 
+import com.electronwill.nightconfig.core.CommentedConfig;
+import com.electronwill.nightconfig.core.io.ParsingMode;
+import com.electronwill.nightconfig.toml.TomlFormat;
 import com.mojang.authlib.GameProfile;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.config.AyarKaydi;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.CekirdekOyunTestleri;
 import io.github.kadirberkpolat1.dogalafetler.core.DonemAlani;
@@ -10,6 +14,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.olay.DonemDegistiEvent;
 import io.github.kadirberkpolat1.dogalafetler.esya.MeteorEsyaKayitlari;
 import io.github.kadirberkpolat1.dogalafetler.esya.termostat.Termostat;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
+import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.MeteorAyarGocu;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.MeteorOlcegi;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.OdulZamani;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.OdulZari;
@@ -22,8 +27,15 @@ import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Yalitim;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
 import io.github.kadirberkpolat1.dogalafetler.yangin.YanginKaynagi;
 import io.github.kadirberkpolat1.dogalafetler.yangin.YanginYoneticisi;
+import java.io.IOException;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.BiPredicate;
@@ -52,8 +64,11 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.common.ForgeConfigSpec;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.eventbus.api.EventPriority;
+import net.minecraftforge.fml.config.ConfigTracker;
+import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
 
@@ -855,6 +870,113 @@ public final class MeteorOyunTestleri {
         } finally {
             level.getServer().getPlayerList().remove(o);
         }
+    }
+
+    /** meteor-2'den önceki ve ara yapıların varsayılanlarıyla, sürüm anahtarı olmadan yazılmış SERVER config (üç elle değer). */
+    private static final String ESKI_AYAR = """
+            #Meteor, krater ve meteor ödülleri (madde 13c, bölüm D/H)
+            [meteor]
+            	kraterBlokButcesi = 300
+            	varlikTavani = 96
+            	girisYuksekligi = 140
+            	dusmeHizi = 3.0
+            	yagmurBuyukOrani = 0.07
+
+            [gunes_patlamasi]
+            	buyukMeteorOrani = 0.05
+            	meteorYagmuruDakikaBasina = 24.0
+
+            [ay_carpmasi]
+            	meteorSuresiSn = 120
+            	meteorDakikaBasina = 7.5
+            	meteorBuyukOrani = 0.04
+            """;
+
+    /**
+     * MT2-31: var olan dünyanın eski SERVER config'i açılışta (dosya işleyicisinin Forge'dan önce çağırdığı yol) göç eder:
+     * eski varsayılanda kalanlar yeniye (24 → 180 zincirle), elle değerler (300, 0,07, 120) korunur, sürüm güncellenir, tek
+     * satır özet döner; ikinci açılış dosyaya dokunmaz. Sonra dosya Forge'un açılış düzeltmesinden ({@code correct}) geçirilir:
+     * kalkan {@code dusmeHizi} silinir, eksik anahtarlar varsayılan alır, göçün değerleri kalır. Tablonun yeni değerleri
+     * spec'in varsayılanlarıdır. Canlı config'e yazılmaz (K-E28): geçici dosya.
+     */
+    @GameTest(template = "bos", batch = "meteor_goc", timeoutTicks = 20)
+    public static void eskiAyarDosyasiAcilistaGocEderElleDegerKorunur(GameTestHelper y) {
+        Path klasor = null;
+        Path dosya = null;
+        try {
+            klasor = Files.createTempDirectory("dogalafetler-goc");
+            dosya = klasor.resolve(AyarKaydi.SUNUCU_DOSYASI);
+            Files.writeString(dosya, ESKI_AYAR, StandardCharsets.UTF_8);
+            String satir = AyarKaydi.sunucuDosyasiniGocEt(dosya);
+            DogalAfetler.LOGGER.info("meteor göç GameTest: {}", satir);
+            dogrula(y, satir != null && satir.contains(MeteorAyarGocu.SURUM_YOLU + " 0 → " + MeteorAyarGocu.GUNCEL),
+                    "göç satırı yok: " + satir);
+            CommentedConfig dosyada = tomlOku(dosya);
+            Map<String, Double> beklenen = new HashMap<>(Map.of(MeteorAyarGocu.SURUM_YOLU, (double) MeteorAyarGocu.GUNCEL,
+                    "meteor.varlikTavani", 448.0, "meteor.girisYuksekligi", 200.0, "gunes_patlamasi.buyukMeteorOrani", 0.10,
+                    "gunes_patlamasi.meteorYagmuruDakikaBasina", 180.0, "ay_carpmasi.meteorDakikaBasina", 180.0,
+                    "ay_carpmasi.meteorBuyukOrani", 0.10, "meteor.kraterBlokButcesi", 300.0, "meteor.yagmurBuyukOrani", 0.07,
+                    "ay_carpmasi.meteorSuresiSn", 120.0));
+            sayilarAyni(y, dosyada, beklenen, "göçten sonra dosyada");
+            dogrula(y, AyarKaydi.sunucuDosyasiniGocEt(dosya) == null, "güncel sürümdeki dosya yeniden göç etmemeli");
+
+            ForgeConfigSpec spec = sunucuSpec();
+            List<String> duzeltilen = new ArrayList<>();
+            spec.correct(dosyada, (eylem, yol, eski, yeni) -> duzeltilen.add(String.join(".", yol) + " " + eski + " → " + yeni));
+            dogrula(y, !dosyada.contains("meteor.dusmeHizi"), "kalkan anahtar Forge düzeltmesinde silinmeli");
+            beklenen.put("meteor.ucusSuresi", 180.0);
+            beklenen.put("gunes_patlamasi.meteorYagmuruSaniye", 600.0);
+            sayilarAyni(y, dosyada, beklenen, "Forge düzeltmesinden sonra");
+            for (MeteorAyarGocu.Adim a : MeteorAyarGocu.ADIMLAR) {
+                Object varsayilan = ((ForgeConfigSpec.ValueSpec) spec.getSpec().get(a.yol())).getDefault();
+                dogrula(y, varsayilan instanceof Number n && n.doubleValue() == a.yeni().doubleValue(),
+                        a.yol() + " tablodaki yeni değer " + a.yeni() + ", spec varsayılanı " + varsayilan);
+            }
+            Object surumVarsayilani = ((ForgeConfigSpec.ValueSpec) spec.getSpec().get(MeteorAyarGocu.SURUM_YOLU)).getDefault();
+            dogrula(y, Integer.valueOf(MeteorAyarGocu.GUNCEL).equals(surumVarsayilani),
+                    "yeni dosya güncel sürümle yazılmalı: " + surumVarsayilani);
+            DogalAfetler.LOGGER.info("meteor göç GameTest: Forge düzeltmesi {} anahtar ({}...)", duzeltilen.size(),
+                    duzeltilen.stream().filter(s -> s.startsWith("meteor.")).limit(3).toList());
+            y.succeed();
+        } catch (IOException hata) {
+            y.fail("geçici config dosyası: " + hata);
+        } finally {
+            try {
+                if (dosya != null) {
+                    Files.deleteIfExists(dosya);
+                }
+                if (klasor != null) {
+                    Files.deleteIfExists(klasor);
+                }
+            } catch (IOException hata) {
+                DogalAfetler.LOGGER.warn("meteor göç GameTest: geçici dosya silinemedi: {}", hata.toString());
+            }
+        }
+    }
+
+    private static CommentedConfig tomlOku(Path dosya) throws IOException {
+        CommentedConfig icerik = TomlFormat.newConfig(HashMap::new);
+        try (Reader okuyucu = Files.newBufferedReader(dosya, StandardCharsets.UTF_8)) {
+            TomlFormat.instance().createParser().parse(okuyucu, icerik, ParsingMode.REPLACE);
+        }
+        return icerik;
+    }
+
+    private static void sayilarAyni(GameTestHelper y, CommentedConfig c, Map<String, Double> beklenen, String an) {
+        for (Map.Entry<String, Double> e : beklenen.entrySet()) {
+            Object deger = c.get(e.getKey());
+            dogrula(y, deger instanceof Number n && Math.abs(n.doubleValue() - e.getValue()) < 1e-9,
+                    an + " " + e.getKey() + " = " + deger + ", beklenen " + e.getValue());
+        }
+    }
+
+    private static ForgeConfigSpec sunucuSpec() {
+        for (ModConfig c : ConfigTracker.INSTANCE.configSets().get(ModConfig.Type.SERVER)) {
+            if (DogalAfetler.MOD_ID.equals(c.getModId()) && c.getSpec() instanceof ForgeConfigSpec spec) {
+                return spec;
+            }
+        }
+        throw new IllegalStateException("dogalafetler SERVER spec'i yok");
     }
 
     @GameTest(template = "bos", batch = "meteor_termostat", timeoutTicks = 100)

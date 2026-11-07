@@ -110,9 +110,9 @@ public final class MeteorVarligi extends Entity {
         return inisKalanTick;
     }
 
-    /** İz şeridinin uzunluğu (blok): tasarım notunda 30–80. */
+    /** İz şeridinin uzunluğu (blok): ölçek 0,5'te 80, 2,5'te 140 (MT2-32; eskiden 40–72), uçtuğu yoldan uzun olmaz. */
     public double izUzunlugu() {
-        double tam = MeteorOlcegi.ara(olcek(), 40, 72, 30, 90);
+        double tam = MeteorOlcegi.ara(olcek(), 86, 125, 80, 140);
         return Math.min(tam, (yas + 1) * getDeltaMovement().length());
     }
 

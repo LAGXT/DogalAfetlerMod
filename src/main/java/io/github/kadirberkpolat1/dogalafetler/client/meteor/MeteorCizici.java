@@ -7,6 +7,7 @@ import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorGorunumu;
 import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorVarligi;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.MeteorOlcegi;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
@@ -24,12 +25,16 @@ import org.joml.Matrix4f;
 /**
  * Meteorun çizimi (tasarım notu "Meteor"): dönen kaya kümesi gövde (güneş: magma + karataş/bazalt, ay: kalsit + bazalt/tüf),
  * önünde additive plazma kabuğu ve ışık halesi, arkasında iki katmanlı additive iz şeridi (içte beyaz-sarı / mavi-beyaz
- * çekirdek, dışta turuncu / mavi), inişe 1,5 sn kala yerde büyüyen parlama diski. Işık motoruna dokunulmaz.
+ * çekirdek, dışta turuncu / mavi; uzakta dışı en az {@value #DIS_EN_AZ_PIKSEL}, içi {@value #IC_EN_AZ_PIKSEL} piksel),
+ * inişe 1,5 sn kala yerde büyüyen parlama diski. Işık motoruna dokunulmaz.
  */
 final class MeteorCizici extends EntityRenderer<MeteorVarligi> {
     private static final ResourceLocation PLAZMA = DogalAfetler.konum("textures/entity/meteor_plazmasi.png");
     private static final ResourceLocation IZ = DogalAfetler.konum("textures/entity/meteor_izi.png");
     private static final int IZ_PARCASI = 14;
+    /** İz şeridinin ekranda en ince kalınlığı (piksel; MT2-32: 200 blok yukarıdaki küçük meteor da seçilsin). */
+    private static final double DIS_EN_AZ_PIKSEL = 2.0;
+    private static final double IC_EN_AZ_PIKSEL = 1.0;
     private static final double DISK_ONCESI = 30;
     /** Bunun ötesinde blok kümesi gövde çizilmez: uzaktan kare leke gibi okunuyordu, plazma panosu yeterli. */
     private static final double GOVDE_MESAFESI = 96;
@@ -65,12 +70,13 @@ final class MeteorCizici extends EntityRenderer<MeteorVarligi> {
 
         VertexConsumer izTampon = tampon.getBuffer(MeteorIsikTipi.ISIK.apply(IZ));
         double uzunluk = m.izUzunlugu();
+        double piksel = pikselAcisi();
         if (ay) {
-            iz(ps, izTampon, yon, uzunluk, goz, 1.3F * olcek, 0.30F, 0.50F, 1.0F, 0.75F);
-            iz(ps, izTampon, yon, uzunluk * 0.7, goz, 0.5F * olcek, 0.85F, 0.94F, 1.0F, 1.0F);
+            iz(ps, izTampon, yon, uzunluk, goz, 1.95F * olcek, DIS_EN_AZ_PIKSEL * piksel, 0.30F, 0.50F, 1.0F, 1.125F);
+            iz(ps, izTampon, yon, uzunluk * 0.7, goz, 0.75F * olcek, IC_EN_AZ_PIKSEL * piksel, 0.85F, 0.94F, 1.0F, 1.5F);
         } else {
-            iz(ps, izTampon, yon, uzunluk, goz, 1.3F * olcek, 1.0F, 0.42F, 0.10F, 0.75F);
-            iz(ps, izTampon, yon, uzunluk * 0.7, goz, 0.5F * olcek, 1.0F, 0.88F, 0.55F, 1.0F);
+            iz(ps, izTampon, yon, uzunluk, goz, 1.95F * olcek, DIS_EN_AZ_PIKSEL * piksel, 1.0F, 0.42F, 0.10F, 1.125F);
+            iz(ps, izTampon, yon, uzunluk * 0.7, goz, 0.75F * olcek, IC_EN_AZ_PIKSEL * piksel, 1.0F, 0.88F, 0.55F, 1.5F);
         }
 
         if (goz.lengthSqr() < GOVDE_MESAFESI * GOVDE_MESAFESI) {
@@ -131,9 +137,18 @@ final class MeteorCizici extends EntityRenderer<MeteorVarligi> {
         ps.popPose();
     }
 
-    /** Kameraya dönük, baştan kuyruğa daralan ve sönen şerit (additive; renk parlaklıktır). */
-    private static void iz(PoseStack ps, VertexConsumer vc, Vec3 yon, double uzunluk, Vec3 goz, float genislik, float r,
-            float g, float b, float guc) {
+    /** Bir pikselin kameradan birim uzaklıktaki dünya boyu (dikey FOV ve pencere yüksekliğinden). */
+    private static double pikselAcisi() {
+        Minecraft mc = Minecraft.getInstance();
+        return 2 * Math.tan(Math.toRadians(mc.options.fov().get()) / 2) / Math.max(1, mc.getWindow().getHeight());
+    }
+
+    /**
+     * Kameraya dönük, baştan kuyruğa daralan ve sönen şerit (additive; renk parlaklıktır, 1'de kırpılır). Kalınlık her
+     * noktada en az {@code enAzKalinlik} × kameraya uzaklıktır.
+     */
+    private static void iz(PoseStack ps, VertexConsumer vc, Vec3 yon, double uzunluk, Vec3 goz, float genislik,
+            double enAzKalinlik, float r, float g, float b, float guc) {
         Matrix4f m = ps.last().pose();
         Matrix3f n = ps.last().normal();
         Vec3 oncekiP = null;
@@ -147,7 +162,7 @@ final class MeteorCizici extends EntityRenderer<MeteorVarligi> {
             if (yan.lengthSqr() < 1e-8) {
                 yan = new Vec3(0, 1, 0).cross(yon);
             }
-            yan = yan.normalize().scale(genislik * (1 - 0.85F * t) * 0.5F);
+            yan = yan.normalize().scale(Math.max(genislik * (1 - 0.85F * t), enAzKalinlik * bakis.length()) * 0.5);
             if (oncekiP != null) {
                 float a0 = guc * (1 - oncekiT);
                 float a1 = guc * (1 - t);
@@ -169,7 +184,8 @@ final class MeteorCizici extends EntityRenderer<MeteorVarligi> {
         for (int yon = 0; yon < 2; yon++) {
             for (int j = 0; j < 4; j++) {
                 int i = yon == 0 ? j : 3 - j;
-                tepe(m, n, vc, k[i], r * gs[i], g * gs[i], bl * gs[i], us[i], vs[i]);
+                tepe(m, n, vc, k[i], Math.min(1, r * gs[i]), Math.min(1, g * gs[i]), Math.min(1, bl * gs[i]), us[i],
+                        vs[i]);
             }
         }
     }
