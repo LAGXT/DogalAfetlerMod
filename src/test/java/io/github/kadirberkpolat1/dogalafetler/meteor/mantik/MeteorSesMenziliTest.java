@@ -34,7 +34,7 @@ class MeteorSesMenziliTest {
         assertEquals(12.0 / 9.0, MeteorSesMenzili.dopplerPerdesi(3), EPS);
         assertEquals(0.8, MeteorSesMenzili.dopplerPerdesi(-3), EPS);
         assertEquals(2.0, MeteorSesMenzili.dopplerPerdesi(100), EPS);
-        assertEquals(0.5, MeteorSesMenzili.dopplerPerdesi(-100), EPS);
+        assertEquals(12.0 / 22.8, MeteorSesMenzili.dopplerPerdesi(-100), EPS, "hız ±0,9 c'de kırpılır");
     }
 
     @Test
