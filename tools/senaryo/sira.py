@@ -287,7 +287,8 @@ def ekle(makine, komut, yuva=1, istemci=False, log=None, cwd=None, olcum=False, 
     if makine == "oto" and istemci:
         veri["ekran_env"] = ekran
     json_yaz(dizin(makine, "bekleyen") / f"{kimlik}.json", veri)
-    onde = len(isler(makine, "bekleyen")) - 1 + len(isler(makine, "kosan"))
+    kosan = sum(len(isler(m, "kosan")) for m in (MAKINELER if makine == "oto" else (makine,)))
+    onde = len(isler(makine, "bekleyen")) - 1 + kosan
     cikti(f"SIRA: {kimlik} {makine} kuyruğunda (önünde {onde} iş); sonuç: tools/senaryo/sira.py bekle {kimlik}",
           file=sys.stderr)
     for m in MAKINELER if makine == "oto" else (makine,):
