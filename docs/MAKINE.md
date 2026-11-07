@@ -155,7 +155,10 @@ kökünden), içeride `uzak.sh -g <kanıt/> env DOGALAFETLER_EKRAN=pc2 DISPLAY=:
 (K0-21 rev. 2 (a)–(d)) uygulanmaz, oyun içi girdi olayları (e) koşuyu geçersiz kılmaz. Kareler oyun içi
 (`GorselOtomasyon.kareIste` → `Screenshot.grab`, ana render hedefi), yakalama aracı gerekmez. FPS/CPU ölçümü geçersiz:
 log'a `MAKINE=LAGXT2` yazılır, `olcum_tablosu.py` o klasörün `OLCUM` satırlarını `bilgi` (kural `pc2`) sayar; ölçüm ana makinede.
-Kipi tanıyan betik şimdilik yalnız `radar_gorsel.py` (`pc2_istemci.sh` tanımayan betiği çıkış 2 ile reddeder).
+Bütün görsel betikler kipi tanır: ekran protokolü `runclient_kilit.py`'de tek yolda (`istemci_baslat`, `pencere_dogrula`,
+`odak_denetle`, `girdi_ozeti`). Kanıtı sabit `KÖK/.vibe/kanit/<ad>/`'a yazan argümansız betiklerde pc2 koşusu 1'den numaralanır ve
+geri çekme yereldeki aynı adlı dosyaları ezer; kanıt argümanı alan betikleri (`radar`, `uyari`, `su`, `tsunami`, `deprem --kanit`)
+tercih edin ya da yereli önce yedekleyin.
 
 | Öğe | Değer | Nasıl ölçüldü |
 |---|---|---|

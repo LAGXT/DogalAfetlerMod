@@ -20,7 +20,6 @@ KOK/.vibe/kanit/gunes-patlamasi-kizil-cuce/gorsel/protokol.log'a, kareler aynı 
 Çıkış: 0 geçerli ve tam, 1 geçersiz/eksik, 2 ağır süreç kapısı açılmadı.
 """
 import hashlib
-import json
 import os
 import re
 import shutil
@@ -57,18 +56,6 @@ def log(*a):
     GUNLUK.flush()
 
 
-def hypr(*a):
-    r = subprocess.run(["hyprctl", *a], capture_output=True, text=True, timeout=10)
-    return r.stdout.strip()
-
-
-def hypr_json(*a):
-    try:
-        return json.loads(hypr(*a, "-j"))
-    except (json.JSONDecodeError, subprocess.TimeoutExpired):
-        return None
-
-
 def kapi():
     for _ in range(21):
         gradle = int(subprocess.run(["pgrep", "-fc", "GradleWrapperMain"], capture_output=True, text=True).stdout
@@ -89,13 +76,6 @@ def istemci_pid():
         except OSError:
             continue
     return None
-
-
-def belirtec_var(pid):
-    try:
-        return b"HL_EXEC_RULE_TOKEN=" in Path(f"/proc/{pid}/environ").read_bytes()
-    except OSError:
-        return False
 
 
 def oldur(pid, neden):
@@ -151,11 +131,7 @@ def kosu(no):
                      f"exec python3 tools/senaryo/runclient_kilit.py kos '{W}' --bekle 1800 -- "
                      "timeout 3000 ./gradlew runClient --offline --no-daemon --console=plain -PquickPlay=gunes "
                      f"-Potomasyon=gunes_patlamasi > '{istemci_log}' 2>&1\n")
-    sahip = hypr_json("activewindow")
-    sahip_adres = sahip.get("address") if isinstance(sahip, dict) else None
-    log(f"koşu {no}: sahibin etkin penceresi {sahip_adres} ({sahip.get('class') if isinstance(sahip, dict) else None})")
-    kural = f"[workspace {WS} silent; no_initial_focus; no_focus on; focus_on_activate off] sh {betik}"
-    log("exec:", hypr("dispatch", f'hl.dsp.exec_cmd("{kural}")'))
+    sahip_adres = runclient_kilit.istemci_baslat(betik, WS, log)
     baslangic = time.time()
     pid = None
     while time.time() - baslangic < 2100 and pid is None:
@@ -164,36 +140,18 @@ def kosu(no):
     if pid is None:
         log("istemci JVM'i 35 dk'da görünmedi (kilit beklemesi dahil)")
         return False, False, "JVM yok"
-    if not belirtec_var(pid):
-        oldur(pid, "HL_EXEC_RULE_TOKEN yok (belirteç kapısı)")
-        return False, False, "belirteç yok"
-    log(f"istemci pid={pid}, belirteç var")
-    dogrulandi = False
+    neden = runclient_kilit.pencere_dogrula(pid, WS, log)
+    if neden:
+        oldur(pid, neden)
+        return False, False, neden
     alarm = False
     yoklama = 0
     bekci = runclient_kilit.KapanisBekcisi(W, pid, (W / "run/logs/latest.log", istemci_log),
                                            f"{ISARET} kapanıyor; girdi sayıları", log)
     while not bekci.bitti_mi():
-        pencereler = [c for c in (hypr_json("clients") or []) if c.get("pid") == pid]
-        if pencereler and not dogrulandi:
-            for ozellik, deger in (("no_focus", "1"), ("focus_on_activate", "0")):
-                hypr("dispatch", f'hl.dsp.window.set_prop({{ window = "pid:{pid}", prop = "{ozellik}", '
-                                 f'value = "{deger}", lock = true }})')
-            nf = hypr("getprop", f"pid:{pid}", "no_focus")
-            ws = [c.get("workspace", {}).get("id") for c in pencereler]
-            log(f"pencere doğrulaması: no_focus={nf!r} ws={ws}")
-            if "true" not in nf.lower() or any(w != WS for w in ws):
-                oldur(pid, "pencere doğrulanamadı")
-                return False, False, "pencere doğrulanamadı"
-            dogrulandi = True
-        etkin = hypr_json("activewindow")
         yoklama += 1
-        if isinstance(etkin, dict) and etkin.get("pid") == pid:
+        if runclient_kilit.odak_denetle(pid, sahip_adres, log, lambda neden: oldur(pid, neden)):
             alarm = True
-            log("ALARM: etkin pencere bizim istemci")
-            oldur(pid, "odak alarmı")
-            if sahip_adres:
-                log("odak geri:", hypr("dispatch", f'hl.dsp.focus({{ window = "address:{sahip_adres}" }})'))
             break
         time.sleep(5)
     log(f"istemci bitti ({time.time() - baslangic:.0f} sn), bekçi yoklaması={yoklama}, ALARM={1 if alarm else 0}")
@@ -227,7 +185,7 @@ def kosu(no):
         return False, False, "girdi satırı yok"
     kaynak, satir_no, sayilar = sayim
     sifir = sayilar == "tuş=0 fare=0 tekerlek=0"
-    log(f"koşu {no} girdi sayıları: {sayilar} ({kaynak.name}:{satir_no})" + ("" if sifir else " → GEÇERSİZ"))
+    sifir = runclient_kilit.girdi_ozeti(sifir, f"koşu {no} girdi sayıları: {sayilar} ({kaynak.name}:{satir_no})", log)
     eksik = [k for k in BEKLENEN if k not in kareler]
     ayni = sorted({a for a in kareler for b in kareler if a < b and kareler[a] == kareler[b]})
     if eksik:

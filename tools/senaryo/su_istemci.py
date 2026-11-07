@@ -15,7 +15,6 @@
 Kullanım (worktree kökünden): python3 tools/senaryo/su_istemci.py <kanıt klasörü> [bölüm]
 Çıkış: 0 geçerli koşu, 1 protokol ihlali/iptal, 2 istemci hatası.
 """
-import json
 import os
 import re
 import shutil
@@ -33,19 +32,11 @@ KOK = Path(__file__).resolve().parents[2]
 RUN = KOK / "run"
 JAVA_HOME = "/home/lagxt/.jdks/jdk-17.0.21+9"
 WS = 91
-KURAL = f"[workspace {WS} silent; no_initial_focus; no_focus on; focus_on_activate off]"
 
 
 def sh(komut, zaman=30):
     r = subprocess.run(komut, shell=isinstance(komut, str), capture_output=True, text=True, timeout=zaman)
     return (r.stdout + r.stderr).strip()
-
-
-def hypr_json(ne):
-    try:
-        return json.loads(sh(["hyprctl", ne, "-j"]))
-    except (json.JSONDecodeError, subprocess.TimeoutExpired):
-        return None
 
 
 class Kayit:
@@ -84,20 +75,6 @@ def istemci_pid():
     return None
 
 
-def belirtec_var(pid):
-    try:
-        return b"HL_EXEC_RULE_TOKEN=" in (Path("/proc") / str(pid) / "environ").read_bytes()
-    except OSError:
-        return False
-
-
-def pencere(pid):
-    for c in hypr_json("clients") or []:
-        if c.get("pid") == pid and c.get("mapped", True):
-            return c
-    return None
-
-
 def oldur(gradle):
     try:
         os.killpg(gradle.pid, signal.SIGTERM)
@@ -109,11 +86,6 @@ def oldur(gradle):
             os.kill(pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
-
-
-def odak_ver(adres, log):
-    for ifade in (f'hl.dsp.focus({{ window = "address:{adres}" }})', f'hl.dsp.window.focus({{ window = "address:{adres}" }})'):
-        log(f"odak geri: {ifade} -> {sh(['hyprctl', 'dispatch', ifade])}")
 
 
 def main():
@@ -131,9 +103,6 @@ def main():
     shutil.copytree(KOK.parents[1] / "run" / "saves" / "test", hedef, ignore=shutil.ignore_patterns("session.lock"))
     (hedef / "serverconfig" / "dogalafetler-server.toml").unlink(missing_ok=True)
     log(f"test dünyası temiz kopyalandı: {hedef}")
-    sahip = hypr_json("activewindow") or {}
-    sahip_adres = sahip.get("address")
-    log(f"sahibin etkin penceresi: {sahip_adres} {sahip.get('class')} ws={sahip.get('workspace', {}).get('id')}")
     oyun_log = kanit / f"runClient-{bolum}.log"
     betik = Path("/tmp/sanal-su-istemci.sh")
     betik.write_text("#!/bin/sh\n"
@@ -142,9 +111,8 @@ def main():
                      f"timeout 1200 ./gradlew runClient --no-daemon --offline --console=plain "
                      f"-PquickPlay=test -Potomasyon=su -PotomasyonBolum={bolum} > '{oyun_log}' 2>&1\n"
                      f"echo \"cikis=$?\" >> '{oyun_log}'\n")
-    ifade = f'hl.dsp.exec_cmd("{KURAL} sh {betik}")'
     duvar_baslangic = time.time()
-    log(f"exec kuralıyla başlatılıyor: {ifade} -> {sh(['hyprctl', 'dispatch', ifade])}")
+    sahip_adres = runclient_kilit.istemci_baslat(betik, WS, log)
     baslangic = time.monotonic()
 
     class Grup:
@@ -164,35 +132,9 @@ def main():
         gradle.pid = os.getpgid(pid)
     except ProcessLookupError:
         gradle.pid = pid
-    if not belirtec_var(pid):
-        log(f"ALARM: pid={pid} ortamında HL_EXEC_RULE_TOKEN yok; pencere eşlenmeden öldürülüyor")
-        os.kill(pid, signal.SIGKILL)
-        return 1
-    log(f"istemci JVM pid={pid} ({time.monotonic() - baslangic:.1f} sn); HL_EXEC_RULE_TOKEN ortamda: True")
-    p = None
-    while time.monotonic() - baslangic < 900:
-        p = pencere(pid)
-        if p:
-            break
-        if istemci_pid() is None:
-            log("istemci pencere açmadan çıktı")
-            return 2
-        time.sleep(0.25)
-    if not p:
-        log("pencere 15 dk'da eşlenmedi")
-        os.kill(pid, signal.SIGKILL)
-        return 2
-    sonuclar = []
-    for prop, deger in (("no_focus", "1"), ("focus_on_activate", "0")):
-        ifade = f'hl.dsp.window.set_prop({{ window = "pid:{pid}", prop = "{prop}", value = "{deger}", lock = true }})'
-        sonuclar.append(sh(["hyprctl", "dispatch", ifade]))
-    no_focus = sh(["hyprctl", "getprop", f"pid:{pid}", "no_focus"])
-    p = pencere(pid) or p
-    ws = p.get("workspace", {}).get("id")
-    etkin = (hypr_json("activewindow") or {}).get("address")
-    log(f"pencerem {p.get('address')} pid={pid} ws={ws}; set_prop -> {sonuclar}; getprop no_focus={no_focus}; etkin={etkin}")
-    if "true" not in no_focus.lower() or ws != WS:
-        log("ALARM: pencere doğrulaması tutmadı; süreç öldürülüyor")
+    neden = runclient_kilit.pencere_dogrula(pid, WS, log)
+    if neden:
+        log(f"ALARM: {neden}; süreç öldürülüyor")
         os.kill(pid, signal.SIGKILL)
         return 1
     yoklama = 0
@@ -201,22 +143,17 @@ def main():
     while not bekci.bitti_mi():
         time.sleep(5)
         yoklama += 1
-        a = hypr_json("activewindow") or {}
-        if a.get("pid") == pid:
+        if runclient_kilit.odak_denetle(pid, sahip_adres, log, lambda _neden: os.kill(pid, signal.SIGKILL)):
             alarm += 1
-            log(f"ALARM: etkin pencere benim istemcim ({a.get('address')}); süreç öldürülüyor, koşu geçersiz")
-            os.kill(pid, signal.SIGKILL)
-            if sahip_adres:
-                odak_ver(sahip_adres, log)
             break
         if yoklama % 6 == 0:
-            p = pencere(pid) or {}
-            log(f"denetim: etkin={a.get('address')} {a.get('class')}; benim ws={p.get('workspace', {}).get('id')}")
+            log(f"denetim {yoklama}: istemci pid={pid} yaşıyor")
     son = time.monotonic() + 120
     while time.monotonic() < son and "cikis=" not in oyun_log.read_text(encoding="utf-8", errors="replace"):
         time.sleep(2)
     metin = oyun_log.read_text(encoding="utf-8", errors="replace")
     girdi = len(re.findall(r"SU-OTOMASYON GIRDI", metin))
+    girdi_temiz = runclient_kilit.girdi_ozeti(girdi == 0, f"(e) oyun içi girdi satırı: {girdi}", log)
     kapi_uyari = len(re.findall(r"KARE-KAPISI su \S+ kapi=GECERSIZ", metin))
     bitti = re.search(r"SU-OTOMASYON BITTI girdi tus=(\d+) fare=(\d+) teker=(\d+)", metin)
     cikis = re.search(r"cikis=(\d+)", metin)
@@ -235,7 +172,7 @@ def main():
             shutil.copy2(png, kanit / png.name)
             log(f"kopyalandı: {png.name}")
     # A-34: kapısı açılmadan alınan kare geçersiz, koşu da.
-    if alarm or girdi or kapi_uyari:
+    if alarm or not girdi_temiz or kapi_uyari:
         return 1
     return 0 if bitti and cikis and cikis.group(1) == "0" else 2
 

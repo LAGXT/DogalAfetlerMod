@@ -14,11 +14,8 @@ sakin → deprem S3 (Hassas Sismograf erken, radar sakin) → normal radar → G
 
 Kullanım (worktree kökünden): python3 tools/senaryo/radar_gorsel.py [kanıt klasörü]
 (varsayılan KÖK/.vibe/kanit/radar-sismograf/gorsel). Çıkış: 0 geçerli koşu, 1 geçersiz/iptal.
-pc2'de görünür istemciyle (yalnız kare; (a)–(d) Hyprland denetimleri yok, (e) geçersiz kılmaz; `runclient_kilit.ekran_pc2`):
-tools/senaryo/pc2_istemci.sh <kanıt>/ radar_gorsel.py <kanıt>
 """
 import hashlib
-import json
 import os
 import re
 import shutil
@@ -42,15 +39,6 @@ TOPLAM_SURE = 20 * 60
 WAV = Path("/tmp/radar-sismograf-cikis.wav")
 ALSOFT_CONF = Path("/tmp/radar-sismograf-alsoft.conf")
 CIHAZ = "Wave File Writer"
-
-
-def ortam():
-    imza = os.listdir("/run/user/1000/hypr")[0]
-    return dict(os.environ, HYPRLAND_INSTANCE_SIGNATURE=imza, XDG_RUNTIME_DIR="/run/user/1000")
-
-
-def hyprctl(*arg):
-    return subprocess.run(["hyprctl", *arg], capture_output=True, text=True, env=ortam(), timeout=10).stdout.strip()
 
 
 class Gunluk:
@@ -185,40 +173,6 @@ def sha256(veri):
     return "yok" if veri is None else hashlib.sha256(veri).hexdigest()
 
 
-def _pencere_dogrula(log, java_pid, basla):
-    """(b) belirteç ve (c) pencere doğrulaması (Hyprland); tutmazsa istemci öldürülür ve False döner."""
-    environ = Path(f"/proc/{java_pid}/environ").read_bytes()
-    belirtec = b"HL_EXEC_RULE_TOKEN=" in environ
-    log(f"(b) istemci JVM pid={java_pid} ({time.monotonic() - basla:.1f} sn); HL_EXEC_RULE_TOKEN ortamda: {belirtec}")
-    if not belirtec:
-        oldur(log, java_pid, "belirteç yok")
-        return False
-
-    pencere = None
-    while time.monotonic() - basla < 600 and pencere is None:
-        if istemci_jvm() is None:
-            break
-        for istemci in json.loads(hyprctl("clients", "-j") or "[]"):
-            if istemci.get("pid") == java_pid:
-                pencere = istemci
-        time.sleep(0.25)
-    if pencere is None:
-        log("pencere eşlenmedi; iptal")
-        oldur(log, java_pid, "pencere yok")
-        return False
-    yazim = [hyprctl("dispatch", f'hl.dsp.window.set_prop({{ window = "pid:{java_pid}", prop = "{p}", value = "{v}", '
-                                 f'lock = true }})') for p, v in (("no_focus", "1"), ("focus_on_activate", "0"))]
-    no_focus = hyprctl("getprop", f"pid:{java_pid}", "no_focus")
-    ws = pencere.get("workspace", {}).get("id")
-    log(f"(c) pencerem {pencere.get('address')} ws={ws} ({time.monotonic() - basla:.1f} sn); set_prop -> {yazim}; "
-        f"getprop no_focus={no_focus!r}; etkin={json.loads(hyprctl('activewindow', '-j') or '{}').get('address')}")
-    if "true" not in no_focus.lower() or ws != WORKSPACE:
-        oldur(log, java_pid, "pencere doğrulaması tutmadı")
-        return False
-    return True
-
-
-
 def _kos(kanit, log, otomasyon, gradle_ek, wav):
     if not dunyayi_hazirla(log):
         log("Quick Play dünyası run/saves/test yok; iptal")
@@ -233,40 +187,30 @@ def _kos(kanit, log, otomasyon, gradle_ek, wav):
     wav.unlink(missing_ok=True)
     ALSOFT_CONF.write_text(f"[general]\ndrivers = wave\nfrequency = 48000\nchannels = stereo\nsample-type = int16\n"
                            f"[wave]\nfile = {wav}\n", encoding="utf-8")
-    pc2 = runclient_kilit.ekran_pc2()
+    ekran = os.environ["DISPLAY"] if runclient_kilit.ekran_pc2() else ":0"
     BASLATMA_BETIGI.write_text(
-        f"#!/bin/sh\ncd '{KOK}' || exit 1\nexport JAVA_HOME='{JAVA_HOME}' DISPLAY={os.environ.get('DISPLAY') if pc2 else ':0'} "
-        f"ALSOFT_DRIVERS=wave ALSOFT_CONF='{ALSOFT_CONF}'\n"
+        f"#!/bin/sh\ncd '{KOK}' || exit 1\nexport JAVA_HOME='{JAVA_HOME}' DISPLAY={ekran} ALSOFT_DRIVERS=wave "
+        f"ALSOFT_CONF='{ALSOFT_CONF}'\n"
         f"exec python3 tools/senaryo/runclient_kilit.py kos '{KOK}' --bekle 1800 -- "
         f"timeout {TOPLAM_SURE} ./gradlew runClient --no-daemon --offline --console=plain "
         f"-Potomasyon={otomasyon} {' '.join(gradle_ek)} > '{istemci_log}' 2>&1\n", encoding="utf-8")
 
-    if pc2:
-        log(f"gradle={gradle_sayisi()} boş={bos_ram_gib():.1f} GiB")
-        runclient_kilit.pc2_baslat(BASLATMA_BETIGI, log)
-        sahip_adres = None
-    else:
-        sahibin = json.loads(hyprctl("activewindow", "-j") or "{}")
-        sahip_adres = sahibin.get("address")
-        log(f"(a) sahibin etkin penceresi: {sahip_adres} {sahibin.get('class')}; gradle={gradle_sayisi()} "
-            f"boş={bos_ram_gib():.1f} GiB")
-        kural = f"[workspace {WORKSPACE} silent; no_initial_focus; no_focus on; focus_on_activate off]"
-        sonuc = hyprctl("dispatch", f'hl.dsp.exec_cmd("{kural} sh {BASLATMA_BETIGI}")')
-        log(f"(a) exec kuralıyla başlatıldı: {kural} -> {sonuc}")
+    log(f"gradle={gradle_sayisi()} boş={bos_ram_gib():.1f} GiB")
+    sahip_adres = runclient_kilit.istemci_baslat(BASLATMA_BETIGI, WORKSPACE, log)
     basla = time.monotonic()
 
     java_pid = None
-    jvm_sn = 900 if pc2 else 300
-    while time.monotonic() - basla < jvm_sn and java_pid is None:
+    while time.monotonic() - basla < 300 and java_pid is None:
         time.sleep(0.5)
         java_pid = istemci_jvm()
     if java_pid is None:
-        log(f"istemci JVM'i {jvm_sn} sn'de görünmedi; iptal")
+        log("istemci JVM'i 300 sn'de görünmedi; iptal")
         oldur(log, None, "JVM yok")
         return False
-    if pc2:
-        log(f"(b) istemci JVM pid={java_pid} ({time.monotonic() - basla:.1f} sn); pc2: belirteç ve pencere denetimi yok")
-    elif not _pencere_dogrula(log, java_pid, basla):
+    log(f"istemci JVM pid={java_pid} ({time.monotonic() - basla:.1f} sn)")
+    neden = runclient_kilit.pencere_dogrula(java_pid, WORKSPACE, log)
+    if neden:
+        oldur(log, java_pid, neden)
         return False
 
     gecerli = True
@@ -278,11 +222,8 @@ def _kos(kanit, log, otomasyon, gradle_ek, wav):
             oldur(log, java_pid, "toplam süre aşıldı")
             gecerli = False
             break
-        etkin = {} if pc2 else json.loads(hyprctl("activewindow", "-j") or "{}")
         yoklama += 1
-        if etkin.get("pid") == java_pid:
-            oldur(log, java_pid, "ALARM: etkin pencere istemci")
-            log(f"(d) odak geri: {hyprctl('dispatch', f'hl.dsp.focus({{ window = "address:{sahip_adres}" }})')}")
+        if runclient_kilit.odak_denetle(java_pid, sahip_adres, log, lambda neden: oldur(log, java_pid, neden)):
             gecerli = False
             break
         if cihaz is None and istemci_log.exists():
@@ -296,7 +237,7 @@ def _kos(kanit, log, otomasyon, gradle_ek, wav):
                     gecerli = False
                     break
         if yoklama % 6 == 1:
-            log(f"(d) denetim {yoklama}: etkin={etkin.get('address')} {etkin.get('class')}; gradle={gradle_sayisi()}")
+            log(f"(d) denetim {yoklama}: istemci pid={java_pid}; gradle={gradle_sayisi()}")
         time.sleep(5)
     if wav.exists():
         log(f"ses kaydı: {wav} ({wav.stat().st_size} bayt)")
@@ -305,12 +246,8 @@ def _kos(kanit, log, otomasyon, gradle_ek, wav):
 
     metin = istemci_log.read_text(encoding="utf-8", errors="replace") if istemci_log.exists() else ""
     girdi = len(re.findall(r"\[radar-otomasyon\] GİRDİ", metin))
-    if pc2:
-        log(runclient_kilit.pc2_girdi_notu(girdi))
-    else:
-        log(f"(e) oyun içi girdi olayı: {girdi}")
-        if girdi:
-            gecerli = False
+    if not runclient_kilit.girdi_ozeti(girdi == 0, f"(e) oyun içi girdi olayı: {girdi}", log):
+        gecerli = False
     for png in sorted((RUN / "screenshots").glob("radar-*.png")):
         shutil.copy2(png, kanit / png.name)
         log(f"kanıt: {png.name}")

@@ -19,7 +19,6 @@ Kullanım (worktree kökünden): python3 tools/senaryo/tsunami_gorsel.py <kanıt
 `tsunami-s5-kopuk-yakin.png` Yüksek, `-yakin-dusuk.png` Düşük; `KAMERA kopuk` ve `DALGA` satırları özette). Ts7 kameraları değişmez.
 Çıkış: 0 geçerli koşu, 1 protokol ihlali/iptal, 2 istemci hatası. FPS pencereleri varsa sonda `TABLO` satırları (Ts1 kabulü, tur 4).
 """
-import json
 import os
 import re
 import shutil
@@ -37,19 +36,11 @@ RUN = KOK / "run"
 JAVA_HOME = "/home/lagxt/.jdks/jdk-17.0.21+9"
 # Workspace ortamdan değişir (aynı anda çalışan işçiler ayrı gizli workspace kullanır; K0-21 rev. 2).
 WS = int(os.environ.get("DOGALAFETLER_WS", "94"))
-KURAL = f"[workspace {WS} silent; no_initial_focus; no_focus on; focus_on_activate off]"
 
 
 def sh(komut, zaman=30):
     r = subprocess.run(komut, shell=isinstance(komut, str), capture_output=True, text=True, timeout=zaman)
     return (r.stdout + r.stderr).strip()
-
-
-def hypr_json(ne):
-    try:
-        return json.loads(sh(["hyprctl", ne, "-j"]))
-    except (json.JSONDecodeError, subprocess.TimeoutExpired):
-        return None
 
 
 class Kayit:
@@ -85,20 +76,6 @@ def istemci_pid():
                 return int(p.name)
         except OSError:
             continue
-    return None
-
-
-def belirtec_var(pid):
-    try:
-        return b"HL_EXEC_RULE_TOKEN=" in (Path("/proc") / str(pid) / "environ").read_bytes()
-    except OSError:
-        return False
-
-
-def pencere(pid):
-    for c in hypr_json("clients") or []:
-        if c.get("pid") == pid and c.get("mapped", True):
-            return c
     return None
 
 
@@ -174,11 +151,6 @@ def fps_tablosu(metin, log):
     return hepsi_gecerli, hepsi_gecti
 
 
-def odak_ver(adres, log):
-    for ifade in (f'hl.dsp.focus({{ window = "address:{adres}" }})', f'hl.dsp.window.focus({{ window = "address:{adres}" }})'):
-        log(f"odak geri: {ifade} -> {sh(['hyprctl', 'dispatch', ifade])}")
-
-
 def main():
     kanit = Path(sys.argv[1]).resolve()
     bolum = sys.argv[2] if len(sys.argv) > 2 else "hepsi"
@@ -194,9 +166,6 @@ def main():
     shutil.copytree(KOK.parents[1] / "run" / "saves" / "test", hedef, ignore=shutil.ignore_patterns("session.lock"))
     (hedef / "serverconfig" / "dogalafetler-server.toml").unlink(missing_ok=True)
     log(f"test dünyası temiz kopyalandı: {hedef}")
-    sahip = hypr_json("activewindow") or {}
-    sahip_adres = sahip.get("address")
-    log(f"sahibin etkin penceresi: {sahip_adres} {sahip.get('class')} ws={sahip.get('workspace', {}).get('id')}")
     oyun_log = kanit / f"runClient-{bolum}.log"
     betik = Path("/tmp/tsunami-istemci.sh")
     betik.write_text("#!/bin/sh\n"
@@ -205,9 +174,8 @@ def main():
                      f"timeout 1200 ./gradlew runClient --no-daemon --offline --console=plain "
                      f"-PquickPlay=test -Potomasyon=tsunami -PotomasyonBolum={bolum} > '{oyun_log}' 2>&1\n"
                      f"echo \"cikis=$?\" >> '{oyun_log}'\n")
-    ifade = f'hl.dsp.exec_cmd("{KURAL} sh {betik}")'
     duvar_baslangic = time.time()
-    log(f"exec kuralıyla başlatılıyor: {ifade} -> {sh(['hyprctl', 'dispatch', ifade])}")
+    sahip_adres = runclient_kilit.istemci_baslat(betik, WS, log)
     baslangic = time.monotonic()
 
     pid = None
@@ -219,35 +187,9 @@ def main():
     if not pid:
         log("istemci JVM'i 10 dk'da görünmedi")
         return 2
-    if not belirtec_var(pid):
-        log(f"ALARM: pid={pid} ortamında HL_EXEC_RULE_TOKEN yok; pencere eşlenmeden öldürülüyor")
-        os.kill(pid, signal.SIGKILL)
-        return 1
-    log(f"istemci JVM pid={pid} ({time.monotonic() - baslangic:.1f} sn); HL_EXEC_RULE_TOKEN ortamda: True")
-    p = None
-    while time.monotonic() - baslangic < 900:
-        p = pencere(pid)
-        if p:
-            break
-        if istemci_pid() is None:
-            log("istemci pencere açmadan çıktı")
-            return 2
-        time.sleep(0.25)
-    if not p:
-        log("pencere 15 dk'da eşlenmedi")
-        os.kill(pid, signal.SIGKILL)
-        return 2
-    sonuclar = []
-    for prop, deger in (("no_focus", "1"), ("focus_on_activate", "0")):
-        ifade = f'hl.dsp.window.set_prop({{ window = "pid:{pid}", prop = "{prop}", value = "{deger}", lock = true }})'
-        sonuclar.append(sh(["hyprctl", "dispatch", ifade]))
-    no_focus = sh(["hyprctl", "getprop", f"pid:{pid}", "no_focus"])
-    p = pencere(pid) or p
-    ws = p.get("workspace", {}).get("id")
-    etkin = (hypr_json("activewindow") or {}).get("address")
-    log(f"pencerem {p.get('address')} pid={pid} ws={ws}; set_prop -> {sonuclar}; getprop no_focus={no_focus}; etkin={etkin}")
-    if "true" not in no_focus.lower() or ws != WS:
-        log("ALARM: pencere doğrulaması tutmadı; süreç öldürülüyor")
+    neden = runclient_kilit.pencere_dogrula(pid, WS, log)
+    if neden:
+        log(f"ALARM: {neden}; süreç öldürülüyor")
         os.kill(pid, signal.SIGKILL)
         return 1
     yoklama = 0
@@ -256,24 +198,18 @@ def main():
     while not bekci.bitti_mi():
         time.sleep(5)
         yoklama += 1
-        a = hypr_json("activewindow") or {}
-        if a.get("pid") == pid:
+        if runclient_kilit.odak_denetle(pid, sahip_adres, log, lambda _neden: os.kill(pid, signal.SIGKILL)):
             alarm += 1
-            log(f"ALARM: etkin pencere benim istemcim ({a.get('address')}); süreç öldürülüyor, koşu geçersiz")
-            os.kill(pid, signal.SIGKILL)
-            if sahip_adres:
-                odak_ver(sahip_adres, log)
             break
         if yoklama % 6 == 0:
-            p = pencere(pid) or {}
-            log(f"denetim: etkin={a.get('address')} {a.get('class')}; benim ws={p.get('workspace', {}).get('id')}; "
-                f"gradle={sh('pgrep -c -f [G]radleWrapperMain')}")
+            log(f"denetim {yoklama}: istemci pid={pid} yaşıyor; gradle={sh('pgrep -c -f [G]radleWrapperMain')}")
     son = time.monotonic() + 120
     while time.monotonic() < son and "cikis=" not in oyun_log.read_text(encoding="utf-8", errors="replace"):
         time.sleep(2)
     metin = oyun_log.read_text(encoding="utf-8", errors="replace")
     asili = bekci.olduruldu or "K-E27: asılı istemci öldürüldü" in metin
     girdi = len(re.findall(r"TSUNAMI-OTOMASYON GIRDI", metin))
+    girdi_temiz = runclient_kilit.girdi_ozeti(girdi == 0, f"(e) oyun içi girdi satırı: {girdi}", log)
     bitti = re.search(r"TSUNAMI-OTOMASYON BITTI girdi tus=(\d+) fare=(\d+) teker=(\d+)", metin)
     cikis = re.search(r"cikis=(\d+)", metin)
     log(f"bitti: yoklama={yoklama} ALARM={alarm} girdi_satiri={girdi} kapanis_asili={'E' if asili else 'H'} "
@@ -292,7 +228,7 @@ def main():
     avci_hata = re.findall(r"fell out of the world|AVCI GECERSIZ", metin)
     if avci_hata:
         log(f"GEÇERSİZ: avcı satırı {avci_hata[0]!r} ({len(avci_hata)} kez)")
-    if alarm or girdi or avci_hata:
+    if alarm or not girdi_temiz or avci_hata:
         return 1
     # Kapanışı asılı kalan istemcinin ölçümleri BITTI'den önce tamamdır; koşu geçerli, asılı kapanış log'da kalır.
     return 0 if bitti and cikis and (cikis.group(1) == "0" or asili) else 2
