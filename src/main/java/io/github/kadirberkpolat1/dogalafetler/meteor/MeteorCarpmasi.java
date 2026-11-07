@@ -18,8 +18,9 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.common.MinecraftForge;
 
 /**
- * Çarpma anı: sarsıntı/görsel paketi, gümbürtü, krater sıcaklığı ve krater işi. Krater blokları, yangın ve ödüller
- * {@link KraterIsi}'nde tick'lere yayılır. Suya düşen meteor buhar çıkarır; krater, ateş ve ödül yoktur.
+ * Çarpma anı: sarsıntı/görsel paketi, krater sıcaklığı ve krater işi. Patlama sesini paketi alan istemci menzil ve mesafe
+ * kazancıyla çalar ({@code client.meteor.MeteorSesi}). Krater blokları, yangın ve ödüller {@link KraterIsi}'nde tick'lere
+ * yayılır. Suya düşen meteor sıçrama ve buhar çıkarır; krater, ateş ve ödül yoktur.
  */
 final class MeteorCarpmasi {
     /** Çarpılan yüzeyin üstünde boşaltılan blok (bitki, kar, asılı blok). */
@@ -46,8 +47,6 @@ final class MeteorCarpmasi {
             MinecraftForge.EVENT_BUS.post(new MeteorCarptiEvent(level, zemin, boyut, kaynak, OdulZari.Sonuc.YOK, true));
             return null;
         }
-        level.playSound(null, nokta.x, nokta.y, nokta.z, SoundEvents.GENERIC_EXPLODE, SoundSource.BLOCKS,
-                boyut.buyuk() ? 10f : 5f, (boyut.buyuk() ? 0.55f : 0.75f) * (ay ? 1.1f : 1f));
         double yaricap = MeteorAyarlari.kraterYaricapi(boyut);
         double derinlik = MeteorAyarlari.kraterDerinligi(boyut);
         int sicaklikSaniye = MeteorAyarlari.kraterSicaklikSaniye();

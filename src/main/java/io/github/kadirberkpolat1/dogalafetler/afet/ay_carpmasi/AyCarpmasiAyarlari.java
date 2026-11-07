@@ -78,8 +78,8 @@ public final class AyCarpmasiAyarlari {
         private Sunucu(ForgeConfigSpec.Builder k) {
             meteorSuresiSn = k.comment("Çarpmadan 10 sn sonra başlayan ay parçası yağmurunun süresi (sn; bölüm H: 1-2 dk).")
                     .defineInRange("meteorSuresiSn", 90, 60, 120);
-            meteorDakikaBasina = k.comment("Oyuncu başına dakikada düşen ay parçası (7,5 = 8 sn'de bir).")
-                    .defineInRange("meteorDakikaBasina", 7.5, 0.0, 60.0);
+            meteorDakikaBasina = k.comment("Oyuncu başına dakikada düşen ay parçası (30 = 2 sn'de bir; 90 sn'de oyuncu başına 45).")
+                    .defineInRange("meteorDakikaBasina", 30.0, 0.0, 60.0);
             meteorBuyukOrani = k.comment("Ay parçası yağmurunda büyük meteor olasılığı.")
                     .defineInRange("meteorBuyukOrani", 0.04, 0.0, 1.0);
             sarsintiBlokSayisi = k.comment("Çarpma sarsıntısında (12 sn) oyuncu başına en çok düşen blok "

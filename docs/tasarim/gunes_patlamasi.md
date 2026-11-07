@@ -102,3 +102,11 @@ Kaynaklar:
   ve kızıl cüce şafak tonu görünüm uzayında (F1'de de); sesler kavurucu rüzgâr (`OrtamSesi`), süpernova basıncı + kristal
   uğultu ve kızıl cüce akoru (`tools/assets/gunes_sesleri.py`). Yapılmayanlar: çarpma anının ayrı beyaz örtüsü, süpernova
   çökmesinde öteki ortam seslerinin susturulması.
+
+## 8. Meteor yağmuru güncellemesi (meteor-2, 2026-11-07; kararlar `.vibe/kararlar/meteor-2.md`)
+
+Kullanıcı: patlamadan önce ve patlama sırasında meteor az. Yoğunluk `mantik.MeteorYagmuruEgrisi`: ön-uyarının son
+`meteorYagmuruOncuSaniye` (90) saniyesinde öncü yağmur oyuncu başına 6/dk başlar, siren (güneş büyürken) boyunca doğrusal
+24/dk'ya çıkar; AKTIF'in ve her günün başında `meteorYagmuruSaniye` (180, ölçekli) 24/dk gerçek meteor yağmuru, arasında §2'nin
+1/40 sn → 1/12 sn arka planı. Afetin tek yağmuru eğriyi her tick izler (`MeteorAPI.yagmurYogunluguAyarla`). Dağılım, tavan ve
+krater bütçesi değişmedi. Not: öncü meteorlar N7'nin gizli ön-uyarısını bilerek bozar (kullanıcı isteği; radar yine göstermez).

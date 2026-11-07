@@ -16,13 +16,14 @@ import net.minecraft.server.level.ServerPlayer;
  * Süreli meteor yağmuru: oyuncu başına dakikada {@code dakikaBasina} meteor, sırayla oyunculara dağıtılır ({@link
  * MeteorDagitimi}), her biri oyuncunun {@code dagitimIcYaricap}–{@code dagitimDisYaricap} halkasına düşer. Oyuncu
  * kümesi boşsa boyuttaki bütün (izleyici olmayan) oyuncular her tick yeniden okunur; hiç oyuncu yoksa dünya doğuş
- * noktası tek hedeftir (oyuncusuz sunucu). Kaydedilmez: afet yüklenince yeniden başlatır.
+ * noktası tek hedeftir (oyuncusuz sunucu). Yoğunluk çalışırken değişebilir ({@link #yogunlukAyarla}; birikim korunur, düşük
+ * yoğunlukta da kesir kaybolmaz). Kaydedilmez: afet yüklenince yeniden başlatır.
  */
 final class MeteorYagmuru {
     final int kimlik;
     final YanginKaynagi kaynak;
     private final Set<UUID> oyuncular;
-    private final double dakikaBasina;
+    private double dakikaBasina;
     private final double buyukOran;
     private final MeteorGorunumu gorunum;
     private final MeteorDagitimi dagitim;
@@ -51,6 +52,14 @@ final class MeteorYagmuru {
         return kalanTick;
     }
 
+    double yogunluk() {
+        return dakikaBasina;
+    }
+
+    void yogunlukAyarla(double yeni) {
+        dakikaBasina = Math.max(0, yeni);
+    }
+
     MeteorYagmuru testAyari(int ic, int dis, double girisAcisi) {
         icYaricap = ic;
         disYaricap = dis;
@@ -69,6 +78,7 @@ final class MeteorYagmuru {
         int dis = disYaricap >= 0 ? disYaricap : MeteorAyarlari.dagitimDisYaricap();
         while (birikim >= 1) {
             birikim -= 1;
+            MeteorYoneticisi.atildi(level, kaynak);
             BlockPos merkez = merkezler.get(dagitim.siradaki(merkezler.size()));
             double[] o = MeteorDagitimi.ofset(rastgele, ic, dis);
             BlockPos hedef = merkez.offset((int) Math.round(o[0]), 0, (int) Math.round(o[1]));

@@ -17,9 +17,12 @@ import io.github.kadirberkpolat1.dogalafetler.gokyuzu.Gokyuzu;
 import io.github.kadirberkpolat1.dogalafetler.komut.DogalAfetKomutu;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorAPI;
+import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorAyarlari;
+import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorGorunumu;
 import io.github.kadirberkpolat1.dogalafetler.network.AgKanali;
 import io.github.kadirberkpolat1.dogalafetler.network.DonemPaketi;
 import io.github.kadirberkpolat1.dogalafetler.uyari.OrtamSesi;
+import io.github.kadirberkpolat1.dogalafetler.yangin.YanginKaynagi;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
@@ -50,13 +53,19 @@ import net.minecraftforge.network.NetworkDirection;
 /**
  * Ay çarpmasının oyun içi testleri (bölüm H, GOREV §6 #1–#4, #8, #12, #16). Gerçek {@link AyCarpmasi} afeti tek afet
  * yuvasını ve global ay alanını kullandığı için her test kendi {@code batch}'indedir; başta ve sonda dönemi sıfırlar
- * (K-E15). Yağmur başladığı tick'te afet bitirilir: sahneye meteor düşmez.
+ * (K-E15). Yağmur başladığı tick'te afet bitirilir: sahneye meteor düşmez (parça testi hariç: yağmur 20 sn sürer,
+ * {@code afetBlokHasari} kapalıyken doğuş noktası çevresine düşer).
  */
 @GameTestHolder(DogalAfetler.MOD_ID)
 @PrefixGameTestTemplate(false)
 public final class AyCarpmasiOyunTestleri {
     /** Hız testinin değiştirdiği meteor sıklığının eski değeri; geri konunca null. */
     private static Double oncekiMeteorSikligi;
+    /** Parça testinin kapattığı {@code afetBlokHasari}'nın eski değeri; geri konunca null. */
+    private static Boolean eskiBlokHasari;
+    /** Parça yağmurunun ilk {@value #PARCA_TICK} tick'inde en az bu kadar ay parçası (varsayılan 30/dk: 10; eskiden 2,5). */
+    private static final int PARCA_ESIK = 9;
+    private static final int PARCA_TICK = 400;
 
     private AyCarpmasiOyunTestleri() {
     }
@@ -70,6 +79,17 @@ public final class AyCarpmasiOyunTestleri {
         if (oncekiMeteorSikligi != null) {
             AyCarpmasiAyarlari.meteorDakikaBasinaAyarla(oncekiMeteorSikligi);
             oncekiMeteorSikligi = null;
+        }
+    }
+
+    @AfterBatch(batch = "ay_carpmasi_parca")
+    public static void parcaSonrasi(ServerLevel level) {
+        AfetYoneticisi yonetici = AfetYoneticisi.al(level.getServer());
+        yonetici.durdur();
+        yonetici.sifirla();
+        if (eskiBlokHasari != null) {
+            level.getServer().getGameRules().getRule(Kurallar.AFET_BLOK_HASARI).set(eskiBlokHasari, level.getServer());
+            eskiBlokHasari = null;
         }
     }
 
@@ -393,6 +413,50 @@ public final class AyCarpmasiOyunTestleri {
             AyCarpmasiAyarlari.meteorDakikaBasinaAyarla(oncekiSiklik);
             oncekiMeteorSikligi = null;
             yonetici.sifirla();
+        });
+    }
+
+    /**
+     * meteor-2 (kullanıcı isteği 2026-11-07): ay parçalanınca yoğun ay parçası yağmuru (oyuncu başına dakikada
+     * {@code ay_carpmasi.meteorDakikaBasina}); parçalar ay görünümündedir. Oyuncusuz dünyada tek merkez doğuş noktasıdır;
+     * sayı atılan meteordur. {@code afetBlokHasari} kapalı (doğuş çevresinde krater yok); bütçe ve uçan meteor tavanı aşılmaz.
+     */
+    @GameTest(template = "bos", batch = "ay_carpmasi_parca", timeoutTicks = 600)
+    public static void parcalanmadaYogunAyParcasiYagmuru(GameTestHelper y) {
+        AfetYoneticisi yonetici = temizBasla(y);
+        ServerLevel level = y.getLevel();
+        MinecraftServer server = level.getServer();
+        GameRules.BooleanValue hasar = server.getGameRules().getRule(Kurallar.AFET_BLOK_HASARI);
+        eskiBlokHasari = hasar.get();
+        hasar.set(false, server);
+        Afet afet = baslat(y, yonetici);
+        sirenden(y, yonetici, afet);
+        yonetici.asamaIleri();
+        yonetici.asamaIleri();
+        dogrula(y, afet.asama() == AfetAsamasi.AKTIF && afet.altAsama() == 1 && MeteorAPI.aktifYagmurSayisi(level) == 1,
+                "ay parçası yağmuru başlamalı");
+        YanginKaynagi kaynak = YanginKaynagi.afet(AfetTuru.AY_CARPMASI, afet.baglam().baslangicSaati());
+        dogrula(y, MeteorGorunumu.kaynaktan(kaynak) == MeteorGorunumu.AY, "ay parçaları ay görünümünde");
+        int bas = MeteorAPI.atilanMeteorSayisi(level, kaynak);
+        int[] asim = {Integer.MIN_VALUE};
+        int[] enCokUcan = {0};
+        y.onEachTick(() -> {
+            asim[0] = Math.max(asim[0], MeteorAPI.sonKraterIslemi(level) - MeteorAPI.sonKraterButcesi(level));
+            enCokUcan[0] = Math.max(enCokUcan[0], MeteorAPI.aktifMeteorSayisi(level));
+        });
+        y.runAfterDelay(PARCA_TICK, () -> {
+            int parca = MeteorAPI.atilanMeteorSayisi(level, kaynak) - bas;
+            int tavan = MeteorAyarlari.varlikTavani();
+            yonetici.durdur();
+            yonetici.sifirla();
+            hasar.set(eskiBlokHasari, server);
+            eskiBlokHasari = null;
+            DogalAfetler.LOGGER.info("Ay GameTest: {} tick'te {} ay parçası, en çok uçan {}/{}", PARCA_TICK, parca,
+                    enCokUcan[0], tavan);
+            dogrula(y, parca >= PARCA_ESIK, "ay parçası sayısı " + parca + " < " + PARCA_ESIK);
+            dogrula(y, asim[0] <= 0, "krater blok bütçesi aşıldı: " + asim[0]);
+            dogrula(y, enCokUcan[0] <= tavan, "uçan meteor tavanı aşıldı: " + enCokUcan[0]);
+            y.succeed();
         });
     }
 }

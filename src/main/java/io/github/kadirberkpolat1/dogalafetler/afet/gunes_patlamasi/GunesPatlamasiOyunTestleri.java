@@ -16,6 +16,8 @@ import io.github.kadirberkpolat1.dogalafetler.gokyuzu.GunesZinciriSureci;
 import io.github.kadirberkpolat1.dogalafetler.komut.DogalAfetKomutu;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorAPI;
+import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorAyarlari;
+import io.github.kadirberkpolat1.dogalafetler.yangin.YanginKaynagi;
 import net.minecraft.advancements.Advancement;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.AfterBatch;
@@ -42,6 +44,8 @@ import net.minecraftforge.gametest.PrefixGameTestTemplate;
 @PrefixGameTestTemplate(false)
 public final class GunesPatlamasiOyunTestleri {
     private static final float EPS = 1e-4f;
+    /** Öncü pencerenin son 600 tick'inde (hız 1) en az bu kadar meteor atılır: varsayılanlarla 5,6–7,5 (eskiden 0). */
+    private static final int ONCU_ESIK = 4;
     /** Siren testinin değiştirdiği {@code afetBlokHasari}'nın eski değeri; geri konunca null. */
     private static Boolean eskiBlokHasari;
 
@@ -60,6 +64,11 @@ public final class GunesPatlamasiOyunTestleri {
 
     @AfterBatch(batch = "gunes_patlamasi_zincir")
     public static void zincirSonrasi(ServerLevel level) {
+        batchSonuTemizligi(level);
+    }
+
+    @AfterBatch(batch = "gunes_patlamasi_oncu")
+    public static void oncuSonrasi(ServerLevel level) {
         batchSonuTemizligi(level);
     }
 
@@ -332,5 +341,70 @@ public final class GunesPatlamasiOyunTestleri {
             yonetici.sifirla();
         }
         y.succeed();
+    }
+
+    /**
+     * meteor-2 (kullanıcı isteği 2026-11-07): ön-uyarının sonunda öncü meteor yağmuru başlar ve artar; AKTIF'in ve sonraki
+     * günün başında yağmur yoğunluğu {@code meteorYagmuruDakikaBasina}'dır. Ön-uyarı hız 4'le geçilir, son 600 tick hız
+     * 1'de sayılır (yağmur yoğunluğu gerçek dakikadır). Sayı atılan meteordur (oyuncusuz dünyada doğuş noktasına; tavan ya da
+     * yüklü olmayan chunk yüzünden uçmayan dahil). Krater blok bütçesi ve uçan meteor tavanı hiçbir tick'te aşılmaz.
+     */
+    @GameTest(template = "bos", batch = "gunes_patlamasi_oncu", timeoutTicks = 1200)
+    public static void onUyaridaOncuMeteorYagmuruAktifteYogunYagmur(GameTestHelper y) {
+        AfetYoneticisi yonetici = temizBasla(y);
+        MinecraftServer server = y.getLevel().getServer();
+        ServerLevel level = y.getLevel();
+        GameRules.BooleanValue hasar = blokHasari(y);
+        eskiBlokHasari = hasar.get();
+        hasar.set(false, server);
+        GunesPatlamasi afet = baslat(y, yonetici);
+        YanginKaynagi kaynak = afet.kaynak();
+        double yagmur = GunesPatlamasiAyarlari.meteorYagmuruDakikaBasina();
+        yonetici.hizAyarla(4);
+        int[] bas = {-1};
+        long[] basTick = {0};
+        int[] asim = {Integer.MIN_VALUE};
+        int[] enCokUcan = {0};
+        y.onEachTick(() -> {
+            asim[0] = Math.max(asim[0], MeteorAPI.sonKraterIslemi(level) - MeteorAPI.sonKraterButcesi(level));
+            enCokUcan[0] = Math.max(enCokUcan[0], MeteorAPI.aktifMeteorSayisi(level));
+            if (bas[0] < 0 && afet.asama() == AfetAsamasi.ON_UYARI && afet.asamaKalanTick() <= 600) {
+                yonetici.hizAyarla(1);
+                bas[0] = MeteorAPI.atilanMeteorSayisi(level, kaynak);
+                basTick[0] = y.getTick();
+            }
+        });
+        y.startSequence()
+                .thenWaitUntil(() -> y.assertTrue(afet.asama() == AfetAsamasi.SIREN, "siren bekleniyor: " + afet.asama()))
+                .thenExecute(() -> {
+                    int oncu = MeteorAPI.atilanMeteorSayisi(level, kaynak) - bas[0];
+                    DogalAfetler.LOGGER.info("Güneş GameTest: ön-uyarının son {} tick'inde {} öncü meteor (yağmur {}/dk)",
+                            y.getTick() - basTick[0], oncu, MeteorAPI.yagmurYogunlugu(level, afet.yagmurKimlik()));
+                    y.assertTrue(bas[0] >= 0, "öncü pencereye hız 1'de girilmeli");
+                    y.assertTrue(oncu >= ONCU_ESIK, "ön-uyarıda öncü meteor sayısı " + oncu + " < " + ONCU_ESIK);
+                    yonetici.asamaIleri();
+                })
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    double d = MeteorAPI.yagmurYogunlugu(level, afet.yagmurKimlik());
+                    y.assertTrue(afet.asama() == AfetAsamasi.AKTIF && Math.abs(d - yagmur) < 1e-6,
+                            "AKTIF başında yağmur yoğunluğu " + yagmur + " bekleniyor: " + afet.asama() + " " + d);
+                    yonetici.asamaIleri();
+                })
+                .thenIdle(2)
+                .thenExecute(() -> {
+                    double d = MeteorAPI.yagmurYogunlugu(level, afet.yagmurKimlik());
+                    int tavan = MeteorAyarlari.varlikTavani();
+                    yonetici.durdur();
+                    yonetici.hizAyarla(1);
+                    yonetici.sifirla();
+                    hasar.set(eskiBlokHasari, server);
+                    eskiBlokHasari = null;
+                    y.assertTrue(afet.altAsama() == 1 && Math.abs(d - yagmur) < 1e-6,
+                            "ikinci günün başında yağmur: gün " + afet.altAsama() + ", " + d);
+                    y.assertTrue(asim[0] <= 0, "krater blok bütçesi aşıldı: " + asim[0]);
+                    y.assertTrue(enCokUcan[0] <= tavan, "uçan meteor tavanı aşıldı: " + enCokUcan[0] + " / " + tavan);
+                })
+                .thenSucceed();
     }
 }

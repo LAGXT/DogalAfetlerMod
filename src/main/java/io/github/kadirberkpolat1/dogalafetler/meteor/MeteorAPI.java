@@ -132,6 +132,19 @@ public final class MeteorAPI {
         return MeteorYoneticisi.yagmurDurdur(level, kimlik);
     }
 
+    /**
+     * Yağmurun oyuncu başına dakikadaki yoğunluğunu çalışırken değiştirir (afetin yağmur eğrisi; birikim korunur). Yağmur
+     * yoksa (süresi doldu, durduruldu, sunucu yeniden açıldı) {@code false}: çağıran yenisini kurar.
+     */
+    public static boolean yagmurYogunluguAyarla(ServerLevel level, int kimlik, double dakikaBasinaAdet) {
+        return MeteorYoneticisi.yogunlukAyarla(level, kimlik, dakikaBasinaAdet);
+    }
+
+    /** Yağmurun oyuncu başına dakikadaki yoğunluğu; yağmur yoksa NaN. */
+    public static double yagmurYogunlugu(ServerLevel level, int kimlik) {
+        return MeteorYoneticisi.yogunluk(level, kimlik);
+    }
+
     /** Kaynağın bütün boyutlardaki yağmurlarını durdurur ({@code ucanlariAt}: uçan meteorlarını da kaldırır). */
     public static int yagmurlariDurdur(MinecraftServer server, YanginKaynagi kaynak, boolean ucanlariAt) {
         return MeteorYoneticisi.durdur(server, Objects.requireNonNull(kaynak, "kaynak"), ucanlariAt);
@@ -169,5 +182,23 @@ public final class MeteorAPI {
 
     public static int bekleyenKraterSayisi(ServerLevel level) {
         return MeteorYoneticisi.bekleyenKraterSayisi(level);
+    }
+
+    /**
+     * Kaynağın yağmurlarının bu boyutta (sunucu açıldığından beri) atmaya kalkıştığı meteor: tavan ya da yüklü olmayan chunk
+     * yüzünden uçmayanlar dahil (komut, test).
+     */
+    public static int atilanMeteorSayisi(ServerLevel level, YanginKaynagi kaynak) {
+        return MeteorYoneticisi.atilanSayisi(level, kaynak);
+    }
+
+    /** Son tick'te krater işlerinin kullandığı blok işlemi; bütçe ({@code meteor.kraterBlokButcesi} × TPS kısması) aşılmaz. */
+    public static int sonKraterIslemi(ServerLevel level) {
+        return MeteorYoneticisi.kraterIslemi(level)[0];
+    }
+
+    /** Son tick'in krater blok bütçesi. */
+    public static int sonKraterButcesi(ServerLevel level) {
+        return MeteorYoneticisi.kraterIslemi(level)[1];
     }
 }

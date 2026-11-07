@@ -151,6 +151,24 @@ Uçuşta rüzgâr ıslığı döngüsü meteoru izler, perde yaklaşırken 1,2, 
 suya/kara değince cız. Kendi sentez dosyası yok: vanilla sesler `SoundEvents` ile (kural: tek seferlik darbe
 `level.playSound`).
 
+### Ses ve yağmur güncellemesi (meteor-2, 2026-11-07; kararlar `.vibe/kararlar/meteor-2.md`)
+
+Kullanıcı isteği: uçuş sesi her yerden duyuluyor ve vanilla gibi. Artık iki sentez dosyası var (`tools/assets/ses_uret.py`,
+ölçüm `docs/kanit/ses/meteor_*_ebur128.txt`): **uçuş** `meteor_ucus.ogg` (8 sn döngü; 35–90 / 90–220 Hz yanma kükremesi
+0,25 Hz'de çapraz kayar, 70→95 Hz süzülen kısmi ton, 6 Hz plazma çalkantısı, konuşma çentiği; −26 LUFS) yalnız meteor 48 blok
+yakınındayken çalar (52 blokta söner), kazanç `(1 − d/48)²`, perde dinleyiciye yaklaşma hızından Doppler `12 / (12 − v)` (3 blok/tick'te
+1,33 → 0,8), ay parçaları %10 tiz; **patlama** `meteor_patlama.ogg` (7 sn tek seferlik; kırılma darbesi, 90 → 32 Hz göğüs vuruşu, 2,2 sn
+zaman sabitli 20–120 Hz uğultu kuyruğu, çakıl; −23 LUFS, ≤ −6 dBTP) büyükte 128, küçükte 96 blok içinde (küçük %70 düzey,
+büyük perde 0,85), kazanç karesel. İkisini de istemci vanilla zayıflaması kapalı çalar (konum yalnız yön için); her türden aynı anda
+en çok 6 (ses.md §4 kural 3): uçuşta en yakın altı, çarpmada en uzaktaki düşer. Sunucunun `entity.generic.explode`'u kalktı; suda
+sıçrama + cız vanilla kalır. Ay parçası görünümü mevcut `AY` varyantıdır (kalsit + pürüzsüz bazalt/tüf gövde, mavi-beyaz
+plazma); yeni doku gerekmedi.
+
+**Yağmur yoğunluğu:** güneş patlaması ön-uyarının son 90 sn'sinde öncü yağmur başlatır (oyuncu başına 6/dk) ve siren
+boyunca 24/dk'ya çıkar; AKTIF'in ve her günün başında 3 dk 24/dk, arasında bölüm D'nin 1,5 → 5/dk arka planı. Ay parçası yağmuru
+oyuncu başına 30/dk (90 sn'de 45 parça). Dağılım (32–160 blok halka), uçan meteor tavanı (48) ve krater bütçesi (512 × TPS kısması)
+değişmedi.
+
 ## Buz altı balıkçılık (madde 15)
 
 ### Gerçek olay

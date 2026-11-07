@@ -428,6 +428,42 @@ public final class MeteorOyunTestleri {
     }
 
     /**
+     * meteor-2: yoğun yağmurda aynı anda bekleyen krater işleri tick başına ortak bütçeyi ({@code meteor.kraterBlokButcesi}
+     * × TPS kısması) aşmaz; 16 küçük krater bütçeyi en az bir tick tam doldurur (bütçe gerçekten sınırlar).
+     */
+    @GameTest(template = SAHNE, batch = "meteor_butce", timeoutTicks = 300)
+    public static void yogunCarpmadaKraterIslemiButceyiAsmaz(GameTestHelper y) {
+        blokHasari(y, true);
+        zemin(y, Blocks.DIRT);
+        ServerLevel level = y.getLevel();
+        for (int i = 0; i < 16; i++) {
+            carp(y, MeteorBoyutu.KUCUK, YanginKaynagi.KOMUT, HIC);
+        }
+        int[] asim = {Integer.MIN_VALUE};
+        int[] toplam = {0};
+        int[] tick = {0};
+        boolean[] doldu = {false};
+        y.onEachTick(() -> {
+            int islem = MeteorAPI.sonKraterIslemi(level);
+            int butce = MeteorAPI.sonKraterButcesi(level);
+            if (islem > 0) {
+                tick[0]++;
+                toplam[0] += islem;
+                asim[0] = Math.max(asim[0], islem - butce);
+                doldu[0] |= islem == butce;
+            }
+        });
+        y.succeedWhen(() -> {
+            y.assertTrue(bekleyenKrater(y) == 0, "krater işleri sürüyor");
+            DogalAfetler.LOGGER.info("meteor bütçe GameTest: {} işlem {} tick'te, en büyük aşım {}, bütçe doldu {}", toplam[0],
+                    tick[0], asim[0], doldu[0]);
+            y.assertTrue(asim[0] <= 0, "tick başına krater bütçesi aşıldı: " + asim[0]);
+            y.assertTrue(doldu[0] && tick[0] >= 2, "bütçe sınırlamalı (16 krater birkaç tick'e yayılmalı): " + tick[0]);
+            sahneyiTemizle(y);
+        });
+    }
+
+    /**
      * M-04: {@code afetBlokHasari=false} iken krater yok, meteor ateşi yangın yöneticisinde yanar ama yakıtı tüketmez
      * (blok değişmez); ödül eşya olduğu için düşer.
      */

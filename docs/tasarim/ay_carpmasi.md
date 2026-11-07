@@ -107,3 +107,9 @@ Kaynak: `.vibe/kararlar/ay-carpmasi.md` AY-01…AY-11, rapor `.vibe/rapor/ay-car
 - "Toz perdesi" parçacıkları ve "plajlarda ıslak kum parlaması" yapılmadı (rapor "yapılmadı"); tsunami çekilmesinin ×1,5'i
   tsunami işçisinindir (çarpan dönemi `DunyaDonemi.carpan(TSUNAMI) > 1` ile okunur).
 - Meteor sesi perdesi %10 tiz meteor sisteminin görünüm dalındadır (M-10); burada ayrıca yapılmadı.
+
+## Meteor-2 güncellemesi, 2026-11-07 (kararlar `.vibe/kararlar/meteor-2.md`)
+
+- Ay parçası yağmuru oyuncu başına 7,5 → **30/dk** (`ay_carpmasi.meteorDakikaBasina`; 90 sn'de oyuncu başına 45 parça),
+  süre aynı (`meteorSuresiSn` 90, aralık 60–120). Görünüm mevcut `AY` varyantı (gri-beyaz kalsit + pürüzsüz bazalt/tüf gövde,
+  mavi-beyaz plazma izi); yeni doku gerekmedi. Uçuş/çarpma sesleri meteor sisteminin (`esyalar.md` "Ses ve yağmur güncellemesi").

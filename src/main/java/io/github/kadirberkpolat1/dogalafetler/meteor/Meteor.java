@@ -15,6 +15,7 @@ public final class Meteor {
     public static void kaydet(IEventBus modBus) {
         MeteorAyarlari.kaydet();
         MeteorKayitlari.kaydet(modBus);
+        MeteorSesleri.kaydet(modBus);
         MeteorEsyaKayitlari.kaydet(modBus);
         Termostat.kaydet();
         AgKanali.kaydet(k -> k.sunucudanIstemciye("meteor/sarsinti", MeteorSarsintiPaketi.class, MeteorSarsintiPaketi::yaz,
@@ -22,6 +23,8 @@ public final class Meteor {
         KomutKaydi.ekle(MeteorKomutlari.komut());
         KomutKaydi.ekle(MeteorKomutlari.odulKomutu());
         DataGenerators.ceviriEkle(MeteorCevirileri::yaz);
+        DataGenerators.sesEkle(MeteorSesleri::tanimla);
+        DataGenerators.ceviriEkle(MeteorSesleri::cevirileriYaz);
         DataGenerators.saglayiciEkle(MeteorVerileri::ekle);
     }
 }

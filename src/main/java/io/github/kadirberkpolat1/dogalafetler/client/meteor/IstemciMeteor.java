@@ -40,15 +40,14 @@ import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
 import net.minecraftforge.client.event.ViewportEvent;
 import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 /**
  * Meteorun istemci olayları: {@code meteor/sarsinti} paketiyle çarpma parçacıkları (şok halkası tozu, fışkıran blok enkazı,
  * erimiş kaya kıvılcımları, duman sütunu; suda sıçrama + buhar), uzaklıkla azalan beyaz parlama (4 tick) ve oyuncuya özgü
- * ekran sarsıntısı; meteor uçuş sesi; yerdeki meteor ödüllerinin parıltısı (parça altın, sıcakken alev; çekirdek mor-mavi
- * ve büyü harfleri).
+ * ekran sarsıntısı; meteor uçuş ve çarpma sesleri ({@link MeteorSesi}); yerdeki meteor ödüllerinin parıltısı (parça altın,
+ * sıcakken alev; çekirdek mor-mavi ve büyü harfleri).
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class IstemciMeteor {
@@ -87,6 +86,7 @@ public final class IstemciMeteor {
         boolean buyuk = p.boyutu().buyuk();
         boolean ay = p.gorunumu() == MeteorGorunumu.AY;
         if (!p.suya()) {
+            MeteorSesi.carpma(nokta, mc.player.getEyePosition().distanceTo(nokta), buyuk, ay);
             double menzil = buyuk ? 200 : 100;
             double f = Math.max(0, 1 - mesafe / menzil);
             float guc = (float) (MeteorAyarlari.parlamaOlcegi() * (buyuk ? 0.85 : 0.5) * f * f);
@@ -279,8 +279,11 @@ public final class IstemciMeteor {
         if (sarsintiKalan > 0) {
             sarsintiKalan--;
         }
-        if (mc.level != null && mc.player != null && saat % 2 == 0) {
-            odulParlamasi(mc.level, mc.player);
+        if (mc.level != null && mc.player != null) {
+            MeteorSesi.tick(mc);
+            if (saat % 2 == 0) {
+                odulParlamasi(mc.level, mc.player);
+            }
         }
     }
 
@@ -321,16 +324,10 @@ public final class IstemciMeteor {
     }
 
     @SubscribeEvent
-    public static void varlikGirdi(EntityJoinLevelEvent olay) {
-        if (olay.getLevel().isClientSide() && olay.getEntity() instanceof MeteorVarligi meteor) {
-            Minecraft.getInstance().getSoundManager().play(new MeteorSesi(meteor));
-        }
-    }
-
-    @SubscribeEvent
     public static void cikis(ClientPlayerNetworkEvent.LoggingOut olay) {
         parlamaKalan = 0;
         sarsintiKalan = 0;
         sarsintiGenlik = 0;
+        MeteorSesi.temizle();
     }
 }

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Meteor ve termostatın görsel kanıtı (K0-21 rev. 2 ekran protokolü, kilit (k)).
 
-Kullanım (worktree kökünden): python3 tools/senaryo/meteor_gorsel.py [odul]
-(`odul`: yalnız ödül ve ipucu kareleri, `-PotomasyonBolum=odul`, M-22; argümansız: bütün vitrin.)
+Kullanım (worktree kökünden): python3 tools/senaryo/meteor_gorsel.py [hepsi|odul|yagmur] [kanıt klasörü]
+(`odul`: yalnız ödül ve ipucu kareleri, `-PotomasyonBolum=odul`, M-22; `yagmur`: güneş patlaması ön-uyarı/siren yağmuru, yakın/uzak
+ses denemesi, ay parçası yağmuru (meteor-2); argümansız: bütün vitrin. Kanıt klasörü KOK'a göredir.)
 
 Tek oyunculu Quick Play dünyası `run/saves/meteor` her koşuda KOK/run/saves/test'ten (seed 20261105, allowCommands=1) taze
 kopyalanır; istemci `-Potomasyon=meteor` (K-E3) ile açılır ve `client.meteor.MeteorOtomasyonu`
@@ -13,7 +14,7 @@ focus_on_activate off]); (b) JVM'de HL_EXEC_RULE_TOKEN yoksa öldürülür; (c) 
 tutmazsa öldürülür; (d) 5 sn'de bir bekçi: etkin pencere bizimse ALARM, süreç öldürülür, odak kaydedilen pencereye
 verilir, koşu geçersiz; (e) oyun içi girdi sayıları kapanış satırından okunur, sıfırdan farklıysa koşu geçersiz.
 Sahibin oturumunda tıklama/odak/workspace değişimi yok. Aynı anda tek runClient; ağır süreç kapısı (en çok 20 dk).
-Sayılar ve adımlar KOK/.vibe/kanit/meteor-termostat/protokol.log'a, kareler KOK/.vibe/kanit/meteor-termostat/kareler/'e.
+Sayılar ve adımlar <kanıt>/protokol.log'a, kareler <kanıt>/kareler/'e (vars. KOK/.vibe/kanit/meteor-termostat).
 """
 import hashlib
 import os
@@ -32,7 +33,7 @@ WS = 92
 BOLUM = sys.argv[1] if len(sys.argv) > 1 else "hepsi"
 W = Path(__file__).resolve().parents[2]
 KOK = W.parents[1] if W.parent.name == ".worktrees" else W
-KANIT = KOK / ".vibe/kanit/meteor-termostat"
+KANIT = KOK / (sys.argv[2] if len(sys.argv) > 2 else ".vibe/kanit/meteor-termostat")
 KARELER = KANIT / "kareler"
 JAVA_HOME = "/home/lagxt/.jdks/jdk-17.0.21+9"
 ISARET = "METEOR_OTOMASYON"
