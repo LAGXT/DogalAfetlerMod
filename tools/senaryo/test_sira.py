@@ -207,6 +207,20 @@ class SiraTest(unittest.TestCase):
             is_sureci.kill()
             is_sureci.wait()
 
+    def test_java_home_varsayilani(self):
+        os.environ.pop("JAVA_HOME", None)
+        veri = {"id": "x", "makine": "ana", "env": {}}
+        self.assertEqual(sira_kosucu.is_ortami(veri)["JAVA_HOME"], "/home/lagxt/.jdks/jdk-17.0.21+9")
+        veri["env"]["JAVA_HOME"] = "/baska/jdk"
+        self.assertEqual(sira_kosucu.is_ortami(veri)["JAVA_HOME"], "/baska/jdk", "kayıttaki JAVA_HOME ezilmemeli")
+        os.environ["JAVA_HOME"] = "/kabuk/java21"
+        try:
+            kimlik = sira.ekle("ana", ["sleep", "0"], cwd=GECICI, cikti=lambda *_a, **_k: None)
+        finally:
+            del os.environ["JAVA_HOME"]
+        self.assertNotIn("JAVA_HOME", kayit(kimlik)["env"], "kabuğun JAVA_HOME'u kayda geçmemeli")
+        self.assertEqual(sira_kosucu.is_ortami(kayit(kimlik))["JAVA_HOME"], sira.JAVA_HOME)
+
     def test_ana_tek_istemci(self):
         self.kosucu_kilidi("pc2")
         ana = sira_kosucu.Kosucu("ana", 2)

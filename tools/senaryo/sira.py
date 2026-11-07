@@ -3,7 +3,8 @@
 
 Spool: ~/.cache/dogalafet-sira/<spool>/{bekleyen,kosan,biten}/<id>.json (SIRA_KOK değiştirir), işin çıktısı
 <spool>/log/<id>.log (ya da --log). Her iş: komut, cwd, env (TEST_FILTRE, KAPI_*, UZAK*, DEFTER_ZORLA, VIBE_OTURUM,
-JAVA_HOME, LC_ALL, GRADLE_OPTS; ana kuyrukta ekran değişkenleri de), yuva, eklenme/başlangıç/bitiş, çıkış, süre, log.
+LC_ALL, GRADLE_OPTS; ana kuyrukta ekran değişkenleri de), yuva, eklenme/başlangıç/bitiş, çıkış, süre, log. Kabuğun
+JAVA_HOME'u (mise Java 21 olabilir) kaydedilmez: kaydında JAVA_HOME olmayan iş JDK 17 ile koşar (K-E54, K0-13).
 İki koşucu da ana makinede, makine başına 2 yuva. Spool'lar:
   oto  (varsayılan, K-E53) iki makinede de koşabilen iş: ekransız ağır iş (gradle_kapisi.sh, ./gradlew ekransız görevler,
        *_sunucu.py) ve makineden bağımsız istemci işi (`--istemci -- python3 tools/senaryo/x_gorsel.py <kanıt/> …`; kanıt
@@ -53,7 +54,8 @@ YUVA = 2
 SURUM = 2
 OTO_BEKLE_SN = float(os.environ.get("SIRA_OTO_BEKLE_SN", "60"))
 ACLIK_SN = float(os.environ.get("SIRA_ACLIK_SN", "600"))
-ENV_ANAHTARI = re.compile(r"(TEST_FILTRE|KAPI_\w+|UZAK\w*|DEFTER_ZORLA|VIBE_OTURUM|JAVA_HOME|LC_ALL|GRADLE_OPTS)")
+ENV_ANAHTARI = re.compile(r"(TEST_FILTRE|KAPI_\w+|UZAK\w*|DEFTER_ZORLA|VIBE_OTURUM|LC_ALL|GRADLE_OPTS)")
+JAVA_HOME = "/home/lagxt/.jdks/jdk-17.0.21+9"
 EKRAN_ENV = ("DISPLAY", "WAYLAND_DISPLAY", "HYPRLAND_INSTANCE_SIGNATURE", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS")
 KENDILIGINDEN_UZAK = ("uzak.sh", "pc2_istemci.sh")
 ISTEMCI_BETIGI = ("_gorsel.py", "_istemci.py")
