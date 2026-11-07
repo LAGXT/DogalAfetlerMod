@@ -281,17 +281,29 @@ def doluluk(makine):
     return max(dolu, uzak_dolu_yuva()) if makine == "pc2" else dolu
 
 
-def gradle_oturumlari():
-    """Ana makinede çalışan Gradle istemcilerinin (GradleWrapperMain) oturum kimlikleri."""
-    oturumlar = []
+def _ana_surec(pid):
+    try:
+        return int(Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[1])
+    except (OSError, IndexError, ValueError):
+        return 0
+
+
+def gradle_istemcileri():
+    """Ana makinede çalışan Gradle istemcileri (`org.gradle.wrapper.GradleWrapperMain`): [(pid, ata pid'leri)]. Hangi kuyruk
+    işine ait olduğu oturumdan değil atalardan anlaşılır: sunucu betikleri Gradle'ı kendi oturumunda açar."""
+    istemciler = []
     for yol in Path("/proc").glob("[0-9]*/cmdline"):
         try:
-            if b"GradleWrapperMain" not in yol.read_bytes():
+            if b"org.gradle.wrapper.GradleWrapperMain" not in yol.read_bytes().split(b"\0"):
                 continue
-            oturumlar.append(int((yol.parent / "stat").read_text().rsplit(")", 1)[1].split()[3]))
-        except (OSError, IndexError, ValueError):
+        except OSError:
             continue
-    return oturumlar
+        atalar, ata = [], _ana_surec(int(yol.parent.name))
+        while ata > 1 and len(atalar) < 64:
+            atalar.append(ata)
+            ata = _ana_surec(ata)
+        istemciler.append((int(yol.parent.name), atalar))
+    return istemciler
 
 
 def bos_ram_mb():
@@ -313,7 +325,7 @@ def dolu_mu(makine, cwd=None):
         if uzak_klasor_dolu(cwd or os.getcwd()):
             return f"bu klasörden pc2'de koşan iş var ({Path(cwd or os.getcwd()).resolve()})"
         return None
-    gradle = len(gradle_oturumlari())
+    gradle = len(gradle_istemcileri())
     if gradle >= 2:
         return f"ana makinede {gradle} Gradle çalışıyor"
     bos = bos_ram_mb()

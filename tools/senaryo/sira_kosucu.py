@@ -180,8 +180,9 @@ class Kosucu:
         oto_kosan = [v for v in kosan if v.get("kaynak") == "oto"]
         if veri["cwd"] in {v["cwd"] for v in oto_kosan}:
             return "aynı klasörden oto işi koşuyor"
-        oturumlar = {v.get("kosturucu") for v in kosan}
-        agir = sum(sira.gerek(v, "ana") for v in kosan) + sum(o not in oturumlar for o in sira.gradle_oturumlari())
+        kosturucular = {v.get("kosturucu") for v in kosan} - {None}
+        disarida = sum(not kosturucular & {pid, *atalar} for pid, atalar in sira.gradle_istemcileri())
+        agir = sum(sira.gerek(v, "ana") for v in kosan) + disarida
         if agir + sira.gerek(veri, "ana") > sira.YUVA:
             return f"ana makinede {agir} ağır süreç"
         if sira.bos_ram_mb() < int(os.environ.get("KAPI_RAM_MB", "4096")):

@@ -5069,7 +5069,10 @@ değişmez, `bekle`/`durum` makineden bağımsız arar). Ana koşucu `oto` işin
 (`SIRA_OTO_BEKLE_SN`) beklediyse alır; ana makinede `UZAK=0` ile yerelde koşar: ağır süreç ≤ 2 (kuyruğun işleri + kuyruk dışı
 `GradleWrapperMain`, K-E19 a), boş RAM ≥ `KAPI_RAM_MB` (4096), aynı klasörden tek oto işi (worktree'nin `build/` ve `run-server/`
 klasörü tek). pc2 doluysa ana beklemeden alır: ilk sürümdeki "iki oto işi arasında 60 sn" (`SIRA_ANA_ARA_SN`) 20:39'da kalktı (canlı
-ölçüm: işler 16–22 sn sürdüğünden ikinci iş başlamadan ilki bitiyor, ana 1/2 kalıyordu; RAM 4 662 MB eşiğin üstündeydi). (2) **İstemci işi makineden bağımsız:** `sira.py ekle --istemci -- python3 tools/senaryo/x_gorsel.py
+ölçüm: işler 16–22 sn sürdüğünden ikinci iş başlamadan ilki bitiyor, ana 1/2 kalıyordu; RAM 4 662 MB eşiğin üstündeydi). Kuyruk
+dışı Gradle sayımı (20:45 düzeltmesi): istemcinin (`org.gradle.wrapper.GradleWrapperMain`) kuyruk işine ait olduğu oturumdan değil
+ata süreçlerinden anlaşılır; `*_sunucu.py` Gradle'ı kendi oturumunda açtığından ana makinede koşan sunucu işi hem yuva hem kuyruk
+dışı Gradle sayılıyor, ikinci yuva "ana makinede 2 ağır süreç" engeliyle boş kalıyordu (20:42–20:45, RAM yer yer > 4 096 MB). (2) **İstemci işi makineden bağımsız:** `sira.py ekle --istemci -- python3 tools/senaryo/x_gorsel.py
 <kanıt/> …` (kanıt klasörü betiğin ilk argümanı, `--kanit` argümanı ya da `sira.py ekle --kanit`) `oto`'da saklanır; pc2 alırsa
 `pc2_istemci.sh <kanıt/> <betik> …` ile iki yuva, ana alırsa betiğin kendisi (gizli workspace, `runclient_kilit`) tek yuva ve tek
 istemci (kuyruğun istemci işi ya da yaşayan runClient kilidi varken alınmaz). `--olcum` (FPS/CPU, K0-33, K-E29 b) yalnız ana;
@@ -5082,9 +5085,9 @@ worktree'lerindeki `gradle_kapisi.sh`/`cekirdek_sunucu` hep `--makine pc2` verir
 başlayınca sarkan bağ silinir. Yeni `gradle_kapisi.sh`/`cekirdek_sunucu` kapı doluyken ekransız işi doğrudan `oto`'ya atar; pc2'nin
 `dolu-mu`'su `oto` bekleyenini de sayar. (5) Pano başlığına `Yuva: ana n/2 · pc2 n/2 · oto bekleyen N`; oto'dan gelen koşan iş
 `ana (oto)`. Reddedilen: oto işini pc2 kuyruğunda bayrakla tutmak (karar `oto` spool'unu istedi; eski istemciler bağla çözüldü),
-ana makinenin oto işini hemen alması (ana makine kullanıcınındır). Sınama `tools/senaryo/test_sira.py` 8/8 (`sleep` işleri: backfill,
+ana makinenin oto işini hemen alması (ana makine kullanıcınındır). Sınama `tools/senaryo/test_sira.py` 9/9 (`sleep` işleri: backfill,
 `SIRA_ACLIK_SN=2` açlık, pc2 dolu → ana alır, 60 sn bekleyeni ana alır, ana iki yuvayı aynı turda doldurur ve aynı klasörün
-ikinci işi bekler, tek istemci, eski işin taşınması ve kimliğin
+ikinci işi bekler, kendi oturumunu açan Gradle işin kendisi sayılır, tek istemci, eski işin taşınması ve kimliğin
 `bekle` ile bulunması, makine seçimi ve istemci çevirisi). Canlı geçiş 20:36:04 (`restart`, koşan `1107-200450560-e7` sürdü): 9 eski
 iş `oto`'ya taşındı, ana makine 20:36:05'te ilkini (`1107-200716577-44`, `gradle_kapisi.sh compileJava test`) aldı.
 

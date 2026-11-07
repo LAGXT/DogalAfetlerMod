@@ -8,6 +8,7 @@ import fcntl
 import os
 import secrets
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
@@ -22,7 +23,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import sira  # noqa: E402
 import sira_kosucu  # noqa: E402
 
-sira.gradle_oturumlari = list
+GERCEK_GRADLE = sira.gradle_istemcileri
+sira.gradle_istemcileri = list
 
 
 def is_yaz(spool, komut, yuva=1, istemci=False, cwd=None, once_sn=0.0, **ek):
@@ -178,6 +180,32 @@ class SiraTest(unittest.TestCase):
                          [("ana", "kosan"), ("oto", "bekleyen"), ("ana", "kosan")],
                          "ana iki oto işini aynı turda almalı; aynı klasörün ikinci işi beklemeli")
         surdur([ana], [bir, ayni, iki])
+
+    def test_kuyruk_isinin_kendi_oturumundaki_gradle_sayilmaz(self):
+        kod = ("import subprocess, sys; subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)', "
+               "'org.gradle.wrapper.GradleWrapperMain'], start_new_session=True).wait()")
+        is_sureci = subprocess.Popen([sys.executable, "-c", kod], start_new_session=True)
+        bizim = []
+        try:
+            son = time.monotonic() + 10
+            while not bizim and time.monotonic() < son:
+                bizim = [c for c in GERCEK_GRADLE() if is_sureci.pid in c[1]]
+                time.sleep(0.05)
+            self.assertEqual(len(bizim), 1, "işin kendi oturumunu açan Gradle istemcisi atalarından bulunmalı")
+            sira.gradle_istemcileri = lambda: bizim
+            self.kosucu_kilidi("pc2")
+            ana = sira_kosucu.Kosucu("ana", 2)
+            aday = {"makine": "oto", "cwd": "/baska", "yuva": 1, "eklendi": 0, "env": {}, "komut": ["sleep"]}
+            kosan = {"id": "x", "cwd": "/yok", "yuva": 1, "kaynak": "oto", "baslangic": 0}
+            self.assertIsNone(ana.ana_engeli(aday, [{**kosan, "kosturucu": is_sureci.pid}], time.time()))
+            self.assertEqual(ana.ana_engeli(aday, [{**kosan, "kosturucu": None}], time.time()),
+                             "ana makinede 2 ağır süreç")
+        finally:
+            sira.gradle_istemcileri = list
+            for pid, _ in bizim:
+                os.kill(pid, 9)
+            is_sureci.kill()
+            is_sureci.wait()
 
     def test_ana_tek_istemci(self):
         self.kosucu_kilidi("pc2")
