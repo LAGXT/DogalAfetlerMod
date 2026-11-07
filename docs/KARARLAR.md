@@ -5030,10 +5030,31 @@ Kanıt `.vibe/kanit/hizlandirma/` (GameTest log'u), defter satırı `gametest:Ce
 pano ve kanıt ana makinede, pc2'de depo ve `.vibe` yok; pc2'de kullanıcı lingering'i `sudo` ister); doğrulayıcının defterdeki testi
 yeniden koşması (aynı hash = aynı girdi; aralıklı şüphede `DEFTER_ZORLA=1`); kapsamda ortak alt sistem paketlerini (yangın, su,
 sıcaklık, başarım, meteor) kendi testine indirmek (birden çok afetin testi onları kullanır; güvenli varsayılan filtresiz); kapı
-doluyken çıkışı ≠ 0 yapmak (kullanıcı "çıkış 0 + iş kimliği" istedi; tamamlanmayı defter gösterir). **Açık (birleşmeden sonra):**
-koşucu birimleri kurulup açılır (`ln -sf KÖK/tools/senaryo/dogalafet-sira@.service ~/.config/systemd/user/`, `systemctl --user
-daemon-reload`, `systemctl --user enable --now dogalafet-sira@ana dogalafet-sira@pc2`); `.vibe/test-defteri.tsv` `main`'de commit'lenir;
-ana makinede `Linger=no`: oturum kapanınca koşucular durur (kalıcı için kullanıcı `sudo loginctl enable-linger lagxt`).
+doluyken çıkışı ≠ 0 yapmak (kullanıcı "çıkış 0 + iş kimliği" istedi; tamamlanmayı defter gösterir).
+
+**pc2 görünür istemci ve daemon (dal `is/pc2-istemci`, `.vibe/kararlar/pc2-istemci.md`; aynı kullanıcı kararının parçası).**
+Görsel betikler (`*_gorsel.py`, `*_istemci.py`) ana makinede Hyprland exec kuralıyla (K0-21 rev. 2) ya da yalnız kare/vitrin koşuları
+için pc2'de görünür istemciyle koşar: `tools/senaryo/pc2_istemci.sh <kanıt/> <betik> [arg]` (XFCE/X11, `DISPLAY=:0`,
+`DOGALAFETLER_EKRAN=pc2`; işi `uzak.sh` götürür; pc2'nin iki yuvasını tutar, yuva-1 alınınca pc2'de `./gradlew --stop`; `run/saves/test`
+yoksa kopyalar). K0-21 rev. 2 (a)–(e) tek ortak yolda: `runclient_kilit.istemci_baslat`/`pencere_dogrula`/`odak_denetle`/`girdi_ozeti`;
+16 görsel betik kendi Hyprland kodunu sildi (+243 / −876), kural pc2'de uygulanmaz. FPS/CPU ölçümleri (`OLCUM`, K0-33, K-E29 b)
+yalnız ana makinede geçerli: pc2 log'u `MAKINE=LAGXT2`, `olcum_tablosu.py` satırları `bilgi`; `runData` ana makinede. Kanıt: radar
+165 sn 8/8 kare (en az kullanılabilir 1 321 MiB, derlemeli ilk koşu), uyarı ~120 sn (117) 3 kare GEÇERLİ (en az 3 534 MiB). pc2 daemon:
+yalnız pc2 `~/.gradle/gradle.properties` (`org.gradle.daemon=true`, boşta 15 dk); `help` soğuk/`--no-daemon` 12,4 sn → sıcak 2,7 sn;
+filtresiz GameTest 216/216 daemon yanındayken en az 3 937 MiB (~3,9 GB) kullanılabilir RAM tuttu. **Birleştirme (entegratör,
+`079f606` + `3af72b3`, çakışmasız):** düzeltmeler `255cd3e` (`pc2_istemci.sh` `UZAK_YUVA_TUTULU=1` iken yuva-2'yi yeniden flock'lamaz:
+kuyruğun `--istemci` işinde koşturucu yuvaları zaten tutar, aksi hâlde 60 dk kilitlenme; `defter.sarmala` pc2'de (`UZAK_ICINDE`, depo
+yok) deftersiz; `sira.py --makine oto` `pc2_istemci.sh`'yi pc2 + iki yuva sayıyor, eskiden `--istemci` hepsini `ana`ya atıyordu),
+`c869bf6` (`kapsam.py` `.vibe/**` → `yok`), `d0f7519` (`uzak.sh` kesmede pc2'deki işin **oturumunu** durdurur, `pkill -s`: GNU `timeout`
+kendi süreç grubunu açtığından eski `kill -- -<grup>` Gradle'a ulaşmıyor, iptal edilen GameTest pc2'de yetim kalıp aynı klasörde
+ikinci GameTest'le yan yana koşuyordu). Koşucular kuruldu: `~/.config/systemd/user/dogalafet-sira@.service` bağlantısı, `enable --now
+dogalafet-sira@ana dogalafet-sira@pc2`, ikisi `active`/`enabled`. pc2 koşucusu ana makinede yerel `~/.cache/dogalafet-sira/pc2/` spool'unu
+sürer; her işin komutu pc2'ye `uzak.sh` (ssh + rsync) ile gider, pc2'de koşucu ya da spool yoktur, pano yalnız ssh ile pc2'ye kopyalanır.
+Birleşme doğrulaması: `kapsam.py eb684ec...HEAD` → `filtresiz` (`gradle.properties`) → tek filtresiz GameTest `gradle_kapisi.sh` ile pc2
+kuyruğundan (iş `1107-192207410-83`): `FILTRE=yok`, 216/216, Gradle 1 dk 53 sn, iş 115 sn; defter `gametest @6b4045c786bd gecti` (`d0f7519`,
+`.vibe/kanit/hizlandirma/gametest-birlesme.log`); `-Puyum=coldsweat` koşmadı.
+**Açık:** iki makinede de `Linger=no`: oturum kapanınca ana makinedeki koşucular ve pc2'deki daemon durur (kalıcı için kullanıcı ana
+makinede ve pc2'de `sudo loginctl enable-linger lagxt`).
 
 ## Açık noktalar (Faz 2b)
 
