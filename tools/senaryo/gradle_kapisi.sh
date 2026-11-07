@@ -4,7 +4,7 @@
 #     `gecti` varsa "DEFTER: geçti @<hash> (...)", çıkış 0, Gradle başlamaz (DEFTER_ZORLA=1 koşturur). Koşu bitince sonuç yazılır.
 #  2. Tek giriş kuyruk (K-E60): kuyruk işinin içinde değilse (SIRA_IS yok; SIRA_SERBEST=1 bilerek atlar) kendini
 #     `sira.py ekle --bekle --makine oto` ile kuyruğa ekler ve bekler: işin çıktısı akar, çıkış kodu işinki, kesilirse iş
-#     iptal. Ekransız görev ortak oto kuyruğuna (pc2 öncelikli, taşanı ana makine alır; K-E53), ekranlı (runData) ana
+#     iptal. Ekransız görev ortak oto kuyruğuna (boş yuvası çok olan makine alır, eşitlikte pc2; K-E60 rev.), ekranlı (runData) ana
 #     kuyruğuna. Beklemeden sıradaki işe geçmek: tools/senaryo/sira.py ekle -- tools/senaryo/gradle_kapisi.sh <log> <görevler>.
 #  3. İşin içinde: görevlerin hepsi ekransızsa ve UZAK=0 değilse (pc2 işi) pc2'de koşar (uzak.sh, log geri gelir; K-E44),
 #     değilse (ana makinenin işi UZAK=0 taşır) yerelde. pc2'de (UZAK_ICINDE) doğrudan Gradle.

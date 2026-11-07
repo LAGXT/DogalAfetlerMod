@@ -19,7 +19,7 @@ import unittest
 from pathlib import Path
 
 GECICI = tempfile.mkdtemp(prefix="sira-sinama-")
-os.environ.update(SIRA_KOK=f"{GECICI}/spool", SIRA_PANO=f"{GECICI}/pano.md", SIRA_ACLIK_SN="2", SIRA_OTO_BEKLE_SN="60",
+os.environ.update(SIRA_KOK=f"{GECICI}/spool", SIRA_PANO=f"{GECICI}/pano.md", SIRA_ACLIK_SN="2",
                   UZAK_MAKINE=f"sinama-{secrets.token_hex(3)}", DOGALAFETLER_RUNCLIENT_KILIT=f"{GECICI}/runclient.lock",
                   KAPI_RAM_MB="0")
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -46,6 +46,15 @@ is_yaz.sayac = 0
 
 def kayit(kimlik):
     return sira.json_oku(sira.bul(kimlik)[2])
+
+
+def proje():
+    """Geçici proje kökü: pc2'ye düşen türsüz oto işinin sarıldığı `tools/senaryo/uzak.sh` komutu yerelde koşturur."""
+    kok = Path(tempfile.mkdtemp(dir=GECICI))
+    (kok / "tools/senaryo").mkdir(parents=True)
+    (kok / "tools/senaryo/uzak.sh").write_text('#!/bin/sh\nexec "$@"\n')
+    (kok / "tools/senaryo/uzak.sh").chmod(0o755)
+    return kok
 
 
 def kosan_yaz(makine, komut, cwd=None):
@@ -80,7 +89,10 @@ class SiraTest(unittest.TestCase):
             k.close()
 
     def kosucu_kilidi(self, makine):
-        """Başka bir koşucu çalışıyormuş gibi (`kosucu_canli`)."""
+        """Başka bir koşucu çalışıyormuş gibi (`kosucu_canli`). Zaten tutuluyorsa yeniden alınmaz (aynı süreçte ikinci
+        flock bekler)."""
+        if sira.kosucu_canli(makine):
+            return
         dosya = open(sira.dizin(makine) / "kosucu.lock", "a")
         fcntl.flock(dosya, fcntl.LOCK_EX)
         self.kilitler.append(dosya)
@@ -110,7 +122,7 @@ class SiraTest(unittest.TestCase):
         ana = sira_kosucu.Kosucu("ana", 2)
         bir = is_yaz("oto", ["sleep", "1"])
         ana.baslat()
-        self.assertEqual(sira.bul(bir)[:2], ("oto", "bekleyen"), "pc2 boşken ana oto işini 60 sn içinde almamalı")
+        self.assertEqual(sira.bul(bir)[:2], ("oto", "bekleyen"), "boş yuva eşitken (2/2) iş pc2'nin")
         dolu = is_yaz("pc2", ["sleep", "3"], yuva=2)
         pc2 = sira_kosucu.Kosucu("pc2", 2)
         pc2.baslat()
@@ -126,11 +138,48 @@ class SiraTest(unittest.TestCase):
         for kimlik in (bir, iki, dolu):
             self.assertEqual(sira.bekle(kimlik, 5, cikti=lambda *_a, **_k: None), 0)
 
-    def test_oto_uzun_bekleyeni_ana_alir(self):
-        self.kosucu_kilidi("pc2")
-        kimlik = is_yaz("oto", ["sleep", "0"], once_sn=sira.OTO_BEKLE_SN + 1)
-        sira_kosucu.Kosucu("ana", 2).baslat()
-        self.assertEqual(sira.bul(kimlik)[:2], ("ana", "kosan"))
+    def dagit(self, kimlikler, tur=6):
+        """İki koşucunun `baslat` turları (öteki koşucu yaşıyor sayılır); işlerin makineleri."""
+        for m in ("ana", "pc2"):
+            self.kosucu_kilidi(m)
+        kosucular = [sira_kosucu.Kosucu("pc2", 2), sira_kosucu.Kosucu("ana", 2)]
+        for _ in range(tur):
+            for k in kosucular:
+                k.baslat()
+        return kosucular, [sira.bul(k)[0] if sira.bul(k)[1] == "kosan" else None for k in kimlikler]
+
+    def test_dagitim_bos_yuvasi_cok_olana_esitlikte_pc2(self):
+        iki = [is_yaz("oto", ["sleep", "3"], cwd=proje()) for _ in range(2)]
+        kosucular, yer = self.dagit(iki)
+        self.assertEqual(yer, ["pc2", "ana"], "2 iş: 1. pc2 (eşitlik), 2. ana (boş yuvası çok)")
+        self.assertIn("Yuva: ana 1/2 · pc2 1/2", sira.pano_metni())
+        surdur(kosucular, iki)
+        dort = [is_yaz("oto", ["sleep", "3"], cwd=proje()) for _ in range(4)]
+        kosucular, yer = self.dagit(dort)
+        self.assertEqual(yer, ["pc2", "ana", "pc2", "ana"])
+        self.assertIn("Yuva: ana 2/2 · pc2 2/2 · oto bekleyen 0", sira.pano_metni())
+        surdur(kosucular, dort)
+
+    def test_dagitim_dolu_makine_atlanir(self):
+        for _ in range(2):
+            kosan_yaz("pc2", ["tools/senaryo/gradle_kapisi.sh", "l", "test"])
+        pc2_dolu = is_yaz("oto", ["sleep", "0"], cwd=proje())
+        _, yer = self.dagit([pc2_dolu], tur=1)
+        self.assertEqual(yer, ["ana"], "pc2 doluyken ana alır")
+        shutil.rmtree(sira.dizin("pc2", "kosan"))
+        for k in self.kilitler:
+            k.close()
+        self.kilitler = []
+        for _ in range(2):
+            kosan_yaz("ana", ["tools/senaryo/gradle_kapisi.sh", "l", "test"])
+        ana_dolu = is_yaz("oto", ["sleep", "0"], cwd=proje())
+        _, yer = self.dagit([ana_dolu], tur=1)
+        self.assertEqual(yer, ["pc2"], "ana doluyken pc2 alır")
+        sonuc = sira_kosucu.Kosucu("pc2", 2)
+        surdur([sonuc], [ana_dolu])
+        shutil.rmtree(sira.dizin("ana", "kosan"))
+        sira.dizin("ana", "kosan")
+        surdur([sira_kosucu.Kosucu("ana", 2)], [pc2_dolu])
 
     def test_eski_pc2_isi_tasinir_kimlik_sabit(self):
         kimlik = is_yaz("pc2", ["tools/senaryo/gradle_kapisi.sh", f"{GECICI}/test.log", "test"])
@@ -188,12 +237,11 @@ class SiraTest(unittest.TestCase):
             sira.ekle("oto", ["sleep", "1"], cwd=GECICI, cikti=sessiz)
 
     def test_ana_iki_yuvayi_beklemeden_doldurur_ayni_klasor_tek(self):
-        self.kosucu_kilidi("pc2")
         ana = sira_kosucu.Kosucu("ana", 2)
         ortak = tempfile.mkdtemp(dir=GECICI)
-        bir = is_yaz("oto", ["sleep", "2"], cwd=ortak, once_sn=sira.OTO_BEKLE_SN + 3)
-        ayni = is_yaz("oto", ["sleep", "0"], cwd=ortak, once_sn=sira.OTO_BEKLE_SN + 2)
-        iki = is_yaz("oto", ["sleep", "2"], once_sn=sira.OTO_BEKLE_SN + 1)
+        bir = is_yaz("oto", ["sleep", "2"], cwd=ortak)
+        ayni = is_yaz("oto", ["sleep", "0"], cwd=ortak)
+        iki = is_yaz("oto", ["sleep", "2"])
         ana.baslat()
         self.assertEqual([sira.bul(k)[:2] for k in (bir, ayni, iki)],
                          [("ana", "kosan"), ("oto", "bekleyen"), ("ana", "kosan")],
@@ -218,7 +266,7 @@ class SiraTest(unittest.TestCase):
             self.assertIn("Yuva: ana 2/2", pano)
             self.kosucu_kilidi("pc2")
             aday = {"makine": "oto", "cwd": "/baska", "yuva": 1, "eklendi": 0, "env": {}, "komut": ["sleep"]}
-            self.assertEqual(sira_kosucu.Kosucu("ana", 2).ana_engeli(aday, [], time.time()), "ana makinede 2 ağır süreç")
+            self.assertEqual(sira_kosucu.Kosucu("ana", 2).engel("ana", aday), "ana: boş yuva 0")
         finally:
             sira.ana_gradle_surecleri = list
             for surec in (isin, disari):
@@ -332,10 +380,9 @@ class SiraTest(unittest.TestCase):
                              "eski")
         finally:
             rk.oturum_ekrani = gercek
-        self.kosucu_kilidi("pc2")
         ana = sira_kosucu.Kosucu("ana", 2)
         ana.hyprland = (time.monotonic(), None)
-        kimlik = is_yaz("oto", ["sleep", "0"], istemci=True, once_sn=sira.OTO_BEKLE_SN + 1, kanit="k/")
+        kimlik = is_yaz("oto", ["sleep", "0"], istemci=True, kanit="k/")
         ana.baslat()
         self.assertEqual(sira.bul(kimlik)[:2], ("oto", "bekleyen"), "yaşayan Hyprland yokken istemci işi pc2'ye kalır")
 
@@ -346,11 +393,11 @@ class SiraTest(unittest.TestCase):
         kosan_yaz("pc2", ["tools/senaryo/gradle_kapisi.sh", "l", "test"], cwd=bir)
         kosan_yaz("pc2", ["./gradlew", "test"], cwd=iki)
         aday = {"cwd": bir, "komut": ["tools/senaryo/gradle_kapisi.sh", "l2", "test"]}
-        self.assertFalse(ana.klasor_engeli(aday), "pc2'deki gradle_kapisi.sh işiyle aynı klasörden iş ana'da koşar")
-        self.assertTrue(ana.klasor_engeli({**aday, "cwd": iki}), "pc2'deki ./gradlew build/ geri çeker")
+        self.assertFalse(ana.klasor_engeli("ana", aday), "pc2'deki gradle_kapisi.sh işiyle aynı klasörden iş ana'da koşar")
+        self.assertTrue(ana.klasor_engeli("ana", {**aday, "cwd": iki}), "pc2'deki ./gradlew build/ geri çeker")
         kosan_yaz("ana", ["tools/senaryo/gradle_kapisi.sh", "l3", "test"], cwd=bir)
-        self.assertTrue(pc2.klasor_engeli({"cwd": bir, "komut": ["./gradlew", "test"]}))
-        self.assertFalse(pc2.klasor_engeli({"cwd": bir, "komut": ["tools/senaryo/gradle_kapisi.sh", "l4", "test"]}))
+        self.assertTrue(pc2.klasor_engeli("pc2", {"cwd": bir, "komut": ["./gradlew", "test"]}))
+        self.assertFalse(pc2.klasor_engeli("pc2", {"cwd": bir, "komut": ["tools/senaryo/gradle_kapisi.sh", "l4", "test"]}))
 
     def test_java_home_varsayilani(self):
         os.environ.pop("JAVA_HOME", None)
@@ -367,12 +414,11 @@ class SiraTest(unittest.TestCase):
         self.assertEqual(sira_kosucu.is_ortami(kayit(kimlik))["JAVA_HOME"], sira.JAVA_HOME)
 
     def test_ana_tek_istemci(self):
-        self.kosucu_kilidi("pc2")
         ana = sira_kosucu.Kosucu("ana", 2)
         ana.hyprland = (time.monotonic(), "sinama")
         sira.json_yaz(Path(os.environ["DOGALAFETLER_RUNCLIENT_KILIT"]),
                       {"pid": os.getpid(), "baslangic": sira_kosucu.runclient_kilit.baslangic_saati(os.getpid())})
-        kimlik = is_yaz("oto", ["sleep", "0"], istemci=True, once_sn=sira.OTO_BEKLE_SN + 1, kanit="k/")
+        kimlik = is_yaz("oto", ["sleep", "0"], istemci=True, kanit="k/")
         ana.baslat()
         self.assertEqual(sira.bul(kimlik)[:2], ("oto", "bekleyen"), "runClient kilidi tutulurken istemci işi alınmamalı")
         Path(os.environ["DOGALAFETLER_RUNCLIENT_KILIT"]).unlink()

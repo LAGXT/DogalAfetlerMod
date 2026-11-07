@@ -5145,6 +5145,17 @@ bozar). Sınama `tools/senaryo/test_sira.py` 17/17 (öz-kuyruklama: altı giriş
 ana'ya verilmez; iki makinede aynı klasör kuralı), `test_runclient_kilit.py` 8/8. Canlı kanıt `.vibe/kanit/sira-4/`. Eski
 worktree'lerin betikleri `main`'i alana dek kuyruğu atlar; atladıkları iş panoda `kuyruk dışı` görünür ve yuva tutar.
 
+**K-E60 rev. Dağıtım: boş yuvası çok olan makine alır, eşitlikte pc2 (şef kararı, 2026-11-07; dal `is/sira-5`).** Kullanıcı şikayeti:
+2 iş varken ikisi pc2'ye gidiyor, ana makine boş kalıyordu (K-E53'ün "pc2 öncelikli, taşan iş ana makineye" kuralı ve 60 sn bekleme).
+Karar: oto işi, onu alabilen makinelerden boş yuvası en çok olana gider (boş yuva = 2 − koşan kuyruk işleri − kuyruk dışı ağır
+süreçler; pc2'de uzak.sh yuva kilitleri de), eşitlikte pc2: 2/2 yuvayla 1. iş pc2, 2. ana, 3. pc2, 4. ana. Bir makine alamıyorsa
+(boş yuvası yetmiyor, aynı klasörden işi koşuyor, koşucusu yok, ana makinede boş RAM < `KAPI_RAM_MB`) öteki alır. İstemci işi aynı
+kurala uyar; ana makinede yaşayan Hyprland yoksa ya da istemci zaten koşuyorsa pc2. `--olcum` yalnız ana (değişmez); makine başına
+klasör başına tek iş kalır. `SIRA_OTO_BEKLE_SN` (60 sn) ve "pc2 alamıyorsa ana alır" kuralı kalktı. Uygulama: her koşucu oto işini
+yalnız `oto_hedefi` kendi makinesiyse alır (`sira_kosucu.engel`/`bos`; iki koşucu aynı hesabı yapar, `rename` yarışı kazananı seçer).
+Sınama `test_sira.py` 18/18 (`test_dagitim_bos_yuvasi_cok_olana_esitlikte_pc2`: 2 iş → pc2, ana, `Yuva: ana 1/2 · pc2 1/2`; 4 iş →
+pc2, ana, pc2, ana, `2/2 · 2/2`; `test_dagitim_dolu_makine_atlanir`: pc2 dolu → ana, ana dolu → pc2). Canlı kanıt
+`.vibe/kanit/sira-4/dagitim-2.md`.
 ## Açık noktalar (Faz 2b)
 
 Entegratöre bırakılan notlardan işlenenler: kancalar (K-E1), protokol (K-C47), `asama ileri [süreç]` (K-C48), sanal su §3a istisnası

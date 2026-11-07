@@ -18,9 +18,9 @@ JAVA_HOME'u (mise Java 21 olabilir) kaydedilmez: kaydında JAVA_HOME olmayan iş
        makineden bağımsız istemci işi (*_gorsel.py/*_istemci.py; kanıt klasörü betik ilk argümanı, `--kanit` argümanı ya
        da `sira.py ekle --kanit`) ve `--makine oto` ile verilen türsüz komut (pc2'de uzak.sh ile sarılır). Koşucu önce
        kendi spool'una, sonra oto'ya bakar ve işi `rename` ile kendi kosan/'ına alır (kayıttaki `makine` koşan makine olur,
-       `kaynak` oto; kimlik değişmez). pc2 öncelikli: ana koşucu oto işini pc2 alamıyorsa (pc2'nin koşan + kuyruk dışı +
-       bekleyen yükü işe yer bırakmıyor, iş pc2'de koşan bir işle aynı klasörden ya da pc2 koşucusu yok) ya da iş
-       SIRA_OTO_BEKLE_SN (60) sn beklediyse alır: sırada iş varken boş yuvalı makine kalmaz. Ana makinede ağır süreç ≤ 2
+       `kaynak` oto; kimlik değişmez). Dağıtım (K-E60 rev.): iş, onu alabilen makinelerden boş yuvası en çok olana gider
+       (koşan + kuyruk dışı yük sayılır; eşitlikte pc2): 2/2 yuvayla 1. iş pc2, 2. ana, 3. pc2, 4. ana; bir makine
+       alamıyorsa (dolu, aynı klasörden işi koşuyor, koşucusu yok) öteki alır. Ana makinede ağır süreç ≤ 2
        (kuyruğun işleri + kuyruk dışı Gradle), boş RAM >= KAPI_RAM_MB (4096); istemci işi bir yuva, tek istemci ve
        yaşayan Hyprland ister (yoksa pc2'ye kalır). pc2 istemci işini `pc2_istemci.sh <kanıt/> <betik> …` ile iki yuvada koşar.
   ana  ekranlı iş (runClient, runData, UZAK=0, --olcum, kanıtı belirsiz istemci işi, istemcili sunucu) ya da `--makine ana`.
@@ -63,7 +63,6 @@ MAKINELER = ("ana", "pc2")
 SPOOLLAR = (*MAKINELER, "oto")
 YUVA = 2
 SURUM = 2
-OTO_BEKLE_SN = float(os.environ.get("SIRA_OTO_BEKLE_SN", "60"))
 ACLIK_SN = float(os.environ.get("SIRA_ACLIK_SN", "600"))
 ENV_ANAHTARI = re.compile(r"(TEST_FILTRE|KAPI_\w+|UZAK\w*|DEFTER_ZORLA|VIBE_OTURUM|LC_ALL|GRADLE_OPTS)")
 JAVA_HOME = "/home/lagxt/.jdks/jdk-17.0.21+9"
