@@ -7,23 +7,41 @@ import io.github.kadirberkpolat1.dogalafetler.config.EfektKalitesi;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.network.AfetDurumPaketi;
+import java.lang.reflect.Field;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Queue;
+import java.util.Set;
+import java.util.stream.Collectors;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.screens.PauseScreen;
+import net.minecraft.client.particle.BubbleParticle;
+import net.minecraft.client.particle.Particle;
+import net.minecraft.client.particle.ParticleEngine;
+import net.minecraft.client.particle.SplashParticle;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.util.Mth;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraftforge.common.ForgeConfigSpec;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.client.event.InputEvent;
+import net.minecraftforge.client.event.RenderLevelStageEvent;
 import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ConfigTracker;
@@ -40,6 +58,7 @@ import net.minecraftforge.fml.config.ModConfig;
 public final class TsunamiOtomasyonu {
     private static final boolean ACIK = "tsunami".equals(System.getProperty("dogalafetler.otomasyon"));
     private static final String BOLUM = System.getProperty("dogalafetler.otomasyon.bolum", "hepsi");
+    private static final int KAPANIS_SN = 30;
     private static final Deque<String> ADIMLAR = new ArrayDeque<>();
     private static final List<Long> KARELER = new ArrayList<>();
     /** Render thread'inin kare başına CPU süresi: makinedeki başka süreçlerin yükünden (kardeş işçiler) duvar saatinden az etkilenir. */
@@ -56,6 +75,28 @@ public final class TsunamiOtomasyonu {
     private static int olcumTick;
     private static int ox;
     private static int oz;
+    /**
+     * Kök neden ölçümü (TS-15): ölçüm penceresinde render thread CPU süresinin aşamalara dağılımı (ns, toplam). Render
+     * aşamaları bir önceki {@link RenderLevelStageEvent}'ten bu yana geçen süredir (ilki {@code after_sky}: ışık, ayıklama,
+     * bölüm yüklemesi ve gökyüzü); {@code istemci_tick} kareler arasındaki istemci tick'leri, {@code takas_diger} kalan
+     * aralık (tampon takası, görev kuyruğu). Toplamları kare başına CPU süresine eşittir.
+     */
+    private static final Map<String, Long> ASAMA = new LinkedHashMap<>();
+    private static long asamaSon;
+    private static long kareSonu;
+    private static long tickBas;
+    private static long tickAcik;
+    private static Field parcacikAlani;
+    /**
+     * K26-1: ölçüm penceresinde yeni BUBBLE/SPLASH parçacıkları ve sudaki varlık-tick'leri. Bir {@code doWaterSplashEffect}
+     * çağrısı ⌈{@code 1 + 20·genişlik}⌉ BUBBLE ve aynı sayıda SPLASH üretir; SPLASH'ı sanal su dalga cephesi de ürettiği için
+     * sıçrama sayısı BUBBLE'dan okunur: {@code 20 · yeniBubble / Σ⌈⌉} = varlık başına saniyede sıçrama.
+     */
+    private static final Set<Particle> SICRAMA_ONCEKI = Collections.newSetFromMap(new IdentityHashMap<>());
+    private static long yeniSplash;
+    private static long yeniBubble;
+    private static long sudaTick;
+    private static double sicramaBirim;
 
     private TsunamiOtomasyonu() {
     }
@@ -181,6 +222,14 @@ public final class TsunamiOtomasyonu {
                 a.addAll(olcum("tsunami-olc-yuksek-" + i, EfektKalitesi.YUKSEK, List.of(), List.of()));
             }
         }
+        if (BOLUM.contains("kabul")) {
+            // Ts1 kabulü (şef kararı, tur 4): her S5 sahnesi Yüksek'te aynı sahnenin stop sonrası ("sonra") tabanına oranla
+            // ≥ %50 kare süresi; "önce" tabanı bilgi.
+            a.addAll(List.of("k:dogalafet su vitrin", "b:300", "k:dogalafet su vitrin kamera tepe", "b:600"));
+            for (int i = 1; i <= 4; i++) {
+                a.addAll(olcum("tsunami-kabul-" + i, EfektKalitesi.YUKSEK, List.of(), List.of()));
+            }
+        }
         if (hepsi || BOLUM.contains("avci")) {
             a.addAll(avci());
         }
@@ -191,16 +240,168 @@ public final class TsunamiOtomasyonu {
 
     @SubscribeEvent
     public static void kare(TickEvent.RenderTickEvent e) {
-        if (ACIK && e.phase == TickEvent.Phase.START && olcum != null) {
+        if (!ACIK || olcum == null) {
+            return;
+        }
+        long cpu = IPLIK.getCurrentThreadCpuTime();
+        if (e.phase == TickEvent.Phase.START) {
             long simdi = System.nanoTime();
-            long cpu = IPLIK.getCurrentThreadCpuTime();
             if (sonKare != 0) {
                 KARELER.add(simdi - sonKare);
                 KARE_CPU.add(cpu - sonCpu);
+                ekle("istemci_tick", tickAcik);
+                ekle("takas_diger", cpu - kareSonu - tickAcik);
             }
+            tickAcik = 0;
             sonKare = simdi;
             sonCpu = cpu;
+            asamaSon = cpu;
+        } else if (sonKare != 0) {
+            ekle("seviye_sonrasi", cpu - asamaSon);
+            kareSonu = cpu;
         }
+    }
+
+    @SubscribeEvent
+    public static void asama(RenderLevelStageEvent e) {
+        if (ACIK && olcum != null && sonKare != 0) {
+            long cpu = IPLIK.getCurrentThreadCpuTime();
+            String ad = e.getStage().toString();
+            ekle(ad.substring(ad.indexOf(':') + 1), cpu - asamaSon);
+            asamaSon = cpu;
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void tickBasi(TickEvent.ClientTickEvent e) {
+        if (ACIK && olcum != null && e.phase == TickEvent.Phase.START) {
+            tickBas = IPLIK.getCurrentThreadCpuTime();
+        }
+    }
+
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public static void tickSonu(TickEvent.ClientTickEvent e) {
+        if (ACIK && olcum != null && e.phase == TickEvent.Phase.END && tickBas != 0) {
+            tickAcik += IPLIK.getCurrentThreadCpuTime() - tickBas;
+            tickBas = 0;
+        }
+    }
+
+    private static void ekle(String ad, long ns) {
+        ASAMA.merge(ad, ns, Long::sum);
+    }
+
+    private static String asamaOzeti(int kare) {
+        return kare == 0 ? "" : ASAMA.entrySet().stream()
+                .map(g -> g.getKey() + "=" + String.format(Locale.ROOT, "%.2f", g.getValue() / 1e6 / kare))
+                .collect(Collectors.joining(" "));
+    }
+
+    private static String enCok(Map<String, Integer> say) {
+        return say.entrySet().stream().sorted(Map.Entry.<String, Integer>comparingByValue().reversed()).limit(5)
+                .map(g -> g.getKey() + "=" + g.getValue()).collect(Collectors.joining(" "));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Collection<Queue<Particle>> kuyruklar(ParticleEngine motor) throws ReflectiveOperationException {
+        if (parcacikAlani == null) {
+            for (Field f : ParticleEngine.class.getDeclaredFields()) {
+                if (Map.class.isAssignableFrom(f.getType()) && f.getGenericType().getTypeName().contains("Queue")) {
+                    f.setAccessible(true);
+                    parcacikAlani = f;
+                    break;
+                }
+            }
+        }
+        return ((Map<?, Queue<Particle>>) parcacikAlani.get(motor)).values();
+    }
+
+    /** Parçacık sınıfına göre sayım: yıkım (TerrainParticle), sanal sudaki varlıklar (Bubble/Splash), su paketi (Cloud/Drip). */
+    private static String parcacikTurleri(ParticleEngine motor) {
+        try {
+            Map<String, Integer> say = new HashMap<>();
+            for (Queue<Particle> q : kuyruklar(motor)) {
+                for (Particle p : q) {
+                    String ad = p.getClass().getName();
+                    say.merge(ad.substring(ad.lastIndexOf('.') + 1), 1, Integer::sum);
+                }
+            }
+            return enCok(say);
+        } catch (ReflectiveOperationException | RuntimeException hata) {
+            return "? " + hata;
+        }
+    }
+
+    private static void sicramaTick(Minecraft mc) {
+        Set<Particle> simdi = Collections.newSetFromMap(new IdentityHashMap<>());
+        try {
+            for (Queue<Particle> q : kuyruklar(mc.particleEngine)) {
+                for (Particle p : q) {
+                    if (p instanceof BubbleParticle || p instanceof SplashParticle) {
+                        simdi.add(p);
+                        if (olcumTick > 0 && !SICRAMA_ONCEKI.contains(p)) {
+                            if (p instanceof BubbleParticle) {
+                                yeniBubble++;
+                            } else {
+                                yeniSplash++;
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (ReflectiveOperationException | RuntimeException hata) {
+            return;
+        }
+        SICRAMA_ONCEKI.clear();
+        SICRAMA_ONCEKI.addAll(simdi);
+        if (olcumTick == 0) {
+            return;
+        }
+        for (Entity v : mc.level.entitiesForRendering()) {
+            if (v.isInWater()) {
+                sudaTick++;
+                sicramaBirim += Math.ceil(1 + 20 * v.getBbWidth());
+            }
+        }
+    }
+
+    private static String sicramaOzeti(int tick) {
+        return String.format(Locale.ROOT, "bubble_yeni=%d splash_yeni=%d suda_ort=%.1f bubble_varlik_tick=%.2f "
+                + "splash_varlik_tick=%.2f sicrama_varlik_sn=%.2f", yeniBubble, yeniSplash, (double) sudaTick / (tick - 1),
+                sudaTick == 0 ? 0.0 : (double) yeniBubble / sudaTick, sudaTick == 0 ? 0.0 : (double) yeniSplash / sudaTick,
+                sicramaBirim == 0 ? 0.0 : 20 * yeniBubble / sicramaBirim);
+    }
+
+    private static String varlikTurleri(Minecraft mc) {
+        Map<String, Integer> say = new HashMap<>();
+        int suda = 0;
+        for (Entity v : mc.level.entitiesForRendering()) {
+            say.merge(EntityType.getKey(v.getType()).getPath(), 1, Integer::sum);
+            if (v.isInWater()) {
+                suda++;
+            }
+        }
+        return "suda=" + suda + " " + enCok(say);
+    }
+
+    /**
+     * Ölçüm geçerliliği (şef kararı, tur 4): komut satırında {@code GradleWrapperMain} geçen süreçler; {@code yabanci} bu
+     * istemciyi başlatan kendi {@code runClient} sarmalayıcısı (ata süreç) dışındakiler.
+     */
+    private static String gradle() {
+        Set<Long> ata = new HashSet<>();
+        for (ProcessHandle p = ProcessHandle.current().parent().orElse(null); p != null; p = p.parent().orElse(null)) {
+            ata.add(p.pid());
+        }
+        long[] n = new long[2];
+        ProcessHandle.allProcesses().filter(h -> h.info().commandLine().orElse("").contains("GradleWrapperMain"))
+                .forEach(h -> {
+                    n[0]++;
+                    if (!ata.contains(h.pid())) {
+                        n[1]++;
+                    }
+                });
+        return "toplam=" + n[0] + " yabanci=" + n[1];
     }
 
     private static String yuk() {
@@ -225,6 +426,7 @@ public final class TsunamiOtomasyonu {
             return;
         }
         if (olcum != null) {
+            sicramaTick(mc);
             if (++olcumTick >= 100) {
                 List<Long> s = new ArrayList<>(KARELER);
                 Collections.sort(s);
@@ -236,13 +438,15 @@ public final class TsunamiOtomasyonu {
                 var sunucu = mc.getSingleplayerServer();
                 float mspt = sunucu == null ? Float.NaN : sunucu.getAverageTickTime();
                 log("FPS {} ortanca_kare_ms={} fps_ortanca={} cpu_kare_ms={} en_uzun_kare_ms={} kare={} yuk=[{}] sunucu_mspt={} "
-                        + "tps={} su={} yagmur={} bolum=[{}] parcacik={} varlik={} kopuk={}", olcum,
+                        + "tps={} gradle=[{}] su={} yagmur={} bolum=[{}] parcacik={} varlik={} kopuk={} asama_cpu_ms=[{}] "
+                        + "parcacik_tur=[{}] varlik_tur=[{}] sicrama=[{}]", olcum,
                         String.format(Locale.ROOT, "%.2f", ortanca), String.format(Locale.ROOT, "%.1f", 1000 / ortanca),
                         String.format(Locale.ROOT, "%.2f", cpuOrtanca), String.format(Locale.ROOT, "%.1f", enUzun), s.size(),
                         yuk(), String.format(Locale.ROOT, "%.2f", mspt),
-                        String.format(Locale.ROOT, "%.1f", Math.min(20, 1000 / mspt)),
+                        String.format(Locale.ROOT, "%.1f", Math.min(20, 1000 / mspt)), gradle(),
                         SuRenderer.olcumOzeti(), TsunamiYagmuru.ozet(), mc.levelRenderer.getChunkStatistics(),
-                        mc.particleEngine.countParticles(), mc.level.getEntityCount(), TsunamiKopugu.sonSegment());
+                        mc.particleEngine.countParticles(), mc.level.getEntityCount(), TsunamiKopugu.sonSegment(),
+                        asamaOzeti(c.size()), parcacikTurleri(mc.particleEngine), varlikTurleri(mc), sicramaOzeti(olcumTick));
                 olcum = null;
             }
             return;
@@ -266,6 +470,14 @@ public final class TsunamiOtomasyonu {
                 sonKare = 0;
                 KARELER.clear();
                 KARE_CPU.clear();
+                ASAMA.clear();
+                tickBas = 0;
+                tickAcik = 0;
+                SICRAMA_ONCEKI.clear();
+                yeniSplash = 0;
+                yeniBubble = 0;
+                sudaTick = 0;
+                sicramaBirim = 0;
                 SuRenderer.olcumSifirla();
             }
             case 's' -> {
@@ -280,10 +492,31 @@ public final class TsunamiOtomasyonu {
             case 'a' -> avciAdimi(mc, deger);
             case 'x' -> {
                 log("BITTI girdi tus={} fare={} teker={}", tus, fare, teker);
+                kapanisBekcisi();
                 mc.stop();
             }
             default -> log("bilinmeyen adım {}", adim);
         }
+    }
+
+    /**
+     * İstemci dünyayı kaydedip penceresini kapattıktan sonra JVM'den çıkmayabiliyor ({@code System.exit} kancalarında asılı
+     * kalır; runClient dönmez, Gradle daemon'ı ve oyun yetim kalır). Ölçümler BITTI'den önce tamamdır; kapanış
+     * {@value #KAPANIS_SN} sn'de bitmezse JVM kancasız durdurulur. Satır stderr'e yazılır: log4j o anda kapanmış olabilir.
+     */
+    private static void kapanisBekcisi() {
+        Thread t = new Thread(() -> {
+            try {
+                Thread.sleep(KAPANIS_SN * 1000L);
+            } catch (InterruptedException e) {
+                return;
+            }
+            System.err.println("TSUNAMI-OTOMASYON KAPANIS ASILDI " + KAPANIS_SN + " sn; Runtime.halt(0)");
+            System.err.flush();
+            Runtime.getRuntime().halt(0);
+        }, "tsunami-otomasyon-kapanis");
+        t.setDaemon(true);
+        t.start();
     }
 
     /** Efekt kalitesini (CLIENT {@code gorsel.efektKalitesi}) çalışma anında değiştirir; dosyaya yazılmaz. */

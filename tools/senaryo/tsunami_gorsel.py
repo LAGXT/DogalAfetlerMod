@@ -11,8 +11,8 @@
     farklıysa geçersiz.
 (i) Ağır süreç kapısı ve aynı anda tek runClient.
 
-Kullanım (worktree kökünden): python3 tools/senaryo/tsunami_gorsel.py <kanıt klasörü> [bölüm: hepsi|s5|s1|magara]
-Çıkış: 0 geçerli koşu, 1 protokol ihlali/iptal, 2 istemci hatası.
+Kullanım (worktree kökünden): python3 tools/senaryo/tsunami_gorsel.py <kanıt klasörü> [bölüm: hepsi|s5|s1|magara|kabul|...]
+Çıkış: 0 geçerli koşu, 1 protokol ihlali/iptal, 2 istemci hatası. FPS pencereleri varsa sonda `TABLO` satırları (Ts1 kabulü, tur 4).
 """
 import json
 import os
@@ -29,6 +29,8 @@ RUN = KOK / "run"
 JAVA_HOME = "/home/lagxt/.jdks/jdk-17.0.21+9"
 WS = 94
 KURAL = f"[workspace {WS} silent; no_initial_focus; no_focus on; focus_on_activate off]"
+# İstemcinin kendi kapanış bekçisi (TsunamiOtomasyonu, 30 sn) tutmazsa BITTI'den bu kadar sn sonra artıklar öldürülür.
+KAPANIS_SN = 90
 
 
 def sh(komut, zaman=30):
@@ -104,6 +106,80 @@ def oldur(gradle):
             os.kill(pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
+
+
+def artiklari_oldur(pid, log):
+    """Kapanışı asılı istemci JVM'i ve onu başlatan tek kullanımlık Gradle daemon'ı (`--no-daemon`; `timeout` yalnız Gradle
+    istemcisini öldürür, daemon ve oyun yetim kalır). Yalnız bu worktree'nin süreçleri: daemon'ın cwd'si KOK olmalı."""
+    hedef = [pid]
+    try:
+        ata = int((Path("/proc") / str(pid) / "stat").read_text().rsplit(")", 1)[1].split()[1])
+        if (os.readlink(f"/proc/{ata}/cwd") == str(KOK)
+                and b"GradleDaemon" in Path(f"/proc/{ata}/cmdline").read_bytes()):
+            hedef.append(ata)
+    except (OSError, ValueError, IndexError):
+        pass
+    for h in hedef:
+        try:
+            os.kill(h, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+    log(f"artıklar öldürüldü: {hedef}")
+
+
+def _sayi(desen, metin, tur=float):
+    r = re.search(desen, metin)
+    return tur(r.group(1)) if r else None
+
+
+def fps_tablosu(metin, log):
+    """Ts1 kabulü (şef kararı, tur 4): her S5 sahnesinde "sonra" tabanı (aynı sahne, stop'tan 200 tick sonra) / karada ortanca
+    kare süresi oranı ≥ 0,5 geçer; "önce" tabanı bilgi. Ölçüm geçerli ancak karada ve sonra pencerelerinde sunucu mspt < 50
+    ve yabancı GradleWrapperMain (kendi runClient'ımız dışında) ≤ 1, sonra tabanı temiz (parçacık ≤ önce + 100) ve kamera
+    aynı (sonra görünür bölüm ≥ önce: yıkım görüşü yalnız açar) ise. K26-1: karada `sicrama_varlik_sn` > 1 ise sahne
+    "K-E26b bekliyor". Sonuç (geçerli, hepsi geçti)."""
+    sahne = {}
+    for m in re.finditer(r"TSUNAMI-OTOMASYON FPS (\S+)-(afetsiz|karada|sonra) (.*)", metin):
+        a = m.group(3)
+        sahne.setdefault(m.group(1), {})[m.group(2)] = {
+            "ms": _sayi(r"ortanca_kare_ms=([\d.]+)", a), "cpu": _sayi(r"cpu_kare_ms=([\d.]+)", a),
+            "mspt": _sayi(r"sunucu_mspt=([\d.]+)", a), "yabanci": _sayi(r"yabanci=(\d+)", a, int),
+            "bolum": _sayi(r"bolum=\[C: (\d+)/", a, int), "parcacik": _sayi(r"parcacik=(\d+)", a, int),
+            "varlik": _sayi(r"varlik=(\d+)", a, int), "suda": _sayi(r"suda_ort=([\d.]+)", a),
+            "sicrama": _sayi(r"sicrama_varlik_sn=([\d.]+)", a), "bubble": _sayi(r"bubble_varlik_tick=([\d.]+)", a),
+            "splash": _sayi(r"splash_varlik_tick=([\d.]+)", a),
+            "parcacik_tur": (re.search(r"parcacik_tur=\[([^]]*)\]", a) or [None, None])[1]}
+    hepsi_gecerli = hepsi_gecti = bool(sahne)
+    for ad, p in sahne.items():
+        o, k, s = p.get("afetsiz"), p.get("karada"), p.get("sonra")
+        if not o or not k or not s or not k["ms"] or not s["ms"]:
+            log(f"TABLO {ad} eksik pencere: {sorted(p)}")
+            hepsi_gecerli = hepsi_gecti = False
+            continue
+        neden = [f"{w}: mspt={p[w]['mspt']}" for w in ("karada", "sonra") if p[w]["mspt"] is None or p[w]["mspt"] >= 50]
+        neden += [f"{w}: yabanci_gradle={p[w]['yabanci']}" for w in ("karada", "sonra")
+                  if p[w]["yabanci"] is None or p[w]["yabanci"] > 1]
+        if (s["parcacik"] or 0) > (o["parcacik"] or 0) + 100:
+            neden.append(f"sonra temiz değil: parcacik={s['parcacik']}")
+        if (s["bolum"] or 0) < (o["bolum"] or 0):
+            neden.append(f"sonra kamerası farklı: bolum {o['bolum']} -> {s['bolum']}")
+        gecerli = not neden
+        oran = s["ms"] / k["ms"]
+        gecti = oran >= 0.5
+        k26b = k["sicrama"] is not None and k["sicrama"] > 1
+        hepsi_gecerli &= gecerli
+        hepsi_gecti &= gecti
+        log(f"TABLO {ad} once={o['ms']:.2f}ms karada={k['ms']:.2f}ms sonra={s['ms']:.2f}ms oran_sonra={oran:.0%} "
+            f"cpu_oran_sonra={s['cpu'] / k['cpu']:.0%} oran_once={o['ms'] / k['ms']:.0%} "
+            f"mspt={o['mspt']}/{k['mspt']}/{s['mspt']} yabanci_gradle={o['yabanci']}/{k['yabanci']}/{s['yabanci']} "
+            f"bolum={o['bolum']}->{k['bolum']}->{s['bolum']} parcacik={o['parcacik']}->{k['parcacik']}->{s['parcacik']} "
+            f"varlik={o['varlik']}->{k['varlik']}->{s['varlik']} suda_ort={k['suda']} sicrama_varlik_sn={k['sicrama']} "
+            f"bubble_varlik_tick={k['bubble']} splash_varlik_tick={k['splash']} "
+            f"gecerli={'E' if gecerli else 'H ' + '; '.join(neden)} sonuc={'GECTI' if gecti else 'KALDI'}"
+            f"{' K-E26b-bekliyor' if k26b else ''} | karada_parcacik_tur=[{k['parcacik_tur']}]")
+    if sahne:
+        log(f"TABLO ozet: gecerli={'E' if hepsi_gecerli else 'H'} hepsi_gecti={'E' if hepsi_gecti else 'H'}")
+    return hepsi_gecerli, hepsi_gecti
 
 
 def odak_ver(adres, log):
@@ -192,6 +268,8 @@ def main():
         return 1
     yoklama = 0
     alarm = 0
+    asili = False
+    bitti_an = None
     while istemci_pid() == pid:
         time.sleep(5)
         yoklama += 1
@@ -205,7 +283,17 @@ def main():
             break
         if yoklama % 6 == 0:
             p = pencere(pid) or {}
-            log(f"denetim: etkin={a.get('address')} {a.get('class')}; benim ws={p.get('workspace', {}).get('id')}")
+            log(f"denetim: etkin={a.get('address')} {a.get('class')}; benim ws={p.get('workspace', {}).get('id')}; "
+                f"gradle={sh('pgrep -c -f [G]radleWrapperMain')}")
+        metin = oyun_log.read_text(encoding="utf-8", errors="replace")
+        if bitti_an is None and "TSUNAMI-OTOMASYON BITTI" in metin:
+            bitti_an = time.monotonic()
+        if "cikis=" in metin or bitti_an is not None and time.monotonic() - bitti_an > KAPANIS_SN:
+            asili = True
+            log(f"KAPANIS ASILI: BITTI'den {time.monotonic() - bitti_an:.0f} sn sonra istemci JVM'i yaşıyor"
+                if bitti_an is not None else "KAPANIS ASILI: runClient döndü, istemci JVM'i yaşıyor")
+            artiklari_oldur(pid, log)
+            break
     son = time.monotonic() + 120
     while time.monotonic() < son and "cikis=" not in oyun_log.read_text(encoding="utf-8", errors="replace"):
         time.sleep(2)
@@ -213,18 +301,21 @@ def main():
     girdi = len(re.findall(r"TSUNAMI-OTOMASYON GIRDI", metin))
     bitti = re.search(r"TSUNAMI-OTOMASYON BITTI girdi tus=(\d+) fare=(\d+) teker=(\d+)", metin)
     cikis = re.search(r"cikis=(\d+)", metin)
-    log(f"bitti: yoklama={yoklama} ALARM={alarm} girdi_satiri={girdi} "
+    log(f"bitti: yoklama={yoklama} ALARM={alarm} girdi_satiri={girdi} kapanis_asili={'E' if asili else 'H'} "
         f"otomasyon_ozeti={bitti.groups() if bitti else None} gradle_{cikis.group(0) if cikis else 'cikis=?'}")
-    desen = r".*(?:TSUNAMI-OTOMASYON (?:FPS|FOTO|KARE|KALITE|AVCI|AYAR)|Tsunami: |\[CHAT\]|has (?:made|reached|completed) the).*"
+    desen = (r".*(?:TSUNAMI-OTOMASYON (?:FPS|FOTO|KARE|KALITE|AVCI|AYAR|KAPANIS)|Tsunami: |\[CHAT\]|"
+             r"has (?:made|reached|completed) the).*")
     for satir in re.findall(desen, metin):
         log("  " + re.split(r"TSUNAMI-OTOMASYON |DogalAfetler/\]: |\]: ", satir, maxsplit=1)[-1])
+    fps_tablosu(metin, log)
     for png in (RUN / "screenshots").glob("tsunami-*.png"):
         if png.stat().st_mtime > duvar_baslangic:
             shutil.copy2(png, kanit / png.name)
             log(f"kopyalandı: {png.name}")
     if alarm or girdi:
         return 1
-    return 0 if bitti and cikis and cikis.group(1) == "0" else 2
+    # Kapanışı asılı kalan istemcinin ölçümleri BITTI'den önce tamamdır; koşu geçerli, asılı kapanış log'da kalır.
+    return 0 if bitti and cikis and (cikis.group(1) == "0" or asili) else 2
 
 
 if __name__ == "__main__":

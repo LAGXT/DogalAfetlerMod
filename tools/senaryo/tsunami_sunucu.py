@@ -11,8 +11,8 @@ Sahnede `start tsunami 3`, `asama ileri` x2 → çekilme ve dalga, kıyıya vuru
 çekilme ve mağara kalmaz, yıkılan blok > 0. Sonra `start tsunami 1` AKTIF'e ilerletilir ve sunucu kapatılır (kalıcılık).
 Koşu 2 (aynı dünya): afet kayıttan yüklenir, dalga aynı kimlikle sürüyor, kendiliğinden biter (doğal bitiş), `su bilgi`
 (dalga 0), `sifirla`, `su bilgi` (dalga 0, mağara 0).
-Her iki koşu `-PoyunTestiAfeti=tsunami,deprem` ile açılır (K-E22): gerçek tsunami kayıtlı olduğu için test afeti tsunamiyi
-atlar (WARN), deprem test afeti olarak kaydedilir, mod yüklenir. Koşu 1'de dalga doğduğunda uğultu ortam katmanı başlar.
+Her iki koşu `-PoyunTestiAfeti=tsunami,deprem` ile açılır (K-E22): iki türün de gerçek afeti kayıtlı olduğu için test afeti
+ikisini de atlar (WARN), mod yüklenir. Koşu 1'de dalga doğduğunda uğultu ortam katmanı başlar.
 Sonda iki log da denetlenir: `invalid dist` yok, istisna yok, config düzeltme uyarısı yok, `[basarim] ... yayıncı olarak
 kayıtlı değil` yok, iki süreç de 0 ile çıktı.
 
@@ -75,7 +75,7 @@ class TsunamiSunucu(c.Sunucu):
 def kosu1(s):
     s.bekle(r"Done \(", 0, c.ACILIS_SURESI, "açılış")
     s.bekle(r"Oyun testi afeti tsunami atlandı .*gerçek afet kayıtlı \(K-E22\)", 0, 5, "K-E22: test afeti tsunamiyi atladı")
-    s.bekle(r"Oyun testi afeti deprem için kaydedildi", 0, 5, "K-E22: deprem test afeti kayıtlı")
+    s.bekle(r"Oyun testi afeti deprem atlandı .*gerçek afet kayıtlı \(K-E22\)", 0, 5, "K-E22: test afeti depremi atladı")
     s.komut("execute positioned ~3000 100 ~3000 run dogalafet start tsunami 3", r"No suitable place found for Tsunami",
             "denizsiz yerde başlamaz (N14)")
     for komut in SAHNE:

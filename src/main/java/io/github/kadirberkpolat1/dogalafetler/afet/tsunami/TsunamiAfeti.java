@@ -427,6 +427,7 @@ public final class TsunamiAfeti extends Afet {
 
     @Override
     protected void temizle(ServerLevel level, boolean temiz) {
+        int bekleyen = yikim.bekleyen();
         yikim.temizle();
         if (cekilme > 0) {
             SanalSu.cekilmeBitir(level, cekilme);
@@ -447,9 +448,9 @@ public final class TsunamiAfeti extends Afet {
         OrtamSesi.durdur(level.getServer(), KATMAN, temiz ? 20 : 60);
         var d = SanalSu.dunya(level);
         DogalAfetler.LOGGER.info("Tsunami: temizlendi (temiz={}, doğal={}): kırılan {} blok, değişen bölüm {}, taranan {} sütun, "
-                + "mağara {}; boyutta kalan dalga {}, çekilme {}, mağara {}", temiz, dogalBitti, yikim.toplamKirilan(),
-                yikim.toplamBolum(), yikim.toplamTaranan(), magaralar.size(), d == null ? 0 : d.dalgalar().size(),
-                d == null ? 0 : d.cekilmeler().size(), d == null ? 0 : d.magaralar().size());
+                + "bekleyen yıkım {}, mağara {}; boyutta kalan dalga {}, çekilme {}, mağara {}", temiz, dogalBitti,
+                yikim.toplamKirilan(), yikim.toplamBolum(), yikim.toplamTaranan(), bekleyen, magaralar.size(),
+                d == null ? 0 : d.dalgalar().size(), d == null ? 0 : d.cekilmeler().size(), d == null ? 0 : d.magaralar().size());
     }
 
     /** Sanal su dalgaları bundan sonra ({@code ServerStartedEvent}) kayıttan döner: süreklilik ilk tick'te log'lanır. */

@@ -1,8 +1,10 @@
 package io.github.kadirberkpolat1.dogalafetler.afet.tsunami;
 
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
+import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.util.ArrayDeque;
+import java.util.Iterator;
 import java.util.function.Predicate;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -43,6 +45,12 @@ final class TsunamiYikimi {
     private record Is(long konum, long hazir) {
     }
 
+    /** Bir 16³ bölümün bekleyen işleri; {@code enErken} en erken hazır olanın tick'i. */
+    private static final class Bolum {
+        final ArrayDeque<Is> isler = new ArrayDeque<>();
+        long enErken = Long.MAX_VALUE;
+    }
+
     private record Kolon(int x, int z, int ust) {
     }
 
@@ -54,8 +62,9 @@ final class TsunamiYikimi {
     private static final double ADIM = 0.7;
 
     private final ArrayDeque<Kolon> kolonlar = new ArrayDeque<>();
-    @SuppressWarnings("unchecked")
-    private final ArrayDeque<Is>[] isler = new ArrayDeque[] {new ArrayDeque<>(), new ArrayDeque<>(), new ArrayDeque<>()};
+    /** Bölüm anahtarıyla bekleyen işler, bölümün ilk iş aldığı sırada (cephe satır sırası). */
+    private final Long2ObjectLinkedOpenHashMap<Bolum> bolumIsleri = new Long2ObjectLinkedOpenHashMap<>();
+    private int isSayisi;
     private final LongOpenHashSet gorulen = new LongOpenHashSet();
     private final LongOpenHashSet degisenChunk = new LongOpenHashSet();
     private final LongOpenHashSet bolumler = new LongOpenHashSet();
@@ -78,7 +87,7 @@ final class TsunamiYikimi {
     }
 
     int bekleyen() {
-        return kolonlar.size() + isler[0].size() + isler[1].size() + isler[2].size();
+        return kolonlar.size() + isSayisi;
     }
 
     /** {@code boyuna} uzaklığındaki cephe şeridi satırının sütunları (her sütun bir kez). */
@@ -94,11 +103,13 @@ final class TsunamiYikimi {
     }
 
     /**
-     * Bir tick: sütun taraması ({@link #KOLON_BUTCESI} × kısma), sonra hazır işlerden en çok {@code butce} blok, en çok
-     * {@code bolumButcesi} farklı 16³ chunk bölümü ve en çok {@code chunkButcesi} farklı chunk sütunu: her değişen bölüm
-     * istemcide yeniden derlenir, ışık değişimi sütun boyunca ve komşu bölümlere yayılıp onları da derletir (TS-12); sınırı
-     * aşan iş sırasını koruyarak sonraki tick'e kalır (kuyruk cephe satır sırasında olduğu için bölümler kümelenir).
-     * {@code magara} mağara ağzı adayını alır ve daha aday istiyorsa {@code true} döner. Kırılan blok sayısı.
+     * Bir tick: sütun taraması ({@link #KOLON_BUTCESI} × kısma), sonra hazır işi olan bölümler cephe sırasında: tick başına en
+     * çok {@code bolumButcesi} farklı 16³ bölüm ve {@code chunkButcesi} farklı chunk sütunu. Seçilen bölümün o an hazır
+     * bütün blokları aynı tick'te kırılır (TS-15): her değişen bölüm istemcide bir kez yeniden derlenir, ışık değişimi
+     * sütun boyunca ve komşu bölümlere yayılıp onları da derletir (TS-12); blok bütçesi ({@code butce}) bölümü ortasından
+     * bölseydi aynı bölüm birkaç tick üst üste derlenirdi. {@code butce} yalnız yeni bölüme başlamayı sınırlar: toplam
+     * hacim aynı, süre uzar. Sınıf gecikmeleri (cam önce, ahşap 0,3 sn sonra) korunur. {@code magara} mağara ağzı adayını
+     * alır ve daha aday istiyorsa {@code true} döner. Kırılan blok sayısı.
      */
     int tick(ServerLevel l, long simdi, TsunamiSeviyesi sv, double taban, double kisma, int butce, int bolumButcesi,
             int chunkButcesi, int efektSiniri, boolean blokHasari, Predicate<BlockPos> magara) {
@@ -121,7 +132,7 @@ final class TsunamiYikimi {
                 } else if (blokHasari) {
                     Sinif c = sinif(l, m, s, sv);
                     if (c != null) {
-                        isler[c.ordinal()].add(new Is(m.asLong(), simdi + c.gecikme));
+                        isEkle(m, simdi + c.gecikme);
                     }
                 }
                 ustDogal = dogal(s);
@@ -131,16 +142,26 @@ final class TsunamiYikimi {
         int efekt = 0;
         int dusen = 0;
         bolumler.clear();
-        for (ArrayDeque<Is> kuyruk : isler) {
-            while (kirilan < butce && !kuyruk.isEmpty() && kuyruk.peek().hazir() <= simdi) {
-                m.set(kuyruk.peek().konum());
-                long bolum = SectionPos.asLong(m.getX() >> 4, m.getY() >> 4, m.getZ() >> 4);
-                long sutun = ChunkPos.asLong(m.getX() >> 4, m.getZ() >> 4);
-                if (!bolumler.contains(bolum) && bolumler.size() >= bolumButcesi
-                        || !degisenChunk.contains(sutun) && degisenChunk.size() >= chunkButcesi) {
-                    break;
+        var bolumIt = bolumIsleri.long2ObjectEntrySet().fastIterator();
+        while (bolumIt.hasNext() && kirilan < butce && bolumler.size() < bolumButcesi) {
+            var g = bolumIt.next();
+            Bolum b = g.getValue();
+            long bolum = g.getLongKey();
+            long sutun = ChunkPos.asLong(SectionPos.x(bolum), SectionPos.z(bolum));
+            if (b.enErken > simdi || !degisenChunk.contains(sutun) && degisenChunk.size() >= chunkButcesi) {
+                continue;
+            }
+            int once = kirilan;
+            long enErken = Long.MAX_VALUE;
+            for (Iterator<Is> isIt = b.isler.iterator(); isIt.hasNext();) {
+                Is is = isIt.next();
+                if (is.hazir() > simdi) {
+                    enErken = Math.min(enErken, is.hazir());
+                    continue;
                 }
-                kuyruk.poll();
+                isIt.remove();
+                isSayisi--;
+                m.set(is.konum());
                 BlockState s = l.getBlockState(m);
                 Sinif c = blokHasari ? sinif(l, m, s, sv) : null;
                 if (c == null) {
@@ -156,9 +177,15 @@ final class TsunamiYikimi {
                     l.levelEvent(2001, m, Block.getId(s));
                 }
                 l.setBlock(m, Blocks.AIR.defaultBlockState(), BAYRAK);
+                kirilan++;
+            }
+            b.enErken = enErken;
+            if (b.isler.isEmpty()) {
+                bolumIt.remove();
+            }
+            if (kirilan > once) {
                 bolumler.add(bolum);
                 degisenChunk.add(sutun);
-                kirilan++;
             }
         }
         for (long c : degisenChunk) {
@@ -168,6 +195,18 @@ final class TsunamiYikimi {
         toplamKirilan += kirilan;
         toplamBolum += bolumler.size();
         return kirilan;
+    }
+
+    private void isEkle(BlockPos p, long hazir) {
+        long anahtar = SectionPos.asLong(p.getX() >> 4, p.getY() >> 4, p.getZ() >> 4);
+        Bolum b = bolumIsleri.get(anahtar);
+        if (b == null) {
+            b = new Bolum();
+            bolumIsleri.put(anahtar, b);
+        }
+        b.isler.add(new Is(p.asLong(), hazir));
+        b.enErken = Math.min(b.enErken, hazir);
+        isSayisi++;
     }
 
     /** Bloğun yıkım sınıfı; yıkılmazsa null. */
@@ -222,9 +261,8 @@ final class TsunamiYikimi {
     /** Kuyrukları bırakır (durdurma). */
     void temizle() {
         kolonlar.clear();
-        for (ArrayDeque<Is> k : isler) {
-            k.clear();
-        }
+        bolumIsleri.clear();
+        isSayisi = 0;
         gorulen.clear();
     }
 }
