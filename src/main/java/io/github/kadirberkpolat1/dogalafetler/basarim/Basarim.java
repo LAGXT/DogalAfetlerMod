@@ -12,7 +12,6 @@ public final class Basarim {
     public static void kaydet(IEventBus modBus) {
         BasarimAyarlari.kaydet();
         modBus.addListener(Basarim::ortakKurulum);
-        modBus.addListener(BasarimAyarlari::configDegisti);
         BasarimKomutlari.kaydet();
         DataGenerators.ceviriEkle(BasarimCevirileri::yaz);
         DataGenerators.saglayiciEkle(BasarimVerileri::ekle);

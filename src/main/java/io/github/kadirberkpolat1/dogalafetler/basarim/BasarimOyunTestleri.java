@@ -29,11 +29,13 @@ import io.github.kadirberkpolat1.dogalafetler.sicaklik.ZirhEkleri;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Kademe;
 import io.github.kadirberkpolat1.dogalafetler.yiyecek.YiyecekKayitlari;
 import io.github.kadirberkpolat1.dogalafetler.yiyecek.YiyecekYendiEvent;
+import io.netty.channel.embedded.EmbeddedChannel;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -42,6 +44,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.contents.TranslatableContents;
+import net.minecraft.network.protocol.game.ClientboundSystemChatPacket;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.advancements.AdvancementVisibilityEvaluator;
@@ -50,7 +54,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -61,7 +64,6 @@ import net.minecraftforge.common.ForgeHooks;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
 import net.minecraftforge.event.entity.living.LivingEntityUseItemEvent;
-import net.minecraftforge.event.entity.player.AdvancementEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.gametest.GameTestHolder;
@@ -74,8 +76,8 @@ import net.minecraftforge.registries.ForgeRegistries;
  * datagen'le üretilmiş advancement'lar. Faz 4 afetinin iç davranışına bağlı koşullar (#2, #4, #5, #6) afetin
  * yayınlayacağı {@link BasarimIpucuEvent} testten yayınlanarak sınanır. Her test kendi oyuncularını açar; tek afet
  * yuvasını ya da dünya dönemini kullanan testler kendi {@code batch}'indedir. Sahte oyuncular tick almadığı için
- * saniyelik denetim doğrudan çağrılır. Toast ve sohbet duyurusu vanilla'dır (JSON'da {@code show_toast}, {@code
- * announce_to_chat}); burada kazanım, görünürlük, ödül, ünvan ve duyurudaki ad sınanır.
+ * saniyelik denetim doğrudan çağrılır. Toast vanilla'dır (JSON'da {@code show_toast}); sohbet duyurusunu mod yapar (A-37,
+ * {@code announce_to_chat=false}). Burada kazanım, görünürlük, ödül, ünvan ve duyuru sınanır.
  */
 @GameTestHolder(DogalAfetler.MOD_ID)
 @PrefixGameTestTemplate(false)
@@ -258,34 +260,27 @@ public final class BasarimOyunTestleri {
     @GameTest(template = "bos", batch = "basarim_seviye5")
     public static void seviyeBesFelaketUstasiUnvanVeXp(GameTestHelper y) {
         ServerPlayer a = oyuncu(y, "usta-a", 0);
-        String[] duyurudakiAd = new String[1];
-        Consumer<AdvancementEvent.AdvancementEarnEvent> dinleyici = olay -> {
-            if (olay.getEntity() == a
-                    && olay.getAdvancement().getId().equals(BasarimKimlikleri.basarim(Basarimlar.FELAKET_USTASI))) {
-                duyurudakiAd[0] = a.getDisplayName().getString();
-            }
-        };
-        MinecraftForge.EVENT_BUS.addListener(EventPriority.HIGHEST, false, AdvancementEvent.AdvancementEarnEvent.class,
-                dinleyici);
         try {
             kasirga(y, 5, a, false, () -> { });
             dogrula(y, kazandi(y, a, Basarimlar.FELAKET_USTASI) && kazandi(y, a, Basarimlar.FIRTINAYA_MEYDAN_OKU),
                     "seviye 5 Felaket Ustası ve Fırtınaya Meydan Oku verir");
             dogrula(y, BasarimVerisi.unvan(a).orElse(null) == Unvan.FELAKET_USTASI, "meydan okuma ünvan verir");
-            String unvan = Component.translatable(Unvan.FELAKET_USTASI.ceviriAnahtari()).getString();
-            String sohbet = a.getDisplayName().getString();
-            dogrula(y, sohbet.startsWith("[" + unvan + "] ") && sohbet.endsWith("usta-a"), "sohbet adı: " + sohbet);
+            // A-37: görünen ad ve tab adı öneksiz; ünvan yalnız modun duyurusunda, meydan okumanın kendi duyurusunda da.
+            String ad = a.getDisplayName().getString();
+            dogrula(y, ad.equals("usta-a"), "görünen ad öneksiz: " + ad);
             Component tab = a.getTabListDisplayName();
-            dogrula(y, tab != null && tab.getString().startsWith("[" + unvan + "] "), "tab adı: " + tab);
-            // Kazanım olayı sohbet duyurusundan hemen sonra gelir: o anki ad duyurudaki addır (A-32).
-            dogrula(y, duyurudakiAd[0] != null && duyurudakiAd[0].startsWith("[" + unvan + "] "),
-                    "meydan okumanın kendi duyurusu önekli ad taşımalı: " + duyurudakiAd[0]);
+            dogrula(y, tab == null || !icerir(tab, Unvan.FELAKET_USTASI.ceviriAnahtari()), "tab adı öneksiz: " + tab);
+            List<Component> duyurular = duyurular(y, a, Basarimlar.FELAKET_USTASI);
+            dogrula(y, duyurular.size() == 1, "tek duyuru (vanilla duyuru kapalı): " + duyurular);
+            dogrula(y, duyurular.get(0).getContents() instanceof TranslatableContents t
+                    && t.getKey().equals(Unvanlar.duyuruAnahtari(BasarimTuru.MEYDAN_OKUMA))
+                    && t.getArgs()[0] instanceof Component onek && icerir(onek, Unvan.FELAKET_USTASI.ceviriAnahtari()),
+                    "meydan okuma duyurusu ünvanlı: " + duyurular.get(0));
             int beklenen = BasarimTuru.GOREV.varsayilanXp() * 2 + BasarimTuru.HEDEF.varsayilanXp()
                     + BasarimTuru.MEYDAN_OKUMA.varsayilanXp();
             dogrula(y, a.totalExperience >= beklenen, "XP (kök, İlk Rüzgâr, hedef, meydan okuma): "
                     + a.totalExperience);
         } finally {
-            MinecraftForge.EVENT_BUS.unregister(dinleyici);
             cikar(y, List.of(a));
         }
         y.succeed();
@@ -461,14 +456,56 @@ public final class BasarimOyunTestleri {
         }
     }
 
-    /** Yerden alma: kayıtlıysa gerçek {@code ItemPickupEvent}, değilse dinleyicinin kimlik yolu ({@link #uret}). */
-    private static void topla(ServerPlayer o, ResourceLocation kimlik) {
-        if (ForgeRegistries.ITEMS.containsKey(kimlik)) {
-            ItemStack esya = new ItemStack(ForgeRegistries.ITEMS.getValue(kimlik));
-            ItemEntity yerde = new ItemEntity(o.level(), o.getX(), o.getY(), o.getZ(), esya.copy());
-            MinecraftForge.EVENT_BUS.post(new PlayerEvent.ItemPickupEvent(o, yerde, esya));
-        } else {
-            BasarimOlaylari.esyaToplandi(o, kimlik);
+    /**
+     * Eşya envantere girer ({@code Inventory.add}; yaratıcı envanterden alma da yuvayı yazar). Sahte oyuncu tick almadığı için
+     * vanilla {@code inventory_changed} tetikleyicisini çağıran {@code broadcastChanges} elle (gerçek oyuncuda her tick).
+     */
+    private static void envantere(ServerPlayer o, ResourceLocation kimlik, GameType kip) {
+        o.setGameMode(kip);
+        o.getInventory().add(new ItemStack(ForgeRegistries.ITEMS.getValue(kimlik)));
+        o.inventoryMenu.broadcastChanges();
+    }
+
+    /** Herkese giden sohbet duyurularından {@code basarim}'ın adını taşıyanlar; kanalın giden kuyruğu boşalır. */
+    private static List<Component> duyurular(GameTestHelper y, ServerPlayer o, Basarimlar basarim) {
+        return duyurular(o).stream().filter(c -> icerir(c, advancement(y, basarim).getDisplay().getTitle()))
+                .toList();
+    }
+
+    private static List<Component> duyurular(ServerPlayer o) {
+        EmbeddedChannel kanal = (EmbeddedChannel) o.connection.connection.channel();
+        List<Component> sonuc = new ArrayList<>();
+        for (Object mesaj = kanal.readOutbound(); mesaj != null; mesaj = kanal.readOutbound()) {
+            if (mesaj instanceof ClientboundSystemChatPacket sohbet && !sohbet.overlay()) {
+                sonuc.add(sohbet.content());
+            }
+        }
+        return sonuc;
+    }
+
+    /** {@code bilesen} ağacında (çeviri argümanları, kardeşler, üzerine gelme metni hariç) {@code anahtar} çevirisi var mı. */
+    private static boolean icerir(Component bilesen, String anahtar) {
+        if (bilesen.getContents() instanceof TranslatableContents t) {
+            if (t.getKey().equals(anahtar)) {
+                return true;
+            }
+            for (Object arguman : t.getArgs()) {
+                if (arguman instanceof Component alt && icerir(alt, anahtar)) {
+                    return true;
+                }
+            }
+        }
+        return bilesen.getSiblings().stream().anyMatch(k -> icerir(k, anahtar));
+    }
+
+    private static boolean icerir(Component bilesen, Component baslik) {
+        return baslik.getContents() instanceof TranslatableContents t && icerir(bilesen, t.getKey());
+    }
+
+    /** Advancement'ın bütün ölçütlerini verir ({@code /advancement grant only} gibi). */
+    private static void ver(ServerPlayer o, Advancement advancement) {
+        for (String olcut : advancement.getCriteria().keySet()) {
+            o.getAdvancements().award(advancement, olcut);
         }
     }
 
@@ -477,17 +514,18 @@ public final class BasarimOyunTestleri {
         ServerPlayer a = oyuncu(y, "meteor-a", 0);
         ServerPlayer b = oyuncu(y, "meteor-b", 2);
         try {
-            ItemStack ates = new ItemStack(Items.FIRE_CHARGE);
-            MinecraftForge.EVENT_BUS.post(new PlayerEvent.ItemPickupEvent(a,
-                    new ItemEntity(a.level(), a.getX(), a.getY(), a.getZ(), ates.copy()), ates));
+            envantere(a, ForgeRegistries.ITEMS.getKey(Items.FIRE_CHARGE), GameType.CREATIVE);
             dogrula(y, !kazandi(y, a, Basarimlar.GOKTEN_GELEN_MISAFIR), "başka eşya (ateş topu) sayılmaz");
-            topla(a, BasarimKimlikleri.METEORIT_PARCASI);
-            dogrula(y, kazandi(y, a, Basarimlar.GOKTEN_GELEN_MISAFIR), "Meteorit Parçası Gökten Gelen Misafir verir");
+            envantere(a, BasarimKimlikleri.METEORIT_PARCASI, GameType.CREATIVE);
+            dogrula(y, kazandi(y, a, Basarimlar.GOKTEN_GELEN_MISAFIR),
+                    "yaratıcı kipte Meteorit Parçası Gökten Gelen Misafir verir (A-36)");
             dogrula(y, !kazandi(y, a, Basarimlar.KOZMIK_SANS), "parça Kozmik Şans vermez");
             dogrula(y, !kazandi(y, b, Basarimlar.GOKTEN_GELEN_MISAFIR), "diğer oyuncu almaz");
-            topla(a, BasarimKimlikleri.KOZMIK_CEKIRDEK);
-            dogrula(y, kazandi(y, a, Basarimlar.KOZMIK_SANS), "Kozmik Çekirdek Kozmik Şans verir");
+            envantere(a, BasarimKimlikleri.KOZMIK_CEKIRDEK, GameType.CREATIVE);
+            dogrula(y, kazandi(y, a, Basarimlar.KOZMIK_SANS), "yaratıcı kipte Kozmik Çekirdek Kozmik Şans verir");
             dogrula(y, BasarimVerisi.unvan(a).orElse(null) == Unvan.KOZMIK_KASIF, "meydan okuma ünvanı");
+            envantere(b, BasarimKimlikleri.METEORIT_PARCASI, GameType.SURVIVAL);
+            dogrula(y, kazandi(y, b, Basarimlar.GOKTEN_GELEN_MISAFIR), "hayatta kalmada envantere giren parça da sayar");
         } finally {
             cikar(y, List.of(a, b));
         }
@@ -509,6 +547,12 @@ public final class BasarimOyunTestleri {
             uret(b, BasarimKimlikleri.SISMOGRAF);
             dogrula(y, kazandi(y, b, Basarimlar.YER_DINLEYICI), "Sismograf üretimi Yer Dinleyici verir");
             dogrula(y, !kazandi(y, b, Basarimlar.RADAR_ALTINDA), "sismograf Radar Altında vermez");
+            envantere(b, BasarimKimlikleri.HAVA_RADARI, GameType.SURVIVAL);
+            dogrula(y, !kazandi(y, b, Basarimlar.RADAR_ALTINDA), "hayatta kalmada üretilmeyen radar sayılmaz (craft et)");
+            envantere(b, BasarimKimlikleri.HAVA_RADARI, GameType.CREATIVE);
+            dogrula(y, kazandi(y, b, Basarimlar.RADAR_ALTINDA), "yaratıcı kipte envantere giren radar verir (A-36)");
+            envantere(a, BasarimKimlikleri.SISMOGRAF, GameType.CREATIVE);
+            dogrula(y, kazandi(y, a, Basarimlar.YER_DINLEYICI), "yaratıcı kipte sismograf Yer Dinleyici verir");
         } finally {
             cikar(y, List.of(a, b));
         }
@@ -636,8 +680,7 @@ public final class BasarimOyunTestleri {
         try {
             int sonuc = komut(server, "dogalafet unvan komut-a kutup_sakini");
             dogrula(y, sonuc == 1 && BasarimVerisi.unvan(a).orElse(null) == Unvan.KUTUP_SAKINI, "komut ünvan verir");
-            String unvan = Component.translatable(Unvan.KUTUP_SAKINI.ceviriAnahtari()).getString();
-            dogrula(y, a.getDisplayName().getString().startsWith("[" + unvan + "] "), "ad yenilendi");
+            dogrula(y, a.getDisplayName().getString().equals("komut-a"), "ünvan görünen ada eklenmez (A-37)");
             komut(server, "dogalafet unvan komut-a yok");
             dogrula(y, BasarimVerisi.unvan(a).isEmpty(), "yok ünvanı kaldırır");
             String ad = a.getDisplayName().getString();
@@ -645,6 +688,47 @@ public final class BasarimOyunTestleri {
             int bilgi = komut(server, "dogalafet basarim bilgi");
             dogrula(y, bilgi == Basarimlar.values().length, "27 başarım yüklü: " + bilgi);
         } finally {
+            cikar(y, List.of(a));
+        }
+        y.succeed();
+    }
+
+    /**
+     * A-37: ünvan yalnız modun başarım duyurusunda. Vanilla başarımın vanilla duyurusu ünvansız; mod başarımının tek duyurusu
+     * ünvanlı; {@code announceAdvancements=false} iken mod da duyurmaz.
+     */
+    @GameTest(template = "bos", batch = "basarim_duyuru")
+    public static void unvanYalnizModBasarimDuyurusunda(GameTestHelper y) {
+        ServerPlayer a = oyuncu(y, "duyuru-a", 0);
+        MinecraftServer server = y.getLevel().getServer();
+        GameRules.BooleanValue duyur = server.getGameRules().getRule(GameRules.RULE_ANNOUNCE_ADVANCEMENTS);
+        boolean onceki = duyur.get();
+        String unvan = Unvan.KOZMIK_KASIF.ceviriAnahtari();
+        try {
+            duyur.set(true, server);
+            Unvanlar.ayarla(a, Optional.of(Unvan.KOZMIK_KASIF));
+            duyurular(a);
+            Advancement vanilla = server.getAdvancements().getAdvancement(new ResourceLocation("minecraft",
+                    "story/mine_stone"));
+            dogrula(y, vanilla != null, "minecraft:story/mine_stone yüklü");
+            ver(a, vanilla);
+            List<Component> vanillaDuyuru = duyurular(a).stream()
+                    .filter(c -> icerir(c, vanilla.getDisplay().getTitle())).toList();
+            dogrula(y, vanillaDuyuru.size() == 1, "vanilla duyuru tek: " + vanillaDuyuru);
+            dogrula(y, !icerir(vanillaDuyuru.get(0), unvan), "vanilla duyuruda ünvan yok: " + vanillaDuyuru.get(0));
+            dogrula(y, a.getDisplayName().getString().equals("duyuru-a"), "görünen ad öneksiz");
+            ver(a, advancement(y, Basarimlar.KOK));
+            List<Component> modDuyuru = duyurular(y, a, Basarimlar.KOK);
+            dogrula(y, modDuyuru.size() == 1, "mod başarımının duyurusu tek: " + modDuyuru);
+            dogrula(y, modDuyuru.get(0).getContents() instanceof TranslatableContents t
+                    && t.getKey().equals(Unvanlar.duyuruAnahtari(BasarimTuru.GOREV)) && icerir(modDuyuru.get(0), unvan),
+                    "mod duyurusu ünvanlı: " + modDuyuru.get(0));
+            duyur.set(false, server);
+            ver(a, advancement(y, Basarimlar.ILK_RUZGAR));
+            dogrula(y, kazandi(y, a, Basarimlar.ILK_RUZGAR), "gamerule kapalıyken de kazanılır");
+            dogrula(y, duyurular(y, a, Basarimlar.ILK_RUZGAR).isEmpty(), "announceAdvancements=false: duyuru yok");
+        } finally {
+            duyur.set(onceki, server);
             cikar(y, List.of(a));
         }
         y.succeed();

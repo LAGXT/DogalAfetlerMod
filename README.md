@@ -235,8 +235,11 @@ hücresi). Sunucu TPS'i düşünce bu bütçeler kendiliğinden kısılır.
 Modun kendi başarım sekmesi **Doğal Afetler**'dir; 27 başarım vardır. "Sağ çıkmak": afetin etki alanındayken afet bitene kadar
 ölmemek. Çok oyunculuda her oyuncu kendi başarımını kazanır.
 
-**Ödüller:** görev 15 XP; hedef 40 XP ve 1–2 Sıcak Salep; meydan okuma 100 XP, bir ünvan (adın önünde görünür) ve sohbet
-duyurusu. Ünvanlar: Kozmik Kâşif, Kutup Sakini, Felaket Ustası, Her Şeyi Atlatan. XP miktarları `basarim.odul.*Xp` ile değişir.
+**Ödüller:** görev 15 XP; hedef 40 XP ve 1–2 Sıcak Salep; meydan okuma 100 XP ve bir ünvan. Ünvanlar: Kozmik Kâşif, Kutup
+Sakini, Felaket Ustası, Her Şeyi Atlatan. Modun başarımları kazanılınca sohbette duyurulur (`announceAdvancements` açıkken);
+ünvan yalnız bu duyurularda oyuncu adının önünde görünür (vanilla duyurular, sohbet, tab listesi ve ölüm mesajlarında yoktur;
+`basarim.unvanGoster` ile kapatılır). Eşya başarımları (#7, #22) eşya envantere girince, yaratıcı kipte de gelir; #15 ve #16
+hayatta kalmada üretimle, yaratıcı kipte eşya envantere girince. XP miktarları `basarim.odul.*Xp` ile değişir.
 
 | # | Başarım | Tür | Nasıl kazanılır |
 |---|---|---|---|

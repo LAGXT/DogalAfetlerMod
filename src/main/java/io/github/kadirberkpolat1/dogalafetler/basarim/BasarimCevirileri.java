@@ -1,10 +1,14 @@
 package io.github.kadirberkpolat1.dogalafetler.basarim;
 
+import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.BasarimTuru;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.Basarimlar;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.Unvan;
 import io.github.kadirberkpolat1.dogalafetler.veri.CeviriYazici;
 
-/** Başarım adları, açıklamaları, ünvanlar ve komut çıktıları (madde 12: her başarımın Türkçe adı ve açıklaması). */
+/**
+ * Başarım adları, açıklamaları, ünvanlar, sohbet duyurusu ve komut çıktıları (madde 12: her başarımın Türkçe adı ve
+ * açıklaması).
+ */
 final class BasarimCevirileri {
     private BasarimCevirileri() {
     }
@@ -17,6 +21,12 @@ final class BasarimCevirileri {
         for (Unvan unvan : Unvan.values()) {
             yazici.ekle(unvan.ceviriAnahtari(), unvan.ingilizceAd(), unvan.turkceAd());
         }
+        yazici.ekle(Unvanlar.duyuruAnahtari(BasarimTuru.GOREV), "%s%s has made the advancement %s",
+                "%s%s %s başarımını kazandı");
+        yazici.ekle(Unvanlar.duyuruAnahtari(BasarimTuru.HEDEF), "%s%s has reached the goal %s",
+                "%s%s %s hedefine ulaştı");
+        yazici.ekle(Unvanlar.duyuruAnahtari(BasarimTuru.MEYDAN_OKUMA), "%s%s has completed the challenge %s",
+                "%s%s %s meydan okumasını tamamladı");
         yazici.ekle("commands.dogalafetler.unvan.mevcut", "Title of %s: %s", "%s ünvanı: %s");
         yazici.ekle("commands.dogalafetler.unvan.yok", "%s has no title", "%s oyuncusunun ünvanı yok");
         yazici.ekle("commands.dogalafetler.unvan.ayarlandi", "Title of %s set to %s", "%s oyuncusunun ünvanı %s oldu");

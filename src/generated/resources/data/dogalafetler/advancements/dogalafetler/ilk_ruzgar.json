@@ -9,7 +9,7 @@
     }
   },
   "display": {
-    "announce_to_chat": true,
+    "announce_to_chat": false,
     "description": {
       "translate": "advancements.dogalafetler.ilk_ruzgar.description"
     },

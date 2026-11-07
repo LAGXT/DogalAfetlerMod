@@ -3,9 +3,6 @@ package io.github.kadirberkpolat1.dogalafetler.basarim;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.BasarimTuru;
 import io.github.kadirberkpolat1.dogalafetler.config.AyarKaydi;
 import net.minecraftforge.common.ForgeConfigSpec;
-import net.minecraftforge.fml.config.ModConfig;
-import net.minecraftforge.fml.event.config.ModConfigEvent;
-import net.minecraftforge.server.ServerLifecycleHooks;
 
 /**
  * {@code basarim} SERVER config bölümü (N17): "sağ çıkma" etki alanı payı, ödül XP'leri ve kozmetik ünvanın
@@ -40,14 +37,6 @@ public final class BasarimAyarlari {
         return sunucu.get().unvanGoster.get();
     }
 
-    /** Ünvan ayarı değişince çevrim içi oyuncuların sohbet ve tab adları yenilenir. */
-    static void configDegisti(ModConfigEvent.Reloading olay) {
-        if (olay.getConfig().getType() == ModConfig.Type.SERVER && ServerLifecycleHooks.getCurrentServer() != null) {
-            ServerLifecycleHooks.getCurrentServer().execute(
-                    () -> Unvanlar.hepsiniYenile(ServerLifecycleHooks.getCurrentServer()));
-        }
-    }
-
     private static final class Sunucu {
         private final ForgeConfigSpec.IntValue etkiAlaniPayi;
         private final ForgeConfigSpec.IntValue gorevXp;
@@ -70,8 +59,8 @@ public final class BasarimAyarlari {
             meydanOkumaXp = k.comment("Meydan okuma başarımlarının XP'si (en büyük ödül; ayrıca kozmetik ünvan).")
                     .defineInRange("meydanOkumaXp", BasarimTuru.MEYDAN_OKUMA.varsayilanXp(), 0, 1000);
             k.pop();
-            unvanGoster = k.comment("Meydan okumaların kozmetik ünvanı sohbet ve tab listesindeki adın önünde",
-                    "görünsün (N16).")
+            unvanGoster = k.comment("Meydan okumaların kozmetik ünvanı modun başarım duyurusunda oyuncu adının önünde",
+                    "görünsün (N16, A-37; görünen ad ve tab listesi öneksizdir).")
                     .define("unvanGoster", true);
         }
     }

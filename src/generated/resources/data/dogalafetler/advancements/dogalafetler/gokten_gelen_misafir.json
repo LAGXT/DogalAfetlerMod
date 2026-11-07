@@ -3,13 +3,19 @@
   "criteria": {
     "topla": {
       "conditions": {
-        "esya": "dogalafetler:meteorit_parcasi"
+        "items": [
+          {
+            "items": [
+              "dogalafetler:meteorit_parcasi"
+            ]
+          }
+        ]
       },
-      "trigger": "dogalafetler:esya_toplandi"
+      "trigger": "minecraft:inventory_changed"
     }
   },
   "display": {
-    "announce_to_chat": true,
+    "announce_to_chat": false,
     "description": {
       "translate": "advancements.dogalafetler.gokten_gelen_misafir.description"
     },

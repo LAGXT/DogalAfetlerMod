@@ -6,7 +6,7 @@
     }
   },
   "display": {
-    "announce_to_chat": true,
+    "announce_to_chat": false,
     "background": "dogalafetler:textures/gui/advancements/backgrounds/felaket.png",
     "description": {
       "translate": "advancements.dogalafetler.root.description"

@@ -10,10 +10,13 @@ import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.OdulTablosu;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import net.minecraft.advancements.Advancement;
 import net.minecraft.advancements.AdvancementRewards;
+import net.minecraft.advancements.CriterionTriggerInstance;
 import net.minecraft.advancements.FrameType;
+import net.minecraft.advancements.RequirementsStrategy;
 import net.minecraft.data.CachedOutput;
 import net.minecraft.data.DataProvider;
 import net.minecraft.data.PackOutput;
@@ -39,7 +42,8 @@ import net.minecraftforge.registries.ForgeRegistries;
  * sıcak yiyecek etiketi ({@code basarim/sicak_yiyecek}, isteğe bağlı girdiler). JSON vanilla kurucularıyla
  * ({@code Advancement.Builder}, {@code LootTable}) üretilir. Tek {@code DataProvider}: vanilla
  * {@code AdvancementProvider}'ın adı sabit ("Advancements") olduğu için başka bir alt sistemin sağlayıcısıyla
- * {@code Duplicate provider} çakışması olmasın (K-E5). Mod eşyası ikonları ve ödül yiyeceği datagen anında kayıtlı
+ * {@code Duplicate provider} çakışması olmasın (K-E5). Vanilla sohbet duyurusu kapalı ({@code announce_to_chat=false}):
+ * duyuruyu mod ünvanla kendisi yapar (A-37). Mod eşyası ikonları ve ödül yiyeceği datagen anında kayıtlı
  * değilse vanilla yedeği yazılır; kardeş dallar birleşince {@code runData} gerçek eşyayı yazar.
  */
 public final class BasarimVerileri implements DataProvider {
@@ -77,8 +81,12 @@ public final class BasarimVerileri implements DataProvider {
         yapici.display(ikon(basarim), Component.translatable(basarim.adAnahtari()),
                 Component.translatable(basarim.aciklamaAnahtari()),
                 basarim == Basarimlar.KOK ? BasarimKimlikleri.ARKA_PLAN : null,
-                FrameType.byName(basarim.tur().cerceve()), true, true, basarim.gizli());
-        yapici.addCriterion(BasarimOlcutleri.olcutAdi(basarim), BasarimOlcutleri.olcut(basarim));
+                FrameType.byName(basarim.tur().cerceve()), true, false, basarim.gizli());
+        Map<String, CriterionTriggerInstance> olcutler = BasarimOlcutleri.olcutler(basarim);
+        olcutler.forEach(yapici::addCriterion);
+        if (olcutler.size() > 1) {
+            yapici.requirements(RequirementsStrategy.OR);
+        }
         AdvancementRewards.Builder odul = AdvancementRewards.Builder.experience(basarim.tur().varsayilanXp());
         if (basarim.tur() == BasarimTuru.HEDEF) {
             odul.addLootTable(BasarimKimlikleri.HEDEF_ODULU);
