@@ -5720,15 +5720,26 @@ boyutlar değişken", 2026-11-07).** Güneş patlaması: öncü yağmur ön-uyar
 AKTIF'in başında 600 sn, sonraki her günün başında 180 sn (ölçekli, AKTIF sayacı) 90/dk; arada bölüm D'nin 1,5 → 5/dk arka
 planı. Ay çarpması: ay parçası yağmuru 600 sn, 90/dk (bölüm H'nin "1–2 dk"sı kullanıcı isteğiyle aşıldı; afet yağmurla
 biter, ~10 dk 10 sn yuvayı tutar). Boy sürekli (`MeteorOlcegi`: %60 küçük 0,5–0,9×, %30 orta 0,9–1,6×, %10 büyük 1,6–2,5×);
-krater, yangın, sarsıntı, parlama, iz, ses ve hız boyla. Uçan meteor tavanı 96, krater bütçesi (512 × TPS kısması) değişmedi.
+krater, yangın, sarsıntı, parlama, iz, ses ve hız boyla. Uçan meteor tavanı 96, krater bütçesi (512 × TPS kısması) değişmedi
+(tavan MT2-29'da 448; aşağıda). **Rev. (şef kararları MT2-25, MT2-28; meteor-2 `6210fde`, entegrasyon `9283fa1`):** uçuş
+süresi 8–10 sn: `meteor.ucusSuresi` 180 tick (orta ölçek; `MeteorOlcegi.ucusSuresi` küçük 9,5 sn, büyük 8,0 sn), hız
+yoldan çıkar (`Yorunge.sureyle`, ~1,0–1,9 blok/tick, en çok 3,8), `meteor.dusmeHizi` kalktı; doğuş hedefin 200 blok üstü
+(`girisYuksekligi` 140 → 200, açı 40–70°); `SES_HIZI` 12 → 5,2 (Doppler 1,33/0,8 korunur). Yoğunluk 90 → **180/dk** (3/sn):
+güneş `meteorYagmuruDakikaBasina` (AKTIF başı 10 dk ve günlük 3 dk) ve ay `meteorDakikaBasina` (10 dk'da oyuncu başına 1800
+parça); öncü 6 → 24/dk aynı. Gökte oyuncu başına ~27 meteor. Uçan meteor tavanı 96 → 240 (MT2-26) → **448** (MT2-29; 16
+oyuncu × 3/sn × ~9 sn ≈ 432; üst sınır 512), doluyken düşmeme kuralı, K-C37 TPS kısması ve `kraterBlokButcesi` 512 aynı.
+Yağmur meteorunun çarpma noktası bakış yönüne ağırlıklı: `meteor.bakisYonuOrani` 0,667 (2/3'ü `getYRot()`'un ±90° ön
+yarısına, 1/3'ü arkaya; `MeteorDagitimi.ofset`; 0,5 eski yönsüz); komut meteoru ve oyuncusuz doğuş yönsüz, geliş azimutu
+rastgele. Görsel otomasyonların yavaş çekimi `ucusSuresi` 360 (2×). TPS (`meteor_sunucu.py --tps`, ana makine `--olcum`, tek
+oyuncu): 180/dk 200 sn blok hasarı açık, ortalama tick 5,54 ms (boşta 3,68), en düşük TPS 20,00, 525 krater (Mt9 kapandı).
 Öncü meteorlar N7 gizli ön-uyarısını ve bölüm D'nin "siren başladıktan 60 sn sonra"sını bilerek bozar (MT2-2;
 `meteorYagmuruOncuSaniye=0` eski davranış). Meteor başına ödül şansı değişmedi. SARTNAME N21. **Mt11 şef kararı (Gk2, MT2-18):**
 doğal patlama penceresi beklenirken (`Afet.pencereBeklemesi() >= 0`, ön-uyarı sayacı 0'da) güneşin öncü yağmuru
 `meteorYagmuruOncuDakikaBasina`'da (6/dk) sabit kalır (`MeteorYagmuruEgrisi.pencereBeklerken`, `GunesPatlamasi` çağrı noktası;
-JUnit `pencereBeklenirkenOncuBastaSabitKalir`); pencere gelince siren eğriden sürer. Mt10 meteor-2'de çözüldü (`4d4449e`: ödül
-yalnız büyük bantta, afet başına oyuncu başına tavan `meteor.odulTavaniAfetBasina` 8, `OdulTavani`). **Şef kararı bekleyenler
-(inceleme-meteor-2-2):** Mt7 gerçek hızda AKTIF karesi (görsel kanıt yavaş çekimde), Mt9 blok hasarı açıkken 90/dk sunucu
-ölçümü (TPS, krater başına INFO satırı).
+JUnit `pencereBeklenirkenOncuBastaSabitKalir`); pencere gelince siren eğriden sürer. MT2-28'in 180/dk'sı yalnız AKTIF yağmur
+anahtarını değiştirir; öncü anahtarları ve çağrı noktası aynı, karar geçerli. Mt10 meteor-2'de çözüldü (`4d4449e`: ödül
+yalnız büyük bantta, afet başına oyuncu başına tavan `meteor.odulTavaniAfetBasina` 8, `OdulTavani`). Mt7 (gerçek hızda AKTIF
+karesi) MT2-25/MT2-28 ile ele alındı; görsel kabul meteor-2 incelemesinde.
 
 **K-E57 Ünvan yalnız modun başarım duyurusunda; eşya başarımları yaratıcı kipte de (istek 16, 19; N16 netleştirmesi,
 kullanıcı Berk adına).** SARTNAME N16'nın "sohbet adının ve tab listesindeki adın önünde (`NameFormat`, `TabListNameFormat`)"
@@ -5767,8 +5778,14 @@ SARTNAME N16 yeniden ve N20–N24, IZLEME 27 satır + 5 yeni, README dönem ve k
 (`4177def`, kuyruktan, K-E60): `runData` (ana, `1107-232739699-cc`) BUILD SUCCESSFUL, yazılan 0, `git status` boş; JUnit 603
 PASSED / 0 FAILED (ana, `1107-232739603-94`, `test @e4fa25ca6b92`); filtresiz GameTest (`FILTRE=yok`, pc2, `1107-232739507-b8`)
 "All 239 required tests passed", protokol 7, en büyük batch 7, iki kasıtlı deprem `/ERROR]` (`gametest @cd473e35f21c`); N19 186/186,
-fark 0. Pano `Yuva: ana 1/2 · pc2 1/2` (aynı klasör makine başına tek iş; `pano-2.txt`). `inceleme-meteor-2-2` kabul;
-afet-fizik tur 3 incelemesi ve meteor-2 MT2-25 bekleniyor: sonuç değişirse dalın yeni HEAD'i yeniden `merge --no-ff`.
+fark 0. Pano `Yuva: ana 1/2 · pc2 1/2` (aynı klasör makine başına tek iş; `pano-2.txt`). **Ek tur 2:** afet-fizik tur 3
+kabul (`90f5a25`, zaten `f9d67f7`'de); `9283fa1` meteor-2 `6210fde` (MT2-25 uçuş 180 tick, MT2-28 180/dk + bakış yönü, MT2-29
+tavan 448; K-E56 rev.) çakışmasız (`GunesPatlamasiOtomasyonu.java`, `AyCarpmasiAyarlari.java`, `ay_carpmasi.md`, `esyalar.md`
+kendiliğinden; gokyuzu-2'nin otomasyon satırları ayrık, `dusmeHizi` kullanımı kalmadı). Mt11 çağrı noktası değişmedi.
+Kanıt (`9283fa1`, kuyruktan): `runData` (ana, `1107-235610456-0b`) yazılan 0; JUnit 607 PASSED / 0 FAILED (ana,
+`1107-235610364-ab`, `test @ebdb35ad992f`); filtresiz GameTest (pc2, `1107-235610272-7d`) "All 240 required tests passed",
+protokol 7, en büyük batch 7, iki kasıtlı deprem `/ERROR]` (`gametest @f22d60f32817`); N19 186/186, fark 0; pano `Yuva: ana 1/2 ·
+pc2 1/2` (`pano-3.txt`). meteor-2 MT2-25/28 incelemesi sürüyor: düzelt çıkarsa yeni HEAD yeniden `merge --no-ff`.
 
 ### Bilinen sınırlar (güncelleme turu 1)
 
@@ -5778,8 +5795,13 @@ afet-fizik tur 3 incelemesi ve meteor-2 MT2-25 bekleniyor: sonuç değişirse da
   pencerenin son 90 sn'sine almak karara girmedi).
 - **K-E29 (b) CPU ölçümü yok (Gk5):** canlı uzay, 1–4 kara delik ve 3B ay patlamasının render thread CPU ms/karesi ana makinede
   ölçülmedi; pc2 FPS'leri (20–42) yalnız bilgi.
-- **Meteor yoğunluğu karede okunmuyor (Mt6, Mt7):** kanıt log sayacı; görsel kareler yavaş çekimde (`dusmeHizi` 0,6). Gerçek
-  hızda gökte aynı anda ~4–5 meteor beklenir [ÇIKARIM].
+- **Meteor yoğunluğu karede okunmuyor (Mt6, Mt7):** kanıt log sayacı; görsel otomasyonların yavaş çekimi `ucusSuresi` 360
+  (2×, MT2-25). Gerçek hızda (180 tick uçuş, 180/dk) gökte oyuncu başına ~27 meteor, kadrajda ~10–13 iz beklenir [ÇIKARIM].
+- **Dünya hasarı (MT2-21, Mt10; kullanıcı isteği):** 10 dk yağmurda duran oyuncunun 32–160 blok halkasına 180/dk'da ~1800
+  krater ve yangın (90/dk'da ~900); kalır. `afetBlokHasari false` kraterı kapatır, yoğunluk config'tedir.
+- **Meteor TPS ölçümü tek oyunculu (MT2-22, MT2-29):** `meteor_sunucu.py --tps` ana makinede tek hedefle (180/dk, 200 sn, blok
+  hasarı açık) ortalama tick 5,54 ms, en düşük TPS 20,00. 16 oyuncuda tavan (448) ve krater bütçesi sınırlar; çok oyunculu
+  ölçüm yok (bütçe oyuncu sayısından bağımsız, varlık ~16×).
 - **10 dk GameTest'inin bütçe denetimi boşta (Mt8):** blok hasarı kapalı; gerçek kraterli bütçe `meteor_butce` testinde. Meteor
   kraterleri `SanalSu.chunkDegisti` çağırmıyor (Mt12, önceden var); `meteor_on_dakika` kuralı yalnız başarı yolunda geri koyuyor
   (Mt13, K-E15 deseni eski testlerde de).
@@ -5794,8 +5816,12 @@ afet-fizik tur 3 incelemesi ve meteor-2 MT2-25 bekleniyor: sonuç değişirse da
 - **Tsunami komşu kırımı birim tavanını tick içinde aşabilir (Af11):** `komsulariKir` iş başına en çok 6 blok fazla kırar; jeton
   borcu sonraki tick'e taşındığı için ortalama bütçe korunur. TS-15'teki "birim tick'te en çok `birimTavani`" ifadesi bu
   istisnayla okunur.
-- **Sanal su yakın ağı yavaş makinede ~150 tick'te kurulur (AF-01 rev. 2–3):** o sürede kamera çevresinde sanal su (ve sanal su
-  halkası) çizilmez, sonra ağ yapım başındaki anı gösterir.
+- **Sanal su yakın ağı yavaş istemcide geride (AF-01 rev. 2–4, Af18):** yakın ağ yenilemesi pc2'de (15 FPS) 147 tick (`ag_araligi`;
+  `ag_yasi` 270–401), ana makinede ~13 tick. O sürede sürüklenen oyuncunun çevresinde sel, çekilme ve sanal su halkası
+  çizilmez (pc2 dalga karesinde `SANAL=0`). Kabul ölçütü (`dalga` karesinde `SANAL ≥ 1`) ana makinede Af16 `OLCUM` koşusuyla.
+- **Kanıt dosyası ezildi (Af20):** afet-fizik tur 6 filtresiz GameTest'i `gametest-2.log`'a yazıldı; defter satırı
+  `gametest:Cekirdek|Deprem|Kasirga|Tsunami… @cc907cfb495d` (44/44) log'unu kaybetti. Sonuç entegrasyon dalının filtresiz
+  GameTest'inde yeniden koştu; sonraki koşular yeni adla.
 - **K-E52 eşik atlaması:** K-D8 sütunu okumadığı sürece eski kırağılı çimen bir sonraki eşik geçişine kadar kalır. Cold Sweat
   yüklüyken HUD karesi yok (`-Puyum=coldsweat` istemcisi dünyaya girmedi; GC-4 kodda).
 - **Defter (Bb1, Gc1, Mt17, Af3):** `basarim_gorsel` pc2 koşusu deftere yazılmadı (pc2 yolunda `defter.sarmala` sonucu ana deftere
@@ -6242,10 +6268,11 @@ P2-9 `5-matris` kabulünde. Kapanış eşlemesi (K-E50) her maddenin sonunda:
 | meteor | `meteor.buyukKraterYaricapi` / `meteor.buyukKraterDerinligi` | 5,5 / 4 | blok | 3 blokluk meteor → 11 blok çap, derinlik/çap 0,36 |
 | meteor | `meteor.magmaSogumaSaniye` | 20 | sn | M-25; tasarım "kraterde 20 sn magma parıltısı" |
 | meteor | `meteor.kraterBlokButcesi` | 512 | blok işlemi / tick | büyük krater ~2 tick; TPS kısmasıyla çarpılır |
-| meteor | `meteor.varlikTavani` | 96 (eski 48) | varlık | M-15; MT2-16: 90/dk × 16 oyuncu × ~3,5 sn uçuş ≈ 84; doluyken atılamayan meteor düşmez |
+| meteor | `meteor.varlikTavani` | 448 (eski 240; 96; 48) | varlık (1–512) | MT2-29 (K-E56 rev.): 180/dk × 16 oyuncu × ~9 sn uçuş ≈ 432; doluyken atılamayan meteor düşmez |
+| meteor | `meteor.bakisYonuOrani` (yeni) | 0,667 | olasılık (0–1; 0,5 yönsüz) | MT2-28: yağmurun 2/3'ü bakışın ±90° ön yarısına, 1/3'ü arkaya (`MeteorDagitimi`); komut meteoru yönsüz |
 | meteor | `meteor.dagitimIcYaricap` / `meteor.dagitimDisYaricap` | 32 / 160 | blok | tasarım §2 "32–160 blok çevresinde" |
-| meteor | `meteor.girisYuksekligi` | 140 | blok | izin gökyüzünde görünmesi, uçuş ~3 sn (tepki süresi) |
-| meteor | `meteor.dusmeHizi` | 3,0 | blok / tick | blok/tick; paket sınırı 3,9 |
+| meteor | `meteor.girisYuksekligi` | 200 (eski 140) | blok (40–300) | MT2-25: şefin y+160–220 aralığı; doğuş varlık işleyen chunk'ta kalır |
+| meteor | `meteor.ucusSuresi` (yeni; `dusmeHizi` 3,0 kalktı) | 180 | tick (40–500) | MT2-25: uçuş 8–10 sn (küçük 9,5, büyük 8,0 sn); hız yoldan, en çok 3,8 blok/tick; yavaş çekim 360 |
 | meteor | `meteor.girisAcisiEnAz` / `meteor.girisAcisiEnCok` | 40 / 70 | — | tasarım "40–70°" |
 | meteor | `meteor.sarsintiMenziliKucuk` / `meteor.sarsintiMenziliBuyuk` | 48 / 112 | — | M-11 |
 | meteor | `meteor.kucukYanginYogunlugu` / `meteor.buyukYanginYogunlugu` | 0,45 / 0,85 | alan oranı | yangın §1: alan oranı %62 / %90 |
@@ -6261,7 +6288,7 @@ P2-9 `5-matris` kabulünde. Kapanış eşlemesi (K-E50) her maddenin sonunda:
 | meteor (istemci sabiti) | `MeteorSesMenzili.UCUS_MENZILI` / `UCUS_BIRAKMA` | 48 / 52 | blok | MT2-5: kullanıcı ~48; histerezis |
 | meteor (istemci sabiti) | `CARPMA_MENZILI_BUYUK` / `_KUCUK` | 128 / 96 | blok | MT2-6: kullanıcı ~128; küçük ¾ (ölçekle 0,5× ~91, 2,5× ~139) |
 | meteor (istemci sabiti) | `AYNI_TUR_TAVANI` | 6 | ses | MT2-7: ses.md §4 kural 3 |
-| meteor (istemci sabiti) | `SES_HIZI` | 12 | blok/tick | MT2-5: Doppler `12/(12 − v)`, oyunda 0,76–1,46 |
+| meteor (istemci sabiti) | `SES_HIZI` | 5,2 (eski 12) | blok/tick | MT2-25: tipik hızda (1,3 blok/tick) Doppler 1,33 / 0,8 korunur |
 | balıkçılık | `balikcilik.aktiflikEsigi` | 30 | % (G) | madde 15 varsayılanı |
 | balıkçılık | `balikcilik.delikOmruEnAzSn` / `delikOmruEnCokSn` | 240 / 300 | sn | madde 15 "4–5 dakika"; her delik aralıktan rastgele |
 | balıkçılık | `balikcilik.donmaAsamasiSn` | 15 | sn (× 3 aşama) | "yavaşça yeniden donarak": son 45 sn görünür zar; oyuncu kapanacağını görür |
@@ -6296,7 +6323,7 @@ P2-9 `5-matris` kabulünde. Kapanış eşlemesi (K-E50) her maddenin sonunda:
 | güneş patlaması | `gunes_patlamasi.meteorYagmuruOncuSonDakikaBasina` | 24 | meteor/dk/oyuncu (0–300) | istek 27 (MT2-15): öncü 6 → 24 (AKTIF'ten ayrı) |
 | güneş patlaması | `gunes_patlamasi.meteorYagmuruSaniye` | 600 (ilk sürüm 180) | ölçekli sn (0–1200) | istek 27 (K-E56): AKTIF başı 10 dk |
 | güneş patlaması | `gunes_patlamasi.meteorYagmuruGunlukSaniye` | 180 | ölçekli sn (0–1200) | MT2-15: sonraki günlerin başında 3 dk (AKTIF sayacı; uyku sayılmaz, MT2-11) |
-| güneş patlaması | `gunes_patlamasi.meteorYagmuruDakikaBasina` | 90 (ilk sürüm 24) | meteor/dk/oyuncu (0–300) | istek 27 (K-E56): ≥ 90; 16 oyuncuda tavanın (96) altında |
+| güneş patlaması | `gunes_patlamasi.meteorYagmuruDakikaBasina` | 180 (eski 90; ilk sürüm 24) | meteor/dk/oyuncu (0–300) | MT2-28 (K-E56 rev.): 3/sn, gökte ~27/oyuncu; 16 oyuncuda tavanın (448) altında |
 | güneş patlaması | `gunes_patlamasi.kavrulmaBaslangicGun` | 3,0 | gün (0–10) | tasarım §2 "3. günden sonra" |
 | güneş patlaması | `gunes_patlamasi.kavrulmaOlasiligi` | 0,5 | olasılık (0–1) | 2 günde çevrenin ~yarısı: yamalı, çöl değil |
 | güneş patlaması | `gunes_patlamasi.kavrulmaYaricap` | 64 | blok (8–160) | 4 chunk: oyuncunun gördüğü çevre, yüklü alan |
@@ -6306,7 +6333,7 @@ P2-9 `5-matris` kabulünde. Kapanış eşlemesi (K-E50) her maddenin sonunda:
 | güneş patlaması | sabit: yaprak/çimen kuruluğu | p 0,564 → 1, tavan %72, 8 basamak | — | tasarım "yapraklar kahverengiye"; basamak = yeniden örme (GP13) |
 | güneş patlaması | `gorsel.efektKalitesi` (mevcut, CLIENT) | Yüksek | Düşük/Orta/Yüksek/Ultra | aurora katmanı 1/2/3/3, dilim 48–128; ısı şeridi 10–32 (N13, tasarım §5) |
 | ay çarpması | `ay_carpmasi.meteorSuresiSn` | 600 (eski 90) | sn (60–900) | istek 27 (MT2-15, K-E56): 10 dk; bölüm H "1–2 dk" kullanıcı isteğiyle aşıldı; afet yağmurla biter |
-| ay çarpması | `ay_carpmasi.meteorDakikaBasina` | 90 (eski 7,5 → 30) | adet/dk/oyuncu (0–300) | istek 27 (K-E56): 1,5/sn, 10 dk'da oyuncu başına 900 parça |
+| ay çarpması | `ay_carpmasi.meteorDakikaBasina` | 180 (eski 90; 7,5 → 30) | adet/dk/oyuncu (0–300) | MT2-28 (K-E56 rev.): 3/sn, 10 dk'da oyuncu başına 1800 parça |
 | ay çarpması | `ay_carpmasi.meteorBuyukOrani` | 0,10 (eski 0,04) | olasılık | MT2-13: ay parçaları da güneşle aynı ölçek dağılımı |
 | ay çarpması | `ay_carpmasi.sarsintiBlokSayisi` | 35 | blok/oyuncu | tasarım §5 Yüksek satırı |
 | ay çarpması | `ay_carpmasi.sarsintiYaricapi` | 48 | blok | tasarım §5 |
