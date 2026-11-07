@@ -235,8 +235,9 @@ def alt_surec(komut, env=None):
 
 def sarmala(main, log=None):
     """`*_gorsel.py`/`*_istemci.py` ana bloğu: `sys.exit(defter.sarmala(main, KANIT))`. Aynı girdi hash'inde `gecti`
-    varsa `main` koşmaz (0); yoksa koşar ve sonucu yazar. Log verilmezse ilk yol argümanı."""
-    if os.environ.get("DEFTER_ICINDE"):
+    varsa `main` koşmaz (0); yoksa koşar ve sonucu yazar. Log verilmezse ilk yol argümanı. pc2'de (`UZAK_ICINDE`,
+    `pc2_istemci.sh` kare/vitrin koşusu) depo ve defter yok: `main` deftersiz koşar."""
+    if os.environ.get("DEFTER_ICINDE") or os.environ.get("UZAK_ICINDE"):
         return main()
     kimlik = betik_kimligi()
     girdi = girdi_hash(kimlik)

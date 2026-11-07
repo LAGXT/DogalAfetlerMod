@@ -9,7 +9,8 @@ Makineler (ikisinin de koşucusu ana makinede, ikisi de 2 yuva; `--istemci` iki 
   pc2  ekransız iş: komutun kendisi pc2'ye gider (K-E44: gradle_kapisi.sh, ./gradlew, *_sunucu.py, uzak.sh,
        pc2_istemci.sh); kendiliğinden gitmeyen komut `tools/senaryo/uzak.sh` ile sarılır. Aynı klasörün ikinci işi
        (uzak.sh klasör kilidi) arkadaki işlere sıra verir.
-  oto  (varsayılan) ekransızsa pc2, değilse (ya da UZAK=0 ya da --istemci) ana
+  oto  (varsayılan) ekransızsa ya da pc2_istemci.sh ise pc2, değilse (ya da UZAK=0) ana. pc2_istemci.sh işi kendiliğinden
+       --istemci (iki yuva; koşturucu uzak.sh yuva kilitlerini tutar, UZAK_YUVA_TUTULU=1)
 
 Kullanım:
   sira.py ekle [--makine ana|pc2|oto] [--yuva 1|2] [--istemci] [--log <yol>] -- <komut...>
@@ -146,8 +147,10 @@ def ekle(makine, komut, yuva=1, istemci=False, log=None, cwd=None, cikti=print):
     """İşi kuyruğa yazar, kimliğini döner. `makine` oto ise komuttan seçilir."""
     cwd = str(Path(cwd or os.getcwd()).resolve())
     env = {k: v for k, v in os.environ.items() if ENV_ANAHTARI.fullmatch(k)}
+    if any(Path(a).name == "pc2_istemci.sh" for a in komut):
+        istemci = True
     if makine == "oto":
-        makine = "ana" if istemci or env.get("UZAK") == "0" or not ekransiz_mi(komut) else "pc2"
+        makine = "pc2" if env.get("UZAK") != "0" and ekransiz_mi(komut) else "ana"
     if makine == "ana":
         env.update({k: os.environ[k] for k in EKRAN_ENV if k in os.environ})
     elif not istemci and kendiliginden(komut)[0] is None:

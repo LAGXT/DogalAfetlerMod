@@ -35,13 +35,16 @@ mkdir -p "$kilitler"
 dk=${UZAK_BEKLE_DK:-60}
 son=${UZAK_YUVA:-2}
 [ "$son" -ge 2 ] || son=2
-for ((n = 2; n <= son; n++)); do
-    exec {fd}>"$kilitler/yuva-$n"
-    if ! flock -n "$fd"; then
-        echo "PC2: $makine yuva $n dolu, bekleniyor (en çok $dk dk)"
-        flock -w $((dk * 60)) "$fd" || { echo "PC2: yuva $n $dk dk'da açılmadı, çıkış 3" >&2; exit 3; }
-    fi
-done
+# Kuyruğun pc2 istemci işi (sira.py ekle --makine pc2 --istemci, K-E51) yuva kilitlerinin hepsini zaten tutar: UZAK_YUVA_TUTULU=1.
+if [ "${UZAK_YUVA_TUTULU:-}" != 1 ]; then
+    for ((n = 2; n <= son; n++)); do
+        exec {fd}>"$kilitler/yuva-$n"
+        if ! flock -n "$fd"; then
+            echo "PC2: $makine yuva $n dolu, bekleniyor (en çok $dk dk)"
+            flock -w $((dk * 60)) "$fd" || { echo "PC2: yuva $n $dk dk'da açılmadı, çıkış 3" >&2; exit 3; }
+        fi
+    done
+fi
 
 kok=$PWD
 kok_ana=$kok
