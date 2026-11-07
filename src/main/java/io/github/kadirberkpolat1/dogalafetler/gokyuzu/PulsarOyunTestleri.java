@@ -38,6 +38,16 @@ public final class PulsarOyunTestleri {
     private PulsarOyunTestleri() {
     }
 
+    @AfterBatch(batch = "gokyuzu2_pulsar")
+    public static void pulsarSonrasi(ServerLevel level) {
+        temizle(level.getServer());
+    }
+
+    @AfterBatch(batch = "gokyuzu2_cozulme")
+    public static void cozulmeSonrasi(ServerLevel level) {
+        temizle(level.getServer());
+    }
+
     @AfterBatch(batch = "gokyuzu2_gun_saati")
     public static void gunSaatiSonrasi(ServerLevel level) {
         temizle(level.getServer());
@@ -206,7 +216,7 @@ public final class PulsarOyunTestleri {
     }
 
     @GameTest(template = "bos", batch = "gokyuzu2_ay_omru", timeoutTicks = 200)
-    public static void ayPatlamasiOmruDolunCaKaybolur(GameTestHelper y) {
+    public static void ayPatlamasiOmruDolununcaKaybolur(GameTestHelper y) {
         AfetYoneticisi yonetici = temizBasla(y);
         DunyaDonemi donem = yonetici.donem();
         kurallar(y, false, 18_000L);

@@ -196,8 +196,8 @@ public final class GunesPatlamasiOtomasyonu {
                 komut(s, "time set 18000");
                 kamera(s, -90f, -60f);
             }, () -> sayac >= 60, "uzay_yildiz_1", 200),
-            new Adim("yıldızlı gök 2 (~3 sn sonra, aynı kamera)", s -> {
-            }, () -> sayac >= 60, "uzay_yildiz_2", 200),
+            new Adim("yıldızlı gök 2 (10 sn sonra, aynı kamera: yavaş dönüş ~6°, kırpışma)", s -> {
+            }, () -> sayac >= 200, "uzay_yildiz_2", 300),
             new Adim("kara delik yakın kadraj", GunesPatlamasiOtomasyonu::karaDelikBak, () -> sayac >= 40,
                     "kara_delik_yakin", 200),
             new Adim("pulsar akşam", s -> {
@@ -205,10 +205,10 @@ public final class GunesPatlamasiOtomasyonu {
                 komut(s, "dogalafet pulsar baslat", "dogalafet asama ileri pulsar", "time set 11600");
                 gunesBak(s);
             }, () -> sayac >= 80 && evre(GunesEvresi.PULSAR), "pulsar_aksam", 300),
-            new Adim("pulsar kavurma (hız 30)", s -> {
+            new Adim("pulsar kavurma (hız 30, 45 sn)", s -> {
                 komut(s, "time set 6000", "dogalafet hiz 30");
                 kamera(s, kavrulmaKamerasi);
-            }, () -> sayac >= 400, null, 500),
+            }, () -> sayac >= 900, null, 1000),
             new Adim("pulsar yanan dünya", s -> {
                 komut(s, "dogalafet hiz 1");
                 kavrulmaSay(s);

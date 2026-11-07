@@ -11,14 +11,16 @@ import net.minecraft.network.protocol.game.ClientboundSetTimePacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.GameRules;
+import net.minecraft.world.level.Level;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
 
 /**
  * Güneş patlaması AKTIF (büyüme/kavrulma) boyunca üst dünyanın gün saatini sabit tutar (gökyüzü-2 kullanıcı isteği 25):
- * başta ilk öğleye geçilir, her tick sonunda vanilla'nın ilerlettiği saat geri alınır ({@link GunSaatiSabitleme}); istemci
- * saat paketinin "gün döngüsü" bayrağı kapalı gönderildiği için istemcide de güneş kaymaz. {@code doDaylightCycle}
+ * başta ilk öğleye geçilir, üst dünya tick'inin sonunda vanilla'nın ilerlettiği saat geri alınır ({@link GunSaatiSabitleme};
+ * aynı tick'te sunucunun geri kalanı ve oyun testleri sabit saati görür); istemci saat paketinin "gün döngüsü" bayrağı
+ * kapalı gönderildiği için istemcide de güneş kaymaz. {@code doDaylightCycle}
  * gamerule'üne dokunulmaz (oyuncunun kuralı aynen kalır); sabit saat {@code ekVeri("gun_saati")}'nde kalıcıdır, AKTIF bitince
  * silinir ve vanilla döngü kaldığı yerden sürer. Siren (gece aurora) ve süpernova sonrası dönemler etkilenmez. Oyun günü ve
  * afetin 5 günlük süresi gün saatinden değil ölçekli saatten/oyun zamanından sayılır.
@@ -33,7 +35,7 @@ final class GunSaatiSabitleyici {
     }
 
     static void kaydet() {
-        MinecraftForge.EVENT_BUS.addListener(EventPriority.LOW, false, TickEvent.ServerTickEvent.class,
+        MinecraftForge.EVENT_BUS.addListener(EventPriority.LOW, false, TickEvent.LevelTickEvent.class,
                 GunSaatiSabitleyici::tick);
     }
 
@@ -43,12 +45,12 @@ final class GunSaatiSabitleyici {
                 .isPresent();
     }
 
-    private static void tick(TickEvent.ServerTickEvent olay) {
-        if (olay.phase != TickEvent.Phase.END) {
+    private static void tick(TickEvent.LevelTickEvent olay) {
+        if (olay.phase != TickEvent.Phase.END || !(olay.level instanceof ServerLevel ust)
+                || ust.dimension() != Level.OVERWORLD) {
             return;
         }
-        MinecraftServer server = olay.getServer();
-        ServerLevel ust = server.overworld();
+        MinecraftServer server = ust.getServer();
         AfetYoneticisi yonetici = AfetYoneticisi.al(server);
         DunyaDonemi donem = yonetici.donem();
         CompoundTag veri = donem.ekVeri(KIMLIK);
@@ -84,8 +86,8 @@ final class GunSaatiSabitleyici {
         if (simdi != hedef) {
             ust.setDayTime(hedef);
         }
-        // Vanilla 20 tick'te bir gün döngüsü bayrağıyla saat paketi yollar (bu olaydan önce); bizimki ardından gelip
-        // istemcinin saati kendi başına ilerletmesini kapatır.
+        // Vanilla 20 tick'te bir gün döngüsü bayrağıyla saat paketi yollar (üst dünya tick'inden önce); bizimki ardından
+        // gelip istemcinin saati kendi başına ilerletmesini kapatır.
         if (yeni || server.getTickCount() % 20 == 0) {
             gonder(server, ust, false);
         }

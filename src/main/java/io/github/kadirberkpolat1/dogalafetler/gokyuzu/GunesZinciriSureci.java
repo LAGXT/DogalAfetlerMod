@@ -38,6 +38,11 @@ public final class GunesZinciriSureci implements DonemSureci {
 
     /** Önceki tick'in üst dünya gün saati (uyku atlaması şafağı geçerse doğuş kaçmasın); kalıcı değil. */
     private long sonGunSaati = Long.MIN_VALUE;
+    /**
+     * Yalnız geliştirme komutu ({@code /dogalafet gokyuzutest yildiz}): doğal doğuşta seçim yerine bu yeni yıldız; null
+     * seçim. Kalıcı değil (sunucu senaryosu seçimin rastgeleliğinden bağımsız olsun).
+     */
+    static volatile GunesEvresi zorlananYildiz;
 
     private GunesZinciriSureci() {
     }
@@ -113,6 +118,10 @@ public final class GunesZinciriSureci implements DonemSureci {
      * başlatmada ve tekrar sorguda aynı); olasılık config'den.
      */
     public static GunesEvresi dogacakYildiz(ServerLevel ust, DunyaDonemi donem) {
+        GunesEvresi zorla = zorlananYildiz;
+        if (zorla != null) {
+            return zorla;
+        }
         long tohum = PulsarSecimi.tohum(ust.getSeed(), donem.ekVeri(KIMLIK).getLong(DONGU));
         return PulsarSecimi.pulsarMi(GokyuzuAyarlari.pulsarOlasiligi(), tohum) ? GunesEvresi.PULSAR : GunesEvresi.KIZIL_CUCE;
     }
@@ -197,7 +206,7 @@ public final class GunesZinciriSureci implements DonemSureci {
             case SAFAK -> yildizDogar(ust, donem, "ilk şafak");
             case SAFAK_GECILDI -> yildizDogar(ust, donem, "şafak geçildi");
             case GUN_DONGUSU_KAPALI -> {
-                DogalAfetler.LOGGER.info("Yeni yıldız: gün döngüsü kapalı, şafak beklenmedi (gün saati {})", gunSaati);
+                DogalAfetler.LOGGER.info("Kızıl cüce: gün döngüsü kapalı, şafak beklenmedi (gün saati {})", gunSaati);
                 yildizDogar(ust, donem, "gün döngüsü kapalı");
             }
             case BEKLE -> {

@@ -667,7 +667,7 @@ final class GokyuzuCizici {
         float b = 1f;
         int evre = level.getMoonPhase();
         switch (d.evre()) {
-            case SUPERNOVA -> {
+            case SUPERNOVA, PULSAR -> {
                 r = 0.75f;
                 g = 0.85f;
             }

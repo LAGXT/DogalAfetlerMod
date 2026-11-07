@@ -99,8 +99,18 @@ public final class GokyuzuKomutlari {
                                         .donmaIlerlemesiAyarla(FloatArgumentType.getFloat(b, "yuzde"));
                                 return yaz(b.getSource(), Component.literal("[test] donma = "
                                         + FloatArgumentType.getFloat(b, "yuzde")));
-                            }))));
+                            })))
+                    .then(Commands.literal("yildiz")
+                            .then(Commands.literal("kizil_cuce").executes(b -> testYildiz(b, GunesEvresi.KIZIL_CUCE)))
+                            .then(Commands.literal("pulsar").executes(b -> testYildiz(b, GunesEvresi.PULSAR)))
+                            .then(Commands.literal("secim").executes(b -> testYildiz(b, null)))));
         }
+    }
+
+    /** Geliştirme: zincirin doğal doğuşunu sabitler ({@code null} = olasılıkla seçim). */
+    private static int testYildiz(CommandContext<CommandSourceStack> b, GunesEvresi yildiz) {
+        GunesZinciriSureci.zorlananYildiz = yildiz;
+        return yaz(b.getSource(), Component.literal("[test] yeni yıldız = " + (yildiz == null ? "secim" : yildiz.kimlik())));
     }
 
     static int baslat(CommandContext<CommandSourceStack> baglam) {
