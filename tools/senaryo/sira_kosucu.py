@@ -13,8 +13,8 @@ Sıra (K-E53): adaylar önce bu makinenin bekleyenleri, sonra oto'nunkiler (ikis
 ve sığan işi alır (backfill: sığmayan iki yuvalı işin arkasındaki tek yuvalı iş öne geçer). Açlık koruması: sığmayan
 iki yuvalı iş SIRA_ACLIK_SN (600) sn'den uzun bekliyorsa arkasındaki hiçbir iş alınmaz, yuvalar boşalınca o koşar. pc2'de
 aynı klasörden koşan işi olan makine o klasörün ikinci işini almaz (pc2'de uzak.sh klasör kilidi de); pc2 kuyruğu kuyruk
-dışından tutulan uzak.sh yuvalarını da sayar. oto işinin dağıtımı (pc2 öncelikli, ana taşanı alır) `sira.py`
-başındaki açıklamada. Ana makinenin işi kullanıcı oturumunun ekranını alır (yaşayan Hyprland imzası; kayıttaki imza eski
+dışından tutulan uzak.sh yuvalarını da sayar. oto işinin dağıtımı (K-E60 rev.: boş yuvası çok olan makine alır,
+eşitlikte pc2) `sira.py` başındaki açıklamada. Ana makinenin işi kullanıcı oturumunun ekranını alır (yaşayan Hyprland imzası; kayıttaki imza eski
 olabilir), yaşayan Hyprland yoksa ana koşucu istemci işi almaz. Her iş kendi
 oturumunda `--kos` kipindeki koşturucuyla koşar; koşturucu çıkışı kendisi yazar, koşucu ölse de kayıt tamamlanır. pc2'nin
 `--istemci` işi süresince koşturucu ana makinedeki uzak.sh yuva kilitlerinin hepsini tutar ve işe UZAK_YUVA_TUTULU=1 verir.
@@ -114,6 +114,7 @@ class Kosucu:
         self.pc2_olay = threading.Event()
         self.tasinmaz = set()
         self.hyprland = (0.0, None)
+        self.bos_onbellek = {}
 
     def kilitle(self):
         self.kilit = open(sira.dizin(self.makine) / "kosucu.lock", "a")
@@ -168,26 +169,33 @@ class Kosucu:
             os.replace(bag, yol)
             print(f"SIRA: {veri['id']} pc2 → oto taşındı (eski kayıt)", flush=True)
 
-    def pc2_alamaz(self, veri):
-        """pc2 bu oto işini şimdi alamaz: koşucusu yok, aynı klasörden işi koşuyor ya da yükü (koşan + uzak.sh yuvaları +
-        kuyruk dışı + pc2'de bekleyen) işe yer bırakmıyor."""
-        if not sira.kosucu_canli("pc2"):
-            return True
-        kosan = [v for _, v in sira.isler("pc2", "kosan")]
-        if veri["cwd"] in {v["cwd"] for v in kosan} or sira.uzak_klasor_dolu(veri["cwd"]):
-            return True
-        yuk = sira.doluluk("pc2") + sum(sira.gerek(v, "pc2") for _, v in sira.isler("pc2", "bekleyen"))
-        return yuk + sira.gerek(veri, "pc2") > sira.YUVA
-
     def hyprland_var(self):
         """Yaşayan Hyprland örneği var mı (HYPRLAND_BAKIM_SN önbellekli)."""
         if time.monotonic() - self.hyprland[0] > HYPRLAND_BAKIM_SN:
             self.hyprland = (time.monotonic(), runclient_kilit.canli_hyprland())
         return self.hyprland[1] is not None
 
-    def ana_engeli(self, veri, kosan, simdi):
-        """Ana makine bu işi şimdi neden alamaz (None: alır). İstemci işi: yaşayan Hyprland ve tek istemci. oto işi: pc2
-        öncelikli, ağır süreç ≤ 2 (kuyruk dışı Gradle da), boş RAM >= KAPI_RAM_MB."""
+    def bos(self, makine):
+        """Makinenin boş yuvası (kuyruk dışı ağır süreçler de dolu sayılır); `baslat` turu boyunca önbellekli."""
+        if makine not in self.bos_onbellek:
+            self.bos_onbellek[makine] = (self.yuva if makine == self.makine else sira.YUVA) - sira.doluluk(makine)
+        return self.bos_onbellek[makine]
+
+    def engel(self, makine, veri):
+        """`makine` bu işi şimdi neden alamaz (None: alır): koşucusu yok, boş yuvası yetmiyor, aynı klasörden işi koşuyor
+        (makine başına klasör başına tek iş; pc2'de uzak.sh klasör kilidi de; `klasor_engeli`). Ana makinede istemci işi
+        yaşayan Hyprland ve tek istemci, oto işi boş RAM >= KAPI_RAM_MB ister."""
+        if makine != self.makine and not sira.kosucu_canli(makine):
+            return f"{makine} koşucusu yok"
+        if self.bos(makine) < sira.gerek(veri, makine):
+            return f"{makine}: boş yuva {self.bos(makine)}"
+        kosan = [v for _, v in sira.isler(makine, "kosan")]
+        if veri["cwd"] in {v["cwd"] for v in kosan} or makine == "pc2" and sira.uzak_klasor_dolu(veri["cwd"]):
+            return "aynı klasörden iş koşuyor"
+        if self.klasor_engeli(makine, veri):
+            return "öteki makinede aynı klasörün ./gradlew işi"
+        if makine == "pc2":
+            return None
         if veri.get("istemci"):
             if not self.hyprland_var():
                 return "yaşayan Hyprland yok"
@@ -196,22 +204,19 @@ class Kosucu:
             kayit = runclient_kilit.oku()
             if kayit and runclient_kilit.yasiyor(kayit):
                 return "runClient kilidi tutuluyor"
-        if veri.get("makine") != "oto":
-            return None
-        if simdi - veri.get("eklendi", simdi) < sira.OTO_BEKLE_SN and not self.pc2_alamaz(veri):
-            return "pc2 öncelikli"
-        agir = sira.doluluk("ana")
-        if agir + sira.gerek(veri, "ana") > sira.YUVA:
-            return f"ana makinede {agir} ağır süreç"
-        if sira.bos_ram_mb() < int(os.environ.get("KAPI_RAM_MB", "4096")):
+        if veri.get("makine") == "oto" and sira.bos_ram_mb() < int(os.environ.get("KAPI_RAM_MB", "4096")):
             return "boş RAM az"
         return None
 
-    def klasor_engeli(self, veri):
+    def oto_hedefi(self, veri):
+        """K-E60 rev.: oto işi, alabilen makinelerden boş yuvası en çok olana; eşitlikte pc2. Kimse alamıyorsa None."""
+        return max((m for m in ("pc2", "ana") if self.engel(m, veri) is None), key=self.bos, default=None)
+
+    def klasor_engeli(self, makine, veri):
         """Öteki makinede aynı klasörün işi varken: pc2'deki doğrudan `./gradlew` işi build/ alt klasörlerini geri
         çektiğinden ana makinedeki işle yan yana koşmaz; öteki işler pc2'de kendi kopyasında koşar, yalnız log/kanıt
         geri gelir."""
-        if self.makine == "ana":
+        if makine == "ana":
             return any(v["cwd"] == veri["cwd"] and sira.build_geri_ceker(v) for _, v in sira.isler("pc2", "kosan"))
         return sira.build_geri_ceker(veri) and any(v["cwd"] == veri["cwd"] for _, v in sira.isler("ana", "kosan"))
 
@@ -220,23 +225,20 @@ class Kosucu:
 
     def baslat(self):
         simdi = time.time()
-        kosan = [v for _, v in sira.isler(self.makine, "kosan")]
-        dolu = sira.doluluk(self.makine)
-        klasorler = {v["cwd"] for v in kosan}
+        self.bos_onbellek = {}
         for yol, veri in self.adaylar():
             if veri.get("tasindi") and (sira.dizin("pc2", "biten") / yol.name).exists():
                 yol.unlink(missing_ok=True)
                 continue
             gerek = sira.gerek(veri, self.makine)
-            if veri["cwd"] in klasorler or self.makine == "pc2" and sira.uzak_klasor_dolu(veri["cwd"]):
-                continue
-            if self.klasor_engeli(veri):
-                continue
-            if dolu + gerek > self.yuva:
+            if self.bos(self.makine) < gerek:
                 if gerek > 1 and simdi - veri.get("eklendi", simdi) > sira.ACLIK_SN:
                     break
                 continue
-            if self.makine == "ana" and self.ana_engeli(veri, kosan, simdi):
+            if veri["makine"] == "oto":
+                if self.oto_hedefi(veri) != self.makine:
+                    continue
+            elif self.engel(self.makine, veri):
                 continue
             hedef = sira.dizin(self.makine, "kosan") / yol.name
             try:
@@ -251,9 +253,7 @@ class Kosucu:
                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             print(f"SIRA: {veri['id']} başladı ({self.makine}, {gerek} yuva, kaynak {veri.get('kaynak', self.makine)})",
                   flush=True)
-            dolu += gerek
-            klasorler.add(veri["cwd"])
-            kosan.append(veri)
+            self.bos_onbellek[self.makine] -= gerek
 
     def imza(self):
         spool = tuple(sorted(str(p.relative_to(sira.SPOOL)) for p in sira.SPOOL.glob("*/*/[!.]*.json")))
