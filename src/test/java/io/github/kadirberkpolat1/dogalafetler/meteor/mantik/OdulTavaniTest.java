@@ -24,19 +24,19 @@ class OdulTavaniTest {
         assertEquals(OdulZari.Sonuc.YOK, OdulTavani.uygula(PARCA, true, 0, 0), "tavan 0: ödül yok");
     }
 
-    /** Varsayılan şanslarla 10 dk yağmur (900 meteor, %10 büyük): sınırsız ~29 parça, sınırla en çok 8 eşya. */
+    /** Varsayılan şanslarla 10 dk 180/dk yağmur (1800 meteor, %10 büyük): sınırsız ~58 eşya, sınırla en çok 8. */
     @Test
     void onDakikalikYagmurdaOncesiVeSonrasi() {
         Random r = new Random(20261107);
         int once = 0;
         int sonra = 0;
-        for (int i = 0; i < 900; i++) {
+        for (int i = 0; i < 1800; i++) {
             boolean buyuk = MeteorOlcegi.buyuk(MeteorOlcegi.ornekle(r, 0.10, 0.30));
             OdulZari.Sonuc zar = OdulZari.at(buyuk, OdulZari.Sanslar.VARSAYILAN, r);
             once += OdulTavani.adet(zar);
             sonra += OdulTavani.adet(OdulTavani.uygula(zar, buyuk, sonra, 8));
         }
-        assertEquals(true, once >= 18 && once <= 40, "sınırsız ödül " + once);
+        assertEquals(true, once >= 40 && once <= 78, "sınırsız ödül " + once);
         assertEquals(true, sonra <= 8 && sonra < once, "sınırlı ödül " + sonra + " / " + once);
     }
 }
