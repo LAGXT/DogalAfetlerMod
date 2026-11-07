@@ -1,0 +1,16 @@
+{
+  "variants": {
+    "axis=x": {
+      "model": "dogalafetler:block/komurlesmis_kutuk_horizontal",
+      "x": 90,
+      "y": 90
+    },
+    "axis=y": {
+      "model": "dogalafetler:block/komurlesmis_kutuk"
+    },
+    "axis=z": {
+      "model": "dogalafetler:block/komurlesmis_kutuk_horizontal",
+      "x": 90
+    }
+  }
+}

@@ -5,6 +5,7 @@
     "#minecraft:sand",
     "#minecraft:base_stone_overworld",
     "minecraft:gravel",
-    "minecraft:clay"
+    "minecraft:clay",
+    "dogalafetler:kul_blogu"
   ]
 }

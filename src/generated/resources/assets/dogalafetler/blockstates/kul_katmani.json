@@ -1,0 +1,28 @@
+{
+  "variants": {
+    "layers=1": {
+      "model": "dogalafetler:block/kul_katmani_height2"
+    },
+    "layers=2": {
+      "model": "dogalafetler:block/kul_katmani_height4"
+    },
+    "layers=3": {
+      "model": "dogalafetler:block/kul_katmani_height6"
+    },
+    "layers=4": {
+      "model": "dogalafetler:block/kul_katmani_height8"
+    },
+    "layers=5": {
+      "model": "dogalafetler:block/kul_katmani_height10"
+    },
+    "layers=6": {
+      "model": "dogalafetler:block/kul_katmani_height12"
+    },
+    "layers=7": {
+      "model": "dogalafetler:block/kul_katmani_height14"
+    },
+    "layers=8": {
+      "model": "dogalafetler:block/kul_blogu"
+    }
+  }
+}

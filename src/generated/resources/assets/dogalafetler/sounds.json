@@ -68,6 +68,12 @@
     ],
     "subtitle": "subtitles.dogalafetler.gunes.supernova_kristal"
   },
+  "karadelik_yutma": {
+    "sounds": [
+      "dogalafetler:karadelik_yutma"
+    ],
+    "subtitle": "subtitles.dogalafetler.karadelik_yutma"
+  },
   "kasirga_ruzgar": {
     "sounds": [
       {
