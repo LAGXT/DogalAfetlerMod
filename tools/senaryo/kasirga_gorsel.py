@@ -13,15 +13,27 @@ tutmazsa öldürülür; (d) 5 sn'de bir bekçi: etkin pencere bizimse ALARM, sü
 verilir, koşu geçersiz; (e) oyun içi girdi sayıları kapanış satırından okunur, sıfırdan farklıysa koşu geçersiz.
 Sahibin oturumunda tıklama/odak/workspace değişimi yok. Aynı anda tek runClient (runclient_kilit.py kos); ağır süreç kapısı.
 Sayılar ve adımlar KOK/.vibe/kanit/kasirga/protokol.log'a, kareler KOK/.vibe/kanit/kasirga/kareler/'e.
+
+S5 sahnesi kara zeminde (K-E45, K-17 taban rengi kararlı olsun): otomasyon oyuncuyu dünyanın doğuş noktasına ışınlar ve
+kasırga oyuncunun 53,5–107 blok uzağında rastgele bir merkezde doğar (`Kasirga.merkezSec`). Betik `test` dünyasının bölge
+dosyalarından kara haritası çıkarır; "uygun merkez" = yüzey ≥ deniz seviyesi + 4 (67) ve 24 blok yarıçapında su sütunu yok.
+Kopyanın doğuş noktası (`level.dat` SpawnX/Y/Z) doğuş halkasında en çok uygun merkez bulunan kara noktaya taşınır. S5 başlayınca
+log'daki merkez denetlenir: uygun değilse istemci hemen kapatılır ve koşu yeniden başlar (en çok `KASIRGA_DENEME`, vars. 5;
+haritanın dışındaki merkez koşu sonunda kopyanın kendi bölge dosyalarıyla doğrulanır). K-17 eşiği aynı.
 """
+import gzip
 import hashlib
+import io
 import json
 import os
+import re
 import shutil
+import struct
 import signal
 import subprocess
 import sys
 import time
+import zlib
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -37,6 +49,12 @@ ISARET = "KASIRGA_OTOMASYON"
 KANIT.mkdir(parents=True, exist_ok=True)
 KARELER.mkdir(exist_ok=True)
 GUNLUK = open(KANIT / "protokol.log", "a", encoding="utf-8")
+# K-E45: uygun S5 merkezi.
+DENIZ_USTU = 63 + 4
+SUSUZ_YARICAP = 24
+DOGUS_HALKASI = (53.5, 107.0)
+DENEME = int(os.environ.get("KASIRGA_DENEME", "5"))
+MERKEZ = re.compile(r"\[kasirga\] başladı: seviye 5 merkez (-?\d+), (-?\d+), (-?\d+)")
 
 
 def log(*a):
@@ -101,13 +119,128 @@ def kosu_no():
     return max(var, default=0) + 1
 
 
-def hazirla():
+def _nbt(veri):
+    """Sıkıştırılmamış NBT'yi Python nesnesine çevirir (yalnız okuma)."""
+    f = io.BytesIO(veri)
+
+    def oku(t):
+        if t in (1, 2, 3, 4, 5, 6):
+            bicim, n = {1: (">b", 1), 2: (">h", 2), 3: (">i", 4), 4: (">q", 8), 5: (">f", 4), 6: (">d", 8)}[t]
+            return struct.unpack(bicim, f.read(n))[0]
+        if t == 7:
+            return f.read(struct.unpack(">i", f.read(4))[0])
+        if t == 8:
+            return f.read(struct.unpack(">H", f.read(2))[0]).decode("utf-8", "replace")
+        if t == 9:
+            et, n = f.read(1)[0], struct.unpack(">i", f.read(4))[0]
+            return [oku(et) for _ in range(n)]
+        if t == 10:
+            d = {}
+            while (tt := f.read(1)[0]) != 0:
+                ad = f.read(struct.unpack(">H", f.read(2))[0]).decode("utf-8", "replace")
+                d[ad] = oku(tt)
+            return d
+        if t in (11, 12):
+            n = struct.unpack(">i", f.read(4))[0]
+            return struct.unpack(f">{n}{'i' if t == 11 else 'q'}", f.read((4 if t == 11 else 8) * n))
+        raise ValueError(f"NBT etiketi {t}")
+
+    t = f.read(1)[0]
+    f.read(struct.unpack(">H", f.read(2))[0])
+    return oku(t)
+
+
+def arazi(dunya):
+    """Dünyanın tam üretilmiş chunk'larından sütun haritası: {(x, z): (yüzey Y, su var mı)}. Yüzey MOTION_BLOCKING (sıvı dahil),
+    su = MOTION_BLOCKING > OCEAN_FLOOR (sütunun üstünde sıvı)."""
+    harita = {}
+    for yol in Path(dunya, "region").glob("r.*.mca"):
+        b = yol.read_bytes()
+        for i in range(1024):
+            ofset = int.from_bytes(b[i * 4:i * 4 + 3], "big") * 4096
+            if ofset == 0:
+                continue
+            boy = int.from_bytes(b[ofset:ofset + 4], "big")
+            ham = b[ofset + 5:ofset + 4 + boy]
+            ch = _nbt(zlib.decompress(ham) if b[ofset + 4] == 2 else gzip.decompress(ham))
+            h = ch.get("Heightmaps", {})
+            if ch.get("Status", "").split(":")[-1] != "full" or "MOTION_BLOCKING" not in h or "OCEAN_FLOOR" not in h:
+                continue
+            mb, of = (([(v & (1 << 64) - 1) >> 9 * k & 511 for v in h[ad] for k in range(7)])[:256]
+                      for ad in ("MOTION_BLOCKING", "OCEAN_FLOOR"))
+            for k in range(256):
+                harita[(ch["xPos"] * 16 + (k & 15), ch["zPos"] * 16 + (k >> 4))] = (mb[k] - 65, mb[k] != of[k])
+    return harita
+
+
+def uygun_merkez(harita, x, z, y=None):
+    """K-E45: yüzey ≥ 67 ve 24 blok yarıçapında su yok; haritada eksik sütun varsa None (doğrulanamadı)."""
+    if (y if y is not None else harita.get((x, z), (0,))[0]) < DENIZ_USTU:
+        return False
+    r = SUSUZ_YARICAP
+    for dx in range(-r, r + 1):
+        for dz in range(-r, r + 1):
+            if dx * dx + dz * dz <= r * r:
+                sutun = harita.get((x + dx, z + dz))
+                if sutun is None:
+                    return None
+                if sutun[1]:
+                    return False
+    return True
+
+
+def hedef_sec(harita):
+    """Doğuş halkasında (53,5–107 blok, 72 yön × 12 uzaklık) uygun merkez payı en yüksek kara sütun: (x, z, y, pay)."""
+    import numpy as np
+    xs = [k[0] for k in harita]
+    zs = [k[1] for k in harita]
+    x0, z0 = min(xs), min(zs)
+    nx, nz = max(xs) - x0 + 1, max(zs) - z0 + 1
+    yuk = np.full((nx, nz), -999)
+    kuru = np.zeros((nx, nz), bool)
+    for (x, z), (y, su) in harita.items():
+        yuk[x - x0, z - z0] = y
+        kuru[x - x0, z - z0] = not su
+    r = SUSUZ_YARICAP
+    dolgu = np.pad(kuru, r)
+    susuz = np.ones((nx, nz), bool)
+    for dx in range(-r, r + 1):
+        for dz in range(-r, r + 1):
+            if dx * dx + dz * dz <= r * r:
+                susuz &= dolgu[r + dx:r + dx + nx, r + dz:r + dz + nz]
+    uygun = susuz & (yuk >= DENIZ_USTU)
+    halka = {(round(np.cos(a) * u), round(np.sin(a) * u)) for a in np.linspace(0, 2 * np.pi, 72, endpoint=False)
+             for u in np.linspace(*DOGUS_HALKASI, 12)}
+    m = int(DOGUS_HALKASI[1]) + 1
+    dolgu = np.pad(uygun, m)
+    sayi = np.zeros((nx, nz), int)
+    for dx, dz in halka:
+        sayi += dolgu[m + dx:m + dx + nx, m + dz:m + dz + nz]
+    sayi[~kuru | (yuk < DENIZ_USTU)] = -1
+    i, j = np.unravel_index(int(sayi.argmax()), sayi.shape)
+    return int(i + x0), int(j + z0), int(yuk[i, j]), sayi[i, j] / len(halka)
+
+
+def dogus_yaz(level_dat, x, y, z):
+    """Kopyanın `level.dat` SpawnX/Y/Z int etiketlerini yerinde değiştirir (aynı uzunluk, gzip)."""
+    veri = gzip.decompress(level_dat.read_bytes())
+    for ad, deger in (("SpawnX", x), ("SpawnY", y), ("SpawnZ", z)):
+        etiket = b"\x03" + struct.pack(">H", len(ad)) + ad.encode()
+        if veri.count(etiket) != 1:
+            raise RuntimeError(f"level.dat {ad} etiketi {veri.count(etiket)} kez")
+        i = veri.index(etiket) + len(etiket)
+        veri = veri[:i] + struct.pack(">i", deger) + veri[i + 4:]
+    level_dat.write_bytes(gzip.compress(veri))
+
+
+def hazirla(hedef):
     run = W / "run"
     (run / "saves").mkdir(parents=True, exist_ok=True)
-    hedef = run / "saves/kasirga"
-    if hedef.exists():
-        shutil.rmtree(hedef)
-    shutil.copytree(KOK / "run/saves/test", hedef, ignore=shutil.ignore_patterns("session.lock"))
+    hedef_dunya = run / "saves/kasirga"
+    if hedef_dunya.exists():
+        shutil.rmtree(hedef_dunya)
+    shutil.copytree(KOK / "run/saves/test", hedef_dunya, ignore=shutil.ignore_patterns("session.lock"))
+    dogus_yaz(hedef_dunya / "level.dat", hedef[0], hedef[2], hedef[1])
     yol = run / "options.txt"
     satirlar = yol.read_text().splitlines() if yol.exists() else []
     satirlar = [s for s in satirlar if not s.startswith(("tutorialStep:", "pauseOnLostFocus:", "renderDistance:",
@@ -162,12 +295,13 @@ def taban_rengi(no):
     return sonuc
 
 
-def main():
+def kosu(hedef, harita):
+    """Tek koşu: çıkış kodu ya da S5 merkezi uygun değilse "tekrar" (istemci kapatıldı)."""
     no = kosu_no()
     if not kapi():
         log("kapı 20 dk'da açılmadı")
         return 2
-    hazirla()
+    hazirla(hedef)
     istemci_log = KANIT / f"runClient-{no}.log"
     betik = Path("/tmp/kasirga_istemci.sh")
     betik.write_text("#!/bin/sh\n"
@@ -196,6 +330,8 @@ def main():
     dogrulandi = False
     alarm = False
     yoklama = 0
+    merkez = None
+    merkez_uygun = None
     bekci = runclient_kilit.KapanisBekcisi(W, pid, (W / "run/logs/latest.log", istemci_log),
                                            f"{ISARET} kapanıyor; girdi sayıları", log)
     while not bekci.bitti_mi():
@@ -211,6 +347,16 @@ def main():
                 oldur(pid, "pencere doğrulanamadı")
                 return 1
             dogrulandi = True
+        if merkez is None and (W / "run/logs/latest.log").exists():
+            bulunan = MERKEZ.search((W / "run/logs/latest.log").read_text(errors="replace"))
+            if bulunan:
+                merkez = tuple(int(v) for v in bulunan.groups())
+                merkez_uygun = uygun_merkez(harita, merkez[0], merkez[2], merkez[1])
+                log(f"S5 merkezi {merkez}: " + {True: "uygun (kara)", False: "UYGUN DEĞİL (su/kıyı ya da alçak)",
+                                                 None: "harita dışı, koşu sonunda doğrulanacak"}[merkez_uygun])
+                if merkez_uygun is False:
+                    oldur(pid, "S5 merkezi uygun değil (K-E45); yeniden denenecek")
+                    return "tekrar"
         etkin = hypr_json("activewindow")
         yoklama += 1
         if yoklama % 6 == 0:
@@ -233,6 +379,14 @@ def main():
     latest = W / "run/logs/latest.log"
     if latest.exists():
         shutil.copy2(latest, KANIT / f"latest-{no}.log")
+    if merkez is None:
+        log(f"koşu {no} GEÇERSİZ: S5 merkezi log'da yok")
+        return 1
+    if merkez_uygun is None:
+        merkez_uygun = uygun_merkez(arazi(W / "run/saves/kasirga"), merkez[0], merkez[2], merkez[1])
+        log(f"S5 merkezi {merkez} koşu dünyasıyla: " + {True: "uygun", False: "UYGUN DEĞİL", None: "doğrulanamadı"}[merkez_uygun])
+        if not merkez_uygun:
+            return "tekrar"
     renk = taban_rengi(no)
     if not renk:
         log(f"koşu {no} GEÇERSİZ: taban rengi (K-17) tutmadı ya da kare eksik")
@@ -244,6 +398,19 @@ def main():
     sifir = sayilar == "tuş=0 fare=0 tekerlek=0"
     log(f"koşu {no} girdi sayıları: {sayilar} ({kaynak.name}:{satir_no})" + ("" if sifir else " → GEÇERSİZ"))
     return 0 if sifir and not alarm and renk else 1
+
+
+def main():
+    harita = arazi(KOK / "run/saves/test")
+    x, z, y, pay = hedef_sec(harita)
+    log(f"K-E45: doğuş noktası ({x}, {y}, {z}); halkada uygun merkez payı %{100 * pay:.0f}, en çok {DENEME} deneme")
+    for deneme in range(1, DENEME + 1):
+        sonuc = kosu((x, z, y), harita)
+        if sonuc != "tekrar":
+            return sonuc
+        log(f"deneme {deneme}/{DENEME}: S5 merkezi uygun değil, yeniden")
+    log(f"{DENEME} denemede uygun S5 merkezi gelmedi; koşu GEÇERSİZ")
+    return 1
 
 
 if __name__ == "__main__":

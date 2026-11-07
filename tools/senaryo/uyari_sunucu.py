@@ -9,23 +9,33 @@ Oyuncusuz (varsayılan): start deprem 1, asama ileri (SIREN: uyarı log'u "SIREN
 çekirdek siren olayı yayınlamaz), asama ileri (AKTIF), stop; start gunes_patlamasi, asama ileri (SIREN), stop (siren
 sürerken durdurma); sunucuya `stop`.
 
-`--istemci`: sunucu açılınca istemci `uyari_istemci.kos` ile (K0-21 rev. 2 protokolü, ses yalnız wave yazıcıya) açılır
-ve `--quickPlayMultiplayer localhost:<port>` ile `Uyari` adıyla bağlanır (otomasyon `uyari-sunucu`: komut vermez). İstemci
-sesi açınca konsoldan start deprem 1 ve asama ileri (SIREN) verilir: sunucu log'unda "siren paketi gönderildi ... ->
-[Uyari]"; 6 sn sonra asama ileri (AKTIF): "siren durdurma paketi gönderildi"; istemci fade-out'tan sonra çıkar, stop.
-Önce ağır süreç kapısı: kullanılabilir RAM ≥ 10 GiB, Gradle sayısı < 2, başka runClient yok (docs/MAKINE.md), port boş;
-oyuncusuz koşuda ortak kapı (cekirdek_sunucu.py, K-E13).
+İstemcili koşu iki makineye bölünür (K-E46; ana makinede sunucu + istemci RAM kapısı ≥ 10 GiB açılmıyordu):
+`--yalniz-sunucu [--dinle 0.0.0.0]`: dedicated sunucu (K-E44 gereği kendiliğinden pc2'de) `Uyari` adındaki oyuncunun
+bağlanmasını bekler (en çok 25 dk); oyuncu katıldıktan 10 sn sonra (`GIRIS_PAYI_SN`) (istemci dünyaya girdikten 0,5 sn sonra sesi açar,
+sireni 40 sn bekler) konsoldan start deprem 1 ve asama ileri (SIREN): sunucu log'unda "siren paketi gönderildi ... -> [Uyari]";
+6 sn sonra asama ileri (AKTIF): "siren durdurma paketi gönderildi"; istemci fade-out'tan sonra çıkar ("left the game"), stop.
+`--dinle` `server.properties` `server-ip` olur (vars. dokunulmaz: bütün arabirimler).
+`--yalniz-istemci --sunucu-adres <makine:port>`: yerelde yalnız istemci; sunucu portuna TCP bağlantısı açılana dek bekler
+(en çok 25 dk), sonra `uyari_istemci.kos` ile (K0-21 rev. 2 protokolü, ses yalnız wave yazıcıya, ağır süreç kapısı ≥ 6 GiB,
+Gradle < 2, başka runClient yok) `--quickPlayMultiplayer <makine:port>` ve `Uyari` adıyla bağlanır (otomasyon
+`uyari-sunucu`: komut vermez). İki komut aynı anda verilebilir:
+  python3 tools/senaryo/uyari_sunucu.py --kanit <k>/sunucu --port 25612 --yalniz-sunucu --dinle 0.0.0.0
+  python3 tools/senaryo/uyari_sunucu.py --kanit <k>/istemci --yalniz-istemci --sunucu-adres 192.168.1.105:25612
+pc2'nin güvenlik duvarı (ufw) portu yerel ağa açmalı (docs/MAKINE.md pc2). Oyuncusuz koşuda ve sunucu tarafında ortak kapı
+(cekirdek_sunucu.py, K-E13).
 
 Log denetimi: `invalid dist` yok (ortak kod istemci sınıfı yüklemez, N15), istisna yok, config düzeltme WARN'ı yok,
 `uyari/siren` paketleri kayıtlı.
 
-Kullanım (worktree kökünden): python3 tools/senaryo/uyari_sunucu.py <log klasörü> | --kanit <dizin> [--port <n>] [--istemci]
-Çıkış: 0 geçti, 1 senaryo/denetim hatası ya da istemcili kapı açılmadı, 2 sunucu süreci sıfır dışı kodla çıktı, 3 kapı açılmadı.
+Kullanım (worktree kökünden): python3 tools/senaryo/uyari_sunucu.py <log klasörü> | --kanit <dizin> [--port <n>]
+    [--yalniz-sunucu [--dinle <ip>] | --yalniz-istemci --sunucu-adres <makine:port>]
+Çıkış: 0 geçti, 1 senaryo/denetim hatası, istemci geçersiz ya da sunucuya ulaşılamadı, 2 sunucu süreci sıfır dışı kodla
+çıktı, 3 kapı açılmadı, 4 pc2 kapalı (uzak.sh).
 """
 import re
 import signal
+import socket
 import sys
-import threading
 import time
 from pathlib import Path
 
@@ -35,6 +45,8 @@ import uyari_istemci as ui  # noqa: E402
 
 OYUNCU = "Uyari"
 ISTEMCI_WAV = Path("/tmp/uyari-ses-sunucu.wav")
+GIRIS_PAYI_SN = 10
+BAGLANTI_SURESI = 1500
 
 
 def kosu(sunucu):
@@ -56,27 +68,14 @@ def kosu(sunucu):
     sunucu.komut("dogalafet stop", r"Solar Flare stopped\.")
 
 
-def istemcili_kosu(sunucu, klasor):
+def istemcili_kosu(sunucu):
+    """`--yalniz-sunucu`: uzaktaki istemcinin (`--yalniz-istemci`) bağlanmasını bekler, sireni başlatır ve durdurur."""
     sunucu.bekle(r"Done \(", 0, c.ACILIS_SURESI, "açılış")
-    sonuc = {}
-    istemci_log = klasor / "runClient-uyari-sunucu.log"
-    istemci_log.unlink(missing_ok=True)
-
-    def istemci():
-        sonuc["gecerli"] = ui.kos(klasor, "uyari-sunucu", (f"-PquickPlaySunucu=localhost:{c.PORT}", f"-PkullaniciAdi={OYUNCU}"),
-                                  ISTEMCI_WAV)
-
-    is_parcacigi = threading.Thread(target=istemci, daemon=True)
+    sunucu.yaz(f"### istemci bekleniyor: port {c.PORT}, oyuncu {OYUNCU}")
     isaret = sunucu.isaret()
-    is_parcacigi.start()
-    sunucu.bekle(rf"{OYUNCU} joined the game", isaret, 1500, "istemci bağlandı")
-    son = time.monotonic() + 300
-    while "[uyari-otomasyon] ses: aygıt=" not in (istemci_log.read_text(encoding="utf-8", errors="replace")
-                                                  if istemci_log.exists() else ""):
-        if time.monotonic() > son or not is_parcacigi.is_alive():
-            raise c.SenaryoHatasi("istemci sesi açmadı (aygıt denetimi log'u yok)")
-        time.sleep(1)
-    sunucu.yaz("### istemci sesi açtı (wave yazıcı)")
+    sunucu.bekle(rf"{OYUNCU} joined the game", isaret, BAGLANTI_SURESI, "istemci bağlandı")
+    time.sleep(GIRIS_PAYI_SN)
+    sunucu.yaz(f"### girişten {GIRIS_PAYI_SN} sn sonra (istemci sesi açtı)")
     sunucu.komut("dogalafet start deprem 1", r"Earthquake started \(Level 1 ")
     isaret = sunucu.isaret()
     sunucu.komut("dogalafet asama ileri", r"Earthquake phase: Siren")
@@ -89,9 +88,30 @@ def istemcili_kosu(sunucu, klasor):
                  isaret, c.ADIM_SURESI, "durdurma paketi oyuncuya gönderildi")
     sunucu.bekle(rf"{OYUNCU} left the game", isaret, 300, "istemci fade-out'tan sonra çıktı")
     sunucu.komut("dogalafet stop", r"Earthquake stopped\.")
-    is_parcacigi.join(timeout=180)
-    if not sonuc.get("gecerli"):
-        raise c.SenaryoHatasi("istemci koşusu geçersiz (pencere-uyari.log)")
+
+
+def sunucuya_ulasilir(adres, sure):
+    """`makine:port`'a TCP bağlantısı `sure` sn içinde açılırsa True (sunucu `Done` olmadan istemci bağlanmasın)."""
+    makine, port = adres.rsplit(":", 1)
+    son = time.monotonic() + sure
+    while time.monotonic() < son:
+        try:
+            with socket.create_connection((makine, int(port)), timeout=5):
+                return True
+        except OSError:
+            time.sleep(10)
+    return False
+
+
+def yalniz_istemci(klasor, adres):
+    """`--yalniz-istemci`: sunucu portu açılınca yerelde istemciyi protokolle açar; koşu geçerli ve senaryo tamamsa 0."""
+    print(f"sunucu bekleniyor: {adres} (en çok {BAGLANTI_SURESI // 60} dk)", flush=True)
+    if not sunucuya_ulasilir(adres, BAGLANTI_SURESI):
+        print(f"{adres} portuna ulaşılamadı (sunucu açılmadı ya da güvenlik duvarı)", file=sys.stderr)
+        return 1
+    gecerli = ui.kos(klasor, "uyari-sunucu", (f"-PquickPlaySunucu={adres}", f"-PkullaniciAdi={OYUNCU}"), ISTEMCI_WAV)
+    print(f"istemci koşusu {'GEÇERLİ' if gecerli else 'GEÇERSİZ'} (pencere-uyari.log)")
+    return 0 if gecerli else 1
 
 
 def ek_denetim(yol):
@@ -104,27 +124,28 @@ def ek_denetim(yol):
     return hatalar
 
 
-def agir_surec_kapisi():
-    for _ in range(10):
-        if ui.gradle_sayisi() < 2 and ui.bos_ram_gib() >= 10 and not ui.baska_istemci() and c.port_bos(c.PORT):
-            return True
-        print(f"ağır süreç kapısı: gradle={ui.gradle_sayisi()} boş={ui.bos_ram_gib():.1f} GiB "
-              f"istemci={ui.baska_istemci()} port {c.PORT} boş={c.port_bos(c.PORT)}; 60 sn", flush=True)
-        time.sleep(60)
-    return False
-
-
 def main():
-    a = c.argumanlar(__doc__, ek=lambda p: p.add_argument("--istemci", action="store_true", help="istemciyle bağlan"))
+    def ek(p):
+        kip = p.add_mutually_exclusive_group()
+        kip.add_argument("--yalniz-sunucu", action="store_true", help="istemcili koşunun sunucu tarafı (pc2)")
+        kip.add_argument("--yalniz-istemci", action="store_true", help="istemcili koşunun istemci tarafı (yerel)")
+        p.add_argument("--sunucu-adres", help="--yalniz-istemci için <makine:port>")
+        p.add_argument("--dinle", help="--yalniz-sunucu için server-ip (ör. 0.0.0.0)")
+
+    a = c.argumanlar(__doc__, ek=ek)
+    if a.yalniz_istemci != bool(a.sunucu_adres):
+        sys.exit("--yalniz-istemci ile --sunucu-adres birlikte verilir")
+    if a.dinle and not a.yalniz_sunucu:
+        sys.exit("--dinle yalnız --yalniz-sunucu ile")
     klasor = a.kanit.resolve()
-    istemcili = a.istemci
     klasor.mkdir(parents=True, exist_ok=True)
     signal.signal(signal.SIGTERM, lambda _i, _c: (_ for _ in ()).throw(SystemExit(143)))
-    if istemcili and not agir_surec_kapisi():
-        print("kapı 10 dk'da açılmadı; koşu iptal", file=sys.stderr)
-        sys.exit(1)
-    if not istemcili:
-        c.kapi_veya_cik(c.PORT)
+    if a.yalniz_istemci:
+        sys.exit(yalniz_istemci(klasor, a.sunucu_adres))
+    istemcili = a.yalniz_sunucu
+    if a.dinle:
+        c.SENARYO_OZELLIKLERI["server-ip"] = a.dinle
+    c.kapi_veya_cik(c.PORT)
     c.senaryo_dunyasini_sil()
     ozgun = c.ozellikleri_senaryoya_cevir()
     sonuc = 0
@@ -132,7 +153,7 @@ def main():
     try:
         sunucu = c.Sunucu("uyari", yol, "!deprem,!gunes_patlamasi")
         try:
-            istemcili_kosu(sunucu, klasor) if istemcili else kosu(sunucu)
+            istemcili_kosu(sunucu) if istemcili else kosu(sunucu)
         except c.SenaryoHatasi as hata:
             sunucu.yaz(f"!!! {hata}")
             print(hata, file=sys.stderr)

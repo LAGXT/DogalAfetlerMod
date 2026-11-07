@@ -186,7 +186,7 @@ def argumanlar(aciklama=None, varsayilan_port=VARSAYILAN_PORT, varsayilan_kanit=
     if not 1024 <= a.port <= 65535:
         ayristirici.error(f"geçersiz port {a.port}")
     PORT = a.port
-    if (Path(sys.argv[0]).name.endswith("_sunucu.py") and not getattr(a, "istemci", False)
+    if (Path(sys.argv[0]).name.endswith("_sunucu.py") and not getattr(a, "yalniz_istemci", False)
             and not os.environ.get("UZAK_ICINDE") and os.environ.get("UZAK", "1") != "0"):
         uzaga_gec(ayristirici, a.kanit)
     return a
@@ -194,7 +194,8 @@ def argumanlar(aciklama=None, varsayilan_port=VARSAYILAN_PORT, varsayilan_kanit=
 
 def uzaga_gec(ayristirici, kanit):
     """K-E44: dedicated senaryo bütünüyle pc2'de koşar; bu süreç `tools/senaryo/uzak.sh`'e dönüşür (kanıt klasörü geri çekilir,
-    çıkış kodu senaryonunkidir; pc2 kapalıysa 4). İstemcili koşu (`--istemci`) ve `UZAK=0` yerelde kalır."""
+    çıkış kodu senaryonunkidir; pc2 kapalıysa 4). İstemci tarafı (`uyari_sunucu.py --yalniz-istemci`, K-E46) ve `UZAK=0`
+    yerelde kalır."""
     if Path.cwd().resolve() != KOK:
         ayristirici.error(f"pc2'ye göndermek için worktree kökünden çalıştır ({KOK})")
     betik = Path(sys.argv[0]).resolve().relative_to(KOK)

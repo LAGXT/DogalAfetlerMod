@@ -4813,6 +4813,38 @@ bu sırada eski tampon çizilir, son dilimde ikisi takas edilir). Kodda bütçe 
 kapandı. Protokol (şef kararı): mağara ve kurulum ölçüm koşuları `6828ff1`/`abf106b`'de alındı, `b1eb45c`'de yeniden koşulmadı;
 `client/su` o tarihten beri değişmediği için (`b1eb45c` yalnız köpüğün CPU ölçümü) ölçümler geçerlidir.
 
+**K-E45 Kasırga görsel koşusunda S5 merkezi kara zeminde (şef kararı, 2026-11-07; `5-matris` P3; şefin metninde "K-E44", kimlik
+kullanıcının pc2 kararıyla dolu olduğu için K-E45).** `kasirga_gorsel.py` K-17 taban rengi denetimi iki koşuda tutmadı: S5 merkezi
+(4, 64, 62) ve (−64, 63, 1) su/kıyı kenarına düştü, yağmur altında taban gri-mavi (`.vibe/kanit/matris-5/wt/istemci/kasirga/`). Kod
+değişmez, yalnız betik. Merkez Java'da rastgele (`Kasirga.merkezSec`: oyuncunun 53,5–107 blok uzağı, rastgele yön); otomasyon
+`start kasirga 5 <oyuncu>` verir, komut konum almaz. Bu yüzden betik iki kaldıraçla sabitler: (a) `test` dünyasının bölge
+dosyalarından (tam üretilmiş chunk'ların `MOTION_BLOCKING`/`OCEAN_FLOOR` yükseklik haritaları) kara haritası çıkarır; "uygun merkez"
+= yüzey ≥ deniz seviyesi + 4 (67) ve 24 blok yarıçapında su sütunu yok; kopyanın `level.dat` doğuş noktası (otomasyon oyuncuyu
+oraya ışınlar) doğuş halkasında en çok uygun merkez bulunan kara sütuna taşınır: (104, 65), pay %52 (eski doğuş (12, 0) %25);
+(b) S5 başlayınca log'daki `[kasirga] başladı: seviye 5 merkez` denetlenir, uygun değilse istemci hemen kapatılır ve koşu yeniden
+başlar (`KASIRGA_DENEME`, vars. 5; dört kez üst üste uygunsuz merkez olasılığı ~%2,5); harita dışındaki merkez koşu sonunda
+kopyanın kendi bölge dosyalarıyla doğrulanır. K-17 eşiği aynı. Geçmiş merkezlerle sınandı: iki başarısız merkez uygun değil,
+harita dışı merkez "doğrulanamadı"; ölçüt temkinli (K-17'nin tuttuğu 01:05 koşusunun merkezi (76, 67, −67) de 24 blokta su
+gördüğü için uygun sayılmaz). Reddedilen: `KasirgaOtomasyonu`'na konum vermek (şef: kod değişmez); yalnız doğuş noktasını
+taşımak (en iyi noktada bile halkanın yarısı uygun değil, dünyada kara %35).
+
+**K-E46 Uyarı istemcili koşusu iki makinede (şef kararı, 2026-11-07; `5-matris` #7; şefin metninde "K-E45").** `uyari_sunucu.py
+--istemci` sunucu + istemciyi ana makinede açıyor ve ≥ 10 GiB boş RAM istiyordu; Gradle 0 iken bile 8,3–9,9 GiB. Karar:
+`--yalniz-sunucu [--dinle 0.0.0.0]` dedicated sunucuyu açar (K-E44 gereği kendiliğinden pc2'de), `Uyari` oyuncusunun bağlanmasını
+bekler (25 dk), girişten 10 sn sonra (istemci dünyaya girdikten 0,5 sn sonra sesi açar, sireni 40 sn bekler) sireni başlatır ve
+durdurur, çıkışı bekler; sunucu tarafı artık istemci log'una bakmaz (uzakta yok). `--yalniz-istemci --sunucu-adres <makine:port>`
+yerelde yalnız istemciyi açar: sunucu portuna TCP bağlantısı açılana dek bekler (25 dk), sonra `uyari_istemci.kos` (K0-21 rev. 2,
+RAM kapısı ≥ 6 GiB). Eski `--istemci` kipi ve 10 GiB kapısı kalktı; `cekirdek_sunucu.argumanlar` pc2'ye yönlendirmede
+`--yalniz-istemci`'yi yerel tutar. `--dinle` `server-ip` olur. **pc2 güvenlik duvarı:** pc2'de `ufw` etkin; geçici dinleyiciyle
+sınandı, ana makineden 192.168.1.105:25651'e bağlantı zaman aşımına düştü. Portun açılması kullanıcıda (`sudo`; ör. `sudo ufw allow
+from 192.168.1.0/24 to any port 25611:25660 proto tcp`); açılana dek istemci tarafı "portuna ulaşılamadı" ile çıkış 1.
+
+**K-E47 `5-matris` kapanış hükümleri (şef kararı, 2026-11-07).** #8 sonradan giren istemcinin gökyüzü karesi ve #14 tab tamamlama
+karesi: otomasyon yok → bilinen sınır (karar 2 benzeri; davranış GameTest ve senaryoyla kanıtlı). #9 bulgusu (`-Puyum=coldsweat`'te 12
+test) K-E41 (`df37de7`) ile kapalı, kanıt `.vibe/rapor/dogrulama-entegrasyon-5-son.md` (`f1954dc`, 216/216); e4mc ve #5 installer dış
+ağ ister, kullanıcı sorusu 4. #10: duvar saati FPS bilinen sınır (karar 2), CPU ms ölçüleri (K-E29 (b), TS-16 rev. 3, SU-45) geçti;
+ay ve güneşin afetsiz taban sahnesi yok → "ön". TEST-RAPORU: 9 yeşil / 2 kısmi / 3 bilinen sınır / 2 bekliyor; IZLEME 247 / 21 / 0.
+
 ## Açık noktalar (Faz 2b)
 
 Entegratöre bırakılan notlardan işlenenler: kancalar (K-E1), protokol (K-C47), `asama ileri [süreç]` (K-C48), sanal su §3a istisnası
@@ -4948,6 +4980,9 @@ P2-9 `5-matris` kabulünde. Açık kalanlar:
   (`af87dd1` ve sonrası, SU-44 notu). Kadrajlar ve `5-matris` #6/#10 ölçümleri yeni HEAD'de.
 - **`uzak.sh -g` geri çekmesinin yol sınırı (inceleme-entegrasyon-5-son P2-4):** kapandı (K-E44) — `-g` yalnız klasör dışı ya da `.vibe/`,
   `build/`, `logs/`, `run*/` altı; `-g src/` ve `-g ./` çıkış 2 ile reddedilir (denendi).
+- **`5-matris` sonrası (K-E45…K-E47):** kasırga görsel koşusu K-E45 betiyle yeniden (#6); uyarı istemcili koşu K-E46 ile pc2 `ufw`
+  portu açılınca (#7, kullanıcı `sudo`); #5 installer ve #9 e4mc kullanıcı sorusu 4; #6/#11–#13/#15 kareleri şef incelemesinde; birleşik HEAD
+  istemci yeniden koşusu (#6/#10, Ts2-1 `kopuk`) şef kararını bekliyor.
 - **Su tampon kapasitesi küçülmüyor (doğrulayıcı-2 P2-2):** `SuRenderer.yukle` kapasiteyi yalnız büyütür; büyük bir yapımdan (tsunami)
   sonra küçük yapımlar (mağara) da en büyük boyda yüklenir (~14 000 boş dolgu dörtgeni; rasterleşmez ama yükleme ve köşe işi sürer).
   Küçültme kuralı (ör. kapasitenin < %40'ı birkaç yapım üst üste) `5-matris` #10 `tampon_buyume` ve yükleme ölçümünden sonra.

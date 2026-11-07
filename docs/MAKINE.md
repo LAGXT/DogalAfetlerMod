@@ -132,6 +132,7 @@ Ekransız ağır iş ana makineyi kasmasın diye eski PC'ye Windows'un yanına C
 | GPU / ekran | Radeon 3000 (VGA, kullanılan) + Radeon HD 3450 (RV620); Mesa OpenGL **3.3** Core, 512 MB video belleği; monitör EDID vermiyor, Xorg `1024x768_60`'a sabit (`/etc/X11/xorg.conf.d/10-monitor.conf`), GRUB düz yazı | Xorg log, `glxinfo -B` |
 | Java / Gradle | JDK aynı yolda (`~/.jdks/jdk-17.0.21+9`, ana makineden kopya); `~/.gradle` ana makineden kopyalandı, `--offline` çalışır | `java -version` |
 | Ayarlar | uyku hedefleri `masked`, donanım saati yerel saat (Windows uyumu), `sudo` parola ister (ajan yazamaz) | `systemctl is-enabled`, `timedatectl` |
+| Güvenlik duvarı | `ufw` etkin (`systemctl is-active ufw`); 192.168.1.105:25651'e ana makineden bağlantı zaman aşımına düştü. Minecraft portu yerel ağa açılmalı (`uyari_sunucu.py --yalniz-sunucu`, K-E46): `sudo ufw allow from 192.168.1.0/24 to any port 25611:25660 proto tcp` (ajan yazamaz) | geçici `socket` dinleyicisi + `create_connection` |
 
 | Koşu (`uzak.sh` + `gradle_kapisi.sh`) | pc2 | Ana makine | Kanıt |
 |---|---|---|---|
