@@ -62,7 +62,8 @@ public final class TsunamiKopugu {
     private static long logCpuNs;
     private static long logEnCokNs;
     private static int logKare;
-    private static long logTick = Long.MIN_VALUE;
+    /** -200: ilk karede satır yazılır ({@code Long.MIN_VALUE} ile {@code tick - logTick} taşıp hiç 200'e ulaşmıyordu). */
+    private static long logTick = -200;
 
     private TsunamiKopugu() {
     }

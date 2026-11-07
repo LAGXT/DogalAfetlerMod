@@ -15,7 +15,7 @@
 (i) Ağır süreç kapısı ve aynı anda tek runClient.
 
 Kullanım (worktree kökünden): python3 tools/senaryo/tsunami_gorsel.py <kanıt klasörü> [bölüm: hepsi|s5|s1|kopuk|magara|kabul|...]
-`kopuk` (hepsi'de de): Ts2-1 kabul karesi, ayrı S5 koşusunda köpük yakından ve alçaktan (tepe göz hizasında, cepheye 8–12 blok;
+`kopuk` (hepsi'de de): Ts2-1 kabul karesi, ayrı S5 koşusunda köpük yakından ve alçaktan (göz tepenin 1,5 blok üstünde, 10° aşağı, cepheye 8–12 blok;
 `tsunami-s5-kopuk-yakin.png` Yüksek, `-yakin-dusuk.png` Düşük; `KAMERA kopuk` ve `DALGA` satırları özette). Ts7 kameraları değişmez.
 Çıkış: 0 geçerli koşu, 1 protokol ihlali/iptal, 2 istemci hatası. FPS pencereleri varsa sonda `TABLO` satırları (Ts1 kabulü, tur 4).
 """

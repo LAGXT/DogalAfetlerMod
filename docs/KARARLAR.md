@@ -3491,7 +3491,9 @@ kaydedilmez (mod veri yolundaki `Kayit` yalnız bayrakla `EVENT_BUS.register` ç
 CPU okumaz (10 sn'lik `Sanal su: kurulum` satırında `tick_cpu_en_cok=-`; duvar saati alanları ve satırın kendisi Faz 2b'den beri
 var). Sıcak yolda kapı kapalıyken sistem çağrısı ve allocation yok. Kanıt çalışma zamanı değil kaynak: üç dosyada kapı satırları,
 derleme/JUnit; dedicated `su_sunucu.py` log'unda `SU-TANI`/köpük satırı 0 (istemci sınıfları sunucuda yüklenmez). Bayraksız
-runClient bu turda koşmadı.
+runClient bu turda koşmadı. **Not (şef kararı, 2026-11-07):** `tools/` betikleri
+koşarken yerinde değiştirilmez; geçici dosya + `mv` (atomik; GOREV §2). Gerekçe: `gradle_kapisi.sh` bir `-Puyum=coldsweat` koşusu sürerken
+yerinde yeniden yazıldı (`f1954dc`); o koşu log yazmadan çıkış 2 verdi (`sh` dosyayı koşarken okur; olası neden, tekrarı temiz).
 
 **K-E43 Ekransız ağır iş ikinci makinede (pc2) koşar (kullanıcı kararı, 2026-11-07).** Ana makine Gradle/GameTest/sunucu
 koşarken kasıyordu. Eski PC'ye (FX-4100, 8 GB, SSD) Windows'un yanına CachyOS + XFCE kuruldu (`docs/MAKINE.md` "İkinci makine
@@ -3704,7 +3706,8 @@ boyunca beyaz payının değişkenlik katsayısı 0,45 (önce 20 piksellik dilim
 yükün en yakın olduğu S5 sahne 4'te +1,1 ms, yani ≈ +1 ms/kare (ölçümler kirli, rapor FPS bölümü). Açık: Ts7 kamerası
 `5-gorsel-otomasyon`'da çözüldü (`main` `cc7e3b2`); birleşince tam kare yeniden puanlanır. **Birleştirme:** köpüğün kendi CPU ölçümü ve 10 sn satırı (`Tsunami köpüğü:`) yalnız `-Potomasyon` ile (K-E42); kabul kanıtı değil,
 `5-matris` #10 (`olcum_tablosu.py`) ölçer. Ts2-1 tam kare kabul karesi `tsunami_gorsel.py kopuk` bölümü (şef kararı; Ts7 kameralarına
-dokunmaz): ayrı S5 koşusunda kamera kıyıdan 2 blok içeride, göz dalga tepesinde, cephe 11 bloka yaklaşınca
+dokunmaz): ayrı S5 koşusunda kamera kıyıdan 2 blok içeride, göz dalga tepesinin 1,5 blok üstünde ve 10° aşağı (şef kararı: tepe
+şeridi üstten görünsün, Düşük karesi boş çıkmasın), cephe 11 bloka yaklaşınca
 `tsunami-s5-kopuk-yakin` (Yüksek) ve `-yakin-dusuk` (Düşük) kareleri; `5-matris` #6 koşar, SU-43 sonucu o kareyle yazılır.
 
 **SU-44 Görsel koşu otomasyonu ve kare tanısı.** `SuOtomasyon` kareleri A-34 kapısından sonra alır (FPS ≥ 15 ve istekten
@@ -4922,6 +4925,9 @@ P2-9 `5-matris` kabulünde. Açık kalanlar:
 - **K-E33 (P2-6):** şef kabul, düzeltme yok (K-E33 notu).
 - **Görsel otomasyon §E:** kapandı — `SuOtomasyon` ortak `GorselOtomasyon`'a çevrildi, `TsunamiOtomasyonu` kendiliğinden birleşti
   (`af87dd1` ve sonrası, SU-44 notu). Kadrajlar ve `5-matris` #6/#10 ölçümleri yeni HEAD'de.
+- **Su tampon kapasitesi küçülmüyor (doğrulayıcı-2 P2-2):** `SuRenderer.yukle` kapasiteyi yalnız büyütür; büyük bir yapımdan (tsunami)
+  sonra küçük yapımlar (mağara) da en büyük boyda yüklenir (~14 000 boş dolgu dörtgeni; rasterleşmez ama yükleme ve köşe işi sürer).
+  Küçültme kuralı (ör. kapasitenin < %40'ı birkaç yapım üst üste) `5-matris` #10 `tampon_buyume` ve yükleme ölçümünden sonra.
 - **Sanal su görseli (inceleme-su-gorsel):** P2-5 köpük paylaşılan kenar hesabı yapılmadı (isteğe bağlı); köpük CPU'su, tampon büyümesi
   (`tampon_buyume`) ve SU-45 duvar saati `5-matris` #10; Ts2-1 tam kare ve yeni `SuOtomasyon` kareleri `5-matris` #6 (bu turda runClient yok).
 

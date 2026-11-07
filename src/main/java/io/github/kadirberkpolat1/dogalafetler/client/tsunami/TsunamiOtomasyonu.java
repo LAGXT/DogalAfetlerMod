@@ -177,7 +177,7 @@ public final class TsunamiOtomasyonu {
 
     /**
      * Ts2-1 kabul karesi (şef kararı; Ts7 kameralarına dokunmaz, ayrı S5 koşusu): dalga kıyıya yaklaşırken köpük yakından
-     * ve alçaktan, dalga tepesi göz hizasında, cepheye 8–12 blok ({@code v:kopuk}, {@code w:}); aynı anın Yüksek ve Düşük eşi
+     * ve alçaktan, göz dalga tepesinin 1,5 blok üstünde 10° aşağı, cepheye 8–12 blok ({@code v:kopuk}, {@code w:}); aynı anın Yüksek ve Düşük eşi
      * (Düşük'te yalnız tepe şeridi, N13). İlk {@code v:kopuk} dalga yokken taban + 4'e, dalga doğunca ikincisi tepeye konar.
      */
     private static List<String> kopukYakin() {
@@ -825,8 +825,9 @@ public final class TsunamiOtomasyonu {
     }
 
     /**
-     * Ts2-1 köpük kamerası ({@code v:kopuk}): tsunaminin kıyı noktasından 2 blok içeride, denize yatay bakar; göz dalga
-     * tepesinde ({@code taban + yukseklik}, en yüksek dalga; dalga yoksa kıyı tabanı + 4), en az zemin + 1,8.
+     * Ts2-1 köpük kamerası ({@code v:kopuk}; şef kararı): tsunaminin kıyı noktasından 2 blok içeride, denize 10° aşağı bakar
+     * (Minecraft eğimi +10; tepe şeridi üstten görünür, Düşük'te de); göz dalga tepesinin ({@code taban + yukseklik}, en yüksek
+     * dalga; dalga yoksa kıyı tabanı + 4) 1,5 blok üstünde, en az zemin + 1,8.
      */
     private static void kopukKamerasi(Minecraft mc) {
         CompoundTag o = IstemciAfetDurumu.aktif().filter(d -> d.tur() == AfetTuru.TSUNAMI).map(AfetDurumPaketi::ozel)
@@ -852,9 +853,9 @@ public final class TsunamiOtomasyonu {
             }
         }
         int zemin = mc.level.getHeight(Heightmap.Types.MOTION_BLOCKING, Mth.floor(x), Mth.floor(z));
-        double goz = Math.max(zemin + 1.8, tepe);
+        double goz = Math.max(zemin + 1.8, tepe + 1.5);
         float yaw = (float) Math.toDegrees(Math.atan2(yx, -yz));
-        String komut = String.format(Locale.ROOT, "tp @s %.2f %.2f %.2f %.1f 0.0", x, goz - mc.player.getEyeHeight(), z, yaw);
+        String komut = String.format(Locale.ROOT, "tp @s %.2f %.2f %.2f %.1f 10.0", x, goz - mc.player.getEyeHeight(), z, yaw);
         mc.player.connection.sendCommand(komut);
         log("KAMERA kopuk {} (tepe {} {}, zemin {})", komut, String.format(Locale.ROOT, "%.1f", tepe),
                 dalga ? "dalgadan" : "tahmin", zemin);
