@@ -49,13 +49,15 @@ def log(*a):
 
 
 def kapi():
+    # pc2 (8 GB): pc2_istemci.sh bütün yuvaları tutar ve daemon'ları durdurur; istemciye en az ~1,3 GiB boş yeter.
+    esik = 1300 if runclient_kilit.ekran_pc2() else 4096
     for _ in range(21):
         gradle = int(subprocess.run(["pgrep", "-fc", "GradleWrapperMain"], capture_output=True, text=True).stdout
                      .strip() or 0)
         istemci = subprocess.run(["pgrep", "-fa", "runClient"], capture_output=True, text=True).stdout.strip()
         bos = int(open("/proc/meminfo").read().split("MemAvailable:")[1].split()[0]) // 1024
         log(f"kapı: gradle={gradle} runClient={'var' if istemci else 'yok'} bos={bos} MB")
-        if gradle < 2 and not istemci and bos >= 4096:
+        if gradle < 2 and not istemci and bos >= esik:
             return True
         time.sleep(60)
     return False
