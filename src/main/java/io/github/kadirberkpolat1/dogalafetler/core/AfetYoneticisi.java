@@ -412,7 +412,8 @@ public final class AfetYoneticisi {
 
     /**
      * {@code /dogalafet stop} aktif afet yokken: süren dönem süreçlerini {@link DonemSureci.DurdurmaNedeni#KOMUT} ile
-     * durdurur, kural ile durmuş olanların kaydını {@code KOMUT}'a çevirir (artık kural açılınca sürmez); bunları döner.
+     * durdurur; kural ile durmuş olanların kaydını da {@code KOMUT}'a çevirip sahibine {@code durdur(KOMUT)} bildirir (artık kural
+     * açılınca sürmez; kuralın dondurduğu plan ya da mağara bırakılır, {@code durum}'da süresiz kalmaz); bunları döner.
      * Güneş patlamasına bağlı süreç komutla durunca tamamlanmamış {@code BUYUYEN} evresi {@code NORMAL}'e döner
      * (K-C26; güneş patlaması afeti sürerken dönmez).
      */
@@ -424,13 +425,10 @@ public final class AfetYoneticisi {
             if (neden.equals(Optional.of(DonemSureci.DurdurmaNedeni.KOMUT)) || !aktifMi(surec, ust)) {
                 continue;
             }
-            if (neden.isEmpty()) {
-                surecDurdur(surec, ust, DonemSureci.DurdurmaNedeni.KOMUT);
-            } else {
-                donem().surecDurdurmasiAyarla(surec.kimlik(), DonemSureci.DurdurmaNedeni.KOMUT);
+            if (neden.isPresent()) {
                 DogalAfetler.LOGGER.info("Dönem süreci kural yerine komutla durmuş sayılıyor: {}", surec.kimlik());
-                gunesBuyumesiniGeriAl(surec);
             }
+            surecDurdur(surec, ust, DonemSureci.DurdurmaNedeni.KOMUT);
             durdurulan.add(surec);
         }
         return durdurulan;

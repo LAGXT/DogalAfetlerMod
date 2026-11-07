@@ -559,8 +559,9 @@ public final class CekirdekOyunTestleri {
             yonetici.donemSureciBasladi(ay);
             kurallar.getRule(Kurallar.AY_CARPMASI_AFETI).set(false, server);
             yonetici.kurallariDenetle();
-            yardimci.assertTrue(komut(yardimci, "dogalafet stop") == 1 && yonetici.durdurmaNedeni(ay).equals(komutla),
-                    "kural ile durmuş sürece stop KOMUT'a çevirmeli");
+            yardimci.assertTrue(komut(yardimci, "dogalafet stop") == 1 && yonetici.durdurmaNedeni(ay).equals(komutla)
+                    && ay.sonNeden == DonemSureci.DurdurmaNedeni.KOMUT,
+                    "kural ile durmuş sürece stop KOMUT'a çevirmeli ve sahibine durdur(KOMUT) bildirmeli (Af15)");
             kurallar.getRule(Kurallar.AY_CARPMASI_AFETI).set(true, server);
             yonetici.kurallariDenetle();
             yardimci.assertTrue(ay.devam == 1 && yonetici.durdurmaNedeni(ay).equals(komutla),

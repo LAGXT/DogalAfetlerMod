@@ -450,7 +450,8 @@ public final class DepremOyunTestleri {
 
     /**
      * Kullanıcı isteği 24 (AF-D1): S3 deprem doğal bitince artçılar beklenmeden afet yuvası boşalır; komutun kullandığı
-     * {@code elleBaslat} hemen yeni afeti kabul eder. Blok hasarı kapalı.
+     * {@code elleBaslat} hemen yeni afeti kabul eder. Araya Af15: deprem kuralı kapanınca kuyruk planını korur (K-C41), afet
+     * yokken {@code stop} onu KOMUT'a çevirince plan bırakılır. Blok hasarı kapalı; kural geri konur (K-E15).
      */
     @GameTest(template = SAHNE, batch = "deprem_bitis", timeoutTicks = 1300)
     public static void depremBitinceYeniAfetHemenBaslar(GameTestHelper y) {
@@ -467,6 +468,18 @@ public final class DepremOyunTestleri {
                     y.assertTrue(deprem.sonlandi(), "deprem sonlanmadı");
                     y.assertTrue(ArtciKuyrugu.suruyor(server) && ArtciKuyrugu.suren(server) == 0,
                             "artçılar kuyruğa geçmedi");
+                    var depremKurali = server.getGameRules().getRule(Kurallar.DEPREM_AFETI);
+                    boolean eskiKural = depremKurali.get();
+                    try {
+                        depremKurali.set(false, server);
+                        y.assertTrue(yonetici.kurallariDenetle().contains(ArtciKuyrugu.ORNEK) && ArtciKuyrugu.suruyor(server),
+                                "kural kapanınca artçı kuyruğu planını korumalı (K-C41)");
+                        y.assertTrue(yonetici.donemSurecleriniDurdur().contains(ArtciKuyrugu.ORNEK) && !ArtciKuyrugu.suruyor(server),
+                                "kural ile duran artçı kuyruğu stop ile KOMUT'a çevrilince planını bırakmadı (Af15)");
+                    } finally {
+                        depremKurali.set(eskiKural, server);
+                    }
+                    yonetici.kurallariDenetle();
                     AfetYoneticisi.BaslatmaSonucu sonuc = yonetici.elleBaslat(AfetTuru.DEPREM, 1, oyuncu, y.getLevel(),
                             y.absolutePos(MERKEZ));
                     y.assertTrue(sonuc == AfetYoneticisi.BaslatmaSonucu.BASLADI,
