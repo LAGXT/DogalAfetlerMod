@@ -134,7 +134,8 @@ Bütün komutlar `/dogalafet` altındadır ve **yalnız OP** (yetki seviyesi 2) 
 |---|---|
 | `/dogalafet start <afet> [seviye] [oyuncu]` | Afeti hemen başlatır (beklemeyi, gamerule'ü ve gün saati penceresini atlar; aktif afet varken reddeder). Doğal güneş patlaması yalnız sabah (gün saati 0–6000), ay çarpması yalnız gece (13000–23000) patlar; komutla başlatma bu pencereye bakmaz. |
 | `/dogalafet stop` | Aktif afeti temizce durdurur; afet yoksa süren dünya dönemi süreçlerini durdurur. |
-| `/dogalafet durum` | Aktif afet, aşama, seviye, kalan süre, beklemeler, çarpanlar, deniz seviyesi, ay/güneş, donma ve buharlaşma. |
+| `/dogalafet` | Kullanabildiğiniz alt komutların listesi. |
+| `/dogalafet durum` | Aktif afet, aşama, seviye, kalan süre, beklemeler, sonraki afet tahmini, çarpanlar, deniz seviyesi, ay/güneş, donma ve buharlaşma. |
 | `/dogalafet sicaklik set <oyuncu> <değer>` | Oyuncunun vücut sıcaklığını ayarlar. |
 | `/dogalafet sicaklik bilgi <oyuncu>` | Vücut ve ortam sıcaklığı, kalemler, yalıtım. |
 | `/dogalafet denizseviyesi <değer> [kademeli]` | Deniz seviyesi artışını ayarlar/sıfırlar (0–6 blok; `kademeli` yavaşça). |
@@ -147,6 +148,7 @@ Bütün komutlar `/dogalafet` altındadır ve **yalnız OP** (yetki seviyesi 2) 
 | `/dogalafet gun <sayı>` | Oyun gününü ayarlar ve seviye olasılıklarını gösterir. |
 | `/dogalafet odul meteor [parca\|cekirdek\|hepsi] [adet] [oyuncu]` | Test için Meteorit Parçası / Kozmik Çekirdek verir. |
 | `/dogalafet asama ileri [süreç]` | Aktif afeti ya da bir dünya dönemi sürecini sonraki aşamaya geçirir. |
+| `/dogalafet siklik [yüzde]` | Afet sıklığını (`afetSikligi` gamerule'ü, 0–1000) gösterir ya da ayarlar; süren beklemeler hemen ölçeklenir ve "sonraki afet: ~N gün (aralık X–Y gün)" yazılır. Değer dünyada kalıcıdır. |
 | `/dogalafet hiz <çarpan>` | Afet ve dönem zamanlayıcılarını hızlandırır (1 = normal; yeniden başlatınca 1'e döner). |
 | `/dogalafet sifirla` | Dünyanın afet ve dönem durumunu ilk hâline döndürür (ay, güneş, deniz, donma). |
 
@@ -171,7 +173,7 @@ Hepsi `/gamerule <ad> [değer]` ile okunur/değiştirilir (tab tamamlamalı) ve 
 |---|---|---|---|
 | `dogalAfetlerAcik` | boolean | `true` | Bütün afet sistemini açar/kapatır. |
 | `kasirgaAfeti`, `tsunamiAfeti`, `depremAfeti`, `asitYagmuruAfeti`, `sinkholeAfeti`, `ormanYanginiAfeti`, `gunesPatlamasiAfeti`, `ayCarpmasiAfeti` | boolean | `true` | Afetleri tek tek açar/kapatır. |
-| `afetSikligi` | int | `100` | Afet sıklığı yüzdesi (50 = yarı, 200 = iki katı). |
+| `afetSikligi` | int | `100` | Afet sıklığı yüzdesi (50 = yarı, 200 = iki katı; 0–1000, üstü 1000 sayılır). Oranın yanında ilk gün beklemesi ve afetler arası beklemeler de bu çarpana bölünür; değişince OP'lere sonraki afet tahmini yazılır. `/dogalafet siklik` aynı değeri ayarlar. |
 | `afetMaksSiddet` | int | `5` | Oluşabilecek en yüksek seviye (1–5). |
 | `afetBlokHasari` | boolean | `true` | Kapalıyken afetler blok yıkmaz, yakmaz, dondurmaz, çözmez; oyuncu ve mob hasarı sürer. |
 | `sicaklikSistemi` | boolean | `true` | Vücut sıcaklığı sistemini ve HUD'u açar/kapatır. |

@@ -53,6 +53,7 @@ public final class DunyaDonemi extends SavedData {
     private DenizSeviyesi deniz = DenizSeviyesi.VARSAYILAN;
     private final CarpanListesi carpanlar = new CarpanListesi();
     private final BeklemeDurumu bekleme = new BeklemeDurumu();
+    private double uygulananSiklik = 1.0;
     private final Deque<GecmisKaydi> sonAfetler = new ArrayDeque<>();
     private UUID sonHedef;
     private int sonSeviye;
@@ -243,6 +244,25 @@ public final class DunyaDonemi extends SavedData {
 
     BeklemeDurumu bekleme() {
         return bekleme;
+    }
+
+    /** Süren beklemelerin hesaplandığı {@code afetSikligi} çarpanı (kayıtta yoksa 1: eski kayıtlar ölçeksizdir). */
+    public double uygulananSiklik() {
+        return uygulananSiklik;
+    }
+
+    /**
+     * {@code afetSikligi} çarpanı değiştiyse süren beklemeleri yeni sıklığa ölçekler ve çarpanı kaydeder. 0 (seçim yok)
+     * kaydedilmez: sıklık yeniden açılınca son pozitif değerden ölçeklenir. Çarpan değiştiyse true.
+     */
+    public boolean siklikUygula(double siklik) {
+        if (!(siklik > 0) || Double.isInfinite(siklik) || siklik == uygulananSiklik) {
+            return false;
+        }
+        bekleme.siklikDegisti(saat, uygulananSiklik, siklik);
+        uygulananSiklik = siklik;
+        setDirty();
+        return true;
     }
 
     /** Genel ve afet başına beklemeleri sıfırlar. */
@@ -470,13 +490,13 @@ public final class DunyaDonemi extends SavedData {
         return String.format(Locale.ROOT,
                 "saat=%d gunOfseti=%d uyku=%d ay=%s gunes=%s ilerleme=%.3f donma=%.2f cozulme=%s buharlasma=%.2f "
                         + "deniz=%.2f/%.2f kalici=%s carpan=%d gecmis=%d genelBekleme=%d sonSeviye=%d aktifAfet=%s "
-                        + "durdurulanSurec=%d ayOlay=%d",
+                        + "durdurulanSurec=%d ayOlay=%d siklik=%.2f",
                 saat, gunOfseti, uykuBirikimi, ayVar, gunesEvresi.kimlik(), evreIlerlemesi, donmaIlerlemesi, cozulmeDonemi,
                 buharlasmaDerinligi, deniz.mevcutArtis(), deniz.hedefArtis(), deniz.kalici(), carpanlar.liste().size(),
                 sonAfetler.size(), bekleme.genelKalan(saat), sonSeviye,
                 canliAfet != null ? canliAfet.tur().kimlik() + "/" + canliAfet.asama().kimlik()
                         : bekleyenAfet != null ? bekleyenAfet.getString("tur") + "/bekliyor" : "yok",
-                surecDurdurmalari.size(), ayOlaySaati);
+                surecDurdurmalari.size(), ayOlaySaati, uygulananSiklik);
     }
 
     // ---------------------------------------------------------------- NBT
@@ -513,6 +533,7 @@ public final class DunyaDonemi extends SavedData {
         }
         beklemeEtiketi.put("turler", turler);
         etiket.put("bekleme", beklemeEtiketi);
+        etiket.putDouble("uygulananSiklik", uygulananSiklik);
         ListTag gecmis = new ListTag();
         for (GecmisKaydi kayit : sonAfetler) {
             gecmis.add(kayit.yaz());
@@ -577,6 +598,8 @@ public final class DunyaDonemi extends SavedData {
             AfetTuru.kimlikIle(anahtar).ifPresent(tur -> turBitisleri.put(tur, turler.getLong(anahtar)));
         }
         donem.bekleme.yukle(beklemeEtiketi.getLong("genel"), turBitisleri);
+        double siklik = etiket.contains("uygulananSiklik") ? etiket.getDouble("uygulananSiklik") : 1.0;
+        donem.uygulananSiklik = siklik > 0 && !Double.isInfinite(siklik) ? siklik : 1.0;
         for (Tag t : etiket.getList("sonAfetler", Tag.TAG_COMPOUND)) {
             GecmisKaydi.oku((CompoundTag) t).ifPresent(donem.sonAfetler::addLast);
         }

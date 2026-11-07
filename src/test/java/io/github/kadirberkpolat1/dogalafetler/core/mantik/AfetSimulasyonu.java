@@ -167,7 +167,7 @@ final class AfetSimulasyonu {
 
         for (long saat = 0; saat < toplamTick; saat += adim) {
             if (aktif != null && saat >= aktif.bitis()) {
-                bekleme.afetBitti(aktif.tur(), aktif.seviye(), saat, zamanlayici);
+                bekleme.afetBitti(aktif.tur(), aktif.seviye(), saat, zamanlayici, siklik);
                 if (aktif.tur().seviyeli()) {
                     oncekiYuksek = SiddetSecici.yuksek(aktif.seviye());
                 }

@@ -12,6 +12,7 @@ import java.util.random.RandomGenerator;
  * aralığında ({@code adimTick}) en az bir afet çıkma olasılığı {@code 1 − e^(−Λ·adim/24000)}'dir; Λ uygun türlerin
  * oranlarının toplamıdır, tür λ_t/Λ olasılıkla seçilir. Oyuncu sayısı hesaba girmez (madde 3). Aynı anda iki afet,
  * genel bekleme, afet başına bekleme ve başlangıç beklemesi seçimi engeller; geçici çarpan yalnız oranı çarpar.
+ * {@code afetSikligi} bütün takvimi ölçekler (11.4 "200 = iki katı"): oranı çarpar, beklemeleri böler ({@link #beklemeOlcekle}).
  */
 public final class AfetZamanlayicisi {
     /** Bir Minecraft günü (tick). */
@@ -47,6 +48,17 @@ public final class AfetZamanlayicisi {
     private AfetZamanlayicisi() {
     }
 
+    /**
+     * Bir bekleme süresinin {@code afetSikligi}'na göre etkin hâli: süre sıklığa bölünür (2 → yarı, 0,5 → iki kat). Sıklık 0'da
+     * seçim zaten yoktur; süre olduğu gibi kalır.
+     */
+    public static long beklemeOlcekle(long tick, double siklik) {
+        if (!(siklik > 0) || Double.isInfinite(siklik)) {
+            return tick;
+        }
+        return Math.round(tick / siklik);
+    }
+
     /** Türün etkin oranı (afet/gün). */
     public static double turOrani(ZamanlayiciAyarlari ayarlar, AfetTuru tur, double carpan, double siklik) {
         double toplam = ayarlar.toplamAgirlik();
@@ -70,7 +82,8 @@ public final class AfetZamanlayicisi {
             return Optional.empty();
         }
         long saat = girdi.saat();
-        if (!girdi.zorla() && (saat < ayarlar.baslangicBeklemeTick() || girdi.bekleme().genelBeklemede(saat))) {
+        if (!girdi.zorla() && (saat < beklemeOlcekle(ayarlar.baslangicBeklemeTick(), girdi.siklik())
+                || girdi.bekleme().genelBeklemede(saat))) {
             return Optional.empty();
         }
         double[] oranlar = new double[TURLER.length];

@@ -1,7 +1,11 @@
 package io.github.kadirberkpolat1.dogalafetler.core;
 
 import com.mojang.authlib.GameProfile;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.config.CekirdekAyarlari;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.AfetZamanlayicisi;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.SonrakiAfetTahmini;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SonumTipi;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.ZamanlayiciAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.TekSeferlikAyarlari;
@@ -108,7 +112,7 @@ public final class CekirdekOyunTestleri {
         donem.buharlasmaDerinligiAyarla(4.25f);
         donem.denizAyarla(new DenizSeviyesi(4.5f, 2.75f, 99_000L, false));
         donem.carpanEkle(AfetTuru.TSUNAMI, 3.5, 72_000, 48_000, SonumTipi.USTEL);
-        donem.bekleme().afetBitti(AfetTuru.DEPREM, 4, donem.saat(), ZamanlayiciAyarlari.VARSAYILAN);
+        donem.bekleme().afetBitti(AfetTuru.DEPREM, 4, donem.saat(), ZamanlayiciAyarlari.VARSAYILAN, 1.0);
         donem.bekleme().ertele(AfetTuru.TSUNAMI, donem.saat(), 6_000);
         for (int i = 0; i < 7; i++) {
             AfetTuru tur = AfetTuru.values()[i];
@@ -221,6 +225,86 @@ public final class CekirdekOyunTestleri {
             kurallar.getRule(Kurallar.KASIRGA_AFETI).set(oncekiKasirga, server);
             kurallar.getRule(Kurallar.DOGAL_AFETLER_ACIK).set(oncekiGenel, server);
             server.getPlayerList().remove(oyuncu);
+        }
+        yardimci.succeed();
+    }
+
+    private static int komut(MinecraftServer server, String komut) {
+        try {
+            return server.getCommands().getDispatcher().execute(komut,
+                    server.createCommandSourceStack().withSuppressedOutput().withPermission(2));
+        } catch (CommandSyntaxException hata) {
+            return -1;
+        }
+    }
+
+    /**
+     * Kullanıcı şikayeti (2026-11-08, "afet sıklığı komutu çalışmıyor"): {@code /dogalafet siklik 1000} gamerule'ü yazar,
+     * süren beklemeleri hemen onda bire ölçekler, ölçek dönem kaydında ve gamerule dünya kaydında kalır, sonraki afet
+     * tahmini kısalır. {@code /gamerule afetSikligi} yolu aynı ölçeklemeyi yapar; komutta aralık dışı değer reddedilir.
+     */
+    @GameTest(template = "bos", batch = "cekirdek_siklik")
+    public static void siklikKomutuBeklemeyiOlcekleriKaliciTahminKisalir(GameTestHelper yardimci) {
+        MinecraftServer server = yardimci.getLevel().getServer();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(server);
+        yonetici.durdur();
+        DunyaDonemi donem = yonetici.donem();
+        GameRules kurallar = server.getGameRules();
+        GameRules.IntegerValue kural = kurallar.getRule(Kurallar.AFET_SIKLIGI);
+        int onceki = kural.get();
+        boolean oncekiGenel = kurallar.getBoolean(Kurallar.DOGAL_AFETLER_ACIK);
+        try {
+            kurallar.getRule(Kurallar.DOGAL_AFETLER_ACIK).set(true, server);
+            kural.set(100, server);
+            yonetici.siklikDenetle(false);
+            donem.beklemeleriSifirla();
+            ZamanlayiciAyarlari ayar = CekirdekAyarlari.al().zamanlayici();
+            donem.bekleme().afetBitti(AfetTuru.DEPREM, 1, donem.saat(), ayar, donem.uygulananSiklik());
+            long genel = donem.genelBeklemeKalan();
+            long deprem = donem.turBeklemeKalan(AfetTuru.DEPREM);
+            yardimci.assertTrue(genel == ayar.genelBeklemeTick(), "%100'de genel bekleme config değeri olmalı: " + genel);
+            SonrakiAfetTahmini normal = yonetici.sonrakiAfetTahmini().orElse(null);
+            yardimci.assertTrue(normal != null && normal.enErken() >= genel, "%100 tahmini: " + normal);
+
+            yardimci.assertTrue(komut(server, "dogalafet siklik 1000") == 1, "/dogalafet siklik 1000 başarısız");
+            yardimci.assertTrue(kural.get() == 1000, "gamerule yazılmadı: " + kural.get());
+            yardimci.assertTrue(donem.uygulananSiklik() == 10.0, "uygulanan sıklık: " + donem.uygulananSiklik());
+            yardimci.assertTrue(Math.abs(donem.genelBeklemeKalan() - genel / 10.0) <= 1,
+                    "genel bekleme onda bire inmedi: " + genel + " -> " + donem.genelBeklemeKalan());
+            yardimci.assertTrue(Math.abs(donem.turBeklemeKalan(AfetTuru.DEPREM) - deprem / 10.0) <= 1,
+                    "deprem beklemesi onda bire inmedi: " + deprem + " -> " + donem.turBeklemeKalan(AfetTuru.DEPREM));
+            SonrakiAfetTahmini on = yonetici.sonrakiAfetTahmini().orElse(null);
+            long baslangic = Math.max(0, AfetZamanlayicisi.beklemeOlcekle(ayar.baslangicBeklemeTick(), 10) - donem.saat());
+            yardimci.assertTrue(on != null && on.enErken() == Math.max(baslangic, donem.genelBeklemeKalan()),
+                    "%1000 en erken = bekleme bitişi olmalı: " + on);
+            yardimci.assertTrue(on.ortalama() * 5 < normal.ortalama(), "%1000 tahmini kısalmadı: " + normal + " -> " + on);
+
+            DunyaDonemi geri = DunyaDonemi.yukle(donem.save(new CompoundTag()));
+            yardimci.assertTrue(geri.uygulananSiklik() == 10.0 && geri.genelBeklemeKalan() == donem.genelBeklemeKalan(),
+                    "ölçek dönem kaydında kalmadı: " + geri.uygulananSiklik() + " " + geri.genelBeklemeKalan());
+            yardimci.assertTrue("1000".equals(kurallar.createTag().getString(Kurallar.AFET_SIKLIGI.getId())),
+                    "afetSikligi dünya kaydına (level.dat) yazılmadı");
+
+            long onluk = donem.genelBeklemeKalan();
+            komut(server, "gamerule afetSikligi 50");
+            yardimci.assertTrue(yonetici.siklikDenetle(true), "/gamerule değişimi görülmedi");
+            yardimci.assertTrue(donem.uygulananSiklik() == 0.5 && Math.abs(donem.genelBeklemeKalan() - onluk * 20) <= 20,
+                    "/gamerule 50 beklemeyi yirmi katına çıkarmadı: " + onluk + " -> " + donem.genelBeklemeKalan());
+            komut(server, "gamerule afetSikligi 999999999");
+            yonetici.siklikDenetle(false);
+            yardimci.assertTrue(donem.uygulananSiklik() == 10.0 && SiklikBilgisi.sinirUyarisi(yonetici).isPresent(),
+                    "1000 üstü değer %1000'e kısılmalı ve söylenmeli");
+
+            yardimci.assertTrue(komut(server, "dogalafet siklik 1001") == -1, "komutta 1001 reddedilmeli");
+            yardimci.assertTrue(komut(server, "dogalafet siklik -1") == -1, "komutta -1 reddedilmeli");
+            yardimci.assertTrue(komut(server, "dogalafet siklik") == 1, "/dogalafet siklik (okuma) başarısız");
+            yardimci.assertTrue(komut(server, "dogalafet durum") == 1, "/dogalafet durum başarısız");
+            yardimci.assertTrue(komut(server, "dogalafet") == 1, "alt komutsuz /dogalafet kullanım listesi vermeli");
+        } finally {
+            kural.set(onceki, server);
+            kurallar.getRule(Kurallar.DOGAL_AFETLER_ACIK).set(oncekiGenel, server);
+            yonetici.siklikDenetle(false);
+            donem.beklemeleriSifirla();
         }
         yardimci.succeed();
     }

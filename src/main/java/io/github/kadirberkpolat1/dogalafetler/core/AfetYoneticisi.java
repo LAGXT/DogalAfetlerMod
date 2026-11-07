@@ -10,6 +10,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.mantik.OyunGunu;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SecimTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SiddetAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SiddetSecici;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.SonrakiAfetTahmini;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.TekSeferlikKurallar;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.ZamanOlcegi;
 import io.github.kadirberkpolat1.dogalafetler.core.olay.AfetAsamaDegistiEvent;
@@ -36,6 +37,7 @@ import java.util.Set;
 import java.util.SplittableRandom;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
+import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTestServer;
 import net.minecraft.nbt.CompoundTag;
@@ -93,6 +95,8 @@ public final class AfetYoneticisi {
     private int sonAdim;
     private long sonKontrolSaati = Long.MIN_VALUE;
     private long tickSayaci;
+    /** Bu sunucu oturumunda son görülen ham {@code afetSikligi} (bildirim yalnız değişimde; ilk okuma sessiz). */
+    private int sonSiklik = Integer.MIN_VALUE;
     private long sonDonemPaketi = Long.MIN_VALUE / 2;
 
     private AfetYoneticisi(MinecraftServer server) {
@@ -498,6 +502,46 @@ public final class AfetYoneticisi {
         return turuIsle(zorla, ayar.kontrolAraligiTick(), (tur, hedef) -> true).map(SecimTuru.Sonuc::tur);
     }
 
+    /** Afet yokken sonraki doğal afet seçiminin tahmini (ölçekli tick); doğal seçim olamıyorsa boş. */
+    public Optional<SonrakiAfetTahmini> sonrakiAfetTahmini() {
+        GameRules kurallar = server.getGameRules();
+        if (!kurallar.getBoolean(Kurallar.DOGAL_AFETLER_ACIK)) {
+            return Optional.empty();
+        }
+        CekirdekAyarlari ayar = CekirdekAyarlari.al();
+        DunyaDonemi donem = donem();
+        return SonrakiAfetTahmini.hesapla(ayar.zamanlayici(), donem.saat(), donem.bekleme(), uygunTurler(kurallar, ayar),
+                donem::carpan, Kurallar.siklikCarpani(kurallar));
+    }
+
+    /**
+     * {@code afetSikligi}'nı uygular (her tick; {@code /gamerule} geri çağırması yok): çarpan değiştiyse süren beklemeler
+     * yeni sıklığa ölçeklenir ({@link DunyaDonemi#siklikUygula}, kalıcı). Ham değer bu oturumda değiştiyse ve {@code bildir}
+     * ise yeni değer ve sonraki afet tahmini OP oyunculara ve konsola yazılır. Ham değer değiştiyse true.
+     */
+    public boolean siklikDenetle(boolean bildir) {
+        int ham = server.getGameRules().getInt(Kurallar.AFET_SIKLIGI);
+        DunyaDonemi donem = donem();
+        double onceki = donem.uygulananSiklik();
+        if (donem.siklikUygula(Kurallar.siklikCarpani(server.getGameRules()))) {
+            DogalAfetler.LOGGER.info("afetSikligi {}: süren beklemeler x{} → x{} ölçeklendi (genel kalan {} tick)", ham,
+                    onceki, donem.uygulananSiklik(), donem.genelBeklemeKalan());
+        }
+        boolean degisti = sonSiklik != Integer.MIN_VALUE && ham != sonSiklik;
+        sonSiklik = ham;
+        if (degisti && bildir) {
+            for (Component satir : SiklikBilgisi.degisimSatirlari(this)) {
+                server.sendSystemMessage(satir);
+                for (ServerPlayer oyuncu : server.getPlayerList().getPlayers()) {
+                    if (oyuncu.hasPermissions(Commands.LEVEL_GAMEMASTERS)) {
+                        oyuncu.sendSystemMessage(satir);
+                    }
+                }
+            }
+        }
+        return degisti;
+    }
+
     /** {@code /dogalafet hiz}. */
     public void hizAyarla(double carpan) {
         zamanOlcegi.ayarla(carpan);
@@ -564,6 +608,7 @@ public final class AfetYoneticisi {
         int adim = zamanOlcegi.ilerle();
         sonAdim = adim;
         donem.saatIlerlet(adim);
+        siklikDenetle(true);
         Optional<Afet> afet = donem.aktifAfet();
         if (afet.isPresent()) {
             afetiIsle(afet.get(), adim);
@@ -989,7 +1034,8 @@ public final class AfetYoneticisi {
         }
         if (neden != BitisNedeni.IPTAL) {
             donem.gecmiseEkle(new GecmisKaydi(afet.tur(), baglam.seviye(), baglam.merkez(), baglam.boyut(), saat));
-            donem.bekleme().afetBitti(afet.tur(), baglam.seviye(), saat, CekirdekAyarlari.al().zamanlayici());
+            donem.bekleme().afetBitti(afet.tur(), baglam.seviye(), saat, CekirdekAyarlari.al().zamanlayici(),
+                    donem.uygulananSiklik());
             if (afet.tur().seviyeli()) {
                 donem.sonSeviyeAyarla(baglam.seviye());
             }
