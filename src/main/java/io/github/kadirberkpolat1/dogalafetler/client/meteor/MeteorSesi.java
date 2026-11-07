@@ -67,9 +67,11 @@ final class MeteorSesi {
                 iz.ucus.bitir();
             }
             if (!iz.caldi) {
-                log(iz.enYakin <= MeteorSesMenzili.UCUS_MENZILI ? "uçuş çalmadı: meteor {} en yakın {}, tavan dolu"
+                if (GorselOtomasyon.AKTIF) {
+                    log(iz.enYakin <= MeteorSesMenzili.UCUS_MENZILI ? "uçuş çalmadı: meteor {} en yakın {}, tavan dolu"
                         : "uçuş çalmadı: meteor {} en yakın {} > menzil {}", iz.meteor.getId(), iz.enYakin,
                         MeteorSesMenzili.UCUS_MENZILI);
+                }
             }
             return true;
         });
@@ -96,12 +98,16 @@ final class MeteorSesi {
                 iz.ucus = new Ucus(iz.meteor);
                 iz.caldi = true;
                 mc.getSoundManager().play(iz.ucus);
-                log("uçuş başladı: meteor {} mesafe {} (menzil {})", iz.meteor.getId(), mesafeler[i],
+                if (GorselOtomasyon.AKTIF) {
+                    log("uçuş başladı: meteor {} mesafe {} (menzil {})", iz.meteor.getId(), mesafeler[i],
                         MeteorSesMenzili.UCUS_MENZILI);
+                }
             } else if (!secildi[i] && caliyor[i]) {
                 iz.ucus.bitir();
                 iz.ucus = null;
-                log("uçuş söndü: meteor {} mesafe {}", iz.meteor.getId(), mesafeler[i]);
+                if (GorselOtomasyon.AKTIF) {
+                    log("uçuş söndü: meteor {} mesafe {}", iz.meteor.getId(), mesafeler[i]);
+                }
             }
         }
     }
@@ -111,7 +117,9 @@ final class MeteorSesi {
         double kazanc = MeteorSesMenzili.carpmaKazanci(mesafe, buyuk);
         String boy = buyuk ? "büyük" : "küçük";
         if (kazanc <= 0) {
-            log("çarpma çalmadı: {} mesafe {} > menzil {}", boy, mesafe, MeteorSesMenzili.carpmaMenzili(buyuk));
+            if (GorselOtomasyon.AKTIF) {
+                log("çarpma çalmadı: {} mesafe {} > menzil {}", boy, mesafe, MeteorSesMenzili.carpmaMenzili(buyuk));
+            }
             return;
         }
         SoundManager sesler = Minecraft.getInstance().getSoundManager();
@@ -122,7 +130,9 @@ final class MeteorSesi {
         }
         int yer = MeteorSesMenzili.yer(calan, mesafe, MeteorSesMenzili.AYNI_TUR_TAVANI);
         if (yer == -2) {
-            log("çarpma çalmadı: {} mesafe {}, tavan dolu ({} daha yakın patlama)", boy, mesafe, calan.length);
+            if (GorselOtomasyon.AKTIF) {
+                log("çarpma çalmadı: {} mesafe {}, tavan dolu ({} daha yakın patlama)", boy, mesafe, calan.length);
+            }
             return;
         }
         if (yer >= 0) {
@@ -133,7 +143,9 @@ final class MeteorSesi {
                 SoundInstance.Attenuation.NONE, nokta.x, nokta.y, nokta.z, false);
         sesler.play(ses);
         PATLAMALAR.add(new Patlama(ses, mesafe, saat));
-        log("çarpma çaldı: {} mesafe {} kazanç {}", boy, mesafe, kazanc);
+        if (GorselOtomasyon.AKTIF) {
+            log("çarpma çaldı: {} mesafe {} kazanç {}", boy, mesafe, kazanc);
+        }
     }
 
     static void temizle() {

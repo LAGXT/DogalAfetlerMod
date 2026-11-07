@@ -44,7 +44,7 @@ public final class MeteorSesMenzili {
         return kazanc(mesafe, UCUS_MENZILI);
     }
 
-    /** Doppler perdesi, Minecraft'ın perde sınırına (0,5–2) kırpılır. {@code yaklasmaHizi} blok/tick, uzaklaşırken eksi. */
+    /** Doppler perdesi: hız ±0,9 ses hızında kırpılır, sonuç 0,526–2 (oyunda hız ≤ 3,8 blok/tick: 0,76–1,46). {@code yaklasmaHizi} blok/tick, uzaklaşırken eksi. */
     public static double dopplerPerdesi(double yaklasmaHizi) {
         double v = Math.max(-0.9 * SES_HIZI, Math.min(0.9 * SES_HIZI, yaklasmaHizi));
         return Math.max(0.5, Math.min(2.0, SES_HIZI / (SES_HIZI - v)));

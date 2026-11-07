@@ -50,8 +50,6 @@ public final class MeteorYoneticisi {
         final List<MeteorVarligi> meteorlar = new ArrayList<>();
         final List<MeteorYagmuru> yagmurlar = new ArrayList<>();
         final List<ItemEntity> sicaklar = new ArrayList<>();
-        /** Yağmurların kaynak başına atmaya kalkıştığı meteor (tavan ya da yüklü olmayan chunk yüzünden uçmayanlar dahil). */
-        final Map<YanginKaynagi, Integer> atilan = new HashMap<>();
         /** Son tick'te krater işlerinin kullandığı blok işlemi ve o tick'in bütçesi. */
         int kraterIslemi;
         int kraterButcesi;
@@ -176,13 +174,17 @@ public final class MeteorYoneticisi {
         return y == null ? Double.NaN : y.yogunluk();
     }
 
-    static void atildi(ServerLevel level, YanginKaynagi kaynak) {
-        durum(level).atilan.merge(kaynak, 1, Integer::sum);
-    }
-
     static int atilanSayisi(ServerLevel level, YanginKaynagi kaynak) {
         Durum d = DURUMLAR.get(level.dimension());
-        return d == null ? 0 : d.atilan.getOrDefault(kaynak, 0);
+        int sayi = 0;
+        if (d != null) {
+            for (MeteorYagmuru y : d.yagmurlar) {
+                if (y.kaynak.equals(kaynak)) {
+                    sayi += y.atilan();
+                }
+            }
+        }
+        return sayi;
     }
 
     /** Son tick'te krater işlerinin kullandığı blok işlemi ({@code [0]}) ve bütçesi ({@code [1]}). */

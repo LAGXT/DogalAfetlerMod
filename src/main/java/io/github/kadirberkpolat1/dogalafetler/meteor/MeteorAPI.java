@@ -185,7 +185,7 @@ public final class MeteorAPI {
     }
 
     /**
-     * Kaynağın yağmurlarının bu boyutta (sunucu açıldığından beri) atmaya kalkıştığı meteor: tavan ya da yüklü olmayan chunk
+     * Kaynağın bu boyuttaki etkin yağmurlarının (başlangıçlarından beri) atmaya kalkıştığı meteor; biten ya da durdurulan yağmur sayılmaz: tavan ya da yüklü olmayan chunk
      * yüzünden uçmayanlar dahil (komut, test).
      */
     public static int atilanMeteorSayisi(ServerLevel level, YanginKaynagi kaynak) {

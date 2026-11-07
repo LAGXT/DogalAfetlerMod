@@ -30,6 +30,8 @@ final class MeteorYagmuru {
     private final Random rastgele;
     private int kalanTick;
     private double birikim;
+    /** Atmaya kalkışılan meteor (tavan ya da yüklü olmayan chunk yüzünden uçmayan dahil). */
+    private int atilan;
     /** Test: sabit dağıtım halkası (− 1: config) ve giriş açısı (NaN: rastgele). */
     private int icYaricap = -1;
     private int disYaricap = -1;
@@ -56,6 +58,10 @@ final class MeteorYagmuru {
         return dakikaBasina;
     }
 
+    int atilan() {
+        return atilan;
+    }
+
     void yogunlukAyarla(double yeni) {
         dakikaBasina = Math.max(0, yeni);
     }
@@ -78,7 +84,7 @@ final class MeteorYagmuru {
         int dis = disYaricap >= 0 ? disYaricap : MeteorAyarlari.dagitimDisYaricap();
         while (birikim >= 1) {
             birikim -= 1;
-            MeteorYoneticisi.atildi(level, kaynak);
+            atilan++;
             BlockPos merkez = merkezler.get(dagitim.siradaki(merkezler.size()));
             double[] o = MeteorDagitimi.ofset(rastgele, ic, dis);
             BlockPos hedef = merkez.offset((int) Math.round(o[0]), 0, (int) Math.round(o[1]));
