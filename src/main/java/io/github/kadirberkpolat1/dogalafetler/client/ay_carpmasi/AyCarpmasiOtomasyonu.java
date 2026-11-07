@@ -4,12 +4,16 @@ import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.afet.ay_carpmasi.AyCarpmasiAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.afet.ay_carpmasi.mantik.AyEgrileri;
 import io.github.kadirberkpolat1.dogalafetler.client.core.GorselOtomasyon;
+import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
+import io.github.kadirberkpolat1.dogalafetler.core.AyDurumu;
+import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import io.github.kadirberkpolat1.dogalafetler.core.TpsOlcer;
 import java.util.Locale;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.GameType;
@@ -25,8 +29,12 @@ import net.minecraftforge.fml.common.Mod;
  * çalışır; üretimde etkisizdir. Gece, seyirci kamera doğuş noktasının {@value #KAMERA_YUKSEKLIGI} blok üstünde (ağaçlar
  * ve arazi ufku kapatmaz) yaklaşma yönüne (doğu-güneydoğu) bakar. Sıra: tepeye bakan önce karesi; vitrin açısından
  * afetsiz FPS tabanı ({@code s5_ay_taban}); ön-uyarı (değişiklik yok); siren boyunca ufkun 12° üstüne bakarak büyüyen ve
- * parçalanan ay; son saniyeler yavaş çekimde ({@code /dogalafet hiz 0.2}) vitrin açısından (ufkun 4° üstü: ay, parlama,
- * mantar sütunu ve ufuk aynı kadrajda); parlama, tam genlikte kısa sarsıntı dizisi (H.3), mantar sütunu; meteorlar
+ * parçalanan ay; son saniyeler ağır çekimde (sunucu tick'inde 47. sn'den hız 0,1 = {@code /dogalafet hiz} alt sınırı) vitrin
+ * açısından (ufkun 4° üstü: ay, parlama ve patlama aynı kadrajda); 3 boyutlu patlama 0,3 / 1 / 2 sn, 3. sn'de kamera
+ * {@value #YUKSELTME} blok yükseltilmiş (patlama dünyada sabit: kadrajda aşağı kayar), 8. sn'de patlama yok (tam genlikte kısa
+ * sarsıntı dizisinden sonra, H.3). Yaklaşma, patlama ve sarsıntı karelerinde istemcinin ay saati kare alınana dek karenin
+ * saniyesinde sabit tutulur ({@link IstemciAy#sabitle}; pc2'de FPS &lt; 15 iken kare kapısı 60 sn bekler); satır sabit ve
+ * canlı saniyeyi yazar. Meteorlar
  * başlayınca en ağır an ölçülür ({@code s5_ay_yuksek}, taban {@code s5_ay_taban}); doğal bitiş, enkaz halkalı aysız gece
  * (halka karesinden {@value #KAYAN_ONCE} tick önce zorlanmış kayan yıldız: kendiliğinden ~3 dk'da bir doğar, ömrü 20 tick,
  * en parlak anı 10. tick), gündüz ve {@code sifirla} sonrası tepede geri gelen ay (önce / aysız / sonra aynı açıdan). Kareler
@@ -54,15 +62,24 @@ public final class AyCarpmasiOtomasyonu {
     private static final int HALKA_KARESI = 80;
 
     /** Yaklaşmada (sirenin başından) ve çarpmadan sonra (çarpmadan) ölçekli saniyeyle alınan kareler. */
-    private record Kare(String ad, float saniye) {
+    private record Kare(String ad, float saniye, int yukari) {
+        Kare(String ad, float saniye) {
+            this(ad, saniye, 0);
+        }
     }
 
+    /** Patlamanın dünyaya bağlı olduğunu gösteren karede kameranın yükseltilmesi (blok). */
+    private static final int YUKSELTME = 80;
     private static final Kare[] YAKLASMA = {new Kare("02_siren_5sn", 5f), new Kare("03_parcalanma_24sn", 24f),
             new Kare("04_catlaklar_38sn", 38f), new Kare("05_son_yaklasma_51sn", 51f), new Kare("06_vitrin_54sn", 54f),
             new Kare("07_vitrin_58sn", 58f)};
-    private static final Kare[] CARPMA = {new Kare("08_parlama", 0.15f), new Kare("09_mantar_baslangic_4sn", 4f),
-            new Kare("10_sarsinti_8sn", 8f), new Kare("11_mantar_meteor_20sn", 20f),
-            new Kare("12_mantar_tepe_47sn", 47f), new Kare("13_toz_kalintisi_90sn", 90f)};
+    /** Patlama anları (0,3 / 1 / 2 / 8 sn) ve yükseltilmiş kamera; {@value #SARSINTI_SIRASI}. kareden önce sarsıntı dizisi. */
+    private static final Kare[] CARPMA = {new Kare("08_patlama_0sn", 0.3f), new Kare("08b_patlama_1sn", 1f),
+            new Kare("09_patlama_2sn", 2f), new Kare("09b_patlama_3sn_yukari", 3f, YUKSELTME),
+            new Kare("10_patlama_8sn_yok", 8f), new Kare("11_meteor_20sn", 20f), new Kare("12_halka_47sn", 47f),
+            new Kare("13_gok_90sn", 90f)};
+    private static final int SARSINTI_SIRASI = 4;
+    private static volatile int yukseltme;
 
     private static int tus;
     private static int fare;
@@ -74,11 +91,39 @@ public final class AyCarpmasiOtomasyonu {
     private static int sonSarsinti = -SARSINTI_ARA;
     private static int olcumBas = -1;
     private static boolean olcumBitti;
-    private static boolean yavas;
+    /** Ağır çekim {yaklaşma saniyesi, hız}; 0,1 {@code /dogalafet hiz} alt sınırıdır (daha küçüğü 0,1'e kenetlenir). */
+    private static final float[][] YAVASLATMA = {{47f, 0.1f}};
+    private static volatile int yavaslatma;
     private static volatile boolean sunucuHazir;
     private static volatile BlockPos kamera;
 
     private AyCarpmasiOtomasyonu() {
+    }
+
+    /**
+     * Sunucu thread'inde: ağır çekim yaklaşma saniyesinden kurulur, istemci kare kapısında beklese de gecikmez. Patlamanın
+     * 3. sn karesinden sonra istemci hızı 1'e döndürür.
+     */
+    @SubscribeEvent
+    public static void sunucuTick(TickEvent.ServerTickEvent olay) {
+        if (!AKTIF || olay.phase != TickEvent.Phase.END || !sunucuHazir || yavaslatma >= YAVASLATMA.length) {
+            return;
+        }
+        MinecraftServer server = olay.getServer();
+        DunyaDonemi d = DunyaDonemi.al(server);
+        if (d.ayDurumu() != AyDurumu.YAKLASIYOR || d.ayOlaySaati() < 0) {
+            return;
+        }
+        float s = (d.saat() - d.ayOlaySaati()) / 20f;
+        if (s >= YAVASLATMA[yavaslatma][0]) {
+            float hiz = YAVASLATMA[yavaslatma][1];
+            AfetYoneticisi.al(server).hizAyarla(hiz);
+            if (yavaslatma == 0) {
+                bak(server, VITRIN_PITCH);
+            }
+            DogalAfetler.LOGGER.info(ON + "ağır çekim x{} (yaklaşma sn {})", hiz, sayi(s));
+            yavaslatma++;
+        }
     }
 
     @SubscribeEvent
@@ -166,28 +211,30 @@ public final class AyCarpmasiOtomasyonu {
                 }
             }
             case 5 -> {
-                if (!yavas && d.yaklasiyor() && d.saniye() >= 48f) {
-                    // Son yaklaşma ve vitrin saniyeleri yavaş çekimde: kare kapısı beklerken an kaçmasın.
-                    komut(server, "dogalafet hiz 0.2");
-                    server.execute(() -> bak(server, VITRIN_PITCH));
-                    yavas = true;
-                }
                 if (d.yaklasiyor() && kareSirasi < YAKLASMA.length && d.saniye() >= YAKLASMA[kareSirasi].saniye()) {
-                    kare(YAKLASMA[kareSirasi++].ad());
+                    Kare k = YAKLASMA[kareSirasi++];
+                    kare(k.ad(), new IstemciAy.Durum(AyDurumu.YAKLASIYOR, k.saniye()));
                 } else if (d.carpti()) {
                     kareSirasi = 0;
                     sonraki();
                 }
             }
             case 6 -> {
-                if (kareSirasi == 2 && sarsintiNo < SARSINTI_KARE && d.saniye() >= SARSINTI_DIZI_SN
+                Kare hedef = kareSirasi < CARPMA.length ? CARPMA[kareSirasi] : null;
+                int istenen = hedef == null ? 0 : hedef.yukari();
+                if (istenen != yukseltme && (istenen == 0 || d.carpti() && d.saniye() >= hedef.saniye() - 0.5f)) {
+                    yukseltme = istenen;
+                    server.execute(() -> bak(server, VITRIN_PITCH));
+                    DogalAfetler.LOGGER.info(ON + "kamera yüksekliği +{} blok (patlama sn {})", istenen, sayi(d.saniye()));
+                } else if (kareSirasi == SARSINTI_SIRASI && sarsintiNo < SARSINTI_KARE && d.saniye() >= SARSINTI_DIZI_SN
                         && sayac - sonSarsinti >= SARSINTI_ARA) {
                     sonSarsinti = sayac;
-                    kare("sarsinti_" + ++sarsintiNo);
-                } else if (kareSirasi < CARPMA.length && d.carpti() && d.saniye() >= CARPMA[kareSirasi].saniye()
-                        && (kareSirasi != 2 || sarsintiNo == SARSINTI_KARE)) {
-                    kare(CARPMA[kareSirasi++].ad());
-                    if (kareSirasi == 2) {
+                    kare("sarsinti_" + ++sarsintiNo, d);
+                } else if (hedef != null && d.carpti() && d.saniye() >= hedef.saniye() && yukseltme == istenen
+                        && (kareSirasi != SARSINTI_SIRASI || sarsintiNo == SARSINTI_KARE)) {
+                    kare(hedef.ad(), new IstemciAy.Durum(AyDurumu.YOK, hedef.saniye()));
+                    kareSirasi++;
+                    if (kareSirasi == SARSINTI_SIRASI) {
                         komut(server, "dogalafet hiz 1");
                     }
                 } else if (kareSirasi >= CARPMA.length && olcumBitti) {
@@ -196,7 +243,7 @@ public final class AyCarpmasiOtomasyonu {
                     sonraki();
                 }
                 if (!olcumBitti && d.carpti() && d.saniye() >= AyEgrileri.METEOR_BAS_SN) {
-                    // En ağır an: meteorlar, büyüyen mantar sütunu, sönen ufuk ışığı ve sarsıntı birlikte.
+                    // En ağır an: meteorlar, enkaz halkasının belirmesi ve sarsıntı birlikte.
                     if (olcumBas < 0) {
                         if (GorselOtomasyon.eylemKapisi(OTOMASYON, "s5_ay_yuksek ölçümü")) {
                             GorselOtomasyon.olcumBasla(OTOMASYON, "s5_ay_yuksek", "s5_ay_taban");
@@ -280,24 +327,37 @@ public final class AyCarpmasiOtomasyonu {
         sunucuHazir = true;
     }
 
-    private static void bak(IntegratedServer server, float pitch) {
+    private static void bak(MinecraftServer server, float pitch) {
         ServerPlayer oyuncu = server.getPlayerList().getPlayers().get(0);
-        oyuncu.teleportTo(server.overworld(), kamera.getX() + 0.5, kamera.getY(), kamera.getZ() + 0.5, BAKIS_YAW, pitch);
+        oyuncu.teleportTo(server.overworld(), kamera.getX() + 0.5, kamera.getY() + yukseltme, kamera.getZ() + 0.5, BAKIS_YAW,
+                pitch);
     }
 
-    /** Kare isteği; satır kapı açılınca isteğin ve alınışın evre saniyesini, sarsıntı genliğini yazar. */
-    private static void kare(String ad) {
-        float istek = IstemciAy.durum(0f).saniye();
+    /**
+     * Kare isteği; ay saati kare alınana dek {@code sabit}'te tutulur. Satır kapı açılınca sabit ve canlı saniyeyi, sarsıntı
+     * genliğini yazar.
+     */
+    private static void kare(String ad, IstemciAy.Durum sabit) {
+        IstemciAy.sabitle(sabit);
         GorselOtomasyon.kareIste(OTOMASYON, "ay_carpmasi_" + ad + ".png", k -> {
             Minecraft mc = Minecraft.getInstance();
             IstemciAy.Durum d = IstemciAy.durum(0f);
+            IstemciAy.Durum canli = IstemciAy.canli(0f);
+            IstemciAy.sabitle(null);
             double sarsinti = d.carpti() ? AyEgrileri.SARSINTI_DERECE * AyEgrileri.sarsinti(d.saniye())
                     * IstemciAy.ayar(AyCarpmasiAyarlari::ekranSarsintisiOlcegi) : 0;
-            DogalAfetler.LOGGER.info(ON + "kare {} (ay {} sn {}, istek sn {}, FPS {}, sunucu TPS {} / {} ms, parçacık {}, "
-                            + "kayan yıldız {}, sarsıntı {}°)", k.dosya(), d.ay(), sayi(d.saniye()), sayi(istek), k.fps(),
-                    sayi(TpsOlcer.tps()), sayi(TpsOlcer.ortalamaMs()), mc.particleEngine.countParticles(),
-                    AyCarpmasiGokyuzu.kayanSayisi(), String.format(Locale.ROOT, "%.2f", sarsinti));
+            float parlama = d.carpti() ? AyEgrileri.dunyaParlamasi(d.saniye()) : 0f;
+            DogalAfetler.LOGGER.info(ON + "kare {} (ay {} sn {} sabit, canlı {} sn {}, FPS {}, sunucu TPS {} / {} ms, "
+                            + "parçacık {}, kayan yıldız {}, sarsıntı {}°, dünya parlaması {})", k.dosya(), d.ay(),
+                    sayi(d.saniye()), canli.ay(), sayi(canli.saniye()), k.fps(), sayi(TpsOlcer.tps()),
+                    sayi(TpsOlcer.ortalamaMs()), mc.particleEngine.countParticles(), AyCarpmasiGokyuzu.kayanSayisi(),
+                    String.format(Locale.ROOT, "%.2f", sarsinti), String.format(Locale.ROOT, "%.2f", parlama));
         });
+    }
+
+    /** Ay saati sabitlenmeden kare isteği (ay durumundan bağımsız kareler). */
+    private static void kare(String ad) {
+        kare(ad, null);
     }
 
     private static String sayi(double d) {

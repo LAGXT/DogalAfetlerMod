@@ -14,7 +14,12 @@ public enum GunesEvresi {
     /** Güneşsiz, yıldızlı/nebulalı dönem; dünya donar. */
     GUNESSIZ("gunessiz"),
     /** Kızıl cüce dönemi; buzul kısmen çekilir. */
-    KIZIL_CUCE("kizil_cuce");
+    KIZIL_CUCE("kizil_cuce"),
+    /**
+     * Kızıl cüce yerine düşük olasılıkla doğan pulsar (gökyüzü-2): dünya donmanın tersine kavrulur. Paket sıra numarasıyla
+     * yazıldığı için en sonda kalmalı.
+     */
+    PULSAR("pulsar");
 
     private final String kimlik;
 

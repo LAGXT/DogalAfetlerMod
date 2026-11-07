@@ -130,8 +130,10 @@ public final class GokyuzuOyunTestleri {
                 ust.setDayTime(Math.floorDiv(ust.getDayTime(), 24_000L) * 24_000L + 24_000L);
                 yardimci.fail("kapı açık; uykudaki gibi sabaha atlandı, şafak geçildi");
             }
-            yardimci.assertTrue(donem.gunesEvresi() == GunesEvresi.KIZIL_CUCE,
-                    "uyku şafağı atlayınca da kızıl cüce doğmalı: " + donem.ozet());
+            // Doğal doğuş kızıl cüce ya da (pulsarOlasiligi ile) pulsar; seçim dünya tohumu ve döngüden belirlenir.
+            GunesEvresi beklenen = GunesZinciriSureci.dogacakYildiz(ust, donem);
+            yardimci.assertTrue(donem.gunesEvresi() == beklenen,
+                    "uyku şafağı atlayınca da yeni yıldız (" + beklenen.kimlik() + ") doğmalı: " + donem.ozet());
             temizle.run();
         });
     }

@@ -8,6 +8,7 @@ import io.github.kadirberkpolat1.dogalafetler.config.EfektKalitesi;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.GokyuzuEgrileri;
+import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.PulsarEgrileri;
 import io.github.kadirberkpolat1.dogalafetler.network.DonemPaketi;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -104,6 +105,9 @@ public final class GunesIstemciOlaylari {
             case BUYUYEN -> new GunesGokCizici.Ortuler(0f,
                     GunesGorselEgrileri.isiDalgasi(d.evreIlerlemesi(), gunIsigi(level, pt), gok), 0f);
             case KIZIL_CUCE -> new GunesGokCizici.Ortuler(0f, 0f, GunesGorselEgrileri.safakTonu(d.evreIlerlemesi()));
+            // Pulsar (gökyüzü-2): ısı dalgalanması güneşe değil ısınmaya bağlı, gece de sürer.
+            case PULSAR -> new GunesGokCizici.Ortuler(0f, gok ? PulsarEgrileri.yogunluk(d.evreIlerlemesi())
+                    * (0.6f + 0.4f * gunIsigi(level, pt)) : 0f, 0f);
             default -> GunesGokCizici.Ortuler.YOK;
         };
     }

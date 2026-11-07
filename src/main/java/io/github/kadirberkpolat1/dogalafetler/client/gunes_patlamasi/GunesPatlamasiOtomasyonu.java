@@ -5,6 +5,7 @@ import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.client.core.GorselOtomasyon;
 import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciAfetDurumu;
 import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciDonem;
+import io.github.kadirberkpolat1.dogalafetler.client.gokyuzu.IstemciGokyuzu;
 import io.github.kadirberkpolat1.dogalafetler.config.EfektKalitesi;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetAsamasi;
@@ -35,6 +36,7 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.InputEvent;
+import net.minecraftforge.client.event.ViewportEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -189,7 +191,34 @@ public final class GunesPatlamasiOtomasyonu {
                 komut(s, "dogalafet hiz 1", "dogalafet asama ileri gunes_zinciri", "time set 3000");
                 kamera(s, -90f, -35f);
             }, () -> sayac >= 140 && evre(GunesEvresi.KIZIL_CUCE) && donem().evreIlerlemesi() >= 1f,
-                    "kizil_cuce_gunduz", 400));
+                    "kizil_cuce_gunduz", 400),
+            // Gökyüzü-2: canlı uzay (iki ardışık kare: yavaş dönüş ve kırpışma), kara delik yakın kadrajı, pulsar.
+            new Adim("yıldızlı gök 1", s -> {
+                komut(s, "time set 18000");
+                kamera(s, -90f, -60f);
+            }, () -> sayac >= 60, "uzay_yildiz_1", 200),
+            new Adim("yıldızlı gök 2 (10 sn sonra, aynı kamera: yavaş dönüş ~6°, kırpışma)", s -> {
+            }, () -> sayac >= 200, "uzay_yildiz_2", 300),
+            new Adim("kara delik yakın kadraj", GunesPatlamasiOtomasyonu::karaDelikBak, () -> sayac >= 40,
+                    "kara_delik_yakin", 200),
+            new Adim("pulsar akşam", s -> {
+                karaDelikTakip = -1;
+                komut(s, "dogalafet pulsar baslat", "dogalafet asama ileri pulsar", "time set 11600");
+                gunesBak(s);
+            }, () -> sayac >= 80 && evre(GunesEvresi.PULSAR), "pulsar_aksam", 300),
+            new Adim("pulsar kavurma (hız 30, 45 sn)", s -> {
+                komut(s, "time set 6000", "dogalafet hiz 30");
+                kamera(s, kavrulmaKamerasi);
+            }, () -> sayac >= 900, null, 1000),
+            new Adim("pulsar yanan dünya", s -> {
+                komut(s, "dogalafet hiz 1");
+                kavrulmaSay(s);
+            }, () -> sayac >= 40, "pulsar_yanan_dunya", 200));
+
+    /** Kara delik yakın kadrajının görüş açısı (derece): halka (çapı ~0,75°) kadrajın ~%15'i olur. */
+    private static final double KARA_DELIK_FOV = 6.0;
+    /** Yakın kadrajda takip edilen kara delik (-1: yok); kamera kare kapısında beklenirken de her tick ona çevrilir. */
+    private static volatile int karaDelikTakip = -1;
 
     private GunesPatlamasiOtomasyonu() {
     }
@@ -236,6 +265,9 @@ public final class GunesPatlamasiOtomasyonu {
         }
         // Başarım toast'ları (Felaket Başlıyor, Güneşi Atlattım, Süpernova Tanığı) F1'de de çizilir; vitrin karesine girmesin.
         mc.getToasts().clear();
+        if (karaDelikTakip >= 0 && mc.player != null && mc.level != null) {
+            karaDelikeCevir(mc, karaDelikTakip);
+        }
         IntegratedServer server = mc.getSingleplayerServer();
         if (mc.player == null || mc.level == null || server == null || GorselOtomasyon.kareBekliyor()) {
             return;
@@ -328,6 +360,49 @@ public final class GunesPatlamasiOtomasyonu {
                 String.format(Locale.ROOT, "%.3f", d.evreIlerlemesi()), String.format(Locale.ROOT, "%.1f", evreSaniyesi()),
                 ucanMeteor, mc.particleEngine.countParticles(), KavrulmaRengi.basamak(),
                 String.format(Locale.ROOT, "%.1f", k.beklemeSn()));
+    }
+
+    /**
+     * Kara delik takibindeyken dünya çiziminin görüş açısı {@value #KARA_DELIK_FOV}° (oyuncunun FOV ayarı değişmez, el
+     * çizimine dokunulmaz).
+     */
+    @SubscribeEvent
+    public static void gorusAcisi(ViewportEvent.ComputeFov olay) {
+        if (AKTIF && karaDelikTakip >= 0 && olay.usedConfiguredFov()) {
+            olay.setFOV(KARA_DELIK_FOV);
+        }
+    }
+
+    /**
+     * Göğün en yüksekteki kara deliği seçilir, görüş açısı {@value #KARA_DELIK_FOV}° (yakın kadraj); kamera her istemci
+     * tick'inde ona çevrilir (yavaş dönüşle kayar; pc2'de kare kapısı 60 sn bekleyebilir). Yön çizimle aynı hesaptan.
+     */
+    private static void karaDelikBak(IntegratedServer s) {
+        Minecraft.getInstance().execute(() -> {
+            Minecraft mc = Minecraft.getInstance();
+            int en = 0;
+            for (int i = 1; i < 3; i++) {
+                if (IstemciGokyuzu.karaDelikYonu(i, mc.level, 1f).y > IstemciGokyuzu.karaDelikYonu(en, mc.level, 1f).y) {
+                    en = i;
+                }
+            }
+            karaDelikTakip = en;
+            float[] aci = karaDelikeCevir(mc, en);
+            DogalAfetler.LOGGER.info(ON + "kara delik kadrajı: {}. kara delik, yaw {}, pitch {} (takip)", en,
+                    String.format(Locale.ROOT, "%.1f", aci[0]), String.format(Locale.ROOT, "%.1f", aci[1]));
+        });
+    }
+
+    /** İstemci oyuncusunu (kamera) {@code i}. kara deliğe çevirir; ara kare yumuşatması olmasın diye önceki açı da. */
+    private static float[] karaDelikeCevir(Minecraft mc, int i) {
+        org.joml.Vector3f y = IstemciGokyuzu.karaDelikYonu(i, mc.level, 1f);
+        float yaw = (float) Math.toDegrees(Math.atan2(-y.x, y.z));
+        float pitch = (float) -Math.toDegrees(Math.asin(Math.max(-1f, Math.min(1f, y.y))));
+        mc.player.setYRot(yaw);
+        mc.player.setXRot(pitch);
+        mc.player.yRotO = yaw;
+        mc.player.xRotO = pitch;
+        return new float[] {yaw, pitch};
     }
 
     private static void sonraki() {

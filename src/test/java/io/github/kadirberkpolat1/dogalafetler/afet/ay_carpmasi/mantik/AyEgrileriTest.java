@@ -59,7 +59,9 @@ class AyEgrileriTest {
         assertEquals(0.7f, AyEgrileri.parlama(0f), EPS);
         assertEquals(0.7f, AyEgrileri.parlama(0.5f), EPS, "0,5 sn %70");
         assertEquals(0f, AyEgrileri.parlama(0.75f), EPS, "0,25 sn'de söner");
-        assertTrue(AyEgrileri.ufukIsigi(0f) > AyEgrileri.ufukIsigi(10f), "ufuk ışığı söner");
+        assertTrue(AyEgrileri.dunyaParlamasi(0.3f) > 0.9f, "dünya parlaması ilk yarım saniyede tam");
+        assertTrue(AyEgrileri.dunyaParlamasi(2f) < AyEgrileri.dunyaParlamasi(1f), "dünya parlaması söner");
+        assertEquals(0f, AyEgrileri.dunyaParlamasi(4.5f), EPS, "birkaç saniyede biter");
     }
 
     @Test
@@ -75,19 +77,25 @@ class AyEgrileriTest {
     }
 
     @Test
-    void mantarYirmiBesDereceyeBuyurBirGundeSoner() {
-        assertEquals(0f, AyEgrileri.mantarYuksekligi(2f), EPS, "2 sn sonra yükselir");
-        assertEquals(25f, AyEgrileri.mantarYuksekligi(47f), EPS, "45 sn'de 25°");
-        assertEquals(0f, AyEgrileri.mantarAlfa(1f), EPS);
-        assertEquals(1f, AyEgrileri.mantarAlfa(60f), EPS);
-        assertEquals(0.35f, AyEgrileri.mantarAlfa(300f), EPS, "kalıntı");
-        assertEquals(0f, AyEgrileri.mantarAlfa(AyEgrileri.MANTAR_SONUM_SN), EPS, "bir günde söner");
+    void patlamaBuyurSonerYediSaniyedeKaybolur() {
+        assertTrue(AyEgrileri.patlamaGorunur(0f) && !AyEgrileri.patlamaGorunur(-0.1f));
+        assertTrue(AyEgrileri.atesTopuAlfa(0.3f) > 0.9f, "0 sn: ateş topu büyüyor");
+        assertTrue(AyEgrileri.patlamaBuyume(0.3f) < AyEgrileri.patlamaBuyume(2f), "genişler");
+        float iki = AyEgrileri.atesTopuAlfa(2f);
+        assertTrue(iki > 0.2f && iki < 0.9f, "2 sn: sönüyor (" + iki + ")");
+        for (float s = AyEgrileri.PATLAMA_SN; s < 20000f; s += 37f) {
+            assertFalse(AyEgrileri.patlamaGorunur(s), "ömür dolunca çizilmez");
+            assertEquals(0f, AyEgrileri.atesTopuAlfa(s) + AyEgrileri.kabukAlfa(s) + AyEgrileri.enkazAlfa(s)
+                    + AyEgrileri.dumanAlfa(s) + AyEgrileri.dunyaParlamasi(s), EPS, "8 sn ve sonrası: yok");
+        }
+        assertTrue(AyEgrileri.PATLAMA_SN < 8f, "8. sn karesinde patlama yok");
         float onceki = 2f;
-        for (float s = 90f; s < AyEgrileri.MANTAR_SONUM_SN; s += 1f) {
-            float a = AyEgrileri.mantarAlfa(s);
-            assertTrue(a <= onceki + EPS, "90 sn'den sonra mantar söner");
+        for (float s = 1f; s < AyEgrileri.PATLAMA_SN; s += 0.05f) {
+            float a = AyEgrileri.atesTopuAlfa(s);
+            assertTrue(a <= onceki + EPS, "1 sn'den sonra ateş topu monoton söner");
             onceki = a;
         }
+        assertFalse(AyEgrileri.carpmaIzleriSuruyor(10f, false), "halka kapalıyken patlamadan sonra iz yok");
     }
 
     @Test
@@ -96,7 +104,7 @@ class AyEgrileriTest {
         assertEquals(0.6f * (1f - 80f / 3600f), AyEgrileri.halkaAlfa(80f), EPS);
         assertEquals(0f, AyEgrileri.halkaAlfa(3600f), EPS, "3 gün sonra yalnız yıldız, galaksi, nebula");
         assertTrue(AyEgrileri.carpmaIzleriSuruyor(2000f, true), "halka açıkken 2. günde de gök çizimi sürer");
-        assertFalse(AyEgrileri.carpmaIzleriSuruyor(2000f, false), "halka kapalıyken mantar söndükten sonra iz yok");
+        assertFalse(AyEgrileri.carpmaIzleriSuruyor(2000f, false), "halka kapalıyken patlama söndükten sonra iz yok");
         assertFalse(AyEgrileri.carpmaIzleriSuruyor(3600f, true));
     }
 
@@ -105,8 +113,9 @@ class AyEgrileriTest {
         assertEquals(15, AyEgrileri.parcaSayisi(0));
         assertEquals(40, AyEgrileri.parcaSayisi(2));
         assertEquals(70, AyEgrileri.parcaSayisi(3));
-        assertEquals(30, AyEgrileri.mantarSayisi(0));
-        assertEquals(180, AyEgrileri.mantarSayisi(3));
+        assertEquals(12, AyEgrileri.enkazSayisi(0));
+        assertEquals(64, AyEgrileri.enkazSayisi(3));
+        assertTrue(AyEgrileri.kureDilimi(0) < AyEgrileri.kureDilimi(3) && AyEgrileri.dumanSayisi(0) < AyEgrileri.dumanSayisi(3));
     }
 
     @Test

@@ -130,7 +130,7 @@ Bütün komutlar `/dogalafet` altındadır ve **yalnız OP** (yetki seviyesi 2) 
 
 | Komut | Ne yapar |
 |---|---|
-| `/dogalafet start <afet> [seviye] [oyuncu]` | Afeti hemen başlatır (beklemeyi ve gamerule'ü atlar; aktif afet varken reddeder). |
+| `/dogalafet start <afet> [seviye] [oyuncu]` | Afeti hemen başlatır (beklemeyi, gamerule'ü ve gün saati penceresini atlar; aktif afet varken reddeder). Doğal güneş patlaması yalnız sabah (gün saati 0–6000), ay çarpması yalnız gece (13000–23000) patlar; komutla başlatma bu pencereye bakmaz. |
 | `/dogalafet stop` | Aktif afeti temizce durdurur; afet yoksa süren dünya dönemi süreçlerini durdurur. |
 | `/dogalafet durum` | Aktif afet, aşama, seviye, kalan süre, beklemeler, çarpanlar, deniz seviyesi, ay/güneş, donma ve buharlaşma. |
 | `/dogalafet sicaklik set <oyuncu> <değer>` | Oyuncunun vücut sıcaklığını ayarlar. |
@@ -141,6 +141,7 @@ Bütün komutlar `/dogalafet` altındadır ve **yalnız OP** (yetki seviyesi 2) 
 | `/dogalafet donma bilgi` | Donma ilerlemesi, dönem, buharlaşma, işlenen chunk kuyruğu. |
 | `/dogalafet kizilcuce baslat` | Beklemeyi atlayıp kızıl cüce doğuşunu başlatır. |
 | `/dogalafet kizilcuce bilgi` | Gökyüzü dönemi, çözülme ilerlemesi, bulunduğunuz chunk kalıcı kış mı. |
+| `/dogalafet pulsar baslat` | Kızıl cüce yerine pulsarı hemen doğurur (olasılık, donma ve şafak beklenmez; zaten pulsarsa ya da güneş patlaması sürüyorsa reddeder). |
 | `/dogalafet gun <sayı>` | Oyun gününü ayarlar ve seviye olasılıklarını gösterir. |
 | `/dogalafet odul meteor [parca\|cekirdek\|hepsi] [adet] [oyuncu]` | Test için Meteorit Parçası / Kozmik Çekirdek verir. |
 | `/dogalafet asama ileri [süreç]` | Aktif afeti ya da bir dünya dönemi sürecini sonraki aşamaya geçirir. |
@@ -227,6 +228,10 @@ hücresi). Sunucu TPS'i düşünce bu bütçeler kendiliğinden kısılır.
 | `cekirdek.tekSeferlik.gunesPatlamasiTekrarlanabilir` | `false` | Güneş patlaması kızıl cücede tekrar gelebilsin mi. |
 | `su.aysonrasiBeklemeDk`, `su.denizHedefArtis` | `10`, `4` | Ay çarpmasından sonra deniz yükselmesinin beklemesi (gerçek dakika) ve hedefi (blok). |
 | `gokyuzu.kizilCuceGecikmeGun` | `7` | Donma %100'e ulaştıktan sonra kızıl cücenin doğmasına kadar gün. |
+| `gokyuzu.pulsarOlasiligi` | `0,15` | Süpernova sonrası doğal doğuşta kızıl cüce yerine pulsar doğma olasılığı (dünya tohumundan belirlenir). |
+| `gokyuzu.pulsarIsinmaGun` | `2` | Pulsarın dünya etkilerinin (sıcaklık, kavrulma, yangın, buharlaşma) tam güce çıkma süresi, MC günü. |
+| `gokyuzu.pulsarYanginDakikaBasina` | `20` | Tam güçte oyuncu başına dakikada yeni yangın odağı (`afetBlokHasari false` iken yok). |
+| `gokyuzu.pulsarKavrulmaOlasiligi` | `0,6` | Tam güçte güneşe açık çimenin kaba toprağa dönme denemesi olasılığı (tick başına, oyuncu başına). |
 | `sicaklik.sicaklikSistemiModu` | `OTOMATIK` | `OTOMATIK`: Cold Sweat yüklüyse kendi sıcaklık sistemi kapalı; `ACIK` / `KAPALI`. |
 | `basarim.etkiAlaniPayi` | `0` | "Sağ çıkma" için afet yarıçapına eklenen pay (blok). |
 
@@ -467,6 +472,12 @@ Gökyüzü: güneş evreleri, süpernova kabuğu, nebula, kızıl cüce, yıldı
 | `kalinti_2048.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `kalinti_512.png` | 512x512 | 321,3 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `kalinti_512.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
+| `kara_delik.png` | 256x256 | 28,2 KB | `tools/assets/gokyuzu_dokulari.py` |
+| `kara_delik.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
+| `kara_delik_akis.png` | 256x256 | 10,5 KB | `tools/assets/gokyuzu_dokulari.py` |
+| `kara_delik_akis.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
+| `kara_delik_jet.png` | 64x512 | 3,9 KB | `tools/assets/gokyuzu_dokulari.py` |
+| `kara_delik_jet.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `nebula_karisik_128.png` | 128x128 | 16,5 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `nebula_karisik_128.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `nebula_karisik_256.png` | 256x256 | 55,1 KB | `tools/assets/gokyuzu_dokulari.py` |
@@ -485,6 +496,8 @@ Gökyüzü: güneş evreleri, süpernova kabuğu, nebula, kızıl cüce, yıldı
 | `nebula_mavi_256.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `nebula_mavi_512.png` | 512x512 | 117,0 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `nebula_mavi_512.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
+| `pulsar_isin.png` | 512x64 | 2,0 KB | `tools/assets/gokyuzu_dokulari.py` |
+| `pulsar_isin.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `samanyolu.png` | 2048x256 | 422,8 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `samanyolu.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `supernova_halka.png` | 512x512 | 99,6 KB | `tools/assets/gokyuzu_dokulari.py` |
@@ -516,8 +529,6 @@ Ay çarpması gök dokuları: yaklaşan ay, parlama, enkaz halkası.
 | `ay_yuzey.png.mcmeta` | — | 0,1 KB | `tools/assets/ay_carpmasi_dokular.py` |
 | `enkaz_halkasi.png` | 512x32 | 7,5 KB | `tools/assets/ay_carpmasi_dokular.py` |
 | `enkaz_halkasi.png.mcmeta` | — | 0,1 KB | `tools/assets/ay_carpmasi_dokular.py` |
-| `mantar.png` | 128x128 | 15,4 KB | `tools/assets/ay_carpmasi_dokular.py` |
-| `mantar.png.mcmeta` | — | 0,1 KB | `tools/assets/ay_carpmasi_dokular.py` |
 
 #### `assets/dogalafetler/textures/misc/`
 

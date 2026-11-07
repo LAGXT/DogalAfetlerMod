@@ -148,6 +148,9 @@ public final class OrtamSicakligi {
         return Math.sin(Math.PI * t / 12000.0);
     }
 
+    /** Pulsar döneminin ısısı: {@code gunesPatlamasiArtisi}'nın katı (ayrı config anahtarı yerine; gökyüzü-2 kararları). */
+    public static final double PULSAR_ARTIS_CARPANI = 1.2;
+
     public static Sonuc hesapla(Girdi g, Ayarlar a) {
         EnumMap<Katki, Double> k = new EnumMap<>(Katki.class);
         if (g.boyut() != Boyut.NORMAL) {
@@ -192,6 +195,9 @@ public final class OrtamSicakligi {
             case BUYUYEN -> a.gunesPatlamasiArtisi() * sinirla01(g.evreIlerlemesi())
                     * (g.gokyuzu() ? 1.0 : a.golgeOrani());
             case SUPERNOVA -> a.supernovaKalintisi() * (1 - sinirla01(g.evreIlerlemesi()));
+            // Pulsar (gökyüzü-2): buzul kıyametinin tersi, ısınmayla güneş patlaması tepesinin 1,2 katı (vars. +45,6 °C).
+            case PULSAR -> PULSAR_ARTIS_CARPANI * a.gunesPatlamasiArtisi() * sinirla01(g.evreIlerlemesi())
+                    * (g.gokyuzu() ? 1.0 : a.golgeOrani());
             default -> 0.0;
         };
         k.put(Katki.GUNES_EVRESI, evreKatkisi * koruma);

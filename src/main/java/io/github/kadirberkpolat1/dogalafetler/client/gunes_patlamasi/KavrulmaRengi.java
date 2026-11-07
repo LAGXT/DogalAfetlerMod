@@ -3,6 +3,7 @@ package io.github.kadirberkpolat1.dogalafetler.client.gunes_patlamasi;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.afet.gunes_patlamasi.mantik.GunesGorselEgrileri;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
+import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.PulsarEgrileri;
 import io.github.kadirberkpolat1.dogalafetler.network.DonemPaketi;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.BiomeColors;
@@ -60,7 +61,12 @@ public final class KavrulmaRengi {
 
     /** İstemci tick'i: kuruluk basamağı değişti mi; değiştiyse karışımı günceller ve chunk'ları yeniden örer. */
     static void denetle(Minecraft mc, DonemPaketi d) {
-        float kuruluk = d.gunesEvresi() == GunesEvresi.BUYUYEN ? GunesGorselEgrileri.kuruluk(d.evreIlerlemesi()) : 0f;
+        // Pulsar döneminde (gökyüzü-2) ısınmayla tam kuruluğa çıkar.
+        float kuruluk = switch (d.gunesEvresi()) {
+            case BUYUYEN -> GunesGorselEgrileri.kuruluk(d.evreIlerlemesi());
+            case PULSAR -> GunesGorselEgrileri.KURULUK_TAVANI * PulsarEgrileri.yogunluk(d.evreIlerlemesi());
+            default -> 0f;
+        };
         int yeni = GunesGorselEgrileri.kurulukBasamagi(kuruluk);
         if (yeni == basamak) {
             return;

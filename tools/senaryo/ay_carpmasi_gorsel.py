@@ -5,7 +5,7 @@ Kullanım (worktree kökünden): python3 tools/senaryo/ay_carpmasi_gorsel.py
 
 Tek oyunculu Quick Play dünyası `run/saves/ay_carpmasi` her koşuda KOK/run/saves/test'ten (seed 20261105, allowCommands=1)
 taze kopyalanır; istemci `-Potomasyon=ay_carpmasi` ile açılır ve `client.ay_carpmasi.AyCarpmasiOtomasyonu` adımları yürütür
-(ön-uyarı, siren boyunca yaklaşan ve parçalanan ay, yavaş çekim vitrin, parlama, mantar sütunu, sarsıntı, ay parçaları,
+(ön-uyarı, siren boyunca yaklaşan ve parçalanan ay, ağır çekim vitrin, 3 boyutlu patlama ve dünya parlaması, sarsıntı, ay parçaları,
 enkaz halkalı aysız gece, gündüz, sifirla).
 
 Protokol: (a) açılış yalnız Hyprland exec kuralıyla ([workspace 95 silent; no_initial_focus; no_focus on;
@@ -96,8 +96,8 @@ def hazirla():
     satirlar = yol.read_text().splitlines() if yol.exists() else []
     satirlar = [s for s in satirlar if not s.startswith(("tutorialStep:", "pauseOnLostFocus:", "renderDistance:",
                                                          "simulationDistance:"))]
-    # Ufuktaki mantar sütunu ve doğuş noktasına düşen parçalar: görüş 16 chunk.
-    yol.write_text("\n".join(satirlar + ["tutorialStep:none", "pauseOnLostFocus:false", "renderDistance:16",
+    # Patlama gök aşamasında (görüş mesafesinden bağımsız); 8 chunk pc2'de kare kapısının FPS >= 15 şartı için (16'da 12–13).
+    yol.write_text("\n".join(satirlar + ["tutorialStep:none", "pauseOnLostFocus:false", "renderDistance:8",
                                          "simulationDistance:10"]) + "\n")
     for eski in (run / "screenshots").glob("ay_carpmasi_*.png"):
         eski.unlink()

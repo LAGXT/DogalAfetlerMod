@@ -43,5 +43,6 @@ public final class CekirdekCevirileri {
         yazici.ekle(GunesEvresi.SUPERNOVA.ceviriAnahtari(), "Supernova", "Süpernova");
         yazici.ekle(GunesEvresi.GUNESSIZ.ceviriAnahtari(), "Sunless era", "Güneşsiz dönem");
         yazici.ekle(GunesEvresi.KIZIL_CUCE.ceviriAnahtari(), "Red dwarf era", "Kızıl cüce dönemi");
+        yazici.ekle(GunesEvresi.PULSAR.ceviriAnahtari(), "Pulsar era", "Pulsar dönemi");
     }
 }
