@@ -1953,7 +1953,7 @@ diğer işçilerin kullandığı arayüz sözleşmeleri (§A) ve entegratöre no
 
 **M-01 Meteor düz çizgide sabit hızla iner; çarpışma sunucuda blok örneklemesiyle.** Varlık `noPhysics`; sunucu her tick
 yolunu 0,4 blok adımla örnekler, ilk çarpışmalı bloka (yaprak ve çarpışmasız bitkiler geçilir: krater ağaç tepesinde
-değil yerde açılır) ya da suya (gerçek ya da `SanalSu.suSeviyesi`) çarpar. Hız 3 blok/tick (eksen başına paket sınırı 3,9),
+değil yerde açılır) ya da suya (gerçek ya da `SanalSu.suSeviyesi`) çarpar. Hız 3 blok/tick (eksen başına paket sınırı 3,9; **rev. MT2-25:** uçuş 180 tick, hız yoldan ~1,0–1,9, en çok 3,8),
 140 blok yükseklikten 40–70°'de ~2,5–3 sn uçuş. İstemci aynı hızla ilerletir (2 tick'te bir düzeltme), iniş noktasını
 `clip` ile tahmin eder. Gerekçe: yerçekimli yayın çarpışma tahmini ve senkronu daha pahalı, görsel farkı yok.
 
@@ -2033,9 +2033,10 @@ kalıcı iz; sıfırlama dönem durumudur, harita değil). Ateşleri yangın ken
 `#dogalafetler:kozmik_cekirdek` eşya etiketini yazar. Sert blok okuması yangının `dogalafetler:deprem_dayanikli` ve
 `dogalafetler:yanmaz` etiketlerinden. Entegratörün K-E12 kancasına bağlayacağı satır yok.
 
-**M-20 Görsel otomasyonun yavaş çekimi.** Gizli workspace'te istemci ~1–10 FPS çizer; 3 blok/tick meteor bir çizilmiş
+**M-20 Görsel otomasyonun yavaş çekimi.** Gizli workspace'te istemci ~1–10 FPS çizer; 3 blok/tick meteor (MT2-25 öncesi; şimdi ~1,0–1,9) bir çizilmiş
 karede ekrandan geçer (koşu 1'de iz ve çarpma kareleri aynı karede kaldı, `carpma`/`carpma_b` md5 eşit). Otomasyon
-vitrinde `meteor.dusmeHizi`'ni 0,6'ya indirir (yalnız `-Potomasyon=meteor`; sonra eski değere döner) ve kareyi istenen
+vitrinde `meteor.dusmeHizi`'ni 0,6'ya indirir (yalnız `-Potomasyon=meteor`; sonra eski değere döner; **rev. MT2-25:** `dusmeHizi`
+kalktı, hız uçuş süresinden çıkar; yavaş çekim `meteor.ucusSuresi` 180 → 360 tick, 2×) ve kareyi istenen
 tick'te değil sonraki çizilmiş karenin sonunda (`RenderTickEvent` END) alır. Oyun davranışı değişmez.
 
 
@@ -2192,7 +2193,8 @@ yalnız istemci çalar (`client.meteor.MeteorSesi`). Saf mantık: `meteor.mantik
 - **MT2-14 Ölçeğe bağlı değerler.** Eski küçük/büyük config çiftleri tipik ölçeklerdeki referanslardır, arası ve uçları
   `MeteorOlcegi.ara` ile doğrusal (kırpılarak): krater yarıçapı/derinliği, krater sıcaklığı, yangın yoğunluğu, sarsıntı menzili
   ve şiddeti, parlama, çarpma parçacıkları, gövde çapı, iz uzunluğu/parçacıkları, iniş diski, uçuş sesi düzeyi, patlama menzili
-  (96 → 128; 0,5× ~91, 2,5× ~139), düzeyi (%70 → %100) ve perdesi (1,0 → 0,85). Hız `dusmeHizi × (0,95 → 1,15)`, en çok 3,8
+  (96 → 128; 0,5× ~91, 2,5× ~139), düzeyi (%70 → %100) ve perdesi (1,0 → 0,85). Hız `dusmeHizi × (0,95 → 1,15)`, en çok 3,8 (**rev. MT2-25:** hız
+  uçuş süresinden çıkar, `meteor.ucusSuresi` 180 tick ÷ 0,95–1,12 ölçeğe göre, `Yorunge.sureyle`; en çok 3,8)
   (paket sınırı). "Hasar" = krater + yangın + sarsıntı (meteorun varlık hasarı yok). Bu değerler için yeni config yok.
 - **MT2-15 Süre.** Güneş: AKTIF başı `meteorYagmuruSaniye` 600 sn, sonraki günler yeni `meteorYagmuruGunlukSaniye` 180 sn (ölçekli,
   AKTIF sayacı); öncünün siren sonu ayrı `meteorYagmuruOncuSonDakikaBasina` 24 (öncü 6 → 24 kalır, AKTIF'te 90'a sıçrar). Ay:
@@ -5159,7 +5161,7 @@ okunur. Yalnız testin kullandığı `YiyecekAyarlari.bolum()` erişimcisi silin
 (`gametest-yiyecek.log:137, :152`); `declared twice` 0, `ConfigLoadingException` 0, `dogalafetler-server.toml` için
 "Correcting" 0 (tek "Correcting" satırı boş dünyanın `forge-server.toml`'u, her koşuda var); `build --rerun-tasks` çıkış 0,
 `warning:` 0, JUnit 89 sınıf 543/0/0/0. Aynı mekanizma (gözlenmedi): `AyCarpmasiAyarlari.meteorDakikaBasinaAyarla` (GameTest),
-`MeteorAyarlari.dusmeHiziAyarla` ve `AsitOrmanOtomasyonu` kalite adımı (görsel otomasyon) da `ConfigValue.set` kullanır;
+`MeteorAyarlari.dusmeHiziAyarla` (MT2-25'ten beri `ucusSuresiAyarla`) ve `AsitOrmanOtomasyonu` kalite adımı (görsel otomasyon) da `ConfigValue.set` kullanır;
 yazmaları arasında çok tick var, hata hiçbir log'da yok. Üretim kodu config'e yazmaz. Reddedilen: bölümleri birleştirmek (iki
 bölüm yok); yazmalar arasına tick beklemek ya da `ModConfigEvent.Reloading` saymak (izleyicide gecikme sınırı yok, bir kayıt
 birden çok yeniden yükleme üretebilir; yarış daralır ama kapanmaz); `WriteSyncFileConfig` kilidini yansımayla almak (Forge iç
@@ -5828,6 +5830,12 @@ pc2 1/2` (`pano-3.txt`). meteor-2 MT2-25/28 incelemesi sürüyor: düzelt çıka
   dönmüyor; log ve kareler kanıtlı). Dalların bazı JUnit/GameTest/sunucu satırları HEAD hash'inde değil ama içerikçe aynı ağaçta;
   entegrasyon dalındaki filtresiz GameTest ve JUnit (K-E59) kapatır. `kasirga_sunucu @3ebe4b57df9d` (7,41 ms) defterde `gecti`:
   betik %20 sınırını denetlemez, yeşil satır kabul değildir (AF-23 rev. 4,25 ms ile geçti).
+- **17+ oyuncuda yoğunluk sessizce kısılır (Mt18):** tavan 448 = 16 oyuncu × 3/sn × ~9 sn; daha kalabalık sunucuda doluyken
+  atılamayan meteor düşmez, oyuncu başına 180/dk tutmaz, log uyarısı yok. `meteor.varlikTavani` (≤ 512) elle yükselir.
+- **Düz bakan oyuncu daha az iz görür (Mt19):** ağırlık yalnız yatay baş (`getYRot`); ufka bakan oyuncunun kadrajında inen
+  izlerin çoğu üst kenarın dışında kalır (~10–13 iz beklentisi göğe dönük kadraj için).
+- **Var olan dünyalar eski meteor varsayılanlarını korur (Mt22):** `serverconfig` dünya klasöründe; eski dünya 90/dk ve eski
+  tavanla açılır. MT2-31 göçü (K-E61) birleşince kapanır.
 
 ## Teslim sonrası — hızlandırma (devam: kuyruk)
 
@@ -5882,6 +5890,14 @@ Sınama `test_sira.py` 18/18 (`test_dagitim_bos_yuvasi_cok_olana_esitlikte_pc2`:
 pc2, ana, pc2, ana, `2/2 · 2/2`; `test_dagitim_dolu_makine_atlanir`: pc2 dolu → ana, ana dolu → pc2). Canlı kanıt
 `.vibe/kanit/sira-4/dagitim-2.md`.
 #
+
+**K-E61 Sunucu config göçü: `ayarSurumu` ile eski varsayılan yeni varsayılana çekilir, elle değer korunur (şef kararı MT2-31,
+Mt22; 2026-11-08).** Forge `serverconfig` dünya klasöründe yaşar; varsayılan değişince var olan dünya eski değeri okur
+(meteor 90 → 180/dk, tavan 240 → 448). Kalıp: sunucu config'inde tamsayı `ayarSurumu`; yüklemede kayıtlı sürüm koddakinden
+küçükse, değişen her anahtarın değeri o sürümün eski varsayılanına eşitse yeni varsayılana çekilir, farklıysa (elle değiştirilmiş)
+korunur; sonra `ayarSurumu` güncellenir, değişen her anahtar için bir INFO satırı. Kalkan anahtar (`dusmeHizi`) yok sayılır.
+Sonraki varsayılan değişiklikleri tabloya sürüm ekler. Uygulama meteor-2 (MT2-31); kanıt JUnit (eski varsayılan → yeni, elle
+değer korunur, yeni dünya dokunulmaz) ve entegrasyon dalında tam kapı.
 
 ## Açık noktalar (Faz 2b)
 
