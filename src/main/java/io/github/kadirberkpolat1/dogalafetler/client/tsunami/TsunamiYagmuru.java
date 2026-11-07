@@ -7,6 +7,7 @@ import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciAfetDurumu;
+import io.github.kadirberkpolat1.dogalafetler.client.su.SuGizleme;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetAsamasi;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
@@ -18,11 +19,15 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.FogRenderer;
 import net.minecraft.client.renderer.GameRenderer;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
@@ -34,10 +39,11 @@ import org.joml.Matrix4f;
 
 /**
  * Tsunaminin kendi yağmuru (B.6, tasarım notu §2 "Özel yağmur"): vanilla yağmur kullanılmaz; dalga yönüne 25° eğik, vanilla'dan
- * 1,5 kat uzun ince çizgiler iki katmanda (yakın hızlı ve parlak, uzak yavaş ve soluk) düşer; zemine ya da sanal su yüzeyine
- * değen yakın damla büyüyen bir halka bırakır. Gri-mavi sis görüşü %70'e indirir. Cephe 24 blok içindeyken yerden gelen
- * titreme (±0,3°·seviye), dalganın içinde ±8° yuvarlanma. Damla sayısı kaliteye bağlı (N13: Düşük 400 … Ultra 2600 /sn);
- * yağmur AKTIF ve BITIS boyunca, 3 sn'de girer ve çıkar.
+ * 1,5 kat uzun ince çizgiler iki katmanda (yakın hızlı ve parlak, uzak yavaş ve soluk) düşer; gerçek bir yüzeye (bloğun
+ * çarpışma şekli, görünen gerçek sıvı, sanal su; hangisi yüksekse) üstten değen yakın damla büyüyen bir halka bırakır.
+ * Gri-mavi sis görüşü %70'e indirir. Cephe 24 blok içindeyken yerden gelen titreme (±0,3°·seviye), dalganın içinde ±8°
+ * yuvarlanma. Damla sayısı kaliteye bağlı (N13: Düşük 400 … Ultra 2600 /sn); yağmur AKTIF ve BITIS boyunca, 3 sn'de girer
+ * ve çıkar.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class TsunamiYagmuru {
@@ -61,6 +67,7 @@ public final class TsunamiYagmuru {
     private static double birikim;
     private static float yonX = 1;
     private static float yonZ;
+    private static final BlockPos.MutableBlockPos P = new BlockPos.MutableBlockPos();
     private static int seviye = 1;
     private static ClientLevel sonLevel;
     /** Yalnız otomasyonun kök neden ölçümü için: yağmuru kapatır. */
@@ -70,9 +77,31 @@ public final class TsunamiYagmuru {
     private TsunamiYagmuru() {
     }
 
-    /** Otomasyon ölçümü: canlı damla ve halka sayısı, şimdiki yoğunluk. */
+    /** Otomasyon ölçümü: canlı damla ve halka sayısı, havada asılı halka ({@link #havadaHalka}), şimdiki yoğunluk. */
     static String ozet() {
-        return "damla=" + damla + " halka=" + halka + " yogunluk=" + String.format(java.util.Locale.ROOT, "%.2f", yogunluk);
+        return "damla=" + damla + " halka=" + halka + " havada=" + havadaHalka() + " yogunluk="
+                + String.format(java.util.Locale.ROOT, "%.2f", yogunluk);
+    }
+
+    /**
+     * Yüzeyi 0,25 bloktan uzak halka: halkanın altındaki hücrede çarpışma şeklinin o noktadaki tepesi, görünen gerçek sıvı ya da
+     * sanal su yüzeyi halkanın yüksekliğinde değil. Yalnız otomasyon sorar ({@link #ozet}); halka ömrü (8 tick) boyunca
+     * kayan dalga yüzeyi payı 0,25.
+     */
+    private static int havadaHalka() {
+        ClientLevel l = Minecraft.getInstance().level;
+        if (l == null) {
+            return 0;
+        }
+        int n = 0;
+        for (int i = 0; i < halka; i++) {
+            double y = HY[i] - 0.02;
+            double yuzey = carpma(l, HX[i], y + 0.25, y - 0.25, HZ[i]);
+            if (Double.isNaN(yuzey) || yuzey == YagmurCarpmasi.YAN || Math.abs(yuzey - y) > 0.25) {
+                n++;
+            }
+        }
+        return n;
     }
 
     static int saniyeBasinaDamla() {
@@ -131,9 +160,16 @@ public final class TsunamiYagmuru {
             // Eğim düşüş boyunca kaymayı önceden telafi eder: damla kameranın çevresine iner.
             double yukari = (yakin ? 10 : 14) + 8 * RASTGELE.nextDouble();
             double kayma = yukari * EGIM;
-            DX[damla] = (float) (kam.x + Math.cos(a) * r - yonX * kayma);
-            DZ[damla] = (float) (kam.z + Math.sin(a) * r - yonZ * kayma);
-            DY[damla] = (float) (kam.y + yukari);
+            double x = kam.x + Math.cos(a) * r - yonX * kayma;
+            double z = kam.z + Math.sin(a) * r - yonZ * kayma;
+            double y = kam.y + yukari;
+            // Çatı, ağaç ya da çıkıntı altında (sütunun tepesinin altında) damla doğmaz: içeride ve mağarada yağmur yok.
+            if (y < l.getHeight(Heightmap.Types.MOTION_BLOCKING, Mth.floor(x), Mth.floor(z))) {
+                continue;
+            }
+            DX[damla] = (float) x;
+            DZ[damla] = (float) z;
+            DY[damla] = (float) y;
             VY[damla] = vy;
             YAKIN[damla] = yakin;
             damla++;
@@ -145,7 +181,10 @@ public final class TsunamiYagmuru {
         }
     }
 
-    /** Damlaları bir tick ilerletir; zemine ya da sanal su yüzeyine değen yakın damla halka bırakır. */
+    /**
+     * Damlaları bir tick ilerletir; gerçek bir yüzeye üstten değen yakın damla halka bırakır ({@link #carpma}), yandan
+     * çarpan halkasız söner.
+     */
     private static void ilerlet(ClientLevel l) {
         for (int i = 0; i < halka; ) {
             if (++HYAS[i] >= HALKA_OMRU) {
@@ -156,28 +195,60 @@ public final class TsunamiYagmuru {
         }
         for (int i = 0; i < damla; ) {
             float vy = VY[i];
+            double once = DY[i];
             DY[i] += vy;
             DX[i] += (float) (yonX * -vy * EGIM);
             DZ[i] += (float) (yonZ * -vy * EGIM);
-            int x = Mth.floor(DX[i]);
-            int z = Mth.floor(DZ[i]);
-            double zemin = l.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z);
-            // Sanal su zeminden en çok ~20 blok yükselir: yukarıdaki damlada yüzey sorgusu gereksiz.
-            double su = DY[i] > zemin + 24 ? Double.NaN : SanalSu.suSeviyesi(l, x, z);
-            double alt = Double.isNaN(su) ? zemin : Math.max(zemin, su);
-            if (DY[i] <= alt) {
-                if (YAKIN[i] && halka < MAKS_HALKA) {
-                    HX[halka] = DX[i];
-                    HY[halka] = (float) alt + 0.02f;
-                    HZ[halka] = DZ[i];
-                    HYAS[halka] = 0;
-                    halka++;
-                }
-                damlaSil(i);
-            } else {
+            double yuzey = carpma(l, DX[i], once, DY[i], DZ[i]);
+            if (Double.isNaN(yuzey)) {
                 i++;
+                continue;
+            }
+            if (yuzey != YagmurCarpmasi.YAN && YAKIN[i] && halka < MAKS_HALKA) {
+                HX[halka] = DX[i];
+                HY[halka] = (float) yuzey + 0.02f;
+                HZ[halka] = DZ[i];
+                HYAS[halka] = 0;
+                halka++;
+            }
+            damlaSil(i);
+        }
+    }
+
+    /**
+     * Damlanın {@code once}'den {@code y}'ye inerken çarptığı yüzey ({@link YagmurCarpmasi#karar}). Bloklar gerçekten taranır
+     * (yolundaki en çok iki hücre): çarpışma şeklinin damlanın düştüğü noktadaki tepesi (çit direğinin yanından geçen damla
+     * yere iner) ve görünen gerçek sıvının yüzeyi; çekilmenin gizlediği gerçek su sayılmaz ({@link SuGizleme#gizliMi}). Yükseklik
+     * haritası yalnız ucuz bir kapıdır: tepesinin bir blok üstünden yukarıdaki damlada hücre, 24 blok üstünde sanal su
+     * sorulmaz (sanal su zeminden en çok ~20 blok yükselir). Haritaya bakılarak konan halka, gizli suyun ve ince direğin
+     * üstünde havada asılı kalıyordu.
+     */
+    private static double carpma(ClientLevel l, double x, double once, double y, double z) {
+        int bx = Mth.floor(x);
+        int bz = Mth.floor(z);
+        int tepe = l.getHeight(Heightmap.Types.MOTION_BLOCKING, bx, bz);
+        double su = y > tepe + 24 ? Double.NaN : SanalSu.suSeviyesi(l, bx, bz);
+        double ust = YagmurCarpmasi.YAN;
+        if (y <= tepe + 1) {
+            for (int by = Mth.floor(once); by >= Mth.floor(y); by--) {
+                P.set(bx, by, bz);
+                BlockState s = l.getBlockState(P);
+                double h = YagmurCarpmasi.YAN;
+                var sekil = s.getCollisionShape(l, P);
+                if (!sekil.isEmpty()) {
+                    h = by + sekil.max(Direction.Axis.Y, z - bz, x - bx);
+                }
+                FluidState f = s.getFluidState();
+                if (!f.isEmpty() && !SuGizleme.gizliMi(l, P, f)) {
+                    h = Math.max(h, by + f.getHeight(l, P));
+                }
+                if (h != YagmurCarpmasi.YAN) {
+                    ust = h;
+                    break;
+                }
             }
         }
+        return YagmurCarpmasi.karar(once, y, ust, su);
     }
 
     private static void damlaSil(int i) {
