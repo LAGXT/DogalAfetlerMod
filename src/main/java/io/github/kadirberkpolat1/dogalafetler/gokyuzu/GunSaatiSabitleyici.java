@@ -70,8 +70,9 @@ final class GunSaatiSabitleyici {
         long hedef;
         if (yeni) {
             hedef = GunSaatiSabitleme.ilkHedef(simdi);
-            DogalAfetler.LOGGER.info("Gün saati sabit (güneş patlaması AKTIF): dayTime {} -> {} (öğle), doDaylightCycle={} "
-                    + "(dokunulmadı), oyun günü {}", simdi, hedef, dongu, yonetici.oyunGunu());
+            DogalAfetler.LOGGER.info("Gün saati sabit (güneş patlaması AKTIF): dayTime {} -> {} ({}), doDaylightCycle={} "
+                    + "(dokunulmadı), oyun günü {}", simdi, hedef,
+                    hedef == simdi ? "sabah penceresi, yerinde" : "pencere dışı, öğle", dongu, yonetici.oyunGunu());
         } else {
             long eski = veri.getLong(HEDEF);
             hedef = GunSaatiSabitleme.tut(eski, simdi, dongu);

@@ -25,16 +25,33 @@ public final class IstemciAy {
         }
     }
 
+    /**
+     * Yalnız görsel otomasyon ({@code -Potomasyon=ay_carpmasi}): kare alınana dek gösterilen ay durumu ve saniyesi; null =
+     * canlı. pc2'de FPS &lt; 15 iken kare kapısı 60 sn bekler ({@code /dogalafet hiz} en az 0,1: 6 patlama saniyesi);
+     * sabit saat karenin istenen anı göstermesini sağlar.
+     */
+    private static volatile Durum sabit;
+
     private IstemciAy() {
     }
 
-    public static Durum durum(float kismiTick) {
+    static void sabitle(Durum d) {
+        sabit = d;
+    }
+
+    /** Sabit saatten bağımsız, paketten tahmin edilen gerçek durum. */
+    static Durum canli(float kismiTick) {
         DonemPaketi d = IstemciDonem.durum();
         AyDurumu ay = d.ayDurumu();
         if (ay == AyDurumu.VAR || d.ayOlaySaati() < 0) {
             return new Durum(ay, Float.NaN);
         }
         return new Durum(ay, (float) ((IstemciDonem.saat(kismiTick) - d.ayOlaySaati()) / 20.0));
+    }
+
+    public static Durum durum(float kismiTick) {
+        Durum s = sabit;
+        return s != null ? s : canli(kismiTick);
     }
 
     /**
@@ -48,7 +65,7 @@ public final class IstemciAy {
 
     /** Yaklaşan ay çizilirken vanilla ayın yerine o görünür. */
     public static boolean ayiGizle() {
-        return IstemciDonem.durum().ayDurumu() == AyDurumu.YAKLASIYOR;
+        return durum(0f).ay() == AyDurumu.YAKLASIYOR;
     }
 
     static boolean halkaAcik() {

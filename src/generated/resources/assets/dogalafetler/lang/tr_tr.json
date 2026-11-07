@@ -179,6 +179,7 @@
   "commands.dogalafetler.start.bilinmeyen": "Bilinmeyen afet: %s",
   "commands.dogalafetler.start.hata": "%s başlatılamadı; sunucu log'una bakın.",
   "commands.dogalafetler.start.kayitli_degil": "%s henüz kayıtlı değil.",
+  "commands.dogalafetler.start.pencere": "Komutla başlatıldı: gün saati penceresine bakılmaz (doğal %s yalnız gün saati %s–%s arasında patlar).",
   "commands.dogalafetler.start.yer_uygun_degil": "%s için uygun yer bulunamadı.",
   "commands.dogalafetler.start.zaten_aktif": "Zaten aktif bir afet var: %s. Önce /dogalafet stop.",
   "commands.dogalafetler.stop.afet_yok": "Durdurulacak afet ya da dönem süreci yok.",

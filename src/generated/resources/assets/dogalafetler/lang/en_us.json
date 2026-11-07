@@ -179,6 +179,7 @@
   "commands.dogalafetler.start.bilinmeyen": "Unknown disaster: %s",
   "commands.dogalafetler.start.hata": "%s could not be started; see the server log.",
   "commands.dogalafetler.start.kayitli_degil": "%s is not registered yet.",
+  "commands.dogalafetler.start.pencere": "Started by command: the time-of-day window is ignored (a natural %s goes off only at day time %s–%s).",
   "commands.dogalafetler.start.yer_uygun_degil": "No suitable place found for %s.",
   "commands.dogalafetler.start.zaten_aktif": "A disaster is already active: %s. Use /dogalafet stop first.",
   "commands.dogalafetler.stop.afet_yok": "There is no disaster or era process to stop.",

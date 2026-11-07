@@ -59,11 +59,14 @@ class PulsarVeGunSaatiTest {
     }
 
     @Test
-    void gunSaatiIlkOgleyeIleriGecerVeTutulur() {
-        assertEquals(6_000L, GunSaatiSabitleme.ilkHedef(1_000L));
+    void gunSaatiSabahtaYerindeDisindaOgleyeIleriGecerVeTutulur() {
+        assertEquals(1_000L, GunSaatiSabitleme.ilkHedef(1_000L), "sabah penceresinde doğal patlama: zıplama yok");
+        assertEquals(0L, GunSaatiSabitleme.ilkHedef(0L));
+        assertEquals(5_999L, GunSaatiSabitleme.ilkHedef(5_999L));
         assertEquals(6_000L, GunSaatiSabitleme.ilkHedef(6_000L));
-        assertEquals(30_000L, GunSaatiSabitleme.ilkHedef(18_000L), "gece: geri sarılmaz, ertesi öğle");
-        assertEquals(78_000L, GunSaatiSabitleme.ilkHedef(72_001L));
+        assertEquals(30_000L, GunSaatiSabitleme.ilkHedef(18_000L), "gece (komutla): geri sarılmaz, ertesi öğle");
+        assertEquals(72_001L, GunSaatiSabitleme.ilkHedef(72_001L));
+        assertEquals(102_000L, GunSaatiSabitleme.ilkHedef(79_000L), "öğleden sonra: aynı günün öğlesi geçti, ertesi");
         assertEquals(6_000L, GunSaatiSabitleme.tut(6_000L, 6_001L, true), "vanilla'nın +1'i geri alınır");
         assertEquals(6_000L, GunSaatiSabitleme.tut(6_000L, 6_000L, false));
         assertEquals(2_500L, GunSaatiSabitleme.tut(6_000L, 2_500L, true), "/time set yeni sabit olur");

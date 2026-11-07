@@ -1,8 +1,11 @@
 package io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik;
 
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.GunSaatiPenceresi;
+
 /**
- * Güneş patlaması AKTIF boyunca gün saatinin sabit tutulması (gökyüzü-2): başta bir sonraki öğleye (ileri; saat geri
- * sarılmaz) geçilir, sonra vanilla'nın tick başına +1'i geri alınır. Başka bir değişiklik ({@code /time set}, uyku, başka
+ * Güneş patlaması AKTIF boyunca gün saatinin sabit tutulması (gökyüzü-2): patlama sabah penceresindeyse (doğal başlangıç,
+ * istek 26) saat yerinde kalır, dışındaysa (komutla başlayan patlama) bir sonraki öğleye geçilir (ileri; saat geri
+ * sarılmaz); sonra vanilla'nın tick başına +1'i geri alınır. Başka bir değişiklik ({@code /time set}, uyku, başka
  * mod) dışarıdan sayılır ve yeni sabit olur. {@code doDaylightCycle}'a dokunulmaz; oyun günü
  * ({@code getGameTime() + uykuBirikimi}, K-C29) gün saatinden bağımsız sürer. Minecraft sınıfı kullanmaz.
  */
@@ -14,8 +17,14 @@ public final class GunSaatiSabitleme {
     private GunSaatiSabitleme() {
     }
 
-    /** Sabitlemenin ilk hedefi: {@code gunSaati}'nden küçük olmayan ilk öğle. */
+    /**
+     * Sabitlemenin ilk hedefi: gün saati sabah penceresindeyse ({@link GunSaatiPenceresi#SABAH}) kendisi, değilse
+     * {@code gunSaati}'nden küçük olmayan ilk öğle.
+     */
     public static long ilkHedef(long gunSaati) {
+        if (GunSaatiPenceresi.SABAH.icinde(gunSaati)) {
+            return gunSaati;
+        }
         long ogle = Math.floorDiv(gunSaati, GUN_TICK) * GUN_TICK + OGLE;
         return gunSaati <= ogle ? ogle : ogle + GUN_TICK;
     }

@@ -29,10 +29,12 @@ import net.minecraftforge.fml.common.Mod;
  * çalışır; üretimde etkisizdir. Gece, seyirci kamera doğuş noktasının {@value #KAMERA_YUKSEKLIGI} blok üstünde (ağaçlar
  * ve arazi ufku kapatmaz) yaklaşma yönüne (doğu-güneydoğu) bakar. Sıra: tepeye bakan önce karesi; vitrin açısından
  * afetsiz FPS tabanı ({@code s5_ay_taban}); ön-uyarı (değişiklik yok); siren boyunca ufkun 12° üstüne bakarak büyüyen ve
- * parçalanan ay; son saniyeler ağır çekimde (sunucu tick'inde: 47. sn'den hız 0,05, 58,5. sn'den 0,01) vitrin açısından
- * (ufkun 4° üstü: ay, parlama ve
- * patlama aynı kadrajda); 3 boyutlu patlama 0 / 2 sn, 3. sn'de kamera {@value #YUKSELTME} blok yükseltilmiş (patlama dünyada
- * sabit: kadrajda aşağı kayar), 8. sn'de patlama yok (tam genlikte kısa sarsıntı dizisinden sonra, H.3); meteorlar
+ * parçalanan ay; son saniyeler ağır çekimde (sunucu tick'inde 47. sn'den hız 0,1 = {@code /dogalafet hiz} alt sınırı) vitrin
+ * açısından (ufkun 4° üstü: ay, parlama ve patlama aynı kadrajda); 3 boyutlu patlama 0,3 / 1 / 2 sn, 3. sn'de kamera
+ * {@value #YUKSELTME} blok yükseltilmiş (patlama dünyada sabit: kadrajda aşağı kayar), 8. sn'de patlama yok (tam genlikte kısa
+ * sarsıntı dizisinden sonra, H.3). Yaklaşma, patlama ve sarsıntı karelerinde istemcinin ay saati kare alınana dek karenin
+ * saniyesinde sabit tutulur ({@link IstemciAy#sabitle}; pc2'de FPS &lt; 15 iken kare kapısı 60 sn bekler); satır sabit ve
+ * canlı saniyeyi yazar. Meteorlar
  * başlayınca en ağır an ölçülür ({@code s5_ay_yuksek}, taban {@code s5_ay_taban}); doğal bitiş, enkaz halkalı aysız gece
  * (halka karesinden {@value #KAYAN_ONCE} tick önce zorlanmış kayan yıldız: kendiliğinden ~3 dk'da bir doğar, ömrü 20 tick,
  * en parlak anı 10. tick), gündüz ve {@code sifirla} sonrası tepede geri gelen ay (önce / aysız / sonra aynı açıdan). Kareler
@@ -71,11 +73,12 @@ public final class AyCarpmasiOtomasyonu {
     private static final Kare[] YAKLASMA = {new Kare("02_siren_5sn", 5f), new Kare("03_parcalanma_24sn", 24f),
             new Kare("04_catlaklar_38sn", 38f), new Kare("05_son_yaklasma_51sn", 51f), new Kare("06_vitrin_54sn", 54f),
             new Kare("07_vitrin_58sn", 58f)};
-    /** Patlama üç anı (0 / 2 / 8 sn) ve yükseltilmiş kamera; {@value #SARSINTI_SIRASI}. kareden önce sarsıntı dizisi. */
-    private static final Kare[] CARPMA = {new Kare("08_patlama_0sn", 0.3f), new Kare("09_patlama_2sn", 2f),
-            new Kare("09b_patlama_3sn_yukari", 3f, YUKSELTME), new Kare("10_patlama_8sn_yok", 8f),
-            new Kare("11_meteor_20sn", 20f), new Kare("12_halka_47sn", 47f), new Kare("13_gok_90sn", 90f)};
-    private static final int SARSINTI_SIRASI = 3;
+    /** Patlama anları (0,3 / 1 / 2 / 8 sn) ve yükseltilmiş kamera; {@value #SARSINTI_SIRASI}. kareden önce sarsıntı dizisi. */
+    private static final Kare[] CARPMA = {new Kare("08_patlama_0sn", 0.3f), new Kare("08b_patlama_1sn", 1f),
+            new Kare("09_patlama_2sn", 2f), new Kare("09b_patlama_3sn_yukari", 3f, YUKSELTME),
+            new Kare("10_patlama_8sn_yok", 8f), new Kare("11_meteor_20sn", 20f), new Kare("12_halka_47sn", 47f),
+            new Kare("13_gok_90sn", 90f)};
+    private static final int SARSINTI_SIRASI = 4;
     private static volatile int yukseltme;
 
     private static int tus;
@@ -88,8 +91,8 @@ public final class AyCarpmasiOtomasyonu {
     private static int sonSarsinti = -SARSINTI_ARA;
     private static int olcumBas = -1;
     private static boolean olcumBitti;
-    /** Ağır çekim adımları {yaklaşma saniyesi, hız}: istemci kare kapısında beklerken (pc2'de kare başına ~60 sn) an kaçmasın. */
-    private static final float[][] YAVASLATMA = {{47f, 0.05f}, {58.5f, 0.01f}};
+    /** Ağır çekim {yaklaşma saniyesi, hız}; 0,1 {@code /dogalafet hiz} alt sınırıdır (daha küçüğü 0,1'e kenetlenir). */
+    private static final float[][] YAVASLATMA = {{47f, 0.1f}};
     private static volatile int yavaslatma;
     private static volatile boolean sunucuHazir;
     private static volatile BlockPos kamera;
@@ -98,9 +101,8 @@ public final class AyCarpmasiOtomasyonu {
     }
 
     /**
-     * Sunucu thread'inde: ağır çekim yaklaşma saniyesinden kurulur, istemci kare kapısında (FPS &lt; 15 iken 60 sn) beklese de
-     * gecikmez. Son yaklaşma ve patlamanın ilk 3 sn'si 0,05 / 0,01 hızda geçer (60 sn bekleme ≤ 0,6 patlama saniyesi); 3. sn
-     * karesinden sonra istemci hızı 1'e döndürür.
+     * Sunucu thread'inde: ağır çekim yaklaşma saniyesinden kurulur, istemci kare kapısında beklese de gecikmez. Patlamanın
+     * 3. sn karesinden sonra istemci hızı 1'e döndürür.
      */
     @SubscribeEvent
     public static void sunucuTick(TickEvent.ServerTickEvent olay) {
@@ -210,7 +212,8 @@ public final class AyCarpmasiOtomasyonu {
             }
             case 5 -> {
                 if (d.yaklasiyor() && kareSirasi < YAKLASMA.length && d.saniye() >= YAKLASMA[kareSirasi].saniye()) {
-                    kare(YAKLASMA[kareSirasi++].ad());
+                    Kare k = YAKLASMA[kareSirasi++];
+                    kare(k.ad(), new IstemciAy.Durum(AyDurumu.YAKLASIYOR, k.saniye()));
                 } else if (d.carpti()) {
                     kareSirasi = 0;
                     sonraki();
@@ -226,10 +229,11 @@ public final class AyCarpmasiOtomasyonu {
                 } else if (kareSirasi == SARSINTI_SIRASI && sarsintiNo < SARSINTI_KARE && d.saniye() >= SARSINTI_DIZI_SN
                         && sayac - sonSarsinti >= SARSINTI_ARA) {
                     sonSarsinti = sayac;
-                    kare("sarsinti_" + ++sarsintiNo);
+                    kare("sarsinti_" + ++sarsintiNo, d);
                 } else if (hedef != null && d.carpti() && d.saniye() >= hedef.saniye() && yukseltme == istenen
                         && (kareSirasi != SARSINTI_SIRASI || sarsintiNo == SARSINTI_KARE)) {
-                    kare(CARPMA[kareSirasi++].ad());
+                    kare(hedef.ad(), new IstemciAy.Durum(AyDurumu.YOK, hedef.saniye()));
+                    kareSirasi++;
                     if (kareSirasi == SARSINTI_SIRASI) {
                         komut(server, "dogalafet hiz 1");
                     }
@@ -329,19 +333,31 @@ public final class AyCarpmasiOtomasyonu {
                 pitch);
     }
 
-    /** Kare isteği; satır kapı açılınca isteğin ve alınışın evre saniyesini, sarsıntı genliğini yazar. */
-    private static void kare(String ad) {
-        float istek = IstemciAy.durum(0f).saniye();
+    /**
+     * Kare isteği; ay saati kare alınana dek {@code sabit}'te tutulur. Satır kapı açılınca sabit ve canlı saniyeyi, sarsıntı
+     * genliğini yazar.
+     */
+    private static void kare(String ad, IstemciAy.Durum sabit) {
+        IstemciAy.sabitle(sabit);
         GorselOtomasyon.kareIste(OTOMASYON, "ay_carpmasi_" + ad + ".png", k -> {
             Minecraft mc = Minecraft.getInstance();
             IstemciAy.Durum d = IstemciAy.durum(0f);
+            IstemciAy.Durum canli = IstemciAy.canli(0f);
+            IstemciAy.sabitle(null);
             double sarsinti = d.carpti() ? AyEgrileri.SARSINTI_DERECE * AyEgrileri.sarsinti(d.saniye())
                     * IstemciAy.ayar(AyCarpmasiAyarlari::ekranSarsintisiOlcegi) : 0;
-            DogalAfetler.LOGGER.info(ON + "kare {} (ay {} sn {}, istek sn {}, FPS {}, sunucu TPS {} / {} ms, parçacık {}, "
-                            + "kayan yıldız {}, sarsıntı {}°)", k.dosya(), d.ay(), sayi(d.saniye()), sayi(istek), k.fps(),
-                    sayi(TpsOlcer.tps()), sayi(TpsOlcer.ortalamaMs()), mc.particleEngine.countParticles(),
-                    AyCarpmasiGokyuzu.kayanSayisi(), String.format(Locale.ROOT, "%.2f", sarsinti));
+            float parlama = d.carpti() ? AyEgrileri.dunyaParlamasi(d.saniye()) : 0f;
+            DogalAfetler.LOGGER.info(ON + "kare {} (ay {} sn {} sabit, canlı {} sn {}, FPS {}, sunucu TPS {} / {} ms, "
+                            + "parçacık {}, kayan yıldız {}, sarsıntı {}°, dünya parlaması {})", k.dosya(), d.ay(),
+                    sayi(d.saniye()), canli.ay(), sayi(canli.saniye()), k.fps(), sayi(TpsOlcer.tps()),
+                    sayi(TpsOlcer.ortalamaMs()), mc.particleEngine.countParticles(), AyCarpmasiGokyuzu.kayanSayisi(),
+                    String.format(Locale.ROOT, "%.2f", sarsinti), String.format(Locale.ROOT, "%.2f", parlama));
         });
+    }
+
+    /** Ay saati sabitlenmeden kare isteği (ay durumundan bağımsız kareler). */
+    private static void kare(String ad) {
+        kare(ad, null);
     }
 
     private static String sayi(double d) {

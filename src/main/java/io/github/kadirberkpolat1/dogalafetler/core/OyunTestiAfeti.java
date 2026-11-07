@@ -99,6 +99,12 @@ public class OyunTestiAfeti extends Afet {
         return Math.max(0, aktifSure - aktifGecen);
     }
 
+    /** Taklit gün saati penceresini beklemez: senaryo betikleri yaşam döngüsünü saatten bağımsız sınar (gökyüzü-2 istek 26). */
+    @Override
+    protected boolean patlamaPenceresiniBekle(ServerLevel level) {
+        return false;
+    }
+
     @Override
     protected void temizle(ServerLevel level, boolean temiz) {
         temizlemeSayisi++;
