@@ -63,7 +63,8 @@ public final class PulsarOtomasyonu {
     private static final float YAKLASMA_SN = 12f;
     private static final float SPAGETTI_SN = 40f;
     private static final float PARLAMA_SN = PulsarZinciri.YUTMA_PARLAMA_SN + KaraDelikYutmaEgrileri.PARLAMA_TEPE_SN;
-    private static final float KARANLIK_SN = 80f;
+    /** Yutumdan sonraki karanlık: kara delik hâlâ büyük (~13°) ve diski parlıyor. */
+    private static final float KARANLIK_SN = 66f;
     private static final float DOGUS_ILERLEME = 0.3f;
     private static final float DONUS_SN = 20f;
 
@@ -151,12 +152,12 @@ public final class PulsarOtomasyonu {
                 yutmaKadraji = false;
                 komut(s, "dogalafet hiz 50");
             }, () -> evre(GunesEvresi.GUNESSIZ), null, 400),
-            new Adim("güneşsiz buzul", s -> {
-                komut(s, "dogalafet hiz 1", "time set 6000", "dogalafet donma 100");
+            new Adim("güneşsiz buzul (tipi)", s -> {
+                komut(s, "dogalafet hiz 1", "time set 6000", "dogalafet donma 100", "weather rain");
                 kamera(s, zeminKamerasi);
-            }, () -> sayac >= 200 && evre(GunesEvresi.GUNESSIZ), "gunessiz_buz", 400),
+            }, () -> sayac >= 600 && evre(GunesEvresi.GUNESSIZ), "gunessiz_buz", 800),
             new Adim("kızıl cüce doğuşu (şafak, hız 4)", s -> {
-                komut(s, "time set 23600", "dogalafet asama ileri gunessiz", "dogalafet hiz 4");
+                komut(s, "weather clear", "time set 23600", "dogalafet asama ileri gunessiz", "dogalafet hiz 4");
                 kamera(s, -90f, -8f);
             }, () -> evre(GunesEvresi.KIZIL_CUCE) && donem().evreIlerlemesi() >= DOGUS_ILERLEME, "kizil_cuce_dogus", 900),
             new Adim("eski güneş döndü", s -> {

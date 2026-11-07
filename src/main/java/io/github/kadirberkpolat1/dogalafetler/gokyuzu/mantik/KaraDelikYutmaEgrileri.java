@@ -113,9 +113,9 @@ public final class KaraDelikYutmaEgrileri {
         return Math.max((0.35f + 0.65f * merceklenme(s)) * karaDelikAlfa(s), parlama(s));
     }
 
-    /** Akresyon diskinin parlaklığı: pulsarın maddesiyle beslendikçe artar. */
+    /** Akresyon diskinin parlaklığı: pulsarın maddesiyle beslendikçe artar, yutumdan sonra o parlaklıkta söner. */
     public static float diskParlakligi(float s) {
-        float besleme = s < YUTUM_SN ? 0.55f + 0.45f * spagetti(s) : 0.75f;
+        float besleme = s < YUTUM_SN ? 0.55f + 0.45f * spagetti(s) : 0.95f;
         return besleme * karaDelikAlfa(s);
     }
 

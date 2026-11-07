@@ -56,6 +56,8 @@ public final class PulsarIstemciEfektleri {
     private static float kulBirikimi;
     /** Işık haritasında parlamanın çektiği mor-beyaz. */
     private static final float[] PARLAMA_RENGI = {0.95f, 0.9f, 1f};
+    /** Parlamanın tam ekran örtüsü: tepede bile parlayan kara delik ve arazi silueti okunur kalır. */
+    private static final float EKRAN_ORTUSU = 0.5f;
 
     private PulsarIstemciEfektleri() {
     }
@@ -192,7 +194,7 @@ public final class PulsarIstemciEfektleri {
         if (level == null || level.dimension() != Level.OVERWORLD) {
             return;
         }
-        float guc = 0.85f * parlama(IstemciGokyuzu.gorunum(pt));
+        float guc = EKRAN_ORTUSU * parlama(IstemciGokyuzu.gorunum(pt));
         if (guc <= 0.004f) {
             return;
         }

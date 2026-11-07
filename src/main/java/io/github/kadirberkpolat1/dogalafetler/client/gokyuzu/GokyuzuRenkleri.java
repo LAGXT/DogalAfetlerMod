@@ -89,7 +89,7 @@ final class GokyuzuRenkleri {
     private static float[] yutmaRengi(float[] pus, int mor, int siyah, int parlama, float s) {
         float[] r = GokyuzuEgrileri.karistir(pus, GokyuzuEgrileri.rgb(mor), KaraDelikYutmaEgrileri.morluk(s));
         r = GokyuzuEgrileri.karistir(r, GokyuzuEgrileri.rgb(siyah), KaraDelikYutmaEgrileri.karanlik(s));
-        return GokyuzuEgrileri.karistir(r, GokyuzuEgrileri.rgb(parlama), 0.85f * KaraDelikYutmaEgrileri.parlama(s));
+        return GokyuzuEgrileri.karistir(r, GokyuzuEgrileri.rgb(parlama), 0.6f * KaraDelikYutmaEgrileri.parlama(s));
     }
 
     private static float[] tekSis(GunesEvresi evre, float p, float saniye, boolean ay, float[] v, float gun, float kc) {
