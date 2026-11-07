@@ -1,0 +1,24 @@
+Dosya: src/main/resources/assets/dogalafetler/sounds/tsunami_ugultu.ogg (78615 bayt, 12.0 sn, mono, 48000 Hz, Vorbis q5)
+Hedef (docs/tasarim/ses.md §4): -26.0 LUFS ±1, gerçek tepe <= -6.0 dBTP, baskın frekans 35–150 Hz, 2500 Hz üstü <= -30 dB
+Ölçülen (ogg): I = -26.0 LUFS, gerçek tepe = -11.5 dBTP
+Baskın frekanslar (20 Hz kümeleri, güçlüden zayıfa): 60 Hz, 40 Hz, 80 Hz
+Perde izi (0,5 sn pencerelerde en güçlü frekans, ilk 20): 40, 38, 74, 76, 78, 56, 78, 78, 50, 52, 72, 38, 70, 42, 100, 62, 46, 62, 62, 78 Hz
+Bant enerjisi / toplam: 35–150 Hz -0.4 dB; 300–3400 Hz (konuşma) -24.1 dB; >2500 Hz -37.6 dB; >8000 Hz -79.5 dB
+Döngü dikişi: |ilk - son| / en büyük iç adım = 0.174 (<= 1 ise süreksizlik yok); ilk örnek = +0.00075
+Hedefle karşılaştırma: UYGUN
+
+ffmpeg -i tsunami_ugultu.ogg -af ebur128=peak=true -f null -
+Summary:
+
+  Integrated loudness:
+    I:         -26.0 LUFS
+    Threshold: -36.0 LUFS
+
+  Loudness range:
+    LRA:         1.1 LU
+    Threshold: -46.1 LUFS
+    LRA low:   -26.7 LUFS
+    LRA high:  -25.6 LUFS
+
+  True peak:
+    Peak:      -11.5 dBFS
