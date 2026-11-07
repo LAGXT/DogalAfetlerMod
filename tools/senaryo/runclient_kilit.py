@@ -26,6 +26,13 @@ bırakılmasından `KAPANIS_SN` sn sonra JVM yaşıyorsa onu öldürerek.
 `al` ile kaydedilen pid, runClient boyunca yaşayan süreç olmalı (ör. koşu betiğinin `$$`'ı); kısa ömürlü bir pid ile alınan
 kilidi bir sonraki bekleyen "sahibi ölü" diye devralır. Çıkış kodları: 0 tamam, 3 bekleme süresi doldu, 4 kilit başkasının.
 Yol `DOGALAFETLER_RUNCLIENT_KILIT` ortam değişkeniyle değiştirilebilir (testler).
+
+Ekran kipi (`DOGALAFETLER_EKRAN`, `ekran_pc2()`): `pc2` ise görsel betik ikinci makinede (XFCE/X11) koşar ve istemci görünür
+açılır (`pc2_istemci.sh`). Kullanıcının oturumu olmadığından K0-21 rev. 2 denetimleri (Hyprland exec kuralı (a), belirteç (b),
+pencere (c), odak bekçisi (d)) uygulanmaz ve oyun içi girdi olayları (e) koşuyu geçersiz kılmaz; kareler oyun içi
+(`GorselOtomasyon.kareIste` → `Screenshot.grab`, ana render hedefi) olduğundan yakalama aracı gerekmez. FPS/CPU ölçümü pc2'de
+geçersizdir: log'a `MAKINE=<ad>` yazılır, `olcum_tablosu.py` o klasörün `OLCUM` satırlarını `bilgi` sayar.
+Kipi tanıyan betik: `radar_gorsel.py`.
 """
 import argparse
 import contextlib
@@ -52,6 +59,34 @@ def kok():
 def kilit_yolu():
     ortam = os.environ.get("DOGALAFETLER_RUNCLIENT_KILIT")
     return Path(ortam) if ortam else kok() / ".vibe" / "runclient.lock"
+
+
+def ekran_pc2():
+    """Görsel betik pc2 kipinde mi (`DOGALAFETLER_EKRAN=pc2`, `pc2_istemci.sh` verir)."""
+    return os.environ.get("DOGALAFETLER_EKRAN", "") == "pc2"
+
+
+def makine():
+    """Bilgisayar adı (`gradle_kapisi.sh` `MAKINE=` satırıyla aynı kaynak)."""
+    with contextlib.suppress(OSError):
+        return Path("/etc/hostname").read_text().strip()
+    return os.uname().nodename
+
+
+def pc2_baslat(betik, log):
+    """pc2 kipi: başlatma betiğini `sh` ile görünür açar (`DISPLAY` ortamdan); Hyprland kuralı ve (b)/(c)/(d) denetimleri
+    yoktur. Betik aynı süreç grubunda kalır: `uzak.sh` kesmesi grubu durdurunca `kos` da sinyal alır. `Popen` döner."""
+    ekran = os.environ.get("DISPLAY")
+    if not ekran:
+        raise RuntimeError("pc2 kipi DISPLAY ister (pc2_istemci.sh DISPLAY=:0 verir)")
+    log(f"(a) pc2 kipi: MAKINE={makine()} DISPLAY={ekran}; istemci görünür açılıyor, Hyprland kuralı ve (b)/(c)/(d) "
+        "denetimleri uygulanmaz; kareler oyun içi, OLCUM satırları bilgi")
+    return subprocess.Popen(["sh", str(betik)], stdin=subprocess.DEVNULL)
+
+
+def pc2_girdi_notu(sayi):
+    """pc2 kipinde (e) satırı: girdi olayları sayılır ama koşuyu geçersiz kılmaz."""
+    return f"(e) oyun içi girdi olayı: {sayi} (pc2: geçersiz değil, uygulanmaz; pencere görünür, sahibin masaüstü değil)"
 
 
 def _stat(pid):

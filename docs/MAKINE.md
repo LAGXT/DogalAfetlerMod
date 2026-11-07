@@ -144,8 +144,28 @@ Testler CPU'ya değil tick'e bağlı olduğu için yavaş işlemcide tek işin s
 537 MiB, zram takası en çok 876 MiB, yük 8,05 (4 iş parçacığı; `.vibe/kanit/uzak-pc2/ram-paralel.txt`). Bu yüzden `uzak.sh` en çok
 **iki** yuva açar (`UZAK_YUVA`), pc2'de kapı eşiği `KAPI_RAM_MB=2500`; üçüncü iş yuva bekler. XFCE kapatılırsa
 (`sudo systemctl set-default multi-user.target`) ~0,4–0,6 GiB pay kazanılır (ölçülmedi). `runClient` (~5–6 GiB) pc2'de
-başka işle sığmaz; görsel betikler Hyprland/hypruse ister, pc2 XFCE/X11. Ana makinenin iki Gradle tavanı (K-E19) yerel iş
+başka işle sığmaz: pc2 istemcisi iki yuvayı birden tutar (aşağıda). Ana makinenin iki Gradle tavanı (K-E19) yerel iş
 (istemci, `runData`) için geçer. pc2 Windows'la açıksa ya da kapalıysa çıkış 4.
+
+### pc2'de görünür istemci (2026-11-07, `is/pc2-istemci`)
+
+Yalnız kare/vitrin koşuları: `tools/senaryo/pc2_istemci.sh <kanıt/> <görsel betik> [argümanlar]` (proje ya da worktree
+kökünden), içeride `uzak.sh -g <kanıt/> env DOGALAFETLER_EKRAN=pc2 DISPLAY=:0 ... python3 tools/senaryo/<betik>`. pc2 kipinde
+(`runclient_kilit.ekran_pc2`) pencere XFCE'de görünür açılır; Hyprland exec kuralı, belirteç, pencere ve odak denetimleri
+(K0-21 rev. 2 (a)–(d)) uygulanmaz, oyun içi girdi olayları (e) koşuyu geçersiz kılmaz. Kareler oyun içi
+(`GorselOtomasyon.kareIste` → `Screenshot.grab`, ana render hedefi), yakalama aracı gerekmez. FPS/CPU ölçümü geçersiz:
+log'a `MAKINE=LAGXT2` yazılır, `olcum_tablosu.py` o klasörün `OLCUM` satırlarını `bilgi` (kural `pc2`) sayar; ölçüm ana makinede.
+Kipi tanıyan betik şimdilik yalnız `radar_gorsel.py` (`pc2_istemci.sh` tanımayan betiği çıkış 2 ile reddeder).
+
+| Öğe | Değer | Nasıl ölçüldü |
+|---|---|---|
+| Oturum | XFCE, X11, `DISPLAY=:0`, LightDM oturumu açık olmalı (`loginctl`: seat0, `Type=x11`, `State=active`; kilit ekranı için denenmedi); ssh'tan `~/.Xauthority` ile açılır | `loginctl show-session` |
+| Çözünürlük | VGA `1024x768` (tek bağlı çıkış; masaüstü geometrisi 1366×1024); istemci karesi **1280×720**, GUI ölçekli ekran 427×240 (ana makine 1870×969, 468×243) | `/sys/class/drm/*/modes`, `xprop -root`, `identify` |
+| GL | Mesa 26.2.6, `AMD RV620`, OpenGL 3.3 Core / 3.3 Compatibility, 512 MB | `glxinfo -B` |
+| Araçlar | var: `import`/`identify` (ImageMagick), `xprop`, `glxinfo`, `xfce4-screenshooter`, `flock`, `rsync`, Python 3.14; yok: `xdotool`, `scrot`, `maim`, `xwd`, `xrandr`, `xdpyinfo`, `bc` (hiçbiri gerekmiyor) | `command -v` |
+| Radar koşusu | iki koşu GEÇERLİ, 8/8 kare, kare kapısı 8 açık / 0 geçersiz (FPS 15–20); toplam 191 sn (ilk, derleme dahil) ve 165 sn; istemci 188 / 163 sn (ana makine 141 sn) | `.vibe/kanit/pc2-istemci/` |
+| RAM | istemci koşusunda en az kullanılabilir 1 321 MiB (ilk koşu, Gradle derlemesiyle) ve 3 681 MiB (yapı güncel); takas 222 MiB | 3–5 sn'lik `free -m` örnekleri |
+| Gradle daemon | yalnız pc2 `~/.gradle/gradle.properties`: `org.gradle.daemon=true`, `idletimeout=900000` (15 dk). `./gradlew help` soğuk 12,4 sn, sıcak 2,7 sn (`--no-daemon` 12,5 sn); filtresiz GameTest 216/216, 1 dk 52 sn, en az kullanılabilir 3 937 MiB. Boştaki daemon ~0,5 GiB; `gradle_kapisi.sh` ortamı (`LC_ALL`) farklı olduğundan ikinci daemon açılır. `pc2_istemci.sh` istemciden önce `./gradlew --stop` (~0,85 GiB geri) | zamanlayıcı + `free -m` |
 
 ## Pratik notlar
 
