@@ -3,13 +3,19 @@
   "criteria": {
     "topla": {
       "conditions": {
-        "esya": "dogalafetler:kozmik_cekirdek"
+        "items": [
+          {
+            "items": [
+              "dogalafetler:kozmik_cekirdek"
+            ]
+          }
+        ]
       },
-      "trigger": "dogalafetler:esya_toplandi"
+      "trigger": "minecraft:inventory_changed"
     }
   },
   "display": {
-    "announce_to_chat": true,
+    "announce_to_chat": false,
     "description": {
       "translate": "advancements.dogalafetler.kozmik_sans.description"
     },

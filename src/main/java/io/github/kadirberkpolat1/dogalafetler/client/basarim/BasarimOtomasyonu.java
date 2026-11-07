@@ -26,9 +26,8 @@ import net.minecraftforge.fml.common.Mod;
 /**
  * Başarım görsel kanıt otomasyonu (K0-21 rev. 2). Yalnız {@code -Ddogalafetler.otomasyon=basarim} ile, tek oyunculu
  * Quick Play dünyasında ve {@code -PoyunTestiAfeti=kasirga} ile çalışır; üretimde etkisizdir. Sırayla: seviye 5 sınama
- * kasırgasının sireniyle kök toast'ı, üç başarımın toast'ı ve sohbet duyurusu (tür ve seviye 3 ayrı tick'lerde verilir,
- * doğal bitiş seviye 5'i ünvanıyla açar: sıra belirlenimci, A-35), ünvanlı sohbet satırı, ünvanlı tab listesi (liste
- * hedefi: tek oyunculu dünyada tek oyuncuyla vanilla listeyi ancak liste hedefi varken çizer), başarım sekmesinin erken
+ * kasırgasının sireniyle kök toast'ı, üç başarımın toast'ı ve modun sohbet duyurusu (tür ve seviye 3 ayrı tick'lerde verilir,
+ * doğal bitiş seviye 5'i açar: sıra belirlenimci, A-35; yalnız meydan okumanın satırı ünvanlı, A-37), başarım sekmesinin erken
  * hali (kök + iki kat), gizliler dışındaki bütün başarımlar açıkken sekmenin dört kaydırma konumu (gizli iki başarım
  * görünmez) ve gizliler açılınca
  * üç konum (gizliler ortada tam görünür). Sahne komutları entegre sunucunun konsol kaynağından çıktısız verilir:
@@ -210,9 +209,7 @@ public final class BasarimOtomasyonu {
                     "gamerule doDaylightCycle false", "time set 6000", "weather clear 100000",
                     "gamerule doWeatherCycle false",
                     "gamerule announceAdvancements true", "advancement revoke @s from dogalafetler:dogalafetler/root",
-                    "dogalafet unvan @s yok", "scoreboard objectives add basarim_kanit dummy",
-                    "scoreboard objectives setdisplay list basarim_kanit",
-                    "dogalafet stop", "xp set @s 0 levels", "xp set @s 0 points"}) {
+                    "dogalafet unvan @s yok", "dogalafet stop", "xp set @s 0 levels", "xp set @s 0 points"}) {
                 komut(mc, k);
             }
         }, bekle(60), 80);
@@ -234,16 +231,11 @@ public final class BasarimOtomasyonu {
         ekle("doğal son", () -> komut(mc, "dogalafet asama ileri"), kazanildi(mc, Basarimlar.FELAKET_USTASI), 200);
         ekle("toast'lar", () -> { }, cizimle(25, 20), 60);
         ekle("toast kare", () -> kare(mc, "toast_felaket_ustasi"), bekle(10), 20);
-        ekle("ünvanlı sohbet", () -> mc.player.connection.sendChat("Felaketi atlattık!"), bekle(40), 60);
+        // A-37: ünvan yalnız modun duyurusunda (Felaket Ustası satırı ünvanlı, öncekiler ünvansız); ad ve tab listesi öneksiz.
         ekle("sohbet ekranı", () -> mc.setScreen(new ChatScreen("")), bekle(20), 30);
         ekle("sohbet kare", () -> kare(mc, "sohbet_duyurusu"), bekle(10), 20);
-        ekle("tab listesi", () -> {
-            mc.setScreen(null);
-            mc.options.keyPlayerList.setDown(true);
-        }, bekle(20), 30);
-        ekle("tab kare", () -> kare(mc, "tab_unvan"), bekle(10), 20);
         ekle("sekme erken", () -> {
-            mc.options.keyPlayerList.setDown(false);
+            mc.setScreen(null);
             mc.getToasts().clear();
             sohbetiTemizle(mc);
             sekmeyiAc(mc);
@@ -297,7 +289,6 @@ public final class BasarimOtomasyonu {
         ekle("kapanış", () -> {
             mc.setScreen(null);
             komut(mc, "gamerule announceAdvancements true");
-            komut(mc, "scoreboard objectives remove basarim_kanit");
             logKomutu(mc, "dogalafet basarim bilgi @s");
             DogalAfetler.LOGGER.info(ON + "bitti; FPS {}", mc.getFps());
         }, bekle(40), 60);

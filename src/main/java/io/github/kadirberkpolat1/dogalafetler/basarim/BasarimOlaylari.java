@@ -40,7 +40,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import net.minecraft.advancements.Advancement;
-import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -48,6 +47,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.GameRules;
 import net.minecraft.world.phys.AABB;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
@@ -382,19 +382,6 @@ public final class BasarimOlaylari {
         BasarimOlcutleri.ESYA_URETILDI.tetikle(oyuncu, esya);
     }
 
-    /** #7, #22: yerden alınan eşya (envantere girdikten sonra gelen olay; dolu envanter saymaz). */
-    @SubscribeEvent
-    public static void esyaToplandi(PlayerEvent.ItemPickupEvent olay) {
-        if (olay.getEntity() instanceof ServerPlayer oyuncu) {
-            esyaToplandi(oyuncu, BasarimKimlikleri.esya(olay.getStack()));
-        }
-    }
-
-    /** #7, #22: yerden alınan eşyanın kimliği. */
-    public static void esyaToplandi(ServerPlayer oyuncu, ResourceLocation esya) {
-        BasarimOlcutleri.ESYA_TOPLANDI.tetikle(oyuncu, esya);
-    }
-
     /** #17: Tüy Upgrade'i sağ tıkı işlendikten sonra (sıcaklığın {@code TuyUpgrade}'i olayı iptal eder). */
     @SubscribeEvent(priority = EventPriority.LOWEST, receiveCanceled = true)
     public static void esyaSagTik(PlayerInteractEvent.RightClickItem olay) {
@@ -491,8 +478,8 @@ public final class BasarimOlaylari {
     // ---------------------------------------------------------------- ödül ve ünvan
 
     /**
-     * Meydan okuma ünvanı (A-22, A-32): ilerleme olayı ödül ve sohbet duyurusundan önce gelir; ünvan burada verilince
-     * başarımın kendi duyurusu da önekli adı taşır.
+     * Meydan okuma ünvanı (A-22, A-32): ilerleme olayı kazanım olayından önce gelir; ünvan burada verilince meydan
+     * okumanın kendi duyurusu ({@link #kazanildi}) da yeni ünvanı taşır.
      */
     @SubscribeEvent
     public static void ilerledi(AdvancementEvent.AdvancementProgressEvent olay) {
@@ -503,14 +490,24 @@ public final class BasarimOlaylari {
         }
     }
 
-    /** Config XP farkı (JSON varsayılanı verdi). */
+    /**
+     * Config XP farkı (JSON varsayılanı verdi) ve sohbet duyurusu (A-37): bizim advancement'larda vanilla duyuru kapalı
+     * ({@code announce_to_chat=false}); duyuru {@code announceAdvancements} açıkken burada, ünvan önekiyle yapılır. Veri
+     * paketi {@code announce_to_chat=true} yaparsa vanilla duyurur, mod susar (çift mesaj yok).
+     */
     @SubscribeEvent
     public static void kazanildi(AdvancementEvent.AdvancementEarnEvent olay) {
         if (olay.getEntity() instanceof ServerPlayer oyuncu) {
-            bizimBasarim(olay.getAdvancement()).ifPresent(basarim -> {
+            Advancement advancement = olay.getAdvancement();
+            bizimBasarim(advancement).ifPresent(basarim -> {
                 int fark = OdulTablosu.xpFarki(basarim.tur(), BasarimAyarlari.xp(basarim.tur()));
                 if (fark != 0) {
                     oyuncu.giveExperiencePoints(fark);
+                }
+                if (advancement.getDisplay() != null && !advancement.getDisplay().shouldAnnounceChat()
+                        && oyuncu.level().getGameRules().getBoolean(GameRules.RULE_ANNOUNCE_ADVANCEMENTS)) {
+                    oyuncu.server.getPlayerList().broadcastSystemMessage(
+                            Unvanlar.duyuru(oyuncu, basarim.tur(), advancement.getChatComponent()), false);
                 }
             });
         }
@@ -524,23 +521,6 @@ public final class BasarimOlaylari {
         return Basarimlar.yoldan(kimlik.getPath());
     }
 
-    @SubscribeEvent(priority = EventPriority.LOW)
-    public static void sohbetAdi(PlayerEvent.NameFormat olay) {
-        if (olay.getEntity() instanceof ServerPlayer oyuncu && BasarimAyarlari.unvanGoster()) {
-            BasarimVerisi.unvan(oyuncu).ifPresent(u -> olay.setDisplayname(Unvanlar.onekli(u, olay.getDisplayname())));
-        }
-    }
-
-    @SubscribeEvent(priority = EventPriority.LOW)
-    public static void tabAdi(PlayerEvent.TabListNameFormat olay) {
-        if (olay.getEntity() instanceof ServerPlayer oyuncu && BasarimAyarlari.unvanGoster()) {
-            BasarimVerisi.unvan(oyuncu).ifPresent(u -> {
-                Component ad = olay.getDisplayName() != null ? olay.getDisplayName() : oyuncu.getName();
-                olay.setDisplayName(Unvanlar.onekli(u, ad));
-            });
-        }
-    }
-
     // ---------------------------------------------------------------- oyuncu yaşam döngüsü
 
     @SubscribeEvent
@@ -550,23 +530,13 @@ public final class BasarimOlaylari {
         }
     }
 
-    @SubscribeEvent
-    public static void yenidenDogdu(PlayerEvent.PlayerRespawnEvent olay) {
-        if (olay.getEntity() instanceof ServerPlayer oyuncu && BasarimVerisi.unvan(oyuncu).isPresent()) {
-            Unvanlar.yenile(oyuncu);
-        }
-    }
-
-    /** Giriş: Kutup sayacı çevrim dışı süreyi saymasın; ünvan yüklenen veriyle yeniden hesaplansın. */
+    /** Giriş: Kutup sayacı çevrim dışı süreyi saymasın. */
     @SubscribeEvent
     public static void girdi(PlayerEvent.PlayerLoggedInEvent olay) {
         if (olay.getEntity() instanceof ServerPlayer oyuncu) {
             KutupSayaci sayac = BasarimVerisi.kutup(oyuncu);
             sayac.girisYapti();
             BasarimVerisi.kutupYaz(oyuncu, sayac);
-            if (BasarimVerisi.unvan(oyuncu).isPresent()) {
-                Unvanlar.yenile(oyuncu);
-            }
         }
     }
 
