@@ -5,14 +5,18 @@ import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
 import io.github.kadirberkpolat1.dogalafetler.core.CekirdekOyunTestleri;
 import io.github.kadirberkpolat1.dogalafetler.core.DonemSureci;
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
+import io.github.kadirberkpolat1.dogalafetler.core.OyunTestiTemizligi;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import net.minecraft.core.BlockPos;
+import net.minecraft.gametest.framework.AfterBatch;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.entity.animal.Pig;
@@ -24,7 +28,10 @@ import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraftforge.event.PlayLevelSoundEvent;
+import net.minecraftforge.event.VanillaGameEvent;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
 
@@ -543,6 +550,90 @@ public final class SuOyunTestleri {
                     h.assertTrue(araliklar(h, 4, 4).adet() == 1, "yeniden kurulan su sorguda yok");
                     SanalSu.magaraBitir(l, id);
                     SanalSu.dalgaBitir(l, dalgaId);
+                })
+                .thenSucceed();
+    }
+
+    /** {@link #sanalSuyaGirenVarlikBirKezSicratir} mağarası; test başarısız bitse de batch sonunda kaldırılır (K-E15). */
+    private static int sicramaMagarasi = -1;
+
+    @AfterBatch(batch = "su_sicrama")
+    public static void sicramaSonrasi(ServerLevel level) {
+        OyunTestiTemizligi.batchSonu(level);
+        if (sicramaMagarasi > 0) {
+            SanalSu.magaraBitir(level, sicramaMagarasi);
+            sicramaMagarasi = -1;
+        }
+    }
+
+    /**
+     * K-E26: sanal suya giren varlık vanilla gibi yalnız girişte bir kez sıçratır (SPLASH oyun olayı ve sıçrama sesi); suda
+     * kaldıkça yeni sıçrama yok, suyun etkileri (suda sayılma, hava kaybı) sürer. Kapalı oda önce tavana kadar dolar; tepede
+     * kuru bekleyen yapay zekâsız domuz ve eşya suya ışınlanır (giriş anı tek, yüzeyde inip çıkma yok). Tick başına sayımlar
+     * log'a yazılır.
+     */
+    @GameTest(template = "su_alani", batch = "su_sicrama", timeoutTicks = 600)
+    public static void sanalSuyaGirenVarlikBirKezSicratir(GameTestHelper h) {
+        ServerLevel l = h.getLevel();
+        oda(h, false);
+        Pig domuz = h.spawn(EntityType.PIG, 6, 10, 6);
+        domuz.setNoAi(true);
+        BlockPos ep = m(h, 8, 10, 8);
+        ItemEntity esya = new ItemEntity(l, ep.getX() + 0.5, ep.getY(), ep.getZ() + 0.5, new ItemStack(Items.OAK_LOG), 0, 0, 0);
+        esya.setNeverPickUp();
+        l.addFreshEntity(esya);
+        sicramaMagarasi = SanalSu.magaraDoldur(l, m(h, 4, 2, 4), 4000, 6000);
+        h.assertTrue(sicramaMagarasi > 0, "oda dolmadı");
+        int sure = 40;
+        int[] domuzSicrama = new int[sure + 2];
+        int[] esyaSicrama = new int[sure + 2];
+        int[] ses = new int[sure + 2];
+        long[] bas = {-1};
+        h.startSequence()
+                .thenWaitUntil(() -> {
+                    SanalSuDunyasi.Magara g = SanalSu.boyut(l).dunya.magaralar().get(sicramaMagarasi);
+                    h.assertTrue(g != null && g.asama(SanalSu.sunucuSaati) == MagaraZamani.Asama.BEKLIYOR, "oda henüz dolmadı");
+                })
+                .thenExecute(() -> {
+                    h.assertTrue(!domuz.isInWater() && !esya.isInWater(), "varlıklar ışınlanmadan önce suda");
+                    OyunTestiTemizligi.dinle(VanillaGameEvent.class, e -> {
+                        if (bas[0] >= 0 && e.getVanillaEvent() == GameEvent.SPLASH) {
+                            int t = (int) Math.min(sure + 1, l.getGameTime() - bas[0]);
+                            if (e.getCause() == domuz) {
+                                domuzSicrama[t]++;
+                            } else if (e.getCause() == esya) {
+                                esyaSicrama[t]++;
+                            }
+                        }
+                    });
+                    OyunTestiTemizligi.dinle(PlayLevelSoundEvent.AtPosition.class, e -> {
+                        if (bas[0] >= 0 && e.getSound() != null && e.getSound().value() == SoundEvents.GENERIC_SPLASH) {
+                            ses[(int) Math.min(sure + 1, l.getGameTime() - bas[0])]++;
+                        }
+                    });
+                    bas[0] = l.getGameTime();
+                    BlockPos dp = m(h, 6, 2, 6);
+                    domuz.teleportTo(dp.getX() + 0.5, dp.getY(), dp.getZ() + 0.5);
+                    BlockPos ip = m(h, 8, 3, 8);
+                    esya.teleportTo(ip.getX() + 0.5, ip.getY(), ip.getZ() + 0.5);
+                })
+                .thenExecuteAfter(sure, () -> {
+                    int d = Arrays.stream(domuzSicrama).sum();
+                    int e = Arrays.stream(esyaSicrama).sum();
+                    int s = Arrays.stream(ses).sum();
+                    DogalAfetler.LOGGER.info("Sanal su GameTest (K-E26): {} tick'te SPLASH domuz={} eşya={} sıçrama sesi={}; tick "
+                            + "başına domuz {} eşya {} ses {}; domuz suda={} hava={}/{}, eşya suda={}", sure, d, e, s,
+                            Arrays.toString(domuzSicrama), Arrays.toString(esyaSicrama), Arrays.toString(ses), domuz.isInWater(),
+                            domuz.getAirSupply(), domuz.getMaxAirSupply(), esya.isInWater());
+                    h.assertTrue(d == 1 && e == 1, "sanal suda kalan varlık yeniden sıçratıyor: domuz " + d + ", eşya " + e
+                            + " SPLASH (" + sure + " tick, beklenen girişte 1)");
+                    h.assertTrue(s == 2, "sıçrama sesi " + s + " (beklenen 2)");
+                    h.assertTrue(domuz.isInWater() && esya.isInWater(), "varlık sanal suda sayılmıyor");
+                    h.assertTrue(domuz.getAirSupply() < domuz.getMaxAirSupply(), "domuzun havası azalmadı");
+                    SanalSu.magaraBitir(l, sicramaMagarasi);
+                    sicramaMagarasi = -1;
+                    domuz.discard();
+                    esya.discard();
                 })
                 .thenSucceed();
     }

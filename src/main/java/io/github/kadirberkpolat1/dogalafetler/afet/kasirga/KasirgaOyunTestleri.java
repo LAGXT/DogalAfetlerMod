@@ -11,12 +11,13 @@ import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
 import io.github.kadirberkpolat1.dogalafetler.core.CekirdekOyunTestleri;
 import io.github.kadirberkpolat1.dogalafetler.core.EtkiAlani;
-import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
+import io.github.kadirberkpolat1.dogalafetler.core.OyunTestiTemizligi;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
 import io.github.kadirberkpolat1.dogalafetler.uyari.OrtamSesi;
 import java.util.UUID;
 import net.minecraft.advancements.Advancement;
 import net.minecraft.core.BlockPos;
+import net.minecraft.gametest.framework.AfterBatch;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
@@ -25,7 +26,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.animal.Pig;
 import net.minecraft.world.entity.item.ItemEntity;
-import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -42,7 +42,8 @@ import net.minecraftforge.gametest.PrefixGameTestTemplate;
  * Kasırganın oyun içi testleri (bölüm A, KOM.2/KOM.3, başarım #1). Gerçek {@link Kasirga} afeti tek afet yuvasını
  * kullandığı için her test kendi batch'indedir (çekirdek §13). Sahne {@code kasirga_sahne} (32x16x32 hava) kutusuna her test
  * kendisi kurulur ve sonunda temizlenir; kasırga sahnenin ortasına taşınır ({@link Kasirga#konumAyarla}: başka testlerin
- * sahte oyuncusu çevrim içiyse kasırga onun 30-100 blok uzağında doğardı).
+ * sahte oyuncusu çevrim içiyse kasırga onun 30-100 blok uzağında doğardı). Kurulumda düşen test de batch sonunda temizlenir
+ * ({@link OyunTestiTemizligi#batchSonu}: afet durur, {@code afetBlokHasari} geri; K-E15, GP18).
  */
 @GameTestHolder(DogalAfetler.MOD_ID)
 @PrefixGameTestTemplate(false)
@@ -51,6 +52,41 @@ public final class KasirgaOyunTestleri {
     private static final BlockPos MERKEZ = new BlockPos(16, 3, 16);
 
     private KasirgaOyunTestleri() {
+    }
+
+    @AfterBatch(batch = "kasirga_blok")
+    public static void blokSonrasi(ServerLevel level) {
+        OyunTestiTemizligi.batchSonu(level);
+    }
+
+    @AfterBatch(batch = "kasirga_stop")
+    public static void stopSonrasi(ServerLevel level) {
+        OyunTestiTemizligi.batchSonu(level);
+    }
+
+    @AfterBatch(batch = "kasirga_kural")
+    public static void kuralSonrasi(ServerLevel level) {
+        OyunTestiTemizligi.batchSonu(level);
+    }
+
+    @AfterBatch(batch = "kasirga_cekim")
+    public static void cekimSonrasi(ServerLevel level) {
+        OyunTestiTemizligi.batchSonu(level);
+    }
+
+    @AfterBatch(batch = "kasirga_dogal")
+    public static void dogalSonrasi(ServerLevel level) {
+        OyunTestiTemizligi.batchSonu(level);
+    }
+
+    @AfterBatch(batch = "kasirga_hareket")
+    public static void hareketSonrasi(ServerLevel level) {
+        OyunTestiTemizligi.batchSonu(level);
+    }
+
+    @AfterBatch(batch = "kasirga_kayit")
+    public static void kayitSonrasi(ServerLevel level) {
+        OyunTestiTemizligi.batchSonu(level);
     }
 
     private static void dogrula(GameTestHelper y, boolean kosul, String mesaj) {
@@ -89,12 +125,9 @@ public final class KasirgaOyunTestleri {
         }
     }
 
-    /** Blok hasarı kuralını ayarlar; eski değeri döner (K-E15: test sonunda geri konur). */
+    /** Blok hasarı kuralını ayarlar; eski değeri döner (K-E15: test sonunda, başarısızlıkta batch sonunda geri konur). */
     private static boolean blokHasari(GameTestHelper y, boolean deger) {
-        GameRules.BooleanValue kural = y.getLevel().getGameRules().getRule(Kurallar.AFET_BLOK_HASARI);
-        boolean onceki = kural.get();
-        kural.set(deger, y.getLevel().getServer());
-        return onceki;
+        return OyunTestiTemizligi.blokHasari(y.getLevel(), deger);
     }
 
     private static AfetYoneticisi yonetici(GameTestHelper y) {
