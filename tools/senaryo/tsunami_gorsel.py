@@ -277,7 +277,7 @@ def main():
     log(f"bitti: yoklama={yoklama} ALARM={alarm} girdi_satiri={girdi} kapanis_asili={'E' if asili else 'H'} "
         f"otomasyon_ozeti={bitti.groups() if bitti else None} gradle_{cikis.group(0) if cikis else 'cikis=?'}")
     desen = (r".*(?:TSUNAMI-OTOMASYON (?:FPS|FOTO|KARE|KALITE|AVCI|AYAR|KAPANIS|PROFIL)|Tsunami: |\[CHAT\]|SU-TANI |"
-             r"Sanal su: kurulum|has (?:made|reached|completed) the).*")
+             r"Sanal su: kurulum|Tsunami köpüğü: |has (?:made|reached|completed) the).*")
     for satir in re.findall(desen, metin):
         log("  " + re.split(r"TSUNAMI-OTOMASYON |DogalAfetler/\]: |\]: ", satir, maxsplit=1)[-1])
     fps_tablosu(metin, log)

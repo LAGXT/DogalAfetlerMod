@@ -14,6 +14,9 @@ import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.su.Dalga;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSuDunyasi;
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadMXBean;
+import java.util.Locale;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
@@ -50,6 +53,12 @@ public final class TsunamiKopugu {
     private static float ku1;
     private static float kv0;
     private static float kv1;
+    private static final ThreadMXBean IPLIK = ManagementFactory.getThreadMXBean();
+    /** 10 sn'lik ölçüm: köpüğün kendi render thread CPU'sı (köşe üretimi, tampon yükleme, çizim çağrısı), kare başına. */
+    private static long logCpuNs;
+    private static long logEnCokNs;
+    private static int logKare;
+    private static long logTick = Long.MIN_VALUE;
 
     private TsunamiKopugu() {
     }
@@ -71,6 +80,7 @@ public final class TsunamiKopugu {
                 || IstemciAfetDurumu.aktif().filter(p -> p.tur() == AfetTuru.TSUNAMI).isEmpty()) {
             return;
         }
+        long cpu0 = IPLIK.getCurrentThreadCpuTime();
         float pt = e.getPartialTick();
         double t = IstemciDonem.saat(pt);
         Vec3 kam = e.getCamera().getPosition();
@@ -104,6 +114,20 @@ public final class TsunamiKopugu {
         RenderSystem.depthMask(true);
         RenderSystem.enableCull();
         RenderSystem.disableBlend();
+        long g = IPLIK.getCurrentThreadCpuTime() - cpu0;
+        logCpuNs += g;
+        logEnCokNs = Math.max(logEnCokNs, g);
+        logKare++;
+        long tick = mc.level.getGameTime();
+        if (tick - logTick >= 200) {
+            DogalAfetler.LOGGER.info("Tsunami köpüğü: kare_cpu_ort={} ms en_cok={} ms kare={} segment={}",
+                    String.format(Locale.ROOT, "%.3f", logCpuNs / 1e6 / logKare), String.format(Locale.ROOT, "%.3f", logEnCokNs / 1e6),
+                    logKare, segment);
+            logTick = tick;
+            logCpuNs = 0;
+            logEnCokNs = 0;
+            logKare = 0;
+        }
     }
 
     private static int dalga(BufferBuilder b, Matrix4f m, Dalga w, double t, Vec3 kam, boolean dusuk, float isik) {
