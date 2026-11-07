@@ -50,12 +50,11 @@ class DelikOmruTest {
     }
 
     @Test
-    void sifirDonmadaSuyaAksiHaldeBuzaDoner() {
-        assertTrue(DelikOmru.suyaDonerMi(0.0, true), "sıfırlanmış dünyada donmanın buzu su olur");
-        assertFalse(DelikOmru.suyaDonerMi(0.01, true), "donma sürerken eski buz");
-        assertFalse(DelikOmru.suyaDonerMi(40.0, true), "kızıl cüce tabanında eski buz (bilinen sınır, B-20)");
-        assertFalse(DelikOmru.suyaDonerMi(0.0, false), "vanilla/oyuncu buzu donma 0'da da eski buza döner (Bc2)");
-        assertFalse(DelikOmru.suyaDonerMi(50.0, false));
+    void hedefDonmamissaSuyaAksiHaldeBuzaDoner() {
+        assertTrue(DelikOmru.suyaDonerMi(false, true), "sütun hedefi buz değilse donmanın buzu su olur");
+        assertFalse(DelikOmru.suyaDonerMi(true, true), "sütun hedefi buzken eski buz");
+        assertFalse(DelikOmru.suyaDonerMi(false, false), "vanilla/oyuncu buzu hedef donmamışken de eski buza döner (Bc2)");
+        assertFalse(DelikOmru.suyaDonerMi(true, false));
     }
 
     @Test

@@ -72,6 +72,14 @@ public final class DonmaApi {
     }
 
     /**
+     * Balıkçılık (B-20): sütunun şimdiki hedefi ilk buz eşiğinin üstünde mi (donma süreci bu sütunu buz tutar mı). Kızıl
+     * cüce çözülmesinde kış sütunu evet, ılık sütun hayır; çözülme dışında global ilerlemeyle aynı.
+     */
+    public static boolean hedefDonmusMu(ServerLevel level, BlockPos konum) {
+        return sutunHedefi(level, konum) >= DonmaAyarlari.esikler().ilkBuzEsigi();
+    }
+
+    /**
      * Tsunami (N10, N14): {@code merkez} çevresindeki yüklü sütunlarda en az {@code enAz} açık (donmamış) su yüzeyi var mı.
      * 4 blokta bir örneklenir; yüklü olmayan chunk sayılmaz.
      */

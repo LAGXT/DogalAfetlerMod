@@ -6,6 +6,7 @@ import io.github.kadirberkpolat1.dogalafetler.balikcilik.mantik.DelikOmru;
 import io.github.kadirberkpolat1.dogalafetler.balikcilik.mantik.IsirmaSuresi;
 import io.github.kadirberkpolat1.dogalafetler.core.CekirdekOyunTestleri;
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
+import io.github.kadirberkpolat1.dogalafetler.donma.DonmaApi;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
 import io.github.kadirberkpolat1.dogalafetler.donma.ChunkDonmaVerisi;
 import io.github.kadirberkpolat1.dogalafetler.donma.DonmaBloklari;
@@ -170,6 +171,16 @@ public final class BalikcilikOyunTestleri {
 
     @AfterBatch(batch = "balikcilik_sifir")
     public static void sifirSonrasi(ServerLevel level) {
+        donemiGeriKoy(level);
+    }
+
+    @BeforeBatch(batch = "balikcilik_kizil_cuce")
+    public static void kizilCuceOncesi(ServerLevel level) {
+        donemiSakla(level);
+    }
+
+    @AfterBatch(batch = "balikcilik_kizil_cuce")
+    public static void kizilCuceSonrasi(ServerLevel level) {
         donemiGeriKoy(level);
     }
 
@@ -482,6 +493,44 @@ public final class BalikcilikOyunTestleri {
         y.assertTrue(level.getBlockState(vanillaBuz).is(Blocks.ICE),
                 "donma 0'da vanilla buzdaki delik eski buza dönmeli: " + level.getBlockState(vanillaBuz));
         sutunBiti(level, donmaBuzu, false);
+        temizle(y, o);
+        y.succeed();
+    }
+
+    /**
+     * B-20: kızıl cüce çözülmesinde (G 40) donmanın buzunda açılan delik global ilerlemeye değil sütunun hedefine bakar: sütun
+     * hedefi buz değilse su, buzsa eski buz olur. Aynı dünyada iki dalı ayırt etmek için sonuç {@link DonmaApi#hedefDonmusMu}
+     * ile karşılaştırılır; çözülme dışı G 40'ta (hedef buz) delik her zaman eski buza döner.
+     */
+    @GameTest(template = "bos", batch = "balikcilik_kizil_cuce")
+    public static void kizilCuceTabanindaDelikSutunHedefiniIzler(GameTestHelper y) {
+        ServerLevel level = y.getLevel();
+        donma(y, 40f);
+        havuzKur(y);
+        BlockPos delik = y.absolutePos(DELIK);
+        sutunBiti(level, delik, true);
+        ServerPlayer o = oyuncu(y, 3, 3);
+        o.setShiftKeyDown(true);
+        o.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.IRON_PICKAXE));
+        sagTik(o, delik);
+        y.assertTrue(delikMi(level.getBlockState(delik)) && level.getBlockState(delik).getValue(BuzDeligiBlogu.DONMA),
+                "bitli sütunda donma kökenli delik açılmalı: " + level.getBlockState(delik));
+        y.assertTrue(DonmaApi.hedefDonmusMu(level, delik), "çözülme dışı G 40'ta sütun hedefi buz olmalı");
+        BlockState acik = level.getBlockState(delik);
+        level.setBlock(delik, acik.setValue(BuzDeligiBlogu.ASAMA, DelikOmru.SON_ASAMA), Block.UPDATE_CLIENTS);
+        level.getBlockState(delik).tick(level, delik, level.random);
+        y.assertTrue(level.getBlockState(delik).is(Blocks.ICE), "hedef buzken delik eski buza dönmeli: " + level.getBlockState(delik));
+        DunyaDonemi.al(level).cozulmeDonemiAyarla(true);
+        boolean hedef = DonmaApi.hedefDonmusMu(level, delik);
+        level.setBlock(delik, acik.setValue(BuzDeligiBlogu.ASAMA, DelikOmru.SON_ASAMA), Block.UPDATE_CLIENTS);
+        level.getBlockState(delik).tick(level, delik, level.random);
+        BlockState sonra = level.getBlockState(delik);
+        y.assertTrue(hedef ? sonra.is(Blocks.ICE) : sonra.is(Blocks.WATER) && sonra.getFluidState().isSource(),
+                "kızıl cüce çözülmesinde delik sütun hedefini izlemeli (hedef buz=" + hedef + "): " + sonra + ", sütun hedefi "
+                        + DonmaApi.sutunHedefi(level, delik));
+        DogalAfetler.LOGGER.info("Balıkçılık GameTest: kızıl cüce G 40 sütun hedefi {} (buz={}), delik -> {}",
+                DonmaApi.sutunHedefi(level, delik), hedef, sonra.getBlock());
+        sutunBiti(level, delik, false);
         temizle(y, o);
         y.succeed();
     }
