@@ -15,8 +15,10 @@ import net.minecraftforge.registries.RegistryObject;
 
 /**
  * Donmayla oluşan bloklar; yüzey tablosunun hedefi yalnız bunlardır (K0-24). {@code kiragili_cimen}: çimen özelliklerinde
- * {@code SnowyDirtBlock}, yayılmaz ve toprağa dönmez; yalnız donma/çözülmeyle değişir. {@code ince_buz}: su sütununun üst
- * bloğunun ilk (donarken) ve son (çözülürken) evresi; koyu, yarı saydam, üstünde yürünür, buz gibi kayar ve ışıkta erir.
+ * {@code SnowyDirtBlock}, yayılmaz ve toprağa dönmez. Varsayılan tablo artık çimeni ona çevirmez (çimen kar örtüsüyle
+ * karlı olur); eski dünyalardaki kopyaları {@link DonmaIsleyici} çimene döndürür, veri paketi yüzey satırı için kayıtlı
+ * kalır. {@code ince_buz}: su sütununun üst bloğunun ilk (donarken) ve son (çözülürken) evresi; koyu, yarı saydam,
+ * üstünde yürünür, buz gibi kayar ve ışıkta erir.
  */
 public final class DonmaBloklari {
     private static final DeferredRegister<Block> BLOKLAR = DeferredRegister.create(ForgeRegistries.BLOCKS,

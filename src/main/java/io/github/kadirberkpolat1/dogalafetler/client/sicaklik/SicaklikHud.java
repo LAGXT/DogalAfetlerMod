@@ -19,7 +19,9 @@ import net.minecraftforge.fml.common.Mod;
 /**
  * Sıcaklık barı (madde 7d): XP barının hemen üstünde, onunla aynı genişlikte; mavi → nötr → kırmızı renk geçişi, üstte
  * vücut işaretçisi, altta ortam oku. Hasar kademesinde bar titrer ve işaretçi uyarı renginde yanıp söner. Kalpler ve
- * açlık barı Forge'un {@code leftHeight/rightHeight} yüksekliğiyle barın üstüne kayar. Yazı yoktur (N6).
+ * açlık barı Forge'un {@code leftHeight/rightHeight} yüksekliğiyle barın üstüne kayar. Yazı yoktur (N6). Bar ve kaydırma
+ * yalnız sunucunun sıcaklık kapısı açıkken ({@code SicaklikKapisi}, S-12 paketi): Cold Sweat sunucuda yüklüyken
+ * (OTOMATIK) kapı kapalıdır, bar çizilmez ve vanilla barlar kaydırılmaz; sistem bizimse oyuncu barı görür.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
 public final class SicaklikHud {
@@ -32,6 +34,8 @@ public final class SicaklikHud {
     private static final int ALTTAN = 41;
     /** İşaretçi barın 4 px üstünden başlar; kalpler işaretçinin üstünde kalsın. */
     private static final int ISARETCI_UST = 4;
+    /** Kalplerin altı ile işaretçinin tepesi arası (vanilla düşük canda kalpleri 1 px aşağı titretir). */
+    private static final int KALP_BOSLUGU = 2;
 
     /** Son çizilen barın titreşim ofseti (GUI px), yanık satırı ve istemci tick'i: görsel kanıt otomasyonu log'a yazar. */
     static int sonDx;
@@ -58,7 +62,7 @@ public final class SicaklikHud {
         int yOfset = SicaklikIstemciAyarlari.hudYOfset();
         int x = (w - GENISLIK) / 2 + SicaklikIstemciAyarlari.hudXOfset();
         int y = h - ALTTAN + yOfset;
-        int gerekli = ALTTAN - yOfset + ISARETCI_UST + 9;
+        int gerekli = ALTTAN - yOfset + ISARETCI_UST + 9 + KALP_BOSLUGU;
         gui.leftHeight = Math.max(gui.leftHeight, gerekli);
         gui.rightHeight = Math.max(gui.rightHeight, gerekli);
 

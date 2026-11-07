@@ -35,9 +35,10 @@ import net.minecraftforge.common.MinecraftForge;
 
 /**
  * Asit yağmuru (bölüm E, madde 10, tasarım notu {@code docs/tasarim/asit_yagmuru.md}). Alan hedef oyuncunun çevresinde
- * doğar ve günün rüzgârıyla kayar; AKTIF'te yağmur 10 sn'de yoğunlaşır, son 15 sn'de seyrelir. Gökyüzüne açık oyuncu
- * aralıklı hasar alır (can {@code asitMinimumCan} altına inmez; çatı altı hiç hasar yok). Gökyüzünü gören yüzey blokları
- * önce 3–5 sn çatlak örtüsü taşır, sonra dönüşür ({@code afetBlokHasari=false} iken hiç aşınma yok). Yağmur, sis ve
+ * doğar ve günün rüzgârıyla kayar; AKTIF'te yağmur 10 sn'de yoğunlaşır, son 15 sn'de seyrelir. Yağmur sürdükçe gökyüzüne
+ * açık oyuncu saniyede {@code hasarSaniye} hasar alır (seviyeden bağımsız; can {@code asitMinimumCan} altına inmez; çatı
+ * altı hiç hasar yok). Gökyüzünü gören yüzey blokları önce 3–5 sn çatlak örtüsü taşır, sonra dönüşür
+ * ({@code afetBlokHasari=false} iken hiç aşınma yok). Yağmur, sis ve
  * dumanlar istemcide {@code client.asit_yagmuru} tarafından bu afetin durum paketinden çizilir; afet ses çalmaz, sireni
  * çekirdek çalar.
  */
@@ -88,8 +89,8 @@ public final class AsitYagmuru extends Afet {
     protected void asamaDegisti(ServerLevel level, AfetAsamasi eski, AfetAsamasi yeni) {
         if (yeni == AfetAsamasi.AKTIF) {
             AsitKurallari.Seviye s = ayar();
-            DogalAfetler.LOGGER.info("asit yağmuru: seviye {} alan {} blok, {} sn, {} blok/sn aşınma, {} can / {} tick ({})",
-                    seviye(), s.yaricap(), s.sureTick() / 20, s.asindirmaSaniye(), s.hasar(), s.hasarAraligi(),
+            DogalAfetler.LOGGER.info("asit yağmuru: seviye {} alan {} blok, {} sn, {} blok/sn aşınma, {} can/sn ({})",
+                    seviye(), s.yaricap(), s.sureTick() / 20, s.asindirmaSaniye(), AsitAyarlari.hasarSaniye(),
                     Kurallar.blokHasariAcik(level.getGameRules()) ? "blok hasarı açık" : "blok hasarı kapalı");
         }
     }
@@ -101,15 +102,15 @@ public final class AsitYagmuru extends Afet {
         }
         kaydir(level, adim);
         double yogunluk = yogunluk();
-        if (yogunluk >= AsitKurallari.ETKI_ESIGI) {
+        if (yogunluk > 0) {
             bekleyenAdim += adim;
             if (level.getGameTime() % HASAR_ADIMI == 0) {
                 oyunculariDenetle(level, bekleyenAdim);
                 bekleyenAdim = 0;
             }
-            if (Kurallar.blokHasariAcik(level.getGameRules())) {
-                asindir(level, yogunluk, adim);
-            }
+        }
+        if (yogunluk >= AsitKurallari.ETKI_ESIGI && Kurallar.blokHasariAcik(level.getGameRules())) {
+            asindir(level, yogunluk, adim);
         }
         if (!Kurallar.blokHasariAcik(level.getGameRules())) {
             asinanlariBirak(level);
@@ -197,11 +198,11 @@ public final class AsitYagmuru extends Afet {
     }
 
     /**
-     * Başının üstü gökyüzüne açık oyuncu aralıklı hasar alır; hasar anında başarım ipucu (Çatı Altı'nı bozar). Maruziyet
-     * {@code adim} ölçekli tick kadar birikir; denetim başına en çok bir hasar, artan birikim bir aralıkla sınırlı.
+     * Başının üstü gökyüzüne açık oyuncu açıkta geçirdiği her saniye {@code hasarSaniye} hasar alır; hasar anında başarım
+     * ipucu (Çatı Altı'nı bozar). Maruziyet {@code adim} ölçekli tick kadar birikir ({@link AsitKurallari#maruziyet}).
      */
     private void oyunculariDenetle(ServerLevel level, int adim) {
-        AsitKurallari.Seviye s = ayar();
+        float hasar = AsitAyarlari.hasarSaniye();
         EtkiAlani alan = etkiAlani();
         for (ServerPlayer oyuncu : level.players()) {
             if (oyuncu.isSpectator() || oyuncu.isCreative() || !oyuncu.isAlive()
@@ -212,12 +213,12 @@ public final class AsitYagmuru extends Afet {
             if (!AsitKurallari.acikta(harita, oyuncu.getEyeY())) {
                 continue;
             }
-            int birikmis = maruziyet.merge(oyuncu.getUUID(), adim, Integer::sum);
-            if (birikmis < s.hasarAraligi()) {
+            AsitKurallari.Maruziyet m = AsitKurallari.maruziyet(maruziyet.getOrDefault(oyuncu.getUUID(), 0), adim);
+            maruziyet.put(oyuncu.getUUID(), m.sayac());
+            if (!m.hasar()) {
                 continue;
             }
-            maruziyet.put(oyuncu.getUUID(), Math.min(birikmis - s.hasarAraligi(), s.hasarAraligi()));
-            float miktar = AsitKurallari.hasarMiktari(oyuncu.getHealth(), s.hasar(), AsitAyarlari.minimumCan());
+            float miktar = AsitKurallari.hasarMiktari(oyuncu.getHealth(), hasar, AsitAyarlari.minimumCan());
             if (miktar > 0 && oyuncu.hurt(AsitKayitlari.hasar(level), miktar)) {
                 MinecraftForge.EVENT_BUS.post(new BasarimIpucuEvent(oyuncu, Ipucu.HASAR_ALDI));
             }

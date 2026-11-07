@@ -53,3 +53,10 @@
 `tools/assets/sicaklik_dokulari.py` (Pillow) üretir: `textures/gui/sicaklik/bar.png` (bar, çerçeve, işaretçiler),
 `textures/misc/sicaklik_buz.png` (256×256 buz kenarı, alfa), `textures/misc/sicaklik_sicak.png` (256×256 sıcak hava
 vinyeti, dikey dalga deseni).
+
+## Görsel cila (2026-11-07)
+
+- Kalpler ve açlık barı işaretçinin tepesinden 2 px yukarıda (`leftHeight/rightHeight` 54 → 56): vanilla düşük canda
+  kalpleri 1 px aşağı titrettiği için boşluksuz düzende kalpler işaretçiye biniyordu.
+- Bar ve kaydırma yalnız sunucunun sıcaklık kapısı açıkken: Cold Sweat sunucuda yüklüyken (OTOMATIK) bar çizilmez ve vanilla
+  barlar kaydırılmaz; sistem bizimse bar görünür. Cold Sweat'in vücut sıcaklığı göstergesinin konumu kendi işidir.

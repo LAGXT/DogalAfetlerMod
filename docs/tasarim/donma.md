@@ -146,3 +146,19 @@ Uygulama `is/donma` dalında; kararlar `.vibe/kararlar/donma.md` (K-D6…K-D21),
 - **Bu turda yapılmayanlar (açık):** vanilla çimen/yaprak biyom rengi tonlaması, kayrağı örtüsü ve sarkit çizimi, rüzgâr ve
   buz şarkısı sesleri. Blok düzeyindeki adımlar (kırağı, kar katmanları, kıyıdan içeri ince buz → buz → kalınlaşma,
   çözülme sırası) ve yukarıdaki parçacıklar vitrini taşır.
+
+## Görsel cila (2026-11-07)
+
+- **Kar tanesi parçacığı (`dogalafetler:kar_tanesi`):** vanilla `SNOWFLAKE` (gri duman topağı gibi görünüyordu) yerine kendi
+  tanemiz. Dört 16x16 kare (`tools/assets/donma_dokular.py`): minik nokta kümesi, küçük altı kollu yıldız, dallı orta yıldız,
+  yumuşak yuvarlak tane; kenarlar alfa ile yumuşak, merkez beyaz, uçlar açık buz mavisi. Kare doğuşta rastgele seçilir.
+- **Hareket:** uç hızına (0,04–0,09 blok/tick) yaklaşarak düşer, kişisel faz/frekansla iki eksende salınır, yavaşça döner,
+  günün rüzgârıyla (~0,024 blok/tick) sürüklenir; yere ya da suya değince durur ve 8 tickte söner. Ömür altındaki zemine
+  yetecek kadar (en çok 600 tick).
+- **Yoğunluk:** kar tabanı 28 → 10 tane/tick (taneler ~6 kat uzun yaşar); Yüksek kalitede ~1800, Ultra ~2700, en yüksek
+  config ile ~8000 canlı tane. Ayaz da aynı karelerin küçük ikisini kullanan pırıldayan `buz_kristali` oldu (taban 5 → 2).
+- **Karlı çimen (K-E52, K0-24 tablosu değişti):** çimen artık `kiragili_cimen`'e dönmez; çimen kalır, ilk kar eşiğinde
+  (15) üstüne tek kat `snow` gelir ve vanilla şekil güncellemesiyle `grass_block[snowy=true]` olur; çözülmede (55'in
+  altı) katman kalkar, `snowy=false`. Varsayılan tabloda yüzey satırı yok (yalnız su sütunu); "kar katmanı ekle ↔ kaldır"
+  iki yönlü dönüşümüdür. Eski dünyalardaki `kiragili_cimen` sütun işlenince aynı `snowy` ile çimene döner; blok veri
+  paketi yüzey satırı için kayıtlı kalır. Kırağı görünümü yalnız biyom rengi tonlamasıyla verilir.

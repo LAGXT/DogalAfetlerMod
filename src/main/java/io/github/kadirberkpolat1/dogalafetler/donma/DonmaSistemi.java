@@ -38,6 +38,7 @@ public final class DonmaSistemi {
     public static void kaydet(IEventBus modBus) {
         DonmaAyarlari.kaydet();
         DonmaBloklari.kaydet(modBus);
+        DonmaParcaciklari.kaydet(modBus);
         modBus.addListener(ChunkDonmaVerisi::kaydet);
         IEventBus forge = MinecraftForge.EVENT_BUS;
         forge.addGenericListener(LevelChunk.class, ChunkDonmaVerisi::ekle);

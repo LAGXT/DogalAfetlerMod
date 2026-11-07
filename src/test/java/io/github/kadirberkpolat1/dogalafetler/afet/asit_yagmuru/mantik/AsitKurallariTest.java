@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 
 class AsitKurallariTest {
     @Test
-    void seviyeArttikcaAlanSureAsinmaVeHasarArtar() {
+    void seviyeArttikcaAlanSureVeAsinmaArtar() {
         Seviye onceki = null;
         for (int s = 1; s <= 5; s++) {
             Seviye v = Tablo.VARSAYILAN.seviye(s);
@@ -20,27 +20,56 @@ class AsitKurallariTest {
                 assertTrue(v.yaricap() > onceki.yaricap(), "yarıçap S" + s);
                 assertTrue(v.sureTick() > onceki.sureTick(), "süre S" + s);
                 assertTrue(v.asindirmaSaniye() > onceki.asindirmaSaniye(), "aşınma S" + s);
-                assertTrue(v.hasar() / v.hasarAraligi() >= onceki.hasar() / onceki.hasarAraligi(), "hasar hızı S" + s);
             }
             onceki = v;
         }
-        assertEquals(new Seviye(32, 1200, 2.0, 0.5f, 80, false), Tablo.VARSAYILAN.seviye(1));
-        assertEquals(new Seviye(128, 4800, 16.0, 1.0f, 40, true), Tablo.VARSAYILAN.seviye(5));
+        assertEquals(new Seviye(32, 1200, 2.0, false), Tablo.VARSAYILAN.seviye(1));
+        assertEquals(new Seviye(128, 4800, 16.0, true), Tablo.VARSAYILAN.seviye(5));
         assertEquals(Tablo.VARSAYILAN.seviye(1), Tablo.VARSAYILAN.seviye(0), "alt sınır");
         assertEquals(Tablo.VARSAYILAN.seviye(5), Tablo.VARSAYILAN.seviye(9), "üst sınır");
     }
 
     @Test
     void seviyeBesteBileOldurmez() {
-        Seviye s5 = Tablo.VARSAYILAN.seviye(5);
         float can = 20f;
         for (int i = 0; i < 10_000; i++) {
-            can -= AsitKurallari.hasarMiktari(can, s5.hasar(), 4f);
+            can -= AsitKurallari.hasarMiktari(can, 1f, 4f);
         }
         assertEquals(4f, can, 1e-6, "can 4'te durur");
         assertEquals(0f, AsitKurallari.hasarMiktari(4f, 1f, 4f));
         assertEquals(0.5f, AsitKurallari.hasarMiktari(4.5f, 1f, 4f));
         assertEquals(0f, AsitKurallari.hasarMiktari(3f, 1f, 4f), "zaten altındaysa hasar yok");
+    }
+
+    /** Kullanıcı isteği (18): açıkta saniyede bir hasar; 4 tick'lik denetimlerle 20 tick'te tam bir kez. */
+    @Test
+    void maruziyetSaniyedeBirHasarVerir() {
+        int sayac = 0;
+        int hasar = 0;
+        for (int tick = 4; tick <= 20 * 60; tick += 4) {
+            AsitKurallari.Maruziyet m = AsitKurallari.maruziyet(sayac, 4);
+            sayac = m.sayac();
+            if (m.hasar()) {
+                hasar++;
+                assertEquals(0, tick % 20, "hasar yalnız saniye sınırında: " + tick);
+            }
+        }
+        assertEquals(60, hasar, "60 sn açıkta 60 hasar");
+        float can = 20f;
+        for (int i = 0; i < 20; i++) {
+            can -= AsitKurallari.hasarMiktari(can, 1f, 0f);
+        }
+        assertEquals(0f, can, 1e-6, "asgari can 0'da 1 HP/sn ile 20 can 20 sn'de biter");
+    }
+
+    @Test
+    void maruziyetHizdaYaDaGecikmedePatlamaz() {
+        AsitKurallari.Maruziyet m = AsitKurallari.maruziyet(0, 400);
+        assertTrue(m.hasar());
+        assertEquals(AsitKurallari.SANIYE_TICK, m.sayac(), "artık birikim bir saniyeyle sınırlı");
+        assertTrue(AsitKurallari.maruziyet(m.sayac(), 0).hasar(), "sınırlı birikim sonraki denetimde bir hasar daha");
+        assertFalse(AsitKurallari.maruziyet(0, 19).hasar());
+        assertEquals(0, AsitKurallari.maruziyet(-5, 0).sayac(), "negatif sayaç sıfırlanır");
     }
 
     @Test

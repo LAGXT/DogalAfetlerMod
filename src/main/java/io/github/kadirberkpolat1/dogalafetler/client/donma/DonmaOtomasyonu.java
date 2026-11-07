@@ -186,7 +186,7 @@ public final class DonmaOtomasyonu {
             evKur(mc);
             yanBak(mc);
         }, bekle(120), 200);
-        // Madde 9 sırası: kırağı 10, ince kar 15, kıyı buzu 20 (15 blok içeride 50), yağmur yerine kar 30 (K-D33). Vitrin
+        // Madde 9 sırası: ince kar ve karlı çimen 15, kıyı buzu 20 (15 blok içeride 50), yağmur yerine kar 30 (K-D33). Vitrin
         // %35, gerçek donma süreciyle hiz 20 altında (72 tick'te 1 puan) 15'ten. Kar yağışı eşiğinin altında yağmur
         // sahneyi karartır (D2-1): %25 açık havada, yağmur 30'da açılır ve istemcide kar olarak yağar.
         ekle("G 15, güneşsiz, öğle", () -> {

@@ -9,6 +9,7 @@ import io.github.kadirberkpolat1.dogalafetler.donma.mantik.EsikKumesi;
 import io.github.kadirberkpolat1.dogalafetler.donma.mantik.KisKaynagi;
 import io.github.kadirberkpolat1.dogalafetler.donma.mantik.KiyiUzakligi;
 import io.github.kadirberkpolat1.dogalafetler.donma.mantik.SuSutunu;
+import io.github.kadirberkpolat1.dogalafetler.donma.mantik.ZeminKari;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -41,9 +42,13 @@ import net.minecraft.world.ticks.LevelTicks;
  * <ul>
  * <li>Üst blok su kaynağı, buz ya da ince buzsa {@link SuSutunu} planı; buz biti işaretli olmayan sütunun buzuna (doğal
  * ya da oyuncunun) dokunulmaz.</li>
+ * <li>Eski sürümün {@code kiragili_cimen}'i (tablo onu tanımıyorsa) sütun işlendiğinde aynı {@code snowy} ile çimene
+ * döner.</li>
  * <li>Zeminin üstü hava ya da bizim karımız değilse (bitki, oyuncunun karı, başka blok) sütuna dokunulmaz.</li>
- * <li>Üst blok yüzey tablosundaysa zincirde yönlü ilerler; aynı adlı blok durumu özellikleri korunur.</li>
- * <li>Kök {@code #dogalafetler:donma/kar_zemini} etiketindeyse kar katmanı ayarlanır ve kar biti tutulur.</li>
+ * <li>Üst blok yüzey tablosundaysa zincirde yönlü ilerler; aynı adlı blok durumu özellikleri korunur. Varsayılan tabloda
+ * yüzey satırı yok: çimen çimen kalır, üstüne gelen kar örtüsü onu vanilla şekil güncellemesiyle {@code snowy} yapar.</li>
+ * <li>Kök {@code #dogalafetler:donma/kar_zemini} etiketindeyse kar katmanı ({@link ZeminKari}) ayarlanır ve kar biti
+ * tutulur.</li>
  * <li>Sütun sanal suyun altındaysa ({@link DisKancalar#sanalSuVarMi}) donmaz.</li>
  * </ul>
  * Donma blokları {@link Block#UPDATE_CLIENTS} ile konur (şekil güncellemesi var, komşu fizik yok); buharlaşma ve geri dolma
@@ -259,6 +264,11 @@ public final class DonmaIsleyici {
             suSutunu(level, chunk, durum, i, x, y, z, etkin, yon, kiyi, tablo, e, konum, sayac);
             return;
         }
+        if (ust.is(DonmaBloklari.KIRAGILI_CIMEN.get()) && !tablo.yuzey().taniyor(ust.getBlock())) {
+            ust = ozellikleriKopyala(ust, Blocks.GRASS_BLOCK);
+            level.setBlock(konum.set(x, y, z), ust, BAYRAK);
+            sayac.degisen++;
+        }
         BlockPos yukari = new BlockPos(x, y + 1, z);
         BlockState ustundeki = chunk.getBlockState(yukari);
         boolean bizimKar = ustundeki.is(Blocks.SNOW) && durum.kar(i);
@@ -278,10 +288,7 @@ public final class DonmaIsleyici {
             return;
         }
         int mevcut = bizimKar ? ustundeki.getValue(SnowLayerBlock.LAYERS) : 0;
-        boolean tekKat = kok instanceof SpreadingSnowyDirtBlock;
-        int istenenKatman = yapi ? e.yapiKarKatmani(etkin, yon)
-                : yon > 0 ? e.karKatmani(etkin, tekKat) : e.karKatmaniCozulme(etkin, tekKat);
-        int katman = DonmaHedefi.yonlu(mevcut, istenenKatman, yon);
+        int katman = ZeminKari.katman(e, yapi, kok instanceof SpreadingSnowyDirtBlock, mevcut, etkin, yon);
         if (katman != mevcut) {
             BlockState yeniUst = katman == 0 ? Blocks.AIR.defaultBlockState()
                     : Blocks.SNOW.defaultBlockState().setValue(SnowLayerBlock.LAYERS, katman);

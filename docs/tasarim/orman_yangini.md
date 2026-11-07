@@ -128,3 +128,12 @@ Yangın mantığının tamamı yukarıdaki motordur; afet üzerine şunları koy
   süresince (afet bitince istemci verisi gelmez).
 - **Isı (madde 7):** motorun sıcaklık kancası (K-E1); seviye farkı yanan hücre sayısından doğar, §6'daki "+4…+14 birim"
   ayrıca uygulanmaz.
+
+## Görsel cila (2026-11-07)
+
+- Duman artık vanilla sürtünmesiyle ~2 blokta asılı kalmaz: sıcak hava gibi ısıyla azalan uç hıza yaklaşır, yatay hız ayrı sönümlenir; rüzgâr yukarı çıktıkça güçlenir (16 blokta iki kat), küçük çalkantıyla dağılır.
+- Hücre dumanı 7–13 sn yaşar, 11–26 blok yükselir, dört katına büyüyüp açılarak söner; tam rüzgârda ~30° yatık.
+- Duman sütunu 15–25 sn yaşar, 30–65 blok yükselir; ilk ~8 bloğu turuncu aydınlanır, üstünde koyu-gri, yukarı doğru açılıp 3,2 katına genişler; tam rüzgârda ~13° eğilir, tepede daha çok bükülür.
+- 12+ hücrede sütun parçacıklarının %60'ı ağırlık merkezinde dar (≤3 blok sapınma) ve daha hızlı yükselir; pirokümülüs sütunun görünür ucunda (taban + 42–52 blok), rüzgâr altına kaymış doğar.
+- Parçacık bütçesi değişmedi: ömür iki katına çıkan hücre dumanının üretim olasılığı yarıya indi; sütun ve küme kademe tavanını (Yüksek 64 / 32) aşmaz.
+- Meteor çarpma dumanı da aynı kusurdan kurtuldu (8–28 blok yükselir); asit cızlama dumanı tasarım gereği 0,5–0,75 sn yaşadığı için değişmedi.

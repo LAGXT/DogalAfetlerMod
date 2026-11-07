@@ -68,10 +68,15 @@ public final class AsitOyunTestleri {
         OyunTestiTemizligi.batchSonu(level);
     }
 
+    @AfterBatch(batch = "asit_saniye")
+    public static void saniyeSonrasi(ServerLevel level) {
+        OyunTestiTemizligi.batchSonu(level);
+    }
+
     /**
-     * AOi-6 (K-C11): maruziyet ölçekli afet saatiyle birikir. S3'te hasar aralığı 40 ölçekli tick; {@code hiz 10} altında 40
-     * gerçek tick'te açıktaki oyuncu her denetimde (4 tick) hasar alır. Gerçek tick'le biriken eski maruziyet en çok bir hasar
-     * verirdi.
+     * AOi-6 (K-C11): maruziyet ölçekli afet saatiyle birikir. Hasar aralığı 20 ölçekli tick (1 sn); {@code hiz 10} altında
+     * açıktaki oyuncu her denetimde (4 gerçek tick = 40 ölçekli) bir hasar alır, birikim patlamaz. Gerçek tick'le biriken
+     * maruziyet 40 tick'te en çok iki hasar verirdi.
      */
     @GameTest(template = SAHNE, batch = "asit_hiz", timeoutTicks = 120)
     public static void maruziyetOlcekliSaatleBirikir(GameTestHelper y) {
@@ -91,7 +96,7 @@ public final class AsitOyunTestleri {
             yonetici.hizAyarla(1);
             yonetici.durdur();
             cikar(level, List.of(acik));
-            y.assertTrue(can <= 17f, "hiz 10 altında 40 tick'te en az 6 hasar (0,5) beklenirdi: can " + can);
+            y.assertTrue(can <= 12f, "hiz 10 altında 40 tick'te en az 8 hasar (1 can) beklenirdi: can " + can);
             y.succeed();
         });
     }
@@ -180,6 +185,45 @@ public final class AsitOyunTestleri {
             y.assertTrue(catiCan == 20f, "çatı altındaki oyuncu hasar almamalı: " + catiCan);
             y.assertTrue(acikIpucu.get() == 1, "5 → 4 tek hasar, tek HASAR_ALDI ipucu: " + acikIpucu.get());
             y.assertTrue(catiIpucu.get() == 0, "çatı altına ipucu gitmemeli: " + catiIpucu.get());
+            y.succeed();
+        });
+    }
+
+    /**
+     * Kullanıcı isteği (18): asit yağmuru altında gökyüzüne açık oyuncu seviyeden bağımsız saniyede 1 can (yarım kalp)
+     * kaybeder; cam çatı altındaki 0. S1'de (eski tabloda 4 sn'de yarım can) 5 sn = 5 can.
+     */
+    @GameTest(template = SAHNE, batch = "asit_saniye", timeoutTicks = 160)
+    public static void acikOyuncuSaniyedeYarimKalpCatiAltiSifir(GameTestHelper y) {
+        ServerLevel level = y.getLevel();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(level.getServer());
+        yonetici.durdur();
+        zemin(y);
+        for (int x = 5; x <= 7; x++) {
+            for (int z = 5; z <= 7; z++) {
+                y.setBlock(new BlockPos(x, 4, z), Blocks.GLASS);
+            }
+        }
+        BlockPos acikP = y.absolutePos(new BlockPos(2, 1, 2));
+        BlockPos catiP = y.absolutePos(new BlockPos(6, 1, 6));
+        ServerPlayer acik = OyunTestiTemizligi.oyuncu(y, acikP.getX() + 0.5, acikP.getY(), acikP.getZ() + 0.5);
+        ServerPlayer cati = OyunTestiTemizligi.oyuncu(y, catiP.getX() + 0.5, catiP.getY(), catiP.getZ() + 0.5);
+        acik.setGameMode(GameType.SURVIVAL);
+        cati.setGameMode(GameType.SURVIVAL);
+        acik.setHealth(20f);
+        cati.setHealth(20f);
+        baslat(y, 1, acikP);
+        y.onEachTick(() -> {
+            hasarAlabilir(acik);
+            hasarAlabilir(cati);
+        });
+        y.runAfterDelay(100, () -> {
+            float kayip = 20f - acik.getHealth();
+            float catiCan = cati.getHealth();
+            yonetici.durdur();
+            cikar(level, List.of(acik, cati));
+            y.assertTrue(kayip >= 4f && kayip <= 5f, "5 sn açıkta 1 can/sn: 4–5 can kaybı beklenirdi, kayıp " + kayip);
+            y.assertTrue(catiCan == 20f, "çatı altındaki oyuncu hasar almamalı: " + catiCan);
             y.succeed();
         });
     }

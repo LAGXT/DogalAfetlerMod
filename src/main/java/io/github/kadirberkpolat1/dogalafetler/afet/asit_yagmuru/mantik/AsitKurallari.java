@@ -11,8 +11,10 @@ public final class AsitKurallari {
     public static final int GIRIS_TICK = 200;
     /** AKTIF sonunda yağmurun seyreldiği süre (15 sn). */
     public static final int CIKIS_TICK = 300;
-    /** Bu yoğunluğun altında (giriş ve çıkış çisesi) hasar ve aşındırma yok, yalnız görüntü. */
+    /** Bu yoğunluğun altında (giriş ve çıkış çisesi) aşındırma yok; oyuncu maruziyeti her yoğunlukta (> 0) işler. */
     public static final double ETKI_ESIGI = 0.15;
+    /** Maruziyet hasarının aralığı: bir saniye (ölçekli tick). */
+    public static final int SANIYE_TICK = 20;
     /** Çatlak örtüsünün en kısa ve en uzun süresi (3–5 sn, tasarım §2 "Aşınma"). */
     public static final int CATLAK_EN_AZ = 60;
     public static final int CATLAK_EN_COK = 100;
@@ -23,23 +25,24 @@ public final class AsitKurallari {
     private AsitKurallari() {
     }
 
-    /** Bir seviyenin değerleri; süreler tick, hasar can puanı (yarım kalp = 1). */
-    public record Seviye(int yaricap, int sureTick, double asindirmaSaniye, float hasar, int hasarAraligi,
-            boolean tasAsinir) {
+    /** Bir seviyenin değerleri; süreler tick. Maruziyet hasarı seviyeden bağımsızdır ({@code hasarSaniye}). */
+    public record Seviye(int yaricap, int sureTick, double asindirmaSaniye, boolean tasAsinir) {
     }
 
     /** Seviye 1–5 tablosu (config listeleri); {@code tasSeviyesi} kırıktaş ve taş tuğlanın aşınmaya başladığı seviye. */
-    public record Tablo(List<Integer> yaricap, List<Integer> sureSaniye, List<Double> asindirma, List<Double> hasar,
-            List<Integer> hasarAraligi, int tasSeviyesi) {
+    public record Tablo(List<Integer> yaricap, List<Integer> sureSaniye, List<Double> asindirma, int tasSeviyesi) {
         public static final Tablo VARSAYILAN = new Tablo(List.of(32, 48, 64, 96, 128), List.of(60, 90, 120, 180, 240),
-                List.of(2.0, 4.0, 7.0, 11.0, 16.0), List.of(0.5, 0.5, 0.5, 1.0, 1.0), List.of(80, 60, 40, 50, 40), 3);
+                List.of(2.0, 4.0, 7.0, 11.0, 16.0), 3);
 
         public Seviye seviye(int seviye) {
             int s = Math.max(1, Math.min(5, seviye));
             int i = s - 1;
-            return new Seviye(yaricap.get(i), sureSaniye.get(i) * 20, asindirma.get(i), hasar.get(i).floatValue(),
-                    hasarAraligi.get(i), s >= tasSeviyesi);
+            return new Seviye(yaricap.get(i), sureSaniye.get(i) * 20, asindirma.get(i), s >= tasSeviyesi);
         }
+    }
+
+    /** Bir maruziyet denetiminin sonucu: sayaç (ölçekli tick) ve bu denetimde hasar verilip verilmeyeceği. */
+    public record Maruziyet(int sayac, boolean hasar) {
     }
 
     /** Aşınabilir blok sınıfları; eşleme Minecraft tarafında ({@code AsitAsindirici.sinif}). */
@@ -97,6 +100,18 @@ public final class AsitKurallari {
     /** Öldürmeme garantisi: hasar canı {@code enAzCan}'ın altına indirmez; 0 dönerse hasar verilmez. */
     public static float hasarMiktari(float can, float hasar, float enAzCan) {
         return Math.max(0f, Math.min(hasar, can - enAzCan));
+    }
+
+    /**
+     * Açıkta geçen {@code adim} ölçekli tick sayaca eklenir; bir saniye dolunca hasar verilir ve bir saniye düşülür. Artan
+     * birikim bir saniyeyle sınırlı: {@code /dogalafet hiz} ya da gecikmiş denetim hasarı patlatmaz (denetim başına en çok bir).
+     */
+    public static Maruziyet maruziyet(int sayac, int adim) {
+        int s = Math.max(0, sayac) + Math.max(0, adim);
+        if (s < SANIYE_TICK) {
+            return new Maruziyet(s, false);
+        }
+        return new Maruziyet(Math.min(s - SANIYE_TICK, SANIYE_TICK), true);
     }
 
     /** Oyuncunun başının üstü gökyüzüne açık mı: {@code MOTION_BLOCKING} yüksekliği göz bloğunun üstünde değilse. */

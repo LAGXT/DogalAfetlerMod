@@ -5,6 +5,7 @@ import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciDonem;
 import io.github.kadirberkpolat1.dogalafetler.config.EfektKalitesi;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.donma.DonmaAyarlari;
+import io.github.kadirberkpolat1.dogalafetler.donma.DonmaParcaciklari;
 import io.github.kadirberkpolat1.dogalafetler.donma.mantik.DonmaEsikleri;
 import io.github.kadirberkpolat1.dogalafetler.network.DonemPaketi;
 import net.minecraft.client.Minecraft;
@@ -29,10 +30,10 @@ import net.minecraftforge.fml.common.Mod;
  * Dünya donmasının istemci efektleri (madde 9, tasarım notu §2 ve §5; yazı yok). Kaynak yalnız {@link IstemciDonem}
  * ({@code DonemPaketi}: donma ilerlemesi, çözülme dönemi, buharlaşma derinliği):
  * <ul>
- * <li>Ayaz: ilerlemeyle artan, süzülen buz kristalleri (göğü gören yerlerde).</li>
+ * <li>Ayaz: ilerlemeyle artan, süzülüp pırıldayan minik buz kristalleri (göğü gören yerlerde).</li>
  * <li>Kar yağışı: ilerleme eşiği aşılınca yağmur istemcide kar olur. Biyom sıcaklığına ve sunucu havasına dokunulmaz;
- * yağmur sürdükçe yerel dünyanın yağmur düzeyi 0'a çekilir (vanilla yağmur çizilmez) ve yerine iri, yavaş kar taneleri
- * düşer; eşiğin altına inince yağmur düzeyi geri verilir.</li>
+ * yağmur sürdükçe yerel dünyanın yağmur düzeyi 0'a çekilir (vanilla yağmur çizilmez) ve yerine sallanarak yavaşça düşen,
+ * rüzgârla sürüklenen kar taneleri ({@link KarTanesiParcacigi}) yağar; eşiğin altına inince yağmur düzeyi geri verilir.</li>
  * <li>Buhar: güneş büyürken (buharlaşma) ve donarken açık kalan su yüzeyinden yükselen deniz dumanu.</li>
  * <li>Nefes buharı: donmuş dünyada oyuncuların ağzından 2 sn'de bir.</li>
  * <li>Çözülme damlası: kızıl cüce çözülmesinde yapraklardan süzülen damlalar.</li>
@@ -133,27 +134,27 @@ public final class DonmaIstemciEfektleri {
 
     private static void ayaz(ClientLevel level, LocalPlayer o, RandomSource r, float g, double c) {
         BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
-        for (int i = sayi(r, g / 100.0 * 5.0 * c); i > 0; i--) {
+        for (int i = sayi(r, g / 100.0 * 2.0 * c); i > 0; i--) {
             double x = o.getX() + (r.nextDouble() - 0.5) * 24;
             double y = o.getY() + r.nextDouble() * 8 - 1;
             double z = o.getZ() + (r.nextDouble() - 0.5) * 24;
             if (level.canSeeSky(p.set(x, y, z))) {
-                level.addParticle(ParticleTypes.SNOWFLAKE, x, y, z, (r.nextDouble() - 0.5) * 0.02, -0.01 - r.nextDouble() * 0.02,
-                        (r.nextDouble() - 0.5) * 0.02);
+                level.addParticle(DonmaParcaciklari.BUZ_KRISTALI.get(), x, y, z, (r.nextDouble() - 0.5) * 0.02,
+                        -0.01 - r.nextDouble() * 0.02, (r.nextDouble() - 0.5) * 0.02);
             }
         }
     }
 
     private static void kar(ClientLevel level, LocalPlayer o, RandomSource r, double c) {
         BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
-        for (int i = sayi(r, 28.0 * c * karSiddeti); i > 0; i--) {
+        for (int i = sayi(r, 10.0 * c * karSiddeti); i > 0; i--) {
             double x = o.getX() + (r.nextDouble() - 0.5) * 32;
             double z = o.getZ() + (r.nextDouble() - 0.5) * 32;
             double y = o.getY() + 6 + r.nextDouble() * 10;
             int zemin = level.getHeight(Heightmap.Types.MOTION_BLOCKING, (int) Math.floor(x), (int) Math.floor(z));
             if (y > zemin && level.canSeeSky(p.set(x, Math.max(y, zemin), z))) {
-                level.addParticle(ParticleTypes.SNOWFLAKE, x, y, z, 0.03 + (r.nextDouble() - 0.5) * 0.03, -0.12 - r.nextDouble() * 0.06,
-                        (r.nextDouble() - 0.5) * 0.03);
+                level.addParticle(DonmaParcaciklari.KAR_TANESI.get(), x, y, z, (r.nextDouble() - 0.5) * 0.01,
+                        -0.04 - r.nextDouble() * 0.03, (r.nextDouble() - 0.5) * 0.01);
             }
         }
     }
