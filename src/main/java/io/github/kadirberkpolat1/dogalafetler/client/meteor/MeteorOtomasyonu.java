@@ -74,6 +74,8 @@ public final class MeteorOtomasyonu {
     private static final int KAMERA_YUKSEKLIGI = 18;
     /** Yavaş çekimin uçuş süresi (tick): varsayılan 180'in 2 katı. */
     private static final int YAVAS_CEKIM = 360;
+    /** Yağmur bölümünde kameranın göğe eğimi (derece). */
+    private static final float YAGMUR_EGIMI = 35F;
 
     /** Hedef ofseti (kameradan bakış yönünde x, sağa z), boyut, görünüm, açı, gelış yönü, başlangıç tick'i. */
     private record Atis(int dx, int dz, MeteorBoyutu boyut, MeteorGorunumu gorunum, double aci, double azimut, int tick) {
@@ -313,8 +315,8 @@ public final class MeteorOtomasyonu {
      * Yağmur bölümü: güneş patlaması ön-uyarısında (öncü yağmur), sirende ve AKTIF başında kare, sirende yakın/uzak
      * çarpma ses denemesi, sonra ay parçası yağmuru. {@code _gercek} kareleri gerçek hızda ({@code meteor.ucusSuresi}), ötekiler
      * vitrindeki gibi 2× yavaş çekimde ({@value #YAVAS_CEKIM} tick uçuş: kadrajda aynı anda 2 kat çok iz; yoğunluk
-     * değişmez). Gerçek hız karesi yavaş meteorlar indikten sonra (400 tick) alınır. Kare isteyen tick'te bekleyen
-     * kare alınana kadar sayaç ilerlemez.
+     * değişmez). Gerçek hız karesi yavaş meteorlar indikten sonra (400 tick) alınır. Kamera göğe {@value #YAGMUR_EGIMI}°
+     * bakar (meteorlar 200 blok yükseklikten iner). Kare isteyen tick'te bekleyen kare alınana kadar sayaç ilerlemez.
      */
     private static void yagmurBolumu(IntegratedServer server) {
         switch (sayac) {
@@ -322,6 +324,8 @@ public final class MeteorOtomasyonu {
                 server.execute(() -> {
                     eskiSure = MeteorAyarlari.ucusSuresi();
                     MeteorAyarlari.ucusSuresiAyarla(YAVAS_CEKIM);
+                    ServerPlayer o = server.getPlayerList().getPlayers().get(0);
+                    o.teleportTo(server.overworld(), o.getX(), o.getY(), o.getZ(), -90F, -YAGMUR_EGIMI);
                 });
                 komut(server, "dogalafet sifirla", "dogalafet start gunes_patlamasi");
             }
