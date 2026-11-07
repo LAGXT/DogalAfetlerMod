@@ -85,7 +85,24 @@ kopuk` karesi, yeni `SuOtomasyon` kapısı) şef kararını bekliyor.
 `OyunTestiAfeti.ozelliktenKaydet()`, özellik yoksa hiçbir şey yapmaz; özelliği yalnız `build.gradle`'ın `-PoyunTestiAfeti` run ayarı verir):
 `cekirdek_sunucu.py`'nin bayraklı kosu1/kosu2'sinde 4'er "Oyun testi" satırı (kasıtlı taklit denetimi), bayraksız kosu3'te ve `5-matris`'in
 diğer 22 senaryo log'unda 0 (`.vibe/kanit/k-e44-dogrulama/sunucu-cekirdek/`, `.vibe/kanit/matris-5/wt/sunucu/`); jar `00d1500`
-(sha256 `687a9cef…4800a`), kayıt yolu o tarihten beri değişmedi. Üretim sunucusu koşusu (#5) kullanıcı sorusu 4'ü bekliyor.
+(sha256 `687a9cef…4800a`), kayıt yolu o tarihten beri değişmedi. Üretim sunucusu koşusu (#5) bilinen sınır (K-E50 (c): dış ağ yok).
+
+## Teslim jar'ı
+
+`cikti/dogalafetler-0.1.0.jar` (git dışı; sürüm `0.1.0`, K-E50 (f)): pc2'de `gradle_kapisi.sh build --rerun-tasks` (`main` `9d90fb7`
+kaynakları, `MAKINE=LAGXT2`) çıkış 0, `warning:` 0, JUnit **551/0/0/0**; jar `uzak.sh -g build/libs/` ile geri çekildi.
+
+| Özellik | Değer |
+|---|---|
+| SHA-256 | `05ffe69a26e98e55e049dfebb8869a3cbbd91764ae284f3f0789034c9bc58a51` |
+| Boyut | 9 997 221 B; 1329 girdi, 794 `.class` (`jar tf \| grep -c class`) |
+| `META-INF/mods.toml` | `modId=dogalafetler`, `version=0.1.0`, `displayTest=MATCH_VERSION`, `license=MIT` |
+| Mixin | manifest `MixinConfigs` iki config (`dogalafetler.su.mixins.json`, `dogalafetler.client.su.mixins.json`); `dogalafetler.refmap.json` `EntityMixin` 2, `LiquidBlockRendererMixin` 1 (ör. `Entity;m_20323_()V`) |
+| Reobf | `javap -p -c EntityMixin` SRG adları (`f_19798_`, `m_5841_`, …); 294 sınıfta SRG adı, Mojang adı (`getGameTime`, `getBlockState`) içeren sınıf 0 |
+
+GameTest bu jar için yeniden koşmadı (kullanıcı kararı, K-E50): kabul kanıtı `6169b46` filtresiz 216/216 ve `-Puyum=coldsweat` 216/216
+(`.vibe/rapor/dogrulama-entegrasyon-5-son-3.md`); `9d90fb7` yalnız `client/kasirga` değiştirdi, `TEST_FILTRE=Kasirga` 11/11 (K-E49).
+Kanıt `.vibe/kanit/teslimat-t32/` (`build.log`, `jar.txt`).
 
 ## Bilinen sınırlar
 

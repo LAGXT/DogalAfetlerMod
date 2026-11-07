@@ -4927,6 +4927,23 @@ Kabul: pc2 `compileJava compileTestJava` 0 (`MAKINE=LAGXT2`), `TEST_FILTRE=Kasir
 passed` (filtreli), `py_compile` 62/0 (`.vibe/kanit/k-e49/`); runClient yok. Reddedilen: göreli Δ ölçüsü (tablo); ufuk bantı
 ölçüsü (şef: ölçü değişmez, önce maske düzelsin); kontrol karesinde uçan blokları da gizleyen eski bayrağı korumak.
 
+**K-E50 Faz 5 kapanışı ve teslim (kullanıcı kararı, 2026-11-07; t32, "test tekrarı yok, bitirelim").** Kullanıcı kareleri gözle
+inceledi ve kabul etti. (a) `5-matris` #6, #11, #12, #13 ve #15 kareleri kullanıcı incelemesiyle kabul; inceleyici puanları bilgi
+(`.vibe/rapor/inceleme-matris-5.md`, `.vibe/rapor/inceleme-matris-5-son-kasirga.md`). (b) K-17 kasırga taban rengi K-E49'un yedek
+yoluyla kapanır: `kasirga_gorsel.py` `taban rengi` satırı bilgi, palet `TOZ` 0,80/0,56/0,30 sabiti ve gözle kabul. (c) #5 üretim
+sunucusu (Forge installer `--installServer`) ve #9 e4mc bilinen sınır: dış ağ izni yok, installer yerel önbellekte yok; README
+"Kurulum" ve "Arkadaşlarla oynamak" adımlarını kullanıcı Windows'ta dener. (d) #10 görünür pencere FPS bilinen sınır (karar 2;
+geçerlilik ölçüsü CPU ms/kare, K-E29 (b)). (e) #7 `uyari_sunucu.py --yalniz-istemci` bilinen sınır: pc2 `ufw` portu açılmadı
+(K-E46). (f) Sürüm `0.1.0` kalır (`gradle.properties` değişmez); README'deki dört `{{SURUM}}` `0.1.0` oldu. README "Bilinen
+sınırlar"a (c), (d), (e) ve K-17 maddeleri oyuncu diliyle eklendi. GameTest yeniden koşmaz: kabul kanıtı `6169b46` filtresiz 216/216 ve
+`-Puyum=coldsweat` 216/216 (`.vibe/rapor/dogrulama-entegrasyon-5-son-3.md`); `9d90fb7` yalnız `client/kasirga`, `TEST_FILTRE=Kasirga`
+11/11. Teslim jar'ı pc2'de `build --rerun-tasks` (`9d90fb7`, JUnit 551/0/0/0, `warning:` 0) → `cikti/dogalafetler-0.1.0.jar`
+9 997 221 B, sha256 `05ffe69a…c58a51` (reobf denetimi TEST-RAPORU "Teslim jar'ı"). Temizlik (şef kararı 8): beş spike
+worktree'si (`spike-donma`, `-gokyuzu`, `-kasirga`, `-sanal-su`, `-siren`) `worktree remove` ile kalktı, dallar `is/spike-*` kalır;
+doğrulayıcı-3'ün `matris-5-son` worktree'si kendisinde. `docs/tasarim/`: son değişikliği `524c338` (Faz 4); Faz 5 sapmaları
+(SU-43…SU-45, K-E42, K-E48, K-E49) bu belgede, tasarım notlarının "Faz 5 cilası" diye andığı ama yapılmayan parçalar (tsunami su
+perdesi ve yüzen enkaz, çöken kütle varlığı) README bilinen sınırlarında; notlar hedef tarif olarak kalır, değişiklik yok.
+
 ## Açık noktalar (Faz 2b)
 
 Entegratöre bırakılan notlardan işlenenler: kancalar (K-E1), protokol (K-C47), `asama ileri [süreç]` (K-C48), sanal su §3a istisnası
@@ -4981,7 +4998,8 @@ birleşmiş beş worktree kaldırıldı (`.vibe/diff/<parça>.patch` kalır). A�
 Faz 4 kapandı (altı parça `main`'de, entegrasyon 4 6/6, rapor `.vibe/rapor/entegrasyon-4.md`). Altı parçanın kalan açıkları tek
 listede; her madde "→" ile Faz 5 görevine eşlendi (`.vibe/gorev/5-entegrasyon.md`, `5-matris.md`, `5-izleme-inceleme.md`,
 `5-teslimat.md`). Görünür koşu ve FPS yolu kullanıcı sorusuna (şef sorusu 1) bağlı; yol yoksa FPS gerekçeli bilinen sınır
-(Faz 5 şef kararı 2).
+(Faz 5 şef kararı 2). **Kapanış (K-E50):** "Durum: `5-matris` #6" maddeleri kullanıcı kare kabulüyle kapandı (K-E50 a), "#10"
+maddeleri bilinen sınır (K-E50 d; CPU ms ölçüsü geçti).
 
 - **Güneş — FPS (GP17):** gerçek FPS ve Düşük/Yüksek/Ultra karşılaştırması Faz 5'te görünür pencere ya da başsız kalibrasyonla
   (K0-21 rev. 2 (j)); hazır yol `gunes_patlamasi_gorsel.py` (kare başına FPS/TPS/mspt), kalite için
@@ -5051,26 +5069,31 @@ listede; her madde "→" ile Faz 5 görevine eşlendi (`.vibe/gorev/5-entegrasyo
 ## Açık noktalar (Faz 5)
 
 `5-entegrasyon` kabul (inceleme-entegrasyon-5, P0/P1 = 0). P2-1, P2-4, P2-5 K-E39'da; P2-7, P2-8 belge (K-E29 b, IZLEME);
-P2-9 `5-matris` kabulünde. Açık kalanlar:
+P2-9 `5-matris` kabulünde. Kapanış eşlemesi (K-E50) her maddenin sonunda:
 
 - **Tsunami birim tavanı dalı testsiz (P2-2):** 4 × bütçeyi aşan tek birimin tick'lere bölündüğü dal (`TsunamiYikimi` `kesildi`)
-  GameTest'te koşmuyor; yüklü olmayan konumdaki yıkım işi yeniden denenmeden atılır (blok yerinde kalır, veri bozulmaz).
+  GameTest'te koşmuyor; yüklü olmayan konumdaki yıkım işi yeniden denenmeden atılır (blok yerinde kalır, veri bozulmaz). **→ bilinen
+  sınır** (kod kabul, testsiz dal; K-E50).
 - **F-18 testi varsayılan pakette koşulsuz geçer (P2-3):** `coldSweatYukluykenYiyecekCekirdegeGider` yalnız `-Puyum=coldsweat` ile
-  sınar; TEST-RAPORU #3 "213 + 1 koşullu", Cold Sweat'le istemci mixin karesi `5-matris` #9.
-- **K-E33 (P2-6):** şef kabul, düzeltme yok (K-E33 notu).
+  sınar; TEST-RAPORU #3 "213 + 1 koşullu", Cold Sweat'le istemci mixin karesi `5-matris` #9. **→ kapandı:** `-Puyum=coldsweat`
+  filtresiz 216/216 (K-E41, `dogrulama-entegrasyon-5-son-3.md`) ve #9 S-18 çift hasar yok.
+- **K-E33 (P2-6):** şef kabul, düzeltme yok (K-E33 notu). **→ kapandı.**
 - **Görsel otomasyon §E:** kapandı — `SuOtomasyon` ortak `GorselOtomasyon`'a çevrildi, `TsunamiOtomasyonu` kendiliğinden birleşti
   (`af87dd1` ve sonrası, SU-44 notu). Kadrajlar ve `5-matris` #6/#10 ölçümleri yeni HEAD'de.
 - **`uzak.sh -g` geri çekmesinin yol sınırı (inceleme-entegrasyon-5-son P2-4):** kapandı (K-E44) — `-g` yalnız klasör dışı ya da `.vibe/`,
   `build/`, `logs/`, `run*/` altı; `-g src/` ve `-g ./` çıkış 2 ile reddedilir (denendi).
 - **`5-matris` sonrası (K-E45…K-E47):** kasırga görsel koşusu K-E45 betiyle yeniden (#6); uyarı istemcili koşu K-E46 ile pc2 `ufw`
   portu açılınca (#7, kullanıcı `sudo`); #5 installer ve #9 e4mc kullanıcı sorusu 4; #6/#11–#13/#15 kareleri şef incelemesinde; birleşik HEAD
-  istemci yeniden koşusu (#6/#10, Ts2-1 `kopuk`) şef kararını bekliyor.
+  istemci yeniden koşusu (#6/#10, Ts2-1 `kopuk`) şef kararını bekliyor. **→ kapandı (K-E50):** #6/#11–#13/#15 kareleri kullanıcı kabulü
+  (a); #7 (e), #5 ve #9 (c) bilinen sınır; birleşik HEAD istemci koşusu doğrulayıcı-3'ün `matris-5-son` (`9ec1b3f`) koşusu, sonucu
+  TEST-RAPORU §6'ya işlenir; yeni tekrar yok.
 - **Su tampon kapasitesi küçülmüyor (doğrulayıcı-2 P2-2):** kapandı (K-E48): kapasite yalnız GPU deposudur, dolgu yazılmaz; SU-45
-  yeniden ölçümü doğrulayıcının `su_istemci.py hepsi` koşusunda.
+  yeniden ölçümü doğrulayıcı-3'ün `matris-5-son` raporunda.
 - **Sanal su görseli (inceleme-su-gorsel):** P2-5 köpük paylaşılan kenar hesabı yapılmadı (isteğe bağlı); köpük CPU'su, tampon büyümesi
   (`tampon_buyume`) ve SU-45 duvar saati `5-matris` #10; Ts2-1 tam kare ve yeni `SuOtomasyon` kareleri `5-matris` #6 (bu turda runClient yok).
+  **→** P2-5 bilinen sınır (isteğe bağlı cila); duvar saati #10 bilinen sınır (K-E50 d); kareler kullanıcı kabulü (K-E50 a).
 - **Kasırga K-17 taban rengi (K-E49):** kontrol karesi yalnız tozu gizler; kalibrasyon doğrulayıcı-3'ün yeniden koşusunda, tutmazsa
-  yedek yol (b): K-17 karesi bilgi, palet sabiti ve gözle hüküm.
+  yedek yol (b): K-17 karesi bilgi, palet sabiti ve gözle hüküm. **→ kapandı (K-E50 b):** yedek yol; satır bilgi, palet sabiti + gözle kabul.
 
 ## N17 — Sayısal varsayılanlar
 

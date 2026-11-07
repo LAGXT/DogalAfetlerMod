@@ -4,8 +4,8 @@ Minecraft 1.20.1 (Forge) için gerçekçi doğal afetler, vücut sıcaklığı s
 deprem, sinkhole, asit yağmuru, orman yangını, güneş patlaması ve ay çarpması; afetlerin bıraktığı izler (donan dünya, yükselen
 deniz, aysız gökyüzü, kızıl cüce güneş) dünyada kalıcıdır.
 
-- Sürüm: **{{SURUM}}** · Minecraft **1.20.1** · Forge **47.4.28** ve üstü (47.x)
-- Jar: `dogalafetler-{{SURUM}}.jar` · Mod kimliği: `dogalafetler`
+- Sürüm: **0.1.0** · Minecraft **1.20.1** · Forge **47.4.28** ve üstü (47.x)
+- Jar: `dogalafetler-0.1.0.jar` · Mod kimliği: `dogalafetler`
 - Yazar: Kadir Berk Polat · Lisans: MIT
 
 ## İçindekiler
@@ -30,7 +30,7 @@ deniz, aysız gökyüzü, kızıl cüce güneş) dünyada kalıcıdır.
 1. Minecraft Launcher'da **1.20.1** sürümünü bir kez açıp kapatın (dosyalar insin).
 2. [Forge indirme sayfasından](https://files.minecraftforge.net/net/minecraftforge/forge/index_1.20.1.html) 1.20.1 için
    **Installer**'ı indirin (47.4.28 ya da daha yeni bir 47.x), çalıştırın, **Install client** ile kurun.
-3. `Win + R` → `%APPDATA%\.minecraft` → `mods` klasörü yoksa oluşturun ve `dogalafetler-{{SURUM}}.jar`'ı içine kopyalayın.
+3. `Win + R` → `%APPDATA%\.minecraft` → `mods` klasörü yoksa oluşturun ve `dogalafetler-0.1.0.jar`'ı içine kopyalayın.
 4. Launcher'da **forge-1.20.1** profilini seçip oynayın. Ana menüde **Mods** listesinde "Doğal Afetler" görünmelidir.
 
 Java ayrıca kurulmaz; Launcher kendi Java'sını kullanır.
@@ -62,7 +62,7 @@ gradlew.bat build
 ./gradlew build
 ```
 
-Çıktı: `build/libs/dogalafetler-{{SURUM}}.jar` (oyuna kurulacak, reobf'lu jar). Faydalı görevler:
+Çıktı: `build/libs/dogalafetler-0.1.0.jar` (oyuna kurulacak, reobf'lu jar). Faydalı görevler:
 
 | Görev | Ne yapar |
 |---|---|
@@ -566,13 +566,21 @@ Başarım sekmesi arka planı.
   kısıyor) ekranda görülen FPS ölçülemedi. Onun yerine kare başına işlemci süresi ölçüldü: asit yağmuru, orman yangını,
   kasırga, tsunami ve sanal suyun en yoğun (seviye 5) sahnesinde Yüksek kalitede sınırın altında kaldı; ay çarpması ve güneş
   patlamasının afetsiz karşılaştırma sahnesi olmadığından onların değerleri ön değerdir. Sunucu tarafı (TPS, tick süresi) ölçüldü.
-  Kendi bilgisayarınızda yavaşlık görürseniz önce `gorsel.efektKalitesi`'ni `ORTA` ya da `DUSUK` yapın.
+  Kendi bilgisayarınızda yavaşlık görürseniz önce `gorsel.efektKalitesi`'ni `ORTA` ya da `DUSUK` yapın. Görünür pencerede
+  Düşük/Yüksek/Ultra FPS karşılaştırması yapılmadı.
 - **Çok oyunculu:** dedicated sunucuya (Cold Sweat'li dahil) tek gerçek istemciyle bağlanıldı; 2–10 oyunculu durumlar oyun içi
-  testlerde sahte oyuncularla sınandı. Birden çok gerçek istemcinin aynı anda bağlı olduğu bir oturum denenmedi.
+  testlerde sahte oyuncularla sınandı. Birden çok gerçek istemcinin aynı anda bağlı olduğu bir oturum denenmedi. Sirenin ayrı
+  bir bilgisayardaki dedicated sunucudan gerçek bir istemciye çaldığı koşu yapılmadı (siren paketi oyun içi testlerde, sesi tek
+  oyunculu dünyada doğrulandı).
 - **Sonradan giren oyuncu:** afet ya da dönem sürerken sunucuya giren oyuncunun doğru gökyüzünü aldığı oyun içi testle
   doğrulandı; ekran görüntüsüyle denetlenmedi.
 - **Gamerule tab tamamlaması:** kurallar okunup yazıldı ve yeniden açılışta korundu; `/gamerule` öneri listesi ekranda denetlenmedi.
-- **e4mc:** e4mc üzerinden internetten gerçek bir arkadaş oturumu geliştirme sırasında denenmedi (internet bağlantısı ister).
+- **Üretim sunucusu ve e4mc:** Forge installer'ın **Install server** ile kurduğu temiz bir sunucuda ve e4mc üzerinden internetten
+  gerçek bir arkadaş oturumunda geliştirme sırasında denenmedi (ikisi de internet bağlantısı ister). Mod Forge geliştirme
+  sunucusunda ve dedicated sunucu koşularında sınandı; "Kurulum" ve "Arkadaşlarla oynamak" adımlarını Windows'ta ilk kez
+  denerken sorun görürseniz `logs/latest.log`'u saklayın.
+- **Kasırga tabanının rengi:** seviye 5 kasırganın tabanındaki toz katmanının sıcak kahverengi göründüğü ekran görüntülerinde
+  gözle denetlendi; otomatik renk ölçüsü zemin rengine (çimen, kum, su kenarı) bağlı kaldığı için kabul ölçüsü sayılmadı.
 - **Cold Sweat:** varsayılan `OTOMATIK` kipte Cold Sweat yüklüyken çift hasar olmadığı ölçüldü (çok soğukta ve tam
   donmada can değişmedi); `sicaklikSistemiModu = ACIK` iken iki sistemin birlikte verdiği hasar ölçülmedi.
 - **Gamerule ve elle başlatılan güneş patlaması:** `/dogalafet start` ile başlatılan güneş patlaması gamerule'den etkilenmez;
