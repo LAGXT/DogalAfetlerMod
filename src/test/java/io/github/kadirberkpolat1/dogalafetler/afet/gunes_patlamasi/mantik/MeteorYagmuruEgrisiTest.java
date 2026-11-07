@@ -38,17 +38,22 @@ class MeteorYagmuruEgrisiTest {
     }
 
     @Test
-    void aktifteHerGununBasindaYagmurArasindaArkaPlan() {
+    void ilkGun10DakikaSonrakiGunler3DakikaArasindaArkaPlan() {
         long sure = 5 * GUN;
-        assertTrue(MeteorYagmuruEgrisi.yagmurda(0, 3600));
-        assertTrue(MeteorYagmuruEgrisi.yagmurda(3599, 3600));
-        assertFalse(MeteorYagmuruEgrisi.yagmurda(3600, 3600));
-        assertTrue(MeteorYagmuruEgrisi.yagmurda(2 * GUN + 10, 3600));
-        assertFalse(MeteorYagmuruEgrisi.yagmurda(0, 0), "0 süre: yağmur yok");
-        assertEquals(24.0, MeteorYagmuruEgrisi.aktif(0, sure, 1.5, 5, 3600, 24), EPS);
-        assertEquals(24.0, MeteorYagmuruEgrisi.aktif(3 * GUN + 100, sure, 1.5, 5, 3600, 24), EPS);
-        assertEquals(GunesPatlamasiEgrileri.dakikaBasinaMeteor(5000, sure, 1.5, 5),
-                MeteorYagmuruEgrisi.aktif(5000, sure, 1.5, 5, 3600, 24), EPS);
-        assertEquals(5.0, MeteorYagmuruEgrisi.aktif(sure, sure, 1.5, 5, 3600, 2), EPS, "arka plan büyükse o");
+        long ilk = 12_000;
+        long gunluk = 3_600;
+        assertTrue(MeteorYagmuruEgrisi.yagmurda(0, ilk, gunluk));
+        assertTrue(MeteorYagmuruEgrisi.yagmurda(11_999, ilk, gunluk), "ilk gün 10 dk");
+        assertFalse(MeteorYagmuruEgrisi.yagmurda(12_000, ilk, gunluk));
+        assertTrue(MeteorYagmuruEgrisi.yagmurda(GUN + 3_599, ilk, gunluk));
+        assertFalse(MeteorYagmuruEgrisi.yagmurda(GUN + 3_600, ilk, gunluk), "sonraki günler 3 dk");
+        assertTrue(MeteorYagmuruEgrisi.yagmurda(2 * GUN + 10, ilk, gunluk));
+        assertFalse(MeteorYagmuruEgrisi.yagmurda(GUN, ilk, 0), "0 süre: yağmur yok");
+        assertEquals(90.0, MeteorYagmuruEgrisi.aktif(0, sure, 1.5, 5, ilk, gunluk, 90), EPS);
+        assertEquals(90.0, MeteorYagmuruEgrisi.aktif(9_000, sure, 1.5, 5, ilk, gunluk, 90), EPS);
+        assertEquals(90.0, MeteorYagmuruEgrisi.aktif(3 * GUN + 100, sure, 1.5, 5, ilk, gunluk, 90), EPS);
+        assertEquals(GunesPatlamasiEgrileri.dakikaBasinaMeteor(15_000, sure, 1.5, 5),
+                MeteorYagmuruEgrisi.aktif(15_000, sure, 1.5, 5, ilk, gunluk, 90), EPS);
+        assertEquals(5.0, MeteorYagmuruEgrisi.aktif(sure, sure, 1.5, 5, ilk, gunluk, 2), EPS, "arka plan büyükse o");
     }
 }

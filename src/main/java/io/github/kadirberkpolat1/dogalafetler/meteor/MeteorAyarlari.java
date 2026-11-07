@@ -1,11 +1,15 @@
 package io.github.kadirberkpolat1.dogalafetler.meteor;
 
 import io.github.kadirberkpolat1.dogalafetler.config.AyarKaydi;
+import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.MeteorOlcegi;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.OdulZamani;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.OdulZari;
 import net.minecraftforge.common.ForgeConfigSpec;
 
-/** {@code meteor} bölümleri: oynanış SERVER, görsel CLIENT (madde 13c, N13, N17). */
+/**
+ * {@code meteor} bölümleri: oynanış SERVER, görsel CLIENT (madde 13c, N13, N17). Küçük/büyük çiftleri tipik ölçeklerdeki
+ * referanslardır; ara ve uç ölçekler {@link MeteorOlcegi#ara} ile türetilir.
+ */
 public final class MeteorAyarlari {
     private static AyarKaydi.Bolum<Sunucu> sunucu;
     private static AyarKaydi.Bolum<Istemci> istemci;
@@ -39,12 +43,14 @@ public final class MeteorAyarlari {
         return sunucu.get().yanmaSaniye.get();
     }
 
-    public static double kraterYaricapi(MeteorBoyutu b) {
-        return (b.buyuk() ? sunucu.get().buyukKraterYaricapi : sunucu.get().kucukKraterYaricapi).get();
+    public static double kraterYaricapi(double olcek) {
+        Sunucu s = sunucu.get();
+        return MeteorOlcegi.ara(olcek, s.kucukKraterYaricapi.get(), s.buyukKraterYaricapi.get(), 0, 12);
     }
 
-    public static double kraterDerinligi(MeteorBoyutu b) {
-        return (b.buyuk() ? sunucu.get().buyukKraterDerinligi : sunucu.get().kucukKraterDerinligi).get();
+    public static double kraterDerinligi(double olcek) {
+        Sunucu s = sunucu.get();
+        return MeteorOlcegi.ara(olcek, s.kucukKraterDerinligi.get(), s.buyukKraterDerinligi.get(), 0, 10);
     }
 
     public static int kraterBlokButcesi() {
@@ -84,20 +90,23 @@ public final class MeteorAyarlari {
         return sunucu.get().girisAcisiEnCok.get();
     }
 
-    public static int sarsintiMenzili(MeteorBoyutu b) {
-        return (b.buyuk() ? sunucu.get().sarsintiMenziliBuyuk : sunucu.get().sarsintiMenziliKucuk).get();
+    public static double sarsintiMenzili(double olcek) {
+        Sunucu s = sunucu.get();
+        return MeteorOlcegi.ara(olcek, s.sarsintiMenziliKucuk.get(), s.sarsintiMenziliBuyuk.get(), 0, 512);
     }
 
-    public static double yanginYogunlugu(MeteorBoyutu b) {
-        return (b.buyuk() ? sunucu.get().buyukYanginYogunlugu : sunucu.get().kucukYanginYogunlugu).get();
+    public static double yanginYogunlugu(double olcek) {
+        Sunucu s = sunucu.get();
+        return MeteorOlcegi.ara(olcek, s.kucukYanginYogunlugu.get(), s.buyukYanginYogunlugu.get(), 0, 1);
     }
 
     public static int yanginYaricapEki() {
         return sunucu.get().yanginYaricapEki.get();
     }
 
-    public static double kraterSicakligi(MeteorBoyutu b) {
-        return (b.buyuk() ? sunucu.get().buyukKraterSicakligi : sunucu.get().kucukKraterSicakligi).get();
+    public static double kraterSicakligi(double olcek) {
+        Sunucu s = sunucu.get();
+        return MeteorOlcegi.ara(olcek, s.kucukKraterSicakligi.get(), s.buyukKraterSicakligi.get(), 0, 45);
     }
 
     public static int kraterSicaklikSaniye() {
@@ -106,6 +115,11 @@ public final class MeteorAyarlari {
 
     public static double yagmurBuyukOrani() {
         return sunucu.get().yagmurBuyukOrani.get();
+    }
+
+    /** Yağmurda orta bant (0,9–1,6×) olasılığı; büyük bantı çağıran verir, küçük kalanıdır. */
+    public static double ortaMeteorOrani() {
+        return sunucu.get().ortaMeteorOrani.get();
     }
 
     public static double izYogunlugu() {
@@ -149,6 +163,7 @@ public final class MeteorAyarlari {
         private final ForgeConfigSpec.DoubleValue buyukKraterSicakligi;
         private final ForgeConfigSpec.IntValue kraterSicaklikSaniye;
         private final ForgeConfigSpec.DoubleValue yagmurBuyukOrani;
+        private final ForgeConfigSpec.DoubleValue ortaMeteorOrani;
 
         private Sunucu(ForgeConfigSpec.Builder k) {
             OdulZari.Sanslar v = OdulZari.Sanslar.VARSAYILAN;
@@ -174,8 +189,8 @@ public final class MeteorAyarlari {
                     .defineInRange("buyukKraterDerinligi", 4.0, 0.0, 10.0);
             kraterBlokButcesi = k.comment("Tick başına krater blok işlemi (bütün kraterler); TPS kısmasıyla çarpılır.")
                     .defineInRange("kraterBlokButcesi", 512, 16, 8192);
-            varlikTavani = k.comment("Boyut başına aynı anda uçan en çok meteor; aşılınca yeni meteor atılmaz.")
-                    .defineInRange("varlikTavani", 48, 1, 256);
+            varlikTavani = k.comment("Boyut başına aynı anda uçan en çok meteor; doluyken atılmak istenen meteor düşmez (kuyruk yok).")
+                    .defineInRange("varlikTavani", 96, 1, 256);
             dagitimIcYaricap = k.comment("Yağmurda meteor oyuncunun en az bu kadar uzağına düşer (blok).")
                     .defineInRange("dagitimIcYaricap", 32, 0, 256);
             dagitimDisYaricap = k.comment("Yağmurda meteor oyuncunun en çok bu kadar uzağına düşer (blok).")
@@ -199,8 +214,11 @@ public final class MeteorAyarlari {
                     .defineInRange("buyukKraterSicakligi", 24.0, 0.0, 45.0);
             kraterSicaklikSaniye = k.comment("Krater bu kadar saniye sıcak kalır (ortam kaynağı).")
                     .defineInRange("kraterSicaklikSaniye", 30, 0, 600);
-            yagmurBuyukOrani = k.comment("/dogalafet meteor yagmur komutunda büyük meteor oranı (tasarım: %5).")
-                    .defineInRange("yagmurBuyukOrani", 0.05, 0.0, 1.0);
+            yagmurBuyukOrani = k.comment("/dogalafet meteor yagmur komutunda büyük bant (1,6–2,5×) olasılığı.")
+                    .defineInRange("yagmurBuyukOrani", 0.10, 0.0, 1.0);
+            ortaMeteorOrani = k.comment("Yağmurlarda orta bant (0,9–1,6×) olasılığı; küçük bant (0,5–0,9×) = 1 − büyük − orta "
+                    + "(büyük oranı afetin config'i: gunes_patlamasi.buyukMeteorOrani, ay_carpmasi.meteorBuyukOrani).")
+                    .defineInRange("ortaMeteorOrani", 0.30, 0.0, 1.0);
         }
     }
 

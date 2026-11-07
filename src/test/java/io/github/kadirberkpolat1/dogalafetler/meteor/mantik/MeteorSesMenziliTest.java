@@ -38,17 +38,29 @@ class MeteorSesMenziliTest {
     }
 
     @Test
-    void carpmaBuyukteDahaUzaktanVeGucluKucukte96Blok() {
-        assertEquals(1.0, MeteorSesMenzili.carpmaKazanci(0, true), EPS);
-        assertEquals(MeteorSesMenzili.KUCUK_CARPMA_DUZEYI, MeteorSesMenzili.carpmaKazanci(0, false), EPS);
-        assertEquals(0.0, MeteorSesMenzili.carpmaKazanci(96, false), EPS);
-        assertTrue(MeteorSesMenzili.carpmaKazanci(96, true) > 0);
-        assertEquals(0.0, MeteorSesMenzili.carpmaKazanci(128, true), EPS);
-        for (double d = 0; d < 96; d += 8) {
-            assertTrue(MeteorSesMenzili.carpmaKazanci(d, true) > MeteorSesMenzili.carpmaKazanci(d, false), "mesafe " + d);
+    void carpmaOlcekleBuyurTipikKucuk96TipikBuyuk128Blok() {
+        double k = MeteorOlcegi.KUCUK_TIPIK;
+        double b = MeteorOlcegi.BUYUK_TIPIK;
+        assertEquals(1.0, MeteorSesMenzili.carpmaKazanci(0, b), EPS);
+        assertEquals(MeteorSesMenzili.KUCUK_CARPMA_DUZEYI, MeteorSesMenzili.carpmaKazanci(0, k), EPS);
+        assertEquals(96.0, MeteorSesMenzili.carpmaMenzili(k), EPS);
+        assertEquals(128.0, MeteorSesMenzili.carpmaMenzili(b), EPS);
+        assertEquals(0.0, MeteorSesMenzili.carpmaKazanci(96, k), EPS);
+        assertTrue(MeteorSesMenzili.carpmaKazanci(96, b) > 0);
+        assertEquals(0.0, MeteorSesMenzili.carpmaKazanci(128, b), EPS);
+        double orta = MeteorSesMenzili.carpmaMenzili(1.25);
+        assertTrue(orta > 96 && orta < 128, "orta ölçek aradadır: " + orta);
+        assertTrue(MeteorSesMenzili.carpmaMenzili(MeteorOlcegi.UST) > 128 && MeteorSesMenzili.carpmaMenzili(0.5) < 96);
+        for (double d = 0; d < 90; d += 8) {
+            double onceki = -1;
+            for (double o = MeteorOlcegi.KUCUK_ALT; o <= MeteorOlcegi.UST; o += 0.1) {
+                double g = MeteorSesMenzili.carpmaKazanci(d, o);
+                assertTrue(g >= onceki, "ölçek büyüdükçe kazanç azalmaz: mesafe " + d + " ölçek " + o);
+                onceki = g;
+            }
         }
-        assertEquals(0.85 * 1.1, MeteorSesMenzili.carpmaPerdesi(true, true), EPS);
-        assertEquals(1.0, MeteorSesMenzili.carpmaPerdesi(false, false), EPS);
+        assertEquals(0.85 * 1.1, MeteorSesMenzili.carpmaPerdesi(b, true), EPS);
+        assertEquals(1.0, MeteorSesMenzili.carpmaPerdesi(k, false), EPS);
     }
 
     @Test

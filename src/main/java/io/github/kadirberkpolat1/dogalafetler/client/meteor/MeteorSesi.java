@@ -5,6 +5,7 @@ import io.github.kadirberkpolat1.dogalafetler.client.core.GorselOtomasyon;
 import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorGorunumu;
 import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorSesleri;
 import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorVarligi;
+import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.MeteorOlcegi;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.MeteorSesMenzili;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,6 +29,7 @@ final class MeteorSesi {
     private static final String ON = "METEOR_SES ";
     /** Patlama dosyasının uzunluğu (tick): bu süreden sonra tavanda yer tutmaz. */
     private static final int PATLAMA_TICK = 140;
+    private static final String[] BANTLAR = {"küçük", "orta", "büyük"};
 
     private record Patlama(SimpleSoundInstance ses, double mesafe, long baslangic) {
     }
@@ -113,12 +115,12 @@ final class MeteorSesi {
     }
 
     /** Çarpma paketi geldi: menzildeyse patlama mesafe kazancıyla çalar; tavan doluysa en uzaktaki patlama söner. */
-    static void carpma(Vec3 nokta, double mesafe, boolean buyuk, boolean ay) {
-        double kazanc = MeteorSesMenzili.carpmaKazanci(mesafe, buyuk);
-        String boy = buyuk ? "büyük" : "küçük";
+    static void carpma(Vec3 nokta, double mesafe, double olcek, boolean ay) {
+        double kazanc = MeteorSesMenzili.carpmaKazanci(mesafe, olcek);
         if (kazanc <= 0) {
             if (GorselOtomasyon.AKTIF) {
-                log("çarpma çalmadı: {} mesafe {} > menzil {}", boy, mesafe, MeteorSesMenzili.carpmaMenzili(buyuk));
+                log("çarpma çalmadı: {} ölçek {} mesafe {} > menzil {}", BANTLAR[MeteorOlcegi.bant(olcek)], olcek, mesafe,
+                        MeteorSesMenzili.carpmaMenzili(olcek));
             }
             return;
         }
@@ -131,7 +133,8 @@ final class MeteorSesi {
         int yer = MeteorSesMenzili.yer(calan, mesafe, MeteorSesMenzili.AYNI_TUR_TAVANI);
         if (yer == -2) {
             if (GorselOtomasyon.AKTIF) {
-                log("çarpma çalmadı: {} mesafe {}, tavan dolu ({} daha yakın patlama)", boy, mesafe, calan.length);
+                log("çarpma çalmadı: {} ölçek {} mesafe {}, tavan dolu ({} daha yakın patlama)",
+                        BANTLAR[MeteorOlcegi.bant(olcek)], olcek, mesafe, calan.length);
             }
             return;
         }
@@ -139,12 +142,12 @@ final class MeteorSesi {
             sesler.stop(PATLAMALAR.remove(yer).ses());
         }
         SimpleSoundInstance ses = new SimpleSoundInstance(MeteorSesleri.PATLAMA, SoundSource.BLOCKS, (float) kazanc,
-                (float) MeteorSesMenzili.carpmaPerdesi(buyuk, ay), SoundInstance.createUnseededRandom(), false, 0,
+                (float) MeteorSesMenzili.carpmaPerdesi(olcek, ay), SoundInstance.createUnseededRandom(), false, 0,
                 SoundInstance.Attenuation.NONE, nokta.x, nokta.y, nokta.z, false);
         sesler.play(ses);
         PATLAMALAR.add(new Patlama(ses, mesafe, saat));
         if (GorselOtomasyon.AKTIF) {
-            log("çarpma çaldı: {} mesafe {} kazanç {}", boy, mesafe, kazanc);
+            log("çarpma çaldı: {} ölçek {} mesafe {} kazanç {}", BANTLAR[MeteorOlcegi.bant(olcek)], olcek, mesafe, kazanc);
         }
     }
 
@@ -208,7 +211,7 @@ final class MeteorSesi {
             Vec3 hiz = meteor.getDeltaMovement();
             double yaklasma = mesafe > 1e-3 ? hiz.dot(r) / mesafe : 0;
             pitch = (float) (MeteorSesMenzili.dopplerPerdesi(yaklasma) * (meteor.gorunum() == MeteorGorunumu.AY ? 1.1 : 1.0));
-            volume = (float) ((meteor.boyut().buyuk() ? 1.0 : 0.75) * MeteorSesMenzili.ucusKazanci(mesafe)
+            volume = (float) (MeteorOlcegi.ara(meteor.olcek(), 0.75, 1.0, 0.6, 1.0) * MeteorSesMenzili.ucusKazanci(mesafe)
                     * Math.min(1.0, yas / 6.0));
         }
 

@@ -8,6 +8,8 @@ import java.util.Comparator;
  * azalır ({@code (1 − d/menzil)²}) ve menzilde sıfırdır: ses menzil sınırında tam düzeyde başlamaz, vanilla doğrusal
  * azalma kullanılmaz. Uçuş sesinin perdesi Doppler oranıdır: {@code c / (c − v)}, {@code v} meteorun dinleyiciye yaklaşma
  * hızı. Aynı türden aynı anda en çok {@value #AYNI_TUR_TAVANI} ses çalar; fazlası en uzaktakinden düşer (ses.md §4 kural 3).
+ * Çarpmanın menzili, düzeyi ve perdesi sürekli ölçekten ({@link MeteorOlcegi#ara}): tipik küçük 96 blok / %70, tipik büyük
+ * 128 blok / %100, arası ve uçları doğrusal.
  */
 public final class MeteorSesMenzili {
     /** Uçuş sesi meteor bu kadar yakınken başlar (blok). */
@@ -16,7 +18,7 @@ public final class MeteorSesMenzili {
     public static final double UCUS_BIRAKMA = 52;
     public static final double CARPMA_MENZILI_BUYUK = 128;
     public static final double CARPMA_MENZILI_KUCUK = 96;
-    /** Küçük çarpmanın düzeyi büyüğe göre (aynı mesafede). */
+    /** Tipik küçük çarpmanın düzeyi tipik büyüğe göre (aynı mesafede). */
     public static final double KUCUK_CARPMA_DUZEYI = 0.7;
     public static final int AYNI_TUR_TAVANI = 6;
     /** Oyundaki ses hızı (blok/tick): 3 blok/tick'lik meteorda perde 0,8 (uzaklaşan) ile 1,33 (yaklaşan) arası kayar. */
@@ -50,18 +52,19 @@ public final class MeteorSesMenzili {
         return Math.max(0.5, Math.min(2.0, SES_HIZI / (SES_HIZI - v)));
     }
 
-    public static double carpmaMenzili(boolean buyuk) {
-        return buyuk ? CARPMA_MENZILI_BUYUK : CARPMA_MENZILI_KUCUK;
+    /** Çarpma menzili (blok): ölçek 0,5'te ~91, 2,5'te ~139. */
+    public static double carpmaMenzili(double olcek) {
+        return MeteorOlcegi.ara(olcek, CARPMA_MENZILI_KUCUK, CARPMA_MENZILI_BUYUK, 64, 160);
     }
 
     /** Çarpma patlamasının dinleyicideki kazancı (0–1): büyük daha uzaktan ve aynı mesafede daha güçlü duyulur. */
-    public static double carpmaKazanci(double mesafe, boolean buyuk) {
-        return (buyuk ? 1.0 : KUCUK_CARPMA_DUZEYI) * kazanc(mesafe, carpmaMenzili(buyuk));
+    public static double carpmaKazanci(double mesafe, double olcek) {
+        return MeteorOlcegi.ara(olcek, KUCUK_CARPMA_DUZEYI, 1.0, 0.5, 1.0) * kazanc(mesafe, carpmaMenzili(olcek));
     }
 
-    /** Büyük meteorun patlaması daha alçak; ay parçaları %10 tiz (tasarım notu). */
-    public static double carpmaPerdesi(boolean buyuk, boolean ay) {
-        return (buyuk ? 0.85 : 1.0) * (ay ? 1.1 : 1.0);
+    /** Büyük meteorun patlaması daha alçak (tipik büyük 0,85); ay parçaları %10 tiz (tasarım notu). */
+    public static double carpmaPerdesi(double olcek, boolean ay) {
+        return MeteorOlcegi.ara(olcek, 1.0, 0.85, 0.75, 1.05) * (ay ? 1.1 : 1.0);
     }
 
     /**

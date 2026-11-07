@@ -2,6 +2,7 @@ package io.github.kadirberkpolat1.dogalafetler.meteor;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.esya.MeteorEsyaKayitlari;
+import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.MeteorOlcegi;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.OdulZari;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.Yorunge;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
@@ -32,24 +33,33 @@ public final class MeteorAPI {
     }
 
     /**
-     * {@code hedef} sütununa (y = yüzey, yapraklar hariç) bir meteor düşürür. Görünüm kaynaktan gelir (ay çarpması →
-     * ay kayası, diğerleri → güneş). Hedef chunk yüklü değilse ya da meteor tavanı doluysa boş döner. Hedef
-     * varlık işleyen bir chunk'ta değilse (uçuş görülemez) çarpma hemen olur ve yine boş döner.
+     * {@code hedef} sütununa (y = yüzey, yapraklar hariç) sınıfın tipik ölçeğinde bir meteor düşürür. Görünüm kaynaktan
+     * gelir (ay çarpması → ay kayası, diğerleri → güneş). Hedef chunk yüklü değilse ya da meteor tavanı doluysa boş döner
+     * (meteor düşmez, beklemez). Hedef varlık işleyen bir chunk'ta değilse (uçuş görülemez) çarpma hemen olur ve yine boş
+     * döner.
      *
      * @param sarsinti çarpma yakındaki oyuncuların ekranını sarssın mı
      */
     public static Optional<MeteorVarligi> dusur(ServerLevel level, BlockPos hedef, MeteorBoyutu boyut,
             YanginKaynagi kaynak, boolean sarsinti) {
-        return dusur(level, hedef, boyut, MeteorGorunumu.kaynaktan(kaynak), kaynak, sarsinti);
+        return dusur(level, hedef, boyut.tipikOlcek(), MeteorGorunumu.kaynaktan(kaynak), kaynak, sarsinti);
     }
 
     public static Optional<MeteorVarligi> dusur(ServerLevel level, BlockPos hedef, MeteorBoyutu boyut,
             MeteorGorunumu gorunum, YanginKaynagi kaynak, boolean sarsinti) {
+        return dusur(level, hedef, boyut.tipikOlcek(), gorunum, kaynak, sarsinti);
+    }
+
+    /**
+     * Sürekli ölçekli meteor ({@code mantik.MeteorOlcegi}, 0,5–2,5): görünür boyut, hız, iz, krater, yangın, sarsıntı ve ses
+     * ölçekle; ödül sınıfı ölçeğin bantı.
+     */
+    public static Optional<MeteorVarligi> dusur(ServerLevel level, BlockPos hedef, double olcek, MeteorGorunumu gorunum,
+            YanginKaynagi kaynak, boolean sarsinti) {
         int enAz = MeteorAyarlari.girisAcisiEnAz();
         int enCok = Math.max(enAz, MeteorAyarlari.girisAcisiEnCok());
         double aci = enAz + level.random.nextDouble() * (enCok - enAz);
-        return dusur(level, hedef, boyut, gorunum, kaynak, sarsinti, aci, level.random.nextDouble() * 2 * Math.PI,
-                null);
+        return dusur(level, hedef, olcek, gorunum, kaynak, sarsinti, aci, level.random.nextDouble() * 2 * Math.PI, null);
     }
 
     /**
@@ -58,10 +68,10 @@ public final class MeteorAPI {
      */
     public static Optional<MeteorVarligi> dusur(ServerLevel level, BlockPos hedef, MeteorBoyutu boyut,
             MeteorGorunumu gorunum, YanginKaynagi kaynak, boolean sarsinti, double aci, double azimut) {
-        return dusur(level, hedef, boyut, gorunum, kaynak, sarsinti, aci, azimut, null);
+        return dusur(level, hedef, boyut.tipikOlcek(), gorunum, kaynak, sarsinti, aci, azimut, null);
     }
 
-    static Optional<MeteorVarligi> dusur(ServerLevel level, BlockPos hedef, MeteorBoyutu boyut, MeteorGorunumu gorunum,
+    static Optional<MeteorVarligi> dusur(ServerLevel level, BlockPos hedef, double olcek, MeteorGorunumu gorunum,
             YanginKaynagi kaynak, boolean sarsinti, double aci, double azimut, OdulZari.Sanslar sanslar) {
         Objects.requireNonNull(kaynak, "kaynak");
         if (!level.hasChunkAt(hedef)) {
@@ -77,21 +87,22 @@ public final class MeteorAPI {
         if (!level.isPositionEntityTicking(zemin)) {
             double sanal = SanalSu.suSeviyesi(level, zemin.getX(), zemin.getZ());
             boolean suya = level.getFluidState(zemin).is(FluidTags.WATER) || !Double.isNaN(sanal) && sanal > nokta.y;
-            MeteorCarpmasi.carp(level, zemin, nokta, boyut, gorunum, kaynak, sarsinti,
+            MeteorCarpmasi.carp(level, zemin, nokta, olcek, gorunum, kaynak, sarsinti,
                     sanslar != null ? sanslar : MeteorAyarlari.sanslar(), suya);
             return Optional.empty();
         }
         double girisAcisi = aci;
+        // Büyük meteor biraz hızlı (tipik küçük ×0,95, büyük ×1,15); eksen başına paket sınırı 3,9.
+        double hiz = Math.min(3.8, MeteorAyarlari.dusmeHizi() * MeteorOlcegi.ara(olcek, 0.95, 1.15, 0.9, 1.2));
         Yorunge yorunge = null;
         for (int deneme = 0; deneme < 6; deneme++) {
-            yorunge = Yorunge.hesapla(nokta.x, nokta.y, nokta.z, girisAcisi, azimut, MeteorAyarlari.girisYuksekligi(),
-                    MeteorAyarlari.dusmeHizi());
+            yorunge = Yorunge.hesapla(nokta.x, nokta.y, nokta.z, girisAcisi, azimut, MeteorAyarlari.girisYuksekligi(), hiz);
             if (level.isPositionEntityTicking(BlockPos.containing(yorunge.baslangicX(), nokta.y, yorunge.baslangicZ()))) {
                 break;
             }
             girisAcisi = deneme == 4 ? 90 : Math.min(90, girisAcisi + 10);
         }
-        MeteorVarligi m = MeteorVarligi.olustur(level, yorunge, boyut, gorunum, kaynak, sarsinti, sanslar);
+        MeteorVarligi m = MeteorVarligi.olustur(level, yorunge, olcek, gorunum, kaynak, sarsinti, sanslar);
         level.addFreshEntity(m);
         MeteorYoneticisi.meteorEkle(level, m);
         return Optional.of(m);
@@ -100,7 +111,8 @@ public final class MeteorAPI {
     /**
      * {@code sureTick} boyunca oyuncu başına dakikada {@code dakikaBasinaAdet} meteor yağdırır; meteorlar oyunculara sırayla
      * ve her birinin çevresine dengeli dağılır (bölüm D). {@code oyuncular} boşsa boyuttaki bütün oyuncular (giren/çıkan
-     * dahil) kullanılır. {@code buyukOran} büyük meteor olasılığıdır. Yağmur kimliğini döndürür.
+     * dahil) kullanılır. Her meteorun ölçeği {@link MeteorOlcegi#ornekle}: büyük bant {@code buyukOran}, orta bant
+     * {@code meteor.ortaMeteorOrani}, küçük kalanı. Tavan doluyken sıradaki meteor düşmez. Yağmur kimliğini döndürür.
      */
     public static int yagmur(ServerLevel level, Collection<ServerPlayer> oyuncular, int sureTick, double dakikaBasinaAdet,
             double buyukOran, YanginKaynagi kaynak) {

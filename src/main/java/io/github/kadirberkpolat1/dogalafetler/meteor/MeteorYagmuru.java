@@ -1,6 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.meteor;
 
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.MeteorDagitimi;
+import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.MeteorOlcegi;
 import io.github.kadirberkpolat1.dogalafetler.yangin.YanginKaynagi;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -88,12 +89,11 @@ final class MeteorYagmuru {
             BlockPos merkez = merkezler.get(dagitim.siradaki(merkezler.size()));
             double[] o = MeteorDagitimi.ofset(rastgele, ic, dis);
             BlockPos hedef = merkez.offset((int) Math.round(o[0]), 0, (int) Math.round(o[1]));
-            MeteorBoyutu boyut = rastgele.nextDouble() < buyukOran ? MeteorBoyutu.BUYUK : MeteorBoyutu.KUCUK;
-            if (Double.isNaN(aci)) {
-                MeteorAPI.dusur(level, hedef, boyut, gorunum, kaynak, true);
-            } else {
-                MeteorAPI.dusur(level, hedef, boyut, gorunum, kaynak, true, aci, rastgele.nextDouble() * 2 * Math.PI);
-            }
+            double olcek = MeteorOlcegi.ornekle(rastgele, buyukOran, MeteorAyarlari.ortaMeteorOrani());
+            double a = Double.isNaN(aci) ? MeteorAyarlari.girisAcisiEnAz()
+                    + rastgele.nextDouble() * Math.max(0, MeteorAyarlari.girisAcisiEnCok() - MeteorAyarlari.girisAcisiEnAz())
+                    : aci;
+            MeteorAPI.dusur(level, hedef, olcek, gorunum, kaynak, true, a, rastgele.nextDouble() * 2 * Math.PI, null);
         }
         return true;
     }

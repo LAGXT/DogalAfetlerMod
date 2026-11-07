@@ -17,6 +17,7 @@ import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorKayitlari;
 import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorOdulleri;
 import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorSarsintiPaketi;
 import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorVarligi;
+import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.MeteorOlcegi;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.Sarsinti;
 import java.util.function.Consumer;
 import net.minecraft.client.Minecraft;
@@ -84,13 +85,13 @@ public final class IstemciMeteor {
         carpmaSayisi++;
         Vec3 nokta = new Vec3(p.x(), p.y(), p.z());
         double mesafe = mc.player.position().distanceTo(nokta);
-        boolean buyuk = p.boyutu().buyuk();
+        double boy = p.olcek();
         boolean ay = p.gorunumu() == MeteorGorunumu.AY;
         if (!p.suya()) {
-            MeteorSesi.carpma(nokta, mc.player.getEyePosition().distanceTo(nokta), buyuk, ay);
-            double menzil = buyuk ? 200 : 100;
+            MeteorSesi.carpma(nokta, mc.player.getEyePosition().distanceTo(nokta), boy, ay);
+            double menzil = MeteorOlcegi.ara(boy, 100, 200, 60, 260);
             double f = Math.max(0, 1 - mesafe / menzil);
-            float guc = (float) (MeteorAyarlari.parlamaOlcegi() * (buyuk ? 0.85 : 0.5) * f * f);
+            float guc = (float) (MeteorAyarlari.parlamaOlcegi() * MeteorOlcegi.ara(boy, 0.5, 0.85, 0.3, 1.0) * f * f);
             if (guc > 0.02F && guc >= parlamaGucu * (parlamaKalan / (float) PARLAMA_TICK)) {
                 parlamaGucu = guc;
                 parlamaKalan = PARLAMA_TICK;
@@ -109,9 +110,9 @@ public final class IstemciMeteor {
                 * (mesafe > 160 ? 0.4 : 1.0);
         if (yogunluk > 0) {
             if (p.suya()) {
-                suCarpmasi(level, nokta, buyuk, yogunluk);
+                suCarpmasi(level, nokta, boy, yogunluk);
             } else {
-                karaCarpmasi(level, nokta, buyuk, ay, yogunluk);
+                karaCarpmasi(level, nokta, boy, ay, yogunluk);
             }
         }
     }
@@ -120,11 +121,16 @@ public final class IstemciMeteor {
         return sarsintiToplam <= 0 ? 0 : sarsintiKalan / (float) sarsintiToplam;
     }
 
-    private static void karaCarpmasi(ClientLevel level, Vec3 n, boolean buyuk, boolean ay, double y) {
+    /** Tipik küçük/büyük sayılar arası ölçekli parçacık sayısı (eksi değil). */
+    private static double say(double boy, double kucuk, double buyuk) {
+        return Math.max(0, MeteorOlcegi.ara(boy, kucuk, buyuk));
+    }
+
+    private static void karaCarpmasi(ClientLevel level, Vec3 n, double boy, boolean ay, double y) {
         RandomSource r = level.random;
-        double cap = buyuk ? 2.6 : 1.1;
+        double cap = MeteorOlcegi.ara(boy, 1.1, 2.6, 0.6, 3.4);
         double halkaHizi = 4 * cap / 7.0;
-        int halka = adet(r, (buyuk ? 56 : 26) * y);
+        int halka = adet(r, say(boy, 26, 56) * y);
         for (int i = 0; i < halka; i++) {
             double aci = i * Math.PI * 2 / Math.max(1, halka) + r.nextDouble() * 0.2;
             double hiz = halkaHizi * (0.85 + r.nextDouble() * 0.3);
@@ -136,28 +142,28 @@ public final class IstemciMeteor {
             zemin = Blocks.DIRT.defaultBlockState();
         }
         BlockParticleOption enkaz = new BlockParticleOption(ParticleTypes.BLOCK, zemin);
-        int enkazSayisi = adet(r, (buyuk ? 30 : 14) * y);
+        int enkazSayisi = adet(r, say(boy, 14, 30) * y);
         for (int i = 0; i < enkazSayisi; i++) {
             hizli(enkaz, n.add(0, 0.6, 0), yarikure(r, 0.25, 0.55, 1.05));
         }
         ParticleOptions kivilcim = (ay ? MeteorKayitlari.KIVILCIM_AY : MeteorKayitlari.KIVILCIM).get();
-        int kivilcimSayisi = adet(r, (buyuk ? 44 : 18) * y);
+        int kivilcimSayisi = adet(r, say(boy, 18, 44) * y);
         for (int i = 0; i < kivilcimSayisi; i++) {
             hizli(kivilcim, n.add(0, 0.5, 0), yarikure(r, 0.35, 0.3, 0.95));
         }
         ParticleOptions sicak = ay ? ParticleTypes.END_ROD : ParticleTypes.LAVA;
-        int sicakSayisi = adet(r, (buyuk ? 12 : 5) * y);
+        int sicakSayisi = adet(r, say(boy, 5, 12) * y);
         for (int i = 0; i < sicakSayisi; i++) {
             level.addParticle(sicak, n.x + (r.nextDouble() - 0.5) * cap, n.y + 0.4, n.z + (r.nextDouble() - 0.5) * cap,
                     0, 0.1, 0);
         }
         ParticleOptions plazma = (ay ? MeteorKayitlari.PLAZMA_AY : MeteorKayitlari.PLAZMA).get();
-        int plazmaSayisi = adet(r, (buyuk ? 26 : 12) * y);
+        int plazmaSayisi = adet(r, say(boy, 12, 26) * y);
         for (int i = 0; i < plazmaSayisi; i++) {
             Vec3 v = yarikure(r, 0.25, 0.05, 0.3);
             level.addParticle(plazma, n.x, n.y + 0.5, n.z, v.x, v.y, v.z);
         }
-        int duman = adet(r, (buyuk ? 26 : 10) * y);
+        int duman = adet(r, say(boy, 10, 26) * y);
         for (int i = 0; i < duman; i++) {
             level.addParticle(MeteorKayitlari.DUMAN.get(), n.x + (r.nextDouble() - 0.5) * cap * 1.5,
                     n.y + 0.5 + r.nextDouble() * 1.5, n.z + (r.nextDouble() - 0.5) * cap * 1.5,
@@ -165,13 +171,13 @@ public final class IstemciMeteor {
         }
     }
 
-    private static void suCarpmasi(ClientLevel level, Vec3 n, boolean buyuk, double y) {
+    private static void suCarpmasi(ClientLevel level, Vec3 n, double boy, double y) {
         RandomSource r = level.random;
-        int sicrama = adet(r, (buyuk ? 90 : 40) * y);
+        int sicrama = adet(r, say(boy, 40, 90) * y);
         for (int i = 0; i < sicrama; i++) {
             hizli(ParticleTypes.SPLASH, n.add(0, 0.3, 0), yarikure(r, 0.3, 0.4, 0.9));
         }
-        int buhar = adet(r, (buyuk ? 36 : 14) * y);
+        int buhar = adet(r, say(boy, 14, 36) * y);
         for (int i = 0; i < buhar; i++) {
             level.addParticle(ParticleTypes.CLOUD, n.x + (r.nextDouble() - 0.5) * 2, n.y + 0.4 + r.nextDouble(),
                     n.z + (r.nextDouble() - 0.5) * 2, (r.nextDouble() - 0.5) * 0.06, 0.08 + r.nextDouble() * 0.12,

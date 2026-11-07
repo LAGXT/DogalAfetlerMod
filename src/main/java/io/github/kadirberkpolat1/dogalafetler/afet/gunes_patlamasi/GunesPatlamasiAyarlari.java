@@ -13,7 +13,9 @@ public final class GunesPatlamasiAyarlari {
     private final ForgeConfigSpec.DoubleValue buyukMeteorOrani;
     private final ForgeConfigSpec.IntValue meteorYagmuruOncuSaniye;
     private final ForgeConfigSpec.DoubleValue meteorYagmuruOncuDakikaBasina;
+    private final ForgeConfigSpec.DoubleValue meteorYagmuruOncuSonDakikaBasina;
     private final ForgeConfigSpec.IntValue meteorYagmuruSaniye;
+    private final ForgeConfigSpec.IntValue meteorYagmuruGunlukSaniye;
     private final ForgeConfigSpec.DoubleValue meteorYagmuruDakikaBasina;
     private final ForgeConfigSpec.DoubleValue kavrulmaBaslangicGun;
     private final ForgeConfigSpec.DoubleValue kavrulmaOlasiligi;
@@ -26,19 +28,24 @@ public final class GunesPatlamasiAyarlari {
                 .defineInRange("meteorBaslangicDakikaBasina", 1.5, 0.0, 30.0);
         meteorSon = k.comment("Sürecin sonunda oyuncu başına dakikadaki meteor (5 = 12 sn'de bir); arası doğrusal.")
                 .defineInRange("meteorSonDakikaBasina", 5.0, 0.0, 30.0);
-        buyukMeteorOrani = k.comment("Büyük meteor olasılığı (Kozmik Çekirdek yalnız büyük meteorda).")
-                .defineInRange("buyukMeteorOrani", 0.05, 0.0, 1.0);
+        buyukMeteorOrani = k.comment("Büyük bant (1,6–2,5×) olasılığı (Kozmik Çekirdek yalnız büyükte); orta bant meteor.ortaMeteorOrani.")
+                .defineInRange("buyukMeteorOrani", 0.10, 0.0, 1.0);
         meteorYagmuruOncuSaniye = k.comment("Öncü meteor yağmuru ön-uyarının son bu kadar saniyesinde başlar ve siren (güneş büyürken) boyunca "
                 + "artar (0: yalnız sirende).")
                 .defineInRange("meteorYagmuruOncuSaniye", 90, 0, 600);
-        meteorYagmuruOncuDakikaBasina = k.comment("Öncü yağmurun başında oyuncu başına dakikadaki meteor; siren sonunda "
-                + "meteorYagmuruDakikaBasina'ya ulaşır.")
-                .defineInRange("meteorYagmuruOncuDakikaBasina", 6.0, 0.0, 60.0);
-        meteorYagmuruSaniye = k.comment("Meteor yağmuru AKTIF'in başında ve her yeni günün başında bu kadar saniye sürer (ölçekli; 0: yok).")
-                .defineInRange("meteorYagmuruSaniye", 180, 0, 1200);
-        meteorYagmuruDakikaBasina = k.comment("Meteor yağmurunda oyuncu başına dakikadaki meteor (24 = 2,5 sn'de bir); uçan meteor "
-                + "tavanı (meteor.varlikTavani) ve krater bütçesi geçerli kalır.")
-                .defineInRange("meteorYagmuruDakikaBasina", 24.0, 0.0, 60.0);
+        meteorYagmuruOncuDakikaBasina = k.comment("Öncü yağmurun başında oyuncu başına dakikadaki meteor.")
+                .defineInRange("meteorYagmuruOncuDakikaBasina", 6.0, 0.0, 300.0);
+        meteorYagmuruOncuSonDakikaBasina = k.comment("Öncü yağmurun siren sonundaki yoğunluğu (arası doğrusal); AKTIF'te "
+                + "meteorYagmuruDakikaBasina'ya sıçrar.")
+                .defineInRange("meteorYagmuruOncuSonDakikaBasina", 24.0, 0.0, 300.0);
+        meteorYagmuruSaniye = k.comment("AKTIF'in başındaki yoğun meteor yağmurunun süresi (ölçekli sn; 0: yok; afet önce biterse "
+                + "yağmur afetle biter).")
+                .defineInRange("meteorYagmuruSaniye", 600, 0, 1200);
+        meteorYagmuruGunlukSaniye = k.comment("Sonraki her günün başındaki meteor yağmurunun süresi (ölçekli sn; 0: yok).")
+                .defineInRange("meteorYagmuruGunlukSaniye", 180, 0, 1200);
+        meteorYagmuruDakikaBasina = k.comment("Meteor yağmurunda oyuncu başına dakikadaki meteor (90 = 1,5/sn); uçan meteor "
+                + "tavanı (meteor.varlikTavani) ve krater bütçesi geçerli kalır, tavan doluyken atılamayan meteor düşmez.")
+                .defineInRange("meteorYagmuruDakikaBasina", 90.0, 0.0, 300.0);
         kavrulmaBaslangicGun = k.comment("Çimenin kaba toprağa dönmeye başladığı gün (afetBlokHasari kapalıyken hiç).")
                 .defineInRange("kavrulmaBaslangicGun", 3.0, 0.0, 10.0);
         kavrulmaOlasiligi = k.comment("Sürecin sonunda oyuncu başına her tick'teki kavrulma denemesinin olasılığı (doğrusal artış).")
@@ -79,8 +86,16 @@ public final class GunesPatlamasiAyarlari {
         return al().meteorYagmuruOncuDakikaBasina.get();
     }
 
+    public static double meteorYagmuruOncuSonDakikaBasina() {
+        return al().meteorYagmuruOncuSonDakikaBasina.get();
+    }
+
     public static int meteorYagmuruSaniye() {
         return al().meteorYagmuruSaniye.get();
+    }
+
+    public static int meteorYagmuruGunlukSaniye() {
+        return al().meteorYagmuruGunlukSaniye.get();
     }
 
     public static double meteorYagmuruDakikaBasina() {

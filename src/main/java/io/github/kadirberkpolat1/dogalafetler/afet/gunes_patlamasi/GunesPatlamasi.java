@@ -113,10 +113,10 @@ public final class GunesPatlamasi extends Afet {
         long sirenSure = SirenTuru.sureTick(tur());
         long oncuTick = GunesPatlamasiAyarlari.meteorYagmuruOncuSaniye() * 20L;
         double oncuBas = GunesPatlamasiAyarlari.meteorYagmuruOncuDakikaBasina();
-        double yagmur = GunesPatlamasiAyarlari.meteorYagmuruDakikaBasina();
+        double oncuSon = GunesPatlamasiAyarlari.meteorYagmuruOncuSonDakikaBasina();
         if (asama == AfetAsamasi.ON_UYARI) {
             double y = MeteorYagmuruEgrisi.onUyari(asamaKalanTick(), baglam().onUyariSuresi(), sirenSure, oncuTick, oncuBas,
-                    yagmur);
+                    oncuSon);
             yagmurSur(level, y, y > 0);
             return;
         }
@@ -125,7 +125,7 @@ public final class GunesPatlamasi extends Afet {
                 donem.evreIlerlemesiAyarla(GunesPatlamasiEgrileri.sirenIlerlemesi(asamaGecenTick(), (int) sirenSure));
             }
             yagmurSur(level, MeteorYagmuruEgrisi.siren(asamaGecenTick(), baglam().onUyariSuresi(), sirenSure, oncuTick,
-                    oncuBas, yagmur), true);
+                    oncuBas, oncuSon), true);
             return;
         }
         if (asama != AfetAsamasi.AKTIF) {
@@ -139,9 +139,11 @@ public final class GunesPatlamasi extends Afet {
         if (gun != altAsama()) {
             altAsamaAyarla(gun);
         }
-        long yagmurTick = GunesPatlamasiAyarlari.meteorYagmuruSaniye() * 20L;
+        long ilkGunTick = GunesPatlamasiAyarlari.meteorYagmuruSaniye() * 20L;
+        long gunlukTick = GunesPatlamasiAyarlari.meteorYagmuruGunlukSaniye() * 20L;
         yagmurSur(level, MeteorYagmuruEgrisi.aktif(aktifGecen, aktifSure, GunesPatlamasiAyarlari.meteorBaslangic(),
-                GunesPatlamasiAyarlari.meteorSon(), yagmurTick, yagmur), MeteorYagmuruEgrisi.yagmurda(aktifGecen, yagmurTick));
+                GunesPatlamasiAyarlari.meteorSon(), ilkGunTick, gunlukTick, GunesPatlamasiAyarlari.meteorYagmuruDakikaBasina()),
+                MeteorYagmuruEgrisi.yagmurda(aktifGecen, ilkGunTick, gunlukTick));
         kavur(level, GunesPatlamasiEgrileri.kavrulmaOlasiligi(aktifGecen, aktifSure,
                 GunesPatlamasiAyarlari.kavrulmaBaslangicGun(), GunesPatlamasiAyarlari.kavrulmaOlasiligi()), adim);
     }

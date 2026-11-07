@@ -3,9 +3,10 @@ package io.github.kadirberkpolat1.dogalafetler.afet.gunes_patlamasi.mantik;
 /**
  * Güneş patlamasının meteor yoğunluğu (oyuncu başına dakikada; kullanıcı isteği 2026-11-07, {@code .vibe/kararlar/meteor-2.md}).
  * Öncü yağmur ön-uyarının son {@code oncuTick}'inde başlar ve sirenin (güneş büyürken) sonuna kadar {@code oncuBas}'tan
- * {@code yagmur}'a doğrusal artar; AKTIF'in başında ve her yeni günün başında {@code yagmurTick} boyunca yağmur yoğunluğu,
- * arasında bölüm D'nin doğrusal arka plan eğrisi ({@link GunesPatlamasiEgrileri#dakikaBasinaMeteor}) sürer. Süreler ölçekli
- * tick'tir; yoğunluk gerçek dakikadır.
+ * {@code yagmur}'a doğrusal artar; AKTIF'in başında {@code ilkGunTick} (istek 27: 10 dk), sonraki her günün başında
+ * {@code gunlukTick} boyunca yağmur yoğunluğu, arasında bölüm D'nin doğrusal arka plan eğrisi
+ * ({@link GunesPatlamasiEgrileri#dakikaBasinaMeteor}) sürer. Süreler ölçekli tick'tir ve afetin AKTIF sayacından ölçülür
+ * (uyku sayılmaz); yoğunluk gerçek dakikadır. Afet pencereden önce biterse yağmur afetle biter.
  */
 public final class MeteorYagmuruEgrisi {
     private MeteorYagmuruEgrisi() {
@@ -33,16 +34,17 @@ public final class MeteorYagmuruEgrisi {
         return dogrusal(pay + Math.max(0, Math.min(gecen, sirenSure)), pay + sirenSure, oncuBas, yagmur);
     }
 
-    /** Günün başındaki yağmur penceresinde mi ({@code aktifGecen}: AKTIF'te geçen). */
-    public static boolean yagmurda(long aktifGecen, long yagmurTick) {
-        return yagmurTick > 0 && Math.floorMod(aktifGecen, GunesPatlamasiEgrileri.GUN_TICK) < yagmurTick;
+    /** Günün başındaki yağmur penceresinde mi ({@code aktifGecen}: AKTIF'te geçen; ilk gün {@code ilkGunTick}). */
+    public static boolean yagmurda(long aktifGecen, long ilkGunTick, long gunlukTick) {
+        long pencere = aktifGecen < GunesPatlamasiEgrileri.GUN_TICK ? ilkGunTick : gunlukTick;
+        return pencere > 0 && Math.floorMod(aktifGecen, GunesPatlamasiEgrileri.GUN_TICK) < pencere;
     }
 
     /** AKTIF: yağmur penceresinde arka plan ile yağmurun büyüğü, dışında arka plan. */
-    public static double aktif(long aktifGecen, long aktifSure, double arkaBas, double arkaSon, long yagmurTick,
-            double yagmur) {
+    public static double aktif(long aktifGecen, long aktifSure, double arkaBas, double arkaSon, long ilkGunTick,
+            long gunlukTick, double yagmur) {
         double arka = GunesPatlamasiEgrileri.dakikaBasinaMeteor(aktifGecen, aktifSure, arkaBas, arkaSon);
-        return yagmurda(aktifGecen, yagmurTick) ? Math.max(arka, yagmur) : arka;
+        return yagmurda(aktifGecen, ilkGunTick, gunlukTick) ? Math.max(arka, yagmur) : arka;
     }
 
     private static double dogrusal(long gecen, long toplam, double bas, double son) {

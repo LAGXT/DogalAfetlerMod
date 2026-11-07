@@ -164,10 +164,16 @@ en çok 6 (ses.md §4 kural 3): uçuşta en yakın altı, çarpmada en uzaktaki 
 sıçrama + cız vanilla kalır. Ay parçası görünümü mevcut `AY` varyantıdır (kalsit + pürüzsüz bazalt/tüf gövde, mavi-beyaz
 plazma); yeni doku gerekmedi.
 
-**Yağmur yoğunluğu:** güneş patlaması ön-uyarının son 90 sn'sinde öncü yağmur başlatır (oyuncu başına 6/dk) ve siren
-boyunca 24/dk'ya çıkar; AKTIF'in ve her günün başında 3 dk 24/dk, arasında bölüm D'nin 1,5 → 5/dk arka planı. Ay parçası yağmuru
-oyuncu başına 30/dk (90 sn'de 45 parça). Dağılım (32–160 blok halka), uçan meteor tavanı (48) ve krater bütçesi (512 × TPS kısması)
-değişmedi.
+**Yağmur yoğunluğu (istek 27):** güneş patlaması ön-uyarının son 90 sn'sinde öncü yağmur başlatır (oyuncu başına 6/dk) ve
+siren boyunca 24/dk'ya çıkar; AKTIF'in başında 10 dk, sonraki günlerin başında 3 dk 90/dk, arasında bölüm D'nin 1,5 → 5/dk
+arka planı. Ay parçası yağmuru oyuncu başına 90/dk, 10 dk. Dağılım (32–160 blok halka) ve krater bütçesi (512 × TPS
+kısması) aynı; uçan meteor tavanı 48 → 96 (doluyken atılamayan meteor düşmez, kuyruk yok).
+
+**Boyut değişkenliği (istek 27):** meteorun sürekli ölçeği (`meteor.mantik.MeteorOlcegi`, senkron varlık verisi ve çarpma
+paketinde): %60 küçük 0,5–0,9×, %30 orta 0,9–1,6×, %10 büyük 1,6–2,5×, bant içinde düzgün. Eski küçük/büyük config değerleri
+tipik ölçek 0,7 ve 2,0'daki referanslardır; arası ve uçları doğrusal: gövde çapı 1,1 → 2,6 (ölçek 2,5'te 3,2), iz 40 → 72 blok,
+hız ×0,95 → ×1,15, krater yarıçapı 2,5 → 5,5 (2,5×'te 6,7), sarsıntı menzili 48 → 112, yangın yoğunluğu 0,45 → 0,85, patlama sesi
+96 → 128 blok ve %70 → %100 düzey, perde 1,0 → 0,85. Ödül sınıfı büyük banttır (Kozmik Çekirdek yalnız 1,6× ve üstünde).
 
 ## Buz altı balıkçılık (madde 15)
 
