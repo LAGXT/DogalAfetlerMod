@@ -3,11 +3,14 @@ package io.github.kadirberkpolat1.dogalafetler.afet.tsunami;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.basarim.BasarimIpucuEvent;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.Ipucu;
+import io.github.kadirberkpolat1.dogalafetler.config.CekirdekAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetBaglami;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
 import io.github.kadirberkpolat1.dogalafetler.core.CekirdekOyunTestleri;
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.AfetZamanlayicisi;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.SonumTipi;
 import io.github.kadirberkpolat1.dogalafetler.su.Dalga;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSuDunyasi;
@@ -301,5 +304,56 @@ public final class TsunamiOyunTestleri {
                     h.assertTrue(!SanalSu.dalgaVarMi(l, a.dalga1()), "durdurulan afetin dalgası kaldı");
                 })
                 .thenSucceed();
+    }
+
+    /**
+     * H.5: ay çarpmasından sonraki tsunami çarpanı {@link DunyaDonemi#carpan}'dan okunur: zamanlayıcının tsunami oranı
+     * çarpanla artar, çekilme {@code tsunami.ayCekilmeCarpani} ile derinleşir. Çarpan ay yolundaki gibi
+     * {@link DunyaDonemi#carpanEkle} ile ama 40 tick'lik eklenir: süresi dolunca 1'e iner, global dönem eski değerine
+     * döner (K-E15) ve çekilme yeniden normal derinlikte.
+     */
+    @GameTest(template = "su_alani", batch = "tsunami_ay", timeoutTicks = 300)
+    public static void ayCarpaniOraniArtirirCekilmeyiDerinlestirir(GameTestHelper h) {
+        ServerLevel l = h.getLevel();
+        sahne(h, 2);
+        DunyaDonemi donem = DunyaDonemi.al(l);
+        CekirdekAyarlari ayar = CekirdekAyarlari.al();
+        double once = donem.carpan(AfetTuru.TSUNAMI);
+        h.assertTrue(once == 1.0, "başta tsunami çarpanı 1 değil: " + once);
+        double derinOnce = cekilmeDerinligi(h);
+        double tepe = ayar.tsunamiCarpani();
+        donem.carpanEkle(AfetTuru.TSUNAMI, tepe, 20, 20, SonumTipi.DOGRUSAL);
+        double oranOnce = AfetZamanlayicisi.turOrani(ayar.zamanlayici(), AfetTuru.TSUNAMI, once, 1);
+        double oranAy = AfetZamanlayicisi.turOrani(ayar.zamanlayici(), AfetTuru.TSUNAMI, donem.carpan(AfetTuru.TSUNAMI), 1);
+        h.assertTrue(tepe > 1 && oranAy > oranOnce && Math.abs(oranAy - oranOnce * tepe) < 1e-9 * oranAy,
+                "tsunami oranı çarpanla artmadı: " + oranOnce + " -> " + oranAy + " (çarpan " + tepe + ")");
+        double derinAy = cekilmeDerinligi(h);
+        double kat = TsunamiAyarlari.al().ayCekilmeCarpani.get();
+        h.assertTrue(Math.abs(derinAy - Math.min(8, derinOnce * kat)) < 1e-9,
+                "ay sonrası çekilme derinleşmedi: " + derinOnce + " -> " + derinAy + " (kat " + kat + ")");
+        h.startSequence()
+                .thenWaitUntil(() -> h.assertTrue(donem.carpan(AfetTuru.TSUNAMI) == 1.0,
+                        "çarpan süresi dolmadı: " + donem.carpan(AfetTuru.TSUNAMI)))
+                .thenExecute(() -> {
+                    double derinSonra = cekilmeDerinligi(h);
+                    h.assertTrue(derinSonra == derinOnce, "çarpan bitince çekilme normale dönmedi: " + derinSonra);
+                    DogalAfetler.LOGGER.info("Tsunami GameTest: H.5 oran {} -> {} (x{}), çekilme derinliği {} -> {} -> {}",
+                            oranOnce, oranAy, tepe, derinOnce, derinAy, derinSonra);
+                })
+                .thenSucceed();
+    }
+
+    /** S1 afeti AKTIF'e geçirip sanal sudaki çekilmesinin derinliğini okur ve afeti temiz durdurur. */
+    private static double cekilmeDerinligi(GameTestHelper h) {
+        ServerLevel l = h.getLevel();
+        TsunamiAfeti a = new TsunamiAfeti();
+        a.testIcin(geometri(h), OLCEK);
+        a.baslat(l, new AfetBaglami(AfetTuru.TSUNAMI, 1, m(h, 10, 3, 8), l.dimension(), null, DunyaDonemi.al(l).saat(), 0,
+                0, true));
+        a.asamaIleri(l);
+        a.asamaIleri(l);
+        double d = dunya(h).cekilmeler().get(a.cekilmeKimligi()).derinlik();
+        a.durdur(l, true);
+        return d;
     }
 }
