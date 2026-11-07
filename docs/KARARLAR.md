@@ -3451,6 +3451,18 @@ S2+ `0,4 + 0,15·(s−1)` korunur (JUnit `gorselYogunlukSeviyeyleArtar`). (5) N1
 parçacık JSON'u yazmaz (K-E25, tanımlar `runData` ile `src/generated/`); N19 denetimi 174/174 eşleşen, depoda olmayan yeni dosya 0.
 Kalan inceleme P2'leri "Açık noktalar (Faz 5)".
 
+**K-E40 Dedicated senaryoların kilidi (entegratör, 2026-11-07; `a0c7b27`).** 17 `*_sunucu.py` aynı `run-server/` klasörünü ve
+`server.properties`'i kendi dünyasına/portuna çevirip sonda geri yazıyordu; kilit yoktu. `5-matris` doğrulayıcısı ile entegratör
+aynı anda koşunca iki koşu birbirini bozdu (K-E39 `asit_orman_yangini_sunucu.py --port 25612` koşu 1 port 25613'te
+`cekirdek-senaryo`yu açtı, koşu 2 afeti geri yüklemedi; doğrulayıcının `ek-2`'si `session.lock: already locked` ile düştü;
+`.vibe/kanit/k-e39/asit-orman-sunucu/`, `.vibe/kanit/matris-5/sunucu/ek-2.out`). Port ve Gradle kapısı bunu yakalamaz (iki koşu
+farklı portta, Gradle ≤ 1 anında başlar). Karar: `cekirdek_sunucu.agir_surec_kapisi` (17 betiğin hepsinin kapısı)
+`run-server/.senaryo.lock` üzerinde `flock` alır ve süreç ömür boyu tutar (süreç ölünce çekirdek bırakır, kalıntı kilit
+olmaz); doluyken kapı "senaryo kilidi bekleniyor" yazar, 60 sn'de bir dener (en çok 20 dk, sonra çıkış 3). Kilit dosyası
+sahibinin pid ve komut satırını tutar. Worktree'lerin `run-server/`'ı ayrı olduğu için kilit worktree başınadır. Reddedilen:
+senaryo başına ayrı `run-server` klasörü (Gradle `runServer` çalışma dizini tek, `build.gradle` değişirdi); yalnız
+özelliklerin yazımını kilitlemek (sunucu çalışırken ikinci senaryo aynı dosyayı yine değiştirirdi).
+
 ## Şef kararları (Faz 0–1)
 
 **K0-19 Ay çarpması siren süresi: 60 sn.** Madde 5 "Güneş Patlaması hariç 10 sn" der; bölüm H "siren çaldıktan 60 saniye
@@ -3566,7 +3578,8 @@ Dayanak: `.vibe/kararlar/spike-kasirga.md` SK-09 (Hyprland 0.57.1, Lua yönetici
   hypruse `desktop`) serbest. Pencere "urgent" işaretlenebilir (çubukta ws `9x`): zararsız.
 - (h) Otomasyon kendi açmadığı ekranı kapatır; adımlar olay/durum koşuluyla ilerler. `EARLYDISPLAY ... trouble handing off`
   çökmesinde `run/config/fml.toml` → `earlyWindowControl = false` (git dışı).
-- (i) Ağır süreç kapısı ve aynı anda tek `runClient` (MAKINE.md) sürer; FPS yalnız Gradle sayacı 1 iken geçerli, oranlar ortanca kare
+- (i) Ağır süreç kapısı ve aynı anda tek `runClient` (MAKINE.md) sürer; FPS yalnız Gradle sayacı 1 iken geçerli (Faz 5: yabancı
+  Gradle ≤ 1, ölçen runClient'ınki sayılmaz; K-E29 (b) rev.), oranlar ortanca kare
   süresiyle.
 - (j) Bu protokolle K0-28 kapanır ve `runClient` ayrıca şef onayı istemez (şef kararı). Başsız yol (weston `--backend=headless`
   + XWayland) kalibrasyon koşusunu geçerse (aynı sahne ve çözünürlük, 60 FPS tavanı yok, `Screenshot.grab` siyah değil, FPS ±%10)
@@ -4455,12 +4468,13 @@ tek çarpan bunların hiçbirini doğru ölçeklemezdi. README config bölümün
 (b) **Faz 5 tek FPS kuralı (K0-33 revizyonu, TS-16 rev. 3 genellemesi), `5-matris` #10 bununla:** her afetin S5 Yüksek
 sahnesinde (i) afetsiz taban kare süresi ≥ 10 ms ise K0-33 oranı: afetli kare süresi ≤ 2 × taban ("≥ %50"); (ii) taban < 10 ms
 ise (maxFps/vsync tavanı ya da çok hızlı taban) mutlak ölçü: render thread CPU ms/kare ≤ 33,3 ve sunucu mspt < 50 ve ölçüm
-anında başka Gradle ≤ 1. Orman 0,48 ve asit emsalleri bu kuralla `5-matris` #10'da ortak ölçüm satırıyla yeniden ölçülür (orman
+anında başka Gradle ≤ 1. **Rev. (şef kararı, 2026-11-07): FPS ölçümünün geçerliliği için tek Gradle kuralı "yabancı (başka) Gradle
+≤ 1"dir; ölçümü yapan runClient'ın kendi Gradle'ı sayılmaz (iki dalda da: taban ≥ 10 ms oran ölçüsü ve mutlak ölçü).** Orman 0,48 ve asit emsalleri bu kuralla `5-matris` #10'da ortak ölçüm satırıyla yeniden ölçülür (orman
 tabanı 120 FPS → 8,3 ms, yani mutlak ölçü dalı). Faz 4'ün "çizim ms/kare" değerleri (Düşük 8,01 / Yüksek 7,42 / Ultra 11,70; aynı
 tabloda orman S5 aktif 22,80 ms) yalnız göstergedir: render thread CPU ms/kare ile ölçü eşdeğerliği ve o koşudaki Gradle sayısı
 gösterilmedi (inceleme-entegrasyon-5 P2-7). Duvar saati ≥ 30 FPS Faz 5 görünür koşu tetikleyicisidir (kullanıcı sorusu 1'e bağlı);
 tutmazsa önce yağmur/parçacık, sonra köpük/duman bütçesi kırpılır. Ortak FPS ölçüm satırı duvar ms, CPU ms, taban ms, mspt,
-Gradle sayısı ve kademeyi yazar (`.vibe/gorev/5-gorsel-otomasyon.md` madde 1).
+yabancı Gradle sayısı ve kademeyi yazar (`.vibe/gorev/5-gorsel-otomasyon.md` madde 1).
 
 **K-E30 B.3 "sürükleme sunucu tarafında" yorumu (şef kararı, 2026-11-07; izleme-inceleme-5 şef sorusu 4; entegratör kaynakla
 düzeltti).** Şefin metni "itme sunucuda hesaplanır, oyuncuya paketle/istemci mixin'iyle uygulanır" idi; kaynak farklı: dalga
