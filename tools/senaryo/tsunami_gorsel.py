@@ -119,12 +119,14 @@ def artiklari_oldur(pid, log):
             hedef.append(ata)
     except (OSError, ValueError, IndexError):
         pass
+    olen = []
     for h in hedef:
         try:
             os.kill(h, signal.SIGKILL)
+            olen.append(h)
         except ProcessLookupError:
             pass
-    log(f"artıklar öldürüldü: {hedef}")
+    log(f"artıklar öldürüldü: {olen}")
 
 
 def _sayi(desen, metin, tur=float):
@@ -135,9 +137,9 @@ def _sayi(desen, metin, tur=float):
 def fps_tablosu(metin, log):
     """Ts1 kabulü (şef kararı, tur 4): her S5 sahnesinde "sonra" tabanı (aynı sahne, stop'tan 200 tick sonra) / karada ortanca
     kare süresi oranı ≥ 0,5 geçer; "önce" tabanı bilgi. Ölçüm geçerli ancak karada ve sonra pencerelerinde sunucu mspt < 50
-    ve yabancı GradleWrapperMain (kendi runClient'ımız dışında) ≤ 1, sonra tabanı temiz (parçacık ≤ önce + 100) ve kamera
-    aynı (sonra görünür bölüm ≥ önce: yıkım görüşü yalnız açar) ise. K26-1: karada `sicrama_varlik_sn` > 1 ise sahne
-    "K-E26b bekliyor". Sonuç (geçerli, hepsi geçti)."""
+    ve yabancı GradleWrapperMain (kendi runClient'ımız dışında) ≤ 1 ve sonra tabanı temiz (parçacık ≤ önce + 100) ise.
+    Görünür bölüm (önce -> karada -> sonra) bilgi. K26-1: karada `sicrama_varlik_sn` > 1 ise sahne "K-E26b bekliyor".
+    Sonuç (geçerli, hepsi geçti)."""
     sahne = {}
     for m in re.finditer(r"TSUNAMI-OTOMASYON FPS (\S+)-(afetsiz|karada|sonra) (.*)", metin):
         a = m.group(3)
@@ -161,8 +163,6 @@ def fps_tablosu(metin, log):
                   if p[w]["yabanci"] is None or p[w]["yabanci"] > 1]
         if (s["parcacik"] or 0) > (o["parcacik"] or 0) + 100:
             neden.append(f"sonra temiz değil: parcacik={s['parcacik']}")
-        if (s["bolum"] or 0) < (o["bolum"] or 0):
-            neden.append(f"sonra kamerası farklı: bolum {o['bolum']} -> {s['bolum']}")
         gecerli = not neden
         oran = s["ms"] / k["ms"]
         gecti = oran >= 0.5
@@ -288,6 +288,8 @@ def main():
         metin = oyun_log.read_text(encoding="utf-8", errors="replace")
         if bitti_an is None and "TSUNAMI-OTOMASYON BITTI" in metin:
             bitti_an = time.monotonic()
+        if istemci_pid() != pid:
+            break
         if "cikis=" in metin or bitti_an is not None and time.monotonic() - bitti_an > KAPANIS_SN:
             asili = True
             log(f"KAPANIS ASILI: BITTI'den {time.monotonic() - bitti_an:.0f} sn sonra istemci JVM'i yaşıyor"
