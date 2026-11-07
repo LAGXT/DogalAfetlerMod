@@ -2740,7 +2740,8 @@ kapatan yeni döngü yok. Orman yangını sesi ortak yangının istemcisindedir 
 hücrede tam) ve görüş %55'e kadar; 24 blok içinde Yüksek/Ultra'da ısı dalgalanması (şader yok: kamera yaw/pitch'ine 0,05°
 3 Hz sinüs, ekranın alt dörtte birinde yukarı kayan yarı saydam ısı dokusu; Y-10'un "ısı titremesi Faz 4" notu); sis
 altında havada süzülen vanilla kül/beyaz kül (1/4/8/14 tick başına; Düşük tur 3'te 2'den 1'e indi, §C). Güneş diskini turuncuya boyamak gokyuzu renderer'ına
-"duman örtüsü" parametresi ister (gökyüzü paketi bu dalın değil): yapılmadı, açık nokta.
+"duman örtüsü" parametresi ister (gökyüzü paketi bu dalın değil): yapılmadı; şef kararı "Şef kararları (Faz 4) → Asit yağmuru
+ve orman yangını": yapılmaz (E zorunlu kılmıyor).
 
 **AO-13 Dokular.** `tools/assets/asit_yagmuru_dokulari.py` (PIL, tohumlu; iki üretimde 14 dosyanın md5'i aynı): yağış
 64×256, sıçrama 4×8², duman 4×16², bulut 4×64² (dış iki piksel halkası alfa 0; Y-28 dersi), ısı bandı 64². Parçacık
@@ -3359,6 +3360,82 @@ her yığında yeniden hesaplanıyor, toplam ise iki yığını kapsıyordu); d�
 - **Doğal araziyi aşındırmak:** sertlik sınırı S3'te toprak/taşı da kapsardı; manzarayı kazırdı. Yıkım yapı ve bitki bloklarıyla sınırlı.
 - **Her test tek batch:** testlerin dalgaları komşu sahnelere sanal su taşırdı; her test ayrı batch.
 
+## Faz 5 — Entegrasyon
+
+Görev `5-entegrasyon` (entegratör, `main`); rapor `.vibe/rapor/entegrasyon-5.md`, kanıt `.vibe/kanit/entegrasyon-5/`. Faz 2b–4 açık
+noktalarının kod işleri ve `5-izleme-inceleme`'nin (`.vibe/rapor/izleme-inceleme-5.md`) dört kod P2'si burada kapandı.
+
+**K-E29 Tek yıkım ayarı yerine afet başına çarpanlar; Faz 5 tek FPS kuralı (şef kararı).** → Şef kararları (Faz 5).
+
+**K-E30 B.3 "sürükleme sunucu tarafında" yorumu (şef kararı, kaynakla düzeltildi).** → Şef kararları (Faz 5).
+
+**K-E31 Devralınan P2'ler (5-entegrasyon §2).** Her biri ayrı commit, GameTest'i kendi batch'inde (K-E16) ve `@AfterBatch`
+temizliğiyle (K-E15). Ay: sarsıntıda düşen blok yere konamazsa eşyaya dönmez (`dropItem = false`; `82438b1`, sarsıntı testine
+iddia). Güneş: şeker kamışı ve nilüfer kavrulma rengine alındı (çimenle kurur); saplar GP13 bilinen sınırında kalır (`586031a`).
+Asit AOi-7: ekran efekti yalnız son hasar kaynağı `dogalafetler:asit` iken (istemci `lastDamageSource` hasar paketinden;
+`70b7ec4`). Asit AOi-6: maruziyet ölçekli afet saatiyle birikir (K-C11; GameTest `maruziyetOlcekliSaatleBirikir`, `a3b4409`).
+Kasırga Kn4: varlık işlemeyen konumdaki ve oraya giden uçan blok `yereBirak()` ile yere konur, `noSave` ile kaybolmaz (GameTest
+`isleyemeyenKonumdakiUcanBlokYereKonur`, `96e1508`). Ay #13/#14: gerçek çarpmanın bıraktığı aysız gecede Yıldızlı Gece, deniz
+yükselmesi tamamlanınca Yükselen Sular; orman AOi-4: gerçek orman yangınıyla Yanmadan Çıktım, 17 blok uzaktaki oyuncuya 0 ipucu
+(`f660642`). Orman AOi-8: `asit_orman_yangini_sunucu.py` koşu 3 kayıttan dönen orman yangınını temiz durdurur (`452d82a`).
+`5-izleme-inceleme` kod P2'leri: tsunami `afetBlokHasari=false` (S2 doğal bitiş, kırılan 0, sahne hash'i aynı; `997eff9`; ayın tek
+blok yolu `SarsintiDusmeleri` kapalı dalıyla mevcut sarsıntı testinde, meteor kendi testinde), gerçek güneşle K-C7/K-C41 (K-E33,
+`d64275f`), gerçek güneş SIREN → BUYUYEN → buharlaşma derinliği > 0, stop sonrası 0 (`f41aec3`), Sallanan Zemin gerçek
+depremle (doğal S1, alandaki alır, 600 blok uzaktaki almaz; `a9b2be0`).
+
+**K-E32 Tsunami yıkımı dalga tepesinde kesilmez (Ts3, Ts4, Ts4-2; B.5).** Sütun taraması dalga tepesinden en çok `UST_PAYI` = 16
+blok yukarıya, sütunun `MOTION_BLOCKING` yüksekliğine kadar uzar: dalgayı aşan çatı ve ağaç tepesi sütunla birlikte yıkılır,
+havada kalmaz (şef kararı 2 "ucuzsa yap": düşen blok varlığına çevirmek gerekmedi). Kırma ve mağara ağzı komşusu `isLoaded`
+sorar. Birim tavanı: bir birim tek tick'te en çok kısmasız blok bütçesinin 4 katı blok kırar, kalanı sonraki tick'te sürer
+(koşulsuz; 50 ms eşiği beklenmedi). `temizlendi` satırına "tick başına en çok N blok, en uzun yıkım tick'i X ms". Kırmızı/yeşil
+kanıt: `UST_PAYI = 0` ile `dogalBitisYikimBitinceGelirDalgaUstuKalmaz` "ahşap sütun y=11 kaldı" ile düştü (`gt-ts3-once.log`),
+16 ile geçti (kırılan 21, bekleyen 0, doğal; `gt-ts3-sonra.log`). Ts4-3: sütun kipinde jeton testi (kısma ×0,25'te ikinci
+yığın 3 → 13 tick), `TpsOlcer.testKismasi` (yalnız GameTest) ile yıkım ayarının kısmayı okuduğu, bütün tsunami batch'lerine
+`@AfterBatch` (`dd81d6a`).
+
+**K-E33 Gamerule'ün süren afete etkisi gerçek afetle: `AfetYoneticisi.secimleBaslat` (yalnız GameTest; izleme-5 P2-2).** GameTest
+sunucusunda otomatik seçim kapalı ve elle başlayan afet gamerule'den muaf (K-C7) olduğu için IPTAL/KURAL yolu yalnız taklitle
+sınanıyordu. Paket içi `secimleBaslat(tür)` sunucu geneli türü seçimin yolundan (`sunucuGeneliBaslat(tür, false)`) başlatır.
+GameTest `gercekGunesKuralKapanincaIptalKuralVeDevam`: ON_UYARI'da kural kapanınca `IPTAL` (evre NORMAL), AKTIF'te `KURAL` ve
+K-C26 ile NORMAL, doğal bitişten sonra güneş zinciri `KURAL` ile durur, 20 tick ×1000'de ilerlemez, kural açılınca sürer.
+Bulgu (bilinen küçük sınır, kod değişmedi): kural, süpernovanın başladığı tick'te kapanırsa zincirin ilk tick'i yeni döngüyü
+kaydeder (`donemSureciBasladi`, eski durdurma kaydını siler) ve bir sonraki 1 Hz kural denetimine kadar ilerler; denetim onu
+yeniden durdurur. Test kuralı iki tick sonra kapatır.
+
+**K-E34 Orman GameTest kararlılığı.** `dogalBitenOrmanYanginiYanmadanCiktimVerir` altı tam koşunun ikisinde 0 ipucuyla düştü. Kök
+neden: çevrim içi oyuncu varken `elleBaslat` merkezi bir oyuncunun yakınındaki rastgele yakıttan seçer (`OrmanYeri.sec`);
+yangın komşu sahnenin yaprağında başlıyordu (merkez `1629, -57, 6`, oyuncu `1673, -55, 4`; `gt-kabul-5.log`). Oyuncular
+afet başladıktan sonra girer; `OrmanOyunTestleri.baslat` merkezi doğrular (`f903704`). Üretim davranışı (`/dogalafet start`
+oyuncu yakınını tercih eder) değişmedi.
+
+**K-E35 Betik temizliği (K-E22/K-E23 kapanışı).** Ortak `Sunucu`'nun varsayılanı bayraksız (gerçek afetler; eski
+`deprem,gunes_patlamasi` taklit bayrağı kalktı), `tsunami_sunucu.py`'nin alt sınıfı ve bayrağı kalktı, güneş senaryosu "oyun testi
+afeti satırı yok" denetler; `cekirdek_sunucu.py` koşu 1–2 taklitle (K-E23 `!deprem,!gunes_patlamasi`, çekirdeği gerçek afetten
+bağımsız sınar), koşu 3 bayraksız: sekiz gerçek afetin her biri start / siren / stop / durum (orman için yanıcı sahne;
+`bcf9e7b`). Bayrağı kalan betikler yalnız görsel/istemci (`basarim_gorsel` `!kasirga`, `radar_gorsel`, `uyari_istemci`) ve
+`basarim_sunucu`/`esya_sunucu` (`!deprem`), `uyari_sunucu` (`!deprem,!gunes_patlamasi`): taklidin hızlı ve blok değiştirmeyen
+yaşam döngüsü o adımların sınadığı şeyin (başarım, eşya, siren) parçası; gerçek afetler çekirdek koşu 3'te ve kendi
+senaryolarında. Kullanılmayan betik yok (her
+biri belgeden ya da başka betikten çağrılıyor). runClient açan yedi Faz 2b/3 betik de K-E27 (b) `KapanisBekcisi`'ne bağlandı.
+
+**K-E36 F-18 Cold Sweat yiyecek köprüsü (F-18 revizyonu).** Cold Sweat jar'ı çevrim dışı önbellekte
+(`~/.gradle/caches/modules-2/files-2.1/maven.modrinth/cold-sweat/z3qJDJxm/`, `coldsweat_surum=z3qJDJxm`). Cold Sweat yüklüyken
+(kendi sistemimiz OTOMATIK kipte kapalı) yiyecek etkisi ve azalan verim yine hesaplanır, efekt verilir; toplam etki (anında +
+süreli, bizim vücut birimi) `ColdSweatKoprusu.yiyecekEtkisi` ile Cold Sweat `CORE` sıcaklığına bir kerede eklenir (iki ölçek
+aynı yerde kırılır: 0 rahat, ±100 hasar eşiği; dağıtım Cold Sweat'in çekirdek hızına kalır). Kanıt `-Puyum=coldsweat` GameTest
+`coldSweatYukluykenYiyecekCekirdegeGider`: çekirdek 0 → 45, bizim vücut sıcaklığı değişmedi; aynı koşuda sanal su mixin testleri 9/9
+(`gt-coldsweat.log`; `39b23e3`). S-18 çift hasar ölçümü `5-matris` #9'da kalır.
+
+**K-E37 B-20 kapandı: delik sütun hedefini sorar.** `DonmaApi.hedefDonmusMu(level, konum)`: sütunun şimdiki donma hedefi ilk buz
+eşiğinin üstünde mi. Donmanın buzunda açılmış delik son aşamada hedef buz değilse su olur (sıfırlanmış dünya ve kızıl cüce
+tabanındaki ılık sütun), buzsa eski buza döner; vanilla/oyuncu buzu her zaman eski buz (`DelikOmru.suyaDonerMi(hedefDonmus,
+donmaBuzu)`). JUnit güncel; GameTest `kizilCuceTabanindaDelikSutunHedefiniIzler` (`9a5d8d2`).
+
+**K-E38 SU-38/SU-40, Ts2-1 ve görünür koşu otomasyonu ayrı görevlere.** Üçü de render/otomasyon kodu ve ancak runClient karesiyle
+doğrulanabilir; 5-entegrasyon runClient açmaz. Taslaklar `.vibe/gorev/5-su-gorsel.md` (SU-40 mağara kareleri, SU-38 kurulum
+bütçesi, Ts2-1 dokulu köpük) ve `.vibe/gorev/5-gorsel-otomasyon.md` (ortak `OLCUM` satırı, A-34 kare kapıları, Faz 4 kamera
+düzeltmeleri, Ts7); şef açar.
+
 ## Şef kararları (Faz 0–1)
 
 **K0-19 Ay çarpması siren süresi: 60 sn.** Madde 5 "Güneş Patlaması hariç 10 sn" der; bölüm H "siren çaldıktan 60 saniye
@@ -3495,6 +3572,8 @@ taşan etek (kasirga.md:57), taban rengi kahverengi (R>G>B ve sıcak ton), S1 ya
 seçilebilir; performans hedefi S5'te 52/36/20/≤5 blok ve kaldırılan oyuncu noktasında Yüksek ≥ %50 (ortanca kare süresi;
 5 blokta bugün %18–32 → LOD gerekir); `kasirga_dayanikli` etiketine deepslate cevherleri, merdiven/basamak/duvar
 varyantları.
+İstisna ve Faz 5 genellemesi: tsunami S5 için TS-16 rev. 3 ("Şef kararları (Faz 4) → Tsunami"); Faz 5'te bütün afetler için
+tek kural K-E29 (b) (taban < 10 ms ise mutlak CPU ms/kare ≤ 33,3 + mspt < 50).
 
 **K0-34 Faz 1 kapanışı.** Beş spike kabul (K0-32 + K0-33). Spike dalları `main`'e birleşmez; Faz 2/4 işçileri
 `.vibe/kararlar/spike-*.md`'yi okur.
@@ -4168,6 +4247,8 @@ Cold Sweat yüklüyse sıcaklık kapısı kapalıdır (sıcaklık §A4); `Yiyece
 yiyecekleri taşımaz. Madde 2'ye aykırı değil (çift etki yok). Faz 5'e: S-18 reçetesine ek olarak Cold Sweat yüklüyken yiyecek
 etkisinin Cold Sweat vücut sıcaklığına köprülenip köprülenemeyeceği (S-13 deseni, Cold Sweat API'si) araştırılacak; karar
 o zamana dek kod değişmez. README "bilinen sınırlar"a girer.
+**Revizyon (Faz 5, K-E36):** köprü yapıldı; Cold Sweat yüklüyken yiyecek etkisi Cold Sweat çekirdeğine gider, bilinen sınır
+kalktı.
 
 ### Radar ve sismograf
 
@@ -4215,6 +4296,8 @@ sütunda donan delik buz kalır (G > 0). Tam çözüm donmadan bir sütun hedefi
 `kazmaylaEgilerekDelikAcilirAletBesHasarAlir` (bitsiz buzda `donma=false`). Dedicated senaryo donma 50 adımında `donma=false`
 (→ buz), donma 0 adımında `buz_deligi[asama=3,donma=true]` (→ su) koyar. Senaryoda sıra önemli: donma 50 açıkken açık su
 yüzeyi kalırsa donma süreci sütunu kalın buzla dondurur (doğru davranış; ilk tur 2 koşusunda alttaki su da buz oldu).
+**Revizyon (Faz 5, K-E37):** son aşama global ilerleme yerine sütun hedefini sorar (`DonmaApi.hedefDonmusMu`); kızıl
+cüce tabanı bilinen sınırı kapandı.
 
 ### Başarımlar
 
@@ -4280,7 +4363,7 @@ başlığındadır.
   cücede başlayıp sirende/AKTIF'te `stop` ile duran afetin BÜYÜYEN'i çekirdekçe `NORMAL`'e döner (K-C26 metni). Varsayılan
   config'te (tekrarlanamaz) bu yol yoktur.
 - **B-20 açık kalır (§E c):** kızıl cüce tabanında yeniden donan buz deliği donma/balıkçılık kodudur, bu parçanın kapsamı dışı
-  ("Açık noktalar (Faz 3)").
+  ("Açık noktalar (Faz 3)"). Faz 5'te kapandı (K-E37).
 - **GP17 FPS ölçümü Faz 5'e:** gizli workspace 1 FPS çizer; kareler boş değilken ikinci runClient açılmaz (yangındaki şef
   kararıyla aynı). Gerçek FPS ve Düşük/Yüksek/Ultra karşılaştırması "Açık noktalar (Faz 4)".
 
@@ -4346,6 +4429,32 @@ başlığındadır.
 - **K-E27 kapanış:** `TsunamiOtomasyonu`'nun 30 sn `Runtime.halt` bekçisi kalır; `tsunami_gorsel.py` bekçisi `KapanisBekcisi`'ne
   bağlandı (6/6).
 
+## Şef kararları (Faz 5)
+
+**K-E29 Tek genel yıkım ayarı yerine afet başına N17 çarpanları; tek FPS kuralı (şef kararı, 2026-11-07;
+izleme-inceleme-5 şef soruları 1 ve 3).** (a) Şartname 1.5 ("yıkım hızı ve parçacık yoğunluğu ayarlanabilsin") afet başına
+çarpanlarla karşılanır: kasırga `blokCarpani`, tsunami `yikimCarpani`/`yikimBolumTick`, deprem/sinkhole, asit
+`eszamanliAsindirma`, orman ve yangın kendi hız anahtarları, ay `sarsintiYogunlugu`, donma/su/yangın `parcacikYogunlugu`, meteor
+`*Yogunlugu`, istemcide `gorsel.efektKalitesi`. Gerekçe: afetlerin yıkım birimi farklı (blok/sn, bölüm jetonu, sütun, hücre);
+tek çarpan bunların hiçbirini doğru ölçeklemezdi. README config bölümünde tablo (`5-teslimat`). IZLEME 1.5 yeşil.
+(b) **Faz 5 tek FPS kuralı (K0-33 revizyonu, TS-16 rev. 3 genellemesi), `5-matris` #10 bununla:** her afetin S5 Yüksek
+sahnesinde (i) afetsiz taban kare süresi ≥ 10 ms ise K0-33 oranı: afetli kare süresi ≤ 2 × taban ("≥ %50"); (ii) taban < 10 ms
+ise (maxFps/vsync tavanı ya da çok hızlı taban) mutlak ölçü: render thread CPU ms/kare ≤ 33,3 ve sunucu mspt < 50 ve ölçüm
+anında başka Gradle ≤ 1. Orman 0,48 ve asit emsalleri bununla kapanır (orman taban 120 FPS → 8,3 ms → mutlak ölçü; Düşük 8,01 /
+Yüksek 7,42 / Ultra 11,70 ms geçer). Duvar saati ≥ 30 FPS Faz 5 görünür koşu tetikleyicisidir (kullanıcı sorusu 1'e bağlı);
+tutmazsa önce yağmur/parçacık, sonra köpük/duman bütçesi kırpılır. Ortak FPS ölçüm satırı duvar ms, CPU ms, taban ms, mspt,
+Gradle sayısı ve kademeyi yazar (`.vibe/gorev/5-gorsel-otomasyon.md` madde 1).
+
+**K-E30 B.3 "sürükleme sunucu tarafında" yorumu (şef kararı, 2026-11-07; izleme-inceleme-5 şef sorusu 4; entegratör kaynakla
+düzeltti).** Şefin metni "itme sunucuda hesaplanır, oyuncuya paketle/istemci mixin'iyle uygulanır" idi; kaynak farklı: dalga
+parametreleri (konum, yükseklik, hız, ivme) sunucuda ve otoriterdir, istemciye sanal su paketiyle gider. Oyuncu itmesini
+`SanalSu.itmeUygula` (`su/SanalSu.java:398-413`, `EntityMixin` her tick) yalnız hareketin sahibinde uygular: oyuncuyu kendi
+istemcisi (`isLocalPlayer`), mob ve eşyayı sunucu iter; itme vektörü iki tarafta aynı deterministik `SanalSu.itmeHesapla`'dan
+gelir (`:370-384`). Sunucu aynı hesabı hasar (`SanalSuSunucu.java:149`), tsunami (`TsunamiAfeti.java:320`) ve Dalga Avcısı
+ipucu (`BasarimOlaylari.java:241`) için yapar. Vanilla'da oyuncu hareketi istemci yetkili olduğundan şartnamenin "sunucu
+tarafında" ifadesinin kabul edilen yorumu budur: sunucu otoriter dalga, istemcide deterministik uygulama (K0-25, SU-03).
+IZLEME B.3 yeşil.
+
 ## Açık noktalar (Faz 2b)
 
 Entegratöre bırakılan notlardan işlenenler: kancalar (K-E1), protokol (K-C47), `asama ileri [süreç]` (K-C48), sanal su §3a istisnası
@@ -4360,7 +4469,7 @@ worktree kaldırıldı, beş spike kalır). Açık kalanlar:
 - **Faz 4 kuralı (sanal su §E):** kodla blok değiştiren her afet (tsunami, deprem, sinkhole, meteor) değişen chunk için
   `SanalSu.chunkDegisti(level, chunkPos)` çağırır; Faz 4 görev metinlerine girer.
 - **Görsel yeniden puanlama Faz 4'te:** mağara suyu ve mağara-sualtı kareleri (SU-40), uzak LOD kurulum tepesi ve FPS (SU-38),
-  buharlaşma göl yatağı karesi (K-D38).
+  buharlaşma göl yatağı karesi (K-D38). **Durum (Faz 5):** SU-38/SU-40 `5-su-gorsel` (K-E38); K-D38 `5-matris` #6.
 - **Ölçümler:** FPS oranları Faz 4 başsız kalibrasyonu ve Faz 5 (K0-21 rev. 2 (j)); Cold Sweat çift hasar ölçümü Faz 5 (S-18);
   `-Puyum=coldsweat` ile sanal su mixin'lerinin refmap yolu runClient'ta sınanmadı (K-E2).
 - **GameTest dünyasında sızan gerçek su (donma/su ortak bulgusu; K-E6, inceleme E3):** birleşik `main`'de `su_alani`
@@ -4384,9 +4493,9 @@ birleşmiş beş worktree kaldırıldı (`.vibe/diff/<parça>.patch` kalır). A�
 - **Meteor çarpma sesi (M-12):** şimdilik vanilla patlama (alçak perde); tasarımın "30–80 Hz güm + çakıl" sentezi Faz 4 afet ses
   tasarımıyla.
 - **Kızıl cüce tabanında yeniden donan delik (B-20):** delik yalnız global donma 0 iken suya döner; kızıl cüce tabanında donma buzunda
-  açılmış delik eski buza döner (bilinen sınır). Donmaya `hedefDonmusMu` sorgusu önerisi (balıkçılık §E) Faz 5.
+  açılmış delik eski buza döner (bilinen sınır). Donmaya `hedefDonmusMu` sorgusu önerisi (balıkçılık §E) Faz 5. **Kapandı** (`9a5d8d2`; K-E37).
 - **Cold Sweat (S-18, F-18):** Cold Sweat yüklüyken yiyecekler (balıklar dahil) yalnız yemek değeri verir; yiyecek etkisinin Cold
-  Sweat vücut sıcaklığına köprüsü Faz 5'te S-18 reçetesiyle araştırılır; README "bilinen sınırlar".
+  Sweat vücut sıcaklığına köprüsü Faz 5'te S-18 reçetesiyle araştırılır; README "bilinen sınırlar". **F-18 kapandı** (`39b23e3`; K-E36); S-18 çift hasar ölçümü `5-matris` #9.
 - **GameTest hijyeni:** balıkçılık testleri global donmayı 50/60'ta bırakıyordu (`BalikcilikOyunTestleri.donma()`); K-E22 (c)
   ile kapandı (batch başında saklanır, sonunda geri konur).
 - **Faz 4 görev metinlerine girecek kurallar:** her batch en çok 7 test (K-E16; bekçi `hicBirBatchSatirKirmaz`); dedicated
@@ -4403,65 +4512,67 @@ listede; her madde "→" ile Faz 5 görevine eşlendi (`.vibe/gorev/5-entegrasyo
 
 - **Güneş — FPS (GP17):** gerçek FPS ve Düşük/Yüksek/Ultra karşılaştırması Faz 5'te görünür pencere ya da başsız kalibrasyonla
   (K0-21 rev. 2 (j)); hazır yol `gunes_patlamasi_gorsel.py` (kare başına FPS/TPS/mspt), kalite için
-  `gorsel.efektKalitesi` değiştirilip üç koşu. **→ `5-matris #10`**
+  `gorsel.efektKalitesi` değiştirilip üç koşu. **→ `5-matris #10`** **Durum:** `5-matris` #10, K-E29 (b) kuralıyla.
 - **Güneş — vitrin kareleri zayıf (inceleme P2):** kavrulma için aynı açıdan 1. gün / 4. gün sonu kare çifti (ağaçlık ve çimen
   çerçevede) yok; süpernova kabuğu karesi gökyüzü sahibinin kabuk kalibrasyonuyla yeniden alınmalı
-  (`client/gunes_patlamasi/GunesPatlamasiOtomasyonu`). Faz 5 görünür koşu. **→ `5-entegrasyon §4 (otomasyon), 5-matris #6`**
+  (`client/gunes_patlamasi/GunesPatlamasiOtomasyonu`). Faz 5 görünür koşu. **→ `5-entegrasyon §4 (otomasyon), 5-matris #6`** **Durum:** otomasyon `5-gorsel-otomasyon` (K-E38, şef açar), kare `5-matris` #6.
 - **Güneş — şeker kamışı kurumuyor (inceleme P2):** `client/gunes_patlamasi/KavrulmaRengi.java:38-42` renk işleyicisi
-  listesinde `Blocks.SUGAR_CANE` yok; nilüfer ve saplar da dışarıda (GP13 bilinen sınırına eklenmeli). Faz 5. **→ `5-entegrasyon §2`**
+  listesinde `Blocks.SUGAR_CANE` yok; nilüfer ve saplar da dışarıda (GP13 bilinen sınırına eklenmeli). Faz 5. **→ `5-entegrasyon §2`** **Kapandı** (`586031a`; K-E31): şeker kamışı ve nilüfer; saplar GP13 bilinen sınırı.
 - **Güneş — GP10 yapılmayanlar:** çarpma anının ayrı beyaz örtüsü, süpernova çökmesinde öteki ortam seslerinin susturulması,
-  kavrulmada ayrı uzak yangın katmanı. **→ `5-izleme-inceleme (yeşil mi bilinen sınır mı)`**
+  kavrulmada ayrı uzak yangın katmanı. **→ `5-izleme-inceleme (yeşil mi bilinen sınır mı)`** **Kapandı:** şartname bu üçünü adlarıyla
+  istemiyor (tasarım notu fazlası), zorunlu değil; D satırları yeşil (izleme-inceleme-5 §Madde 3).
 - **Betikler (K-E22/K-E23):** `-PoyunTestiAfeti` taşıyan betikler birleştirme turlarında `!tür`'e geçer ya da gerçek afete
   uyarlanır (`entegrasyon-4.md` §3.6). Güneş birleştiğinde `uyari_sunucu.py` ve `radar_gorsel.py` güneş adımları gerçek afetle
-  aynı çıktıyı verir (güneş §E); `basarim_sunucu.py`'de güneş adımı yok. **→ `5-entegrasyon §3`**
+  aynı çıktıyı verir (güneş §E); `basarim_sunucu.py`'de güneş adımı yok. **→ `5-entegrasyon §3`** **Kapandı** (`452d82a`, `bcf9e7b`; K-E35).
 
 - **Ay — vitrin kamerası (inceleme P2):** çarpma vitrininde ufuk arazinin arkasında; parlama sonrası ufuk ışığı ve mantar sütunu
   09–12 karelerinde seçilmiyor. Kamera açık ufka (kıyı ya da `ust + 40`, pitch −3…−5°), `00_once` ve `17_sifirla_ay_geri` −88°'de
-  (`client/ay_carpmasi/AyCarpmasiOtomasyonu.java:149-172, 208`). Faz 5 görünür koşu. **→ `5-entegrasyon §4, 5-matris #6`**
+  (`client/ay_carpmasi/AyCarpmasiOtomasyonu.java:149-172, 208`). Faz 5 görünür koşu. **→ `5-entegrasyon §4, 5-matris #6`** **Durum:** `5-gorsel-otomasyon` (K-E38), `5-matris` #6.
 - **Ay — kayan yıldız görünmedi:** bütün karelerde kayan yıldız sayısı 0; otomasyon halka karesinden önce paket içi
-  `kayanYildizZorla`'yı çağırmalı (`AyCarpmasiGokyuzu.java:313-327`). Faz 5. **→ `5-entegrasyon §4, 5-matris #6`**
-- **Ay — düşen cam/yaprak eşyaya dönüşebiliyor:** `SarsintiDusmeleri.java:117-122` düşen varlıkta `dropItem = false` yok. **→ `5-entegrasyon §2`**
+  `kayanYildizZorla`'yı çağırmalı (`AyCarpmasiGokyuzu.java:313-327`). Faz 5. **→ `5-entegrasyon §4, 5-matris #6`** **Durum:** `5-gorsel-otomasyon` (K-E38), `5-matris` #6.
+- **Ay — düşen cam/yaprak eşyaya dönüşebiliyor:** `SarsintiDusmeleri.java:117-122` düşen varlıkta `dropItem = false` yok. **→ `5-entegrasyon §2`** **Kapandı** (`82438b1`; K-E31).
 - **Ay — #13 Yıldızlı Gece ve #14 Yükselen Sular gerçek zincirle sınanmadı:** zincir GameTest'ine sahte oyuncuyla iki iddia
-  eklenmeli (bugün başarımın kendi testleri dönem alanından sınıyor). **→ `5-entegrasyon §2`**
-- **Ay — FPS:** gizli workspace 1 FPS (GP17 ile aynı), Faz 5. **→ `5-matris #10`**
+  eklenmeli (bugün başarımın kendi testleri dönem alanından sınıyor). **→ `5-entegrasyon §2`** **Kapandı** (`f660642`; K-E31).
+- **Ay — FPS:** gizli workspace 1 FPS (GP17 ile aynı), Faz 5. **→ `5-matris #10`** **Durum:** `5-matris` #10, K-E29 (b).
 
 - **Deprem/sinkhole — görsel kareler (inceleme P2):** kare `RenderTickEvent.END`'de, istekten sonra ≥ 2 yeni çizilmiş kareyle
   alınmalı; çöküş ve S1 yavaş çekimde (`hiz 0.2`), siren karesi siren aşamasında (`client/deprem/DepremOtomasyonu.java:286-291,
   615-617`). Rapordaki "bayat kopya yok" cümlesi yanlış: `sinkhole_cokus_vitrin` bayat; `deprem_s1` sarsıntı bittikten sonra,
-  `deprem_siren` AKTIF'te alındı. Faz 5 görünür koşu. **→ `5-entegrasyon §4, 5-matris #6`**
+  `deprem_siren` AKTIF'te alındı. Faz 5 görünür koşu. **→ `5-entegrasyon §4, 5-matris #6`** **Durum:** `5-gorsel-otomasyon` (K-E38), `5-matris` #6.
 - **Deprem/sinkhole — DS-02 ve ses:** çöken kütle varlığı, eğilen ağaç, kendi toz dokusu, sinkhole dibinde nem buharı, ayrı
-  öncü gürleme/çatlama sesleri Faz 5 cilası. **→ `5-izleme-inceleme`**
-- **Deprem/sinkhole — FPS:** gizli workspace 1 FPS (GP17), Faz 5. **→ `5-matris #10`**
+  öncü gürleme/çatlama sesleri Faz 5 cilası. **→ `5-izleme-inceleme`** **Kapandı:** isteğe bağlı cila (C/F tavanlı düşen
+  blokla karşılanıyor; izleme-inceleme-5); F.3 kare kanıtı `5-matris` #6.
+- **Deprem/sinkhole — FPS:** gizli workspace 1 FPS (GP17), Faz 5. **→ `5-matris #10`** **Durum:** `5-matris` #10, K-E29 (b).
 
 - **Asit/orman — görsel kareler (AOi-1–3):** asit kamerası 40 blok üstte; sıçrama/cızlama 24 blok eşiği altında görünmüyor,
   dumanlanma zayıf. Faz 5'te yere yakın (göz ≤ 10 blok) asit S5 karesi, ufku gören siren karesi, S1 görsel çarpanı 0,25 ile "çise";
-  FPS tabanı `maxFps` sınırsız ve aynı kamerada (taban 120 FPS tavanda kalıyordu). **→ `5-entegrasyon §4, 5-matris #6 ve #10`**
+  FPS tabanı `maxFps` sınırsız ve aynı kamerada (taban 120 FPS tavanda kalıyordu). **→ `5-entegrasyon §4, 5-matris #6 ve #10`** **Durum:** otomasyon `5-gorsel-otomasyon` (K-E38); FPS `5-matris` #10, K-E29 (b) (orman taban 8,3 ms → mutlak ölçü).
 - **Asit — maruziyet ölçekli saat (AOi-6):** `AsitYagmuru.java:103, 207` maruziyet gerçek tick'le birikiyor; ölçekli `adim`
-  (K-C11) Faz 5. **→ `5-entegrasyon §2`**
+  (K-C11) Faz 5. **→ `5-entegrasyon §2`** **Kapandı** (`a3b4409`; K-E31).
 - **Asit — ekran efekti kaynağı (AOi-7):** `IstemciAsitYagmuru.java:288` efekt yalnız son hasar `dogalafetler:asit` iken
-  çalışmalı. **→ `5-entegrasyon §2`**
+  çalışmalı. **→ `5-entegrasyon §2`** **Kapandı** (`70b7ec4`; K-E31).
 - **Orman — kayıttan dönüş adımı (AOi-8)** `asit_orman_yangini_sunucu.py`'de yok; "Yanmadan Çıktım" uçtan uca GameTest'i yok
-  (AOi-4'ün orman yarısı; 12–16 blok uzak oyuncu 0 ipucu sahnesi dahil). **→ `5-entegrasyon §2`**
+  (AOi-4'ün orman yarısı; 12–16 blok uzak oyuncu 0 ipucu sahnesi dahil). **→ `5-entegrasyon §2`** **Kapandı** (`452d82a` AOi-8, `f660642` + `f903704` AOi-4; K-E31, K-E34).
 
 - **Kasırga — yüklü alandan çıkan uçan blok (Kn4):** varlık işlemeyen konumdaki uçan bloklar ve yüklü alandan çıkan kasırganın
-  taşıdıkları `noSave` varlıkla kayboluyor; `yereBirak()` ile bırakılmalı (`afet/kasirga/Kasirga.java:220, 404-406`). **→ `5-entegrasyon §2`**
-- **Kasırga — S1 izi kısa (Kv3-2):** S1 olgun evresi ilerletilmeden sürsün, bitiş kamerası 18–20 blok yükseklikten; Faz 5 görsel koşu. **→ `5-entegrasyon §4, 5-matris #6`**
+  taşıdıkları `noSave` varlıkla kayboluyor; `yereBirak()` ile bırakılmalı (`afet/kasirga/Kasirga.java:220, 404-406`). **→ `5-entegrasyon §2`** **Kapandı** (`96e1508`; K-E31).
+- **Kasırga — S1 izi kısa (Kv3-2):** S1 olgun evresi ilerletilmeden sürsün, bitiş kamerası 18–20 blok yükseklikten; Faz 5 görsel koşu. **→ `5-entegrasyon §4, 5-matris #6`** **Durum:** `5-gorsel-otomasyon` (K-E38), `5-matris` #6.
 - **Kasırga — tepe yük ölçümü (Kv2-2):** K0-33 mesafe ölçümleri uçan blok ≥ 30 iken alınmalı; koşu 4'te 36/20 blokta %56 / %58,
-  5 blokta %47 (gürültü). Faz 5 görünür koşuda yeniden ölçülür. **→ `5-matris #10`**
+  5 blokta %47 (gürültü). Faz 5 görünür koşuda yeniden ölçülür. **→ `5-matris #10`** **Durum:** `5-matris` #10, K-E29 (b).
 
 - **Tsunami — yıkım (Ts3, Ts4, Ts4-2):** dalga tepesinde kesilen yıkım üst kısmı havada bırakıyor (`afet/tsunami/TsunamiAfeti.java:268`);
   kırma ve mağara ağzı yüklülük sormuyor (`TsunamiYikimi.java:206, 305-316`); tick başına tepe yıkım işi sınırsız ve ölçülmüyor
   (`TsunamiYikimi.java:187, 197-223`): ölçüm satırına tick başına en çok blok ve en uzun sunucu tick'i; tepe 50 ms'yi aşarsa birim
   tavanı (ör. 4 × blok bütçesi). TS-15b eşli koşusu (`yikimSutunBirimi=false`, aynı sahne sırası, istemci derleme sayısı, Ts4-1).
-  **→ `5-entegrasyon §2`, eşli koşu `5-matris #10`**
+  **→ `5-entegrasyon §2`, eşli koşu `5-matris #10`** **Kapandı** (`dd81d6a`; K-E32: çatı havada kalmaz, yüklülük, birim tavanı ve ölçüm satırı); eşli koşu `5-matris` #10.
 - **Tsunami — testler (hata yolu, Ts4-3):** `TsunamiOyunTestleri`'nde `@AfterBatch` temizliği yok (K-E15, `OyunTestiTemizligi`);
   jeton testi sütun kipinde ve `TpsOlcer` bağıyla tekrar; S2 yıkımlı doğal bitişte `temizlendi` "bekleyen yıkım 0" ve `doğal=true`.
-  **→ `5-entegrasyon §2`**
+  **→ `5-entegrasyon §2`** **Kapandı** (`dd81d6a`; K-E32).
 - **Tsunami — görsel (Ts7, Ts2-1, SU-38/SU-40):** otomasyon kameraları çekilmeyi ve ufku seçmiyor, S1 dalgası zor görünüyor
   (`client/tsunami/TsunamiOtomasyonu.java:150-151`); köpük tepe şeridi dokusuz bant (`TsunamiKopugu.java:125-126, 151-158`); sanal su
-  mağara kareleri ve uzak LOD kurulum tepesi (şef kararı 6). **→ `5-entegrasyon §4 ve §6`, `5-matris #6`**
+  mağara kareleri ve uzak LOD kurulum tepesi (şef kararı 6). **→ `5-entegrasyon §4 ve §6`, `5-matris #6`** **Durum:** Ts2-1 ve SU-38/SU-40 `5-su-gorsel`, Ts7 `5-gorsel-otomasyon` (K-E38, şef açar); kare `5-matris` #6.
 - **Tsunami — FPS (TS-16 rev. 3):** "Şef kararları (Faz 4) → Tsunami" Faz 5 tetikleyicisi (her S5 sahnesi Yüksek'te, iki tekrar,
-  duvar saati ≥ 30 FPS; tutmazsa önce yağmur, sonra köpük bütçesi). **→ `5-matris #10`**
+  duvar saati ≥ 30 FPS; tutmazsa önce yağmur, sonra köpük bütçesi). **→ `5-matris #10`** **Durum:** `5-matris` #10, K-E29 (b).
 
 ## N17 — Sayısal varsayılanlar
 
@@ -4511,6 +4622,7 @@ listede; her madde "→" ile Faz 5 görevine eşlendi (`.vibe/gorev/5-entegrasyo
 | çekirdek | `cekirdek.carpan.tsunamiCarpanSuresiTick` | 72 000 | tick (3 gün) | bölüm H "birkaç Minecraft günü" |
 | çekirdek | `cekirdek.carpan.tsunamiSonumTick` | 48 000 | tick (2 gün) | "yavaş yavaş normale dönsün" |
 | çekirdek | `cekirdek.carpan.tsunamiSonumTipi` | DOGRUSAL | — | öngörülebilir sönüm |
+| çekirdek | `sicaklik.sicaklikSistemiModu` | OTOMATIK | OTOMATIK / ACIK / KAPALI | N8, K0-08: Cold Sweat yüklüyse kendi sıcaklık sistemimiz kapalı (çift hasar yok); `sicaklikSistemi` gamerule'ü ayrıca |
 | sıcaklık | `sicaklik.guncellemeAraligiTick` | 20 | tick | madde 3 "saniyede birkaç kez" sınırının altında; zaman sabiti dakikalar olduğu için 1 Hz algılanabilir fark yaratmaz |
 | sıcaklık | `sicaklik.paketTazelemeTick` | 200 | tick | değer değişmese de 10 sn'de bir; kayıp paket HUD'u en çok 10 sn eski tutar |
 | sıcaklık | `sicaklik.tuyUstSiniri` | 30 | upgrade/parça | N2 "20 veya 30" |
@@ -4730,6 +4842,8 @@ listede; her madde "→" ile Faz 5 görevine eşlendi (`.vibe/gorev/5-entegrasyo
 | ay çarpması | `ay_carpmasi.sarsintiYaricapi` | 48 | blok | tasarım §5 |
 | ay çarpması | `ay_carpmasi.sarsintiYogunlugu` | 0,30 | olasılık | tasarım §6 |
 | ay çarpması | `ay_carpmasi.halka` | true | — | tasarım §2 "config ile kapatılabilir" |
+| ay çarpması (istemci) | `ay_carpmasi.ekranSarsintisi` | 1,0 (0–2) | çarpan | çarpma sarsıntısının kamera genliği; 0 kapalı (hareket hassasiyeti) |
+| ay çarpması (istemci) | `ay_carpmasi.parlama` | 1,0 (0–1) | çarpan | çarpma parlamasının ekran beyazlığı; 0 kapalı (ışığa duyarlı oyuncular, `meteor.parlamaOlcegi` ile aynı) |
 | ay çarpması | (sabit) sarsıntı | 12 sn, 2,5° | — | tasarım §6; `AyEgrileri` |
 | ay çarpması | (sabit) parlama | 0,5 sn %70 | — | tasarım §2 |
 | ay çarpması | (sabit) mantar | 45 sn'de 25°, 1 günde söner | — | tasarım §2, §2 "afet sonrası iz" |
