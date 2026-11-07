@@ -117,7 +117,7 @@ https://www.amsmeteors.org/fireballs/faqf/ (bolid renkleri, iz, ses).
 
 ### Minecraft'ta gösterim
 
-- **Meteor varlığı** (`MeteorVarligi`, sunucu otoriteli): 40–70° açıyla, hedefin 140 blok üstünden 3 blok/tick düz
+- **Meteor varlığı** (`MeteorVarligi`, sunucu otoriteli): 40–70° açıyla, hedefin 200 blok üstünden ~9 sn'de (MT2-25) düz
   inen dönen kaya kümesi (güneş: magma + karataş/bazalt; ay: kalsit + pürüzsüz bazalt/tüf), önünde additive plazma
   kabuğu ve ışık halesi, arkasında iki katmanlı additive iz şeridi (40 / 72 blok; güneş: beyaz-sarı çekirdek + turuncu,
   ay: mavi-beyaz çekirdek + mavi) ve 8 sn'de dağılan gri duman, düşen kıvılcımlar. İnişe 1,5 sn kala zeminde büyüyen
@@ -156,8 +156,8 @@ suya/kara değince cız. Kendi sentez dosyası yok: vanilla sesler `SoundEvents`
 Kullanıcı isteği: uçuş sesi her yerden duyuluyor ve vanilla gibi. Artık iki sentez dosyası var (`tools/assets/ses_uret.py`,
 ölçüm `docs/kanit/ses/meteor_*_ebur128.txt`): **uçuş** `meteor_ucus.ogg` (8 sn döngü; 35–90 / 90–220 Hz yanma kükremesi
 0,25 Hz'de çapraz kayar, 70→95 Hz süzülen kısmi ton, 6 Hz plazma çalkantısı, konuşma çentiği; −26 LUFS) yalnız meteor 48 blok
-yakınındayken çalar (52 blokta söner), kazanç `(1 − d/48)²`, perde dinleyiciye yaklaşma hızından Doppler `12 / (12 − v)` (3 blok/tick'te
-1,33 → 0,8), ay parçaları %10 tiz; **patlama** `meteor_patlama.ogg` (7 sn tek seferlik; kırılma darbesi, 90 → 32 Hz göğüs vuruşu, 2,2 sn
+yakınındayken çalar (52 blokta söner), kazanç `(1 − d/48)²`, perde dinleyiciye yaklaşma hızından Doppler `5,2 / (5,2 − v)` (tipik 1,3 blok/tick'te
+1,33 → 0,8; MT2-25 öncesi `12 / (12 − v)`, 3 blok/tick), ay parçaları %10 tiz; **patlama** `meteor_patlama.ogg` (7 sn tek seferlik; kırılma darbesi, 90 → 32 Hz göğüs vuruşu, 2,2 sn
 zaman sabitli 20–120 Hz uğultu kuyruğu, çakıl; −23 LUFS, ≤ −6 dBTP) büyükte 128, küçükte 96 blok içinde (küçük %70 düzey,
 büyük perde 0,85), kazanç karesel. İkisini de istemci vanilla zayıflaması kapalı çalar (konum yalnız yön için); her türden aynı anda
 en çok 6 (ses.md §4 kural 3): uçuşta en yakın altı, çarpmada en uzaktaki düşer. Sunucunun `entity.generic.explode`'u kalktı; suda
@@ -172,12 +172,17 @@ kısması) aynı; uçan meteor tavanı 48 → 96 (doluyken atılamayan meteor d�
 **Boyut değişkenliği (istek 27):** meteorun sürekli ölçeği (`meteor.mantik.MeteorOlcegi`, senkron varlık verisi ve çarpma
 paketinde): %60 küçük 0,5–0,9×, %30 orta 0,9–1,6×, %10 büyük 1,6–2,5×, bant içinde düzgün. Eski küçük/büyük config değerleri
 tipik ölçek 0,7 ve 2,0'daki referanslardır; arası ve uçları doğrusal: gövde çapı 1,1 → 2,6 (ölçek 2,5'te 3,2), iz 40 → 72 blok,
-hız ×0,95 → ×1,15, krater yarıçapı 2,5 → 5,5 (2,5×'te 6,7), sarsıntı menzili 48 → 112, yangın yoğunluğu 0,45 → 0,85, patlama sesi
+uçuş süresi ÷0,97 → ÷1,10 (uçlarda ÷0,95–1,12), krater yarıçapı 2,5 → 5,5 (2,5×'te 6,7), sarsıntı menzili 48 → 112, yangın yoğunluğu 0,45 → 0,85, patlama sesi
 96 → 128 blok ve %70 → %100 düzey, perde 1,0 → 0,85. Ödül sınıfı büyük banttır (Kozmik Çekirdek yalnız 1,6× ve üstünde).
 
 **Ödül sınırı (tur 2, şef kararı):** yağmur meteorları ödülü yalnız büyük bantta bırakır ve afet başına, hedef oyuncu başına
 en çok `meteor.odulTavaniAfetBasina` (8) eşya (`meteor.mantik.OdulTavani`); 10 dk'lık yağmurda oyuncu başına ~29 eşyalık
 enflasyon ~5'e (en çok 8) iner. Tek düşürülen meteor (komut) madde 13c şanslarıyla sınırsızdır.
+
+**Uçuş süresi (tur 3, şef kararı MT2-25):** gerçek hızda gökte aynı anda ~5 meteor "aşırı fazla" isteğine yetmedi;
+sorun uçuşun ~3 sn sürmesiydi. Meteor hedefin 200 blok üstünden doğar (40–70°) ve hedefe `meteor.ucusSuresi`'nde (180 tick;
+küçük 9,5 sn, büyük 8,0 sn) varır: hız yoldan çıkar (~1,0–1,9 blok/tick). 90/dk'da oyuncu başına gökte ~13,5 meteor;
+uçan meteor tavanı 240 (16 oyuncu). Doppler (yukarıdaki 1,2/0,8 kayma) tipik hızda 1,33/0,8 kalır (`SES_HIZI` 5,2).
 
 ## Buz altı balıkçılık (madde 15)
 
