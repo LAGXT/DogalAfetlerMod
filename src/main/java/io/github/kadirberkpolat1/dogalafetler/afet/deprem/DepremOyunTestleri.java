@@ -300,7 +300,7 @@ public final class DepremOyunTestleri {
     @GameTest(template = SAHNE, batch = "deprem_basarim", timeoutTicks = 600)
     public static void dogalBitenDepremSallananZeminVerir(GameTestHelper y) {
         zemin(y, YUZEY);
-        blokHasari(y, false);
+        boolean eski = blokHasari(y, false);
         BlockPos merkez = y.absolutePos(MERKEZ);
         ServerPlayer uzak = oyuncu(y, merkez.getX() + 600.5, merkez.getY(), merkez.getZ() + 0.5);
         uzak.setGameMode(GameType.CREATIVE);
@@ -320,6 +320,7 @@ public final class DepremOyunTestleri {
             y.assertTrue(!uzak.getAdvancements().getOrStartProgress(sallanan).isDone(), "alan dışındaki oyuncu almamalı");
             DogalAfetler.LOGGER.info("Deprem GameTest: Sallanan Zemin gerçek depremle verildi (etkilenen {})",
                     deprem.etkilenenler().size());
+            blokHasari(y, eski);
             sahneyiTemizle(y);
         });
     }
