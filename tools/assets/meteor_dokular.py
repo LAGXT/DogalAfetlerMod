@@ -13,10 +13,9 @@ Kullanım (worktree kökünden): KÖK/.venv/bin/python tools/assets/meteor_dokul
 - textures/particle/meteor_yildiz_0..1.png 8x8   dört kollu parıltı (ödüller)
 - textures/entity/meteor_plazmasi.png  64x64  radyal ışık (additive: parlaklık = RGB)
 - textures/entity/meteor_izi.png       64x16  iz şeridi: u boyunca baştan kuyruğa söner, v ortası parlak
-- particles/*.json (8 parçacık tanımı)
+Parçacık tanımları (`particles/*.json`) bu dokulara `runData` ile bağlanır (K-E25, `ParcacikTanimlari`); betik yazmaz.
 Renkleri değiştirmek için aşağıdaki RENK sözlüklerini düzenleyip betiği yeniden çalıştırın.
 """
-import json
 import math
 import random
 from pathlib import Path
@@ -28,7 +27,6 @@ VARLIK = KOK / "src/main/resources/assets/dogalafetler"
 ESYA = VARLIK / "textures/item"
 PARCACIK = VARLIK / "textures/particle"
 VARLIK_DOKU = VARLIK / "textures/entity"
-TANIM = VARLIK / "particles"
 
 
 def kaydet(resim, yol):
@@ -217,13 +215,6 @@ def iz():
     return img
 
 
-def tanim(ad, dokular):
-    yol = TANIM / f"{ad}.json"
-    yol.parent.mkdir(parents=True, exist_ok=True)
-    yol.write_text(json.dumps({"textures": [f"dogalafetler:{d}" for d in dokular]}, indent=2) + "\n")
-    print(yol.relative_to(KOK))
-
-
 def main():
     kaydet(meteorit_parcasi(), ESYA / "meteorit_parcasi.png")
     kaydet(kozmik_cekirdek(), ESYA / "kozmik_cekirdek.png")
@@ -237,15 +228,6 @@ def main():
         kaydet(yildiz(kol), PARCACIK / f"meteor_yildiz_{i}.png")
     kaydet(plazma(), VARLIK_DOKU / "meteor_plazmasi.png")
     kaydet(iz(), VARLIK_DOKU / "meteor_izi.png")
-    isiklar = [f"meteor_isik_{i}" for i in range(4)]
-    dumanlar = [f"meteor_duman_{i}" for i in range(4)]
-    yildizlar = [f"meteor_yildiz_{i}" for i in range(2)]
-    for ad in ("meteor_plazmasi", "meteor_plazmasi_ay", "meteor_kivilcimi", "meteor_kivilcimi_ay"):
-        tanim(ad, isiklar)
-    for ad in ("meteor_dumani", "meteor_tozu"):
-        tanim(ad, dumanlar)
-    for ad in ("meteorit_parlamasi", "kozmik_parilti"):
-        tanim(ad, yildizlar)
 
 
 if __name__ == "__main__":

@@ -69,7 +69,10 @@ final class TsunamiYikimi {
     }
 
     static final int KOLON_BUTCESI = 192;
-    /** Ts3: sütun taraması dalga tepesinden en çok bu kadar yukarı (çatı, ağaç tepesi) uzar; dalga üstü yapı havada kalmaz. */
+    /**
+     * Ts3, K-E39: sütun taraması dalga tepesinden en çok bu kadar yukarı (çatı, ağaç tepesi) uzar; dalga üstü yapı havada kalmaz.
+     * Uzama ilk doğal arazi bloğunda kesilir: zemini dalga tepesinden yüksek yamaçtaki yapıya dalga ulaşmaz, kalır.
+     */
     static final int UST_PAYI = 16;
     /** İstemciye gönder, komşu şekillerini güncelleme (yaprak/çit zinciri yok), komşuya {@code neighborChanged} yok. */
     static final int BAYRAK = Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE;
@@ -176,7 +179,11 @@ final class TsunamiYikimi {
                 continue;
             }
             boolean ustDogal = false;
-            int tepe = Math.max(k.ust, Math.min(k.ust + UST_PAYI, l.getHeight(Heightmap.Types.MOTION_BLOCKING, k.x, k.z) - 1));
+            int sinir = Math.min(k.ust + UST_PAYI, l.getHeight(Heightmap.Types.MOTION_BLOCKING, k.x, k.z) - 1);
+            int tepe = k.ust;
+            while (tepe < sinir && !dogal(l.getBlockState(m.set(k.x, tepe, k.z)))) {
+                tepe++;
+            }
             for (int y = Math.min(tepe, l.getMaxBuildHeight() - 1); y >= Math.max(alt, l.getMinBuildHeight()); y--) {
                 BlockState s = l.getBlockState(m.set(k.x, y, k.z));
                 if (s.isAir()) {

@@ -132,7 +132,8 @@ class AsitKurallariTest {
 
     @Test
     void gorselYogunlukSeviyeyleArtar() {
-        assertEquals(0.4, AsitKurallari.gorselCarpan(1), 1e-9, "S1 seyrek çise");
+        assertEquals(0.25, AsitKurallari.gorselCarpan(1), 1e-9, "S1 seyrek çise (AOi-2)");
+        assertEquals(0.55, AsitKurallari.gorselCarpan(2), 1e-9, "S2+ doğrusal dizi korunur");
         assertEquals(1.0, AsitKurallari.gorselCarpan(5), 1e-9, "S5 tam sağanak");
         assertEquals(1.0, AsitKurallari.gorselCarpan(8), 1e-9);
         for (int s = 2; s <= 5; s++) {

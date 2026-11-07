@@ -110,6 +110,11 @@ public final class TsunamiOyunTestleri {
         temizlik(level);
     }
 
+    @AfterBatch(batch = "tsunami_yamac")
+    public static void yamacSonrasi(ServerLevel level) {
+        temizlik(level);
+    }
+
     @AfterBatch(batch = "tsunami_blok_hasari")
     public static void blokHasariSonrasi(ServerLevel level) {
         temizlik(level);
@@ -525,6 +530,36 @@ public final class TsunamiOyunTestleri {
                             a.bekleyenYikim(), a.dogalBitti());
                     a.durdur(l, true);
                     a.magaralar().forEach(id -> SanalSu.magaraBitir(l, id));
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * K-E39 (inceleme-entegrasyon-5 P2-1): dalga tepesini aşan yapı yıkılır (Ts3), ama zemini dalga tepesinden yüksek yamaçtaki
+     * yapıya dalga ulaşmaz: sütun taramasının yukarı uzaması ilk doğal arazide kesilir. Karada toprak tepe (y 3..12) ve üstünde
+     * kalas (y 13..15) ayakta kalır; dalganın içindeki cam kırılır. S2 düşen dalganın tepesi en çok y 10 (Ts3 kırmızı koşusu).
+     */
+    @GameTest(template = "su_alani", batch = "tsunami_yamac", timeoutTicks = 900)
+    public static void yamacUstuYapiyaDalgaUlasmazKalir(GameTestHelper h) {
+        ServerLevel l = h.getLevel();
+        sahne(h, 2);
+        kutu(h, 11, 3, 3, 12, 12, 5, Blocks.DIRT.defaultBlockState());
+        kutu(h, 11, 13, 3, 12, 15, 5, Blocks.OAK_PLANKS.defaultBlockState());
+        h.setBlock(8, 3, 8, Blocks.GLASS);
+        TsunamiAfeti a = baslat(h, 2);
+        h.startSequence()
+                .thenWaitUntil(() -> h.assertTrue(a.sonlandi(), "afet kendiliğinden bitmedi: " + a.asama()))
+                .thenExecute(() -> {
+                    h.assertTrue(l.getBlockState(m(h, 8, 3, 8)).isAir() && a.kirilan() > 0, "dalganın içindeki cam kırılmadı");
+                    int kalas = 0;
+                    for (BlockPos p : BlockPos.betweenClosed(m(h, 11, 13, 3), m(h, 12, 15, 5))) {
+                        kalas += l.getBlockState(p).is(Blocks.OAK_PLANKS) ? 1 : 0;
+                    }
+                    h.assertTrue(kalas == 18, "yamaç üstü kalas yıkıldı: 18 bloktan " + kalas + " kaldı");
+                    DogalAfetler.LOGGER.info("Tsunami GameTest: yamaç üstü yapı ayakta (kalas {}/18), kırılan {}", kalas, a.kirilan());
+                    a.durdur(l, true);
+                    a.magaralar().forEach(id -> SanalSu.magaraBitir(l, id));
+                    kutu(h, 11, 12, 3, 12, 15, 5, Blocks.AIR.defaultBlockState());
                 })
                 .thenSucceed();
     }

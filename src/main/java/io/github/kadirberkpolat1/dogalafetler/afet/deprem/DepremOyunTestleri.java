@@ -95,10 +95,7 @@ public final class DepremOyunTestleri {
     public static void batchSonu(ServerLevel level) {
         AfetYoneticisi.al(level.getServer()).durdur();
         DepremAyarlari.geciciEnAltY(null);
-        if (eskiBlokHasari != null) {
-            level.getGameRules().getRule(Kurallar.AFET_BLOK_HASARI).set(eskiBlokHasari, level.getServer());
-            eskiBlokHasari = null;
-        }
+        kuraliGeriKoy(level);
         DINLEYICILER.forEach(MinecraftForge.EVENT_BUS::unregister);
         DINLEYICILER.clear();
         oyunculariCikar(level);
@@ -160,18 +157,25 @@ public final class DepremOyunTestleri {
         return eski;
     }
 
+    /** {@link #blokHasari}'nın ilk çağrıdan önceki değerini geri koyar (K-E39: sıfırlamadan önce, kural sonraki batch'e sızmasın). */
+    private static void kuraliGeriKoy(ServerLevel level) {
+        if (eskiBlokHasari != null) {
+            level.getGameRules().getRule(Kurallar.AFET_BLOK_HASARI).set(eskiBlokHasari, level.getServer());
+            eskiBlokHasari = null;
+        }
+    }
+
     public static int dusenSayisi(GameTestHelper y) {
         return y.getLevel().getEntitiesOfClass(FallingBlockEntity.class, kutu(y).inflate(4)).size();
     }
 
     /**
-     * Test geçince (kural testçe geri konduktan sonra): afet durur, sahte oyuncular çıkar, düşen blok ve eşyalar kalkar, kutu
-     * havayla boşalır.
+     * Test geçince: afet durur, kural geri gelir, sahte oyuncular çıkar, düşen blok ve eşyalar kalkar, kutu havayla boşalır.
      */
     public static void sahneyiTemizle(GameTestHelper y) {
         AfetYoneticisi.al(y.getLevel().getServer()).durdur();
         DepremAyarlari.geciciEnAltY(null);
-        eskiBlokHasari = null;
+        kuraliGeriKoy(y.getLevel());
         oyunculariCikar(y.getLevel());
         for (Entity e : y.getLevel().getEntitiesOfClass(Entity.class, kutu(y).inflate(4),
                 e -> e instanceof FallingBlockEntity || e instanceof ItemEntity)) {
@@ -257,7 +261,7 @@ public final class DepremOyunTestleri {
     public static void depremYarikAcarKirilganYikarDayanikliKorur(GameTestHelper y) {
         zemin(y, YUZEY);
         yapilar(y);
-        boolean eski = blokHasari(y, true);
+        blokHasari(y, true);
         int kirilganOnce = kirilganSayisi(y);
         Deprem deprem = baslat(y, 1);
         AfetYoneticisi yonetici = AfetYoneticisi.al(y.getLevel().getServer());
@@ -288,7 +292,6 @@ public final class DepremOyunTestleri {
             }
             y.assertTrue(kirilganSayisi(y) < kirilganOnce, "kırılgan blok yıkılmadı (" + kirilganOnce + ")");
             y.assertTrue(deprem.isler().degisenBlok() > 0, "blok değişimi sayılmadı");
-            blokHasari(y, eski);
             sahneyiTemizle(y);
         });
     }
@@ -300,7 +303,7 @@ public final class DepremOyunTestleri {
     @GameTest(template = SAHNE, batch = "deprem_basarim", timeoutTicks = 600)
     public static void dogalBitenDepremSallananZeminVerir(GameTestHelper y) {
         zemin(y, YUZEY);
-        boolean eski = blokHasari(y, false);
+        blokHasari(y, false);
         BlockPos merkez = y.absolutePos(MERKEZ);
         ServerPlayer uzak = oyuncu(y, merkez.getX() + 600.5, merkez.getY(), merkez.getZ() + 0.5);
         uzak.setGameMode(GameType.CREATIVE);
@@ -320,7 +323,6 @@ public final class DepremOyunTestleri {
             y.assertTrue(!uzak.getAdvancements().getOrStartProgress(sallanan).isDone(), "alan dışındaki oyuncu almamalı");
             DogalAfetler.LOGGER.info("Deprem GameTest: Sallanan Zemin gerçek depremle verildi (etkilenen {})",
                     deprem.etkilenenler().size());
-            blokHasari(y, eski);
             sahneyiTemizle(y);
         });
     }
@@ -330,7 +332,7 @@ public final class DepremOyunTestleri {
     public static void depremBlokHasariKapaliykenDunyaDegismez(GameTestHelper y) {
         zemin(y, YUZEY);
         yapilar(y);
-        boolean eski = blokHasari(y, false);
+        blokHasari(y, false);
         long once = kutuHash(y);
         Deprem deprem = baslat(y, 1);
         AfetYoneticisi yonetici = AfetYoneticisi.al(y.getLevel().getServer());
@@ -338,7 +340,6 @@ public final class DepremOyunTestleri {
             y.assertTrue(kutuHash(y) == once, "blok hasarı kapalıyken kutu değişti");
             y.assertTrue(yonetici.aktifAfet().isEmpty(), "deprem sürüyor");
             y.assertTrue(deprem.isler().degisenBlok() == 0, "değişen blok " + deprem.isler().degisenBlok());
-            blokHasari(y, eski);
             sahneyiTemizle(y);
         });
     }
@@ -348,7 +349,7 @@ public final class DepremOyunTestleri {
     public static void depremStopTemizBirakir(GameTestHelper y) {
         zemin(y, YUZEY);
         yapilar(y);
-        boolean eski = blokHasari(y, true);
+        blokHasari(y, true);
         Deprem deprem = baslat(y, 1);
         AfetYoneticisi yonetici = AfetYoneticisi.al(y.getLevel().getServer());
         y.assertTrue(OrtamSesi.aktifMi(Deprem.SES_KATMANI), "AKTIF'te gürleme katmanı yok");
@@ -361,7 +362,6 @@ public final class DepremOyunTestleri {
             y.assertTrue(!OrtamSesi.aktifMi(Deprem.SES_KATMANI), "gürleme katmanı kaldı");
             y.assertTrue(deprem.isler().ortuSayisi() == 0, "çatlak örtüsü kaldı");
             y.assertTrue(deprem.isler().canliDusenSayisi() == 0, "düşen blok kaldı");
-            blokHasari(y, eski);
             sahneyiTemizle(y);
             y.succeed();
         });
@@ -376,7 +376,7 @@ public final class DepremOyunTestleri {
     public static void depremArtciSarsintilariPlanlaBlokYikmaz(GameTestHelper y) {
         zemin(y, YUZEY);
         yapilar(y);
-        boolean eski = blokHasari(y, false);
+        blokHasari(y, false);
         long once = kutuHash(y);
         List<Integer> artcilar = new ArrayList<>();
         List<Boolean> katmanAcik = new ArrayList<>();
@@ -412,7 +412,6 @@ public final class DepremOyunTestleri {
             y.assertTrue(!OrtamSesi.aktifMi(Deprem.ARTCI_KATMANI) && !OrtamSesi.aktifMi(Deprem.SES_KATMANI),
                     "ortam katmanı kaldı");
             y.assertTrue(kutuHash(y) == once && deprem.isler().degisenBlok() == 0, "artçılı depremde blok değişti");
-            blokHasari(y, eski);
             sahneyiTemizle(y);
         });
     }

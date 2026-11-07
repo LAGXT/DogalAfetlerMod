@@ -75,7 +75,7 @@ public final class SinkholeOyunTestleri {
     @GameTest(template = SAHNE, batch = "sinkhole_cokus", timeoutTicks = 900)
     public static void sinkholeCokerCukuraDolarIpucuVerir(GameTestHelper y) {
         zemin(y, YUZEY);
-        boolean eski = blokHasari(y, true);
+        blokHasari(y, true);
         BlockPos m = y.absolutePos(MERKEZ);
         ServerPlayer oyuncu = oyuncu(y, m.getX() + 0.5, m.getY(), m.getZ() + 0.5);
         List<BasarimIpucuEvent> ipuclari = new ArrayList<>();
@@ -109,7 +109,6 @@ public final class SinkholeOyunTestleri {
                 y.assertTrue(y.getBlockState(p).is(Blocks.GRASS_BLOCK), "çukur dışı bozuldu: " + p);
             }
             y.assertTrue(dusenSayisi(y) == 0, "düşen blok havada kaldı");
-            blokHasari(y, eski);
             y.getLevel().getServer().getPlayerList().remove(oyuncu);
             sahneyiTemizle(y);
         });
@@ -122,7 +121,7 @@ public final class SinkholeOyunTestleri {
     @GameTest(template = SAHNE, batch = "sinkhole_kapali", timeoutTicks = 300)
     public static void sinkholeBlokHasariKapaliVeStopTemiz(GameTestHelper y) {
         zemin(y, YUZEY);
-        boolean eski = blokHasari(y, false);
+        blokHasari(y, false);
         long once = kutuHash(y);
         BlockPos m = y.absolutePos(MERKEZ);
         ServerPlayer oyuncu = oyuncu(y, m.getX() + 12.5, m.getY(), m.getZ() + 0.5);
@@ -142,7 +141,6 @@ public final class SinkholeOyunTestleri {
             y.assertTrue(yonetici.aktifAfet().isEmpty(), "stop sonrası afet sürüyor");
             y.assertTrue(!OrtamSesi.aktifMi(Sinkhole.SES_KATMANI), "ortam katmanı kaldı");
             y.assertTrue(sinkhole.isler().ortuSayisi() == 0, "çatlak örtüsü kaldı");
-            blokHasari(y, eski);
             y.getLevel().getServer().getPlayerList().remove(oyuncu);
             sahneyiTemizle(y);
             y.succeed();
@@ -153,7 +151,7 @@ public final class SinkholeOyunTestleri {
     @GameTest(template = SAHNE, batch = "sinkhole_stop", timeoutTicks = 300)
     public static void sinkholeCokusteStopDusenleriKaldirir(GameTestHelper y) {
         zemin(y, YUZEY);
-        boolean eski = blokHasari(y, true);
+        blokHasari(y, true);
         BlockPos m = y.absolutePos(MERKEZ);
         ServerPlayer oyuncu = oyuncu(y, m.getX() + 12.5, m.getY(), m.getZ() + 0.5);
         Sinkhole sinkhole = baslat(y, 2, oyuncu);
@@ -167,7 +165,6 @@ public final class SinkholeOyunTestleri {
             }
             y.assertTrue(yonetici.aktifAfet().isEmpty(), "stop sonrası afet sürüyor");
             y.assertTrue(sinkhole.isler().canliDusenSayisi() == 0 && dusenSayisi(y) == 0, "düşen blok kaldı");
-            blokHasari(y, eski);
             y.getLevel().getServer().getPlayerList().remove(oyuncu);
             sahneyiTemizle(y);
         });

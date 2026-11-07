@@ -7,6 +7,7 @@ import io.github.kadirberkpolat1.dogalafetler.balikcilik.mantik.IsirmaSuresi;
 import io.github.kadirberkpolat1.dogalafetler.core.CekirdekOyunTestleri;
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import io.github.kadirberkpolat1.dogalafetler.donma.DonmaApi;
+import io.github.kadirberkpolat1.dogalafetler.donma.DonmaAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
 import io.github.kadirberkpolat1.dogalafetler.donma.ChunkDonmaVerisi;
 import io.github.kadirberkpolat1.dogalafetler.donma.DonmaBloklari;
@@ -171,6 +172,16 @@ public final class BalikcilikOyunTestleri {
 
     @AfterBatch(batch = "balikcilik_sifir")
     public static void sifirSonrasi(ServerLevel level) {
+        donemiGeriKoy(level);
+    }
+
+    @BeforeBatch(batch = "balikcilik_hedef_alti")
+    public static void hedefAltiOncesi(ServerLevel level) {
+        donemiSakla(level);
+    }
+
+    @AfterBatch(batch = "balikcilik_hedef_alti")
+    public static void hedefAltiSonrasi(ServerLevel level) {
         donemiGeriKoy(level);
     }
 
@@ -530,6 +541,40 @@ public final class BalikcilikOyunTestleri {
                         + DonmaApi.sutunHedefi(level, delik));
         DogalAfetler.LOGGER.info("Balıkçılık GameTest: kızıl cüce G 40 sütun hedefi {} (buz={}), delik -> {}",
                 DonmaApi.sutunHedefi(level, delik), hedef, sonra.getBlock());
+        sutunBiti(level, delik, false);
+        temizle(y, o);
+        y.succeed();
+    }
+
+    /**
+     * B-20 su dalı (K-E39): global ilerleme sıfır değilken (G 19) sütun hedefi ilk buz eşiğinin (20) altındaysa donmanın
+     * buzunda açılan delik kaynak suya döner (eski kural G > 0'da buz verirdi). Çözülme dönemi kapalı: sütun hedefi G'dir,
+     * kış ağırlığından ve ılık ofsetten bağımsız. Delik eşik üstünde (G 50) açılır, son aşamadan önce G iner.
+     */
+    @GameTest(template = "bos", batch = "balikcilik_hedef_alti")
+    public static void hedefBuzEsigininAltindaDelikSuyaDoner(GameTestHelper y) {
+        ServerLevel level = y.getLevel();
+        donma(y, 50f);
+        havuzKur(y);
+        BlockPos delik = y.absolutePos(DELIK);
+        sutunBiti(level, delik, true);
+        ServerPlayer o = oyuncu(y, 3, 3);
+        o.setShiftKeyDown(true);
+        o.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.IRON_PICKAXE));
+        sagTik(o, delik);
+        BlockState acik = level.getBlockState(delik);
+        y.assertTrue(delikMi(acik) && acik.getValue(BuzDeligiBlogu.DONMA), "bitli sütunda donma kökenli delik açılmalı: " + acik);
+        int esik = DonmaAyarlari.esikler().ilkBuzEsigi();
+        donma(y, esik - 1);
+        y.assertTrue(DunyaDonemi.al(level).donmaIlerlemesi() > 0 && !DonmaApi.hedefDonmusMu(level, delik),
+                "G " + (esik - 1) + "'da sütun hedefi " + DonmaApi.sutunHedefi(level, delik) + " buz eşiğinin (" + esik + ") altında olmalı");
+        level.setBlock(delik, acik.setValue(BuzDeligiBlogu.ASAMA, DelikOmru.SON_ASAMA), Block.UPDATE_CLIENTS);
+        level.getBlockState(delik).tick(level, delik, level.random);
+        BlockState sonra = level.getBlockState(delik);
+        y.assertTrue(sonra.is(Blocks.WATER) && sonra.getFluidState().isSource(),
+                "hedef buz değilken donmanın buzundaki delik kaynak su olmalı: " + sonra);
+        DogalAfetler.LOGGER.info("Balıkçılık GameTest: G {} sütun hedefi {} (buz=false), delik -> {}", esik - 1,
+                DonmaApi.sutunHedefi(level, delik), sonra.getBlock());
         sutunBiti(level, delik, false);
         temizle(y, o);
         y.succeed();

@@ -3438,6 +3438,19 @@ doğrulanabilir; 5-entegrasyon runClient açmaz. Taslaklar `.vibe/gorev/5-su-gor
 bütçesi, Ts2-1 dokulu köpük) ve `.vibe/gorev/5-gorsel-otomasyon.md` (ortak `OLCUM` satırı, A-34 kare kapıları, Faz 4 kamera
 düzeltmeleri, Ts7); şef açar.
 
+**K-E39 İnceleme-entegrasyon-5 kod P2'leri (şef kararı, 2026-11-07; tek commit).** (1) Ts3 yan etkisi (P2-1): sütun taramasının
+dalga tepesinden yukarı uzaması (`TsunamiYikimi.UST_PAYI` 16) artık ilk doğal arazi bloğunda kesilir (`dogal`; dalga tepesi
+hücresi doğalsa hiç uzamaz): dalgaya değen sütunun çatısı havada kalmaz, zemini dalga tepesinden yüksek yamaçtaki yapı kalır.
+GameTest `yamacUstuYapiyaDalgaUlasmazKalir` (`tsunami_yamac`): eski formülle 18 kalasın 0'ı kaldı (`.vibe/kanit/k-e39/gt-yamac-once.log`),
+düzeltmeyle 18/18; Ts3 testi değişmeden geçer. (2) B-20 su dalı (P2-4): GameTest `hedefBuzEsigininAltindaDelikSuyaDoner`
+(`balikcilik_hedef_alti`) belirlenimci: delik G 50'de açılır, G 19'a (ilk buz eşiği 20'nin altı, sıfır değil) inilir, çözülme kapalı
+oldığu için sütun hedefi G'dir; delik kaynak suya döner (eski kural G > 0'da buz verirdi). Kızıl cüce testi (buz dalı) kalır.
+(3) `DepremOyunTestleri.sahneyiTemizle` kuralı sıfırlamadan önce geri koyar (P2-5, `553d0c2`'nin kökü; `batchSonu` ile aynı
+`kuraliGeriKoy`); deprem ve sinkhole testlerindeki elle geri koyma kalktı. (4) AOi-2: `AsitKurallari.gorselCarpan` S1 = 0,25 "çise",
+S2+ `0,4 + 0,15·(s−1)` korunur (JUnit `gorselYogunlukSeviyeyleArtar`). (5) N19 tek kaynak: `tools/assets/meteor_dokular.py` artık
+parçacık JSON'u yazmaz (K-E25, tanımlar `runData` ile `src/generated/`); N19 denetimi 174/174 eşleşen, depoda olmayan yeni dosya 0.
+Kalan inceleme P2'leri "Açık noktalar (Faz 5)".
+
 ## Şef kararları (Faz 0–1)
 
 **K0-19 Ay çarpması siren süresi: 60 sn.** Madde 5 "Güneş Patlaması hariç 10 sn" der; bölüm H "siren çaldıktan 60 saniye
@@ -4578,6 +4591,17 @@ listede; her madde "→" ile Faz 5 görevine eşlendi (`.vibe/gorev/5-entegrasyo
 - **Tsunami — FPS (TS-16 rev. 3):** "Şef kararları (Faz 4) → Tsunami" Faz 5 tetikleyicisi (her S5 sahnesi Yüksek'te, iki tekrar,
   duvar saati ≥ 30 FPS; tutmazsa önce yağmur, sonra köpük bütçesi). **→ `5-matris #10`** **Durum:** `5-matris` #10, K-E29 (b).
 
+## Açık noktalar (Faz 5)
+
+`5-entegrasyon` kabul (inceleme-entegrasyon-5, P0/P1 = 0). P2-1, P2-4, P2-5 K-E39'da; P2-7, P2-8 belge (K-E29 b, IZLEME);
+P2-9 `5-matris` kabulünde. Açık kalanlar:
+
+- **Tsunami birim tavanı dalı testsiz (P2-2):** 4 × bütçeyi aşan tek birimin tick'lere bölündüğü dal (`TsunamiYikimi` `kesildi`)
+  GameTest'te koşmuyor; yüklü olmayan konumdaki yıkım işi yeniden denenmeden atılır (blok yerinde kalır, veri bozulmaz).
+- **F-18 testi varsayılan pakette koşulsuz geçer (P2-3):** `coldSweatYukluykenYiyecekCekirdegeGider` yalnız `-Puyum=coldsweat` ile
+  sınar; TEST-RAPORU #3 "213 + 1 koşullu", Cold Sweat'le istemci mixin karesi `5-matris` #9.
+- **K-E33 (P2-6):** şef kabul, düzeltme yok (K-E33 notu).
+
 ## N17 — Sayısal varsayılanlar
 
 Şartnamenin sayı vermediği her değer config'e konur ve burada gerekçesiyle listelenir. Satırları değeri koyan işçi ekler.
@@ -4887,6 +4911,7 @@ listede; her madde "→" ile Faz 5 görevine eşlendi (`.vibe/gorev/5-entegrasyo
 | asit yağmuru | `asit_yagmuru.asitMinimumCan` | 4,0 | can puanı | madde 10 "Seviye 5'te bile öldürücü olmasın": 2 kalbin altına inmez |
 | asit yağmuru | `asit_yagmuru.eszamanliAsindirma` | 64 | blok | S5 16 blok/sn × ortalama çatlak 4 sn; tasarım §5'in 32'si bu hızı kesiyordu (kırılma örtüsü paketi küçük, yalnız 32 blok içindekilere) |
 | asit yağmuru | `asit_yagmuru.kaymaHizi` | 0,3 | blok/sn | tasarım §6; S5 240 sn'de 72 blok kayar, oyuncu alanda kalır |
+| asit yağmuru (istemci) | (sabit) görsel yoğunluk `AsitKurallari.gorselCarpan` | 0,25 / 0,55 / 0,7 / 0,85 / 1 | çarpan (S1…S5) | tasarım §2 "S1 seyrek çise, S5 yoğun sağanak"; S1 0,4'te hafif yağmur görünüyordu (AOi-2, K-E39) |
 | orman yangını | `orman_yangini.baslangicYaricapi` (SERVER) | 3, 6, 10, 16, 24 | blok | tasarım §6; ortak yangın `alanTutustur` en çok 24 |
 | orman yangını | `orman_yangini.yogunluk` | 0, 0,2, 0,4, 0,7, 1 | 0–1 | yangın §A1 önerisi: yayılma ×0,5…×1,8, sıçrama yok/2/5/8/12 blok |
 | orman yangını | `orman_yangini.sureSaniye` | 120, 180, 240, 360, 480 | sn | tasarım §6 (2–8 dk); sonra yeni tutuşma durur, kalan en geç 30 sn'de yanar |
