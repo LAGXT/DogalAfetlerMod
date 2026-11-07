@@ -14,10 +14,12 @@ import io.github.kadirberkpolat1.dogalafetler.core.mantik.SonumTipi;
 import io.github.kadirberkpolat1.dogalafetler.su.Dalga;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSuDunyasi;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
@@ -174,19 +176,29 @@ public final class TsunamiOyunTestleri {
 
     /**
      * B.5 yıkım sırası (S2): aynı cephe satırındaki cam anında, ahşap 0,3 sn sonra kırılır; yaprak kırılır; kırıktaş (yalnız
-     * S4–5) ve doğal arazi (toprak, taş taban) kalır.
+     * S4–5) ve doğal arazi (toprak, taş taban) kalır. TS-15b: satır boyu cam şeridi (z 3..14) iki chunk'a taşabilir; tick
+     * başına değişen bölüm {@code tsunami.yikimBolumTick} (1) aşılmaz, şeridin her bölümü yine de kırılır.
      */
     @GameTest(template = "su_alani", batch = "tsunami_yikim", timeoutTicks = 300)
     public static void dalgaOnceCamSonraAhsapYikarAraziKalir(GameTestHelper h) {
         ServerLevel l = h.getLevel();
         sahne(h, 2);
-        h.setBlock(9, 3, 8, Blocks.GLASS);
+        LongOpenHashSet camBolumleri = new LongOpenHashSet();
+        for (int z = 3; z <= 14; z++) {
+            if (z != 6) {
+                h.setBlock(9, 3, z, Blocks.GLASS);
+                BlockPos p = m(h, 9, 3, z);
+                camBolumleri.add(SectionPos.asLong(p.getX() >> 4, p.getY() >> 4, p.getZ() >> 4));
+            }
+        }
         h.setBlock(9, 3, 6, Blocks.OAK_PLANKS);
         h.setBlock(10, 3, 10, Blocks.OAK_LEAVES.defaultBlockState()
                 .setValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT, true));
         h.setBlock(11, 3, 8, Blocks.COBBLESTONE);
         TsunamiAfeti a = baslat(h, 2);
+        int butce = TsunamiAyarlari.al().yikimBolumTick.get();
         long[] kirildi = {-1, -1};
+        int[] enCokBolum = {0};
         h.onEachTick(() -> {
             long t = DunyaDonemi.al(l).saat();
             if (kirildi[0] < 0 && l.getBlockState(m(h, 9, 3, 8)).isAir()) {
@@ -195,18 +207,25 @@ public final class TsunamiOyunTestleri {
             if (kirildi[1] < 0 && l.getBlockState(m(h, 9, 3, 6)).isAir()) {
                 kirildi[1] = t;
             }
+            enCokBolum[0] = Math.max(enCokBolum[0], a.sonTickBolum());
         });
         h.startSequence()
                 .thenWaitUntil(() -> h.assertTrue(kirildi[0] >= 0 && kirildi[1] >= 0
-                        && l.getBlockState(m(h, 10, 3, 10)).isAir(), "cam/ahşap/yaprak henüz kırılmadı"))
+                        && l.getBlockState(m(h, 10, 3, 10)).isAir() && l.getBlockState(m(h, 9, 3, 3)).isAir()
+                        && l.getBlockState(m(h, 9, 3, 14)).isAir(), "cam/ahşap/yaprak henüz kırılmadı"))
                 .thenExecute(() -> {
                     h.assertTrue(kirildi[1] - kirildi[0] >= 5, "ahşap camdan sonra kırılmadı: " + kirildi[0] + ", "
                             + kirildi[1]);
+                    h.assertTrue(enCokBolum[0] >= 1 && enCokBolum[0] <= butce, "tick başına değişen bölüm " + enCokBolum[0]
+                            + " (bütçe " + butce + ")");
+                    h.assertTrue(a.toplamBolum() >= camBolumleri.size(), "cam şeridinin bölümleri " + camBolumleri.size()
+                            + ", değişen " + a.toplamBolum());
                     h.assertBlockPresent(Blocks.COBBLESTONE, 11, 3, 8);
                     h.assertBlockPresent(Blocks.DIRT, 9, 2, 8);
                     h.assertBlockPresent(Blocks.STONE, 9, 0, 8);
-                    DogalAfetler.LOGGER.info("Tsunami GameTest: yıkım cam t={} ahşap t={} kırılan={}", kirildi[0], kirildi[1],
-                            a.kirilan());
+                    DogalAfetler.LOGGER.info("Tsunami GameTest: yıkım cam t={} ahşap t={} kırılan={} cam bölümü={} değişen "
+                            + "bölüm={} tick başına en çok={}", kirildi[0], kirildi[1], a.kirilan(), camBolumleri.size(),
+                            a.toplamBolum(), enCokBolum[0]);
                     a.durdur(l, true);
                 })
                 .thenSucceed();

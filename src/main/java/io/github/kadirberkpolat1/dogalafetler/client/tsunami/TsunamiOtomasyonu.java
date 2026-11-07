@@ -97,6 +97,14 @@ public final class TsunamiOtomasyonu {
     private static long yeniBubble;
     private static long sudaTick;
     private static double sicramaBirim;
+    /** Karar 3 (tur 5): istemci tick'inin örneklemeli ayrıştırması, ölçüm penceresinden sonraki kendi penceresinde. */
+    private static final int ORNEK_MS = 2;
+    private static final int PROFIL_ILK = 8;
+    private static final String MOD_PAKETI = "io.github.kadirberkpolat1.dogalafetler.";
+    private static String profil;
+    private static int profilTick;
+    private static long profilBas;
+    private static Ornekleyici ornekleyici;
 
     private TsunamiOtomasyonu() {
     }
@@ -147,14 +155,15 @@ public final class TsunamiOtomasyonu {
      * sonra afetsiz "sonra" tabanı: yıkılan köy kameranın görüş hattını açar ve vanilla daha çok bölüm çizer (ölçüm 7'de
      * görünür bölüm 456 → 1343); bu taban afetin çalışma maliyetini dünyanın değişen geometrisinden ayırır. {@code ayar}
      * adımları (blok hasarı kapalı, yağmur kapalı) kök neden ayrıştırması içindir; afetten önce uygulanır, sonra geri alınır.
+     * Karada FPS penceresinden sonra 100 tick istemci tick'i örneklenir ({@code PROFIL} satırı, {@link Ornekleyici}).
      */
     private static List<String> olcum(String ad, EfektKalitesi kalite, List<String> ayar, List<String> geri) {
         List<String> a = new ArrayList<>(List.of("q:" + kalite.name(), "k:dogalafet su vitrin", "b:300", "k:time set 10500",
                 "k:dogalafet su vitrin kamera tepe", "b:200", "f:" + ad + "-afetsiz"));
         a.addAll(ayar);
         a.addAll(List.of("k:dogalafet start tsunami 5", "b:20", "k:dogalafet asama ileri", "b:20",
-                "k:dogalafet asama ileri", "b:620", "f:" + ad + "-karada", "s:" + ad + "-karada", "k:dogalafet stop", "b:200",
-                "f:" + ad + "-sonra", "k:dogalafet su temizle", "b:40"));
+                "k:dogalafet asama ileri", "b:620", "f:" + ad + "-karada", "s:" + ad + "-karada", "p:" + ad + "-karada",
+                "k:dogalafet stop", "b:200", "f:" + ad + "-sonra", "k:dogalafet su temizle", "b:40"));
         a.addAll(geri);
         return a;
     }
@@ -223,8 +232,8 @@ public final class TsunamiOtomasyonu {
             }
         }
         if (BOLUM.contains("kabul")) {
-            // Ts1 kabulü (şef kararı, tur 4): her S5 sahnesi Yüksek'te aynı sahnenin stop sonrası ("sonra") tabanına oranla
-            // ≥ %50 kare süresi; "önce" tabanı bilgi.
+            // Ts1 kabulü (TS-16 rev. 2): her S5 sahnesi Yüksek'te "sonra" tabanı < 10 ms ise karada ≥ 30 FPS, değilse "sonra"
+            // tabanına oranla ≥ %50 kare süresi; "önce"/"sonra" oranları bilgi.
             a.addAll(List.of("k:dogalafet su vitrin", "b:300", "k:dogalafet su vitrin kamera tepe", "b:600"));
             for (int i = 1; i <= 4; i++) {
                 a.addAll(olcum("tsunami-kabul-" + i, EfektKalitesi.YUKSEK, List.of(), List.of()));
@@ -300,6 +309,99 @@ public final class TsunamiOtomasyonu {
     private static String enCok(Map<String, Integer> say) {
         return say.entrySet().stream().sorted(Map.Entry.<String, Integer>comparingByValue().reversed()).limit(5)
                 .map(g -> g.getKey() + "=" + g.getValue()).collect(Collectors.joining(" "));
+    }
+
+    /**
+     * Render thread'inin yığınını {@value #ORNEK_MS} ms'de bir okur; yalnız {@code Minecraft.tick} içindeki örnekler
+     * sınıflandırılır: {@code cagri} {@code Minecraft.tick}'in doğrudan çağırdığı çerçeve, {@code varlik} {@code tickNonPassenger}
+     * / {@code tickPassenger} altındaki ilk üç çerçeve (varlık sınıfının tick yolu), {@code mod} tick içindeki en dış ve en iç
+     * mod çerçevesi (mixin işleyicileri dahil). Her örnek okuması bir safepoint ister; FPS penceresinde çalışmaz.
+     */
+    private static final class Ornekleyici extends Thread {
+        private final Thread hedef;
+        private volatile boolean dur;
+        private int ornek;
+        private int tickte;
+        private final Map<String, Integer> cagri = new HashMap<>();
+        private final Map<String, Integer> varlik = new HashMap<>();
+        private final Map<String, Integer> mod = new HashMap<>();
+
+        Ornekleyici(Thread hedef) {
+            super("tsunami-otomasyon-ornek");
+            this.hedef = hedef;
+            setDaemon(true);
+        }
+
+        @Override
+        public void run() {
+            while (!dur) {
+                try {
+                    Thread.sleep(ORNEK_MS);
+                } catch (InterruptedException e) {
+                    return;
+                }
+                StackTraceElement[] y = hedef.getStackTrace();
+                synchronized (this) {
+                    ornek++;
+                    siniflandir(y);
+                }
+            }
+        }
+
+        private void siniflandir(StackTraceElement[] y) {
+            int mc = -1;
+            for (int i = 0; i < y.length && mc < 0; i++) {
+                if ("tick".equals(y[i].getMethodName()) && "net.minecraft.client.Minecraft".equals(y[i].getClassName())) {
+                    mc = i;
+                }
+            }
+            if (mc < 0) {
+                return;
+            }
+            tickte++;
+            cagri.merge(mc == 0 ? "Minecraft.tick" : kisa(y[mc - 1]), 1, Integer::sum);
+            String dis = null;
+            String ic = null;
+            for (int i = mc - 1; i >= 0; i--) {
+                String m = y[i].getMethodName();
+                if (("tickNonPassenger".equals(m) || "tickPassenger".equals(m)) && y[i].getClassName().endsWith("ClientLevel")) {
+                    StringBuilder b = new StringBuilder();
+                    for (int j = i - 1; j >= Math.max(0, i - 3); j--) {
+                        b.append(b.length() == 0 ? "" : ">").append(kisa(y[j]));
+                    }
+                    varlik.merge(b.length() == 0 ? kisa(y[i]) : b.toString(), 1, Integer::sum);
+                    break;
+                }
+            }
+            for (int i = mc - 1; i >= 0; i--) {
+                if (y[i].getClassName().startsWith(MOD_PAKETI) || y[i].getMethodName().contains("dogalafetler")) {
+                    if (dis == null) {
+                        dis = kisa(y[i]);
+                    }
+                    ic = kisa(y[i]);
+                }
+            }
+            mod.merge(dis == null ? "yok" : dis.equals(ic) ? dis : dis + ">" + ic, 1, Integer::sum);
+        }
+
+        private static String kisa(StackTraceElement e) {
+            String s = e.getClassName();
+            return s.substring(s.lastIndexOf('.') + 1) + "." + e.getMethodName();
+        }
+
+        /** Anahtar başına tick başına ms: örnek payı × pencere duvar süresi / tick. */
+        synchronized String ozet(int tick, double pencereMs) {
+            double birim = ornek == 0 ? 0 : pencereMs / ornek / tick;
+            return String.format(Locale.ROOT, "ornek=%d tickte=%d pencere_ms=%.0f tick_ms=%.2f", ornek, tickte, pencereMs,
+                    tickte * birim) + " cagri=[" + ilk(cagri, birim) + "] varlik=[" + ilk(varlik, birim) + "] mod=["
+                    + ilk(mod, birim) + "]";
+        }
+
+        private static String ilk(Map<String, Integer> say, double birim) {
+            return say.entrySet().stream().sorted(Map.Entry.<String, Integer>comparingByValue().reversed()).limit(PROFIL_ILK)
+                    .map(g -> g.getKey() + "=" + String.format(Locale.ROOT, "%.2f", g.getValue() * birim))
+                    .collect(Collectors.joining(" "));
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -451,6 +553,17 @@ public final class TsunamiOtomasyonu {
             }
             return;
         }
+        if (profil != null) {
+            if (++profilTick >= 100) {
+                ornekleyici.dur = true;
+                ornekleyici.interrupt();
+                log("PROFIL {} {} varlik_tur=[{}]", profil, ornekleyici.ozet(profilTick, (System.nanoTime() - profilBas) / 1e6),
+                        varlikTurleri(mc));
+                profil = null;
+                ornekleyici = null;
+            }
+            return;
+        }
         if (--bekle > 0) {
             return;
         }
@@ -484,6 +597,13 @@ public final class TsunamiOtomasyonu {
                 log("KARE {} {} kopuk={}", deger, TsunamiYagmuru.ozet(), TsunamiKopugu.sonSegment());
                 Screenshot.grab(mc.gameDirectory, deger + ".png", mc.getMainRenderTarget(),
                         m -> log("FOTO {} {}", deger, m.getString()));
+            }
+            case 'p' -> {
+                profil = deger;
+                profilTick = 0;
+                profilBas = System.nanoTime();
+                ornekleyici = new Ornekleyici(Thread.currentThread());
+                ornekleyici.start();
             }
             case 'm' -> magara(mc, deger);
             case 'y' -> TsunamiYagmuru.kapali = "0".equals(deger);

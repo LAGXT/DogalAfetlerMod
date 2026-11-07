@@ -71,6 +71,8 @@ final class TsunamiYikimi {
     private long toplamKirilan;
     private long toplamTaranan;
     private long toplamBolum;
+    private int sonTickBolum;
+    private int enCokBolumTick;
     private int toplamDusen;
 
     long toplamKirilan() {
@@ -84,6 +86,15 @@ final class TsunamiYikimi {
     /** Tick başına değişen farklı chunk bölümü sayılarının toplamı (istemcide yeniden derlenen bölüm). */
     long toplamBolum() {
         return toplamBolum;
+    }
+
+    /** Son tick'te değişen farklı bölüm sayısı (TS-15b: en çok {@code bolumButcesi}). */
+    int sonTickBolum() {
+        return sonTickBolum;
+    }
+
+    int enCokBolumTick() {
+        return enCokBolumTick;
     }
 
     int bekleyen() {
@@ -194,6 +205,8 @@ final class TsunamiYikimi {
         degisenChunk.clear();
         toplamKirilan += kirilan;
         toplamBolum += bolumler.size();
+        sonTickBolum = bolumler.size();
+        enCokBolumTick = Math.max(enCokBolumTick, sonTickBolum);
         return kirilan;
     }
 
