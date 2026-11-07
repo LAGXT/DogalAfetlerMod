@@ -2,6 +2,8 @@ package io.github.kadirberkpolat1.dogalafetler.client.asit_yagmuru;
 
 import com.mojang.datafixers.util.Pair;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.client.core.GorselOtomasyon;
+import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciAfetDurumu;
 import io.github.kadirberkpolat1.dogalafetler.config.AyarKaydi;
 import io.github.kadirberkpolat1.dogalafetler.config.EfektKalitesi;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
@@ -18,7 +20,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.core.BlockPos;
@@ -43,24 +44,36 @@ import net.minecraftforge.fml.config.ModConfig;
 
 /**
  * Görsel kanıt otomasyonu (K0-21 rev. 2). Yalnız {@code -Ddogalafetler.otomasyon=asit_orman} ile tek oyunculu dünyada
- * çalışır; üretimde etkisizdir. Yaratıcı kipte uçan kamera en yakın ormanın tepesinde: asit yağmuru S1 aktif karesi, sonra S5
- * ile ön-uyarı (elde Hava Radarı, arayüz açık), siren, aktif, vitrin (yoğun yağış, aşınan yapraklar) ve bitiş kareleri; asit
- * kamerası iki seviyede aynı yerde durur. Ardından alacakaranlıkta orman yangını S1 ve S5 aynı dizide, kamera yangın merkezinin
- * 34 blok rüzgâr üstünde, 10 blok yukarıda; orman S5 vitrininden sonra efekt kalitesi Düşük, Yüksek ve Ultra'ya zorlanır
- * (istemci config değeri, koşu sonunda geri konur), afet durunca aynı kamerada afetsiz taban ölçülür.
- * Ön-uyarı penceresi {@code hiz 20} ile kısaltılır, radar karesinden önce hız 1'e döner. Her ölçüm satırı TPS'i, her kare
- * FPS'i, parçacık sayısını ve kamerayı yazar. Klavye, fare ve tekerlek girdileri kapanışa kadar sayılır; kare istenen tick'te
- * değil sonraki çizilmiş karenin sonunda alınır (gizli workspace ~1 FPS).
+ * çalışır; üretimde etkisizdir. Açılışta vsync kapanır, {@code maxFps} 260 olur (FPS tavana yapışmaz, AOi-3). Yaratıcı kipte
+ * uçan kamera en yakın ormanın tepesinde: asit yağmuru S1 aktif karesi, sonra S5 ile aynı kamerada afetsiz taban ölçümü,
+ * ön-uyarı (elde Hava Radarı, arayüz açık), aynı yerden ufka bakan (bulut tavanı kadrajda) ve aşağı bakan siren kareleri,
+ * aktif, vitrin (yoğun yağış, aşınan yapraklar), S5 ölçümü, yere yakın kare (göz aşınan bloğun {@value #YAKIN_GOZ} blok
+ * üstünde, ona {@value #YAKIN_UZAKLIK} blok uzakta: sıçrama, cızlama dumanı ve çatlak örtüsü; AOi-1) ve bitiş kareleri.
+ * Ardından alacakaranlıkta orman yangını S1 ve S5 aynı dizide, kamera yangın merkezinin 34 blok rüzgâr üstünde, 10 blok
+ * yukarıda; S5'te yangın başlamadan aynı kamerada taban ölçülür, vitrinden sonra efekt kalitesi Düşük, Yüksek ve Ultra'ya
+ * zorlanıp her biri ölçülür (istemci config değeri, koşu sonunda geri konur), afet durunca yanmış sahne bilgi olarak
+ * ölçülür. Ölçümler K-E29 (b) {@code OLCUM} satırıdır ({@link GorselOtomasyon#olcumBasla}; FPS kapısından sonra
+ * {@value #OLCUM_TICK} tick); ek satır TPS'i ve yanan hücreyi yazar. Kareler A-34 kapısından geçer
+ * ({@link GorselOtomasyon#kareIste}, istekten sonra en az 20 yeni kare); kare beklenirken adım motoru durur. Ön-uyarı
+ * penceresi {@code hiz 20} ile kısaltılır, radar karesinden önce hız 1'e döner. Kare satırı FPS'i, parçacık sayısını ve
+ * kamerayı yazar. Klavye, fare ve tekerlek girdileri kapanışa kadar sayılır.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class AsitOrmanOtomasyonu {
     private static final boolean AKTIF = "asit_orman".equals(System.getProperty("dogalafetler.otomasyon", ""));
     private static final String ON = "ASIT_ORMAN_OTOMASYON ";
     private static final double KAMERA_UZAKLIGI = 34;
+    private static final double YAKIN_GOZ = 4;
+    private static final double YAKIN_UZAKLIK = 8;
+    private static final float UFUK_PITCH = -12F;
+    private static final int OLCUM_TICK = 100;
 
     /** Bir adım her tick çağrılır ({@code t} adımın kaçıncı tick'i); {@code true} dönünce sıradakine geçilir. */
     private interface Adim {
         boolean calis(Minecraft mc, IntegratedServer s, int t);
+    }
+
+    private record Kamera(double x, double y, double z, float yaw, float pitch) {
     }
 
     private static final List<Adim> ADIMLAR = new ArrayList<>();
@@ -69,26 +82,21 @@ public final class AsitOrmanOtomasyonu {
     private static int teker;
     private static int adim;
     private static int sayac;
-    private static String istenenKare;
     private static volatile boolean hazir;
     private static volatile boolean onUyari;
     private static EfektKalitesi ilkKalite;
-    private static long cizimBasi;
-    private static long cizimNs;
-    private static int cizimSayisi;
-    private static long toplamCizim;
-    private static long kapiCizim;
-    private static long kapiBasi;
+    /** Asit kamerası (sunucu thread'inde yazılıp okunur). */
+    private static Kamera asitKamerasi;
 
     static {
         ADIMLAR.add(bekle(100));
+        ADIMLAR.add(AsitOrmanOtomasyonu::cizimAyari);
         ADIMLAR.add(sunucu(AsitOrmanOtomasyonu::hazirla));
         ADIMLAR.add(bekle(240));
         ADIMLAR.add(arayuz(false));
-        dizi(AfetTuru.ASIT_YAGMURU, "asit", 300, 300, 400, 60, false, s -> {
-        });
+        dizi(AfetTuru.ASIT_YAGMURU, "asit", 300, 300, 400, 60, AsitOrmanOtomasyonu::asitKamera);
         ADIMLAR.add(sunucu(s -> komut(s, "time set 13000")));
-        dizi(AfetTuru.ORMAN_YANGINI, "orman", 400, 120, 400, 500, true, AsitOrmanOtomasyonu::ormanKamera);
+        dizi(AfetTuru.ORMAN_YANGINI, "orman", 400, 120, 400, 500, AsitOrmanOtomasyonu::ormanKamera);
         ADIMLAR.add(kalite(null));
     }
 
@@ -96,11 +104,14 @@ public final class AsitOrmanOtomasyonu {
     }
 
     /**
-     * S1 aktif karesi, sonra S5'in ön-uyarı, siren, aktif, vitrin ve bitiş kareleri; {@code kademeler} ise vitrinden sonra
-     * Düşük/Yüksek/Ultra kareleri ve durduktan sonra afetsiz taban.
+     * S1 aktif karesi; sonra S5: aynı kamerada afetsiz taban (ön-uyarıda, yağış ya da yangın yokken), ön-uyarı, siren, aktif,
+     * vitrin, S5 ölçümü ve bitiş. Asitte ufka bakan siren karesi, config kademesinde ölçüm ve yere yakın kare; ormanda
+     * Düşük/Yüksek/Ultra ölçümleri ve durduktan sonra yanmış sahnede bilgi ölçümü.
      */
-    private static void dizi(AfetTuru tur, String ad, int s1, int aktif, int vitrin, int bitis, boolean kademeler,
+    private static void dizi(AfetTuru tur, String ad, int s1, int aktif, int vitrin, int bitis,
             Consumer<IntegratedServer> kamera) {
+        boolean asit = tur == AfetTuru.ASIT_YAGMURU;
+        String taban = "s5_" + ad + "_taban";
         ADIMLAR.add(sunucu(s -> baslat(s, tur, 1)));
         ADIMLAR.add(sunucu(kamera));
         ADIMLAR.add(sunucu(s -> ileri(s, AfetAsamasi.SIREN)));
@@ -111,6 +122,9 @@ public final class AsitOrmanOtomasyonu {
         ADIMLAR.add(sunucu(AsitOrmanOtomasyonu::dur));
         ADIMLAR.add(sunucu(s -> baslat(s, tur, 5)));
         ADIMLAR.add(sunucu(kamera));
+        olc(taban, null, null);
+        ADIMLAR.add(sunucu(s -> olcum(s, ad + "_taban")));
+        ADIMLAR.add(kare(ad + "_taban"));
         ADIMLAR.add(sunucu(s -> AfetYoneticisi.al(s).hizAyarla(20)));
         ADIMLAR.add(onUyariBekle());
         ADIMLAR.add(sunucu(s -> AfetYoneticisi.al(s).hizAyarla(1)));
@@ -119,7 +133,15 @@ public final class AsitOrmanOtomasyonu {
         ADIMLAR.add(kare(ad + "_on_uyari_radar"));
         ADIMLAR.add(arayuz(false));
         ADIMLAR.add(sunucu(s -> ileri(s, AfetAsamasi.SIREN)));
-        ADIMLAR.add(bekle(120));
+        if (asit) {
+            ADIMLAR.add(sunucu(AsitOrmanOtomasyonu::ufukKamera));
+            ADIMLAR.add(bekle(100));
+            ADIMLAR.add(kare(ad + "_siren_ufuk"));
+            ADIMLAR.add(sunucu(kamera));
+            ADIMLAR.add(bekle(20));
+        } else {
+            ADIMLAR.add(bekle(120));
+        }
         ADIMLAR.add(kare(ad + "_siren"));
         ADIMLAR.add(sunucu(s -> ileri(s, AfetAsamasi.AKTIF)));
         ADIMLAR.add(bekle(aktif));
@@ -127,11 +149,21 @@ public final class AsitOrmanOtomasyonu {
         ADIMLAR.add(bekle(vitrin));
         ADIMLAR.add(sunucu(s -> olcum(s, ad + "_vitrin")));
         ADIMLAR.add(kare(ad + "_vitrin"));
-        if (kademeler) {
+        if (asit) {
+            olc("s5_" + ad + "_yuksek", null, taban);
+            ADIMLAR.add(sunucu(s -> olcum(s, ad + "_s5_yuksek")));
+            ADIMLAR.add(yakinKamera());
+            ADIMLAR.add(bekle(60));
+            ADIMLAR.add(kare(ad + "_s5_yakin"));
+            ADIMLAR.add(sunucu(kamera));
+            ADIMLAR.add(bekle(20));
+        } else {
             for (EfektKalitesi k : new EfektKalitesi[] {EfektKalitesi.DUSUK, EfektKalitesi.YUKSEK, EfektKalitesi.ULTRA}) {
-                String e = ad + "_s5_" + k.name().toLowerCase(Locale.ROOT);
+                String kademe = k.name().toLowerCase(Locale.ROOT);
+                String e = ad + "_s5_" + kademe;
                 ADIMLAR.add(kalite(k));
-                ADIMLAR.add(bekle(200));
+                ADIMLAR.add(bekle(100));
+                olc("s5_" + ad + "_" + kademe, k, taban);
                 ADIMLAR.add(sunucu(s -> olcum(s, e)));
                 ADIMLAR.add(kare(e));
             }
@@ -142,10 +174,10 @@ public final class AsitOrmanOtomasyonu {
         ADIMLAR.add(sunucu(s -> olcum(s, ad + "_bitis")));
         ADIMLAR.add(kare(ad + "_bitis"));
         ADIMLAR.add(sunucu(AsitOrmanOtomasyonu::dur));
-        if (kademeler) {
-            ADIMLAR.add(bekle(200));
-            ADIMLAR.add(sunucu(s -> olcum(s, ad + "_taban")));
-            ADIMLAR.add(kare(ad + "_taban"));
+        if (!asit) {
+            ADIMLAR.add(bekle(100));
+            olc("s5_" + ad + "_sonra", null, null);
+            ADIMLAR.add(sunucu(s -> olcum(s, ad + "_sonra")));
         }
     }
 
@@ -158,6 +190,30 @@ public final class AsitOrmanOtomasyonu {
             mc.options.hideGui = !acik;
             return true;
         };
+    }
+
+    /** AOi-3: ortak çizim ayarı (vsync kapalı, {@code maxFps} 260); taban FPS tavana yapışmaz. */
+    private static boolean cizimAyari(Minecraft mc, IntegratedServer s, int t) {
+        GorselOtomasyon.cizimAyari();
+        return true;
+    }
+
+    /**
+     * K-E29 (b) ölçüm penceresi: FPS kapısı (ışınlamadan sonra en az 40 tick ve FPS ≥ {@value GorselOtomasyon#AKICI_FPS};
+     * {@value GorselOtomasyon#KAPI_SN} sn'de sağlanmazsa WARN ile devam), {@value #OLCUM_TICK} tick, {@code OLCUM} satırı.
+     * {@code kademe} {@code null} ise istemci ayarı; {@code taban} aynı kameranın afetsiz sahnesi ya da {@code null}.
+     */
+    private static void olc(String sahne, EfektKalitesi kademe, String taban) {
+        ADIMLAR.add((mc, s, t) -> t >= 40 && GorselOtomasyon.eylemKapisi("asit_orman", sahne + " ölçümü"));
+        ADIMLAR.add((mc, s, t) -> {
+            GorselOtomasyon.olcumBasla("asit_orman", sahne, kademe, taban);
+            return true;
+        });
+        ADIMLAR.add(bekle(OLCUM_TICK));
+        ADIMLAR.add((mc, s, t) -> {
+            GorselOtomasyon.olcumBitir();
+            return true;
+        });
     }
 
     /** Efekt kalitesini istemci config değeriyle zorlar ({@code null}: koşu başındaki değer); eski parçacıklar silinir. */
@@ -213,29 +269,44 @@ public final class AsitOrmanOtomasyonu {
         };
     }
 
-    /**
-     * Kareyi A-34 kapısından sonra ister: istekten sonra en az 20 kare çizilmiş ve FPS ≥ 15 olmalı, en çok 60 sn beklenir
-     * (gizli workspace'te tek kare bayat kalabilir). Kare sonraki çizilmiş karenin sonunda alınır; çizim ms/kare kapı
-     * penceresinin ortalamasıdır.
-     */
+    /** A-34 kare isteği (istekten sonra en az 20 yeni kare); satır kare alındığı andaki durumu yazar. */
     private static Adim kare(String ad) {
         return (mc, s, t) -> {
-            if (t == 1) {
-                kapiCizim = toplamCizim;
-                kapiBasi = System.nanoTime();
-                cizimNs = 0;
-                cizimSayisi = 0;
-                return false;
-            }
-            long cizilen = toplamCizim - kapiCizim;
-            boolean acik = cizilen >= 20 && mc.getFps() >= 15;
-            if (!acik && System.nanoTime() - kapiBasi < 60_000_000_000L) {
-                return false;
-            }
-            DogalAfetler.LOGGER.info(ON + "kare kapısı {}: {} ({} kare çizildi, FPS {})", ad,
-                    acik ? "kapı açık" : "60 sn doldu, UYARI", cizilen, mc.getFps());
-            istenenKare = ad;
+            GorselOtomasyon.kareIste("asit_orman", "ao_" + ad + ".png", 20, k -> DogalAfetler.LOGGER.info(ON
+                    + "kare {} (adım {}, FPS {}, yeni kare {}, parçacık {}, asit yoğunluğu {}, kalite {}, kamera {})",
+                    k.dosya(), adim, k.fps(), k.yeniKare(), mc.particleEngine.countParticles(),
+                    String.format(Locale.ROOT, "%.2f", IstemciAsitYagmuru.yogunluk()), IstemciAyarlari.efektKalitesi(),
+                    String.format(Locale.ROOT, "%.1f %.1f %.1f yaw %.0f pitch %.0f", mc.player.getX(), mc.player.getY(),
+                            mc.player.getZ(), mc.player.getYRot(), mc.player.getXRot())));
             return true;
+        };
+    }
+
+    /** Yere yakın asit kamerası; hedef istemcinin bildiği aşınan bloklardan oyuncuya en yakını (ışınlama sunucuda). */
+    private static Adim yakinKamera() {
+        return (mc, s, t) -> {
+            if (t == 1) {
+                long[] asinan = IstemciAfetDurumu.aktif().filter(p -> p.tur() == AfetTuru.ASIT_YAGMURU)
+                        .map(p -> p.ozel().getLongArray("a")).orElse(new long[0]);
+                BlockPos enYakin = null;
+                double uzaklik = Double.MAX_VALUE;
+                for (long a : asinan) {
+                    BlockPos b = BlockPos.of(a);
+                    double d = mc.player.distanceToSqr(b.getX() + 0.5, b.getY() + 1, b.getZ() + 0.5);
+                    if (d < uzaklik) {
+                        uzaklik = d;
+                        enYakin = b;
+                    }
+                }
+                BlockPos hedef = enYakin;
+                hazir = false;
+                s.execute(() -> {
+                    yakinKameraKur(s, hedef, asinan.length);
+                    hazir = true;
+                });
+                return false;
+            }
+            return hazir;
         };
     }
 
@@ -274,7 +345,7 @@ public final class AsitOrmanOtomasyonu {
             mc.setScreen(null);
         }
         IntegratedServer s = mc.getSingleplayerServer();
-        if (mc.player == null || mc.level == null || s == null || istenenKare != null) {
+        if (mc.player == null || mc.level == null || s == null || GorselOtomasyon.kareBekliyor()) {
             return;
         }
         if (adim < ADIMLAR.size()) {
@@ -284,41 +355,10 @@ public final class AsitOrmanOtomasyonu {
             }
         } else if (adim == ADIMLAR.size()) {
             adim++;
+            GorselOtomasyon.kareOzetiYaz("asit_orman");
             DogalAfetler.LOGGER.info(ON + "kapanıyor; girdi sayıları: tuş={} fare={} tekerlek={}", tus, fare, teker);
             mc.stop();
         }
-    }
-
-    @SubscribeEvent
-    public static void cizimSonu(TickEvent.RenderTickEvent olay) {
-        if (!AKTIF) {
-            return;
-        }
-        if (olay.phase == TickEvent.Phase.START) {
-            cizimBasi = System.nanoTime();
-            return;
-        }
-        if (cizimBasi != 0) {
-            cizimNs += System.nanoTime() - cizimBasi;
-            cizimSayisi++;
-            toplamCizim++;
-        }
-        if (istenenKare == null) {
-            return;
-        }
-        Minecraft mc = Minecraft.getInstance();
-        String dosya = "ao_" + istenenKare + ".png";
-        istenenKare = null;
-        Screenshot.grab(mc.gameDirectory, dosya, mc.getMainRenderTarget(), mesaj -> {
-        });
-        double cizimMs = cizimSayisi == 0 ? 0 : cizimNs / 1e6 / cizimSayisi;
-        DogalAfetler.LOGGER.info(ON + "kare {} (adım {}, FPS {}, çizim {} ms/kare ({} kare), parçacık {}, asit yoğunluğu {}, "
-                + "kalite {}, kamera {})", dosya, adim, mc.getFps(), String.format(Locale.ROOT, "%.2f", cizimMs), cizimSayisi,
-                mc.particleEngine.countParticles(), String.format(Locale.ROOT, "%.2f", IstemciAsitYagmuru.yogunluk()),
-                IstemciAyarlari.efektKalitesi(), String.format(Locale.ROOT, "%.1f %.1f %.1f yaw %.0f pitch %.0f",
-                        mc.player.getX(), mc.player.getY(), mc.player.getZ(), mc.player.getYRot(), mc.player.getXRot()));
-        cizimNs = 0;
-        cizimSayisi = 0;
     }
 
     // ---------------------------------------------------------------- sunucu thread'i
@@ -347,9 +387,64 @@ public final class AsitOrmanOtomasyonu {
         o.onUpdateAbilities();
         o.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(EsyaKayitlari.HAVA_RADARI.get()));
         int ust = level.getHeight(Heightmap.Types.MOTION_BLOCKING, m.getX(), m.getZ());
-        o.teleportTo(level, m.getX() + 0.5, ust + 4, m.getZ() + 0.5, -90F, 28F);
+        asitKamerasi = new Kamera(m.getX() + 0.5, ust + 4, m.getZ() + 0.5, -90F, 28F);
+        asitKamera(s);
         DogalAfetler.LOGGER.info(ON + "orman {} ({}), kamera y={}", m.toShortString(), bulunan == null ? "bulunamadı"
                 : bulunan.getSecond().unwrapKey().map(k -> k.location().toString()).orElse("?"), ust + 4);
+    }
+
+    private static void asitKamera(IntegratedServer s) {
+        Kamera k = asitKamerasi;
+        oyuncu(s).teleportTo(s.overworld(), k.x(), k.y(), k.z(), k.yaw(), k.pitch());
+    }
+
+    /** AOi-1: asit kamerasının yerinden ufka bakış; siren bulut tavanı kadrajda. */
+    private static void ufukKamera(IntegratedServer s) {
+        Kamera k = asitKamerasi;
+        oyuncu(s).teleportTo(s.overworld(), k.x(), k.y(), k.z(), k.yaw(), UFUK_PITCH);
+        DogalAfetler.LOGGER.info(ON + String.format(Locale.ROOT, "ufuk kamerası %.0f %.0f %.0f yaw %.0f pitch %.0f", k.x(),
+                k.y(), k.z(), k.yaw(), UFUK_PITCH));
+    }
+
+    /**
+     * AOi-1: göz aşınan bloğun üst yüzünden {@value #YAKIN_GOZ} blok yukarıda, ona yatayda {@value #YAKIN_UZAKLIK} blok
+     * uzakta, ona hafif aşağı bakan kamera (istemcinin sıçrama ve cızlama yolu yüzey ile göz arasında en çok 24 blok ister).
+     * Sekiz yönden zemini en alçak olanı seçilir; göz o zeminin 2 blok üstünden aşağı inmez. Aşınan blok yoksa kameranın
+     * baktığı yönde 12 blok ötedeki yüzey hedeflenir.
+     */
+    private static void yakinKameraKur(IntegratedServer s, BlockPos asinan, int asinanSayisi) {
+        ServerLevel level = s.overworld();
+        ServerPlayer o = oyuncu(s);
+        BlockPos hedef = asinan;
+        if (hedef == null) {
+            double bakis = Math.toRadians(o.getYRot());
+            int hx = Mth.floor(o.getX() - Math.sin(bakis) * 12);
+            int hz = Mth.floor(o.getZ() + Math.cos(bakis) * 12);
+            hedef = new BlockPos(hx, level.getHeight(Heightmap.Types.MOTION_BLOCKING, hx, hz) - 1, hz);
+        }
+        double tx = hedef.getX() + 0.5;
+        double ty = hedef.getY() + 1;
+        double tz = hedef.getZ() + 0.5;
+        double x = tx;
+        double z = tz;
+        int zemin = Integer.MAX_VALUE;
+        for (int i = 0; i < 8; i++) {
+            double cx = tx + Math.cos(i * Math.PI / 4) * YAKIN_UZAKLIK;
+            double cz = tz + Math.sin(i * Math.PI / 4) * YAKIN_UZAKLIK;
+            int h = level.getHeight(Heightmap.Types.MOTION_BLOCKING, Mth.floor(cx), Mth.floor(cz));
+            if (h < zemin) {
+                zemin = h;
+                x = cx;
+                z = cz;
+            }
+        }
+        double goz = Math.max(ty + YAKIN_GOZ, zemin + 2);
+        float yaw = (float) Math.toDegrees(Math.atan2(-(tx - x), tz - z));
+        float pitch = (float) Math.toDegrees(Math.atan2(goz - ty, YAKIN_UZAKLIK));
+        o.teleportTo(level, x, goz - o.getEyeHeight(), z, yaw, pitch);
+        DogalAfetler.LOGGER.info(ON + String.format(Locale.ROOT, "yakın kamera %.1f %.1f %.1f yaw %.0f pitch %.0f; hedef %s (%s), "
+                + "göz aşınan yüzeyden %.1f blok, zemin %d", x, goz, z, yaw, pitch, hedef.toShortString(), asinan == null
+                ? "aşınan blok yok, bakış yönü" : asinanSayisi + " aşınan bloktan en yakını", goz - ty, zemin));
     }
 
     private static void baslat(IntegratedServer s, AfetTuru tur, int seviye) {

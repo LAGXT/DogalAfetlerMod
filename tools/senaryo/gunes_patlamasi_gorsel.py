@@ -40,8 +40,8 @@ KANIT = KOK / ".vibe/kanit/gunes-patlamasi-kizil-cuce/gorsel"
 KARELER = KANIT / "kareler"
 JAVA_HOME = "/home/lagxt/.jdks/jdk-17.0.21+9"
 ISARET = "GUNES_OTOMASYON"
-BEKLENEN = ["on_uyari", "siren_aurora", "siren_gunes", "aktif_gun1", "meteor_yagmuru", "meteor_krater_ates",
-            "aktif_gun4_kavrulma", "supernova_cokme", "supernova_parlama", "supernova_kabuk", "gunessiz",
+BEKLENEN = ["on_uyari", "siren_aurora", "siren_gunes", "aktif_gun1", "kavrulma_gun1", "meteor_yagmuru", "meteor_krater_ates",
+            "kavrulma_gun4", "supernova_cokme", "supernova_parlama", "supernova_kabuk", "gunessiz",
             "kizil_cuce_dogus", "kizil_cuce_gunduz"]
 KARE_SATIRI = re.compile(rf"{ISARET} kare gunes_(\w+)\.png \(FPS (\d+), TPS ([\d.?]+), mspt ([\d.?]+), evre (\w+), "
                          r"ilerleme ([\d.]+), evre sn ([\d.]+), uçan meteor (\d+), parçacık (\d+), kuruluk basamağı (\d+)")

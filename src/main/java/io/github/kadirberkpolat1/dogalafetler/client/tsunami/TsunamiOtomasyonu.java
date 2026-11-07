@@ -2,6 +2,7 @@ package io.github.kadirberkpolat1.dogalafetler.client.tsunami;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.afet.tsunami.TsunamiAfeti;
+import io.github.kadirberkpolat1.dogalafetler.client.core.GorselOtomasyon;
 import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciAfetDurumu;
 import io.github.kadirberkpolat1.dogalafetler.client.su.SuRenderer;
 import io.github.kadirberkpolat1.dogalafetler.config.EfektKalitesi;
@@ -16,7 +17,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -26,7 +26,6 @@ import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.particle.BubbleParticle;
 import net.minecraft.client.particle.Particle;
@@ -51,10 +50,12 @@ import net.minecraftforge.fml.config.ModConfig;
 
 /**
  * Tsunami görsel kanıt otomasyonu (K0-21 rev. 2): yalnız {@code -Potomasyon=tsunami}. Sanal suyun vitrin sahnesinde (kıyı köyü,
- * iskele; {@code /dogalafet su vitrin}) gerçek tsunamiyi komutla başlatır: S5 ve S1 için ön-uyarı, siren, çekilme, ufuktaki
- * dalga, vitrin anı (kıyıya vurmadan önceki son saniyeler), çarpma, karada, durdurma sonrası kareleri; dalga sırasında
- * ortanca kare süresi ve sunucu mspt; mağara suyu ve mağara-sualtı (SU-40 yeniden puanlama). Kurulumdan kapanışa kadar
- * bütün tuş, fare ve tekerlek olayları log'a yazılır (sıfırdan farklıysa koşu geçersiz).
+ * iskele; {@code /dogalafet su vitrin}) gerçek tsunamiyi komutla başlatır: S5 ve S1 için ön-uyarı (radar elde, arayüz açık),
+ * siren, çekilme, ufuktaki dalga, vitrin anı (kıyıya vurmadan önceki son saniyeler), çarpma, karada, durdurma sonrası
+ * kareleri; dalga sırasında ortanca kare süresi ve sunucu mspt; mağara suyu ve mağara-sualtı (SU-40 yeniden puanlama).
+ * Kareler ve ölçümler {@link GorselOtomasyon} ile: kare A-34 kapısından geçince alınır, beklerken adımlar durur; her
+ * {@code f:} penceresi bir {@code OLCUM} satırı yazar. Kurulumdan kapanışa kadar bütün tuş, fare ve tekerlek olayları log'a
+ * yazılır (sıfırdan farklıysa koşu geçersiz).
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class TsunamiOtomasyonu {
@@ -62,17 +63,15 @@ public final class TsunamiOtomasyonu {
     private static final String BOLUM = System.getProperty("dogalafetler.otomasyon.bolum", "hepsi");
     private static final int KAPANIS_SN = 30;
     private static final Deque<String> ADIMLAR = new ArrayDeque<>();
-    private static final List<Long> KARELER = new ArrayList<>();
-    /** Render thread'inin kare başına CPU süresi: makinedeki başka süreçlerin yükünden (kardeş işçiler) duvar saatinden az etkilenir. */
-    private static final List<Long> KARE_CPU = new ArrayList<>();
     private static final java.lang.management.ThreadMXBean IPLIK = java.lang.management.ManagementFactory.getThreadMXBean();
-    private static long sonCpu;
     private static int tus;
     private static int fare;
     private static int teker;
     private static boolean girdi;
     private static long bekle = 200;
     private static long sonKare;
+    /** Ölçüm penceresinin en uzun kare süresi (duvar saati, ns). */
+    private static long enUzunKare;
     private static String olcum;
     private static int olcumTick;
     private static int ox;
@@ -141,23 +140,45 @@ public final class TsunamiOtomasyonu {
         }
     }
 
-    /** Bir tsunami koşusu: vitrin yeniden kurulur, kamera evlerin arasından denize bakar, afet AKTIF'e ilerletilir. */
+    /**
+     * Bir tsunami koşusu: vitrin yeniden kurulur, kamera evlerin arasından denize bakar ({@code vitrin kamera tepe}), afet
+     * AKTIF'e ilerletilir. Ts7: çekilme (S5'te ufuk da) kıyının arkasından yüksekten denize bakan kameradan, S1'in ufuk ve
+     * vitrin kareleri alçak kameradan ({@link #kamera}); ölçümler ve sonraki kareler afetsiz tabanla aynı tepe kamerasından.
+     */
     private static List<String> tsunami(int seviye, String on) {
         // AKTIF'in ilk anından: çekilme 8 sn, ufuktaki dalga 13 sn, ölçüm 13-18 sn, vitrin anı 24 sn (kıyıya ~28 sn),
-        // çarpma 31 sn, karada 36-41 sn.
-        return List.of("k:dogalafet su vitrin", "b:300", "k:time set 10500", "k:dogalafet su vitrin kamera tepe", "b:200",
-                "f:" + on + "-afetsiz", "s:" + on + "-once", "k:dogalafet start tsunami " + seviye, "b:60",
-                "s:" + on + "-onuyari", "k:dogalafet asama ileri", "b:60", "s:" + on + "-siren", "k:dogalafet asama ileri",
-                "b:160", "s:" + on + "-cekilme", "b:100", "s:" + on + "-ufuk", "f:" + on + "-yaklasma", "b:120",
-                "s:" + on + "-vitrin", "b:140", "s:" + on + "-carpma", "b:100", "s:" + on + "-karada",
-                "f:" + on + "-karada", "k:dogalafet stop", "b:100", "s:" + on + "-sonra", "k:dogalafet su temizle", "b:40");
+        // çarpma 31 sn, karada 36-41 sn. Komut geri bildirimi ön-uyarı karesinin sohbetine düşmesin diye o kareye dek kapalı.
+        List<String> a = new ArrayList<>(List.of("k:dogalafet su vitrin", "b:300", "k:time set 10500",
+                "k:dogalafet su vitrin kamera tepe", "b:200", "f:" + on + "-afetsiz", "s:" + on + "-once",
+                "k:gamerule sendCommandFeedback false", "k:dogalafet start tsunami " + seviye, "b:50", "k:gamemode creative",
+                "k:item replace entity @s weapon.mainhand with dogalafetler:gelismis_hava_radari", "b:8", "g:1",
+                "s:" + on + "-onuyari", "g:0", "k:item replace entity @s weapon.mainhand with air", "v:tepe",
+                "k:gamerule sendCommandFeedback true", "k:dogalafet asama ileri", "b:60", "s:" + on + "-siren",
+                "k:dogalafet asama ileri", "b:150", "v:deniz", "b:10", "s:" + on + "-cekilme"));
+        if (seviye == 1) {
+            a.addAll(List.of("b:90", "v:alcak", "b:10", "s:" + on + "-ufuk", "v:tepe", "b:9",
+                    olc(on + "-yaklasma", on + "-afetsiz"), "b:100", "v:alcak", "b:10", "s:" + on + "-vitrin", "v:tepe",
+                    "b:139"));
+        } else {
+            a.addAll(List.of("b:100", "s:" + on + "-ufuk", "v:tepe", "b:9", olc(on + "-yaklasma", on + "-afetsiz"), "b:110",
+                    "s:" + on + "-vitrin", "b:140"));
+        }
+        a.addAll(List.of("s:" + on + "-carpma", "b:100", "s:" + on + "-karada", olc(on + "-karada", on + "-afetsiz"),
+                "k:dogalafet stop", "b:100", "s:" + on + "-sonra", "k:dogalafet su temizle", "b:40"));
+        return a;
+    }
+
+    /** Tabanlı {@code f:} adımı: {@code taban} aynı kameranın afetsiz ölçümü ({@code OLCUM ... taban=}, K-E29 (b)). */
+    private static String olc(String ad, String taban) {
+        return "f:" + ad + " " + taban;
     }
 
     /**
      * FPS kabulü (TS-12, K0-33 ölçüsü): aynı vitrin kamerasından, verilen efekt kalitesiyle önce afetsiz taban, sonra S5'in
      * karadaki penceresi (AKTİF'in 620. tick'i, normal koşudaki "karada" penceresiyle aynı), sonra {@code stop}'tan 200 tick
      * sonra afetsiz "sonra" tabanı: yıkılan köy kameranın görüş hattını açar ve vanilla daha çok bölüm çizer (ölçüm 7'de
-     * görünür bölüm 456 → 1343); bu taban afetin çalışma maliyetini dünyanın değişen geometrisinden ayırır. {@code ayar}
+     * görünür bölüm 456 → 1343); bu taban afetin çalışma maliyetini dünyanın değişen geometrisinden ayırır ve karada
+     * ölçümünün {@code OLCUM} tabanıdır (TS-16 rev. 3). {@code ayar}
      * adımları (blok hasarı kapalı, yağmur kapalı) kök neden ayrıştırması içindir; afetten önce uygulanır, sonra geri alınır.
      * Karada FPS penceresinden sonra 100 tick istemci tick'i örneklenir ({@code PROFIL} satırı, {@link Ornekleyici}).
      */
@@ -166,7 +187,7 @@ public final class TsunamiOtomasyonu {
                 "k:dogalafet su vitrin kamera tepe", "b:200", "f:" + ad + "-afetsiz"));
         a.addAll(ayar);
         a.addAll(List.of("k:dogalafet start tsunami 5", "b:20", "k:dogalafet asama ileri", "b:20",
-                "k:dogalafet asama ileri", "b:620", "f:" + ad + "-karada", "s:" + ad + "-karada", "p:" + ad + "-karada",
+                "k:dogalafet asama ileri", "b:620", olc(ad + "-karada", ad + "-sonra"), "s:" + ad + "-karada", "p:" + ad + "-karada",
                 "k:dogalafet stop", "b:200", "f:" + ad + "-sonra", "k:dogalafet su temizle", "b:40"));
         a.addAll(geri);
         return a;
@@ -195,8 +216,7 @@ public final class TsunamiOtomasyonu {
         girdi = true;
         Minecraft mc = Minecraft.getInstance();
         mc.options.renderDistance().set(12);
-        mc.options.enableVsync().set(false);
-        mc.options.framerateLimit().set(260);
+        GorselOtomasyon.cizimAyari();
         mc.options.hideGui = true;
         boolean hepsi = "hepsi".equals(BOLUM);
         List<String> a = new ArrayList<>(List.of("k:gamerule doDaylightCycle false", "k:weather clear 100000",
@@ -272,14 +292,12 @@ public final class TsunamiOtomasyonu {
         if (e.phase == TickEvent.Phase.START) {
             long simdi = System.nanoTime();
             if (sonKare != 0) {
-                KARELER.add(simdi - sonKare);
-                KARE_CPU.add(cpu - sonCpu);
+                enUzunKare = Math.max(enUzunKare, simdi - sonKare);
                 ekle("istemci_tick", tickAcik);
                 ekle("takas_diger", cpu - kareSonu - tickAcik);
             }
             tickAcik = 0;
             sonKare = simdi;
-            sonCpu = cpu;
             asamaSon = cpu;
         } else if (sonKare != 0) {
             ekle("seviye_sonrasi", cpu - asamaSon);
@@ -521,26 +539,6 @@ public final class TsunamiOtomasyonu {
         return "suda=" + suda + " " + enCok(say);
     }
 
-    /**
-     * Ölçüm geçerliliği (şef kararı, tur 4): komut satırında {@code GradleWrapperMain} geçen süreçler; {@code yabanci} bu
-     * istemciyi başlatan kendi {@code runClient} sarmalayıcısı (ata süreç) dışındakiler.
-     */
-    private static String gradle() {
-        Set<Long> ata = new HashSet<>();
-        for (ProcessHandle p = ProcessHandle.current().parent().orElse(null); p != null; p = p.parent().orElse(null)) {
-            ata.add(p.pid());
-        }
-        long[] n = new long[2];
-        ProcessHandle.allProcesses().filter(h -> h.info().commandLine().orElse("").contains("GradleWrapperMain"))
-                .forEach(h -> {
-                    n[0]++;
-                    if (!ata.contains(h.pid())) {
-                        n[1]++;
-                    }
-                });
-        return "toplam=" + n[0] + " yabanci=" + n[1];
-    }
-
     private static String yuk() {
         try {
             return java.nio.file.Files.readString(java.nio.file.Path.of("/proc/loadavg")).trim();
@@ -565,25 +563,17 @@ public final class TsunamiOtomasyonu {
         if (olcum != null) {
             sicramaTick(mc);
             if (++olcumTick >= 100) {
-                List<Long> s = new ArrayList<>(KARELER);
-                Collections.sort(s);
-                List<Long> c = new ArrayList<>(KARE_CPU);
-                Collections.sort(c);
-                double ortanca = s.isEmpty() ? Double.NaN : s.get(s.size() / 2) / 1e6;
-                double enUzun = s.isEmpty() ? Double.NaN : s.get(s.size() - 1) / 1e6;
-                double cpuOrtanca = c.isEmpty() ? Double.NaN : c.get(c.size() / 2) / 1e6;
-                var sunucu = mc.getSingleplayerServer();
-                float mspt = sunucu == null ? Float.NaN : sunucu.getAverageTickTime();
+                GorselOtomasyon.Olcum o = GorselOtomasyon.olcumBitir();
                 log("FPS {} ortanca_kare_ms={} fps_ortanca={} cpu_kare_ms={} en_uzun_kare_ms={} kare={} yuk=[{}] sunucu_mspt={} "
-                        + "tps={} gradle=[{}] su={} yagmur={} bolum=[{}] parcacik={} varlik={} kopuk={} asama_cpu_ms=[{}] "
-                        + "parcacik_tur=[{}] varlik_tur=[{}] sicrama=[{}] yikim=[{}]", olcum,
-                        String.format(Locale.ROOT, "%.2f", ortanca), String.format(Locale.ROOT, "%.1f", 1000 / ortanca),
-                        String.format(Locale.ROOT, "%.2f", cpuOrtanca), String.format(Locale.ROOT, "%.1f", enUzun), s.size(),
-                        yuk(), String.format(Locale.ROOT, "%.2f", mspt),
-                        String.format(Locale.ROOT, "%.1f", Math.min(20, 1000 / mspt)), gradle(),
+                        + "tps={} gradle=[toplam={} yabanci={}] su={} yagmur={} bolum=[{}] parcacik={} varlik={} kopuk={} "
+                        + "asama_cpu_ms=[{}] parcacik_tur=[{}] varlik_tur=[{}] sicrama=[{}] yikim=[{}]", olcum,
+                        String.format(Locale.ROOT, "%.2f", o.duvarMs()), String.format(Locale.ROOT, "%.1f", o.fps()),
+                        String.format(Locale.ROOT, "%.2f", o.cpuMs()), String.format(Locale.ROOT, "%.1f", enUzunKare / 1e6),
+                        o.kare(), yuk(), String.format(Locale.ROOT, "%.2f", o.mspt()),
+                        String.format(Locale.ROOT, "%.1f", Math.min(20, 1000 / o.mspt())), o.gradle(), o.yabanci(),
                         SuRenderer.olcumOzeti(), TsunamiYagmuru.ozet(), mc.levelRenderer.getChunkStatistics(),
                         mc.particleEngine.countParticles(), mc.level.getEntityCount(), TsunamiKopugu.sonSegment(),
-                        asamaOzeti(c.size()), parcacikTurleri(mc.particleEngine), varlikTurleri(mc), sicramaOzeti(olcumTick),
+                        asamaOzeti(o.kare()), parcacikTurleri(mc.particleEngine), varlikTurleri(mc), sicramaOzeti(olcumTick),
                         yikimFarki(mc));
                 olcum = null;
             }
@@ -600,6 +590,9 @@ public final class TsunamiOtomasyonu {
             }
             return;
         }
+        if (GorselOtomasyon.kareBekliyor()) {
+            return;
+        }
         if (--bekle > 0) {
             return;
         }
@@ -614,11 +607,11 @@ public final class TsunamiOtomasyonu {
             case 'k' -> mc.player.connection.sendCommand(deger);
             case 'b' -> bekle = Long.parseLong(deger);
             case 'f' -> {
-                olcum = deger;
+                String[] p = deger.split(" ", 2);
+                olcum = p[0];
                 olcumTick = 0;
                 sonKare = 0;
-                KARELER.clear();
-                KARE_CPU.clear();
+                enUzunKare = 0;
                 ASAMA.clear();
                 tickBas = 0;
                 tickAcik = 0;
@@ -629,12 +622,13 @@ public final class TsunamiOtomasyonu {
                 sicramaBirim = 0;
                 yikimBas = yikimSayaci(mc);
                 SuRenderer.olcumSifirla();
+                GorselOtomasyon.olcumBasla("tsunami", olcum, p.length > 1 ? p[1] : null);
             }
-            case 's' -> {
+            case 's' -> GorselOtomasyon.kareIste("tsunami", deger + ".png", k -> {
                 log("KARE {} {} kopuk={}", deger, TsunamiYagmuru.ozet(), TsunamiKopugu.sonSegment());
-                Screenshot.grab(mc.gameDirectory, deger + ".png", mc.getMainRenderTarget(),
-                        m -> log("FOTO {} {}", deger, m.getString()));
-            }
+                log("FOTO {} fps={} yeni_kare={} bekleme_sn={} kapi={}", deger, k.fps(), k.yeniKare(),
+                        String.format(Locale.ROOT, "%.1f", k.beklemeSn()), k.gecerli() ? "acik" : "GECERSIZ");
+            });
             case 'p' -> {
                 profil = deger;
                 profilTick = 0;
@@ -647,7 +641,10 @@ public final class TsunamiOtomasyonu {
             case 'q' -> kalite(EfektKalitesi.valueOf(deger));
             case 'c' -> sunucuAyari(deger);
             case 'a' -> avciAdimi(mc, deger);
+            case 'v' -> kamera(mc, deger);
+            case 'g' -> mc.options.hideGui = !"1".equals(deger);
             case 'x' -> {
+                GorselOtomasyon.kareOzetiYaz("tsunami");
                 log("BITTI girdi tus={} fare={} teker={}", tus, fare, teker);
                 kapanisBekcisi();
                 mc.stop();
@@ -752,6 +749,40 @@ public final class TsunamiOtomasyonu {
         String komut = String.format(Locale.ROOT, "tp @s %.2f %d %.2f %.1f 5", x, y, z, yaw);
         mc.player.connection.sendCommand(komut);
         log("AVCI yerlesti {} (kıyı {} {}, yön {} {})", komut, o.getFloat("kx"), o.getFloat("kz"), yx, yz);
+    }
+
+    /**
+     * Ts7 kameraları ({@code v:} adımı): {@code tepe} vitrin tepe kamerası (evlerin arasından; afetsiz ölçümlerle aynı);
+     * {@code deniz} tsunaminin kıyı noktasından 14 blok içeriden, göz tabanın en az 11 blok üstünde, denize 10° aşağı bakar
+     * (çekilen kıyı şeridi kadrajın altında, ufuk üst yarıda); {@code alcak} kıyıdan 4 blok içeride, göz tabanın 4,5 blok
+     * üstünde, denize 3° aşağı bakar (S1 dalgası ufuk çizgisinin üstüne çıkar). Minecraft eğiminde aşağı pozitiftir.
+     */
+    private static void kamera(Minecraft mc, String ne) {
+        if ("tepe".equals(ne)) {
+            mc.player.connection.sendCommand("dogalafet su vitrin kamera tepe");
+            return;
+        }
+        CompoundTag o = IstemciAfetDurumu.aktif().filter(d -> d.tur() == AfetTuru.TSUNAMI).map(AfetDurumPaketi::ozel)
+                .orElse(null);
+        if (o == null || !o.contains("kx")) {
+            log("KAMERA {} tsunami verisi yok; kamera değişmedi", ne);
+            return;
+        }
+        boolean alcak = "alcak".equals(ne);
+        float yx = o.getFloat("yx");
+        float yz = o.getFloat("yz");
+        float tb = o.getFloat("tb");
+        double geri = alcak ? 4 : 14;
+        double x = o.getFloat("kx") + yx * geri;
+        double z = o.getFloat("kz") + yz * geri;
+        int zemin = mc.level.getHeight(Heightmap.Types.MOTION_BLOCKING, Mth.floor(x), Mth.floor(z));
+        double goz = alcak ? Math.max(zemin + 1.8, tb + 4.5) : Math.max(zemin + 3, tb + 11);
+        float yaw = (float) Math.toDegrees(Math.atan2(yx, -yz));
+        String komut = String.format(Locale.ROOT, "tp @s %.2f %.2f %.2f %.1f %.1f", x, goz - mc.player.getEyeHeight(), z, yaw,
+                alcak ? 3f : 10f);
+        mc.player.connection.sendCommand(komut);
+        log("KAMERA {} {} (kıyı {} {}, yön {} {}, taban {}, zemin {})", ne, komut, o.getFloat("kx"), o.getFloat("kz"), yx, yz,
+                tb, zemin);
     }
 
     /**

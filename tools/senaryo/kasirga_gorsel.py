@@ -113,9 +113,10 @@ def hazirla():
     satirlar = [s for s in satirlar if not s.startswith(("tutorialStep:", "pauseOnLostFocus:", "renderDistance:",
                                                          "simulationDistance:", "enableVsync:", "maxFps:"))]
     # Kasırga hedefin 54-107 blok uzağında doğar, kamera 70 bloğa kadar uzakta: simülasyon 10 chunk. Gizli workspace'te
-    # vsync takası kare geri çağrısı bekleyip FPS'i 1'e düşürüyordu (koşu 1): vsync kapalı, üst sınır 120.
+    # vsync takası kare geri çağrısı bekleyip FPS'i 1'e düşürüyordu (koşu 1): vsync kapalı. Üst sınır 260 (K-E29 (b) tabanı
+    # tavana yapışmasın; otomasyon açılışta aynı ayarı çalışma anında da verir, `GorselOtomasyon.cizimAyari`).
     yol.write_text("\n".join(satirlar + ["tutorialStep:none", "pauseOnLostFocus:false", "renderDistance:12",
-                                         "simulationDistance:10", "enableVsync:false", "maxFps:120"]) + "\n")
+                                         "simulationDistance:10", "enableVsync:false", "maxFps:260"]) + "\n")
     for eski in (run / "screenshots").glob("kasirga_*.png"):
         eski.unlink()
     latest = run / "logs/latest.log"

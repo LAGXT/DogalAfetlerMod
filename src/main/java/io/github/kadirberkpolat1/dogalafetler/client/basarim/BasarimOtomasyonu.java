@@ -2,14 +2,13 @@ package io.github.kadirberkpolat1.dogalafetler.client.basarim;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.Basarimlar;
+import io.github.kadirberkpolat1.dogalafetler.client.core.GorselOtomasyon;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
 import net.minecraft.advancements.Advancement;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.MouseHandler;
-import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.advancements.AdvancementsScreen;
@@ -23,7 +22,6 @@ import net.minecraftforge.client.event.InputEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.util.ObfuscationReflectionHelper;
 
 /**
  * Başarım görsel kanıt otomasyonu (K0-21 rev. 2). Yalnız {@code -Ddogalafetler.otomasyon=basarim} ile, tek oyunculu
@@ -35,9 +33,10 @@ import net.minecraftforge.fml.util.ObfuscationReflectionHelper;
  * görünmez) ve gizliler açılınca
  * üç konum (gizliler ortada tam görünür). Sahne komutları entegre sunucunun konsol kaynağından çıktısız verilir:
  * sohbete komut satırı (başarı ya da hata) düşmez; sohbet kareden önce temizlenir (A-33). Toast üreten komuttan önce
- * istemci en az {@value #AKICI_FPS} FPS çizmeli ve toast karesi ancak toast'ın kayma süresi boyunca gerçekten kare
- * çizildikten sonra alınır: görünmeyen workspace'te FPS 1'e düşünce framebuffer bayat kalıyordu (A-34). Sekme
- * açıldıktan sonra istemcinin iç imleç konumu pencerenin köşesine alınır (ipucu kutusu sekmeyi karartmasın). Klavye,
+ * istemci en az {@value #AKICI_FPS} FPS çizmeli, toast karesi adım başından beri 25 tick geçip 20 kare çizilince istenir
+ * (toast kayması 600 ms); her kare A-34 kapısından alınır ({@link GorselOtomasyon#kareIste}, istekten sonra en az 20 yeni
+ * kare) ve bekleyen kare varken adım ilerlemez. Sekme açıldıktan sonra iç imleç pencerenin köşesine alınır (ipucu kutusu
+ * sekmeyi karartmasın). Sekme açıkken tabansız ölçüm {@code sekme_acik} (en az 100 tick, K-E29 biçimi) yazılır. Klavye,
  * fare ve tekerlek girdileri kapanışa kadar sayılır; kendi açmadığı duraklatma ekranını kapatır.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
@@ -58,10 +57,11 @@ public final class BasarimOtomasyonu {
     private static int sayac;
     private static int adim = -1;
     private static int adimTick;
-    /** Çizilen kare sayısı ({@code RenderTickEvent}), adımın başındaki değeri ve biten adımda çizilen kare. */
-    private static int kareSayaci;
-    private static int adimKaresi;
-    private static int oncekiAdimKaresi;
+    /** Adımın başındaki çizilmiş kare sayacı ({@link GorselOtomasyon#cizilenKare}) ve biten adımda çizilen kare. */
+    private static long adimKaresi;
+    private static long oncekiAdimKaresi;
+    /** {@code sekme_acik} ölçümünün başladığı {@code sayac}. */
+    private static int olcumTick;
 
     private BasarimOtomasyonu() {
     }
@@ -95,13 +95,6 @@ public final class BasarimOtomasyonu {
     }
 
     @SubscribeEvent
-    public static void cizildi(TickEvent.RenderTickEvent olay) {
-        if (aktif() && olay.phase == TickEvent.Phase.END) {
-            kareSayaci++;
-        }
-    }
-
-    @SubscribeEvent
     public static void tick(TickEvent.ClientTickEvent olay) {
         if (!aktif() || olay.phase != TickEvent.Phase.END) {
             return;
@@ -122,12 +115,12 @@ public final class BasarimOtomasyonu {
             plan(mc);
             adim = 0;
             adimTick = 0;
-            adimKaresi = kareSayaci;
+            adimKaresi = GorselOtomasyon.cizilenKare();
             DogalAfetler.LOGGER.info(ON + "başlıyor: {} adım", ADIMLAR.size());
             ADIMLAR.get(0).is().run();
             return;
         }
-        if (adim >= ADIMLAR.size()) {
+        if (adim >= ADIMLAR.size() || GorselOtomasyon.kareBekliyor()) {
             return;
         }
         adimTick++;
@@ -139,8 +132,8 @@ public final class BasarimOtomasyonu {
             }
             adim++;
             adimTick = 0;
-            oncekiAdimKaresi = kareSayaci - adimKaresi;
-            adimKaresi = kareSayaci;
+            oncekiAdimKaresi = GorselOtomasyon.cizilenKare() - adimKaresi;
+            adimKaresi = GorselOtomasyon.cizilenKare();
             if (adim < ADIMLAR.size()) {
                 ADIMLAR.get(adim).is().run();
             }
@@ -184,7 +177,7 @@ public final class BasarimOtomasyonu {
 
     /** En az {@code tick} tick geçti ve adım başından beri en az {@code kare} kare çizildi. */
     private static BooleanSupplier cizimle(int tick, int kare) {
-        return () -> adimTick >= tick && kareSayaci - adimKaresi >= kare;
+        return () -> adimTick >= tick && GorselOtomasyon.cizilenKare() - adimKaresi >= kare;
     }
 
     /** İstemci akıcı çiziyor: toast'ın 5 sn'lik görünürlüğü içinde kareye girecek kadar. */
@@ -208,6 +201,7 @@ public final class BasarimOtomasyonu {
 
     private static void plan(Minecraft mc) {
         ekle("kurulum", () -> {
+            GorselOtomasyon.cizimAyari();
             mc.options.hideGui = false;
             for (String k : new String[] {"gamemode survival @s", "difficulty peaceful",
                     "gamerule doDaylightCycle false", "time set 6000", "weather clear 100000",
@@ -266,6 +260,8 @@ public final class BasarimOtomasyonu {
             mc.getToasts().clear();
             sohbetiTemizle(mc);
             sekmeyiAc(mc);
+            GorselOtomasyon.olcumBasla("basarim", "sekme_acik", null);
+            olcumTick = sayac;
         }, bekle(40), 60);
         ekle("en üste kaydır", () -> kaydir(mc, 1000), bekle(10), 20);
         ekle("sekme tam kare 1", () -> kare(mc, "sekme_tam_ust"), bekle(10), 20);
@@ -275,7 +271,9 @@ public final class BasarimOtomasyonu {
         ekle("sekme tam kare 3", () -> kare(mc, "sekme_tam_orta2"), bekle(10), 20);
         ekle("kaydır 3", () -> kaydir(mc, -1000), bekle(10), 20);
         ekle("sekme tam kare 4", () -> kare(mc, "sekme_tam_alt"), bekle(10), 20);
+        ekle("sekme ölçümü", () -> { }, () -> sayac - olcumTick >= 100, 200);
         ekle("gizliler", () -> {
+            GorselOtomasyon.olcumBitir();
             mc.setScreen(null);
             komut(mc, "advancement grant @s only dogalafetler:dogalafetler/" + Basarimlar.BIRLIKTE_HAYATTA.yol());
             komut(mc, "advancement grant @s only dogalafetler:dogalafetler/" + Basarimlar.HEPSINI_ATLATTIM.yol());
@@ -301,6 +299,7 @@ public final class BasarimOtomasyonu {
             DogalAfetler.LOGGER.info(ON + "bitti; FPS {}", mc.getFps());
         }, bekle(40), 60);
         ekle("çıkış", () -> {
+            GorselOtomasyon.kareOzetiYaz("basarim");
             DogalAfetler.LOGGER.info(ON + "kapanıyor; girdi sayıları: tuş={} fare={} tekerlek={}", tus, fare, teker);
             mc.stop();
         }, bekle(1), 2);
@@ -309,23 +308,12 @@ public final class BasarimOtomasyonu {
     private static void sekmeyiAc(Minecraft mc) {
         ClientAdvancements liste = mc.player.connection.getAdvancements();
         mc.setScreen(new AdvancementsScreen(liste));
-        imleciKenaraAl(mc);
+        GorselOtomasyon.imleciKenaraAl();
         Advancement kok = liste.getAdvancements().get(KOK);
         if (kok != null) {
             liste.setSelectedTab(kok, true);
         }
         DogalAfetler.LOGGER.info(ON + "sekme açıldı (kök {})", kok != null ? "var" : "yok");
-    }
-
-    /**
-     * İstemcinin iç imleç konumunu pencerenin sol üst köşesine alır: sabit imleç bir widget'ın üstünde kalırsa vanilla
-     * ipucu kutusu çıkar ve sekmeyi karartır. Ekran açıldıktan sonra çağrılır: {@code setScreen} →
-     * {@code releaseMouse} konumu pencere ortasına geri alır. Gerçek imlece ve sahibin oturumuna dokunmaz (yalnız
-     * {@code MouseHandler} alanı; SRG adları {@code build/createSrgToMcp/output.srg}).
-     */
-    private static void imleciKenaraAl(Minecraft mc) {
-        ObfuscationReflectionHelper.setPrivateValue(MouseHandler.class, mc.mouseHandler, 0.0, "f_91507_");
-        ObfuscationReflectionHelper.setPrivateValue(MouseHandler.class, mc.mouseHandler, 0.0, "f_91508_");
     }
 
     /** Seçili sekmeyi dikey kaydırır (ekranın sürükleme yolu; gerçek fare girdisi değildir, sayılmaz). */
@@ -337,9 +325,8 @@ public final class BasarimOtomasyonu {
     }
 
     private static void kare(Minecraft mc, String ad) {
-        String dosya = "basarim_" + ad + ".png";
-        Screenshot.grab(mc.gameDirectory, dosya, mc.getMainRenderTarget(), mesaj -> { });
-        DogalAfetler.LOGGER.info(ON + "kare {} (FPS {}, önceki adımda çizilen kare {}, ekran {})", dosya, mc.getFps(),
-                oncekiAdimKaresi, mc.screen == null ? "yok" : mc.screen.getClass().getSimpleName());
+        GorselOtomasyon.kareIste("basarim", "basarim_" + ad + ".png", 20, k -> DogalAfetler.LOGGER.info(
+                ON + "kare {} (FPS {}, önceki adımda çizilen kare {}, ekran {})", k.dosya(), k.fps(), oncekiAdimKaresi,
+                mc.screen == null ? "yok" : mc.screen.getClass().getSimpleName()));
     }
 }

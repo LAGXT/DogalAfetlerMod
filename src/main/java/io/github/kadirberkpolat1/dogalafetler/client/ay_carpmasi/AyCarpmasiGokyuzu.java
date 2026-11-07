@@ -318,6 +318,14 @@ public final class AyCarpmasiGokyuzu {
                 || r.nextInt(3 * 60 * 20) != 0) {
             return;
         }
+        kayanYildizZorla(r);
+    }
+
+    /**
+     * Gökte rastgele yönde bir kayan yıldız doğurur; halka koşulunu sormaz. {@link #tick} ve görsel otomasyon (yalnız
+     * {@code -Potomasyon}, halka karesinden önce) çağırır.
+     */
+    static void kayanYildizZorla(RandomSource r) {
         float az = r.nextFloat() * Mth.TWO_PI;
         float el = (float) Math.toRadians(30 + 50 * r.nextFloat());
         Vector3f bas = new Vector3f(Mth.cos(el) * Mth.cos(az), Mth.sin(el), Mth.cos(el) * Mth.sin(az));

@@ -6,6 +6,7 @@ import io.github.kadirberkpolat1.dogalafetler.balikcilik.BalikcilikKayitlari;
 import io.github.kadirberkpolat1.dogalafetler.balikcilik.BalikcilikKayitlari.Balik;
 import io.github.kadirberkpolat1.dogalafetler.balikcilik.BuzBalikciligi;
 import io.github.kadirberkpolat1.dogalafetler.balikcilik.BuzDeligiBlogu;
+import io.github.kadirberkpolat1.dogalafetler.client.core.GorselOtomasyon;
 import io.github.kadirberkpolat1.dogalafetler.donma.DonmaZamanlayici;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -14,7 +15,6 @@ import java.util.Locale;
 import java.util.function.BooleanSupplier;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.core.BlockPos;
@@ -49,8 +49,11 @@ import net.minecraftforge.fml.util.ObfuscationReflectionHelper;
  * Quick Play dünyasında çalışır; üretimde etkisizdir. Dünyayı {@code /dogalafet donma 60} ile dondurur, oyuncunun
  * yanında karla çevrili 7x7 donmuş gölet kurar ve sırayla: delik açılışı (sunucu yolu, gerçek Forge sağ tık olayı),
  * deliğin yakın planı, iki donma aşaması, delikteki olta (üçüncü ve birinci şahıs), gerçek ısırmayı bekleyip çekme,
- * tutulan balık elde ve balık tooltip'leri karelerini alır. Tooltip karesi gerçek {@code GuiGraphics.renderTooltip} ile bu
- * sınıfın çizdiği katmandır (fare imleci oynatılmaz). Klavye, fare ve tekerlek girdileri kapanışa kadar sayılır.
+ * tutulan balık elde ve balık tooltip'leri karelerini alır. Sonda vitrin anı (Ba8): gün batımında, buz yüzeyinden ~1,6 blok
+ * göz yüksekliğinde deliğe hafif aşağı bakan alçak açıyla yeni atışın gerçek ısırma anı ve elde Donmuş Ringa. Tooltip karesi
+ * gerçek {@code GuiGraphics.renderTooltip} ile bu sınıfın çizdiği katmandır (fare imleci oynatılmaz). Kareler A-34 kapısından
+ * alınır ({@link GorselOtomasyon#kareIste}): bekleyen kare varken adım ilerlemez, karedeki sahne (delik aşaması, tooltip
+ * katmanı) ancak sonraki adımda değişir. Klavye, fare ve tekerlek girdileri kapanışa kadar sayılır.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class BalikcilikOtomasyonu {
@@ -164,7 +167,7 @@ public final class BalikcilikOtomasyonu {
             ADIMLAR.get(0).is().run();
             return;
         }
-        if (adim >= ADIMLAR.size()) {
+        if (adim >= ADIMLAR.size() || GorselOtomasyon.kareBekliyor()) {
             return;
         }
         adimTick++;
@@ -213,6 +216,7 @@ public final class BalikcilikOtomasyonu {
 
     private static void plan(Minecraft mc) {
         ekle("kurulum", () -> {
+            GorselOtomasyon.cizimAyari();
             mc.options.chatVisibility().set(ChatVisiblity.HIDDEN);
             mc.options.hideGui = true;
             for (String k : new String[] {"gamemode creative", "gamerule doDaylightCycle false", "time set 9500",
@@ -250,26 +254,14 @@ public final class BalikcilikOtomasyonu {
         ekle("donma aşama 2", () -> asama(mc, 2), bekle(20), 30);
         ekle("donma aşama 2 karesi", () -> kare(mc, "delik_donuyor_2"), bekle(10), 20);
         ekle("donma aşama 3", () -> asama(mc, 3), bekle(20), 30);
-        ekle("donma aşama 3 karesi", () -> {
-            kare(mc, "delik_donuyor_3");
-            asama(mc, 0);
-        }, bekle(20), 30);
+        ekle("donma aşama 3 karesi", () -> kare(mc, "delik_donuyor_3"), bekle(20), 30);
         ekle("olta at", () -> {
+            asama(mc, 0);
             bak(mc, delik().getX() - 2.6, delik().getY() + 1, delik().getZ() + 0.5);
             MinecraftServer s = sunucu(mc);
-            olta = s.submit(() -> {
-                ServerPlayer o = sunucuOyuncusu(s);
-                o.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.FISHING_ROD));
-                FishingHook h = new FishingHook(o, o.serverLevel(), 0, 0);
-                BlockPos p = delik();
-                h.moveTo(p.getX() + 0.5, p.getY() + 1.4, p.getZ() + 0.5, 0f, 0f);
-                h.setDeltaMovement(0, -0.12, 0);
-                o.serverLevel().addFreshEntity(h);
-                atisTick = o.serverLevel().getGameTime();
-                return h;
-            }).join();
+            olta = s.submit(() -> oltaAt(s)).join();
             mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);
-        }, () -> adimTick >= 40 && sunucu(mc).submit(() -> olta.isInWater() && BuzBalikciligi.delikteMi(olta)).join(), 200);
+        }, oltaDelikte(mc), 200);
         ekle("olta üçüncü şahıs", () -> {
             DogalAfetler.LOGGER.info(ON + "olta delikte yüzüyor; kalan bekleme {} tick",
                     sunucu(mc).submit(() -> BuzBalikciligi.kalanBekleme(olta)).join());
@@ -310,19 +302,59 @@ public final class BalikcilikOtomasyonu {
         }, bekle(20), 30);
         ekle("balık elde karesi", () -> kare(mc, "balik_elde"), bekle(10), 20);
         ekle("tooltip'ler", () -> tooltip = true, bekle(10), 20);
-        ekle("tooltip karesi", () -> {
-            kare(mc, "tooltipler");
+        ekle("tooltip karesi", () -> kare(mc, "tooltipler"), bekle(5), 10);
+        ekle("vitrin kamera", () -> {
             tooltip = false;
-        }, bekle(5), 10);
+            mc.options.hideGui = true;
+            komut(mc, "time set 12500");
+            bak(mc, delik().getX() + 5.0, delik().getY() + 1, delik().getZ() + 0.5);
+        }, bekle(40), 60);
+        ekle("vitrin olta", () -> {
+            MinecraftServer s = sunucu(mc);
+            olta = s.submit(() -> oltaAt(s)).join();
+        }, oltaDelikte(mc), 200);
+        ekle("vitrin gerçek ısırmayı bekle", () -> { }, () -> sunucu(mc).submit(() -> isirmaVar(olta)).join(), 1500);
+        ekle("vitrin ısırma karesi", () -> kare(mc, "vitrin_isirma"), bekle(2), 5);
+        ekle("vitrin çek", () -> {
+            MinecraftServer s = sunucu(mc);
+            int hasar = s.submit(() -> olta.retrieve(sunucuOyuncusu(s).getMainHandItem())).join();
+            DogalAfetler.LOGGER.info(ON + "vitrin: çekildi; olta hasarı {}", hasar);
+        }, bekle(40), 60);
+        ekle("vitrin ringa", () -> {
+            MinecraftServer s = sunucu(mc);
+            s.submit(() -> sunucuOyuncusu(s).setItemInHand(InteractionHand.MAIN_HAND,
+                    new ItemStack(Balik.DONMUS_RINGA.cig()))).join();
+            mc.options.hideGui = false;
+        }, bekle(20), 30);
+        ekle("vitrin ringa karesi", () -> kare(mc, "vitrin_ringa"), bekle(10), 20);
         ekle("kapanış", () -> {
             komut(mc, "forge tps");
             DogalAfetler.LOGGER.info(ON + "bitti; FPS {}", mc.getFps());
         }, bekle(40), 60);
         ekle("çıkış", () -> {
             mc.options.chatVisibility().set(ChatVisiblity.FULL);
+            GorselOtomasyon.kareOzetiYaz("balikcilik");
             DogalAfetler.LOGGER.info(ON + "kapanıyor; girdi sayıları: tuş={} fare={} tekerlek={}", tus, fare, teker);
             mc.stop();
         }, bekle(1), 2);
+    }
+
+    /** Sunucu thread'inde: olta ele verilir, şamandıra deliğin üstünden suya bırakılır. */
+    private static FishingHook oltaAt(MinecraftServer s) {
+        ServerPlayer o = sunucuOyuncusu(s);
+        o.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.FISHING_ROD));
+        FishingHook h = new FishingHook(o, o.serverLevel(), 0, 0);
+        BlockPos p = delik();
+        h.moveTo(p.getX() + 0.5, p.getY() + 1.4, p.getZ() + 0.5, 0f, 0f);
+        h.setDeltaMovement(0, -0.12, 0);
+        o.serverLevel().addFreshEntity(h);
+        atisTick = o.serverLevel().getGameTime();
+        return h;
+    }
+
+    /** En az 40 tick geçti ve şamandıra delikteki suda yüzüyor. */
+    private static BooleanSupplier oltaDelikte(Minecraft mc) {
+        return () -> adimTick >= 40 && sunucu(mc).submit(() -> olta.isInWater() && BuzBalikciligi.delikteMi(olta)).join();
     }
 
     private static boolean isirmaVar(FishingHook h) {
@@ -392,8 +424,7 @@ public final class BalikcilikOtomasyonu {
     }
 
     private static void kare(Minecraft mc, String ad) {
-        String dosya = "balikcilik_" + ad + ".png";
-        Screenshot.grab(mc.gameDirectory, dosya, mc.getMainRenderTarget(), mesaj -> { });
-        DogalAfetler.LOGGER.info(ON + "kare {} (FPS {}, oyuncu {})", dosya, mc.getFps(), mc.player.blockPosition().toShortString());
+        GorselOtomasyon.kareIste("balikcilik", "balikcilik_" + ad + ".png", k -> DogalAfetler.LOGGER.info(
+                ON + "kare {} (FPS {}, oyuncu {})", k.dosya(), k.fps(), mc.player.blockPosition().toShortString()));
     }
 }

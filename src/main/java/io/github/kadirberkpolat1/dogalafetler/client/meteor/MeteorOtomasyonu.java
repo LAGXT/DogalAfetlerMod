@@ -2,6 +2,7 @@ package io.github.kadirberkpolat1.dogalafetler.client.meteor;
 
 import com.mojang.datafixers.util.Pair;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.client.core.GorselOtomasyon;
 import io.github.kadirberkpolat1.dogalafetler.esya.MeteorEsyaKayitlari;
 import io.github.kadirberkpolat1.dogalafetler.esya.termostat.Termostat;
 import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorAPI;
@@ -15,7 +16,6 @@ import io.github.kadirberkpolat1.dogalafetler.yangin.YanginYoneticisi;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.Screen;
@@ -46,9 +46,10 @@ import net.minecraftforge.fml.common.Mod;
  * üretimde etkisizdir. Alacakaranlıkta, en yakın ormanın 48 blok batısında ağaçların üstünde seyirci kamera doğuya bakar; sağdan
  * gelen kademeli ay (mavi-beyaz) ve güneş meteorlarının izleri, çarpma anı, krater ve ateş karelenir; sonra yakın kamerayla
  * parıldayan Meteorit Parçası ve Kozmik Çekirdek, en sonda Kozmik Çekirdek ve Termostatlı zırh ipuçları. Klavye, fare ve
- * tekerlek girdileri kapanışa kadar sayılır. Gizli workspace'te istemci ~1 FPS çizer: kare istenen tick'te değil, sonraki
- * çizilmiş karenin sonunda ({@code RenderTickEvent} END) alınır ve vitrinde meteorlar yavaş çekimde düşer
- * ({@code meteor.dusmeHizi} 0,6; sonra eski değere döner) ki uçuş birkaç çizilmiş kareye yayılsın.
+ * tekerlek girdileri kapanışa kadar sayılır. Kareler A-34 kapısından alınır ({@link GorselOtomasyon#kareIste}); bekleyen kare
+ * varken adım ilerlemez. Vitrinde meteorlar yavaş çekimde düşer ({@code meteor.dusmeHizi} 0,6; sonra eski değere döner).
+ * Ölçüm (K-E29 (b)): vitrin kamerasında meteorlardan önce afetsiz taban {@code s5_meteor_taban}, ilk atıştan itibaren yağmur
+ * {@code s5_meteor_yuksek} (her biri 100 tick; öncesinde FPS kapısı, {@link GorselOtomasyon#akici}).
  * {@code -PotomasyonBolum=odul} (M-22): yalnız ödül ve ipucu kareleri, öğlen ışığında; her ipucu kendi karesinde, satırlar
  * ekran genişliğine göre sarılır (tooltip'ler üst üste binmez).
  */
@@ -82,7 +83,8 @@ public final class MeteorOtomasyonu {
     private static volatile boolean sunucuHazir;
     private static volatile BlockPos odak;
     private static volatile double eskiHiz = -1;
-    private static String istenenKare;
+    /** Vitrin öncesi: 0 FPS kapısı, 1 taban ölçümü, 2 FPS kapısı, 3 vitrin. */
+    private static int tabanEvresi;
     private static int carpmaSonrasiKare;
     private static int kraterAdimi;
     private static int ipucu;
@@ -128,11 +130,15 @@ public final class MeteorOtomasyonu {
         if (mc.player == null || mc.level == null || server == null) {
             return;
         }
+        if (GorselOtomasyon.kareBekliyor()) {
+            return;
+        }
         sayac++;
         switch (adim) {
             case -1 -> {
                 if (sayac >= 100) {
                     DogalAfetler.LOGGER.info(ON + "başlıyor: oyuncu {}", mc.player.getGameProfile().getName());
+                    GorselOtomasyon.cizimAyari();
                     server.execute(() -> hazirla(server));
                     sonraki();
                 }
@@ -147,13 +153,19 @@ public final class MeteorOtomasyonu {
                     }
                 }
             }
-            case 1 -> vitrin(mc, server);
+            case 1 -> {
+                if (tabanEvresi < 3) {
+                    taban();
+                } else {
+                    vitrin(mc, server);
+                }
+            }
             case 2 -> {
                 if (sayac == 1) {
                     server.execute(() -> oduller(server));
                 } else if (sayac == 80) {
                     kare("odul_yakin");
-                } else if (sayac > 80 && istenenKare == null && sayac >= 110) {
+                } else if (sayac >= 110) {
                     kare("odul_yakin_b");
                     sonraki();
                 }
@@ -163,7 +175,7 @@ public final class MeteorOtomasyonu {
                     mc.setScreen(new IpucuEkrani(ipucuYigini(ipucu)));
                 } else if (ipucu < IPUCLARI.length && sayac == 30) {
                     kare("ipucu_" + IPUCLARI[ipucu]);
-                } else if (ipucu < IPUCLARI.length && sayac > 30 && istenenKare == null) {
+                } else if (ipucu < IPUCLARI.length && sayac > 30) {
                     ipucu++;
                     sayac = 0;
                 } else if (ipucu >= IPUCLARI.length) {
@@ -176,7 +188,8 @@ public final class MeteorOtomasyonu {
                 }
             }
             case 4 -> {
-                if (sayac >= 60 && istenenKare == null) {
+                if (sayac >= 60) {
+                    GorselOtomasyon.kareOzetiYaz("meteor");
                     DogalAfetler.LOGGER.info(ON + "kapanıyor; girdi sayıları: tuş={} fare={} tekerlek={}", tus, fare, teker);
                     adim = 5;
                     mc.stop();
@@ -187,7 +200,30 @@ public final class MeteorOtomasyonu {
         }
     }
 
-    /** Meteorlar: yavaş çekimde atar, uçuşta iki kare, ilk ve son çarpmada birer kare, sonra krater ve ateş kareleri. */
+    /** Vitrin kamerasında, meteorlardan önce: FPS kapısı, 100 tick'lik afetsiz taban ölçümü, yine FPS kapısı. */
+    private static void taban() {
+        if (tabanEvresi == 1) {
+            if (sayac >= 100) {
+                GorselOtomasyon.olcumBitir();
+                tabanEvresi = 2;
+                sayac = 0;
+            }
+            return;
+        }
+        if (!GorselOtomasyon.eylemKapisi("meteor", tabanEvresi == 0 ? "taban ölçümü" : "vitrin")) {
+            return;
+        }
+        if (tabanEvresi == 0) {
+            GorselOtomasyon.olcumBasla("meteor", "s5_meteor_taban", null);
+        }
+        tabanEvresi++;
+        sayac = 0;
+    }
+
+    /**
+     * Meteorlar: yavaş çekimde atar, ilk atıştan 100 tick yağmur ölçümü, uçuşta iki kare, ilk ve son çarpmada birer kare,
+     * sonra krater ve ateş kareleri. Kare isteyen dal hemen döner: aynı tick'te ikinci istek birincisini düşürürdü.
+     */
     private static void vitrin(Minecraft mc, IntegratedServer server) {
         if (sayac == 1) {
             server.execute(() -> {
@@ -200,24 +236,28 @@ public final class MeteorOtomasyonu {
                 server.execute(() -> at(server, a));
             }
         }
-        if (sayac == 130) {
-            kare("iz_1");
-        } else if (sayac == 210) {
-            kare("iz_2");
+        if (sayac == 4) {
+            GorselOtomasyon.olcumBasla("meteor", "s5_meteor_yuksek", "s5_meteor_taban");
+        } else if (sayac == 104) {
+            GorselOtomasyon.olcumBitir();
+        }
+        if (sayac == 130 || sayac == 210) {
+            kare(sayac == 130 ? "iz_1" : "iz_2");
+            return;
         }
         int carpma = IstemciMeteor.carpmaSayisi() - carpmaBaslangic;
         if (ilkCarpma < 0 && carpma > 0) {
             ilkCarpma = sayac;
             DogalAfetler.LOGGER.info(ON + "ilk çarpma paketi tick {}", sayac);
             kare("carpma");
+            return;
         }
         if (ilkCarpma < 0 && sayac > 900) {
             DogalAfetler.LOGGER.warn(ON + "900 tick'te çarpma paketi gelmedi");
             sonraki();
             return;
         }
-        if (ilkCarpma > 0 && carpmaSonrasiKare == 0 && istenenKare == null
-                && (carpma >= ATISLAR.size() || sayac > ilkCarpma + 200)) {
+        if (ilkCarpma > 0 && carpmaSonrasiKare == 0 && (carpma >= ATISLAR.size() || sayac > ilkCarpma + 200)) {
             carpmaSonrasiKare = sayac;
             kare("carpma_son");
             server.execute(() -> {
@@ -225,8 +265,9 @@ public final class MeteorOtomasyonu {
                     MeteorAyarlari.dusmeHiziAyarla(eskiHiz);
                 }
             });
+            return;
         }
-        if (carpmaSonrasiKare <= 0 || istenenKare != null) {
+        if (carpmaSonrasiKare <= 0) {
             return;
         }
         if (kraterAdimi == 0 && sayac >= carpmaSonrasiKare + 100) {
@@ -318,26 +359,11 @@ public final class MeteorOtomasyonu {
         DogalAfetler.LOGGER.info(ON + "ödüller {} y={}", taban.toShortString(), y + 1);
     }
 
-    /** Kareyi ister; sonraki çizilmiş karenin sonunda alınır. */
+    /** Kareyi A-34 kapısına ister; alınınca kare satırı yazılır. */
     private static void kare(String ad) {
-        if (istenenKare != null) {
-            DogalAfetler.LOGGER.warn(ON + "kare {} alınmadan {} istendi", istenenKare, ad);
-        }
-        istenenKare = ad;
-    }
-
-    @SubscribeEvent
-    public static void cizimSonu(TickEvent.RenderTickEvent olay) {
-        if (!AKTIF || olay.phase != TickEvent.Phase.END || istenenKare == null) {
-            return;
-        }
-        Minecraft mc = Minecraft.getInstance();
-        String dosya = "meteor_" + istenenKare + ".png";
-        istenenKare = null;
-        Screenshot.grab(mc.gameDirectory, dosya, mc.getMainRenderTarget(), mesaj -> {
-        });
-        DogalAfetler.LOGGER.info(ON + "kare {} (adım {} tick {}, FPS {}, parçacık {}, çarpma paketi {})", dosya, adim, sayac,
-                mc.getFps(), mc.particleEngine.countParticles(), IstemciMeteor.carpmaSayisi());
+        GorselOtomasyon.kareIste("meteor", "meteor_" + ad + ".png", k -> DogalAfetler.LOGGER.info(
+                ON + "kare {} (adım {} tick {}, FPS {}, parçacık {}, çarpma paketi {})", k.dosya(), adim, sayac, k.fps(),
+                Minecraft.getInstance().particleEngine.countParticles(), IstemciMeteor.carpmaSayisi()));
     }
 
     private static ItemStack ipucuYigini(int i) {
