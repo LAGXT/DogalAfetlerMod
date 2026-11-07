@@ -56,6 +56,8 @@ public final class IstemciAsitYagmuru {
     private static double z;
     private static double yaricap;
     private static double yogunluk;
+    /** Sunucunun gönderdiği yumuşatılmamış yoğunluk (AKTIF değilse 0): maruziyet sunucuyla aynı anda başlayıp biter. */
+    private static double hamYogunluk;
     private static double bulut;
     private static long[] asinan = new long[0];
     private static long afetNo;
@@ -97,6 +99,7 @@ public final class IstemciAsitYagmuru {
     private static void sifirla() {
         aktif = false;
         yogunluk = 0;
+        hamYogunluk = 0;
         bulut = 0;
         asinan = new long[0];
         AsitParcacigi.BULUTLAR.clear();
@@ -126,8 +129,11 @@ public final class IstemciAsitYagmuru {
         }
         AsitParcacigi.BULUTLAR.removeIf(p -> !p.isAlive());
         if (!durumuOku(level)) {
+            AsitEkranEfekti.maruzGuncelle(false);
             return;
         }
+        boolean maruz = maruzMu(level, mc.player);
+        AsitEkranEfekti.maruzGuncelle(maruz);
         Camera kamera = mc.gameRenderer.getMainCamera();
         Vec3 goz = kamera.getPosition();
         Kademe k = kademe();
@@ -140,7 +146,30 @@ public final class IstemciAsitYagmuru {
             sesler(level, goz, r);
         }
         asinanlar(level, goz, ayar, r);
+        if (maruz) {
+            maruzDumani(level, mc.player, ayar, r);
+        }
         hasarIzle(mc.player);
+    }
+
+    /**
+     * Sunucudaki hasar denetimiyle aynı koşul: AKTIF yağmur (ham yoğunluk > 0), alanın içinde ve başın üstü gökyüzüne açık.
+     * Ekran efekti ve oyuncunun üstündeki cızlama bu sürece görünür.
+     */
+    static boolean maruzMu(ClientLevel level, LocalPlayer oyuncu) {
+        return oyuncu != null && aktif && hamYogunluk > 0 && !oyuncu.isSpectator()
+                && Math.hypot(oyuncu.getX() - x, oyuncu.getZ() - z) <= yaricap
+                && acikta(level, oyuncu.getX(), oyuncu.getEyeY(), oyuncu.getZ());
+    }
+
+    /** Maruz oyuncunun başı ve omuzlarından seyrek cızlama dumanı (üçüncü kişi kamerada okunur). */
+    private static void maruzDumani(ClientLevel level, LocalPlayer oyuncu, double ayar, RandomSource r) {
+        if (r.nextDouble() > 0.35 * ayar) {
+            return;
+        }
+        ekle(level, AsitKayitlari.DUMAN.get(), oyuncu.getX() + (r.nextDouble() - 0.5) * 0.7,
+                oyuncu.getEyeY() + 0.25 + r.nextDouble() * 0.2, oyuncu.getZ() + (r.nextDouble() - 0.5) * 0.7, 0,
+                0.03 + r.nextDouble() * 0.02, 0);
     }
 
     /** Paketten durumu okur, 1 Hz arasında yumuşatır; bu boyutta asit yağmuru yoksa sıfırlar. */
@@ -167,7 +196,8 @@ public final class IstemciAsitYagmuru {
         z += (hedefZ - z) * 0.05;
         yaricap = p.yaricap();
         double carpan = AsitKurallari.gorselCarpan(p.seviye());
-        double hedefYogunluk = p.asama() == AfetAsamasi.AKTIF ? p.ozel().getFloat("y") * carpan : 0;
+        hamYogunluk = p.asama() == AfetAsamasi.AKTIF ? p.ozel().getFloat("y") : 0;
+        double hedefYogunluk = hamYogunluk * carpan;
         double sirenIlerleme = p.asama() == AfetAsamasi.SIREN && p.kalanTick() >= 0
                 ? 1.0 - Math.min(1.0, p.kalanTick() / (double) SIREN_TICK) : 1.0;
         double hedefBulut = p.asama() == AfetAsamasi.SIREN ? 0.7 * carpan * sirenIlerleme

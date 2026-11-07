@@ -8,6 +8,7 @@ import io.github.kadirberkpolat1.dogalafetler.balikcilik.BuzBalikciligi;
 import io.github.kadirberkpolat1.dogalafetler.balikcilik.BuzDeligiBlogu;
 import io.github.kadirberkpolat1.dogalafetler.client.core.GorselOtomasyon;
 import io.github.kadirberkpolat1.dogalafetler.donma.DonmaZamanlayici;
+import io.github.kadirberkpolat1.dogalafetler.yiyecek.YiyecekKayitlari;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
@@ -76,6 +77,7 @@ public final class BalikcilikOtomasyonu {
     private static FishingHook olta;
     private static long atisTick;
     private static boolean tooltip;
+    private static boolean dokuVitrini;
     private static boolean dinleyiciVar;
 
     private BalikcilikOtomasyonu() {
@@ -112,7 +114,14 @@ public final class BalikcilikOtomasyonu {
     /** Tooltip karesi: gerçek eşya tooltip'leri (ad + balıkçılık satırı) ekranın sol yarısında. */
     @SubscribeEvent
     public static void arayuz(RenderGuiEvent.Post olay) {
-        if (!aktif() || !tooltip) {
+        if (!aktif()) {
+            return;
+        }
+        if (dokuVitrini) {
+            dokuVitrini(olay.getGuiGraphics());
+            return;
+        }
+        if (!tooltip) {
             return;
         }
         Minecraft mc = Minecraft.getInstance();
@@ -129,6 +138,37 @@ public final class BalikcilikOtomasyonu {
             g.renderItem(yiginlar[i], 0, 0);
             g.pose().popPose();
             g.renderTooltip(mc.font, yiginlar[i], 44, y + 12);
+        }
+    }
+
+    /**
+     * Doku vitrini (görsel cila, istek 12a): üst sıra beş çiğ balık, orta sıra pişmişleri, alt sıra çorba ve karşılaştırma için
+     * vanilla morina, somon, pişmişleri ve mantar çorbası; 4× büyütülmüş.
+     */
+    private static void dokuVitrini(GuiGraphics g) {
+        Balik[] baliklar = Balik.values();
+        List<ItemStack[]> siralar = new ArrayList<>();
+        ItemStack[] cig = new ItemStack[baliklar.length];
+        ItemStack[] pismis = new ItemStack[baliklar.length];
+        for (int i = 0; i < baliklar.length; i++) {
+            cig[i] = new ItemStack(baliklar[i].cig());
+            pismis[i] = new ItemStack(baliklar[i].pismis());
+        }
+        siralar.add(cig);
+        siralar.add(pismis);
+        siralar.add(new ItemStack[] {new ItemStack(YiyecekKayitlari.esya("kutup_baligi_corbasi")), new ItemStack(Items.COD),
+            new ItemStack(Items.SALMON), new ItemStack(Items.COOKED_COD), new ItemStack(Items.COOKED_SALMON),
+            new ItemStack(Items.MUSHROOM_STEW)});
+        g.fill(8, 8, 8 + 6 * 76 + 12, 8 + siralar.size() * 76 + 12, 0xC0202830);
+        for (int s = 0; s < siralar.size(); s++) {
+            ItemStack[] sira = siralar.get(s);
+            for (int i = 0; i < sira.length; i++) {
+                g.pose().pushPose();
+                g.pose().translate(20 + i * 76, 20 + s * 76, 0);
+                g.pose().scale(4f, 4f, 1f);
+                g.renderItem(sira[i], 0, 0);
+                g.pose().popPose();
+            }
         }
     }
 
@@ -303,8 +343,13 @@ public final class BalikcilikOtomasyonu {
         ekle("balık elde karesi", () -> kare(mc, "balik_elde"), bekle(10), 20);
         ekle("tooltip'ler", () -> tooltip = true, bekle(10), 20);
         ekle("tooltip karesi", () -> kare(mc, "tooltipler"), bekle(5), 10);
-        ekle("vitrin kamera", () -> {
+        ekle("doku vitrini", () -> {
             tooltip = false;
+            dokuVitrini = true;
+        }, bekle(10), 20);
+        ekle("doku vitrini karesi", () -> kare(mc, "doku_vitrini"), bekle(5), 10);
+        ekle("vitrin kamera", () -> {
+            dokuVitrini = false;
             mc.options.hideGui = true;
             komut(mc, "time set 12500");
             bak(mc, delik().getX() + 5.0, delik().getY() + 1, delik().getZ() + 0.5);

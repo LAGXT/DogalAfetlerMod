@@ -53,7 +53,10 @@ public final class DonmaVeriSaglayicilari {
         uretici.addProvider(olay.includeClient(), new Modeller(cikti, dosyalar));
     }
 
-    /** Varsayılan dönüşüm tablosu: su sütunu (su → ince buz → buz) ve çimen ↔ kırağılı çimen (10 / 50). */
+    /**
+     * Varsayılan dönüşüm tablosu: yalnız su sütunu (su → ince buz → buz). Çimen blok olarak değişmez; kar örtüsüyle karlı
+     * çimen olur (kar katmanı ekle ↔ kaldır). Yüzey satırları veri paketiyle eklenebilir.
+     */
     private record TabloSaglayici(PackOutput cikti) implements DataProvider {
         @Override
         public CompletableFuture<?> run(CachedOutput yazici) {
@@ -64,13 +67,6 @@ public final class DonmaVeriSaglayicilari {
             su.addProperty("hedef", "minecraft:ice");
             su.addProperty("ince", DogalAfetler.konum("ince_buz").toString());
             donusumler.add(su);
-            JsonObject cimen = new JsonObject();
-            cimen.addProperty("tur", "yuzey");
-            cimen.addProperty("kaynak", "minecraft:grass_block");
-            cimen.addProperty("hedef", DogalAfetler.konum("kiragili_cimen").toString());
-            cimen.addProperty("esik", 10);
-            cimen.addProperty("cozulmeEsigi", 50);
-            donusumler.add(cimen);
             JsonObject kok = new JsonObject();
             kok.add("donusumler", donusumler);
             return DataProvider.saveStable(yazici, kok, cikti.getOutputFolder(PackOutput.Target.DATA_PACK)

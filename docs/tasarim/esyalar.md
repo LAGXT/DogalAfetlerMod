@@ -238,3 +238,13 @@ dilinde görür. `basarim.unvanGoster=false` öneki kapatır; `/dogalafet unvan 
 çerçeveli Felaket Ustası) ve sohbetteki mor duyurunun kendisinde oyuncunun adının önünde beliren altın `[Felaket Ustası]`
 (ünvan duyurudan önce verilir). Üçü aynı tick'te aynı tetikleyiciden gelir; oyunda sıraları garanti değildir. Görsel kanıt
 koşusu sırayı sabitler: tür ve seviye 3 ayrı tick'lerde verilir, doğal bitiş Felaket Ustası'nı açar.
+
+## Görsel cila (2026-11-07)
+
+Beş buz balığı ve pişmişleri vanilla balık ikonu kalitesinde yeniden çizildi (`tools/assets/balikcilik_dokular.py`, rastgelelik
+yok): çapraz duruş, 1 px seçici dış çizgi (üst açık, karın/alt-sağ en koyu), sırttan karına 4+3 tonluk ters gölgeleme, sıralı pul
+gölgesi, ışınlı açık yüzgeçler, 2 px göz, solungaç ve göğüs yüzgeci. Tür bir bakışta ayrılır: alabalık pembe şerit ve benek,
+morina alacalı sırt, yan çizgi, iki sırt yüzgeci ve bıyık; somon iri, lacivert-gümüş, derin çatal kuyruk; kefal gri boyuna
+çizgili, yuvarlak kuyruk; ringa ince parlak mavi, kırağı kenar ve parıltı. Pişmişler aynı siluette altın-kahve rampa, kıtır
+kenar, iki ızgara izi ve bulanık beyaz göz taşır. Kutup Balığı Çorbası kendi kasesini alır (parlayan ön ağız, damarlı gölgeli
+ahşap, buz mavisi krem çorbada somon/beyaz balık ve dereotu); kullanıcı isteğiyle buharsızdır, ısıtan olduğu adı ve tarifiyle okunur.

@@ -6,7 +6,9 @@
   mob_effect/<ad>.png    18x18  "İçten Isınma" (alev) ve "Serinlik" (kar tanesi) durum efekti ikonları
 
 Görsel dil vanilla'ya yakın: vanilla iksir şişesi ve kase silueti, koyu kenar çizgisi, sol üstten ışık. Sıcaklar buhar
-(ve güveçte alev dili), soğuklar kırağı ve buz parlaması taşır: envanterde bir bakışta ısıtan/serinleten ayrılır.
+(ve güveçte alev dili), soğuklar kırağı ve buz parlaması taşır: envanterde bir bakışta ısıtan/serinleten ayrılır. Kutup
+balığı çorbası kendi kasesini çizer (parlayan ön ağız, damarlı gölgeli ahşap, krem çorbada somon/beyaz balık ve dereotu)
+ve buharsızdır.
 Çalıştırma: KÖK/.venv/bin/python tools/assets/yiyecek_dokular.py (rastgelelik yok; aynı kod → aynı bayt).
 """
 from pathlib import Path
@@ -219,13 +221,40 @@ def atesli_guvec():
 
 
 def kutup_baligi_corbasi():
+    """Kendi kasesi (vanilla güveç kalitesi): arka ağız, iç duvar gölgesi, sol üstten parlayan ön ağız bandı, damarlı ve
+    sağa doğru koyulan ahşap gövde, ayak; içinde serin krem çorba, somon ve beyaz balık parçaları, dereotu. Buharsız."""
     t = Tuval(16)
-    kase(t, rgba("#D7E3E0"), rgba("#EEF5F2"), [
-        (5, 7, "#F3B58E"), (6, 7, "#F3B58E"), (10, 8, "#F3B58E"),  # balık (somon tonu)
-        (8, 8, "#FBF7EE"), (11, 7, "#FBF7EE"),  # beyaz balık
-        (7, 8, "#4F8F3A"), (9, 6, "#4F8F3A"),  # dereotu
-        (4, 8, "#D9C38A")])  # patates
-    buhar(t, KASE_BUHAR)
+    hucreler, kenar, _ = sekil({4: (4, 11), 5: (2, 13), 6: (1, 14), 7: (1, 14), 8: (1, 14), 9: (1, 14), 10: (1, 14),
+                               11: (2, 13), 12: (3, 12), 13: (4, 11), 14: (5, 10)})
+    corba = {6: (5, 10), 7: (3, 12), 8: (3, 12)}
+    agac = ("#C98E54", "#A86E3A", "#8A562A", "#6A3E1C")
+    for (x, y) in sorted(hucreler):
+        if (x, y) in kenar:
+            alt_sag = (x + 1, y) not in hucreler or (x, y + 1) not in hucreler
+            renk = "#2C180A" if alt_sag else "#56341A" if y == 4 else "#4A2C14"
+        elif y in corba and corba[y][0] <= x <= corba[y][1]:
+            renk = "#B4C6CC" if y == 6 or x >= 11 else "#F4FAFA" if (x, y) == (6, 7) else "#D6E4E6"
+        elif y <= 8:
+            if y == 6 and 3 <= x <= 12:
+                renk = "#7A4C24"  # arka iç duvar
+            else:
+                renk = "#DEAA6C" if x <= 5 else "#B07A44" if x >= 11 else "#C8925A"  # ağız üstü
+        elif y == 9:
+            renk = "#EEC082" if x <= 4 else "#D6A064" if x <= 9 else "#B8804A"  # ön ağız parlaması
+        elif y == 13:
+            renk = agac[2] if x <= 6 else agac[3]  # ayak
+        else:
+            v = (x - 7.5) / 6 + (y - 10) * 0.25
+            i = 0 if v < -0.5 else 1 if v < 0.2 else 2 if v < 0.6 else 3
+            if (y == 11 and 5 <= x <= 7) or (y == 12 and 8 <= x <= 9):
+                i = min(i + 1, 3)  # ahşap damarı
+            renk = agac[i]
+        t.koy(x, y, rgba(renk))
+    for x, y, renk in ((4, 7, "#F09C6E"), (5, 7, "#C8704A"), (8, 8, "#F09C6E"), (9, 8, "#C8704A"),  # somon
+                       (9, 6, "#FBF7EE"), (10, 6, "#D8D0C0"), (11, 7, "#FBF7EE"), (12, 7, "#D8D0C0"),  # beyaz balık
+                       (7, 6, "#5E9A3C"), (8, 7, "#3E6E2A"), (3, 8, "#5E9A3C"), (11, 8, "#3E6E2A"),  # dereotu
+                       (6, 8, "#4A3A30")):  # karabiber
+        t.koy(x, y, rgba(renk))
     return t
 
 

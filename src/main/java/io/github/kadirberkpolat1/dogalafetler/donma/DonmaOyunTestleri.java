@@ -70,8 +70,9 @@ public final class DonmaOyunTestleri {
         return new BlockPos(x, yy + 1, z);
     }
 
-    private static Block kiragili() {
-        return DonmaBloklari.KIRAGILI_CIMEN.get();
+    private static boolean karliCimen(GameTestHelper y, int x, int yy, int z) {
+        BlockState s = y.getBlockState(p(x, yy, z));
+        return s.is(Blocks.GRASS_BLOCK) && s.getValue(SnowyDirtBlock.SNOWY);
     }
 
     private static int[] kutu(GameTestHelper y) {
@@ -191,8 +192,7 @@ public final class DonmaOyunTestleri {
         y.assertTrue(is(y, 4, 3, 4, Blocks.ICE) && is(y, 4, 2, 4, Blocks.ICE), "göl yüzeyi 2 blok buz; " + sutunTani(y, 4, 4));
         y.assertTrue(is(y, 4, 1, 4, Blocks.WATER), "gölün en altı su kalmalı");
         y.assertTrue(kar(y, 1, 4, 1) == 1, "çimende tek kat kar; " + sutunTani(y, 1, 1));
-        BlockState cimen = y.getBlockState(p(1, 3, 1));
-        y.assertTrue(cimen.is(kiragili()) && cimen.getValue(SnowyDirtBlock.SNOWY), "çimen kırağılı ve karlı: " + cimen);
+        y.assertTrue(karliCimen(y, 1, 3, 1), "çimen çimen kalmalı ve karlı olmalı; " + sutunTani(y, 1, 1));
         y.assertTrue(is(y, 0, 3, 0, Blocks.PACKED_MUD) && y.getBlockState(p(0, 4, 0)).isAir(), "kuru çamura dokunulmamalı");
         y.assertTrue(is(y, 8, 3, 0, Blocks.IRON_BLOCK) && y.getBlockState(p(8, 4, 0)).isAir(), "tanınmayan bloğa dokunulmamalı");
         y.assertTrue(kar(y, 8, 5, 8) >= 4, "yaprağın üstünde kalın kar; " + sutunTani(y, 8, 8));
@@ -244,15 +244,15 @@ public final class DonmaOyunTestleri {
         y.succeed();
     }
 
-    /** Madde 9 ÇÖZÜLME: 100'den taban 40'a inince kar ve kırağı kalkmış, buz kıyıdan açılmış, ortada kalmış olmalı. */
+    /** Madde 9 ÇÖZÜLME: 100'den taban 40'a inince kar kalkmış, buz kıyıdan açılmış, ortada kalmış olmalı. */
     @GameTest(template = ALAN, batch = "donma_alan")
-    public static void cozulmeKarVeKiragiOnceBuzKiyidanIceriAcilir(GameTestHelper y) {
+    public static void cozulmeKarOnceBuzKiyidanIceriAcilir(GameTestHelper y) {
         sahneKur(y);
         DonmaEsikleri e = DonmaEsikleri.VARSAYILAN.titresimsiz();
         isle(y, gecis(0, false, 100, false), KisKaynagi.YOK, e);
         isle(y, gecis(100, false, 40, false), KisKaynagi.YOK, e);
-        y.assertTrue(kar(y, 1, 4, 1) == 0 && is(y, 1, 3, 1, Blocks.GRASS_BLOCK), "40'ta kar ve kırağı kalkmalı; "
-                + sutunTani(y, 1, 1));
+        y.assertTrue(kar(y, 1, 4, 1) == 0 && is(y, 1, 3, 1, Blocks.GRASS_BLOCK) && !karliCimen(y, 1, 3, 1),
+                "40'ta kar kalkmalı, çimen karlı olmamalı; " + sutunTani(y, 1, 1));
         y.assertTrue(kar(y, 8, 5, 8) == 0, "40'ta yaprakta kar kalmamalı; " + sutunTani(y, 8, 8));
         y.assertTrue(is(y, 2, 3, 4, Blocks.WATER) && is(y, 3, 3, 4, Blocks.WATER), "40'ta kıyı halkası açık; "
                 + sutunTani(y, 2, 4) + " | " + sutunTani(y, 3, 4));
@@ -293,8 +293,8 @@ public final class DonmaOyunTestleri {
                 y.assertTrue(kar(y, x, 5, z) == 5, "yüksek sütun %100 (5 kat kar) olmalı; " + sutunTani(y, x, z));
             }
             for (int x = 0; x < 5; x++) {
-                y.assertTrue(is(y, x, 1, z, kiragili()) && kar(y, x, 2, z) == 1, "alçak sütun G=40 (kırağı + 1 kat kar); "
-                        + sutunTani(y, x, z));
+                y.assertTrue(karliCimen(y, x, 1, z) && kar(y, x, 2, z) == 1,
+                        "alçak sütun G=40 (karlı çimen + 1 kat kar); " + sutunTani(y, x, z));
             }
         }
         y.succeed();
@@ -463,6 +463,23 @@ public final class DonmaOyunTestleri {
     }
 
     /**
+     * Eski sürümün kırağılı çimeni (varsayılan tablo onu artık tanımıyor) sütun işlenince çimene döner; sonrası çimen
+     * gibi: 100'de karlı çimen ve 1 kat kar, 0'da çıplak çimen.
+     */
+    @GameTest(template = ALAN, batch = "donma_alan_3")
+    public static void eskiKiragiliCimenCimeneDoner(GameTestHelper y) {
+        sahneKur(y);
+        y.setBlock(p(1, 3, 1), DonmaBloklari.KIRAGILI_CIMEN.get());
+        isle(y, 0, 100);
+        y.assertTrue(karliCimen(y, 1, 3, 1) && kar(y, 1, 4, 1) == 1, "100'de kırağılı çimen karlı çimen olmalı; "
+                + sutunTani(y, 1, 1));
+        isle(y, 100, 0);
+        y.assertTrue(is(y, 1, 3, 1, Blocks.GRASS_BLOCK) && !karliCimen(y, 1, 3, 1) && kar(y, 1, 4, 1) == 0,
+                "0'da çıplak çimen kalmalı; " + sutunTani(y, 1, 1));
+        y.succeed();
+    }
+
+    /**
      * D1: eğimli kıyılı göl (dış halka 1, iç halka 2, orta 3 derin). %100'de 1 derin kıyı tamamen buz (yürünebilir, açık
      * su şeridi yok), daha derinde en alt su kalır; 40'ta kıyı açılır; 0'da sahne başlangıçla aynı.
      */
@@ -569,8 +586,8 @@ public final class DonmaOyunTestleri {
     /**
      * K-D26 (D5): görüş mesafesinde olup simülasyon mesafesi dışında kalan chunk da donar. Oyuncunun görüş bileti gibi
      * yalnız yükleme bileti (seviye 31, ticking izleyicisine girmez) uzak bir chunk'ı ve komşularını tam yükler; chunk
-     * {@code isPositionTicking} değilken kuyruk onu G=60'a (konulan çimen kırağılanır), sonra 0'a (çimen geri gelir)
-     * yetiştirir. Hedef z = −40 chunk: GameTest ızgarası x, z ≥ 0'a yerleşir ve sahneleri zorla yüklü, sahte oyuncuları
+     * {@code isPositionTicking} değilken kuyruk onu G=60'a (konulan çimen karlanır), sonra 0'a (kar kalkar) yetiştirir.
+     * Hedef z = −40 chunk: GameTest ızgarası x, z ≥ 0'a yerleşir ve sahneleri zorla yüklü, sahte oyuncuları
      * çevrelerinde 10 chunk ticking'dir; spawn da kuzeyde değil. Köke göre doğu, test sayısı arttıkça ızgaranın içine düşer.
      */
     @GameTest(template = "bos", batch = "donma_zamanlayici_7", timeoutTicks = 3000)
@@ -618,13 +635,16 @@ public final class DonmaOyunTestleri {
                 asama[0] = 1;
             } else if (asama[0] == 1 && v.sonG() == 60 && !v.yarimVar()) {
                 y.assertTrue(!kaynak.isPositionTicking(anahtar), "chunk donarken de simülasyon dışında kalmalı");
-                y.assertTrue(level.getBlockState(cimen).is(kiragili()), "60'ta çimen kırağılı olmalı: "
-                        + level.getBlockState(cimen));
+                BlockState zemin = level.getBlockState(cimen);
+                BlockState ustu = level.getBlockState(cimen.above());
+                y.assertTrue(zemin.is(Blocks.GRASS_BLOCK) && zemin.getValue(SnowyDirtBlock.SNOWY) && ustu.is(Blocks.SNOW),
+                        "60'ta çimen karlı ve üstünde kar olmalı: " + zemin + " / " + ustu);
                 d.donmaIlerlemesiAyarla(0f);
                 asama[0] = 2;
             } else if (asama[0] == 2 && v.sonG() == 0 && !v.yarimVar()) {
-                y.assertTrue(level.getBlockState(cimen).is(Blocks.GRASS_BLOCK), "0'da çimen geri gelmeli: "
-                        + level.getBlockState(cimen));
+                BlockState zemin = level.getBlockState(cimen);
+                y.assertTrue(zemin.is(Blocks.GRASS_BLOCK) && !zemin.getValue(SnowyDirtBlock.SNOWY)
+                        && level.getBlockState(cimen.above()).isAir(), "0'da kar kalkmalı, çimen karlı olmamalı: " + zemin);
                 asama[0] = 3;
             }
         });
@@ -641,9 +661,8 @@ public final class DonmaOyunTestleri {
         DonmaTablosuYukleyici.Tablo tablo = DonmaTablosuYukleyici.etkin();
         y.assertTrue(tablo.suKaynak() == Blocks.WATER && tablo.suHedef() == Blocks.ICE
                 && tablo.suInce() == DonmaBloklari.INCE_BUZ.get(), "su sütunu satırı yüklenmedi");
-        y.assertTrue(tablo.yuzey().durum(Blocks.GRASS_BLOCK, 10) == kiragili(), "çimen → kırağılı çimen yüklenmedi");
-        y.assertTrue(tablo.yuzey().durum(kiragili(), 45, -1) == Blocks.GRASS_BLOCK, "kırağı 50'nin altında kalkmalı");
-        y.assertTrue(tablo.yuzey().durum(kiragili(), 55, -1) == kiragili(), "kırağı 50'nin üstünde kalmalı");
+        y.assertTrue(tablo.yuzey().boyut() == 0 && !tablo.yuzey().taniyor(Blocks.GRASS_BLOCK),
+                "varsayılan tabloda yüzey satırı olmamalı (çimen çimen kalır): " + tablo.yuzey().donusumler());
         for (DonusumTablosu.Donusum<Block> d : tablo.yuzey().donusumler()) {
             y.assertTrue(d.cozulmeEsik() > DonmaEsikleri.VARSAYILAN.buzCozulmeTabani(), "yüzey çözülmesi buzdan önce: " + d);
         }
@@ -865,7 +884,7 @@ public final class DonmaOyunTestleri {
     }
 
     /**
-     * D4: {@code /dogalafet sifirla} test aracıdır ve dünyayı ilk haline döndürür: bizim kar/buz/kırağımız kuyrukla 0'a
+     * D4: {@code /dogalafet sifirla} test aracıdır ve dünyayı ilk haline döndürür: bizim kar/buzumuz kuyrukla 0'a
      * çözülür, oyuncunun karı (bit yok) kalır. {@code donma 100} → {@code sifirla} → bekle → sahne başlangıçla aynı.
      */
     @GameTest(template = ALAN, batch = "donma_zamanlayici_4", timeoutTicks = 3000)

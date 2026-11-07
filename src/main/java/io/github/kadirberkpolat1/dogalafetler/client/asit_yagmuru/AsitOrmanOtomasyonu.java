@@ -170,6 +170,16 @@ public final class AsitOrmanOtomasyonu {
         ADIMLAR.add(sunucu(s -> olcum(s, ad + "_vitrin")));
         ADIMLAR.add(kare(ad + "_vitrin"));
         if (asit) {
+            ADIMLAR.add(arayuz(true));
+            ADIMLAR.add(bekle(30));
+            ADIMLAR.add((mc, s, t) -> {
+                DogalAfetler.LOGGER.info(ON + "maruziyet: istemci koşulu {}, ekran efekti gücü {}",
+                        IstemciAsitYagmuru.maruzMu(mc.level, mc.player),
+                        String.format(Locale.ROOT, "%.2f", AsitEkranEfekti.maruziyet()));
+                return true;
+            });
+            ADIMLAR.add(kare(ad + "_maruz"));
+            ADIMLAR.add(arayuz(false));
             olc("s5_" + ad + "_yuksek", null, taban);
             ADIMLAR.add(sunucu(s -> olcum(s, ad + "_s5_yuksek")));
             ADIMLAR.add(yakinKamera());

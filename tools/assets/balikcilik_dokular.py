@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Buz altı balıkçılık dokularını üretir (16x16 PNG, prosedürel, sabit tohumlu; Mojang dokusu kopyalanmaz).
+"""Buz altı balıkçılık dokularını üretir (16x16 PNG, prosedürel; Mojang dokusu kopyalanmaz). Blok dokuları ve buz parçası
+sabit tohumlu gürültü kullanır; balıklarda rastgelelik yoktur. Her çıktı kendi tohumuyla üretilir, biri değişince ötekiler
+bayt bayt aynı kalır.
 
 Blok (src/main/resources/assets/dogalafetler/textures/block/):
 - buz_deligi_kenar.png: deliğin buz çerçevesi; açık mavi, ~%85 opak buz, beyaz çatlak ağı ve kırağı noktaları.
@@ -7,14 +9,21 @@ Blok (src/main/resources/assets/dogalafetler/textures/block/):
   büyüyen yarı saydam beyaz-mavi buz iğneleri. Aşama 1 kenar şeridi, 2 yarısı, 3 neredeyse kapalı.
 
 Eşya (src/main/resources/assets/dogalafetler/textures/item/):
-- buz_alabaligi, kutup_morinasi, derin_soguk_somonu, buz_kefali, donmus_ringa (+ pismis_ önekli beşi): çapraz duran balık
-  (kuyruk sol altta, baş sağ üstte, vanilla balıklarıyla aynı duruş). Türler gövde biçimi, sırt/karın rengi ve desenle
-  ayrılır: alabalık pembe yan şerit + koyu benekler; morina zeytin-kahve alacalı; somon koyu lacivert sırt + gümüş yan,
-  daha iri; kefal gri ve boyuna koyu çizgiler; ringa parlak mavi + beyaz kırağı kenarı ve parıltı. Siluet de türe göre:
-  kuyruk (düz, yuvarlak, çatal, derin çatal), sırt yüzgeci, gövde genişliği, morinada çene bıyığı. Pişmişler türün
-  kendi et rengiyle ızgara izli: alabalık pembe-turuncu + koyu benek, morina krem beyaz pul pul, somon koyu turuncu + açık
-  yağ çizgileri, kefal gri-kahve çizgili, ringa altın. Betik sonunda pişmiş çiftlerin ortak piksellerdeki ortalama
-  |dR|+|dG|+|dB| renk farkı ve siluet farkı (XOR piksel) yazılır.
+- buz_alabaligi, kutup_morinasi, derin_soguk_somonu, buz_kefali, donmus_ringa (+ pismis_ önekli beşi): vanilla balık
+  ikonları kalitesinde piksel sanat, çapraz duruş (kuyruk sol altta, baş sağ üstte). Çizim köşegen çerçevede yapılır
+  (s = x - y gövde boyunca, p = x + y sırttan karına): türün sırt/karın zarfı, kuyruk yelpazesi (düz, yuvarlak, çatal,
+  derin çatal) ve sırt/anal yüzgeçleri ayrı şekiller olarak çıkar; dolgu 1..14'te kalır, dışına 1 px seçici dış çizgi
+  gelir (üst/sol daha açık, karın/alt-sağ en koyu). Gövde sırttan karına bantlarla boyanır (sırt gölgesi, sırt, parlak
+  şerit, yan, karın, karın gölgesi; 4 tonluk sırt + 3 tonluk alt rampası), sırt ve yanda (x + 2y) % 4 sıralı pul gölgesi;
+  yüzgeçler açık zar + koyu ışın (sırtta gövdeye dik, kuyrukta eksene paralel). Başta 1 px bebek + 1 px parlamalı
+  göz, ağız çentiği, gövdeye dik solungaç çizgisi ve arkasında göğüs yüzgeci. Türler: alabalık zeytin-camgöbeği
+  sırt, pembe yan şerit, koyu benekler (yüzgeç ve kuyrukta da); morina zeytin-kahve alacalı sırt, soluk yan çizgi, iki
+  sırt yüzgeci, çene bıyığı; somon en iri, koyu lacivert sırt, geniş gümüş yan, derin çatal kuyruk; kefal gri, boyuna
+  koyu çizgiler, iki sırt yüzgeci, yuvarlak kuyruk; ringa ince, parlak mavi, gümüş şerit, sırt dış çizgisinde beyaz
+  kırağı ve parıltılar. Pişmişler aynı siluette altın-kahveden koyu kahveye rampa (türe göre hafif ton), kıtır koyu
+  kenar bantları, opak kızarmış yüzgeçler, yanık kuyruk ucu, iki yatay ızgara izi, bulanık beyaz göz; tür izi kalır
+  (alabalık benek, morina pul pul beyaz et, somon açık yağ çizgileri, kefal çizgi, ringa altın parlaklık). Betik sonunda
+  pişmiş çiftlerin ortak piksellerdeki ortalama |dR|+|dG|+|dB| renk farkı ve siluet farkı (XOR piksel) yazılır.
 - buz_parcasi.png: sivri, açık camgöbeği buz kristali.
 
 Kullanım (worktree kökünden): KOK/.venv/bin/python tools/assets/balikcilik_dokular.py
@@ -90,148 +99,286 @@ def buzlanma(asama):
 
 # --- Balıklar ------------------------------------------------------------------------------------------------------
 
-# Tür: sırt, karın, en geniş yarı genişlik, desen, kuyruk biçimi, sırt yüzgeci (baş, son u; yükseklik), pişmiş et rengi.
-# Siluet türe göre: somon iri ve derin çatal kuyruklu, ringa ince ve keskin çatal, morina düz kuyruk + iki sırt
-# yüzgeci + çene bıyığı, kefal yuvarlak yelpaze kuyruk, alabalık küt düz kuyruk ve geniş yüzgeç.
+# Köşegen çerçeve: s = x - y kuyruktan (-) başa (+), p = x + y sırttan (küçük) karına (büyük); gövde ekseni p = 15.
+# Sabit s köşegenleri gövdeye diktir (solungaç, sırt yüzgeci ışınları, somon yağ çizgileri), sabit p köşegenleri eksene
+# paraleldir (yan şerit, boyuna çizgiler, kuyruk ışınları). Aynı s üzerindeki pikseller p'de ikişer artar.
+EKSEN = 15
+
+# Siluet: bas/sap = burun ve kuyruk sapı köşegeni (s); *_yari = eksenden sırt/karın kenarına p uzaklığı (dik 1 piksel = 2 p);
+# kuyruk = (biçim, arka kenar s, en büyük yarı açıklık p); yuzgecler = (taraf, s0, s1, yükseklik p), yükseklik önde (s1)
+# en büyük. Rampalar: sirt (parlak, ana, gölge, derin), alt (yan, karın, karın gölgesi), yuzgec (zar, ışın),
+# pismis (parlak, ana, gölge, derin, karın).
 TURLER = {
-    "buz_alabaligi": dict(sirt=(66, 108, 122), karin=(222, 232, 236), genislik=2.4, desen="alabalik", kuyruk="duz",
-                          yuzgec=[(0.45, 0.72, 1.4)], pismis=(212, 134, 118)),
-    "kutup_morinasi": dict(sirt=(116, 112, 84), karin=(226, 220, 198), genislik=3.2, desen="morina", kuyruk="duz",
-                           yuzgec=[(0.40, 0.52, 1.1), (0.60, 0.74, 1.1)], pismis=(238, 224, 192)),
-    "derin_soguk_somonu": dict(sirt=(36, 56, 96), karin=(232, 238, 244), genislik=3.3, desen="somon", kuyruk="derin",
-                               yuzgec=[(0.52, 0.64, 1.6)], pismis=(228, 98, 54)),
-    "buz_kefali": dict(sirt=(92, 102, 114), karin=(212, 218, 224), genislik=2.6, desen="kefal", kuyruk="yuvarlak",
-                       yuzgec=[(0.50, 0.60, 1.0)], pismis=(122, 104, 90)),
-    "donmus_ringa": dict(sirt=(58, 112, 166), karin=(234, 244, 252), genislik=2.2, desen="ringa", kuyruk="catal",
-                         yuzgec=[], pismis=(216, 172, 52)),
+    "buz_alabaligi": dict(
+        bas=11, sap=-5, sirt_yari=3.0, karin_yari=3.4, sap_yari=1.0, kuyruk=("duz", -9, 4.0),
+        yuzgecler=[("sirt", 0, 4, 3.4), ("karin", -3, -1, 2.4)],
+        sirt=((126, 162, 134), (84, 126, 110), (58, 96, 88), (36, 64, 62)),
+        alt=((180, 194, 178), (232, 236, 226), (190, 196, 186)),
+        yuzgec=((168, 184, 150), (122, 142, 114)),
+        pismis=((238, 178, 128), (212, 138, 94), (166, 96, 62), (112, 62, 40), (242, 204, 160))),
+    "kutup_morinasi": dict(
+        bas=11, sap=-5, sirt_yari=3.4, karin_yari=3.8, sap_yari=1.0, kuyruk=("duz", -9, 3.6),
+        yuzgecler=[("sirt", 4, 6, 2.6), ("sirt", -1, 2, 2.6), ("karin", -3, 0, 2.2)],
+        sirt=((170, 154, 108), (132, 116, 78), (100, 86, 58), (70, 58, 40)),
+        alt=((190, 178, 138), (234, 228, 206), (200, 192, 166)),
+        yuzgec=((178, 162, 118), (134, 118, 82)),
+        pismis=((244, 214, 160), (222, 178, 116), (180, 134, 78), (126, 88, 48), (248, 232, 194))),
+    "derin_soguk_somonu": dict(
+        bas=12, sap=-6, sirt_yari=3.8, karin_yari=4.0, sap_yari=1.0, kuyruk=("derin", -10, 5.0),
+        yuzgecler=[("sirt", 1, 4, 3.0), ("karin", -4, -2, 2.0)],
+        sirt=((78, 102, 148), (46, 64, 108), (32, 44, 80), (20, 28, 54)),
+        alt=((192, 204, 216), (240, 242, 246), (200, 208, 220)),
+        yuzgec=((128, 142, 168), (84, 98, 128)),
+        pismis=((240, 156, 94), (212, 114, 62), (164, 78, 40), (110, 48, 24), (244, 188, 132))),
+    "buz_kefali": dict(
+        bas=11, sap=-5, sirt_yari=3.0, karin_yari=3.2, sap_yari=1.2, kuyruk=("yuvarlak", -8, 3.6),
+        yuzgecler=[("sirt", 3, 5, 2.6), ("sirt", -2, 0, 2.2), ("karin", -3, -1, 2.2)],
+        sirt=((156, 164, 172), (114, 122, 132), (86, 92, 102), (60, 64, 74)),
+        alt=((178, 184, 190), (226, 230, 234), (190, 196, 202)),
+        yuzgec=((168, 174, 180), (122, 128, 136)),
+        pismis=((212, 176, 134), (176, 138, 100), (134, 100, 70), (92, 66, 46), (224, 200, 164))),
+    "donmus_ringa": dict(
+        bas=11, sap=-5, sirt_yari=2.2, karin_yari=2.6, sap_yari=0.8, kuyruk=("catal", -11, 4.4),
+        yuzgecler=[("sirt", 0, 2, 2.6)],
+        sirt=((108, 176, 232), (58, 126, 200), (40, 92, 162), (26, 62, 122)),
+        alt=((178, 214, 240), (240, 248, 254), (196, 218, 236)),
+        yuzgec=((164, 206, 236), (104, 156, 206)),
+        pismis=((244, 202, 104), (214, 158, 66), (168, 112, 40), (116, 74, 26), (248, 222, 150))),
 }
-T0 = (2.6, 13.2)
-H0 = (13.1, 2.9)
+GOZ_BEBEK = (16, 18, 26)
+GOZ_ISIK = (250, 252, 255)
+PISMIS_GOZ = (236, 230, 212)
+KIRAGI = (234, 246, 255)
 
 
-def eksen(x, y):
-    """Piksel merkezinin balık çerçevesi: u kuyruktan (0) başa (1), v sırt (+) / karın (-) yönünde piksel."""
-    dx, dy = H0[0] - T0[0], H0[1] - T0[1]
-    boy = math.hypot(dx, dy)
-    ex, ey = dx / boy, dy / boy
-    px_, py_ = x + 0.5 - T0[0], y + 0.5 - T0[1]
-    u = (px_ * ex + py_ * ey) / boy
-    v = px_ * ey - py_ * ex  # sol üst taraf (sırt) pozitif
-    return u, v
+def zarf(tur, s):
+    """Gövdenin s köşegenindeki sırt ve karın kenarı (p): saptan genişleyen gövde, küt baş."""
+    t = (s - tur["sap"]) / (tur["bas"] - tur["sap"])
+    if t < 0.55:
+        e = math.sin(math.pi / 2 * t / 0.55) ** 0.8
+    else:
+        e = 1 - 0.62 * ((t - 0.55) / 0.45) ** 1.8
+    return EKSEN - tur["sap_yari"] - tur["sirt_yari"] * e, EKSEN + tur["sap_yari"] + tur["karin_yari"] * e
 
 
-def govde_yari(u, g):
-    if u < 0.24 or u > 1.0:
-        return 0.0
-    t = (u - 0.24) / 0.76
-    return g * math.sin(math.pi * min(1.0, t * 0.96 + 0.04)) ** 0.75
-
-
-def kuyruk(u, v, bicim):
-    if u < 0.0 or u > 0.28:
+def kuyrukta(tur, s, p):
+    """Kuyruk yelpazesi: saptan geriye açılır, arka kenarı biçime göre düz, yuvarlak ya da çatal."""
+    bicim, arka, acik = tur["kuyruk"]
+    d = abs(p - EKSEN)
+    if s >= tur["sap"] or d > min(acik, tur["sap_yari"] + (tur["sap"] - s) * 1.1):
         return False
-    a = 0.28 - u
-    if bicim == "duz":
-        return abs(v) <= min(2.6, a * 11 + 0.6)
+    oran = d / acik
     if bicim == "yuvarlak":
-        return (a / 0.28) ** 2 + (v / 3.0) ** 2 <= 1.0 and abs(v) <= a * 14 + 0.6
-    if bicim == "derin":
-        return abs(v) <= a * 12 + 0.6 and not (u < 0.17 and abs(v) < (0.17 - u) * 12)
-    return abs(v) <= a * 9.5 + 0.6 and not (u < 0.12 and abs(v) < (0.12 - u) * 7)
+        arka -= 1.6 * (1 - oran ** 2)
+    elif bicim == "catal":
+        arka += 3.2 * (1 - oran)
+    elif bicim == "derin":
+        arka += 4.4 * (1 - oran)
+    return s >= arka
+
+
+def bolgeler(tur):
+    """(x, y) -> 'govde' | 'kuyruk' | 'yuzgec'; yüzgeçler gövdenin dışına taşan ayrı şekillerdir. Dolgu 1..14'te
+    kalır ki dış çizgi doku içine sığsın."""
+    b = {}
+    for y in range(1, 15):
+        for x in range(1, 15):
+            s, p = x - y, x + y
+            if tur["sap"] <= s <= tur["bas"]:
+                sirt, karin = zarf(tur, s)
+                if sirt <= p <= karin:
+                    b[x, y] = "govde"
+                    continue
+                for taraf, s0, s1, yuk in tur["yuzgecler"]:
+                    if s0 <= s <= s1:
+                        h = yuk * (s - s0 + 1) / (s1 - s0 + 1)
+                        if (taraf == "sirt" and sirt - h <= p < sirt) or (taraf == "karin" and karin < p <= karin + h):
+                            b[x, y] = "yuzgec"
+            elif kuyrukta(tur, s, p):
+                b[x, y] = "kuyruk"
+    return b
+
+
+def ton(tur, s, p):
+    """Sırttan karına konum (0..1), gövde zarfına göre; aynı p satırı komşu köşegenlerde aynı bandı verir."""
+    sirt, karin = zarf(tur, min(max(s, tur["sap"]), tur["bas"]))
+    return (p - sirt) / max(karin - sirt, 0.1)
+
+
+def govdede_desen(tur, s):
+    """Tür deseni başın (solungaçtan önce) ve kuyruk sapının dışında kalır."""
+    return tur["sap"] < s < tur["bas"] - 4
+
+
+def ciy_renk(ad, tur, x, y, bolge):
+    s, p = x - y, x + y
+    sirt, alt, yz = tur["sirt"], tur["alt"], tur["yuzgec"]
+    benek = ad == "buz_alabaligi" and (x * 5 + y * 3) % 7 == 0
+    if bolge == "yuzgec":
+        if benek:
+            return sirt[3]
+        return yz[1] if s % 2 == 0 else yz[0]  # zar arasında dik ışınlar
+    if bolge == "kuyruk":
+        if tur["sap"] - s == 1:
+            return sirt[1] if p < EKSEN else alt[0]
+        if benek:
+            return sirt[3]
+        return yz[1] if (p - EKSEN) % 4 in (0, 1) else yz[0]  # eksene paralel ışınlar
+    t = ton(tur, s, p)
+    pul = (x + 2 * y) % 4 == 0  # sıralı pul gölgesi
+    if t < 0.16:
+        renk = sirt[2]
+    elif t < 0.36:
+        renk = sirt[2] if pul else sirt[1]
+    elif t < 0.48:
+        renk = sirt[0]
+    elif t < 0.64:
+        renk = karistir(alt[0], sirt[0], 0.35) if pul else alt[0]
+    elif t < 0.88:
+        renk = alt[1]
+    else:
+        renk = alt[2]
+    if not govdede_desen(tur, s):
+        return renk
+    if ad == "buz_alabaligi":
+        if 0.4 <= t < 0.56:
+            renk = (204, 104, 122) if pul else (226, 126, 140)  # pembe yan şerit
+        elif t < 0.4 and benek:
+            renk = sirt[3]
+    elif ad == "kutup_morinasi":
+        if 0.36 <= t < 0.48:
+            renk = (232, 224, 190)  # soluk yan çizgi
+        elif t < 0.36:
+            m = math.sin(x * 1.3 + 0.4) + math.sin(y * 1.7 + x * 0.6)
+            if m > 0.9:
+                renk = sirt[3]
+            elif m < -1.1:
+                renk = sirt[0]  # alacalı sırt
+        elif t < 0.64 and (x + 3 * y) % 5 == 0:
+            renk = sirt[1]
+    elif ad == "derin_soguk_somonu":
+        if 0.36 <= t < 0.48:
+            renk = (104, 124, 158)  # lacivertten gümüşe geçiş
+        elif 0.48 <= t < 0.76:
+            renk = (170, 182, 198) if pul else alt[0]  # geniş gümüş yan
+        elif t < 0.36 and (x * 3 + y * 5) % 9 == 0:
+            renk = sirt[3]
+    elif ad == "buz_kefali":
+        if 0.1 <= t < 0.72 and p % 3 == 0:
+            renk = (62, 68, 80)  # boyuna koyu çizgiler
+    elif ad == "donmus_ringa":
+        if 0.36 <= t < 0.48:
+            renk = (204, 234, 252)  # gümüş parlak şerit
+    return renk
+
+
+def pismis_renk(ad, tur, x, y, bolge):
+    s, p = x - y, x + y
+    pis = tur["pismis"]
+    if bolge == "yuzgec":
+        return pis[3] if s % 2 == 0 else pis[2]
+    if bolge == "kuyruk":
+        g = tur["sap"] - s
+        if g == 1:
+            return pis[1]
+        if g >= 4:
+            return karistir(pis[3], (40, 22, 12), 0.35)  # kıtır yanık uç
+        return pis[3] if (p - EKSEN) % 4 in (0, 1) else pis[2]
+    t = ton(tur, s, p)
+    if t < 0.16 or t >= 0.9:
+        renk = pis[2]  # kıtır koyu kenar
+    elif t < 0.4:
+        renk = pis[1]
+    elif t < 0.54:
+        renk = pis[0]
+    else:
+        renk = pis[4]
+    if not govdede_desen(tur, s):
+        return renk
+    if 0.24 < t < 0.78 and y in (6, 9):
+        return pis[3]  # ızgara izi
+    if ad == "buz_alabaligi" and t < 0.4 and (x * 5 + y * 3) % 7 == 0:
+        renk = pis[3]
+    elif ad == "kutup_morinasi" and t >= 0.4 and (x + 3 * y) % 5 == 0:
+        renk = (252, 240, 210)  # pul pul beyaz et
+    elif ad == "derin_soguk_somonu" and 0.3 <= t < 0.9 and s % 3 == 0:
+        renk = (248, 200, 156)  # açık yağ çizgileri
+    elif ad == "buz_kefali" and 0.1 <= t < 0.72 and p % 3 == 0:
+        renk = pis[2]
+    elif ad == "donmus_ringa" and 0.4 <= t < 0.54:
+        renk = (252, 226, 140)  # altın parlaklık
+    return renk
+
+
+def kosegen(bolge, s):
+    """s köşegenindeki gövde pikselleri, sırttan karına."""
+    return sorted((k for k, b in bolge.items() if b == "govde" and k[0] - k[1] == s), key=lambda k: k[0] + k[1])
 
 
 def balik(ad, pismis):
     tur = TURLER[ad]
-    r = random.Random(sum(map(ord, ad)) * (7 if pismis else 3))
+    bolge = bolgeler(tur)
+    renk = {k: (pismis_renk if pismis else ciy_renk)(ad, tur, *k, b) for k, b in bolge.items()}
+    bas = tur["bas"]
+    pis = tur["pismis"]
+    derin = pis[3] if pismis else tur["sirt"][3]
+    # solungaç çizgisi: başın arkasında gövdeye dik köşegen, sırt kenarından boğaza
+    sg = bas - 4
+    for k in kosegen(bolge, sg)[1:]:
+        renk[k] = karistir(renk[k], derin, 0.6)
+    # göğüs yüzgeci: solungacın arkasında, eksenin karın tarafında kuyruğa doğru yatan kısa şekil
+    p0 = EKSEN + 1 if (sg + EKSEN + 1) % 2 == 0 else EKSEN + 2
+    gx, gy = (sg + p0) // 2, (p0 - sg) // 2
+    for i, (dx, dy) in enumerate(((-1, 0), (-1, 1), (-2, 1), (-2, 2))):
+        k = (gx + dx, gy + dy)
+        if bolge.get(k) == "govde":
+            renk[k] = pis[2 + i % 2] if pismis else tur["yuzgec"][i % 2]
+    # göz: 1 px koyu bebek + 1 px parlama (pişmişte bulanık beyaz); ağız: burnun karın ucunda koyu çentik
+    ex, ey = kosegen(bolge, bas - 2)[1]
+    renk[ex, ey] = PISMIS_GOZ if pismis else GOZ_BEBEK
+    if not pismis:
+        renk[ex - 1, ey] = GOZ_ISIK
+    renk[kosegen(bolge, bas)[-1]] = derin
     img = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
     px = img.load()
-    maske = [[False] * 16 for _ in range(16)]
-    g = tur["genislik"]
-    d = tur["desen"]
+    for (x, y), c in renk.items():
+        px[x, y] = (*sinirla(c), 255)
+    # seçici dış çizgi: üst/sol kenar daha açık (ışık sol üstten), alt/sağ kenar (karın tarafı) en koyu
     for y in range(16):
         for x in range(16):
-            u, v = eksen(x, y)
-            w = govde_yari(u, g)
-            kuyrukta = kuyruk(u, v, tur["kuyruk"])
-            ic = abs(v) <= w or kuyrukta
-            for bas, son, yuk in tur["yuzgec"]:
-                if bas < u < son and w < v <= w + yuk:
-                    ic = True
-            if d == "morina" and 0.86 < u < 0.93 and -w - 1.2 < v < -w + 0.2:
-                ic = True  # çene bıyığı
-            if not ic:
+            if (x, y) in bolge:
                 continue
-            maske[y][x] = True
-            t = max(0.0, min(1.0, (v + g) / (2 * g)))
-            if pismis:
-                et = tur["pismis"]
-                renk = karistir(karistir(et, (255, 246, 230), 0.22), karistir(et, (40, 22, 10), 0.32), t ** 1.1)
-                if d == "alabalik" and v > 0.6 and r.random() < 0.3:
-                    renk = karistir(renk, (92, 48, 30), 0.7)
-                elif d == "morina" and r.random() < 0.25:
-                    renk = karistir(renk, (255, 252, 240), 0.6)  # pul pul beyaz et
-                elif d == "somon" and int(u * 18) % 3 == 0 and u > 0.3:
-                    renk = karistir(renk, (250, 214, 190), 0.55)  # yağ çizgileri
-                elif d == "kefal" and v > -1.0 and round(v * 1.6) % 2 == 0:
-                    renk = karistir(renk, (52, 40, 32), 0.5)
-                elif d == "ringa" and -0.4 < v < 0.9:
-                    renk = karistir(renk, (250, 222, 120), 0.5)  # altın parlaklık
-                if u > 0.32 and int(u * 15) % 4 == 0:
-                    renk = karistir(renk, (70, 38, 18), 0.35)  # ızgara izi
-                if kuyrukta and u < 0.24:
-                    renk = karistir(renk, (96, 58, 30), 0.45)
+            altta = [k for k in ((x - 1, y), (x, y - 1)) if k in bolge]
+            ustte = [k for k in ((x + 1, y), (x, y + 1)) if k in bolge]
+            if not altta and not ustte:
+                continue
+            ince = bolge[(altta or ustte)[0]] != "govde"
+            if altta:
+                taban, koyu = (pis[3], 0.72) if pismis else (tur["yuzgec"][1], 0.62) if ince else (tur["sirt"][3], 0.74)
             else:
-                renk = karistir(tur["karin"], tur["sirt"], t ** 1.2)
-                if d == "alabalik":
-                    if abs(v) < 0.55 and u > 0.3:
-                        renk = karistir(renk, (232, 132, 146), 0.75)
-                    if v > 0.9 and r.random() < 0.28:
-                        renk = karistir(renk, (34, 44, 46), 0.8)
-                elif d == "morina":
-                    renk = karistir(renk, (88, 80, 58), r.random() * 0.35 if v > -0.5 else 0)
-                    if abs(v + 0.2) < 0.35 and u > 0.3:
-                        renk = karistir(renk, (236, 230, 204), 0.6)
-                elif d == "somon":
-                    if -0.6 < v < 0.8:
-                        renk = karistir(renk, (182, 196, 212), 0.55)
-                    if v > 1.2 and r.random() < 0.15:
-                        renk = karistir(renk, (20, 30, 52), 0.7)
-                elif d == "kefal":
-                    if v > -1.0 and round(v * 1.6) % 2 == 0:
-                        renk = karistir(renk, (54, 60, 70), 0.55)
-                elif d == "ringa":
-                    if -0.4 < v < 1.0:
-                        renk = karistir(renk, (196, 224, 242), 0.45)
-                if kuyrukta and u < 0.26:
-                    renk = karistir(renk, tur["sirt"], 0.5)
-            n = r.randint(-6, 6)
-            px[x, y] = (*sinirla((renk[0] + n, renk[1] + n, renk[2] + n)), 255)
-    # koyu dış çizgi
-    kenar_renk = (44, 30, 20) if pismis else (24, 36, 52)
-    for y in range(16):
-        for x in range(16):
-            if maske[y][x]:
-                continue
-            komsu = any(0 <= x + a < 16 and 0 <= y + b < 16 and maske[y + b][x + a]
-                        for a, b in ((1, 0), (-1, 0), (0, 1), (0, -1)))
-            if komsu:
-                px[x, y] = (*kenar_renk, 255)
-    # göz
-    for y in range(16):
-        for x in range(16):
-            u, v = eksen(x, y)
-            if 0.84 < u < 0.92 and 0.15 < v < 1.25 and maske[y][x]:
-                px[x, y] = (12, 12, 16, 255) if not pismis else (238, 232, 214, 255)
-                break
-    # ringa: kırağı kenarı ve parıltı (çiğde)
-    if d == "ringa" and not pismis:
+                taban, koyu = (pis[3], 0.45) if pismis else (tur["yuzgec"][1], 0.45) if ince else (tur["sirt"][2], 0.5)
+            px[x, y] = (*sinirla(karistir(taban, (8, 6, 12), koyu)), 255)
+    if ad == "kutup_morinasi":
+        # çene bıyığı: çenenin altındaki dış çizgiden sarkan iki piksel
+        x, y = kosegen(bolge, bas - 3)[-1]
+        while (x, y) in bolge:
+            y += 1
+        for k in ((x, y + 1), (x, y + 2)):
+            if k not in bolge and k[1] < 16:
+                px[k] = (*(pis[3] if pismis else (110, 94, 62)), 255)
+    if ad == "donmus_ringa" and not pismis:
+        # kırağı kenarı: sırt tarafı dış çizgide aralıklı beyaz; gövdede iki parıltı, sırtın üstünde dört kollu yıldız
         for y in range(16):
             for x in range(16):
-                if px[x, y][3] and px[x, y][:3] == kenar_renk and (x * 3 + y) % 4 == 0:
-                    px[x, y] = (236, 246, 255, 255)
-        for x, y in ((7, 7), (9, 5), (5, 9)):
-            if maske[y][x]:
-                px[x, y] = (255, 255, 255, 255)
+                if (x, y) not in bolge and px[x, y][3] and ((x + 1, y) in bolge or (x, y + 1) in bolge) \
+                        and (x, y - 1) not in bolge and (x - 1, y) not in bolge and (x + y) % 3 != 0:
+                    px[x, y] = (*KIRAGI, 255)
+        for k in ((8, 6), (5, 9)):
+            if bolge.get(k) == "govde":
+                px[k] = (255, 255, 255, 255)
+        px[3, 3] = (255, 255, 255, 255)
+        for k in ((2, 3), (4, 3), (3, 2), (3, 4)):
+            px[k] = (*KIRAGI, 170)
     return img
 
 

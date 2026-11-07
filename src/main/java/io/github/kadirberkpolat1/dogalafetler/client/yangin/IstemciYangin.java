@@ -41,9 +41,11 @@ public final class IstemciYangin {
     private static final AtesDurumuPaketi BOS = new AtesDurumuPaketi(List.of(), new long[0]);
     private static final double KUME_MESAFESI = 96;
     private static final double[] VANILLA_AYAR_CARPANI = {1.0, 0.5, 0.2};
-    private static final int SUTUN_OMRU = 240;
+    private static final int SUTUN_OMRU = 400;
     private static final int KUME_OMRU = 360;
     private static final int PIROKUMULUS_ESIGI = 12;
+    private static final double MERKEZ_SUTUN_PAYI = 0.6;
+    private static final double KUME_KAYMASI = 18.0;
     private static AtesDurumuPaketi son = BOS;
     private static ClientLevel sonDunya;
     private static EfektKalitesi kaliteZorlamasi;
@@ -155,8 +157,8 @@ public final class IstemciYangin {
         List<AtesDurumuPaketi.Ozet> sutunluk = new ArrayList<>();
         int sutunHucresi = 0;
         double merkezX = 0;
+        double merkezY = 0;
         double merkezZ = 0;
-        int tepe = Integer.MIN_VALUE;
         List<double[]> yakinlar = new ArrayList<>();
         for (AtesDurumuPaketi.Ozet o : son.ozetler()) {
             double mesafe = Math.sqrt(goz.distanceToSqr(o.x(), o.y(), o.z()));
@@ -164,11 +166,11 @@ public final class IstemciYangin {
                 sutunluk.add(o);
                 sutunHucresi += o.sayi();
                 merkezX += o.x() * o.sayi();
+                merkezY += o.ustY() * o.sayi();
                 merkezZ += o.z() * o.sayi();
-                tepe = Math.max(tepe, o.ustY());
             }
             if (mesafe > lod || o.hucreler().length == 0) {
-                if (mesafe <= KUME_MESAFESI && r.nextDouble() < 0.3 * yogunluk) {
+                if (mesafe <= KUME_MESAFESI && r.nextDouble() < 0.15 * yogunluk) {
                     ekle(level, YanginKayitlari.DUMAN.get(), o.x() + r.nextGaussian() * 2.5, o.ustY() + 1.5,
                             o.z() + r.nextGaussian() * 2.5, 0, 0.07, 0);
                 }
@@ -192,7 +194,7 @@ public final class IstemciYangin {
                 yakinlar.add(new double[] {x, y, z, d2});
             }
         }
-        sutunVeKume(level, r, sutunluk, sutunHucresi, merkezX, merkezZ, tepe, sutunTavani, yogunluk);
+        sutunVeKume(level, r, sutunluk, sutunHucresi, merkezX, merkezY, merkezZ, sutunTavani, yogunluk);
         if (yakinlar.size() > kademe.alevHucresi) {
             yakinlar.sort((a, b) -> Double.compare(a[3], b[3]));
         }
@@ -204,7 +206,7 @@ public final class IstemciYangin {
                         h[2] + r.nextGaussian() * 0.25, r.nextGaussian() * 0.01, 0.03 + r.nextDouble() * 0.04,
                         r.nextGaussian() * 0.01);
             }
-            if (i % kademe.dumanAdimi == 0 && r.nextDouble() < 0.05 * kademe.dumanCarpani * yogunluk) {
+            if (i % kademe.dumanAdimi == 0 && r.nextDouble() < 0.025 * kademe.dumanCarpani * yogunluk) {
                 ekle(level, YanginKayitlari.DUMAN.get(), h[0] + r.nextGaussian() * 0.3, h[1] + 1.2, h[2] + r.nextGaussian() * 0.3,
                         0, 0.05 + r.nextDouble() * 0.03, 0);
             }
@@ -223,34 +225,44 @@ public final class IstemciYangin {
 
     /**
      * Duman sütunu ve pirokümülüs (tasarım §2.5): yangının sütun mesafesi içindeki chunk'larından hücre sayısıyla ağırlıklı
-     * seçilen yerde yükselen sütun, ağırlık merkezinin 20–28 blok üstünde açık renkli küme. Canlı sütun parçacığı
-     * kademe tavanını, küme parçacığı tavanın yarısını aşmaz; üretim hızı tavanı ömre bölerek dolduracak kadardır.
+     * seçilen yerde yükselen sütun; büyük yangında parçacıkların çoğu ağırlık merkezinde dar ve daha hızlı yükselir. Açık
+     * renkli küme sütunun görünür ucunda, rüzgâr altına kaymış olarak doğar. Canlı sütun parçacığı kademe tavanını, küme
+     * parçacığı tavanın yarısını aşmaz; üretim hızı tavanı ortalama ömre bölerek dolduracak kadardır.
      */
     private static void sutunVeKume(ClientLevel level, RandomSource r, List<AtesDurumuPaketi.Ozet> sutunluk, int hucre,
-            double merkezX, double merkezZ, int tepe, int tavan, double yogunluk) {
+            double merkezX, double merkezY, double merkezZ, int tavan, double yogunluk) {
         if (hucre <= 0) {
             return;
         }
+        double taban = merkezY / hucre + 2.0;
+        boolean buyuk = hucre >= PIROKUMULUS_ESIGI;
         if (YanginParcacigi.SUTUNLAR.size() < tavan && r.nextDouble() < Math.min(1.0, 1.2 * tavan / SUTUN_OMRU) * yogunluk) {
-            int secim = r.nextInt(hucre);
-            for (AtesDurumuPaketi.Ozet o : sutunluk) {
-                secim -= o.sayi();
-                if (secim < 0) {
-                    if (o.sayi() >= 3) {
-                        ekle(level, YanginKayitlari.SUTUN.get(), o.x() + r.nextGaussian() * 1.5, o.ustY() + 2.0,
-                                o.z() + r.nextGaussian() * 1.5, 0, 0.18 + r.nextDouble() * 0.06, 0);
+            if (buyuk && r.nextDouble() < MERKEZ_SUTUN_PAYI) {
+                double yayilim = Math.min(3.0, 1.0 + Math.sqrt(hucre) * 0.1);
+                ekle(level, YanginKayitlari.SUTUN.get(), merkezX / hucre + r.nextGaussian() * yayilim, taban,
+                        merkezZ / hucre + r.nextGaussian() * yayilim, 0, 0.21 + r.nextDouble() * 0.04, 0);
+            } else {
+                int secim = r.nextInt(hucre);
+                for (AtesDurumuPaketi.Ozet o : sutunluk) {
+                    secim -= o.sayi();
+                    if (secim < 0) {
+                        if (o.sayi() >= 3) {
+                            ekle(level, YanginKayitlari.SUTUN.get(), o.x() + r.nextGaussian() * 1.5, o.ustY() + 2.0,
+                                    o.z() + r.nextGaussian() * 1.5, 0, 0.17 + r.nextDouble() * 0.04, 0);
+                        }
+                        break;
                     }
-                    break;
                 }
             }
         }
         int kumeTavani = Math.max(1, tavan / 2);
-        if (hucre >= PIROKUMULUS_ESIGI && YanginParcacigi.KUMELER.size() < kumeTavani
+        if (buyuk && YanginParcacigi.KUMELER.size() < kumeTavani
                 && r.nextDouble() < Math.min(1.0, 1.2 * kumeTavani / KUME_OMRU) * yogunluk) {
             double yayilim = 4.0 + Math.sqrt(hucre) * 0.25;
-            ekle(level, YanginKayitlari.KUME.get(), merkezX / hucre + r.nextGaussian() * yayilim,
-                    tepe + 20.0 + r.nextDouble() * 8.0, merkezZ / hucre + r.nextGaussian() * yayilim,
-                    ruzgar[0] * 0.03, 0.005 + r.nextDouble() * 0.01, ruzgar[1] * 0.03);
+            ekle(level, YanginKayitlari.KUME.get(), merkezX / hucre + ruzgar[0] * KUME_KAYMASI + r.nextGaussian() * yayilim,
+                    taban + YanginParcacigi.SUTUN_BOYU + r.nextDouble() * 10.0,
+                    merkezZ / hucre + ruzgar[1] * KUME_KAYMASI + r.nextGaussian() * yayilim, ruzgar[0] * 0.03,
+                    0.005 + r.nextDouble() * 0.01, ruzgar[1] * 0.03);
         }
     }
 
