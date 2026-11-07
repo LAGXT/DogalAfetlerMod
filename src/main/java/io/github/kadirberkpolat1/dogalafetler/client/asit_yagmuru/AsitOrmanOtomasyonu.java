@@ -51,8 +51,12 @@ import net.minecraftforge.fml.config.ModConfig;
  * üstünde, ona {@value #YAKIN_UZAKLIK} blok uzakta: sıçrama, cızlama dumanı ve çatlak örtüsü; AOi-1) ve bitiş kareleri.
  * Ardından alacakaranlıkta orman yangını S1 ve S5 aynı dizide, kamera yangın merkezinin 34 blok rüzgâr üstünde, 10 blok
  * yukarıda; S5'te yangın başlamadan aynı kamerada taban ölçülür, vitrinden sonra efekt kalitesi Düşük, Yüksek ve Ultra'ya
- * zorlanıp her biri ölçülür (istemci config değeri, koşu sonunda geri konur), afet durunca yanmış sahne bilgi olarak
- * ölçülür. Ölçümler K-E29 (b) {@code OLCUM} satırıdır ({@link GorselOtomasyon#olcumBasla}; FPS kapısından sonra
+ * zorlanıp her biri ölçülür (istemci config değeri, koşu sonunda geri konur). Orman bitiş karesi (K-E47 eki,
+ * inceleme-matris-5 P2-4) zamana değil yangının sönmesine bağlıdır: afet bittikten ve ortak yangın yöneticisinde yanan hücre
+ * ile bekleyen tutuşturma kalmadıktan sonra ({@value #SONME_EN_COK} tick'te sönmezse söndürülür, WARN), yanık alanın
+ * ağırlık merkezine ({@link #YANIK_UZAKLIK} blok rüzgâr üstünden, zeminin {@link #YANIK_YUKSEKLIK} blok üstünden, merkeze
+ * bakan) ayrı kameradan alınır; ağırlık merkezi S5 aktifken istemci paketinin sıcak karelerinden ({@code h}) toplanır.
+ * Ardından yanmış sahne aynı kamerada bilgi olarak ölçülür. Ölçümler K-E29 (b) {@code OLCUM} satırıdır ({@link GorselOtomasyon#olcumBasla}; FPS kapısından sonra
  * {@value #OLCUM_TICK} tick); ek satır TPS'i ve yanan hücreyi yazar. Kareler A-34 kapısından geçer
  * ({@link GorselOtomasyon#kareIste}, istekten sonra en az 20 yeni kare); kare beklenirken adım motoru durur. Ön-uyarı
  * penceresi {@code hiz 20} ile kısaltılır, radar karesinden önce hız 1'e döner. Kare satırı FPS'i, parçacık sayısını ve
@@ -67,6 +71,11 @@ public final class AsitOrmanOtomasyonu {
     private static final double YAKIN_UZAKLIK = 8;
     private static final float UFUK_PITCH = -12F;
     private static final int OLCUM_TICK = 100;
+    /** Orman bitiş kamerası: yanık merkezine yatay uzaklık ve zeminden yükseklik (tasarım notu "Afet sonrası iz"). */
+    private static final double YANIK_UZAKLIK = 24;
+    private static final double YANIK_YUKSEKLIK = 8;
+    /** Bitişten sonra yangının kendiliğinden sönmesi için en uzun bekleme (tick). */
+    private static final int SONME_EN_COK = 4800;
 
     /** Bir adım her tick çağrılır ({@code t} adımın kaçıncı tick'i); {@code true} dönünce sıradakine geçilir. */
     private interface Adim {
@@ -87,6 +96,14 @@ public final class AsitOrmanOtomasyonu {
     private static EfektKalitesi ilkKalite;
     /** Asit kamerası (sunucu thread'inde yazılıp okunur). */
     private static Kamera asitKamerasi;
+    /** S5 orman yangınının merkezi ({@link #ormanKamera}'da, sunucu thread'i). */
+    private static BlockPos ormanMerkezi;
+    /** Yanık ağırlık merkezi: istemci thread'inde sıcak karelerden toplanır (x·n, z·n, n). */
+    private static boolean yanikIzle;
+    private static double yanikX;
+    private static double yanikZ;
+    private static long yanikN;
+    private static volatile boolean sondu;
 
     static {
         ADIMLAR.add(bekle(100));
@@ -144,6 +161,9 @@ public final class AsitOrmanOtomasyonu {
         }
         ADIMLAR.add(kare(ad + "_siren"));
         ADIMLAR.add(sunucu(s -> ileri(s, AfetAsamasi.AKTIF)));
+        if (!asit) {
+            ADIMLAR.add(yanikIzi(true));
+        }
         ADIMLAR.add(bekle(aktif));
         ADIMLAR.add(kare(ad + "_aktif"));
         ADIMLAR.add(bekle(vitrin));
@@ -170,7 +190,14 @@ public final class AsitOrmanOtomasyonu {
             ADIMLAR.add(kalite(null));
         }
         ADIMLAR.add(sunucu(s -> ileri(s, AfetAsamasi.BITIS)));
-        ADIMLAR.add(bekle(bitis));
+        if (asit) {
+            ADIMLAR.add(bekle(bitis));
+        } else {
+            ADIMLAR.add(sonmeBekle());
+            ADIMLAR.add(yanikIzi(false));
+            ADIMLAR.add(yanikKamera());
+            ADIMLAR.add(bekle(bitis));
+        }
         ADIMLAR.add(sunucu(s -> olcum(s, ad + "_bitis")));
         ADIMLAR.add(kare(ad + "_bitis"));
         ADIMLAR.add(sunucu(AsitOrmanOtomasyonu::dur));
@@ -282,6 +309,83 @@ public final class AsitOrmanOtomasyonu {
         };
     }
 
+    /** Yanık ağırlık merkezini toplamaya başlar ({@code true}; sıfırlar) ya da bırakır. */
+    private static Adim yanikIzi(boolean acik) {
+        return (mc, s, t) -> {
+            if (acik) {
+                yanikX = 0;
+                yanikZ = 0;
+                yanikN = 0;
+            }
+            yanikIzle = acik;
+            return true;
+        };
+    }
+
+    /** Sıcak karelerden ({@code h}: x, z, yanan hücre üçlüleri) ağırlık merkezi; istemci tick'inde saniyede bir. */
+    private static void yanikTopla() {
+        IstemciAfetDurumu.aktif().filter(p -> p.tur() == AfetTuru.ORMAN_YANGINI).ifPresent(p -> {
+            int[] h = p.ozel().getIntArray("h");
+            for (int i = 0; i + 2 < h.length; i += 3) {
+                yanikX += (double) h[i] * h[i + 2];
+                yanikZ += (double) h[i + 1] * h[i + 2];
+                yanikN += h[i + 2];
+            }
+        });
+    }
+
+    /**
+     * Yangın sönene kadar: afet bitti ve ortak yöneticide yanan hücre ile bekleyen alan tutuşturması yok. Zamana bağlı değil;
+     * {@value #SONME_EN_COK} tick'te sönmezse WARN ile söndürülür (kare yine alınır, satırdan okunur).
+     */
+    private static Adim sonmeBekle() {
+        return (mc, s, t) -> {
+            if (t == 1) {
+                sondu = false;
+            }
+            if (t % 20 == 0) {
+                s.execute(() -> {
+                    ServerLevel level = s.overworld();
+                    int yanan = YanginYoneticisi.aktifSayi(level);
+                    boolean bitti = AfetYoneticisi.al(s).aktifAfet().isEmpty() && yanan == 0
+                            && YanginYoneticisi.bekleyenAlanSayisi(level) == 0;
+                    if (bitti && !sondu) {
+                        DogalAfetler.LOGGER.info(ON + "yangın söndü: afet bitti, yanan hücre 0");
+                    }
+                    sondu = bitti;
+                });
+            }
+            if (sondu) {
+                return true;
+            }
+            if (t >= SONME_EN_COK) {
+                s.execute(() -> {
+                    DogalAfetler.LOGGER.warn(ON + "BITIS-KAPISI yangın {} tick'te sönmedi (yanan hücre {}); söndürülüp kare alınıyor",
+                            SONME_EN_COK, YanginYoneticisi.aktifSayi(s.overworld()));
+                    dur(s);
+                });
+                return true;
+            }
+            return false;
+        };
+    }
+
+    /** Yanık merkezi istemcide hesaplanır, kamera sunucu thread'inde kurulur. */
+    private static Adim yanikKamera() {
+        return (mc, s, t) -> {
+            if (t == 1) {
+                double[] hedef = yanikN > 0 ? new double[] {yanikX / yanikN, yanikZ / yanikN, yanikN} : null;
+                hazir = false;
+                s.execute(() -> {
+                    yanikKameraKur(s, hedef);
+                    hazir = true;
+                });
+                return false;
+            }
+            return hazir;
+        };
+    }
+
     /** Yere yakın asit kamerası; hedef istemcinin bildiği aşınan bloklardan oyuncuya en yakını (ışınlama sunucuda). */
     private static Adim yakinKamera() {
         return (mc, s, t) -> {
@@ -345,7 +449,13 @@ public final class AsitOrmanOtomasyonu {
             mc.setScreen(null);
         }
         IntegratedServer s = mc.getSingleplayerServer();
-        if (mc.player == null || mc.level == null || s == null || GorselOtomasyon.kareBekliyor()) {
+        if (mc.player == null || mc.level == null || s == null) {
+            return;
+        }
+        if (yanikIzle && mc.level.getGameTime() % 20 == 0) {
+            yanikTopla();
+        }
+        if (GorselOtomasyon.kareBekliyor()) {
             return;
         }
         if (adim < ADIMLAR.size()) {
@@ -484,6 +594,7 @@ public final class AsitOrmanOtomasyonu {
         ServerLevel level = s.overworld();
         AfetYoneticisi.al(s).aktifAfet().ifPresent(afet -> {
             BlockPos m = afet.baglam().merkez();
+            ormanMerkezi = m;
             double[] r = YanginMantigi.gununRuzgari(level.getGameTime() / 24000L);
             double g = Math.max(1e-6, Math.hypot(r[0], r[1]));
             double x = m.getX() + 0.5 - r[0] / g * KAMERA_UZAKLIGI;
@@ -498,5 +609,31 @@ public final class AsitOrmanOtomasyonu {
             DogalAfetler.LOGGER.info(ON + String.format(Locale.ROOT, "orman kamerası %.0f %.0f %.0f yaw %.0f pitch %.0f", x, y,
                     z, yaw, pitch));
         });
+    }
+
+    /**
+     * Orman bitiş kamerası (K-E47 eki, P2-4): yanık ağırlık merkezinin {@link #YANIK_UZAKLIK} blok rüzgâr üstünde (yangın
+     * kamerasıyla aynı yön), oradaki zeminin {@link #YANIK_YUKSEKLIK} blok üstünde, merkezdeki zemine bakar. Ağırlık merkezi
+     * yoksa (sıcak kare gelmedi) afet merkezi.
+     */
+    private static void yanikKameraKur(IntegratedServer s, double[] hedef) {
+        ServerLevel level = s.overworld();
+        BlockPos m = ormanMerkezi != null ? ormanMerkezi : oyuncu(s).blockPosition();
+        double tx = hedef != null ? hedef[0] : m.getX() + 0.5;
+        double tz = hedef != null ? hedef[1] : m.getZ() + 0.5;
+        int ty = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, Mth.floor(tx), Mth.floor(tz));
+        double[] r = YanginMantigi.gununRuzgari(level.getGameTime() / 24000L);
+        double g = Math.max(1e-6, Math.hypot(r[0], r[1]));
+        double x = tx - r[0] / g * YANIK_UZAKLIK;
+        double z = tz - r[1] / g * YANIK_UZAKLIK;
+        int zemin = Math.max(level.getHeight(Heightmap.Types.MOTION_BLOCKING, Mth.floor(x), Mth.floor(z)), ty);
+        double y = zemin + YANIK_YUKSEKLIK;
+        float yaw = (float) Math.toDegrees(Math.atan2(-(tx - x), tz - z));
+        float pitch = (float) Math.toDegrees(Math.atan2(y - ty, YANIK_UZAKLIK));
+        ServerPlayer o = oyuncu(s);
+        o.teleportTo(level, x, y - o.getEyeHeight(), z, yaw, pitch);
+        DogalAfetler.LOGGER.info(ON + String.format(Locale.ROOT, "yanık kamerası %.0f %.0f %.0f yaw %.0f pitch %.0f; hedef %.0f %d %.0f (%s)",
+                x, y, z, yaw, pitch, tx, ty, tz, hedef != null ? "yanık ağırlık merkezi, " + (long) hedef[2] + " hücre-saniye"
+                        : "sıcak kare yok, afet merkezi"));
     }
 }

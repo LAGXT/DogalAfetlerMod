@@ -3615,7 +3615,7 @@ bulut tavanı kadrajda; eski `asit_siren` karesi kalır) ve `ao_asit_s5_yakin` (
 üstü, yatayda 8 blok, ~27° aşağı; |h − gözY| ≤ 24 sıçrama yolu çalışır). AOi-3: ortak çizim ayarı (GO-05); orman tabanı
 `s5_orman_taban` yangın başlamadan (S5 ön-uyarısında) aynı kamerada, sonra Düşük/Yüksek/Ultra (`s5_orman_*`, her biri 100 tick
 bekleme + 100 tick ölçüm); asit `s5_asit_taban` → `s5_asit_yuksek` aynı kaydedilmiş asit kamerasından. Eski stop sonrası yanmış
-sahne ölçümü tabansız bilgi `s5_orman_sonra`. AOi-2 (S1 çarpanı 0,25) entegratörde K-E39 (§E).
+sahne ölçümü tabansız bilgi `s5_orman_sonra`. **Rev. (K-E47 ek 2):** orman bitiş karesi yangın sönünce yanık merkezine bakan ayrı kameradan. AOi-2 (S1 çarpanı 0,25) entegratörde K-E39 (§E).
 
 **GO-11 Ay (vitrin, H.3, FPS).** Vitrin kamerası doğuştaki en üst bloğun 40 blok üstünde (`ust + 40`); 48. sn'den (yavaş çekim)
 05–13 kareleri pitch −4° (ay, parlama, mantar sütunu ve ufuk aynı kadrajda); `00_once`, `15`, `17_sifirla_ay_geri` −88°;
@@ -4854,7 +4854,13 @@ tabanındaysa oyuncu yerleştirilmez, `AVCI GECERSIZ` yazılır; `tsunami_gorsel
 geçersiz sayar. P2-7 #13 yetişme karesi zamana bağlıydı (%35 anında, bütün chunk'lar birlikte ilerlerken; vitrinle %0,2 fark):
 `DonmaOtomasyonu` artık gölün chunk'ı sunucuda boşalınca (`hasChunk` false, 640 blok uzakta) uzakta `donma 60` verir, geri döner ve
 kareyi olaya bağlar: yetişme kuyruğu doluyken dönüşten beri ≥ 2000 blok değişmiş (`yetisme_60_surerken`), sonra yetişme bitince aynı
-kameradan `yetisme_60_bitti`; eski `vitrin_35_yetisirken` kalktı.
+kameradan `yetisme_60_bitti`; eski `vitrin_35_yetisirken` kalktı. **Ek 2 (inceleme-matris-5 P2-4, şef kararı):** `ao_orman_bitis` tabanın kamerasından ve sabit 500 tick sonra
+alınıyordu (taban kareyle %0,0 fark: yanık alan kadrajda değildi). `AsitOrmanOtomasyonu` artık S5 aktifken istemci paketinin sıcak
+karelerinden (`h`: x, z, yanan hücre) yanık ağırlık merkezini toplar; `BITIS`'ten sonra kare zamana değil sönmeye bağlıdır (afet
+bitti, `YanginYoneticisi.aktifSayi` 0 ve bekleyen alan tutuşturması 0; 4800 tick'te sönmezse `BITIS-KAPISI` WARN ile söndürülür) ve ayrı
+kameradan alınır: yanık merkezinin 24 blok rüzgâr üstünde, zeminin 8 blok üstünde, merkezdeki zemine bakan (sıcak kare yoksa afet
+merkezi). Yanmış sahne bilgi ölçümü (`s5_orman_sonra`) aynı kamerada. `asit_orman_yangini_gorsel.py` özetine sönme/kamera satırları.
+Asit bitişi değişmedi.
 
 **K-E48 Su tamponu dolgusuz: GPU deposu yalnız büyür, CPU maliyeti sıfır (şef kararı, 2026-11-07; SU-45 gerilemesi; şefin metninde
 "K-E46").** `matris-5-ek` (`b5fd573`) `su_istemci.py hepsi` ölçümünde `kurulum_tick_cpu_en_cok` deniz 2,95 / dalga 5,80 / mağara 7,88 ms

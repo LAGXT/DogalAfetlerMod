@@ -200,6 +200,10 @@ def main():
     latest = W / "run/logs/latest.log"
     if latest.exists():
         shutil.copy2(latest, KANIT / f"latest-{no}.log")
+        # K-E47 eki (P2-4): orman bitiş karesi yangın söndükten sonra yanık kamerasından; sönmeyip söndürülen koşu satırdan okunur.
+        for satir in latest.read_text(errors="replace").splitlines():
+            if any(k in satir for k in ("yangın söndü", "BITIS-KAPISI", "yanık kamerası")):
+                log("bitiş:", satir.split(f"{ISARET} ", 1)[-1])
     sayim = girdi_sayilari(istemci_log)
     if sayim is None:
         log(f"koşu {no} GEÇERSİZ: girdi sayıları satırı yok")
