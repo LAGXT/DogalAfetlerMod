@@ -252,6 +252,8 @@ public final class AyCarpmasiOyunTestleri {
             int dusen = level.getEntitiesOfClass(FallingBlockEntity.class, alan).size();
             dogrula(y, dusmeler.toplam() > 0 && dusmeler.toplam() <= 20 && dusen == dusmeler.toplam(),
                     "altı boş yapraklar düşen bloka dönmeli (tavan 20): " + dusmeler.toplam() + ", varlık " + dusen);
+            dogrula(y, level.getEntitiesOfClass(FallingBlockEntity.class, alan).stream().noneMatch(e -> e.dropItem),
+                    "düşen blok yere konamazsa eşyaya dönebilir (dropItem)");
             dusmeler.geriAl(level);
             long yaprak = BlockPos.betweenClosedStream(yaprakBas, yaprakSon)
                     .filter(p -> level.getBlockState(p).is(Blocks.OAK_LEAVES)).count();

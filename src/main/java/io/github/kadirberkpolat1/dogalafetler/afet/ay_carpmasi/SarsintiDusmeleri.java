@@ -117,6 +117,8 @@ final class SarsintiDusmeleri {
     private void dusur(ServerLevel level, BlockPos konum) {
         BlockState durum = level.getBlockState(konum);
         FallingBlockEntity varlik = FallingBlockEntity.fall(level, konum, durum);
+        // Yere konamayan blok eşyaya dönmez: sarsıntı haritadan eşya üretmez.
+        varlik.dropItem = false;
         havadakiler.add(new Dusen(varlik, konum, durum));
         toplam++;
     }
