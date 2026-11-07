@@ -6,7 +6,8 @@ package io.github.kadirberkpolat1.dogalafetler.afet.gunes_patlamasi.mantik;
  * {@code yagmur}'a doğrusal artar; AKTIF'in başında {@code ilkGunTick} (istek 27: 10 dk), sonraki her günün başında
  * {@code gunlukTick} boyunca yağmur yoğunluğu, arasında bölüm D'nin doğrusal arka plan eğrisi
  * ({@link GunesPatlamasiEgrileri#dakikaBasinaMeteor}) sürer. Süreler ölçekli tick'tir ve afetin AKTIF sayacından ölçülür
- * (uyku sayılmaz); yoğunluk gerçek dakikadır. Afet pencereden önce biterse yağmur afetle biter.
+ * (uyku sayılmaz); yoğunluk gerçek dakikadır. Afet pencereden önce biterse yağmur afetle biter. Doğal patlama penceresi
+ * beklenirken ön-uyarı sayacı 0'da durur; öncü o sürede {@code oncuBas}'ta sabit kalır (Mt11, K-E56).
  */
 public final class MeteorYagmuruEgrisi {
     private MeteorYagmuruEgrisi() {
@@ -25,6 +26,11 @@ public final class MeteorYagmuruEgrisi {
             return 0;
         }
         return dogrusal(pay - Math.max(0, kalan), pay + sirenSure, oncuBas, yagmur);
+    }
+
+    /** Ön-uyarı bitti, doğal patlama penceresi bekleniyor (Mt11): öncü açıksa {@code oncuBas}'ta sabit, kapalıysa 0. */
+    public static double pencereBeklerken(long onUyariSure, long oncuTick, double oncuBas) {
+        return onUyariPayi(onUyariSure, oncuTick) > 0 ? oncuBas : 0;
     }
 
     /** Sirende, başından {@code gecen} tick sonra: ön-uyarıdaki artışın devamı, siren sonunda {@code yagmur}. */

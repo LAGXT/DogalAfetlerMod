@@ -5722,10 +5722,13 @@ planı. Ay çarpması: ay parçası yağmuru 600 sn, 90/dk (bölüm H'nin "1–2
 biter, ~10 dk 10 sn yuvayı tutar). Boy sürekli (`MeteorOlcegi`: %60 küçük 0,5–0,9×, %30 orta 0,9–1,6×, %10 büyük 1,6–2,5×);
 krater, yangın, sarsıntı, parlama, iz, ses ve hız boyla. Uçan meteor tavanı 96, krater bütçesi (512 × TPS kısması) değişmedi.
 Öncü meteorlar N7 gizli ön-uyarısını ve bölüm D'nin "siren başladıktan 60 sn sonra"sını bilerek bozar (MT2-2;
-`meteorYagmuruOncuSaniye=0` eski davranış). Meteor başına ödül şansı değişmedi. SARTNAME N21. **Şef kararı bekleyenler
+`meteorYagmuruOncuSaniye=0` eski davranış). Meteor başına ödül şansı değişmedi. SARTNAME N21. **Mt11 şef kararı (Gk2, MT2-18):**
+doğal patlama penceresi beklenirken (`Afet.pencereBeklemesi() >= 0`, ön-uyarı sayacı 0'da) güneşin öncü yağmuru
+`meteorYagmuruOncuDakikaBasina`'da (6/dk) sabit kalır (`MeteorYagmuruEgrisi.pencereBeklerken`, `GunesPatlamasi` çağrı noktası;
+JUnit `pencereBeklenirkenOncuBastaSabitKalir`); pencere gelince siren eğriden sürer. Mt10 meteor-2'de çözüldü (`4d4449e`: ödül
+yalnız büyük bantta, afet başına oyuncu başına tavan `meteor.odulTavaniAfetBasina` 8, `OdulTavani`). **Şef kararı bekleyenler
 (inceleme-meteor-2-2):** Mt7 gerçek hızda AKTIF karesi (görsel kanıt yavaş çekimde), Mt9 blok hasarı açıkken 90/dk sunucu
-ölçümü (TPS, krater başına INFO satırı), Mt10 olay başına ödül artışı (Meteorit Parçası ~2 → ~29, Kozmik Çekirdek
-~0,01 → ~0,27 oyuncu başına) bilinçli mi, Mt11/Gk2 pencere beklemesindeki öncü yağmur (aşağıda bilinen sınır).
+ölçümü (TPS, krater başına INFO satırı).
 
 **K-E57 Ünvan yalnız modun başarım duyurusunda; eşya başarımları yaratıcı kipte de (istek 16, 19; N16 netleştirmesi,
 kullanıcı Berk adına).** SARTNAME N16'nın "sohbet adının ve tab listesindeki adın önünde (`NameFormat`, `TabListNameFormat`)"
@@ -5765,9 +5768,9 @@ edilir, Af13…Af17 P2'leri o turda.
 ### Bilinen sınırlar (güncelleme turu 1)
 
 - **Pencere beklemesinde öncü meteor yağmuru (Gk2, Mt11, MT2-18):** doğal güneş patlaması sabah penceresini beklerken öncü
-  eğrisi `asamaKalanTick()` 0'da kenetli olduğu için yoğunluk ~16/dk/oyuncu sabit kalır; en kötü ~14–15 dk, oyuncu başına
-  ~230–250 meteor (kraterli, yangınlı, radar göstermez). Uçan tavanı ve krater bütçesi sınırlar. Düzeltme (beklemede `oncuBas`
-  6/dk, rampa pencerenin son 90 sn'sinde) şef kararına bırakıldı.
+  6/dk/oyuncuda sabit (K-E56 Mt11 kararı; önceden ~16/dk). En kötü bekleme ~14 dk, oyuncu başına ~85 meteor (krater, yangın,
+  radar göstermez). Pencere gelince siren eğrinin ön-uyarı ucundan (~14–17/dk) başlar; 6 → ~16 sıçraması bilerek kaldı (rampayı
+  pencerenin son 90 sn'sine almak karara girmedi).
 - **K-E29 (b) CPU ölçümü yok (Gk5):** canlı uzay, 1–4 kara delik ve 3B ay patlamasının render thread CPU ms/karesi ana makinede
   ölçülmedi; pc2 FPS'leri (20–42) yalnız bilgi.
 - **Meteor yoğunluğu karede okunmuyor (Mt6, Mt7):** kanıt log sayacı; görsel kareler yavaş çekimde (`dusmeHizi` 0,6). Gerçek

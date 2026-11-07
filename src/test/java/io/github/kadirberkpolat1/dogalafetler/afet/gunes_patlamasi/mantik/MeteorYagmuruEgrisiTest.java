@@ -38,6 +38,15 @@ class MeteorYagmuruEgrisiTest {
     }
 
     @Test
+    void pencereBeklenirkenOncuBastaSabitKalir() {
+        long onUyari = 1800;
+        assertTrue(MeteorYagmuruEgrisi.onUyari(0, onUyari, SIREN, 1800, 6, 24) > 13, "bekleme olmadan uçta 16,8/dk");
+        assertEquals(6.0, MeteorYagmuruEgrisi.pencereBeklerken(onUyari, 1800, 6), EPS, "Mt11: beklemede 6/dk");
+        assertEquals(6.0, MeteorYagmuruEgrisi.pencereBeklerken(600, 1800, 6), EPS, "kısa ön-uyarıda da");
+        assertEquals(0.0, MeteorYagmuruEgrisi.pencereBeklerken(onUyari, 0, 6), EPS, "öncü kapalıysa yağmur yok");
+    }
+
+    @Test
     void ilkGun10DakikaSonrakiGunler3DakikaArasindaArkaPlan() {
         long sure = 5 * GUN;
         long ilk = 12_000;
