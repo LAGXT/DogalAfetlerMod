@@ -63,8 +63,8 @@ public final class AyCarpmasiOyunTestleri {
     private static Double oncekiMeteorSikligi;
     /** Parça testinin kapattığı {@code afetBlokHasari}'nın eski değeri; geri konunca null. */
     private static Boolean eskiBlokHasari;
-    /** Parça yağmurunun ilk {@value #PARCA_TICK} tick'inde en az bu kadar ay parçası (varsayılan 90/dk: 30; istek 27'den önce 10). */
-    private static final int PARCA_ESIK = 28;
+    /** Parça yağmurunun ilk {@value #PARCA_TICK} tick'inde en az bu kadar ay parçası (varsayılan 180/dk: 60; MT2-28'den önce 30). */
+    private static final int PARCA_ESIK = 56;
     private static final int PARCA_TICK = 400;
 
     private AyCarpmasiOyunTestleri() {

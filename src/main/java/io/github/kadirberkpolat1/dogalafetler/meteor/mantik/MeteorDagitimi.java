@@ -26,10 +26,31 @@ public final class MeteorDagitimi {
 
     /** {@code ic}–{@code dis} blok halkasında alana göre düzgün bir yatay ofset: {@code {dx, dz}}. */
     public static double[] ofset(RandomGenerator r, double ic, double dis) {
-        double a = Math.max(0, Math.min(ic, dis));
-        double b = Math.max(a, dis);
-        double yaricap = Math.sqrt(a * a + r.nextDouble() * (b * b - a * a));
+        double yaricap = yaricap(r, ic, dis);
         double aci = r.nextDouble() * 2 * Math.PI;
         return new double[] {Math.cos(aci) * yaricap, Math.sin(aci) * yaricap};
+    }
+
+    /**
+     * Bakış yönüne ağırlıklı halka ofseti (MT2-28): {@code onOrani} olasılıkla yön bakışın ±90°'lik ön yarısına, kalanı
+     * arka yarısına düşer; yarı içinde açı, halkada yarıçap alana göre düzgün. {@code bakisAcisi} radyan, {@link #ofset}
+     * ekseninde (0 = +X, π/2 = +Z); {@code onOrani} 0,5'te dağılım yönsüz {@link #ofset} ile aynıdır.
+     */
+    public static double[] ofset(RandomGenerator r, double ic, double dis, double bakisAcisi, double onOrani) {
+        double yaricap = yaricap(r, ic, dis);
+        boolean on = r.nextDouble() < onOrani;
+        double aci = bakisAcisi + (r.nextDouble() - 0.5) * Math.PI + (on ? 0 : Math.PI);
+        return new double[] {Math.cos(aci) * yaricap, Math.sin(aci) * yaricap};
+    }
+
+    /** Minecraft yaw'ının (derece; 0 = +Z'ye, 90 = −X'e bakar) {@link #ofset} eksenindeki bakış açısı (radyan). */
+    public static double bakisAcisi(float yRot) {
+        return Math.toRadians(yRot + 90.0);
+    }
+
+    private static double yaricap(RandomGenerator r, double ic, double dis) {
+        double a = Math.max(0, Math.min(ic, dis));
+        double b = Math.max(a, dis);
+        return Math.sqrt(a * a + r.nextDouble() * (b * b - a * a));
     }
 }

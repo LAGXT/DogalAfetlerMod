@@ -68,7 +68,8 @@ public final class GunesPatlamasiOtomasyonu {
     private static final float KAVRULMA_PITCH = 15f;
     private static final float VITRIN_YAW = -72f;
     private static final float VITRIN_PITCH = -12f;
-    private static final double YAVAS_CEKIM = 0.6;
+    /** Vitrin yavaş çekiminin meteor uçuş süresi (tick): varsayılan 180'in 2 katı. */
+    private static final int YAVAS_CEKIM = 360;
     private static final int OLCUM_TICK = 100;
     private static final String TABAN = "s5_gunes_taban";
     /**
@@ -110,7 +111,7 @@ public final class GunesPatlamasiOtomasyonu {
     private static volatile Vec3 kameraKonumu;
     private static volatile Kamera kavrulmaKamerasi;
     private static volatile int ucanMeteor;
-    private static volatile double eskiDusmeHizi = -1;
+    private static volatile int eskiUcusSuresi = -1;
     private static volatile int vitrinYagmuru = -1;
 
     private static final List<Adim> ADIMLAR = List.of(
@@ -338,9 +339,9 @@ public final class GunesPatlamasiOtomasyonu {
             if (GorselOtomasyon.eylemKapisi(OTOMASYON, o.sahne() + " ölçümü")) {
                 GorselOtomasyon.olcumBasla(OTOMASYON, o.sahne(), o.taban());
                 olcumBas = sayac;
-                double dusme = MeteorAyarlari.dusmeHizi();
-                DogalAfetler.LOGGER.info(ON + "ölçüm {}: meteor düşme hızı {} (vitrin yavaş çekimi {}), uçan meteor {}",
-                        o.sahne(), dusme, dusme == YAVAS_CEKIM ? "açık" : "kapalı", ucanMeteor);
+                int ucus = MeteorAyarlari.ucusSuresi();
+                DogalAfetler.LOGGER.info(ON + "ölçüm {}: meteor uçuş süresi {} tick (vitrin yavaş çekimi {}), uçan meteor {}",
+                        o.sahne(), ucus, ucus == YAVAS_CEKIM ? "açık" : "kapalı", ucanMeteor);
             }
         } else if (sayac - olcumBas >= OLCUM_TICK) {
             GorselOtomasyon.olcumBitir();
@@ -514,8 +515,8 @@ public final class GunesPatlamasiOtomasyonu {
         }
         komut(s, "time set 2500");
         kamera(s, VITRIN_YAW, VITRIN_PITCH);
-        eskiDusmeHizi = MeteorAyarlari.dusmeHizi();
-        MeteorAyarlari.dusmeHiziAyarla(YAVAS_CEKIM);
+        eskiUcusSuresi = MeteorAyarlari.ucusSuresi();
+        MeteorAyarlari.ucusSuresiAyarla(YAVAS_CEKIM);
         long afetNo = y.aktifAfet().map(a -> a.baglam().baslangicSaati()).orElse(0L);
         vitrinYagmuru = MeteorAPI.yagmur(s.overworld(), List.of(oyuncu(s)), 900, 40, 0.15,
                 YanginKaynagi.afet(AfetTuru.GUNES_PATLAMASI, afetNo));
@@ -524,8 +525,8 @@ public final class GunesPatlamasiOtomasyonu {
     }
 
     private static void yavasCekimiBitir(IntegratedServer s) {
-        if (eskiDusmeHizi > 0) {
-            MeteorAyarlari.dusmeHiziAyarla(eskiDusmeHizi);
+        if (eskiUcusSuresi > 0) {
+            MeteorAyarlari.ucusSuresiAyarla(eskiUcusSuresi);
         }
         if (vitrinYagmuru >= 0) {
             MeteorAPI.yagmurDurdur(s.overworld(), vitrinYagmuru);

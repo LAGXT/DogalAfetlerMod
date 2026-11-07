@@ -43,9 +43,9 @@ public final class GunesPatlamasiAyarlari {
                 .defineInRange("meteorYagmuruSaniye", 600, 0, 1200);
         meteorYagmuruGunlukSaniye = k.comment("Sonraki her günün başındaki meteor yağmurunun süresi (ölçekli sn; 0: yok).")
                 .defineInRange("meteorYagmuruGunlukSaniye", 180, 0, 1200);
-        meteorYagmuruDakikaBasina = k.comment("Meteor yağmurunda oyuncu başına dakikadaki meteor (90 = 1,5/sn); uçan meteor "
+        meteorYagmuruDakikaBasina = k.comment("Meteor yağmurunda oyuncu başına dakikadaki meteor (180 = 3/sn); uçan meteor "
                 + "tavanı (meteor.varlikTavani) ve krater bütçesi geçerli kalır, tavan doluyken atılamayan meteor düşmez.")
-                .defineInRange("meteorYagmuruDakikaBasina", 90.0, 0.0, 300.0);
+                .defineInRange("meteorYagmuruDakikaBasina", 180.0, 0.0, 300.0);
         kavrulmaBaslangicGun = k.comment("Çimenin kaba toprağa dönmeye başladığı gün (afetBlokHasari kapalıyken hiç).")
                 .defineInRange("kavrulmaBaslangicGun", 3.0, 0.0, 10.0);
         kavrulmaOlasiligi = k.comment("Sürecin sonunda oyuncu başına her tick'teki kavrulma denemesinin olasılığı (doğrusal artış).")

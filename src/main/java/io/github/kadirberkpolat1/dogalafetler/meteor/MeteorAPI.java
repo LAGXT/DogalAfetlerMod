@@ -98,11 +98,10 @@ public final class MeteorAPI {
             return Optional.empty();
         }
         double girisAcisi = aci;
-        // Büyük meteor biraz hızlı (tipik küçük ×0,95, büyük ×1,15); eksen başına paket sınırı 3,9.
-        double hiz = Math.min(3.8, MeteorAyarlari.dusmeHizi() * MeteorOlcegi.ara(olcek, 0.95, 1.15, 0.9, 1.2));
+        double sure = MeteorOlcegi.ucusSuresi(MeteorAyarlari.ucusSuresi(), olcek);
         Yorunge yorunge = null;
         for (int deneme = 0; deneme < 6; deneme++) {
-            yorunge = Yorunge.hesapla(nokta.x, nokta.y, nokta.z, girisAcisi, azimut, MeteorAyarlari.girisYuksekligi(), hiz);
+            yorunge = Yorunge.sureyle(nokta.x, nokta.y, nokta.z, girisAcisi, azimut, MeteorAyarlari.girisYuksekligi(), sure);
             if (level.isPositionEntityTicking(BlockPos.containing(yorunge.baslangicX(), nokta.y, yorunge.baslangicZ()))) {
                 break;
             }

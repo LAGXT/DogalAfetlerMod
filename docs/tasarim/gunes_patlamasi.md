@@ -116,3 +116,8 @@ atılamayan meteor düşmez. **Boyut:** her meteorun sürekli ölçeği (`meteor
 0,9–1,6×, %10 büyük 1,6–2,5× (`buyukMeteorOrani` 0,10, `meteor.ortaMeteorOrani` 0,30); görünür boyut, hız (×0,9–1,2),
 iz, krater, yangın, sarsıntı ve patlama sesi ölçekle. Not: öncü meteorlar N7'nin gizli ön-uyarısını bilerek bozar (kullanıcı
 isteği; radar yine göstermez).
+
+**Tur 3–4 (şef kararları MT2-25, MT2-28):** uçuş 8–10 sn (200 blok yükseklik, `meteor.ucusSuresi`), AKTIF başı ve günlük
+yağmur `meteorYagmuruDakikaBasina` **180/dk** (3/sn; öncü 6 → 24 aynı): oyuncu başına gökte ~27 meteor, uçan meteor tavanı
+448. Yağmur göründüğü yerde yoğundur, arkada da düşer: çarpma noktasının 2/3'ü oyuncunun baktığı yönün ±90° ön yarısında,
+1/3'ü arkada (`meteor.bakisYonuOrani` 0,667; geliş yönü rastgele). Kadrajda ~10–13 iz. Krater bütçesi ve TPS kısması aynı.

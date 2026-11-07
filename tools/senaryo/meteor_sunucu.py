@@ -19,9 +19,10 @@ listesinde `meteor/sarsinti` var, süreçler 0 ile çıktı.
 Kullanım (worktree kökünden): python3 tools/senaryo/meteor_sunucu.py <log klasörü> | --kanit <dizin> [--port <n>] [--tps]
 `--tps` (meteor-2, inceleme-meteor-2-2 Mt9; GOREV §6 madde 10): yalnız yük ölçümü. `afetBlokHasari true`, doğuşün çevresi
 ±160 blok forceload (bir oyuncunun 10 chunk'lık simülasyon alanı; oyuncusuz sunucuda yağmurun tek hedefi doğuş noktasıdır),
-`meteor yagmur 200 90` (200 sn gerçek zaman, 90/dk), yağmur boyunca ve krater işleri bitene dek 10 sn'de bir `forge tps`;
-`<kanıt>/tps.txt`'ye örnekler, ortalama tick ms, en düşük TPS, krater ve blok işlemi sayısı. Ölçüt en düşük TPS > 18.
-Çıkış: 0 geçti, 1 senaryo/denetim hatası (--tps: TPS ölçütü tutmadı), 2 sunucu süreci sıfır dışı kodla çıktı, 3 ağır süreç
+`meteor yagmur 200 180` (200 sn gerçek zaman, 180/dk; MT2-28), yağmur boyunca ve krater işleri bitene dek 10 sn'de bir `forge tps`;
+`<kanıt>/tps.txt`'ye örnekler, ortalama tick ms, en düşük TPS, krater ve blok işlemi sayısı. Ölçüt en düşük TPS > 18 ve
+yağmur örneklerinin ortalama tick'i < 10 ms.
+Çıkış: 0 geçti, 1 senaryo/denetim hatası (--tps: TPS ya da tick ölçütü tutmadı), 2 sunucu süreci sıfır dışı kodla çıktı, 3 ağır süreç
 kapısı açılmadı (port ve kapı: cekirdek_sunucu.py, K-E13).
 """
 import re
@@ -36,12 +37,14 @@ import cekirdek_sunucu as cs  # noqa: E402
 cs.SENARYO_DUNYASI = "meteor-senaryo"
 cs.SENARYO_OZELLIKLERI = {"level-name": cs.SENARYO_DUNYASI, "level-seed": "20261106", "online-mode": "false"}
 
-TAVAN = 96
+TAVAN = 448
 KRATER = (r"meteor krateri tamam: -?\d+, -?\d+, -?\d+ \(ölçek {olcek}, {gorunum}, minecraft:overworld\): kazılan (\d+), "
           r"korunan \d+")
 TPS_SURESI = 200
+TPS_YOGUNLUK = 180
 TPS_ARALIGI = 10
 TPS_ESIGI = 18.0
+TICK_ESIGI_MS = 10.0
 
 
 def kosu1(sunucu):
@@ -141,7 +144,7 @@ def tps_ornegi(sunucu, etiket, ornekler):
 
 
 def tps_kosusu(sunucu, klasor):
-    """Mt9: blok hasarı açık 90/dk yağmurun sunucu yükü (tek hedef, 200 sn)."""
+    """Mt9/MT2-28: blok hasarı açık 180/dk yağmurun sunucu yükü (tek hedef, 200 sn)."""
     sunucu.bekle(r"Done \(", 0, cs.ACILIS_SURESI, "açılış")
     sunucu.komut("gamerule afetBlokHasari true", r"afetBlokHasari is now set to: true")
     for alan in ("~-160 ~-160 ~-1 ~-1", "~0 ~-160 ~160 ~-1", "~-160 ~0 ~-1 ~160", "~0 ~0 ~160 ~160"):
@@ -150,7 +153,7 @@ def tps_kosusu(sunucu, klasor):
     ornekler = []
     tps_ornegi(sunucu, "boşta (forceload sonrası)", ornekler)
     isaret = sunucu.isaret()
-    sunucu.komut(f"dogalafet meteor yagmur {TPS_SURESI} 90", rf"Meteor shower #\d+ started: {TPS_SURESI} s")
+    sunucu.komut(f"dogalafet meteor yagmur {TPS_SURESI} {TPS_YOGUNLUK}", rf"Meteor shower #\d+ started: {TPS_SURESI} s")
     baslangic = time.monotonic()
     while time.monotonic() - baslangic < TPS_SURESI:
         time.sleep(TPS_ARALIGI)
@@ -177,8 +180,8 @@ def tps_kosusu(sunucu, klasor):
     ort_ms = sum(o[1] for o in yagmur) / len(yagmur)
     en_dusuk = min(o[2] for o in yagmur)
     tick = TPS_SURESI * 20
-    ozet = (f"yağmur {TPS_SURESI} sn × 90/dk (tek hedef), afetBlokHasari true, ±160 blok forceload\n"
-            f"ortalama tick {ort_ms:.2f} ms, en düşük TPS {en_dusuk:.2f} (ölçüt > {TPS_ESIGI:.0f})\n"
+    ozet = (f"yağmur {TPS_SURESI} sn × {TPS_YOGUNLUK}/dk (tek hedef), afetBlokHasari true, ±160 blok forceload\n"
+            f"ortalama tick {ort_ms:.2f} ms (ölçüt < {TICK_ESIGI_MS:.0f}), en düşük TPS {en_dusuk:.2f} (ölçüt > {TPS_ESIGI:.0f})\n"
             f"krater {krater}, suya {suya}; krater blok işlemi {blok} (yağmur tick'i başına {blok / tick:.1f}, "
             f"krater başına {blok / max(1, krater):.0f})\n")
     (klasor / "tps.txt").write_text(ozet + "\n".join(f"{e}	{ms:.2f} ms	TPS {t:.2f}" for e, ms, t in ornekler) + "\n",
@@ -186,11 +189,13 @@ def tps_kosusu(sunucu, klasor):
     sunucu.yaz("### " + ozet.replace("\n", " | "))
     if en_dusuk <= TPS_ESIGI:
         raise cs.SenaryoHatasi(f"en düşük TPS {en_dusuk:.2f} ≤ {TPS_ESIGI:.0f} (GOREV §6 madde 10)")
+    if ort_ms >= TICK_ESIGI_MS:
+        raise cs.SenaryoHatasi(f"ortalama tick {ort_ms:.2f} ms ≥ {TICK_ESIGI_MS:.0f} ms (MT2-28)")
 
 
 def main():
     a = cs.argumanlar(__doc__, ek=lambda p: p.add_argument("--tps", action="store_true",
-                                                          help="yalnız 90/dk yağmurun TPS ölçümü (Mt9)"))
+                                                          help="yalnız 180/dk yağmurun TPS ölçümü (Mt9, MT2-28)"))
     klasor = a.kanit
     klasor.mkdir(parents=True, exist_ok=True)
     signal.signal(signal.SIGTERM, lambda _i, _c: (_ for _ in ()).throw(SystemExit(143)))
