@@ -5800,8 +5800,12 @@ MT2-32 iz 80–140 blok ×1,5, MT2-33 belgeler) çakışmasız (`MeteorParcacigi
 `esyalar.md` kendiliğinden). Kanıt (`7745c47`, kuyruktan): `runData` (ana, `1108-003713351-09`) yazılan 0; JUnit 613 PASSED / 0
 FAILED (ana, `1108-003713249-77`, `test @da5f90613d0e`); filtresiz GameTest (pc2, `1108-003713154-80`) "All 241 required tests
 passed", protokol 7, en büyük batch 7, göç GameTest'i `Config göçü … meteor.ayarSurumu 0 → 1` satırı, iki kasıtlı deprem
-`/ERROR]` (`gametest @574b42278318`); N19 186/186; pano `Yuva: ana 1/2 · pc2 1/2` (`pano-4.txt`). Bekleyen: meteor-2 tur 4
-incelemesi; düzelt çıkarsa yeni HEAD yeniden `merge --no-ff`.
+`/ERROR]` (`gametest @574b42278318`); N19 186/186; pano `Yuva: ana 1/2 · pc2 1/2` (`pano-4.txt`). **Ek tur 4:**
+`inceleme-meteor-2-4` kabul; `158fbaf` meteor-2 `001f10d` (MT2-34 yedekli/atomik göç yazımı, K-E61 rev.) çakışmasız. Kanıt
+(`158fbaf`, kuyruktan): `runData` (ana, `1108-005556015-d8`) yazılan 0; JUnit 616 PASSED / 0 FAILED (ana, `1108-005555911-06`,
+`test @53d3e8819c7f`); filtresiz GameTest (pc2, `1108-005555808-f9`) "All 241 required tests passed", protokol 7, en büyük
+batch 7, göç satırı yedek adıyla (`….bak-ayarSurumu0`), iki kasıtlı deprem `/ERROR]` (`gametest @889de862deba`); N19 186/186;
+pano `Yuva: ana 1/2 · pc2 1/2` (`pano-5.txt`). Tüm incelemeler kabul; `main`'e birleştirme şefin "birleştir"inden sonra.
 
 ### Bilinen sınırlar (güncelleme turu 1)
 
@@ -5813,8 +5817,10 @@ incelemesi; düzelt çıkarsa yeni HEAD yeniden `merge --no-ff`.
   ölçülmedi; pc2 FPS'leri (20–42) yalnız bilgi.
 - **pc2'de düz bakışta 180/dk yağmurda FPS 15–18 (K-E29, MT2-32 ölçümü):** ufka bakan kadrajda 180/dk çarpma dumanı/ateşi ve
   ufka kadar zemin; 35° kadrajda 20–21. Taban deneyi (`.vibe/kanit/meteor-2/deney-fps/`: `590629e` + üç iz dosyası `6210fde`
-  hâlinde) düz bakışta MT2-32'siz 15, MT2-32'li 18 ve 15 FPS verdi: düşüş MT2-32'den değil sahneden. Ana makinede ölçülmedi:
-  gizli workspace'teki istemci FPS ölçemez (K0-21 rev. 2 j).
+  hâlinde) düz bakışta MT2-32'siz 15, MT2-32'li 18 ve 15 FPS verdi: düşüş MT2-32'den değil sahneden (tek koşu, ±5 FPS).
+- **Ana makinede düz bakış FPS'i ölçülmedi (Mt30, Mt26):** gizli workspace'teki istemci FPS ölçemez (K0-21 rev. 2 j); GOREV
+  §1 hedefi için ana makinede `--olcum` koşusu gerekir (180/dk güneş AKTIF, Yüksek, 35° ve düz bakış, aynı yerde afetsiz
+  taban). Kullanıcının makinesi pc2'den güçlü [ÇIKARIM].
 - **Meteor yoğunluğu karede okunmuyor (Mt6, Mt7):** kanıt log sayacı; görsel otomasyonların yavaş çekimi `ucusSuresi` 360
   (2×, MT2-25). Gerçek hızda (180 tick uçuş, 180/dk) gökte oyuncu başına ~27 meteor, kadrajda ~10–13 iz beklenir [ÇIKARIM].
 - **Dünya hasarı (MT2-21, Mt10; kullanıcı isteği):** 10 dk yağmurda duran oyuncunun 32–160 blok halkasına 180/dk'da ~1800
@@ -5852,6 +5858,11 @@ incelemesi; düzelt çıkarsa yeni HEAD yeniden `merge --no-ff`.
   atılamayan meteor düşmez, oyuncu başına 180/dk tutmaz, log uyarısı yok. `meteor.varlikTavani` (≤ 512) elle yükselir.
 - **Düz bakan oyuncu daha az iz görür (Mt19):** ağırlık yalnız yatay baş (`getYRot`); ufka bakan oyuncunun kadrajında inen
   izlerin çoğu üst kenarın dışında kalır (~10–13 iz beklentisi göğe dönük kadraj için).
+- **Ay 35° karesinde ~7 iz (Mt29; ölçüt ≥ 8):** ay kadrajında uçanların çoğu küçük bantta (20/6/1); güneş 35° (~10) ve düz
+  bakış (~6) ölçütleri tuttu. Kaldıraç (küçük bantta ay izinin uzunluğu/parlaklığı) şef kararına; sunucu yükü yok.
+- **Yavaş çekim bilgi kareleri turlar arası eşdeğer değil (Mt32):** düz kare eklenince yavaş çekim 1801 yerine 1881'de
+  başlıyor; `gunes_aktif` karesi (2100) 219 tick yavaş çekimle, uçan 33 (gorsel-6/7: 44). Kabul karesi değil; karşılaştırmada
+  bilinmeli.
 - **Var olan dünyalar eski meteor varsayılanlarını korur (Mt22):** kapandı: MT2-31 göçü (K-E61) entegrasyon `7745c47`'de; elle
   değiştirilmiş değer bilerek korunur.
 
@@ -5924,9 +5935,18 @@ dosyası güncel sürümle yazılır, göç dokunmaz; çalışırken elle düzen
 dosyada WARN ve atlama. Kalkan anahtara (`dusmeHizi`) göç dokunmaz (spec dışı anahtar Forge'un düzeltmesine kalır). Sonraki bir
 varsayılan değişikliği yeni sürümlü adım ekler ve güncel sürümü artırır; eski sürümden gelen dosya adımları sırayla geçer.
 Meteor zinciri K-E56 rev.'de. Reddedilen: `ModConfigEvent.Loading`'de `set` (iki neden yukarıda), `ayarSurumu` varsayılanı 0
-(olayda göç için), sürüm notunda "toml'u silin" (elle seçilen değerler de kaybolur). Kanıt: JUnit `MeteorAyarGocuTest` (eski
-varsayılan → yeni, ara sürüm zinciri, elle değer korunur, güncel sürüme dokunulmaz, sayı türü), GameTest
-`eskiAyarDosyasiAcilistaGocEderElleDegerKorunur` (batch `meteor_goc`); entegrasyon dalında tam kapı (K-E59).
+(olayda göç için), sürüm notunda "toml'u silin" (elle seçilen değerler de kaybolur). **Rev. MT2-34 (Mt27; meteor-2 `001f10d`,
+entegrasyon `158fbaf`):** yazım yedekli ve atomik: yeni içerik aynı klasörde geçici dosyaya yazılır, özgün dosya
+`<dosya>.bak-ayarSurumu<eski>`'ye kopyalanır (var olan yedek ezilmez: `-2`, `-3`, …), geçici dosya `ATOMIC_MOVE` ile yerine
+taşınır, özet satırı yedeğin adını taşır. Hata yolunda (okuma, yazma, atomik taşıma desteklenmiyor) tek WARN, dosyaya
+dokunulmaz, geçici dosya silinir, Forge eski değerlerle sürer. **Kapsam (Mt28):** yalnız SERVER config'i; CLIENT config
+(`dogalafetler-client.toml`), gamerule varsayılanları (`level.dat`) ve paket yapımcısının `defaultconfigs/` dosyası (Forge ilk
+kopyada `ayarSurumu`'nu güncel sürümle doldurur, göç etmez; K-C38) K-E61 dışında. Kalıp başka SERVER bölümlerine kendi
+`<bölüm>.ayarSurumu` + `AyarKaydi.sunucuGocu` ile uygulanır; "varsayılanı değişen SERVER anahtarı göç tablosuna girer"
+kuralının bekçisi yok (öneri: N19 denetiminde yayımlanmış sürümün varsayılan anlık görüntüsüyle karşılaştırma). Kanıt:
+JUnit `MeteorAyarGocuTest` (eski varsayılan → yeni, ara sürüm zinciri, elle değer korunur, güncel sürüme dokunulmaz, sayı
+türü), `AyarGocuTest` (yedek ve numara, bozuk toml değişmez, yazılamayan klasörde dosya değişmez), GameTest
+`eskiAyarDosyasiAcilistaGocEderElleDegerKorunur` (batch `meteor_goc`, yedeği de sınar); entegrasyon dalında tam kapı (K-E59).
 
 ## Açık noktalar (Faz 2b)
 
