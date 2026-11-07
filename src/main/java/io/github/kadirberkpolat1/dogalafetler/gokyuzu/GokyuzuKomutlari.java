@@ -112,7 +112,12 @@ public final class GokyuzuKomutlari {
                     .then(Commands.literal("yildiz")
                             .then(Commands.literal("kizil_cuce").executes(b -> testYildiz(b, GunesEvresi.KIZIL_CUCE)))
                             .then(Commands.literal("pulsar").executes(b -> testYildiz(b, GunesEvresi.PULSAR)))
-                            .then(Commands.literal("secim").executes(b -> testYildiz(b, null)))));
+                            .then(Commands.literal("secim").executes(b -> testYildiz(b, null))))
+                    .then(Commands.literal("pulsarmerkez")
+                            .then(Commands.literal("dogus").executes(b -> testMerkez(b, true)))
+                            .then(Commands.literal("kaldir").executes(b -> testMerkez(b, false)))
+                            .then(Commands.literal("bilgi").executes(b -> yaz(b.getSource(),
+                                    Component.literal("[test] " + KavurmaKuyrugu.ozet(b.getSource().getServer().overworld())))))));
         }
     }
 
@@ -120,6 +125,16 @@ public final class GokyuzuKomutlari {
     private static int testYildiz(CommandContext<CommandSourceStack> b, GunesEvresi yildiz) {
         GunesZinciriSureci.zorlananYildiz = yildiz;
         return yaz(b.getSource(), Component.literal("[test] yeni yıldız = " + (yildiz == null ? "secim" : yildiz.kimlik())));
+    }
+
+    /** Geliştirme: oyuncusuz sunucuda (TPS senaryosu) pulsarın kavurma ve yangın merkezi dünya doğuş noktası olur. */
+    private static int testMerkez(CommandContext<CommandSourceStack> b, boolean dogus) {
+        if (dogus) {
+            KavurmaKuyrugu.merkezKaynagiAyarla(l -> List.of(l.getSharedSpawnPos()));
+        } else {
+            KavurmaKuyrugu.merkezKaynagiAyarla(null);
+        }
+        return yaz(b.getSource(), Component.literal("[test] pulsar merkezi = " + (dogus ? "dogus" : "oyuncular")));
     }
 
     static int baslat(CommandContext<CommandSourceStack> baglam) {

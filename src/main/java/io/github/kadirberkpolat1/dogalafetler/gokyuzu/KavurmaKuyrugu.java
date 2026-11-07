@@ -58,6 +58,10 @@ public final class KavurmaKuyrugu {
     private static final class Durum {
         int sonIslem;
         int sonButce;
+        /** Sunucu açıldığından beri (kalıcı değil): toplam yazma, tick başına en çok yazma, lav gözesi. */
+        long toplamIslem;
+        int enCokIslem;
+        int lav;
     }
 
     /** Bir tick'in (ya da tek dönüşümün) yazma sayacı ve değişen chunk'ları. */
@@ -67,6 +71,7 @@ public final class KavurmaKuyrugu {
         final float guc;
         int kalan;
         int kullanilan;
+        int lav;
         final LongOpenHashSet chunklar = new LongOpenHashSet();
 
         Islem(ServerLevel level, int butce, float guc) {
@@ -113,6 +118,14 @@ public final class KavurmaKuyrugu {
         return d == null ? 0 : d.sonButce;
     }
 
+    /** Geliştirme komutu ve TPS senaryosu: sunucu açıldığından beri bu boyuttaki kavurma toplamları. */
+    static String ozet(ServerLevel level) {
+        Durum d = DURUMLAR.get(level.dimension());
+        return d == null ? "kavurma: toplam 0, en çok 0/tick, lav 0"
+                : "kavurma: toplam " + d.toplamIslem + ", en çok " + d.enCokIslem + "/tick (bütçe " + d.sonButce
+                        + "), lav " + d.lav;
+    }
+
     static int butce() {
         return (int) Math.max(0L, Math.round(butceKaynagi.getAsInt() * kisma()));
     }
@@ -150,6 +163,9 @@ public final class KavurmaKuyrugu {
             }
         }
         d.sonIslem = islem.kullanilan;
+        d.toplamIslem += islem.kullanilan;
+        d.enCokIslem = Math.max(d.enCokIslem, islem.kullanilan);
+        d.lav += islem.lav;
         islem.bildir();
     }
 
@@ -311,6 +327,7 @@ public final class KavurmaKuyrugu {
                 && level.getBlockState(konum.above()).isAir()
                 && !level.hasNearbyAlivePlayer(konum.getX() + 0.5, konum.getY() + 0.5, konum.getZ() + 0.5, LAV_UZAKLIGI)) {
             islem.yaz(konum, Blocks.LAVA.defaultBlockState(), TAM);
+            islem.lav++;
         }
     }
 

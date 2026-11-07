@@ -145,13 +145,16 @@ public final class PulsarDunyaOyunTestleri {
         return sb.toString();
     }
 
+    /** Sahnenin blok durumları; yaprağın {@code distance}'ı vanilla'nın zamanlanmış tick'iyle yeniden hesaplanır, sabitlenir. */
     private static BlockState[] anlik(GameTestHelper y) {
         BlockState[] d = new BlockState[EN * BOY * EN];
         int i = 0;
         for (int yy = 0; yy < BOY; yy++) {
             for (int z = 0; z < EN; z++) {
                 for (int x = 0; x < EN; x++) {
-                    d[i++] = y.getBlockState(p(x, yy, z));
+                    BlockState s = y.getBlockState(p(x, yy, z));
+                    d[i++] = s.hasProperty(LeavesBlock.DISTANCE) ? s.setValue(LeavesBlock.DISTANCE, LeavesBlock.DECAY_DISTANCE)
+                            : s;
                 }
             }
         }

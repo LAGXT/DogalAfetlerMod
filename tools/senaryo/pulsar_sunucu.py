@@ -6,15 +6,15 @@
 oyuncunun 10 chunk'lık simülasyon alanı).
 
 Adımlar: diğer afet kuralları kapalı, `afetBlokHasari true`, forceload, 20 sn bekleme ve boşta `forge tps`;
-`dogalafet pulsar baslat` + `dogalafet asama ileri pulsar` (ısınma tamam, tam güç) ve `dogalafet durum` (evre pulsar);
-`dogalafet meteor yagmur 200 12` (pulsar meteor yoğunluğu `gokyuzu.pulsarMeteorDakikaBasina` = 12/dk tek hedefe: pulsarın
-kendi yağmuru oyuncu başınadır ve oyuncusuz sunucuda hedefsiz kalır); 200 sn boyunca ve krater işleri bitene dek 10 sn'de
-bir `forge tps`; sonda `yangin bilgi`, `meteor durdur`, `yangin sondur`, `sifirla`. `<kanıt>/tps.txt`'ye MAKINE, örnekler,
-ortalama tick ms, en düşük TPS, krater ve blok işlemi sayısı; özet satırı `PULSAR-TPS ...` hem log'a hem çıktıya.
-Ölçüt (pulsar-2 kanıtı): en düşük TPS > 18 ve pulsar/yağmur örneklerinin ortalama tick'i < 10 ms. Log denetimi: `invalid
-dist` yok, istisna yok, config düzeltme WARN'ı yok, ağ kimlik listesinde `gokyuzu/yutma` var, süreç 0 ile çıktı.
-Bilinen sınır: kavurma, yangın ve lav oyuncu çevresinde çalışır; oyuncusuz sunucuda yükü gök, sıcaklık, kuyruk taraması
-ve meteor/krater/meteor ateşidir. Oyunculu yük (entegre sunucu) `pulsar_gorsel.py` kare satırlarındaki TPS/mspt'dedir.
+`dogalafet pulsar baslat` + `dogalafet asama ileri pulsar` (ısınma tamam, tam güç), `dogalafet durum` (evre pulsar) ve
+`dogalafet gokyuzutest pulsarmerkez dogus` (geliştirme komutu: oyuncusuz sunucuda kavurma, kül, lav ve yangının merkezi doğuş
+noktası; meteor yağmuru oyuncusuz sunucuda zaten doğuş noktasına, `gokyuzu.pulsarMeteorDakikaBasina` = 12/dk düşer); 200 sn
+boyunca ve krater işleri bitene dek 10 sn'de bir `forge tps`; sonda `gokyuzutest pulsarmerkez bilgi` (kavurma toplamı, tick
+başına en çok yazma, lav), `yangin bilgi`, `pulsarmerkez kaldir`, `yangin sondur`, `sifirla`. `<kanıt>/tps.txt`'ye MAKINE,
+örnekler, ortalama tick ms, en düşük TPS, krater, kavurma ve yangın; özet satırı `PULSAR-TPS ...` hem log'a hem çıktıya.
+Ölçüt (pulsar-2 kanıtı): en düşük TPS > 18 ve pulsar örneklerinin ortalama tick'i < 10 ms; kavurma toplamı > 0 ve en az bir
+meteor düştü (yük gerçekten oluştu). Log denetimi: `invalid dist` yok, istisna yok, config düzeltme WARN'ı yok, ağ kimlik
+listesinde `gokyuzu/yutma` var, süreç 0 ile çıktı.
 
 Kullanım (worktree kökünden): python3 tools/senaryo/pulsar_sunucu.py --kanit <dizin> [--port <n>] [--olcum]
 `--olcum`: yalnız ana makinede koşar (kuyrukta `UZAK=0`, ana makinenin işi; K0-33, K-E29 b); verilmezse kuyruk işi
@@ -66,9 +66,8 @@ def tps_kosusu(sunucu, klasor):
     sunucu.komut("dogalafet pulsar baslat", r"pulsar is born|pulsar era has already begun")
     sunucu.komut("dogalafet asama ileri pulsar", r"(?i)pulsar", "pulsar tam güç")
     sunucu.komut("dogalafet durum", r"sun: Pulsar era", "durum (evre pulsar)")
+    sunucu.komut("dogalafet gokyuzutest pulsarmerkez dogus", r"\[test\] pulsar merkezi = dogus")
     isaret = sunucu.isaret()
-    sunucu.komut(f"dogalafet meteor yagmur {TPS_SURESI} {METEOR_DAKIKA_BASINA}",
-                 rf"Meteor shower #\d+ started: {TPS_SURESI} s")
     baslangic = time.monotonic()
     while time.monotonic() - baslangic < TPS_SURESI:
         time.sleep(TPS_ARALIGI)
@@ -78,10 +77,11 @@ def tps_kosusu(sunucu, klasor):
             break
         time.sleep(TPS_ARALIGI)
         tps_ornegi(sunucu, f"krater kuyruğu +{time.monotonic() - baslangic:.0f} sn", ornekler)
+    kavurma = sunucu.komut("dogalafet gokyuzutest pulsarmerkez bilgi", r"\[test\] kavurma: toplam \d+.*").strip()
     yangin = sunucu.komut("dogalafet yangin bilgi", r"Burning cells: \d+/").strip()
     sunucu.komut("dogalafet durum", r"sun: Pulsar era", "durum (200 sn sonra hâlâ pulsar)")
     bitis = sunucu.isaret()
-    sunucu.komut("dogalafet meteor durdur", r"Stopped \d+ command meteor shower")
+    sunucu.komut("dogalafet gokyuzutest pulsarmerkez kaldir", r"\[test\] pulsar merkezi = oyuncular")
     sunucu.komut("dogalafet yangin sondur", r"Extinguished \d+ fire cells")
     sunucu.komut("dogalafet sifirla", r"disaster and era state was reset")
     sunucu.komut("forceload remove all", r"Unmarked all force loaded chunks")
@@ -98,22 +98,28 @@ def tps_kosusu(sunucu, klasor):
     ort_ms = sum(o[1] for o in yuklu) / len(yuklu)
     en_dusuk = min(o[2] for o in yuklu)
     makine = runclient_kilit.makine()
+    kavurma_toplam = int(re.search(r"kavurma: toplam (\d+)", kavurma).group(1))
     ozet = (f"MAKINE={makine}\n"
-            f"pulsar tam güç + afetBlokHasari true + meteor {TPS_SURESI} sn × {METEOR_DAKIKA_BASINA}/dk (tek hedef), "
-            f"±160 blok forceload\n"
+            f"pulsar tam güç + afetBlokHasari true + pulsar meteor yağmuru {METEOR_DAKIKA_BASINA}/dk {TPS_SURESI} sn (tek hedef: "
+            f"doğuş noktası), ±160 blok forceload\n"
             f"ortalama tick {ort_ms:.2f} ms (ölçüt < {TICK_ESIGI_MS:.0f}), en düşük TPS {en_dusuk:.2f} (ölçüt > {TPS_ESIGI:.0f})\n"
-            f"krater {krater}, suya {suya}; krater blok işlemi {blok}; {yangin}\n")
+            f"krater {krater}, suya {suya}; krater blok işlemi {blok}; {kavurma}; {yangin}\n")
     (klasor / "tps.txt").write_text(ozet + "\n".join(f"{e}	{ms:.2f} ms	TPS {t:.2f}" for e, ms, t in ornekler) + "\n",
                                     encoding="utf-8")
-    gecti = en_dusuk > TPS_ESIGI and ort_ms < TICK_ESIGI_MS
+    gecti = en_dusuk > TPS_ESIGI and ort_ms < TICK_ESIGI_MS and kavurma_toplam > 0 and krater + suya > 0
     satir = (f"PULSAR-TPS {'GEÇTİ' if gecti else 'KALDI'} makine={makine} en_dusuk_tps={en_dusuk:.2f} "
-             f"ort_tick_ms={ort_ms:.2f} ornek={len(yuklu)} krater={krater} blok={blok}")
+             f"ort_tick_ms={ort_ms:.2f} ornek={len(yuklu)} krater={krater} suya={suya} blok={blok} "
+             f"kavurma={kavurma_toplam}")
     sunucu.yaz("### " + satir)
     print(satir, flush=True)
     if en_dusuk <= TPS_ESIGI:
         raise cs.SenaryoHatasi(f"en düşük TPS {en_dusuk:.2f} ≤ {TPS_ESIGI:.0f}")
     if ort_ms >= TICK_ESIGI_MS:
         raise cs.SenaryoHatasi(f"ortalama tick {ort_ms:.2f} ms ≥ {TICK_ESIGI_MS:.0f} ms")
+    if kavurma_toplam <= 0:
+        raise cs.SenaryoHatasi("kavurma hiç blok değiştirmedi (yük oluşmadı)")
+    if krater + suya <= 0:
+        raise cs.SenaryoHatasi("pulsar meteor yağmuru düşmedi")
 
 
 def log_denetimi(yol):
