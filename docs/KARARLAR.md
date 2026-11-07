@@ -5761,9 +5761,14 @@ bekçisi `hicBirBatchSatirKirmaz` 238'in içinde), iki `/ERROR]` kasıtlı depre
 ay 7,5, güneş yağmur dilimi, mantar satırları yerinde düzeldi; pulsar, pencere, meteor, kasırga/deprem/tsunami satırları eklendi),
 parça bölümlerine "Güncelleme turu 1" alt bölümleri, A-16/A-22/A-30/AO-03/DS-04/DS-14/K-04/TS-08/GP3/M-15/K0-24 rev. notları,
 SARTNAME N16 yeniden ve N20–N24, IZLEME 27 satır + 5 yeni, README dönem ve kırağı satırları, `donma.md` §2 kırağı satırı.
-`main`'e birleştirme şefin "birleştir" komutundan sonra. `inceleme-meteor-2-2` kabul (P2 = 11, dördü şef kararı);
-`inceleme-afet-fizik-2` düzelt (P1 Af12: sanal su yüzeyinde halka yok): dalın yeni HEAD'i entegrasyon dalında yeniden `merge --no-ff`
-edilir, Af13…Af17 P2'leri o turda.
+`main`'e birleştirme şefin "birleştir" komutundan sonra. **Ek tur (şef "DEVAM"):** `4ef57fc` main (K-E60 kuyruk; tek çakışma
+`docs/KARARLAR.md`, iki taraf da kaldı), `f9d67f7` afet-fizik `90f5a25` (AF-01 rev. 4 Af12, Af13 `KARE` kaynak sayıları, Af15),
+`2ff617d` meteor-2 `1000e58` (Mt10 `OdulTavani`, `meteor_sunucu.py --tps`), ikisi de çakışmasız; `4177def` Mt11 (K-E56). Kanıt
+(`4177def`, kuyruktan, K-E60): `runData` (ana, `1107-232739699-cc`) BUILD SUCCESSFUL, yazılan 0, `git status` boş; JUnit 603
+PASSED / 0 FAILED (ana, `1107-232739603-94`, `test @e4fa25ca6b92`); filtresiz GameTest (`FILTRE=yok`, pc2, `1107-232739507-b8`)
+"All 239 required tests passed", protokol 7, en büyük batch 7, iki kasıtlı deprem `/ERROR]` (`gametest @cd473e35f21c`); N19 186/186,
+fark 0. Pano `Yuva: ana 1/2 · pc2 1/2` (aynı klasör makine başına tek iş; `pano-2.txt`). `inceleme-meteor-2-2` kabul;
+afet-fizik tur 3 incelemesi ve meteor-2 MT2-25 bekleniyor: sonuç değişirse dalın yeni HEAD'i yeniden `merge --no-ff`.
 
 ### Bilinen sınırlar (güncelleme turu 1)
 
