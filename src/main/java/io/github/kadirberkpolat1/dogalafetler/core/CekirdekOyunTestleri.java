@@ -27,6 +27,7 @@ import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import net.minecraft.core.BlockPos;
+import net.minecraft.gametest.framework.AfterBatch;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.gametest.framework.GameTestRegistry;
@@ -321,6 +322,104 @@ public final class CekirdekOyunTestleri {
             donem.gunesEvresiAyarla(GunesEvresi.NORMAL);
         }
         yardimci.succeed();
+    }
+
+    @AfterBatch(batch = "cekirdek_gercek_kural")
+    public static void gercekKuralSonrasi(ServerLevel level) {
+        MinecraftServer server = level.getServer();
+        OyunTestiTemizligi.batchSonu(level);
+        server.getGameRules().getRule(Kurallar.GUNES_PATLAMASI_AFETI).set(true, server);
+        AfetYoneticisi.al(server).sifirla();
+    }
+
+    /**
+     * K-C7 ve K-C41 gerçek güneş patlamasıyla (madde 11; izleme-inceleme-5 P2-2). Seçimin başlattığı (elle olmayan) afet
+     * ON_UYARI'da kural kapanınca {@code IPTAL} ile kalkar; AKTIF'te {@code KURAL} ile yumuşak durur ve tamamlanmamış büyüme
+     * {@code NORMAL}'e döner (K-C26). Doğal bitişten sonra güneş zinciri kural kapanınca {@code KURAL} ile durur ve ilerlemez,
+     * açılınca sürer.
+     */
+    @GameTest(template = "bos", batch = "cekirdek_gercek_kural", timeoutTicks = 400)
+    public static void gercekGunesKuralKapanincaIptalKuralVeDevam(GameTestHelper yardimci) {
+        MinecraftServer server = yardimci.getLevel().getServer();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(server);
+        DunyaDonemi donem = yonetici.donem();
+        yonetici.durdur();
+        yonetici.sifirla();
+        GameRules.BooleanValue kural = server.getGameRules().getRule(Kurallar.GUNES_PATLAMASI_AFETI);
+        List<BitisNedeni> nedenler = new ArrayList<>();
+        OyunTestiTemizligi.dinle(AfetBittiEvent.class, olay -> {
+            if (olay.tur() == AfetTuru.GUNES_PATLAMASI) {
+                nedenler.add(olay.neden());
+            }
+        });
+        DonemSureci zincir = AfetYoneticisi.donemSurecleri().stream().filter(s -> s.kimlik().equals("gunes_zinciri"))
+                .findFirst().orElseThrow();
+        GunesEvresi[] donukEvre = new GunesEvresi[1];
+        float[] donuk = new float[1];
+        kural.set(true, server);
+        gercekGunesBaslat(yardimci, yonetici);
+        kural.set(false, server);
+        yardimci.startSequence()
+                .thenWaitUntil(() -> yardimci.assertTrue(yonetici.aktifAfet().isEmpty(),
+                        "ON_UYARI'daki afet kural kapanınca kalkmadı"))
+                .thenExecute(() -> {
+                    yardimci.assertTrue(nedenler.equals(List.of(BitisNedeni.IPTAL)) && donem.gunesEvresi() == GunesEvresi.NORMAL,
+                            "ON_UYARI'da kural kapanınca IPTAL ve evre NORMAL: " + nedenler + ", " + donem.gunesEvresi());
+                    kural.set(true, server);
+                    gercekGunesBaslat(yardimci, yonetici);
+                    yonetici.asamaIleri();
+                    yonetici.asamaIleri();
+                    yardimci.assertTrue(yonetici.aktifAfet().map(Afet::asama).orElse(null) == AfetAsamasi.AKTIF
+                            && donem.gunesEvresi() == GunesEvresi.BUYUYEN, "AKTIF'te güneş büyümeli: " + donem.ozet());
+                    kural.set(false, server);
+                })
+                .thenWaitUntil(() -> yardimci.assertTrue(yonetici.aktifAfet().isEmpty(),
+                        "AKTIF sunucu geneli afet kural kapanınca durmadı"))
+                .thenExecute(() -> {
+                    yardimci.assertTrue(nedenler.size() == 2 && nedenler.get(1) == BitisNedeni.KURAL,
+                            "AKTIF'te KURAL bitişi bekleniyordu: " + nedenler);
+                    yardimci.assertTrue(donem.gunesEvresi() == GunesEvresi.NORMAL,
+                            "tamamlanmamış büyüme NORMAL'e dönmeli (K-C26): " + donem.gunesEvresi());
+                    kural.set(true, server);
+                    gercekGunesBaslat(yardimci, yonetici);
+                    for (int i = 0; i < 8 && yonetici.aktifAfet().isPresent(); i++) {
+                        yonetici.asamaIleri();
+                    }
+                    yardimci.assertTrue(yonetici.aktifAfet().isEmpty() && donem.gunesEvresi() == GunesEvresi.SUPERNOVA
+                            && zincir.aktifMi(server.overworld()), "doğal bitiş süpernova ve güneş zinciri: " + donem.ozet());
+                })
+                // Zincir yeni döngüsünü kendi ilk tick'inde kaydeder (eski durdurma kaydını siler); kural ondan sonra kapanır.
+                .thenExecuteAfter(2, () -> {
+                    kural.set(false, server);
+                    yardimci.assertTrue(yonetici.kurallariDenetle().contains(zincir)
+                            && yonetici.durdurmaNedeni(zincir).equals(Optional.of(DonemSureci.DurdurmaNedeni.KURAL)),
+                            "kural kapanınca güneş zinciri KURAL ile durmalı");
+                    donukEvre[0] = donem.gunesEvresi();
+                    donuk[0] = donem.evreIlerlemesi();
+                    yonetici.hizAyarla(1000);
+                })
+                .thenExecuteAfter(20, () -> {
+                    yardimci.assertTrue(donem.gunesEvresi() == donukEvre[0] && donem.evreIlerlemesi() == donuk[0],
+                            "kuralla durmuş zincir ilerledi: " + donem.ozet());
+                    kural.set(true, server);
+                    yonetici.kurallariDenetle();
+                    yardimci.assertTrue(yonetici.durdurmaNedeni(zincir).isEmpty(), "kural açılınca durdurma kaydı silinmeli");
+                })
+                .thenWaitUntil(() -> yardimci.assertTrue(donem.gunesEvresi() != donukEvre[0] || donem.evreIlerlemesi() > donuk[0],
+                        "kural açılınca zincir sürmedi: " + donem.ozet()))
+                .thenExecute(() -> {
+                    DogalAfetler.LOGGER.info("Çekirdek GameTest: gerçek güneş kural yolu {}; zincir sürdü: {}", nedenler, donem.ozet());
+                    yonetici.sifirla();
+                })
+                .thenSucceed();
+    }
+
+    private static void gercekGunesBaslat(GameTestHelper yardimci, AfetYoneticisi yonetici) {
+        yardimci.assertTrue(yonetici.secimleBaslat(AfetTuru.GUNES_PATLAMASI) == AfetYoneticisi.BaslatmaSonucu.BASLADI,
+                "güneş patlaması başlamadı");
+        Afet afet = yonetici.aktifAfet().orElseThrow();
+        yardimci.assertTrue(!(afet instanceof OyunTestiAfeti) && !afet.baglam().elle(),
+                "gerçek ve seçimle başlamış afet bekleniyordu: " + afet.getClass().getSimpleName());
     }
 
     /** Durdurma, sürdürme ve aşama çağrılarını sayan sahte dönem süreci. */

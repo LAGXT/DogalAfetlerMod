@@ -389,6 +389,17 @@ public final class AfetYoneticisi {
         return konumaBaslat(tur, etkinSeviye, konumLevel, konum);
     }
 
+    /**
+     * Yalnız GameTest: sunucu geneli türü otomatik seçimin başlattığı gibi (elle değil) başlatır. GameTest sunucusunda otomatik
+     * seçim kapalıdır; gamerule'ün süren afete etkisi (K-C7, elle başlayan muaf) ancak böyle sınanır.
+     */
+    BaslatmaSonucu secimleBaslat(AfetTuru tur) {
+        if (!tur.sunucuGeneli()) {
+            throw new IllegalArgumentException(tur.kimlik() + " sunucu geneli değil");
+        }
+        return sunucuGeneliBaslat(tur, false);
+    }
+
     /** Aktif afeti temizce durdurur ({@code /dogalafet stop}); afet yoksa {@code false}. */
     public boolean durdur() {
         Optional<Afet> afet = aktifAfet();
