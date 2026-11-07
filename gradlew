@@ -85,6 +85,14 @@ done
 APP_BASE_NAME=${0##*/}
 APP_HOME=$( cd "${APP_HOME:-./}" && pwd -P ) || exit
 
+# K-E60 tek giriş: ağır iş kuyruktan (tools/senaryo/sira.py). Kuyruk işinin (SIRA_IS) ya da pc2'deki uzak.sh işinin
+# (UZAK_ICINDE) dışındaki doğrudan çağrı reddedilir; SIRA_SERBEST=1 bilerek atlar (pano onu kuyruk dışı gösterir).
+if [ -z "${SIRA_IS-}${UZAK_ICINDE-}" ] && [ "${SIRA_SERBEST-}" != 1 ]; then
+    echo "gradlew: kuyruk dışı çağrı reddedildi (K-E60). Kuyruğa ekle: tools/senaryo/sira.py ekle -- ./gradlew $*" >&2
+    echo "gradlew: ya da tools/senaryo/gradle_kapisi.sh <log> $* (kendisi kuyruğa girer); bilerek atlamak: SIRA_SERBEST=1" >&2
+    exit 3
+fi
+
 # K-E44: ekransız görevler (test, build, runGameTestServer...) ikinci makinede (pc2) koşar; UZAK=0 yerelde zorlar.
 if [ -z "${UZAK_ICINDE-}" ] && [ "${UZAK-1}" != 0 ] && [ -x "$APP_HOME/tools/senaryo/uzak.sh" ]; then
     exec "$APP_HOME/tools/senaryo/uzak.sh" --gradle "$APP_HOME" "$@"

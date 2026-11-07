@@ -235,8 +235,9 @@ def alt_surec(komut, env=None):
 
 def sarmala(main, log=None):
     """`*_gorsel.py`/`*_istemci.py` ana bloğu: `sys.exit(defter.sarmala(main, KANIT))`. Aynı girdi hash'inde `gecti`
-    varsa `main` koşmaz (0); yoksa koşar ve sonucu yazar. Log verilmezse ilk yol argümanı. pc2'de (`UZAK_ICINDE`,
-    `pc2_istemci.sh` kare/vitrin koşusu) depo ve defter yok: `main` deftersiz koşar."""
+    varsa `main` koşmaz (0); yoksa kuyruk işinin dışındaki çağrı kendini istemci işi olarak kuyruğa ekleyip bekler (K-E60;
+    kanıt klasörü `log`, pc2 alırsa geri çekilir), işin içinde koşar ve sonucu yazar. Log verilmezse ilk yol argümanı.
+    pc2'de (`UZAK_ICINDE`, `pc2_istemci.sh` kare/vitrin koşusu) depo ve defter yok: `main` deftersiz koşar."""
     if os.environ.get("DEFTER_ICINDE") or os.environ.get("UZAK_ICINDE"):
         return main()
     kimlik = betik_kimligi()
@@ -244,6 +245,8 @@ def sarmala(main, log=None):
     if bak(kimlik, girdi):
         return 0
     log = log or next((a for a in sys.argv[1:] if "/" in a), None)
+    import sira
+    sira.kuyruga_gir([sys.executable, sys.argv[0], *sys.argv[1:]], istemci=True, kanit=log)
     os.environ["DEFTER_ICINDE"] = "1"
     try:
         kod = main()

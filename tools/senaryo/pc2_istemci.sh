@@ -13,9 +13,13 @@
 # (4) yuva-1 alındıktan sonra (bütün yuvalar bizde, başka iş yok) pc2'nin boştaki Gradle daemon'larını `./gradlew --stop` ile
 # durdurur: pc2'de daemon açık (~/.gradle/gradle.properties, boşta 15 dk), her biri ~0,5 GiB tutar, istemci koşusunda en az boş
 # ~1,3 GiB. Uzak ortam: DOGALAFETLER_EKRAN=pc2, DISPLAY=$PC2_DISPLAY (vars. :0). Çıkış: `uzak.sh`'ninki (4 pc2 kapalı, 3 bekleme
-# doldu), 2 kullanım hatası.
+# doldu), 2 kullanım hatası. Tek giriş (K-E60): kuyruk işinin dışındaki çağrı kendini pc2 istemci işi olarak kuyruğa ekler ve
+# bekler (`sira.py ekle --bekle`).
 set -u
 [ $# -ge 2 ] || { echo "kullanım: tools/senaryo/pc2_istemci.sh <kanıt/> <görsel betik> [argümanlar...]" >&2; exit 2; }
+if [ -z "${SIRA_IS-}${UZAK_ICINDE-}" ] && [ "${SIRA_SERBEST-}" != 1 ]; then
+    exec python3 "$(dirname -- "$0")/sira.py" ekle --bekle --makine oto -- "$0" "$@"
+fi
 kanit=$1
 betik=${2##*/}
 shift 2
