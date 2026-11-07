@@ -2962,6 +2962,403 @@ Seviye tablosunun kendisi (çap, yükseklik, hız, süre, çekim yarıçapı, bl
 - **Elytra ıslığı:** konuşma bandı (K-07).
 - **Kaldırılan oyuncuya her tick hız paketi:** ağ; 10 Hz + istemci fiziği yeterli.
 
+## Faz 4 — Tsunami
+
+Parça `tsunami` (dal `is/tsunami`, son commit `0da931f`; `main`'e birleştirme `4f12577`, P2 kodu `c55d67d`, entegrasyon 4 6/6).
+Kaynak `.vibe/kararlar/tsunami.md` §B/§C/§D (Ts3-3, Ts4-1, Ts4-5 metin düzeltmeleri 6/6'da işlendi); sözleşmeler (§A) ve
+entegratör notları (§E) o dosyada kalır. Şef kararları (TS-14, TS-15, TS-15b, TS-16 rev. 3 = K0-33 tsunami istisnası ve Faz 5
+tetikleyicisi, K-E26 kök nedeni) "Şef kararları (Faz 4)" bölümündedir; N17 satırları sondaki tablodadır. Rapor
+`.vibe/rapor/tsunami.md`, inceleme `.vibe/rapor/inceleme-tsunami.md`, `-2.md`, `-3.md`, `-4.md` (son: kabul, P0/P1 = 0, P2 = 14),
+doğrulama `.vibe/rapor/dogrulama-tsunami.md`, `-2.md`, `-3.md` (7/7), birleştirme `.vibe/rapor/entegrasyon-4.md` §4.
+
+**TS-01 Yer ve yön (N14, N10).** `KiyiAnalizi`: hedefin `aramaYaricapi` (96) içinde en üst bloğu durgun su olan ve en az 3 blok
+derin sütun sayılır (yüklü chunk'lar; 48'den büyük yarıçapta 2 blokta bir örnek = 4 sütun). Buz, sığ gölet ve akan su sayılmaz:
+donmuş deniz tsunamiyi erteler (N10; `DonmaApi.acikSuVarMi` ile aynı sonuç tek tarama içinde). Eşik `enAzDenizSutunu` 400 (tasarım
+notu). Dalga yönü deniz örneklerinin ağırlık merkezinden karaya; kıyı merkezden denize doğru ilk su sütunu (merkez sudaysa
+karaya doğru son su sütunu), yoksa en yakın deniz sütunu. Dalga tabanı kıyı sütununun en üst su bloğu (+ dünyanın sanal deniz
+artışı). `yerUygunMu` geometriyi afet örneğinde saklar (yönetici her aday için yeni örnek kurar).
+
+**TS-02 Zaman çizelgesi.** AKTIF'in ilk anı: çekilme (`cekilmeSn` 18 sn'de tamam), dalga `dalgaGecikmeSn` (10 sn) sonra kıyıdan
+`açıklık = clamp(hız·18 sn, 60, 150)` blok açıkta doğar ve her seviyede ~18 sn'de kıyıya varır (çarpma ~28. sn, tasarım
+notu §2 tablosu). Menzil = açıklık + karaya giriş. AKTIF son dalga menzile varınca biter; BITIS dalgalar sönünceye kadar
+(sanal su `5·uzunluk` ilerleme sönümü = geri çekilme) ya da en çok 2400 ölçekli tick. `aktifKalanTick` son varışa kalan.
+
+**TS-03 Sığlaşma ve ikinci dalga.** Yükseklik `H·max(0,35, (1 - kalan/açıklık)^0,25)` (tasarım notu formülü; açıkta 0'a
+inmesin diye %35 pay: ufukta alçak geniş çizgi). 10 tick'te bir ve en az 0,4 blok değişince `dalgaGuncelle` (paket ~116 B; tick
+başına paket yok). Hız ve başlangıç değişmez (cephe konumu deterministik kalır). S3+ ikinci dalga birincisi menzile vardığı an
+aynı kökenden %60 yükseklikle başlar.
+
+**TS-04 Çekilme geometrisi.** Merkez kıyıdan `mesafe/2` açıkta, yarıçap `max(1,5·mesafe, genişlik·0,3)` (TS-12 düzeltme 4), derinlik
+`(1 + 0,8·seviye)·ayçarpanı` (1–8 blok); `mesafe` tablo çekilmesi × ay çarpanı. Ay sonrası tsunami çarpanı sürerken
+(`DunyaDonemi.carpan(TSUNAMI) > 1`, H.5) mesafe ve derinlik `ayCekilmeCarpani` (1,5) ile çarpılır. Çekilme ilk dalga kıyıya
+vardığı an biter. Oyuncusuz da hesaplanacak deniz alanı kıyı ±32 blokla sınırlı (`bolgeSabitle`, temizlikte bırakılır): dalga
+tabanı canlı zeminden gelir (SU-36), çekilme istemcide hesaplanır; ilk sürümde tüm çekilme kutusu (S5'te ~600 chunk) sabitleniyordu.
+
+**TS-05 Yıkım (B.5).** Cephenin 3 blok önüne kadar 0,7 blok aralıklı satırların sütunları (yanal 0,7 adım, her sütun bir kez)
+kuyruğa girer; satırlar kıyıdan `min(çekilme mesafesi, açıklık)` açıktan (iskele) karaya girişe kadar. Sütun taraması tick başına
+192 × TPS kısması sütun, dalga tepesi + 1'den taban - 1'e. Sınıflar: HAFİF (yaprak, cam, cam panel, çit, çit kapısı, halı;
+anında), AHŞAP (kütük, tahta, ahşap basamak/kapı/tuzak kapı, yün, bambu, ahşap ses türleri; +6 tick = 0,3 sn), TAŞ (kırıktaş,
+tuğla, taş tuğla, duvar, basamak, levha; yalnız S4–5; +12 tick). Sertlik tablo sınırını (S1 ≤1 … S5 ≤4) aşan, sıvı içeren
+(su dolu), blok varlıklı (sandık, tabela, yatak), doğal arazi (taş tabanı, toprak, kum, çakıl, cevher, kil, pişmiş toprak,
+kumtaşı) ve çimen/çiçek/ekin gibi bitkiler yıkılmaz. Tick başına `8 + 8·seviye` (S5 48) × `yikimCarpani` × TPS kısması blok.
+Kırılan ahşap/taş bloğun %30'u eşya bırakır (gerçek `ItemEntity`, dalga sürükler), tick başına en çok 2, afet başına `16·seviye`;
+tick başına en çok `tsunami.yikimEfektTick` (1) kırılma efekti (ses + parçacık), blok komşu güncellemesiz değişir (TS-12).
+`afetBlokHasari=false` iken hiç blok kırılmaz (mağara suyu yine dolar: harita değişmez). GameTest: cam t=27, ahşap t=32 (aynı
+satır), kırıktaş S2'de kaldı.
+**Ölçümle daraltıldı (görsel koşu 1):** ilk sürüm çimen, çiçek ve çarpışmasız blokları da kırıyor, her kırılanın %30'unu
+düşürüyordu: S5'te 4739 blok, ~1400 eşya varlığı; karada FPS 1,6, sunucu 100 ms/tick (rapor). Her kırılan blok istemcide bölüm
+yeniden derler; çayırı düzlemek görsel kazanç getirmeden kare ve tick bütçesini yiyordu.
+
+**TS-06 Mağara (B.7).** Tarama sırasında doğal tavanın altındaki, göğü görmeyen ve yatay komşusu göğe açık hava olan hücre
+"dalgaya açılan mağara ağzı"dır (yalnız dalga yüksekliği bandında). Doğal tavan şartı evin içini mağara saymaz; göğe açık
+komşu şartı kapalı yeraltı boşluğunu (suyun giremeyeceği) saymaz. Seviye başına en çok `1 + seviye/2` cep, ağızlar arası en az
+12 blok, cep başına `magaraHacmi·seviye` (≤ `su.magaraMaksHacim`) hücre, kalış `su.magaraKalisSn` (config, B.7). Dolum, kuruma,
+buhar ve "iz yok" sanal suyundur (`magaraDoldur`, SU-14/15).
+
+**TS-07 Sürükleme ve hasar (B.3, B.4).** `Dalga.ivme` ve `Dalga.hasar` tablo değerleri (`tsunami.md` §6; hasar sanal su
+`hurt(drown, hasar)` ile saniyede, yani tablo "can" = sağlık puanı). Sanal su hasarı yalnız ilerleyen dalgada verir
+(menzilde duran su itmez, `itmeHesapla` null): GameTest domuzu bu yüzden kıyıya yakın kondu.
+
+**TS-08 Yağmur (B.6).** Vanilla yağmur ve parçacık kullanılmaz: kendi dizi havuzlu damla sistemi (en çok 3200 damla, 480 halka),
+`POSITION_COLOR` şeritleri `AFTER_WEATHER`'da, iki katman (yakın %60: 2–14 blok, hızlı, alfa 0,42; uzak: 14–40 blok, yavaş, alfa
+0,2), dalga yönüne 25° eğik, boy 1,8/1,3 blok (vanilla ~1,2'nin 1,5 katı), zemine ya da sanal su yüzeyine değen yakın damlada 8
+tick büyüyen halka. Saniyede damla Düşük 400 / Orta 900 / Yüksek 1600 / Ultra 2600 (tasarım notu §5). Sis görüş %70, gri-mavi
+%60. Yağmur sesi vanilla `weather.rain` 8 tick'te bir. 3 sn giriş/çıkış.
+
+**TS-09 Ses (tur 2'de kendi seslerimiz).** Çekilmede `entity.cod.flop` + `block.pointed_dripstone.drip_water` (30 tick'te bir,
+açığa çıkan şeritte rastgele nokta). Yaklaşan dalga: `dogalafetler:tsunami_ugultu` (12 sn döngü, 40–150 Hz pembe gürültü
+gürlemesi + 62–78 Hz kayan kaba ton + çok düşük 2–5 kHz köpük hışıltısı, 0,5/0,25 Hz yuvarlanma), `uyari.OrtamSesi` katmanı
+`tsunami/ugultu`: dalga doğduğu an cephenin ortasında başlar, açıklığı geçerken hacim %35 → %100 (sığlaşmayla aynı süre),
+cepheyle 4 Hz taşınır, menzil `96 + genişlik/2`, dalgalar sönünce 60 tick'te, `stop`ta 20 tick'te söner; sunucu yeniden açılınca
+katman (bellekte) ilk tick'te yeniden kurulur. Çarpma: `dogalafetler:tsunami_carpma` (3 sn: 55 → 32 Hz güm, 0,4–3,5 kHz sıçrama
+patlaması ve çıtırtı, geri çekilen su hışırtısı; tanh yumuşak doyum) cephe boyunca üç noktada perde 0,85/0,95/1,05, hacim 6
+(menzil 96) + vanilla `entity.player.splash.high_speed`. Ölçüm (`docs/kanit/ses/tsunami_*_ebur128.txt`): uğultu −26,0 LUFS,
+tepe −11,5 dBTP, baskın 60/40/80 Hz, konuşma bandı −24,1 dB, döngü dikişi 0,174 (≤ 1); çarpma −22,9 LUFS, tepe −7,6 dBTP,
+baskın 40 Hz, 6 kHz üstü −30,1 dB (uyarı-ses §A4 kural 1 ve 2). Kategori `WEATHER`. İlk çarpma üretimi tepe +1,1 dBTP ve 6 kHz
+üstü −12 dB ile hedef dışı çıktı: çıtırtı darbeleri tam banttı ve gümün tepe/RMS oranı yüksekti (bant sınırı + 5 kHz alçak
+geçiren + tanh).
+
+**TS-10 Kamera.** Cephe 24 blok içinde yaklaşırken roll `0,3°·seviye·(1 + s/24)` (iki frekans), dalgada ve %50'den çok batıkken
+±8° yavaş yuvarlanma (tasarım notu). Ekran kenarında su perdesi Faz 5 cilası (şef kararı, §D).
+
+**TS-11 Test ölçeği.** GameTest küçük sahnede (`su_alani` 16³) afeti paket içi `testIcin(geometri, Olcek)` ile kurar (açıklık 6, karaya
+giriş 8, genişlik 12, uzunluk 10, gecikmesiz) ve çekirdeğin final metotlarıyla sürer; yıkım ve sanal su şablon dışına taşmaz.
+Her test kendi batch'inde (K-E16). Ölçek NBT'ye yazılır (kayıt testi).
+
+**TS-12 S5 karada FPS: kök neden yıkımın bölüm yeniden derlemesi; tick başına bölüm bütçesi (inceleme Ts1).** İlk
+raporda "uzak LOD kurulumu ortalama 38 ms" kök neden sayılmıştı: **yanlış teşhis**. O ölçüm penceresinde uzak LOD kurulumu
+`x0` (pencerede hiç kurulum bitmedi; 38 ms son bitenin ortalamasıydı ve zaten 2 ms bütçeyle tick'lere yayılır, SU-38),
+sanal su CPU'su kare başına 2,6 ms'ydi; FPS yıkımla birlikte değişiyordu (S5 4739 blok → 1,6 FPS, 1976 blok → 7,9 FPS). Her
+kırılan blok istemcide bulunduğu 16³ bölümü (ve sınırdaki komşusunu) yeniden derletir; S5'te tick başına 48 blok cephe
+boyunca (260 blok genişlik) dağınık olduğu için tick başına onlarca farklı bölüm kirleniyordu. Karar: `TsunamiYikimi.tick`
+tick başına en çok `tsunami.yikimBolumTick` × TPS kısması farklı bölüm değiştirir; sınırı aşan iş kuyrukta sırasını
+koruyarak sonraki tick'e kalır (kuyruk cephe satır sırasında: aynı bölümdeki bloklar art arda kırılır). Yıkımın görünen hızı
+cepheyi izler (bekleyen iş dalga geçtikten sonra da sürer). Ölçüm: aynı vitrin kamerasından afetsiz taban ve S5 karada
+(AKTİF'in 620. tick'i), Düşük/Yüksek/Ultra (`tsunami_gorsel.py … olc`); kök neden ayrıştırması Yüksek'te yıkımsız ve
+yağmursuz (`… ayrinti`). Kabul (K0-33 ölçüsü): S5 karada ortanca FPS ≥ tabanın %50'si.
+
+Ölçüm 1 (`gorsel-4`, bölüm bütçesi 4, `Block.UPDATE_ALL`; makine kardeş işçilerle yüklü, tabanlar koşudan koşuya oynuyor):
+
+| Koşu | taban FPS | S5 karada FPS | oran | kırılan blok / değişen bölüm | istemci parçacık | bekleyen derleme |
+|---|---|---|---|---|---|---|
+| Düşük | 26,9 | 7,5 | %28 | 1976 / 211 | 8722 | 665 |
+| Yüksek | 40,7 | 13,4 | %33 | 2159 / 302 | 6513 | 277 |
+| Ultra | 244,1 | 18,9 | %8 | 8384 / 1064 | 2794 | 1948 |
+| Yüksek, yıkımsız | 86,5 | **130,8** | %151 | 0 / 0 | 3365 | 978 |
+| Yüksek, yağmursuz | 54,7 | 10,4 | %19 | 6944 / 931 | 1907 | 2111 |
+
+Sonuç: kök neden yıkımdır (yıkımsız S5 tabanın üstünde; yağmur, köpük, sanal su ve bekleyen derleme kuyruğu tek başına FPS'i
+düşürmüyor: yıkımsız koşuda kuyruk 978 iken 130 FPS). Bölüm bütçesi 4 çoğu tick bağlayıcı değildi (Ultra: 1064 bölüm / ~640
+tick). Ek etken: `UPDATE_ALL` komşu şekil güncellemesi yaprak `distance`, çit/cam bağlantısı zincirleriyle ikinci bir blok
+değişikliği dalgası doğuruyor (bu değişiklikler bütçeye girmiyordu) ve kırılma efekti tick başına 6 × ~64 parçacık. Düzeltme 2:
+`setBlock` bayrağı `UPDATE_CLIENTS | UPDATE_KNOWN_SHAPE` (komşu zinciri yok; dalganın bantındaki yapraklar zaten kırılır), efekt
+tick başına 3, bölüm bütçesi 2.
+
+Ölçüm 2 (`gorsel-5`, `f7c5ae1`):
+
+| Koşu | taban FPS | S5 karada FPS | oran | kırılan blok / değişen bölüm |
+|---|---|---|---|---|
+| Düşük | 74,9 | 11,8 | %16 | 2166 / 320 |
+| Yüksek | 89,2 | 38,0 | %43 | 2101 / 268 |
+| Ultra | 104,7 | 42,7 | %41 | 3943 / 540 |
+
+Yüksek ve Ultra ~3 kat iyileşti (%33 → %43, %8 → %41) ama hedefin altında. Düşük ilk ölçümdü (JIT, ilk sahnenin chunk
+yüklemesi: tabanı Yüksek'ten düşük; koşudan koşuya 26,9 → 74,9 oynuyor) — ölçüm öncesine 600 tick ısınma eklendi. Bölüm
+bütçesi 2 hep bağlayıcı değil (268 bölüm / ~640 tick). Kalan aday: kırılma efekti parçacıkları (tick başına 3 × ~64 blok
+parçacığı, ölçüm 1'de yıkımlı koşularda +3000–5000 parçacık) ve tick başına kırılan blok sayısı (ışık güncellemesi, blok
+paketleri). Düzeltme 3: efekt config'e (`tsunami.yikimEfektTick`, varsayılan 1). Ölçüm 3 ayrıştırması: Yüksek'te efektsiz (0),
+yarım bütçe (`yikimCarpani` 0,5), yıkımsız; config çalışma anında otomasyondan (`c:` adımı). Ölçüm 3 aşağıda.
+
+Ölçüm 3 (`gorsel-6`, `284eb22`, efekt 1, ısınmalı):
+
+| Koşu | taban FPS | S5 karada FPS | oran |
+|---|---|---|---|
+| Düşük | 286,7 | 7,5 | %3 |
+| Yüksek | 81,6 | 26,0 | %32 |
+| Ultra | 27,9 | 6,4 | %23 |
+| Yüksek, efektsiz | 20,9 | 40,0 | %191 |
+| Yüksek, yarım bütçe | 179,3 | 37,6 | %21 |
+| Yüksek, yıkımsız | 71,6 | **20,7** | **%29** |
+
+**Ölçüm geçersiz sayıldı:** kontrol tutarsız. Aynı yıkımsız S5, ölçüm 1'de tabanın %151'i, burada %29; afetsiz tabanlar aynı
+kalite ve kamerada 20,9–286,7 FPS, afetsiz sunucu mspt 9,9–37,6 arasında oynuyor (kardeş işçilerin runClient/Gradle süreçleri aynı
+anda çalışıyor). Duvar saati kare süresi bu makinede karar verdirmiyor. Yüksek'te S5 karada mutlak değerler yıkımlı/yıkımsız
+20,7–40,0 FPS aynı bantta. Karşı önlem: ölçüm satırına render thread'inin kare başına CPU süresi
+(`ThreadMXBean.getCurrentThreadCpuTime`, başka süreçlerin zamanlayıcı bekletmesini saymaz) ve `/proc/loadavg` eklendi; ölçüm 4
+iki ölçüyü birlikte raporlar.
+
+Ölçüm 4 (`gorsel-7`, `f21b669`; loadavg 9–18, yani makine 16 çekirdekte dolu). Oran: taban / S5 karada kare süresi.
+
+| Koşu | taban FPS / CPU ms | S5 karada FPS / CPU ms | oran FPS | oran CPU | kırılan / bölüm | parçacık / varlık |
+|---|---|---|---|---|---|---|
+| Düşük | 189,7 / 3,79 | 2,3 / 220,3 | %1 | %2 | 2212 / 312 | 6758 / 153 |
+| Yüksek | 39,8 / 16,52 | 12,4 / 39,46 | %31 | %42 | 6144 / 532 | 442 / 74 |
+| Ultra | 44,5 / 10,61 | 24,8 / 30,34 | %56 | %35 | 5305 / 538 | 981 / 63 |
+| Yüksek, efektsiz | 83,1 / 5,65 | 19,7 / 26,88 | %24 | %21 | 3020 / 426 | 400 / 102 |
+| Yüksek, yarım bütçe | 86,8 / 7,80 | 21,0 / 27,26 | %24 | %29 | 2525 / 518 | 774 / 111 |
+| Yüksek, yıkımsız | 106,5 / 7,59 | 45,4 / 16,88 | %43 | %45 | 0 / 0 | 566 / 77 |
+
+Okuma: (1) her ölçüm `su vitrin` ile yeni bir kumsal seçer (önceki köy yıkıldığı için), satırlar aynı sahne değil; yalnız satır
+içi oran karşılaştırılabilir. (2) Yıkımsız S5 de CPU'da %45: yıkım tek neden değil. Pencere (AKTİF'in 620–720. tick'i) dalganın
+kıyıya vurduğu anın (560. tick) hemen ardı: o anda çekilme biter ve istemci çember içindeki bütün su bölümlerini yeniden
+derler (S5 yarıçap 130 blok, ~200 chunk sütunu); yıkımsız satırda da bekleyen derleme 355 (afetsiz 0). (3) Efekt ve yarım bütçe
+satırları tam yıkımdan iyi değil: tick başına blok/efekt sayısı belirleyici görünmüyor; maliyet değişen bölümlerin sayısıyla
+(426–538) ilgili. (4) Düşük satırı her koşuda ilk sahnedir (doğuşa en yakın kumsal, 153 varlık, 6758–8722 parçacık; sonraki
+sahneler 54–111 varlık, 400–1000 parçacık): o sahnedeki hayvanlar sanal dalgaya girip çıkarken vanilla sıçrama/kabarcık
+parçacığı üretiyor [ÇIKARIM: `EntityMixin` `wasTouchingWater`'ı doldurduğu için `doWaterSplashEffect` yolu; `su` paketi, kaçış
+tasarımı sanal su sahibine]. Düzeltme 4: çekilme yarıçapı `max(1,5·mesafe, genişlik·0,3)` (S5 130 → 78 blok, alan ×0,36). Ölçüm 5
+(`gorsel-8`) aşağıda.
+
+Ölçüm 5 (`gorsel-8`, `afc5aa8`; loadavg 7–13):
+
+| Koşu | taban FPS / CPU ms | S5 karada FPS / CPU ms | oran FPS | oran CPU | kırılan / bölüm | bekleyen derleme |
+|---|---|---|---|---|---|---|
+| Düşük | 292,5 / 3,28 | 23,1 / 31,71 | %8 | %10 | 1971 / 311 | 5 |
+| Yüksek | 293,2 / 3,09 | 78,8 / 12,00 | %27 | %26 | 2433 / 302 | 1282 |
+| Ultra | 77,2 / 7,89 | 37,1 / 20,05 | %48 | %39 | 5312 / 540 | 1795 |
+| Yüksek, efektsiz | 82,8 / 7,02 | 20,0 / 30,78 | %24 | %23 | 4794 / 542 | 370 |
+| Yüksek, yarım bütçe | 89,1 / 6,33 | 6,4 / 82,33 | %7 | %8 | 2482 / 393 | 1684 |
+| Yüksek, yıkımsız | 221,9 / 3,37 | **149,9 / 5,81** | **%68** | **%58** | 0 / 0 | 0 |
+
+Okuma: düzeltme 4 yıkımsız S5'i hedefin üstüne taşıdı (CPU %45 → %58, bekleyen derleme 355 → 0): çekilme sonu yeniden derlemesi
+çözdü. Kalan maliyetin tamamı yıkım. Yıkımlı satırlarda bekleyen derleme 1282–1795 iken pencerede değişen bölüm yalnız
+302–540: her kırılan bölüm başına istemcide 3–4 bölüm derleniyor [ÇIKARIM: ışık güncellemesi (çatı kırılınca gökyüzü ışığı
+sütun boyunca değişir) ve sınır komşuları 3×3×3 bölümü kirletir]. Tick başına 2 bölüm farklı chunk sütunlarına dağılabiliyordu.
+Düzeltme 5: ayrıca tick başına en çok `tsunami.yikimChunkTick` (1) farklı chunk sütunu; aynı sütundaki ışık ve komşu kirlenmeleri
+tek derlemede birleşir. Cephe 260 blok (~17 sütun) genişliğinde ve ~640 tick'lik pencerede sütun başına ~37 tick kalır:
+yıkım cepheyi gecikmeyle izler. Ölçüm 6 (`gorsel-9`) aşağıda.
+
+Ölçüm 6 (`gorsel-9`, `07dd394`; loadavg 11–17):
+
+| Koşu | taban FPS / CPU ms | S5 karada FPS / CPU ms | oran FPS | oran CPU | kırılan / bölüm | bekleyen derleme |
+|---|---|---|---|---|---|---|
+| Düşük | 24,0 / 19,86 | 10,5 / 69,75 | %44 | %28 | 2191 / 242 | 1362 |
+| Yüksek | 40,0 / 14,93 | 14,7 / 29,61 | %37 | **%50** | 4562 / 287 | 883 |
+| Ultra | 212,2 / 3,34 | 43,3 / 17,28 | %20 | %19 | 3287 / 278 | 0 |
+
+Okuma: sütun bütçesi değişen bölümü 302–540'tan 242–287'ye indirdi; K0-33 ölçüsü (Yüksek) CPU'da tam sınırda (%50,4),
+duvar saatinde %37. Tabanlar aynı kalite ve kamerada yine 3,3–19,9 ms CPU oynuyor (her ölçüm başka kumsal): tek satır karar
+verdirmiyor. Ölçüm 7 (`gorsel-10`, bölüm `tekrar`): Yüksek'te bölüm bütçesi 2 ve 1 dönüşümlü ikişer kez.
+
+Ölçüm 7 (`gorsel-10`, `da553a3`; Yüksek, loadavg 7–15):
+
+| Koşu | taban FPS / CPU ms | S5 karada FPS / CPU ms | oran FPS | oran CPU | kırılan / bölüm | görünür bölüm taban → karada |
+|---|---|---|---|---|---|---|
+| bölüm 2, 1. | 78,4 / 8,70 | 15,2 / 39,56 | %19 | %22 | 1135 / 193 | 333 → 316 (167 varlıklı ilk sahne) |
+| bölüm 1, 1. | 273,1 / 3,27 | 128,0 / 7,50 | %47 | %44 | 1082 / 239 | 438 → 371 |
+| bölüm 2, 2. | 183,3 / 4,40 | 21,1 / 24,21 | %12 | %18 | 3342 / 369 | 467 → 528 |
+| bölüm 1, 2. | 280,3 / 3,30 | 45,7 / 16,45 | %16 | %20 | 3544 / 269 | 456 → **1343** (bekleyen derleme 0) |
+
+Okuma: (1) bölüm bütçesi 1 iki eşleşik çiftte de 2'den iyi (%44 / %22, %20 / %18) → varsayılan 1. (2) Son satırda bekleyen
+derleme 0 iken CPU 3,3 → 16,5 ms; görünür bölüm 456 → 1343: yıkılan köy kameranın önündeki örtüyü kaldırıyor, vanilla
+üç kat bölüm çiziyor. Bu, afetin çalışma maliyeti değil dünyanın yeni hali; yıkımın kendisi (örtü kalktı) bir afet sonrası
+oyuncunun her zaman göreceği yük. Ölçüm 8 (`gorsel-11`) her koşuya `stop`'tan 200 tick sonra afetsiz "sonra" tabanını
+ekler: karada / sonra oranı tsunaminin kendi maliyetini, karada / önce oranı K0-33 ölçüsünü verir.
+
+Ölçüm 8 (`gorsel-11`, `417a4d5`: bölüm 1, sütun 1, efekt 1; loadavg 6–12). "önce" afetsiz taban, "sonra" `stop`'tan 200 tick
+sonra aynı kamera:
+
+| Koşu | önce FPS / CPU ms | karada FPS / CPU ms | sonra FPS / CPU ms | karada/önce FPS, CPU | karada/sonra FPS, CPU | kırılan / bölüm | karada varlık / parçacık |
+|---|---|---|---|---|---|---|---|
+| Düşük (ilk sahne) | 298,1 / 2,85 | 19,6 / 37,02 | 162,6 / 5,90 | %7, %8 | %12, %16 | 1206 / 200 | 148 / 5650 |
+| Yüksek | 138,6 / 6,41 | 27,5 / 27,11 | 93,2 / 9,83 | %20, %24 | %30, %36 | 653 / 147 | 152 / 6716 |
+| Ultra | 78,2 / 8,24 | 38,1 / 20,64 | 56,5 / 13,90 | %49, %40 | %67, %67 | 1049 / 269 | 91 / 1149 |
+| Yüksek 1. tekrar | 45,7 / 11,41 | 69,5 / 11,63 | 126,4 / 7,02 | **%152, %98** | %55, %60 | 1136 / 270 | 87 / 1711 |
+| Yüksek 2. tekrar | 84,9 / 7,59 | 92,1 / 9,47 | 175,4 / 4,70 | **%108, %80** | %53, %50 | 1009 / 268 | 79 / 874 |
+| Yüksek 3. tekrar | 226,6 / 3,12 | 33,3 / 21,56 | 94,9 / 9,04 | %15, %14 | %35, %42 | 3707 / 270 | 45 / 156 |
+
+Okuma: K0-33 ölçüsü (Yüksek, karada/önce) dört sahnede FPS %20 / %152 / %108 / %15 (ortanca %64; 2/4 geçer), CPU %24 / %98 /
+%80 / %14 (ortanca %52). Tsunaminin kendi maliyeti (karada/sonra) Yüksek'te CPU %36–60 (ortanca %46). Geçmeyen iki Yüksek
+sahnenin nedeni ayrı: (a) 152 varlıklı sahnede 6716 istemci parçacığı (Düşük ilk sahne de 148 varlık / 5650 parçacık; geçen
+sahnelerde 79–87 varlık / 874–1711) — [ÇIKARIM] sanal dalgada girip çıkan varlıkların vanilla sıçrama parçacığı, `su`
+paketi (§E); (b) 3707 bloğu yıkılan sahnede görünür bölüm 457 → 1232 (köy örtüsü kalktı, "sonra" tabanı da 9,04 ms). Tick başına
+bölüm ve sütun bütçesi artık bağlayıcı: değişen bölüm her koşuda 147–270, bekleyen derleme 0–1427. **Sonuç: Ts1 kesin
+karşılanmadı;** kabul ölçüsü için şef kararı istendi (rapor "Açık").
+
+**TS-13 Köpük katmanı (tur 2).** Tepe köpüğü ortak su renderer'ında karede seçilmiyordu (S5 karelerinde beyaz piksel ~%0).
+`client.tsunami.TsunamiKopugu` (`AFTER_TRIPWIRE_BLOCKS`, yani su çiziminden sonra; `POSITION_COLOR`, derinlik yazılmaz) yalnız
+tsunami sürerken her dalganın cephesi boyunca üç şerit çizer: tepe şeridi (`s` 1,4–2,5 opak %92, 2,5–4,5 saydamlaşır; yüzeyin
+0,10–0,12 üstü), ön yüz çizgileri (`s` 0,35–1,4, yanal konuma bağlı desenle kesik, 6 sn'de bir değişir) ve cephe tabanında
+bore (yükseklik %12, en çok 1,6 blok, titreşen üst kenar). Yükseklik `Dalga.yuzey` analitik yüzeyinden; renk gün ışığıyla
+(`getSkyDarken`, 0,3–1). Yanal adım 1 blok, kameradan 64 blok ötede 2, 220 ötede 4; Düşük kalitede yalnız tepe şeridi ve 2
+blok (N13). S5 (260 genişlik) ~260 segment × en çok 4 dörtgen.
+
+**TS-14 Faz 5 cilası (şef kararı, tur 2).** Ekran kenarındaki su perdesi ve istemcide yüzen görsel enkaz (`SuruklenenBlokVarligi`)
+Faz 4'te yapılmaz; tasarım notu §7'ye "Faz 5 cilası" olarak yazıldı.
+
+**TS-15 Yıkım kuyruğu bölüm (16³) anahtarlı; seçilen bölümün hazır blokları aynı tick'te (şef kararı, tur 4; inceleme Ts1 (b)).**
+Ölçüm 8'in 3707 bloklu sahnesinde karada − sonra 12,5 ms (diğer Yüksek sahnelerde 4,6 / 4,8): fazla yıkım hacminin
+yeniden derleme yükü. TS-12'nin bütçeleri tick başına bölümü sınırlıyordu ama bir bölümü birden çok tick'e dağıtıyordu: (1)
+blok bütçesi (S5 48) bölümü ortasından kesiyordu (150 bloklu bir ev bölümü 4 tick'te, yani 4 kez derleniyordu); (2) üç
+sınıf kuyruğu (hafif / ahşap / taş) ayrı FIFO'lardı, aynı bölümün sınıfları arasında başka bölümler araya giriyordu. Karar:
+`TsunamiYikimi` bekleyen işi bölüm anahtarıyla, bölümün ilk iş aldığı sırada (cephe satır sırası) tutar; tick başına en çok
+`tsunami.yikimBolumTick` × TPS kısması bölüm ve `tsunami.yikimChunkTick` sütun seçilir, seçilen bölümün **o an hazır
+bütün blokları** aynı tick'te kırılır. Blok bütçesi (`8 + 8·seviye` × `yikimCarpani`) yalnız yeni bölüme başlamayı
+sınırlar: toplam hacim aynı (`yikimCarpani` düşürülmez, B.5), süre uzar. Bütçeye takılan bölüm atlanır, sıradaki hazır
+bölüm (aynı sütunda olabilir) alınır. Sınıf gecikmeleri korunur (B.5: cam ve yaprak anında, ahşap 0,3 sn sonra; GameTest
+`dalgaOnceCamSonraAhsapYikarAraziKalir` aynı bölümde cam ile ahşabın ≥ 5 tick arayla kırıldığını doğrular): bölüm en çok sınıf
+gecikmesi ve cephenin yeni satırları kadar tekrar seçilir. Varsayılan bölüm bütçesi 1 kalır (ölçüm 7'de 1, 2'den iyi; şefin örneği
+4 config'le ayarlanabilir). `temizlendi` satırına "bekleyen yıkım" eklendi (stop anında kuyrukta kalan sütun + blok). Ölçüm
+sonucu TS-16. **Düzeltme (inceleme-tsunami-3 Ts3-3, entegrasyon 6/6):** eski kuyruğun bağlayıcı sınırı 48 blok/tick bütçesi
+değil, kuyruk başı bölüm koşusuydu (~4 blok/tick); "150 bloklu bölüm 4 tick'te" ve TS-15b (5), TS-16 (2)'deki "48 blok/tick"
+ifadeleri bu sınırı anlatmıyor. TS-15 değişen bölüm sayısını düşürmedi (TS-16 (2): afet başına 101–270); istemci kirlenmesi
+ışık güncellemesiyle (değişen blok başına bölümü ve 26 komşusu, 27 bölüm) büyüyor.
+
+**TS-15b Yıkım bütçesi: birim bütünlüğü + jetonlu hız + chunk sütunu birimi (şef kararı tur 5; inceleme-tsunami-3 Ts3-1).**
+(1) **Bütünlük:** TS-15 kalır: başlatılan birimin o an hazır bütün blokları aynı tick'te kırılır; tick başına **başlatılan**
+birim `tsunami.yikimBolumTick` × TPS kısması (varsayılan **1**; SERVER config, N13 efekt kademesine bağlı değil) ve
+`yikimChunkTick` sütunla sınırlı. (2) **Jeton (Ts3-1, P1):** ilk TS-15b sürümünde (`7bcb07f`) döngü ilk kırılan birimde bitiyor,
+blok bütçesi (`8 + 8·seviye` × `yikimCarpani` × TPS kısması) hiç bağlamıyordu: TPS düşünce yıkım yavaşlamıyordu (şartname
+madde 3; eski kuyruk kısmada ≤ 12 blok/tick). Şimdi jeton her tick blok bütçesi kadar dolar (en çok bir tick'lik); birim ancak
+jeton ≥ 0 iken başlar, kırılan blok sayısı jetondan düşülür (negatife inebilir, sonraki tick'lerde dolar): ortalama hız = blok
+bütçesi, birim bölünmez, kısmada yavaşlar. `yikimBolumTick` üst sınır olarak kalır, bağlayıcı olan jeton. GameTest
+`yikimJetonuKismadaYavaslarBolumBolunmez` (batch `tsunami_jeton`): iki cam yığını (3×8×7) tek kuyrukla; her tick'te ≤ 1 bölüm,
+başlayan bölümün kalan camı aynı tick'te, toplam ≤ jeton × tick + en büyük bölüm; ikinci yığın tam hızda 3, ×0,25 kısmada 13
+tick sonra başlıyor. (3) **Birim: chunk sütunu (varsayılan, `tsunami.yikimSutunBirimi=true`).** İstemci değişen her blok için
+bölümünü ve 26 komşusunu kirletir (`setSectionDirtyWithNeighbors`); aynı tick'te örtüşenler bir kez derlenir. Ölçüm satırına
+kirletilen bölüm (tick başına değişen bölümlerin 3×3×3 komşuluk birleşimi, pencere farkı) ve bekleyen derleme (`pC`) eklendi.
+`gorsel-15` (`b40a948`, `deney`, Yüksek, karada 100 tick penceresi):
+
+| Sahne / birim | kırılan | değişen bölüm | kirletilen bölüm | kirletilen / kırılan | bekleyen derleme | karada ms (CPU) |
+|---|---|---|---|---|---|---|
+| 1 bölüm, eşyasız | 1604 | 41 | 1107 | 0,69 | 1872 | 16,08 (13,60) |
+| 2 sütun | 4994 | 19 | 405 | 0,08 | 1675 | 6,72 (6,33) |
+| 3 bölüm | 2326 | 88 | 2376 | 1,02 | 759 | 17,02 (15,07) |
+| 4 sütun | 1045 | 37 | 999 | 0,96 | 466 | 16,14 (14,74) |
+
+Sütun biriminde tick başına kirletilen bölüm 4,1 / 10,0, bölümde 11,1 / 23,8; kırılan blok başına toplam 1404 / 6039 = 0,23 (sütun) ve
+3483 / 3930 = 0,89 (bölüm). Sahneler farklı kumsal (her `su vitrin` yenisini seçer) olduğu için tek tek kıyas gürültülü. **Düzeltme
+(inceleme-tsunami-4 Ts4-1, entegrasyon 6/6):** havuzlanmış 0,23 / 0,89 farkını yalnız sütun kipinde koşulan yoğun sahne 2 yaratıyor;
+eşli sahnelerde (aynı sahne sırası, iki kip) blok başına kirletilen bölüm sütunda düşmüyor (sahne 1: 1,52 / 1,52; sahne 3:
+bölüm 0,65, sütun 0,84). Gösterilen: değişen bölüm başına %10–23 örtüşme tasarrufu; blok başına toplamda fark
+gösterilmedi. Sütun varsayılanı zararsız olduğu için kalır; eşli koşu (`yikimSutunBirimi=false`, aynı sahne sırası, `pC`
+farkı) Faz 5 açık noktası. (4) **Kuyruk ve bitiş:** `stop` bekleyen kuyruğu atar (K-C26 temiz bitiş; `temizlendi`
+satırı kırılan, değişen ve kirletilen bölümü, tick başına en çok birimi ve bekleyeni yazar); doğal bitişte BITIS dalgalar
+sönünce **ve** kuyruk jetonlu hızla boşalınca biter (`bitisTamam`; üst sınır 2400 ölçekli tick). (5) **Dürüst not (B.5):** tur
+4'e kadar ölçülen kırılan blok 653–3707 (ölçüm 8) yıkımın gerçek hacmi değildi: 48 blok/tick kuyruğu biriktiriyor, `stop`
+biriken kuyruğu atıyordu (doğal bitiş de dalga sönünce bekleyeni atıyordu, inceleme Ts2-2); FPS ölçümleri yıkım yükünün bir
+kısmını görmüyordu. Birim bütünlüğüyle afet başına 1910–23440 blok kırılıyor (`gorsel-13`/`-14`; sütunla `gorsel-15`
+17110): B.5'in S5'teki gerçek hacmi; kabul edildi, süre uzar, kare başına yeniden derlenen bölüm düşer. (6) **Eşya (Karar 3
+ipucu):** yeni config `tsunami.yikimEsyaOrani` (varsayılan 0,3, eski sabit). Eşyasız sahnede istemci tick'i yine 4,08 ms/kare;
+örnekleyici (`PROFIL`, tick başına duvar ms) `ItemEntity` yollarını eşyalı sahne 1'de (`gorsel-14`, 83 eşya) ~1,1 / 10,6 ms,
+eşyasızda ~0,6 / 11,4 ms buldu: eşya baskın değil, varsayılan düşürülmedi.
+
+**TS-16 Ts1 kabul ölçümü (tur 4, `gorsel-13`, `5e77ba8`: TS-15 + K-E26 birleşik): karşılanmadı, 1/4 sahne geçti.** Ölçü şef
+kararıyla: her S5 sahnesinde Yüksek'te "sonra" tabanı (aynı sahne, `stop`'tan 200 tick sonra) / karada ortanca kare süresi
+≥ %50; geçerlilik karada ve sonra pencerelerinde mspt < 50, yabancı Gradle ≤ 1, sonra tabanı temiz. Dört sahne de geçerli
+(mspt ≤ 35,2, yabancı Gradle 0, sonra parçacık 2–165), tekrar yapılmadı. Tablo `gorsel-13/tablo.txt`:
+
+| Sahne | önce ms | karada ms | sonra ms | oran-sonra (CPU) | oran-önce | mspt k/s | kırılan / bölüm / bekleyen | görünür bölüm ö/k/s | parçacık k / varlık k (suda) | SPLASH-sıçrama / varlık / sn |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | 3,45 | 40,77 | 3,36 | **%8** (%13) | %8 | 29,6 / 10,2 | 2212 / 130 / 0 | 379 / 825 / 341 | 339 / 153 (88) | 0,23 |
+| 2 | 3,57 | 33,06 | 7,05 | **%21** (%28) | %11 | 35,2 / 15,2 | 13332 / 270 / 161 | 440 / 394 / 1246 | 273 / 78 (25) | 0,03 |
+| 3 | 3,60 | 12,54 | 7,10 | **%57** (%61) | %29 | 25,0 / 10,6 | 12123 / 269 / 647 | 459 / 831 / 1336 | 992 / 85 (43) | 0,07 |
+| 4 | 3,32 | 19,89 | 5,96 | **%30** (%38) | %17 | 20,8 / 11,7 | 2076 / 101 / 64 | 459 / 396 / 1247 | 274 / 110 (59) | 0,29 |
+
+Okuma: (1) **K-E26 tuttu:** karada parçacık 273–992 (ölçüm 8'de 874–6716), SPLASH parçacığı 42–109; K26-1 sıçrama varlık
+başına saniyede 0,03–0,29 (BUBBLE'dan; eşik 1) → hiçbir sahne "K-E26b bekliyor" değil, histerezis önerisi gerekmedi. (2) **TS-15
+yan etkisi:** bölüm bütçesi 1 iken değişen bölüm afet başına 101–270 (ölçüm 8: 147–270; aynı bölüm artık birkaç
+tick'e bölünmüyor) ama kırılan blok 2076–13332 (önceki 653–3707): eski 48 blok/tick sınırı kuyruğun çoğunu `stop`'ta
+attırıyordu, şimdi ağaç taçları (yaprak, HAFİF) bölüm bölüm tamamen kırılıyor. Sunucu karada mspt 20,8–35,2 (afetsiz 10,6–15,2;
+20 TPS'te). (3) **Karada − sonra CPU dağılımı** (ms/kare, `asama_cpu_ms`): istemci tick'i +8,1 / +5,2 / +2,6 / +2,8 (sonra
+0,3–0,6); katı bloklar +3,5 / +1,9 / +0,6 / +1,3; yarı saydam (sanal su) +2,2 / +1,2 / +0,7 / +0,8; yeniş/yağmur (`after_weather`)
++2,0 / +2,0 / +1,7 / +1,9; parçacık +1,0 / +1,0 / +0,8 / +0,9; bekleyen derleme karada 1048–2958 (sonra 0). Tsunaminin
+kendi sabit görsel maliyeti (yağmur ~2 ms + sanal su 1–1,9 ms + köpük/parçacık ~1 ms) tek başına 4–5 ms; "sonra" tabanı 3,4–7,1 ms
+(140–300 FPS) iken %50 ölçüsü afetin bütün yüküne 3,4–7,1 ms bırakır: sahne 1'de (sonra 3,36 ms) yıkımsız da tutmaz. İstemci
+tick'inin artışı suda varlıkla (sahne 1: 88) ve kırılan blokla (sahne 2: 13332; istemci ışık güncellemesi tick'te işlenir)
+birlikte büyüyor [ÇIKARIM: tick içi ayrıştırılmadı]. Mutlak karada FPS 24,5 / 30,2 / 79,7 / 50,3. **Sonuç: Ts1 bu ölçüyle
+tutmadı;** sonraki adım şef kararı (rapor "Açık"): (a) bölüm hızını yarıya (2 tick'te 1 bölüm) ya da tick başına blok
+tavanını bölüm bütünlüğüyle birlikte geri koymak (TS-15 "toplam hacim aynı, süre uzar" yerine çok büyük kuyrukta süre
+sınırı), (b) istemci tick'ini ayrıştıran ölçüm, (c) çok hızlı tabanda (≥ 140 FPS) oran yerine mutlak taban (K0-33 ölçüsünün
+yeniden tanımı).
+
+**TS-16 rev. 2 Ts1 kabul ölçüsü ve tur 5 sonucu (şef kararı tur 5, Karar 1 ve 3): 3/4 sahne geçti, sahne 4 29,0 FPS.** Ölçü:
+"sonra" tabanı < 10 ms ise oran yerine mutlak: her S5 sahnesinde Yüksek'te karada ortanca kare ≤ 33,3 ms (≥ 30 FPS), mspt < 50,
+yabancı Gradle ≤ 1, sonra tabanı temiz; "önce"/"sonra" oranları bilgi (asit-orman emsali). Bütün tur 5 sahnelerinde "sonra"
+6,2–7,9 ms → mutlak ölçü. Bu ölçüyle `gorsel-13` (tur 4) 3/4 (sahne 1 24,5 FPS). Tur 5 koşuları (hepsi çıkış 0, ALARM 0, girdi
+0/0/0, yabancı Gradle 0, mspt ≤ 41,6, geçerli): `gorsel-14` (`7bcb07f`, TS-15b ilk sürüm: bölüm birimi, jetonsuz) karada 22,3 /
+132,3 / 67,0 / 129,4 FPS (3/4); `gorsel-15` (`b40a948`, `deney`: birim ve eşya ayrıştırması, TS-15b tablosu) 62,2 / 148,8 / 58,8 /
+62,0 (4/4, ölçü deney ayarlarıyla); **kabul koşusu `gorsel-16` (`68ba295`: jeton + sütun birimi, varsayılanlar)**, tablo
+`gorsel-16/pencere.log` `TABLO` satırları:
+
+| Sahne | önce ms | karada ms (FPS) | sonra ms | CPU ms ö / k / s | mspt k / s | kırılan afet / pencere | kirletilen bölüm (pencere) | bekleyen derleme k | parçacık k | sonuç |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | 3,71 | 13,06 (76,6) | 6,67 | 3,42 / 12,46 / 6,20 | 27,3 / 12,1 | 2345 / 1583 | 1197 | 1688 | 357 | GEÇTİ |
+| 2 | 3,78 | 7,82 (127,9) | 7,57 | 3,52 / 7,25 / 7,23 | 32,6 / 17,7 | 16982 / 4673 | 405 | 1634 | 365 | GEÇTİ |
+| 3 | 3,87 | 8,43 (118,6) | 7,93 | 3,66 / 8,19 / 7,49 | 21,5 / 12,7 | 7215 / 2174 | 2475 | 871 | 988 | GEÇTİ |
+| 4 | 3,86 | **34,50 (29,0)** | 6,21 | 3,44 / 23,57 / 6,11 | 36,6 / 12,9 | 10250 / 4582 | 981 | 1185 | 249 | KALDI |
+
+Tick başına başlatılan birim her sahnede en çok 1; sıçrama varlık başına saniyede 0,04–0,51 (K26-1 eşiği 1'in altında).
+**Karar 3 ayrıştırması (tek tur, sahne 4):** karada − sonra CPU (ms/kare): istemci tick'i +5,6, katı bloklar +2,6, yarı saydam
+(sanal su) +1,4, yağmur (`after_weather`) +2,3, parçacık +1,0, `takas_diger` +1,4; duvar saati − CPU **10,9 ms** (geçen sahnelerde
+0,2–0,6; loadavg 6,2, yabancı Gradle 0: CPU dışı bekleme, GPU/sürücü [ÇIKARIM]). İstemci tick'inin örneklemeli profili (`PROFIL`,
+tick başına duvar ms, safepoint yanlılığı olan örnekleme) sahne 4'te 9,60 ms, geçen sahnelerde 8,29–11,88: tick sahne 4'ü ayırmıyor.
+Tick içinde mod çerçeveleri 1,27 ms (sanal su `IstemciSu`/`SanalSu.okuyucu`/`DenizAlani.hesapIsi` ~0,6, tsunami `TsunamiYagmuru`
+~0,5); geri kalanı vanilla (`TextureManager.tick` 4,4, `ClientLevel.tickEntities` 2,4: `ItemEntity` çarpışma/hareket ~1,0, hayvan
+~0,6). Eşyasız ölçüm (`gorsel-15` sahne 1) istemci tick'ini düşürmedi (TS-15b (6)). Sonuç: sahne 4'ün fazlası ne kendi paketimizin
+ne kardeş paketin ölçülebilir bir sıcak yolu; kare süresi vanilla çizim ve CPU dışı beklemede, sınırı 1,2 ms aşıyor. Kardeş paket
+nedeni olmadığı için sahne "K-E26b bekliyor" işaretlenmedi; yağmur bütçesi (tasarım notu §5, Yüksek 1600 damla/sn) bu veriyle
+düşürülmedi (yağmur bütün sahnelerde 1,5–2,4 ms, sahne 4'ün farkını açıklamıyor). Sahneler arası oynama büyük (her `su vitrin`
+başka kumsal seçer): sahne 1 tur 4–5'te 24,5 / 22,3 / 62,2 / 76,6 FPS, sahne 4 50,3 / 129,4 / 62,0 / 29,0 FPS. Kabul kararı şefte
+(rapor "Açık").
+
+**TS-16 rev. 3 Ts1 kabul ölçüsü: CPU ms/kare (şef kararı tur 5 sonu): Ts1 KAPANDI, 4/4 sahne geçti.** "Sonra" tabanı < 10 ms ise
+mutlak ölçü: her S5 sahnesinde Yüksek kademe karada **render thread CPU ms/kare ≤ 33,3** ve mspt < 50 ve başka Gradle ≤ 1 (kabul);
+duvar saati FPS tabloda bilgi. ≥ 30 FPS duvar saati hedefi **Faz 5 görünür koşuda** yeniden ölçülür; tutmazsa "efekti kırp" kuralı
+(yağmur/köpük Yüksek bütçesi) uygulanır. `gorsel-16` (`68ba295`, kod değişmedi) karada CPU 12,46 / 7,25 / 8,19 / 23,57 ms → 4/4
+(duvar saati 76,6 / 127,9 / 118,6 / **29,0** FPS). **rev. 2 → rev. 3 farkı ve nedeni:** rev. 2 duvar saati kare süresini (≥ 30 FPS)
+ölçüyordu; sahne 4'te duvar saati − CPU farkı 10,9 ms (geçen sahnelerde 0,2–0,6) ölçülemeyen kısımdır: istemci gizli
+workspace'te (K0-21 rev. 2 (j)) çizildiği için kaynağı belirlenmedi; modun ölçülen render thread yollarında ve engelleyici
+beklemede değil (Ts4-5 düzeltmesi, entegrasyon 6/6; GP17; asit-orman 0,48 emsali). Modun ölçülebilen kısmı render thread CPU
+süresidir (sahne 4: 23,57 ms ≈ 42 FPS); Karar 3 ayrıştırması mod kaynağı
+göstermedi, eşyasız ölçüm düşürmedi, aynı sahne tur 4'te 129,4 FPS verdi (sahne oynaması). Kabul ölçüsü bu yüzden CPU ms/kare.
+
+**TS-17 Aralıklı GameTest `dalgaOnceCamSonraAhsapYikarAraziKalir` (tur 6, doğrulayıcı-2 P1).** Kök neden: vanilla
+`GameTestHelper.onEachTick` her tick için yeni bir lambda'yı `GameTestInfo.setRunAtTickTime` ile `Object2LongOpenHashMap`
+türündeki `runAtTickTimeMap`'e koyar ve `tickInternal` onu kimlik hash sırasıyla dolaşır (javap, Forge 47.4.28 mapped jar:
+`lambda$onEachTick$26` → `setRunAtTickTime` → `Object2LongMap.put`; `tickInternal` `object2LongEntrySet().iterator()`), bu yüzden
+afet tick'i ile gözlemcinin aynı oyun tick'indeki sırası belirsizdir ve tick-anlık `sonTickBirim` her `tick`'te yeniden
+yazıldığı için gözlemci yalnız iki kırılma tick'indeki 1 değerini kaçırabiliyordu (`gametest-1.log:238` "0 (bütçe 1)"; yıkım
+sayacı doğruydu). Düzeltme yalnız testte: afetin biriktirdiği `enCokBirimTick()` sıra bitince okunur, `≥ 1` ve
+`≤ yikimBolumTick` denetlenir (eşik ve assert aynı); `TsunamiAfeti.sonTickBirim()` yerine `enCokBirimTick()`, kullanılmayan
+`TsunamiYikimi.sonTickBirim` kaldırıldı. Aynı testin `kirildi` gözlemi sıraya dayanıklı: her algılama en çok 1 tick kayar, ahşap
+gecikmesi 6 tick, en kötü fark 5 = eşik. `yikimJetonuKismadaYavaslarBolumBolunmez` `TsunamiYikimi.tick`'i kendi döngüsünde sürer
+(`onEachTick` yok), bu yarışı taşımaz; tur 5'teki düşmesi (`gametest-tur5b.log`) testin kendi hatasıydı (en büyük bölüm sınırı
+her yığında yeniden hesaplanıyor, toplam ise iki yığını kapsıyordu); düzeltmesi `b40a948`'de.
+`dalgaOyuncuyuSurukleyinceIpucuVerirHasarVerir`'in tur 5 düşmesi (domuz şeritten yürüyüp çıktı) `68ba295`'te `NoAi` ile kapandı.
+
+### Reddedilen yollar
+
+- **Sanal su motorunu değiştirmek** (ayrı dalga renderer'ı, kendi mağara dolumu): görev "API'sini kullan"; dalga, çekilme,
+  köpük, sıçrantı, ıslak dip ve mağara görüntüsü `client.su`'dadır.
+- **Yeni mixin:** gerekmedi (yağmur, sis, kamera Forge olaylarıyla).
+- **`SuruklenenBlokVarligi` (istemcide yüzen görsel enkaz blokları) ve ekran kenarı su perdesi:** Faz 5 cilası (şef kararı, TS-14);
+  enkaz şimdilik gerçek `ItemEntity` düşmeleriyle dalgada sürüklenir.
+- **Ortak su renderer'ında köpüğü güçlendirmek:** `client.su` kardeş paket; tsunaminin köpüğü kendi katmanında (TS-13).
+- **Blok varlıklı blokları yıkmak:** sandık içerikleri saçılırdı; oyuncu eşyasını korumak için yıkılmaz.
+- **Doğal araziyi aşındırmak:** sertlik sınırı S3'te toprak/taşı da kapsardı; manzarayı kazırdı. Yıkım yapı ve bitki bloklarıyla sınırlı.
+- **Her test tek batch:** testlerin dalgaları komşu sahnelere sanal su taşırdı; her test ayrı batch.
+
 ## Şef kararları (Faz 0–1)
 
 **K0-19 Ay çarpması siren süresi: 60 sn.** Madde 5 "Güneş Patlaması hariç 10 sn" der; bölüm H "siren çaldıktan 60 saniye
@@ -3917,6 +4314,38 @@ başlığındadır.
   `!kasirga`'ya geçti (K-E23 etki listesi: `basarim_gorsel.py`, `radar_gorsel.py`); `cekirdek_sunucu.py` kasırga adımı gerçek
   kasırgayı başlatıp durdurur.
 
+### Tsunami
+
+- **K0-33 tsunami istisnası (TS-16 rev. 3, şef kararı tur 5 sonu; Ts1 kapandı):** K0-33'ün performans ölçüsü (Yüksek ortanca
+  kare süresi afetsiz tabanın ≥ %50'si) tsunami S5 sahnelerinde şöyle uygulanır: "sonra" tabanı (afet bittikten sonra aynı
+  kamera) < 10 ms/kare ise oran yerine mutlak ölçü: her S5 sahnesinde Yüksek kademe karada **render thread CPU ms/kare
+  ≤ 33,3** ve sunucu **mspt < 50** (ölçüm anında başka Gradle ≤ 1). Duvar saati FPS tabloda bilgi sütunudur. Gerekçe: gizli
+  workspace'te (K0-21 rev. 2 (j)) duvar saati − CPU farkı ölçülemeyen kısımdır, kaynağı belirlenmedi (sahne 4'te 10,9 ms, geçen
+  sahnelerde 0,2–0,6); Karar 3 ayrıştırması onu modun ölçülen render thread yollarında bulmadı (Ts4-5: "modun denetiminde
+  değil" denmez). Kanıt `gorsel-16` (`68ba295`): karada CPU 12,46 / 7,25 / 8,19 / 23,57 ms, mspt 27,3 / 32,6 / 21,5 / 36,6,
+  yabancı Gradle 0, "sonra" parçacığı temiz → 4/4. Ölçüt gevşektir (sahne 4'te afetin kendi CPU yükü 17,5 ms/kare, CPU oranı
+  %26); asıl güvence Faz 5 tetikleyicisidir. **Faz 5 tetikleyicisi:** görünür koşuda (ya da başsız kalibrasyonu geçen yolda) her
+  S5 sahnesi Yüksek'te, sahne başına iki tekrarla, duvar saati ≥ 30 FPS. Tutmazsa önce yağmurun Yüksek bütçesi (1600
+  damla/sn), sonra köpük bütçesi kırpılır ve ölçüm tekrarlanır. Ölçüm yolu yoksa Faz 5 şef kararı 2 (FPS gerekçeli bilinen
+  sınır). Aynı satır `.vibe/gorev/5-matris.md` "Faz 2b–4 açık noktalarından" (#10).
+- **TS-15 / TS-15b yıkım bütçesi (şef kararları tur 4–5; inceleme-tsunami-3 Ts3-1 P1 kapandı):** başlatılan birimin (chunk
+  sütunu, varsayılan) o an hazır bütün blokları aynı tick'te kırılır; tick başına en çok `yikimBolumTick` (1) birim başlar; jeton
+  her tick blok bütçesi (`8 + 8·seviye` × `yikimCarpani` × TPS kısması) kadar dolar ve ortalama hızı bağlar (kısmada yavaşlar,
+  birim bölünmez). Sütun birimi blok başına toplam kirlenmeyi düşürdüğü gösterilmedi (Ts4-1), zararsız olduğu için varsayılan
+  kalır. Toplam yıkım hacmi (B.5) düşürülmedi, süre uzar.
+- **TS-14 Faz 5 cilası:** ekran kenarı su perdesi ve istemcide yüzen görsel enkaz (`SuruklenenBlokVarligi`) Faz 4'te yapılmaz.
+- **K-E26 kök nedeni tsunamiden (inceleme-tsunami-2 Ts1 (a)):** S5 sahnesindeki 6716 parçacığın kaynağı sanal su
+  `EntityMixin`'in her tick sıçramasıydı; düzeltme sanal suda (`b326d11`), tsunami tarafında parçacık tavanı eklenmedi (semptom).
+  K26-1 ölçümü: sıçrama varlık başına saniyede 0,03–0,74 (≤ 1), histerezis istenmedi.
+- **Dalga Avcısı (başarım #2, §A.3):** `yayinciKaydet(TSUNAMI, SURUKLENDI)`; ipucu AKTIF/BITIS'te sanal dalga oyuncuyu ittiği ilk
+  tick, afet başına oyuncu başına bir kez (GameTest `dalgaOyuncuyuSurukleyinceIpucuVerirHasarVerir`; inceleme-tsunami-2 (2) uçtan
+  uca doğru). Log'da "yayıncı olarak kayıtlı değil" satırı 0.
+- **H.5 ay → tsunami:** çarpanı ay yazar (`AfetYoneticisi.ayCarpmasiTsunamiCarpaniniEkle`), tsunami okur; çarpan sürerken çekilme
+  `ayCekilmeCarpani` (1,5) ile derinleşir. GameTest `ayCarpaniOraniArtirirCekilmeyiDerinlestirir` seçimi yöneticinin yolundan
+  (`AfetZamanlayicisi.sec`, girdi `donem::carpan`) sınar (Ts3-2, 6/6).
+- **K-E27 kapanış:** `TsunamiOtomasyonu`'nun 30 sn `Runtime.halt` bekçisi kalır; `tsunami_gorsel.py` bekçisi `KapanisBekcisi`'ne
+  bağlandı (6/6).
+
 ## Açık noktalar (Faz 2b)
 
 Entegratöre bırakılan notlardan işlenenler: kancalar (K-E1), protokol (K-C47), `asama ileri [süreç]` (K-C48), sanal su §3a istisnası
@@ -3967,55 +4396,72 @@ birleşmiş beş worktree kaldırıldı (`.vibe/diff/<parça>.patch` kalır). A�
 
 ## Açık noktalar (Faz 4)
 
-Birleşen parçalardan kalanlar (her birleştirmede güncellenir; plan `.vibe/rapor/entegrasyon-4.md`):
+Faz 4 kapandı (altı parça `main`'de, entegrasyon 4 6/6, rapor `.vibe/rapor/entegrasyon-4.md`). Altı parçanın kalan açıkları tek
+listede; her madde "→" ile Faz 5 görevine eşlendi (`.vibe/gorev/5-entegrasyon.md`, `5-matris.md`, `5-izleme-inceleme.md`,
+`5-teslimat.md`). Görünür koşu ve FPS yolu kullanıcı sorusuna (şef sorusu 1) bağlı; yol yoksa FPS gerekçeli bilinen sınır
+(Faz 5 şef kararı 2).
 
 - **Güneş — FPS (GP17):** gerçek FPS ve Düşük/Yüksek/Ultra karşılaştırması Faz 5'te görünür pencere ya da başsız kalibrasyonla
   (K0-21 rev. 2 (j)); hazır yol `gunes_patlamasi_gorsel.py` (kare başına FPS/TPS/mspt), kalite için
-  `gorsel.efektKalitesi` değiştirilip üç koşu.
+  `gorsel.efektKalitesi` değiştirilip üç koşu. **→ `5-matris #10`**
 - **Güneş — vitrin kareleri zayıf (inceleme P2):** kavrulma için aynı açıdan 1. gün / 4. gün sonu kare çifti (ağaçlık ve çimen
   çerçevede) yok; süpernova kabuğu karesi gökyüzü sahibinin kabuk kalibrasyonuyla yeniden alınmalı
-  (`client/gunes_patlamasi/GunesPatlamasiOtomasyonu`). Faz 5 görünür koşu.
+  (`client/gunes_patlamasi/GunesPatlamasiOtomasyonu`). Faz 5 görünür koşu. **→ `5-entegrasyon §4 (otomasyon), 5-matris #6`**
 - **Güneş — şeker kamışı kurumuyor (inceleme P2):** `client/gunes_patlamasi/KavrulmaRengi.java:38-42` renk işleyicisi
-  listesinde `Blocks.SUGAR_CANE` yok; nilüfer ve saplar da dışarıda (GP13 bilinen sınırına eklenmeli). Faz 5.
+  listesinde `Blocks.SUGAR_CANE` yok; nilüfer ve saplar da dışarıda (GP13 bilinen sınırına eklenmeli). Faz 5. **→ `5-entegrasyon §2`**
 - **Güneş — GP10 yapılmayanlar:** çarpma anının ayrı beyaz örtüsü, süpernova çökmesinde öteki ortam seslerinin susturulması,
-  kavrulmada ayrı uzak yangın katmanı.
+  kavrulmada ayrı uzak yangın katmanı. **→ `5-izleme-inceleme (yeşil mi bilinen sınır mı)`**
 - **Betikler (K-E22/K-E23):** `-PoyunTestiAfeti` taşıyan betikler birleştirme turlarında `!tür`'e geçer ya da gerçek afete
   uyarlanır (`entegrasyon-4.md` §3.6). Güneş birleştiğinde `uyari_sunucu.py` ve `radar_gorsel.py` güneş adımları gerçek afetle
-  aynı çıktıyı verir (güneş §E); `basarim_sunucu.py`'de güneş adımı yok.
+  aynı çıktıyı verir (güneş §E); `basarim_sunucu.py`'de güneş adımı yok. **→ `5-entegrasyon §3`**
 
 - **Ay — vitrin kamerası (inceleme P2):** çarpma vitrininde ufuk arazinin arkasında; parlama sonrası ufuk ışığı ve mantar sütunu
   09–12 karelerinde seçilmiyor. Kamera açık ufka (kıyı ya da `ust + 40`, pitch −3…−5°), `00_once` ve `17_sifirla_ay_geri` −88°'de
-  (`client/ay_carpmasi/AyCarpmasiOtomasyonu.java:149-172, 208`). Faz 5 görünür koşu.
+  (`client/ay_carpmasi/AyCarpmasiOtomasyonu.java:149-172, 208`). Faz 5 görünür koşu. **→ `5-entegrasyon §4, 5-matris #6`**
 - **Ay — kayan yıldız görünmedi:** bütün karelerde kayan yıldız sayısı 0; otomasyon halka karesinden önce paket içi
-  `kayanYildizZorla`'yı çağırmalı (`AyCarpmasiGokyuzu.java:313-327`). Faz 5.
-- **Ay — düşen cam/yaprak eşyaya dönüşebiliyor:** `SarsintiDusmeleri.java:117-122` düşen varlıkta `dropItem = false` yok.
+  `kayanYildizZorla`'yı çağırmalı (`AyCarpmasiGokyuzu.java:313-327`). Faz 5. **→ `5-entegrasyon §4, 5-matris #6`**
+- **Ay — düşen cam/yaprak eşyaya dönüşebiliyor:** `SarsintiDusmeleri.java:117-122` düşen varlıkta `dropItem = false` yok. **→ `5-entegrasyon §2`**
 - **Ay — #13 Yıldızlı Gece ve #14 Yükselen Sular gerçek zincirle sınanmadı:** zincir GameTest'ine sahte oyuncuyla iki iddia
-  eklenmeli (bugün başarımın kendi testleri dönem alanından sınıyor).
-- **Ay — FPS:** gizli workspace 1 FPS (GP17 ile aynı), Faz 5.
+  eklenmeli (bugün başarımın kendi testleri dönem alanından sınıyor). **→ `5-entegrasyon §2`**
+- **Ay — FPS:** gizli workspace 1 FPS (GP17 ile aynı), Faz 5. **→ `5-matris #10`**
 
 - **Deprem/sinkhole — görsel kareler (inceleme P2):** kare `RenderTickEvent.END`'de, istekten sonra ≥ 2 yeni çizilmiş kareyle
   alınmalı; çöküş ve S1 yavaş çekimde (`hiz 0.2`), siren karesi siren aşamasında (`client/deprem/DepremOtomasyonu.java:286-291,
   615-617`). Rapordaki "bayat kopya yok" cümlesi yanlış: `sinkhole_cokus_vitrin` bayat; `deprem_s1` sarsıntı bittikten sonra,
-  `deprem_siren` AKTIF'te alındı. Faz 5 görünür koşu.
+  `deprem_siren` AKTIF'te alındı. Faz 5 görünür koşu. **→ `5-entegrasyon §4, 5-matris #6`**
 - **Deprem/sinkhole — DS-02 ve ses:** çöken kütle varlığı, eğilen ağaç, kendi toz dokusu, sinkhole dibinde nem buharı, ayrı
-  öncü gürleme/çatlama sesleri Faz 5 cilası.
-- **Deprem/sinkhole — FPS:** gizli workspace 1 FPS (GP17), Faz 5.
+  öncü gürleme/çatlama sesleri Faz 5 cilası. **→ `5-izleme-inceleme`**
+- **Deprem/sinkhole — FPS:** gizli workspace 1 FPS (GP17), Faz 5. **→ `5-matris #10`**
 
 - **Asit/orman — görsel kareler (AOi-1–3):** asit kamerası 40 blok üstte; sıçrama/cızlama 24 blok eşiği altında görünmüyor,
   dumanlanma zayıf. Faz 5'te yere yakın (göz ≤ 10 blok) asit S5 karesi, ufku gören siren karesi, S1 görsel çarpanı 0,25 ile "çise";
-  FPS tabanı `maxFps` sınırsız ve aynı kamerada (taban 120 FPS tavanda kalıyordu).
+  FPS tabanı `maxFps` sınırsız ve aynı kamerada (taban 120 FPS tavanda kalıyordu). **→ `5-entegrasyon §4, 5-matris #6 ve #10`**
 - **Asit — maruziyet ölçekli saat (AOi-6):** `AsitYagmuru.java:103, 207` maruziyet gerçek tick'le birikiyor; ölçekli `adim`
-  (K-C11) Faz 5.
+  (K-C11) Faz 5. **→ `5-entegrasyon §2`**
 - **Asit — ekran efekti kaynağı (AOi-7):** `IstemciAsitYagmuru.java:288` efekt yalnız son hasar `dogalafetler:asit` iken
-  çalışmalı.
+  çalışmalı. **→ `5-entegrasyon §2`**
 - **Orman — kayıttan dönüş adımı (AOi-8)** `asit_orman_yangini_sunucu.py`'de yok; "Yanmadan Çıktım" uçtan uca GameTest'i yok
-  (AOi-4'ün orman yarısı; 12–16 blok uzak oyuncu 0 ipucu sahnesi dahil).
+  (AOi-4'ün orman yarısı; 12–16 blok uzak oyuncu 0 ipucu sahnesi dahil). **→ `5-entegrasyon §2`**
 
 - **Kasırga — yüklü alandan çıkan uçan blok (Kn4):** varlık işlemeyen konumdaki uçan bloklar ve yüklü alandan çıkan kasırganın
-  taşıdıkları `noSave` varlıkla kayboluyor; `yereBirak()` ile bırakılmalı (`afet/kasirga/Kasirga.java:220, 404-406`).
-- **Kasırga — S1 izi kısa (Kv3-2):** S1 olgun evresi ilerletilmeden sürsün, bitiş kamerası 18–20 blok yükseklikten; Faz 5 görsel koşu.
+  taşıdıkları `noSave` varlıkla kayboluyor; `yereBirak()` ile bırakılmalı (`afet/kasirga/Kasirga.java:220, 404-406`). **→ `5-entegrasyon §2`**
+- **Kasırga — S1 izi kısa (Kv3-2):** S1 olgun evresi ilerletilmeden sürsün, bitiş kamerası 18–20 blok yükseklikten; Faz 5 görsel koşu. **→ `5-entegrasyon §4, 5-matris #6`**
 - **Kasırga — tepe yük ölçümü (Kv2-2):** K0-33 mesafe ölçümleri uçan blok ≥ 30 iken alınmalı; koşu 4'te 36/20 blokta %56 / %58,
-  5 blokta %47 (gürültü). Faz 5 görünür koşuda yeniden ölçülür.
+  5 blokta %47 (gürültü). Faz 5 görünür koşuda yeniden ölçülür. **→ `5-matris #10`**
+
+- **Tsunami — yıkım (Ts3, Ts4, Ts4-2):** dalga tepesinde kesilen yıkım üst kısmı havada bırakıyor (`afet/tsunami/TsunamiAfeti.java:268`);
+  kırma ve mağara ağzı yüklülük sormuyor (`TsunamiYikimi.java:206, 305-316`); tick başına tepe yıkım işi sınırsız ve ölçülmüyor
+  (`TsunamiYikimi.java:187, 197-223`): ölçüm satırına tick başına en çok blok ve en uzun sunucu tick'i; tepe 50 ms'yi aşarsa birim
+  tavanı (ör. 4 × blok bütçesi). TS-15b eşli koşusu (`yikimSutunBirimi=false`, aynı sahne sırası, istemci derleme sayısı, Ts4-1).
+  **→ `5-entegrasyon §2`, eşli koşu `5-matris #10`**
+- **Tsunami — testler (hata yolu, Ts4-3):** `TsunamiOyunTestleri`'nde `@AfterBatch` temizliği yok (K-E15, `OyunTestiTemizligi`);
+  jeton testi sütun kipinde ve `TpsOlcer` bağıyla tekrar; S2 yıkımlı doğal bitişte `temizlendi` "bekleyen yıkım 0" ve `doğal=true`.
+  **→ `5-entegrasyon §2`**
+- **Tsunami — görsel (Ts7, Ts2-1, SU-38/SU-40):** otomasyon kameraları çekilmeyi ve ufku seçmiyor, S1 dalgası zor görünüyor
+  (`client/tsunami/TsunamiOtomasyonu.java:150-151`); köpük tepe şeridi dokusuz bant (`TsunamiKopugu.java:125-126, 151-158`); sanal su
+  mağara kareleri ve uzak LOD kurulum tepesi (şef kararı 6). **→ `5-entegrasyon §4 ve §6`, `5-matris #6`**
+- **Tsunami — FPS (TS-16 rev. 3):** "Şef kararları (Faz 4) → Tsunami" Faz 5 tetikleyicisi (her S5 sahnesi Yüksek'te, iki tekrar,
+  duvar saati ≥ 30 FPS; tutmazsa önce yağmur, sonra köpük bütçesi). **→ `5-matris #10`**
 
 ## N17 — Sayısal varsayılanlar
 
@@ -4348,6 +4794,24 @@ Birleşen parçalardan kalanlar (her birleştirmede güncellenir; plan `.vibe/ra
 | kasırga (istemci) | `kasirga.gorselKopyaTavani` | 240 | kopya / kasırga | SK-03 (Ultra 6 × 40) |
 | kasırga (istemci) | `kasirga.kameraSarsintisi` | 1,0 (0–2) | oran | 40 blok içinde ±0,4°·seviye yuvarlanma |
 | kasırga (istemci) | `kasirga.sisEtkisi` | true | — | 64 blok içinde #5E6B5A sis, görüş %60 |
+| tsunami (SERVER) | `tsunami.enAzDenizSutunu` | 400 | sütun | tasarım notu §6 (N14 "okyanus/geniş su"; ~20×20 blok körfez) |
+| tsunami | `tsunami.aramaYaricapi` | 96 | blok | tasarım notu; varsayılan görüş mesafesinin yarısı, yüklü chunk'larda |
+| tsunami | `tsunami.dalgaGecikmeSn` | 10 | sn | tasarım notu çizelgesi: çekilme başladıktan 10 sn sonra ufukta çizgi |
+| tsunami | `tsunami.cekilmeSn` | 18 | sn | tasarım notu: 0–18 sn çekilme |
+| tsunami | `tsunami.ayCekilmeCarpani` | 1,5 | kat | bölüm H "çekilme biraz daha belirgin"; tasarım notu ×1,5 |
+| tsunami | `tsunami.yikimCarpani` | 1,0 | kat | tick başına S1 16 … S5 48 blok (tasarım notu §5 "en çok 48"); TS-15b: jeton, ortalama yıkım hızı (× TPS kısması) |
+| tsunami | `tsunami.yikimBolumTick` | 1 | birim/tick | TS-12/TS-15b: tick başına başlatılan en çok birim (üst sınır; bağlayıcı olan jeton); TPS kısmasıyla çarpılır; N13'ten bağımsız; ölçüm 7'de 1, 2'den iyi |
+| tsunami | `tsunami.yikimChunkTick` | 1 | chunk sütunu/tick | TS-12 ölçüm 5: ışık değişimi sütun boyunca derlenir; aynı sütundaki kırılmalar bir derlemede birleşir |
+| tsunami | `tsunami.yikimEfektTick` | 1 | kırılma efekti/tick | TS-12: her efekt ~64 blok parçacığı + ses; tasarım notu "aynı anda en çok 6" ses sınırı korunur |
+| tsunami | `tsunami.yikimEsyaOrani` | 0,3 | olasılık | TS-15b (6): ahşap/taş bloğun eşya bırakması (tick başına ≤ 2, afet başına 16·seviye); eşyasız ölçümde istemci tick'i düşmedi |
+| tsunami | `tsunami.yikimSutunBirimi` | true | — | TS-15b (3): birim chunk sütunu; değişen bölüm başına %10–23 örtüşme tasarrufu, blok başına toplam fark gösterilmedi (Ts4-1); zararsız, varsayılan kalır |
+| tsunami | `tsunami.magaraHacmi` | 400 | hücre/seviye | S5 2000 hücre: bir kıyı mağarasını doldurur, mağara tavanı (4000) içinde |
+| tsunami (kod) | seviye tablosu (yükseklik, hız, karaya giriş, genişlik, çekilme, ivme, hasar, sertlik) | `tsunami.md` §6 | — | madde 10.4; `TsunamiSeviyesi` |
+| tsunami (kod) | ikinci dalga | S3+, %60 | — | tasarım notu |
+| tsunami (kod) | mağara sayısı | 1 + seviye/2 | cep | kıyıdaki birkaç ağız; ağızlar arası 12 blok |
+| tsunami (CLIENT, kod) | yağmur damlası / sn | 400 / 900 / 1600 / 2600 | damla | tasarım notu §5 (N13) |
+| tsunami (ses) | `tsunami_ugultu` / `tsunami_carpma` | −26 / −23 LUFS, tepe ≤ −6 dBTP | — | uyarı-ses §A4 kural 1 (ortam) ve 2 (darbe) |
+| tsunami (kod) | uğultu katmanı | %35 → %100, menzil 96 + genişlik/2, fade 60 / 20 tick | — | TS-09 |
 
 Config dışı sabitler (oynanış değeri değil, sınır/biçim): siren 200/1200 tick (şartname, K0-19); son afet geçmişi 5
 (madde 13a); tek çarpan ≤ 100, toplam ≤ 1000 (K-C22); hız 0,1–1000; TPS ölçüm aralığı 20 tick; dönem kaydı sınırları
