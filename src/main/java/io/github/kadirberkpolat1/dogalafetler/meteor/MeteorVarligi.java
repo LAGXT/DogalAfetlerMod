@@ -2,10 +2,12 @@ package io.github.kadirberkpolat1.dogalafetler.meteor;
 
 import io.github.kadirberkpolat1.dogalafetler.config.EfektKalitesi;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
+import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.MeteorOlcegi;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.OdulZari;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.Yorunge;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
 import io.github.kadirberkpolat1.dogalafetler.yangin.YanginKaynagi;
+import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraft.nbt.CompoundTag;
@@ -34,11 +36,11 @@ import net.minecraft.world.phys.Vec3;
  * Düşen meteor (sunucu otoriteli). Sabit hızla düz bir çizgide iner; sunucu her tick yolunu blok blok örnekler ve ilk
  * katı bloka (yaprak ve çarpışmasız bitkiler hariç) ya da suya (gerçek ya da sanal) çarpınca {@link MeteorCarpmasi}'nı
  * başlatıp kaybolur. İstemci aynı hızla ilerletir (sunucu 2 tick'te bir düzeltir), iz parçacıklarını üretir ve tahmini
- * iniş noktasını (yer parlama diski) hesaplar. Boyut ve görünüm senkron veridir; kaydedilmez.
+ * iniş noktasını (yer parlama diski) hesaplar. Ölçek ({@link MeteorOlcegi}) ve görünüm senkron veridir; kaydedilmez.
  */
 public final class MeteorVarligi extends Entity {
-    private static final EntityDataAccessor<Byte> BOYUT = SynchedEntityData.defineId(MeteorVarligi.class,
-            EntityDataSerializers.BYTE);
+    private static final EntityDataAccessor<Float> OLCEK = SynchedEntityData.defineId(MeteorVarligi.class,
+            EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Byte> GORUNUM = SynchedEntityData.defineId(MeteorVarligi.class,
             EntityDataSerializers.BYTE);
     private static final double ORNEK_ADIMI = 0.4;
@@ -50,6 +52,8 @@ public final class MeteorVarligi extends Entity {
     private YanginKaynagi kaynak = YanginKaynagi.KOMUT;
     private boolean sarsinti = true;
     private OdulZari.Sanslar sanslar;
+    /** Yağmurun hedef oyuncusu (ödül tavanı; yalnız sunucu, null: tek düşürülen meteor). */
+    private UUID odulOyuncu;
     private int yas;
     private Vec3 inis;
     private double inisKalanTick = -1;
@@ -59,21 +63,28 @@ public final class MeteorVarligi extends Entity {
         noPhysics = true;
     }
 
-    static MeteorVarligi olustur(ServerLevel level, Yorunge y, MeteorBoyutu boyut, MeteorGorunumu gorunum,
-            YanginKaynagi kaynak, boolean sarsinti, OdulZari.Sanslar sanslar) {
+    static MeteorVarligi olustur(ServerLevel level, Yorunge y, double olcek, MeteorGorunumu gorunum,
+            YanginKaynagi kaynak, boolean sarsinti, OdulZari.Sanslar sanslar, UUID odulOyuncu) {
         MeteorVarligi m = new MeteorVarligi(MeteorKayitlari.METEOR.get(), level);
         m.setPos(y.baslangicX(), y.baslangicY(), y.baslangicZ());
         m.setDeltaMovement(y.hizX(), y.hizY(), y.hizZ());
-        m.entityData.set(BOYUT, (byte) boyut.ordinal());
+        m.entityData.set(OLCEK, (float) olcek);
         m.entityData.set(GORUNUM, (byte) gorunum.ordinal());
         m.kaynak = kaynak;
         m.sarsinti = sarsinti;
         m.sanslar = sanslar;
+        m.odulOyuncu = odulOyuncu;
         return m;
     }
 
+    /** Sürekli ölçek ({@value MeteorOlcegi#KUCUK_ALT}–{@value MeteorOlcegi#UST}). */
+    public double olcek() {
+        return entityData.get(OLCEK);
+    }
+
+    /** Ödül sınıfı (ölçeğin bantından). */
     public MeteorBoyutu boyut() {
-        return MeteorBoyutu.kimlik(entityData.get(BOYUT));
+        return MeteorBoyutu.olcekten(olcek());
     }
 
     public MeteorGorunumu gorunum() {
@@ -99,15 +110,15 @@ public final class MeteorVarligi extends Entity {
         return inisKalanTick;
     }
 
-    /** İz şeridinin uzunluğu (blok): tasarım notunda 30–80. */
+    /** İz şeridinin uzunluğu (blok): ölçek 0,5'te 80, 2,5'te 140 (MT2-32; eskiden 40–72), uçtuğu yoldan uzun olmaz. */
     public double izUzunlugu() {
-        double tam = boyut().buyuk() ? 72 : 40;
+        double tam = MeteorOlcegi.ara(olcek(), 86, 125, 80, 140);
         return Math.min(tam, (yas + 1) * getDeltaMovement().length());
     }
 
     @Override
     protected void defineSynchedData() {
-        entityData.define(BOYUT, (byte) 0);
+        entityData.define(OLCEK, (float) MeteorOlcegi.KUCUK_TIPIK);
         entityData.define(GORUNUM, (byte) 0);
     }
 
@@ -125,8 +136,8 @@ public final class MeteorVarligi extends Entity {
             Carpisma c = carpismaAra(sunucu, konum, hiz);
             if (c != null) {
                 discard();
-                MeteorCarpmasi.carp(sunucu, c.zemin(), c.nokta(), boyut(), gorunum(), kaynak, sarsinti,
-                        sanslar != null ? sanslar : MeteorAyarlari.sanslar(), c.suya());
+                MeteorCarpmasi.carp(sunucu, c.zemin(), c.nokta(), olcek(), gorunum(), kaynak, sarsinti,
+                        sanslar != null ? sanslar : MeteorAyarlari.sanslar(), c.suya(), odulOyuncu);
                 return;
             }
         } else {
@@ -202,9 +213,8 @@ public final class MeteorVarligi extends Entity {
         if (yogunluk <= 0) {
             return;
         }
-        boolean buyuk = boyut().buyuk();
         boolean ay = gorunum() == MeteorGorunumu.AY;
-        double olcek = buyuk ? 2.4 : 1.0;
+        double olcek = MeteorOlcegi.ara(olcek(), 1.0, 2.4, 0.6, 3.0);
         SimpleParticleType plazma = (ay ? MeteorKayitlari.PLAZMA_AY : MeteorKayitlari.PLAZMA).get();
         SimpleParticleType kivilcim = (ay ? MeteorKayitlari.KIVILCIM_AY : MeteorKayitlari.KIVILCIM).get();
         Vec3 geri = hiz.scale(-1);

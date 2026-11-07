@@ -1,19 +1,20 @@
 """Başarımların görsel kanıtı (K0-21 rev. 2 ekran protokolü + (k) kilit, TEK koşu).
 
-Kullanım (worktree kökünden): python3 tools/senaryo/basarim_gorsel.py
+Kullanım (worktree kökünden): python3 tools/senaryo/basarim_gorsel.py [<kanıt klasörü>]  (vars. KOK/.vibe/kanit/basarim;
+pc2: tools/senaryo/pc2_istemci.sh <kanıt/> basarim_gorsel.py <kanıt/>)
 
 Tek oyunculu Quick Play dünyası `run/saves/basarim` her koşuda KOK/run/saves/test'ten (seed 20261105, allowCommands=1)
 taze kopyalanır; istemci `-Potomasyon=basarim -PoyunTestiAfeti=!kasirga` ile açılır (K-E23: gerçek kasırga
 birleşse de hızlı yaşam döngülü taklit) ve `client.basarim.BasarimOtomasyonu`
-adımlarını yürütür: kök toast'ı, seviye 5 kasırganın doğal bitişinde toast + sohbet duyurusu, ünvanlı sohbet ve tab
-listesi, sekmenin erken/tam/gizliler-açık halleri.
+adımlarını yürütür: kök toast'ı, seviye 5 kasırganın doğal bitişinde toast + modun sohbet duyurusu (meydan okuma
+satırı ünvanlı, A-37), sekmenin erken/tam/gizliler-açık halleri.
 
 Protokol: (a) açılış yalnız Hyprland exec kuralıyla ([workspace 95 silent; no_initial_focus; no_focus on;
 focus_on_activate off]); (b) JVM'de HL_EXEC_RULE_TOKEN yoksa öldürülür; (c) pencere no_focus=true ve ws 95 doğrulanır,
 tutmazsa öldürülür; (d) 5 sn'de bir bekçi: etkin pencere bizimse ALARM, süreç öldürülür, odak kaydedilen pencereye
 verilir, koşu geçersiz; (e) oyun içi girdi sayıları kapanış satırından okunur, sıfırdan farklıysa koşu geçersiz.
 Sahibin oturumunda tıklama/odak/workspace değişimi yok. Aynı anda tek runClient (runclient_kilit.py kos); ağır süreç
-kapısı (en çok 20 dk). Sayılar ve adımlar KOK/.vibe/kanit/basarim/protokol.log'a, kareler KOK/.vibe/kanit/basarim/kareler/'e.
+kapısı (en çok 20 dk). Sayılar ve adımlar <kanıt>/protokol.log'a, kareler <kanıt>/kareler/'e.
 """
 import hashlib
 import os
@@ -31,7 +32,7 @@ import runclient_kilit  # noqa: E402
 WS = 95
 W = Path(__file__).resolve().parents[2]
 KOK = W.parents[1] if W.parent.name == ".worktrees" else W
-KANIT = KOK / ".vibe/kanit/basarim"
+KANIT = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else KOK / ".vibe/kanit/basarim"
 KARELER = KANIT / "kareler"
 JAVA_HOME = "/home/lagxt/.jdks/jdk-17.0.21+9"
 ISARET = "BASARIM_OTOMASYON"
@@ -48,13 +49,15 @@ def log(*a):
 
 
 def kapi():
+    # pc2 (8 GB): pc2_istemci.sh bütün yuvaları tutar ve daemon'ları durdurur; istemciye en az ~1,3 GiB boş yeter.
+    esik = 1300 if runclient_kilit.ekran_pc2() else 4096
     for _ in range(21):
         gradle = int(subprocess.run(["pgrep", "-fc", "GradleWrapperMain"], capture_output=True, text=True).stdout
                      .strip() or 0)
         istemci = subprocess.run(["pgrep", "-fa", "runClient"], capture_output=True, text=True).stdout.strip()
         bos = int(open("/proc/meminfo").read().split("MemAvailable:")[1].split()[0]) // 1024
         log(f"kapı: gradle={gradle} runClient={'var' if istemci else 'yok'} bos={bos} MB")
-        if gradle < 2 and not istemci and bos >= 4096:
+        if gradle < 2 and not istemci and bos >= esik:
             return True
         time.sleep(60)
     return False

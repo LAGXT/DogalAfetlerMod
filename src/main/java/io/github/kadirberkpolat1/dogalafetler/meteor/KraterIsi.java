@@ -43,7 +43,7 @@ public final class KraterIsi {
     private final double yaricap;
     private final double derinlik;
     private final long tohum;
-    private final MeteorBoyutu boyut;
+    private final double olcek;
     private final MeteorGorunumu gorunum;
     private final YanginKaynagi kaynak;
     private final OdulZari.Sonuc odul;
@@ -57,14 +57,14 @@ public final class KraterIsi {
     private int yigilan;
     private boolean bekliyor;
 
-    KraterIsi(BlockPos merkez, double yaricap, double derinlik, long tohum, MeteorBoyutu boyut, MeteorGorunumu gorunum,
+    KraterIsi(BlockPos merkez, double yaricap, double derinlik, long tohum, double olcek, MeteorGorunumu gorunum,
             YanginKaynagi kaynak, OdulZari.Sonuc odul, boolean blokHasari) {
         this.merkez = merkez.immutable();
         this.plan = KraterProfili.planla(yaricap, derinlik, tohum, MeteorCarpmasi.UST_TEMIZLIK, blokHasari);
         this.yaricap = yaricap;
         this.derinlik = derinlik;
         this.tohum = tohum;
-        this.boyut = boyut;
+        this.olcek = olcek;
         this.gorunum = gorunum;
         this.kaynak = kaynak;
         this.odul = odul;
@@ -77,7 +77,7 @@ public final class KraterIsi {
         t.putDouble("yaricap", yaricap);
         t.putDouble("derinlik", derinlik);
         t.putLong("tohum", tohum);
-        t.putByte("boyut", (byte) boyut.ordinal());
+        t.putDouble("olcek", olcek);
         t.putByte("gorunum", (byte) gorunum.ordinal());
         t.putString("kaynakTur", kaynak.tur() == null ? "" : kaynak.tur().kimlik());
         t.putLong("afetNo", kaynak.afetNo());
@@ -92,8 +92,10 @@ public final class KraterIsi {
     static KraterIsi oku(CompoundTag t) {
         AfetTuru tur = AfetTuru.kimlikIle(t.getString("kaynakTur")).orElse(null);
         YanginKaynagi kaynak = tur == null ? YanginKaynagi.KOMUT : YanginKaynagi.afet(tur, t.getLong("afetNo"));
+        // Ölçekten önceki kayıtta yalnız boyut baytı var: sınıfın tipik ölçeği.
+        double olcek = t.contains("olcek") ? t.getDouble("olcek") : MeteorBoyutu.kimlik(t.getByte("boyut")).tipikOlcek();
         KraterIsi is = new KraterIsi(BlockPos.of(t.getLong("merkez")), t.getDouble("yaricap"), t.getDouble("derinlik"),
-                t.getLong("tohum"), MeteorBoyutu.kimlik(t.getByte("boyut")), MeteorGorunumu.kimlik(t.getByte("gorunum")),
+                t.getLong("tohum"), olcek, MeteorGorunumu.kimlik(t.getByte("gorunum")),
                 kaynak, new OdulZari.Sonuc(t.getBoolean("parca"), t.getBoolean("cekirdek")), t.getBoolean("blokHasari"));
         is.evre = Evre.values()[Math.max(0, Math.min(Evre.values().length - 1, t.getByte("evre")))];
         is.sira = Math.max(0, t.getInt("sira"));
@@ -139,8 +141,8 @@ public final class KraterIsi {
 
     /** Kayıt karşılaştırması (GameTest): evre, sıra ve sayaçlar. */
     String ozet() {
-        return merkez.toShortString() + " " + boyut + " " + gorunum + " " + kaynak + " " + odul + " " + evre + "/" + sira
-                + " " + kazilan + "/" + korunan + "/" + astarlanan + "/" + yigilan + " t=" + tohum + " h=" + blokHasari;
+        return merkez.toShortString() + " ölçek " + (float) olcek + " " + gorunum + " " + kaynak + " " + odul + " " + evre
+                + "/" + sira + " " + kazilan + "/" + korunan + "/" + astarlanan + "/" + yigilan + " t=" + tohum + " h=" + blokHasari;
     }
 
     /**
@@ -298,7 +300,7 @@ public final class KraterIsi {
     private void bitir(ServerLevel level) {
         int yanginYaricapi = (int) Math.ceil(yaricap) + MeteorAyarlari.yanginYaricapEki();
         int tutusan = YanginYoneticisi.alanTutustur(level, merkez, yanginYaricapi, kaynak,
-                MeteorAyarlari.yanginYogunlugu(boyut));
+                MeteorAyarlari.yanginYogunlugu(olcek));
         if (odul.cekirdek()) {
             MeteorOdulleri.birak(level, tabanNoktasi(level, 0, 0),
                     new ItemStack(MeteorEsyaKayitlari.KOZMIK_CEKIRDEK.get()), 0);
@@ -310,11 +312,11 @@ public final class KraterIsi {
                     (int) Math.round(Math.sin(aci) * r)), new ItemStack(MeteorEsyaKayitlari.METEORIT_PARCASI.get()),
                     MeteorAyarlari.sicakSaniye());
         }
-        DogalAfetler.LOGGER.info("meteor krateri tamam: {} ({}, {}, {}): kazılan {}, korunan {}, astar {}, kenar {}; "
+        DogalAfetler.LOGGER.info("meteor krateri tamam: {} (ölçek {}, {}, {}): kazılan {}, korunan {}, astar {}, kenar {}; "
                 + "ateş alanı r={} ilk tutuşan {} hücre; ödül parça={} çekirdek={}; blok hasarı {}", merkez.toShortString(),
-                boyut, gorunum, level.dimension().location(), kazilan, korunan, astarlanan, yigilan, yanginYaricapi,
+                (float) olcek, gorunum, level.dimension().location(), kazilan, korunan, astarlanan, yigilan, yanginYaricapi,
                 tutusan, odul.parca(), odul.cekirdek(), blokHasari ? "açık" : "kapalı");
-        MinecraftForge.EVENT_BUS.post(new MeteorCarptiEvent(level, merkez, boyut, kaynak, odul, false));
+        MinecraftForge.EVENT_BUS.post(new MeteorCarptiEvent(level, merkez, olcek, kaynak, odul, false));
     }
 
     /** Krater tabanında {@code (dx, dz)} sütununun ilk boş noktası (sert blok kalmışsa üstünde). */

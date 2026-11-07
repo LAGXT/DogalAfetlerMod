@@ -5,6 +5,7 @@ import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.Carpanlar;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.Cekim;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.KasirgaEvresi;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.KasirgaSeviyesi;
+import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.KasirgaYikimi;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.Yonelim;
 import io.github.kadirberkpolat1.dogalafetler.core.Afet;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetAsamasi;
@@ -22,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -65,8 +67,10 @@ import net.minecraft.world.phys.Vec3;
 public final class Kasirga extends Afet {
     static final String UGULTU_KIMLIK = "kasirga/ugultu";
     static final String RUZGAR_KIMLIK = "kasirga/ruzgar";
-    /** Uçan blok tavanı doluyken parçalanan bloğun eşya düşürme olasılığı (patlamadaki gibi kayıp; eşya varlığı TPS'i yer). */
-    static final double PARCA_ESYA_PAYI = 1.0 / 16;
+    /** Devrilen gövdede yukarıdan aşağı en çok bu kadar kesintisiz dikey kütük aranır (dev ağaçlar dahil). */
+    private static final int GOVDE_TARAMA = 32;
+    /** Devrik kütüğün konduğu zemin, gövde dibinden en çok bu kadar blok yüksek ya da alçakta olabilir. */
+    private static final int YATIS_YUKSEKLIK_FARKI = 2;
     private static final SoundEvent[] ENKAZ_SESLERI = {SoundEvents.WOOD_BREAK, SoundEvents.GRAVEL_BREAK,
         SoundEvents.GLASS_BREAK, SoundEvents.GRASS_BREAK, SoundEvents.WOOD_BREAK};
     private static final double TAM_TUR = Math.PI * 2;
@@ -454,59 +458,245 @@ public final class Kasirga extends Afet {
     }
 
     /**
-     * Tick başına seviye tablosundaki sayı kadar deneme (evre payı × TPS kısması): çekim yarıçapının %60'ı içinde, merkeze
-     * yoğun rastgele sütunun en üst bloğu. Uçan blok tavanı doluysa blok parçalanır (kırılma parçacığı ve sesi): tick başına
-     * en çok denemenin dörtte biri, yalnız {@link #PARCA_ESYA_PAYI}'nda eşya düşer. Her kırılan blok eşya düşürseydi S5'te
-     * 15 sn'de ~3800 eşya varlığı oluşuyor ve tick 40 ms'ye çıkıyordu (K-04).
+     * Tick başına {@link KasirgaYikimi#butce} kadar sütun denemesi (seviye × evre payı × TPS kısması): yıkım yarıçapında
+     * (çekim yarıçapının %60'ı) rastgele sütun, seviyeye ve merkeze uzaklığa göre {@link KasirgaYikimi#cekimOlasiligi} ile
+     * çekilir ve {@link #sutunuIsle} ile yukarıdan aşağı taranır. Uçan blok tavanı doluysa blok parçalanır (kırılma
+     * parçacığı ve sesi), tick başına en çok bütçenin parça sayısı kadar; eşya payı K-04'ün tick başına eşya hızını aşmaz
+     * (her kırılan blok eşya düşürseydi S5'te 15 sn'de ~3800 eşya varlığı oluşuyor ve tick 40 ms'ye çıkıyordu).
      */
     private void bloklariKaldir(ServerLevel level) {
-        double pay = KasirgaEvresi.kaldirmaPayi(durum);
         KasirgaSeviyesi s = seviyeBilgisi();
-        if (pay <= 0 || s.blokKaldirmaTick() <= 0) {
+        KasirgaYikimi.Butce butce = KasirgaYikimi.butce(s.seviye(), s.blokKaldirmaTick(), KasirgaEvresi.kaldirmaPayi(durum),
+                TpsOlcer.kismaCarpani());
+        if (butce.deneme() <= 0) {
             return;
         }
-        int deneme = Math.max(1, (int) Math.round(s.blokKaldirmaTick() * pay * TpsOlcer.kismaCarpani()));
-        int tavan = KasirgaAyarlari.ucanBlokTavani();
-        int parcalanabilir = Math.max(1, deneme / 4);
-        int parcalanan = 0;
+        YikimTuru tur = new YikimTuru(butce, KasirgaAyarlari.ucanBlokTavani());
         Vec3 k = konum();
-        LongSet degisen = new LongOpenHashSet();
-        for (int i = 0; i < deneme; i++) {
+        double yikim = KasirgaYikimi.yikimYaricapi(s.cekimYaricapi());
+        for (int i = 0; i < butce.deneme() && !tur.tukendi(ucanlar.size()); i++) {
             double aci = rastgele.nextDouble() * TAM_TUR;
-            double r = s.cekimYaricapi() * 0.6 * Math.sqrt(rastgele.nextDouble());
+            double r = yikim * Math.sqrt(rastgele.nextDouble());
+            if (rastgele.nextDouble() >= KasirgaYikimi.cekimOlasiligi(s.seviye(), r, s.tabanYaricapi(), yikim)) {
+                continue;
+            }
             int x = Mth.floor(k.x + Math.cos(aci) * r);
             int z = Mth.floor(k.z + Math.sin(aci) * r);
-            if (!level.hasChunk(x >> 4, z >> 4)) {
-                continue;
-            }
-            BlockPos yer = new BlockPos(x, level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z) - 1, z);
-            BlockState blok = level.getBlockState(yer);
-            if (!kaldirilabilir(level, yer, blok, s)) {
-                continue;
-            }
-            boolean ucabilir = ucanlar.size() < tavan && level.isPositionEntityTicking(yer);
-            if (!ucabilir && parcalanan >= parcalanabilir) {
-                continue;
-            }
-            degisen.add(ChunkPos.asLong(x >> 4, z >> 4));
-            toplamKaldirilan++;
-            if (ucabilir) {
-                level.removeBlock(yer, false);
-                double yaricap = Math.hypot(x + 0.5 - k.x, z + 0.5 - k.z);
-                double baslangic = Math.atan2(z + 0.5 - k.z, x + 0.5 - k.x);
-                UcanBlokVarligi ucan = UcanBlokVarligi.olustur(level, blok, this, varlik != null ? varlik.getId() : -1,
-                        baslangic, yaricap, yer.getY() - k.y);
-                level.addFreshEntity(ucan);
-                ucanlar.add(ucan);
-            } else {
-                parcalanan++;
-                level.destroyBlock(yer, false);
-                if (rastgele.nextDouble() < PARCA_ESYA_PAYI) {
-                    Block.dropResources(blok, level, yer);
-                }
+            if (level.hasChunk(x >> 4, z >> 4)) {
+                sutunuIsle(level, x, z, s, tur, true);
             }
         }
-        degisen.forEach((long c) -> SanalSu.chunkDegisti(level, new ChunkPos(c)));
+        tur.bildir(level);
+    }
+
+    /**
+     * GameTest: {@code (x, z)} sütununu tam evre payı ve kısmasız bir tick bütçesiyle işler; {@code ucurabilir=false} uçan
+     * blok tavanı doluymuş gibidir (bloklar parçalanır, gövde yatırılır). {@code afetBlokHasari=false} iken hiçbir şey yapmaz.
+     */
+    int sutunuIsleTest(ServerLevel level, int x, int z, boolean ucurabilir) {
+        if (!Kurallar.blokHasariAcik(level.getGameRules())) {
+            return 0;
+        }
+        KasirgaSeviyesi s = seviyeBilgisi();
+        YikimTuru tur = new YikimTuru(KasirgaYikimi.butce(s.seviye(), s.blokKaldirmaTick(), 1, 1),
+                KasirgaAyarlari.ucanBlokTavani());
+        int kalkan = sutunuIsle(level, x, z, s, tur, ucurabilir);
+        tur.bildir(level);
+        return kalkan;
+    }
+
+    /**
+     * Sütunu en üst bloktan aşağı {@link KasirgaYikimi#derinlik} kadar tarar (hava atlanır ama sayılır). Kaldırılamayan ya da
+     * seviyenin bu derinlikte almadığı ilk blokta durur: sığınağın altı kazılmaz. S4-5'te dikey kütüğe varınca gövde
+     * devrilir ({@link #govdeyiDevir}) ve tarama biter. Döner: sütundan kalkan blok sayısı.
+     */
+    private int sutunuIsle(ServerLevel level, int x, int z, KasirgaSeviyesi s, YikimTuru tur, boolean ucurabilir) {
+        int ust = level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z) - 1;
+        int alt = Math.max(level.getMinBuildHeight(), ust - KasirgaYikimi.derinlik(s.seviye()) + 1);
+        BlockPos.MutableBlockPos yer = new BlockPos.MutableBlockPos();
+        int kalkan = 0;
+        for (int y = ust; y >= alt; y--) {
+            yer.set(x, y, z);
+            BlockState blok = level.getBlockState(yer);
+            if (blok.isAir()) {
+                continue;
+            }
+            if (!kaldirilabilir(level, yer, blok, s) || !KasirgaYikimi.alinir(s.seviye(), sinif(level, yer, blok), ust - y)) {
+                break;
+            }
+            if (KasirgaYikimi.devirir(s.seviye()) && dikeyKutuk(blok)) {
+                kalkan += govdeyiDevir(level, yer.immutable(), s, tur, ucurabilir);
+                break;
+            }
+            if (!kaldir(level, yer, blok, tur, ucurabilir)) {
+                break;
+            }
+            kalkan++;
+        }
+        return kalkan;
+    }
+
+    /** Bloğu uçurur ya da parçalar; ikisine de bütçe yoksa {@code false} (blok yerinde kalır). */
+    private boolean kaldir(ServerLevel level, BlockPos yer, BlockState blok, YikimTuru tur, boolean ucurabilir) {
+        if (ucabilir(level, yer, tur, ucurabilir)) {
+            ucur(level, yer, blok);
+        } else if (!parcala(level, yer, blok, tur)) {
+            return false;
+        }
+        tur.degisti(yer);
+        toplamKaldirilan++;
+        return true;
+    }
+
+    private boolean ucabilir(ServerLevel level, BlockPos yer, YikimTuru tur, boolean ucurabilir) {
+        return ucurabilir && ucanlar.size() < tur.tavan && level.isPositionEntityTicking(yer);
+    }
+
+    private void ucur(ServerLevel level, BlockPos yer, BlockState blok) {
+        level.removeBlock(yer, false);
+        Vec3 k = konum();
+        double dx = yer.getX() + 0.5 - k.x;
+        double dz = yer.getZ() + 0.5 - k.z;
+        UcanBlokVarligi ucan = UcanBlokVarligi.olustur(level, blok, this, varlik != null ? varlik.getId() : -1,
+                Math.atan2(dz, dx), Math.hypot(dx, dz), yer.getY() - k.y);
+        level.addFreshEntity(ucan);
+        ucanlar.add(ucan);
+    }
+
+    /** Parça bütçesi varsa blok kırılır (vanilla parçacık ve ses), yalnız tick'in eşya payında eşya düşer. */
+    private boolean parcala(ServerLevel level, BlockPos yer, BlockState blok, YikimTuru tur) {
+        if (tur.parca <= 0) {
+            return false;
+        }
+        tur.parca--;
+        level.destroyBlock(yer, false);
+        if (rastgele.nextDouble() < tur.esyaPayi) {
+            Block.dropResources(blok, level, yer);
+        }
+        return true;
+    }
+
+    /**
+     * S4-5 ağaç devrilmesi (K-05 devrik kütük): {@code tepe}'den aşağı kesintisiz dikey kütükler tepeden başlayarak tick'in
+     * kütük bütçesi kadar kalkar. Tavanda yer varsa kütük uçar; yoksa rüzgârın teğet yönüne ({@link
+     * KasirgaYikimi#devrilmeYonu}) yatar: tepeden {@code j}. kütük gövde dibinden {@code boy - j} blok ötedeki zemine yatay
+     * konur. Yer yoksa parçalanır. Yatırılan kütük de parça bütçesinden düşer: tavan doluyken tick başına değişen blok
+     * K-04'ün parça tavanını aşmaz (AF-23 rev.); bütçe bitince gövdenin kalanı kütük kalır, sonraki ziyaret sürdürür.
+     */
+    private int govdeyiDevir(ServerLevel level, BlockPos tepe, KasirgaSeviyesi s, YikimTuru tur, boolean ucurabilir) {
+        int x = tepe.getX();
+        int z = tepe.getZ();
+        BlockPos.MutableBlockPos m = tepe.mutable();
+        int boy = 0;
+        while (boy < GOVDE_TARAMA && m.getY() >= level.getMinBuildHeight()) {
+            BlockState b = level.getBlockState(m);
+            if (!dikeyKutuk(b) || !kaldirilabilir(level, m, b, s)) {
+                break;
+            }
+            boy++;
+            m.move(Direction.DOWN);
+        }
+        int dipY = tepe.getY() - boy + 1;
+        Vec3 k = konum();
+        int[] yon = KasirgaYikimi.devrilmeYonu(x + 0.5 - k.x, z + 0.5 - k.z);
+        Direction.Axis eksen = yon[0] != 0 ? Direction.Axis.X : Direction.Axis.Z;
+        int devrilen = 0;
+        for (int j = 0; j < boy && tur.kutuk > 0; j++) {
+            m.set(x, tepe.getY() - j, z);
+            BlockState kutuk = level.getBlockState(m);
+            if (ucabilir(level, m, tur, ucurabilir)) {
+                ucur(level, m, kutuk);
+            } else {
+                if (tur.parca <= 0) {
+                    break;
+                }
+                BlockPos yatis = yatisYeri(level, x + yon[0] * (boy - j), z + yon[1] * (boy - j), dipY);
+                if (yatis != null) {
+                    tur.parca--;
+                    level.removeBlock(m, false);
+                    level.setBlock(yatis, kutuk.hasProperty(BlockStateProperties.AXIS)
+                            ? kutuk.setValue(BlockStateProperties.AXIS, eksen) : kutuk, Block.UPDATE_ALL);
+                    tur.degisti(yatis);
+                } else {
+                    parcala(level, m, kutuk, tur);
+                }
+            }
+            tur.degisti(m);
+            tur.kutuk--;
+            toplamKaldirilan++;
+            devrilen++;
+        }
+        return devrilen;
+    }
+
+    /**
+     * Devrik kütüğün yeri: {@code (x, z)} sütununda yaprak saymayan en üst katı bloğun üstü; gövde dibinin ±2 bloğunda,
+     * boş (değiştirilebilir: hava, ot) ve suyun üstü değil. Uygun değilse {@code null}.
+     */
+    private static BlockPos yatisYeri(ServerLevel level, int x, int z, int dipY) {
+        if (!level.hasChunk(x >> 4, z >> 4)) {
+            return null;
+        }
+        int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+        if (Math.abs(y - dipY) > YATIS_YUKSEKLIK_FARKI) {
+            return null;
+        }
+        BlockPos yer = new BlockPos(x, y, z);
+        BlockState mevcut = level.getBlockState(yer);
+        return mevcut.canBeReplaced() && mevcut.getFluidState().isEmpty() && level.getFluidState(yer.below()).isEmpty()
+                ? yer : null;
+    }
+
+    private static boolean dikeyKutuk(BlockState blok) {
+        return blok.is(BlockTags.LOGS) && (!blok.hasProperty(BlockStateProperties.AXIS)
+                || blok.getValue(BlockStateProperties.AXIS) == Direction.Axis.Y);
+    }
+
+    /** Bloğun yıkım sınıfı: yaprak, kütük ve ahşap yapı etiketlerden (N12), zemin {@link #zeminMi}, anında kırılan bitki. */
+    private static KasirgaYikimi.Sinif sinif(ServerLevel level, BlockPos yer, BlockState blok) {
+        if (blok.is(BlockTags.LEAVES)) {
+            return KasirgaYikimi.Sinif.YAPRAK;
+        }
+        if (blok.is(BlockTags.LOGS)) {
+            return KasirgaYikimi.Sinif.KUTUK;
+        }
+        if (blok.is(BlockTags.PLANKS) || blok.is(BlockTags.WOODEN_STAIRS) || blok.is(BlockTags.WOODEN_SLABS)
+                || blok.is(BlockTags.WOODEN_FENCES) || blok.is(BlockTags.FENCE_GATES) || blok.is(BlockTags.WOODEN_TRAPDOORS)) {
+            return KasirgaYikimi.Sinif.AHSAP_YAPI;
+        }
+        if (zeminMi(blok)) {
+            return KasirgaYikimi.Sinif.ZEMIN;
+        }
+        return blok.getDestroySpeed(level, yer) == 0 ? KasirgaYikimi.Sinif.BITKI : KasirgaYikimi.Sinif.DIGER;
+    }
+
+    /** Bir tick'in kalan yıkım bütçesi ve değişen chunk'ları ({@link SanalSu#chunkDegisti} bir kez, tick sonunda). */
+    private static final class YikimTuru {
+        final int tavan;
+        final double esyaPayi;
+        final LongSet degisen = new LongOpenHashSet();
+        int parca;
+        int kutuk;
+
+        YikimTuru(KasirgaYikimi.Butce butce, int tavan) {
+            this.tavan = tavan;
+            this.esyaPayi = butce.esyaPayi();
+            this.parca = butce.parca();
+            this.kutuk = butce.kutuk();
+        }
+
+        /** Tavan dolu ve parça bütçesi bitti (yatırılan kütük de ondan düşer): bu tick başka blok kalkamaz. */
+        boolean tukendi(int ucan) {
+            return parca <= 0 && ucan >= tavan;
+        }
+
+        void degisti(BlockPos p) {
+            degisen.add(ChunkPos.asLong(p.getX() >> 4, p.getZ() >> 4));
+        }
+
+        void bildir(ServerLevel level) {
+            degisen.forEach((long c) -> SanalSu.chunkDegisti(level, new ChunkPos(c)));
+        }
     }
 
     /**

@@ -48,6 +48,8 @@ final class DonmaSureci implements DonemSureci {
             case GUNESSIZ -> g < 100f - PAY;
             case KIZIL_CUCE -> d.cozulmeDonemi() && !DonmaAyarlari.kalici() && g > DonmaAyarlari.cozulmeTabani() + PAY;
             case NORMAL -> DonmaAyarlari.bagimsizCozulme() && g > PAY;
+            // Pulsar (gökyüzü-2): donma durur ve geri çözülür; kalıcı kış ve "donma kalıcı" ayarı yok sayılır.
+            case PULSAR -> g > PAY;
             default -> false;
         };
     }

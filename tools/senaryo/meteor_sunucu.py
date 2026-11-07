@@ -16,9 +16,14 @@ halka (chunk 65, x ≥ 1040) yüklü değil. 1037,1000'e `meteor dusur buyuk` �
 craters: 0`, `stop`. Sonda log denetimi: `invalid dist` yok, istisna yok, `meteor` config düzeltme WARN'ı yok, ağ kimlik
 listesinde `meteor/sarsinti` var, süreçler 0 ile çıktı.
 
-Kullanım (worktree kökünden): python3 tools/senaryo/meteor_sunucu.py <log klasörü> | --kanit <dizin> [--port <n>]
-Çıkış: 0 geçti, 1 senaryo/denetim hatası, 2 sunucu süreci sıfır dışı kodla çıktı, 3 ağır süreç kapısı açılmadı
-(port ve kapı: cekirdek_sunucu.py, K-E13).
+Kullanım (worktree kökünden): python3 tools/senaryo/meteor_sunucu.py <log klasörü> | --kanit <dizin> [--port <n>] [--tps]
+`--tps` (meteor-2, inceleme-meteor-2-2 Mt9; GOREV §6 madde 10): yalnız yük ölçümü. `afetBlokHasari true`, doğuşün çevresi
+±160 blok forceload (bir oyuncunun 10 chunk'lık simülasyon alanı; oyuncusuz sunucuda yağmurun tek hedefi doğuş noktasıdır),
+`meteor yagmur 200 180` (200 sn gerçek zaman, 180/dk; MT2-28), yağmur boyunca ve krater işleri bitene dek 10 sn'de bir `forge tps`;
+`<kanıt>/tps.txt`'ye örnekler, ortalama tick ms, en düşük TPS, krater ve blok işlemi sayısı. Ölçüt en düşük TPS > 18 ve
+yağmur örneklerinin ortalama tick'i < 10 ms.
+Çıkış: 0 geçti, 1 senaryo/denetim hatası (--tps: TPS ya da tick ölçütü tutmadı), 2 sunucu süreci sıfır dışı kodla çıktı, 3 ağır süreç
+kapısı açılmadı (port ve kapı: cekirdek_sunucu.py, K-E13).
 """
 import re
 import signal
@@ -32,8 +37,14 @@ import cekirdek_sunucu as cs  # noqa: E402
 cs.SENARYO_DUNYASI = "meteor-senaryo"
 cs.SENARYO_OZELLIKLERI = {"level-name": cs.SENARYO_DUNYASI, "level-seed": "20261106", "online-mode": "false"}
 
-TAVAN = 48
-KRATER = r"meteor krateri tamam: -?\d+, -?\d+, -?\d+ \({boyut}, {gorunum}, minecraft:overworld\): kazılan (\d+), korunan \d+"
+TAVAN = 448
+KRATER = (r"meteor krateri tamam: -?\d+, -?\d+, -?\d+ \(ölçek {olcek}, {gorunum}, minecraft:overworld\): kazılan (\d+), "
+          r"korunan \d+")
+TPS_SURESI = 200
+TPS_YOGUNLUK = 180
+TPS_ARALIGI = 10
+TPS_ESIGI = 18.0
+TICK_ESIGI_MS = 10.0
 
 
 def kosu1(sunucu):
@@ -45,7 +56,7 @@ def kosu1(sunucu):
 
     isaret = sunucu.isaret()
     sunucu.komut("dogalafet meteor dusur buyuk", r"Meteor \(buyuk/gunes\) (falling towards|struck)")
-    satir = sunucu.bekle(KRATER.format(boyut="BUYUK", gorunum="GUNES"), isaret, 90, "büyük meteor krateri")
+    satir = sunucu.bekle(KRATER.format(olcek=r"2\.0", gorunum="GUNES"), isaret, 90, "büyük meteor krateri")
     kazilan = int(re.search(r"kazılan (\d+)", satir).group(1))
     if kazilan <= 0:
         raise cs.SenaryoHatasi(f"krater kazmadı: {satir}")
@@ -56,7 +67,7 @@ def kosu1(sunucu):
 
     isaret = sunucu.isaret()
     sunucu.komut("dogalafet meteor dusur ay", r"Meteor \(kucuk/ay\) (falling towards|struck)")
-    sunucu.bekle(KRATER.format(boyut="KUCUK", gorunum="AY"), isaret, 90, "küçük ay meteoru krateri")
+    sunucu.bekle(KRATER.format(olcek=r"0\.7", gorunum="AY"), isaret, 90, "küçük ay meteoru krateri")
 
     isaret = sunucu.isaret()
     sunucu.komut("dogalafet meteor yagmur 15 40", r"Meteor shower #\d+ started: 15 s")
@@ -106,7 +117,7 @@ def kosu2(sunucu):
     sunucu.komut("dogalafet meteor bilgi", r"pending craters: 1 ", "kayıttan okunan iş")
     isaret = sunucu.isaret()
     sunucu.komut("forceload add 1024 992 1055 1007", r"to be force loaded")
-    sunucu.bekle(KRATER.format(boyut="BUYUK", gorunum="GUNES").replace(r"-?\d+, -?\d+, -?\d+", r"1037, -?\d+, 1000"),
+    sunucu.bekle(KRATER.format(olcek=r"2\.0", gorunum="GUNES").replace(r"-?\d+, -?\d+, -?\d+", r"1037, -?\d+, 1000"),
                  isaret, 60, "chunk yüklenince bekleyen krater tamamlandı")
     sunucu.komut("dogalafet meteor bilgi", r"pending craters: 0 ", "bekleyen krater yok")
     sunucu.komut("forceload remove all", r"Unmarked all force loaded chunks")
@@ -125,8 +136,67 @@ def log_denetimi(yol):
     return hatalar
 
 
+def tps_ornegi(sunucu, etiket, ornekler):
+    # Sunucu makinenin yerel ayarıyla yazar: tr_TR'de ondalık virgül ("3,754 ms").
+    satir = sunucu.komut("forge tps", r"Overall: Mean tick time: [\d.,]+ ms\. Mean TPS: [\d.,]+")
+    eslesme = re.search(r"Mean tick time: ([\d.,]+) ms\. Mean TPS: ([\d.,]+)", satir)
+    ornekler.append((etiket, float(eslesme.group(1).replace(",", ".")), float(eslesme.group(2).replace(",", "."))))
+
+
+def tps_kosusu(sunucu, klasor):
+    """Mt9/MT2-28: blok hasarı açık 180/dk yağmurun sunucu yükü (tek hedef, 200 sn)."""
+    sunucu.bekle(r"Done \(", 0, cs.ACILIS_SURESI, "açılış")
+    sunucu.komut("gamerule afetBlokHasari true", r"afetBlokHasari is now set to: true")
+    for alan in ("~-160 ~-160 ~-1 ~-1", "~0 ~-160 ~160 ~-1", "~-160 ~0 ~-1 ~160", "~0 ~0 ~160 ~160"):
+        sunucu.komut(f"forceload add {alan}", r"to be force loaded|already marked")
+    time.sleep(20)
+    ornekler = []
+    tps_ornegi(sunucu, "boşta (forceload sonrası)", ornekler)
+    isaret = sunucu.isaret()
+    sunucu.komut(f"dogalafet meteor yagmur {TPS_SURESI} {TPS_YOGUNLUK}", rf"Meteor shower #\d+ started: {TPS_SURESI} s")
+    baslangic = time.monotonic()
+    while time.monotonic() - baslangic < TPS_SURESI:
+        time.sleep(TPS_ARALIGI)
+        tps_ornegi(sunucu, f"yağmur +{time.monotonic() - baslangic:.0f} sn", ornekler)
+    for _ in range(12):
+        if "pending craters: 0 " in sunucu.komut("dogalafet meteor bilgi", r"Flying meteors: \d+/\d+"):
+            break
+        time.sleep(TPS_ARALIGI)
+        tps_ornegi(sunucu, f"krater kuyruğu +{time.monotonic() - baslangic:.0f} sn", ornekler)
+    bitis = sunucu.isaret()
+    sunucu.komut("dogalafet meteor durdur", r"Stopped \d+ command meteor shower")
+    sunucu.komut("dogalafet yangin sondur", r"Extinguished \d+ fire cells")
+    sunucu.komut("forceload remove all", r"Unmarked all force loaded chunks")
+    with sunucu.kilit:
+        satirlar = sunucu.satirlar[isaret:bitis]
+    krater = blok = suya = 0
+    for s in satirlar:
+        e = re.search(r"meteor krateri tamam: .*kazılan (\d+), korunan \d+, astar (\d+), kenar (\d+)", s)
+        if e:
+            krater += 1
+            blok += sum(int(g) for g in e.groups())
+        suya += "meteor suya düştü" in s
+    yagmur = ornekler[1:]
+    ort_ms = sum(o[1] for o in yagmur) / len(yagmur)
+    en_dusuk = min(o[2] for o in yagmur)
+    tick = TPS_SURESI * 20
+    ozet = (f"yağmur {TPS_SURESI} sn × {TPS_YOGUNLUK}/dk (tek hedef), afetBlokHasari true, ±160 blok forceload\n"
+            f"ortalama tick {ort_ms:.2f} ms (ölçüt < {TICK_ESIGI_MS:.0f}), en düşük TPS {en_dusuk:.2f} (ölçüt > {TPS_ESIGI:.0f})\n"
+            f"krater {krater}, suya {suya}; krater blok işlemi {blok} (yağmur tick'i başına {blok / tick:.1f}, "
+            f"krater başına {blok / max(1, krater):.0f})\n")
+    (klasor / "tps.txt").write_text(ozet + "\n".join(f"{e}	{ms:.2f} ms	TPS {t:.2f}" for e, ms, t in ornekler) + "\n",
+                                    encoding="utf-8")
+    sunucu.yaz("### " + ozet.replace("\n", " | "))
+    if en_dusuk <= TPS_ESIGI:
+        raise cs.SenaryoHatasi(f"en düşük TPS {en_dusuk:.2f} ≤ {TPS_ESIGI:.0f} (GOREV §6 madde 10)")
+    if ort_ms >= TICK_ESIGI_MS:
+        raise cs.SenaryoHatasi(f"ortalama tick {ort_ms:.2f} ms ≥ {TICK_ESIGI_MS:.0f} ms (MT2-28)")
+
+
 def main():
-    klasor = cs.argumanlar(__doc__).kanit
+    a = cs.argumanlar(__doc__, ek=lambda p: p.add_argument("--tps", action="store_true",
+                                                          help="yalnız 180/dk yağmurun TPS ölçümü (Mt9, MT2-28)"))
+    klasor = a.kanit
     klasor.mkdir(parents=True, exist_ok=True)
     signal.signal(signal.SIGTERM, lambda _i, _c: (_ for _ in ()).throw(SystemExit(143)))
     cs.kapi_veya_cik(cs.PORT)
@@ -135,7 +205,8 @@ def main():
     sonuc = 0
     kodlar = []
     try:
-        for ad, adimlar in (("kosu", kosu1), ("kosu2", kosu2)):
+        kosular = (("tps", lambda s: tps_kosusu(s, klasor)),) if a.tps else (("kosu", kosu1), ("kosu2", kosu2))
+        for ad, adimlar in kosular:
             sunucu = cs.Sunucu(ad, klasor / f"{ad}.log")
             try:
                 adimlar(sunucu)
@@ -149,7 +220,7 @@ def main():
                 break
     finally:
         cs.ozellikleri_geri_al(ozgun)
-    for ad in ("kosu", "kosu2"):
+    for ad in ("tps",) if a.tps else ("kosu", "kosu2"):
         yol = klasor / f"{ad}.log"
         if yol.exists():
             for hata in log_denetimi(yol):

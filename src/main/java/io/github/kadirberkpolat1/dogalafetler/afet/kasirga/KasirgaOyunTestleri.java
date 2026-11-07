@@ -17,6 +17,7 @@ import io.github.kadirberkpolat1.dogalafetler.uyari.OrtamSesi;
 import java.util.UUID;
 import net.minecraft.advancements.Advancement;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.AfterBatch;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -95,6 +96,16 @@ public final class KasirgaOyunTestleri {
         OyunTestiTemizligi.batchSonu(level);
     }
 
+    @AfterBatch(batch = "kasirga_devrik")
+    public static void devrikSonrasi(ServerLevel level) {
+        OyunTestiTemizligi.batchSonu(level);
+    }
+
+    @AfterBatch(batch = "kasirga_hafif")
+    public static void hafifSonrasi(ServerLevel level) {
+        OyunTestiTemizligi.batchSonu(level);
+    }
+
     private static void dogrula(GameTestHelper y, boolean kosul, String mesaj) {
         if (!kosul) {
             y.fail(mesaj);
@@ -112,6 +123,33 @@ public final class KasirgaOyunTestleri {
                 }
             }
         }
+    }
+
+    /**
+     * Küçük meşe: gövde {@code (x, 2..6, z)} beş dikey kütük; y 5-6'da 5x5, y 7'de 3x3 kalıcı yaprak (gövdenin tepesi
+     * yaprakla örtülü). Döner: gövde konumları (göreceli, aşağıdan yukarı).
+     */
+    private static BlockPos[] agac(GameTestHelper y, int x, int z) {
+        BlockState yaprak = Blocks.OAK_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true);
+        for (int k = 5; k <= 7; k++) {
+            int r = k == 7 ? 1 : 2;
+            for (int dx = -r; dx <= r; dx++) {
+                for (int dz = -r; dz <= r; dz++) {
+                    y.setBlock(new BlockPos(x + dx, k, z + dz), yaprak);
+                }
+            }
+        }
+        BlockPos[] govde = new BlockPos[5];
+        for (int i = 0; i < govde.length; i++) {
+            govde[i] = new BlockPos(x, 2 + i, z);
+            y.setBlock(govde[i], Blocks.OAK_LOG);
+        }
+        return govde;
+    }
+
+    private static boolean dikeyMeseKutugu(ServerLevel level, BlockPos mutlak) {
+        BlockState s = level.getBlockState(mutlak);
+        return s.is(Blocks.OAK_LOG) && s.getValue(BlockStateProperties.AXIS) == Direction.Axis.Y;
     }
 
     private static AABB kutu(GameTestHelper y) {
@@ -296,6 +334,74 @@ public final class KasirgaOyunTestleri {
             }
             y.succeed();
         });
+    }
+
+    /**
+     * S4 sütun taraması ağacın tepe yaprağını alıp gövdeye iner ve gövdeyi devirir; uçan blok tavanı doluyken kütükler
+     * rüzgârın teğet yönüne yatay konur (K-05 devrik kütük). Yatırılan kütük parça bütçesinden düştüğü için (S4 3/tick)
+     * beş kat gövde iki sütun adımında devrilir. {@code afetBlokHasari=false} iken aynı adım hiçbir bloğu değiştirmez.
+     * Doğuşun ilk yarısında evre payı 0 olduğu için kasırganın kendi tick'i blok kaldırmaz; adım testten sürülür.
+     */
+    @GameTest(template = SAHNE, batch = "kasirga_devrik", timeoutTicks = 40)
+    public static void s4AgacGovdesiniDevirirKuralKapaliykenDokunmaz(GameTestHelper y) {
+        ServerLevel level = y.getLevel();
+        zemin(y, false);
+        BlockPos[] govde = agac(y, MERKEZ.getX() + 4, MERKEZ.getZ());
+        BlockPos a = y.absolutePos(BlockPos.ZERO);
+        BlockPos b = y.absolutePos(new BlockPos(31, 15, 31));
+        boolean onceki = blokHasari(y, false);
+        long once = SanalSu.bolgeHash(level, a.getX(), a.getY(), a.getZ(), b.getX(), b.getY(), b.getZ());
+        Kasirga kasirga = baslat(y, 4, false, KasirgaEvresi.DOGUS);
+        BlockPos sutun = y.absolutePos(govde[0]);
+        try {
+            dogrula(y, kasirga.sutunuIsleTest(level, sutun.getX(), sutun.getZ(), false) == 0, "kural kapalıyken sütun işlendi");
+            dogrula(y, once == SanalSu.bolgeHash(level, a.getX(), a.getY(), a.getZ(), b.getX(), b.getY(), b.getZ()),
+                    "kural kapalıyken sahne değişti");
+            blokHasari(y, true);
+            int kalkan = kasirga.sutunuIsleTest(level, sutun.getX(), sutun.getZ(), false)
+                    + kasirga.sutunuIsleTest(level, sutun.getX(), sutun.getZ(), false);
+            for (BlockPos p : govde) {
+                dogrula(y, !dikeyMeseKutugu(level, y.absolutePos(p)), "gövde kütüğü yerinde: " + p.toShortString());
+            }
+            int devrik = 0;
+            for (int x = 0; x < 32; x++) {
+                for (int z = 0; z < 32; z++) {
+                    BlockState s = level.getBlockState(y.absolutePos(new BlockPos(x, 2, z)));
+                    if (s.is(Blocks.OAK_LOG) && s.getValue(BlockStateProperties.AXIS) != Direction.Axis.Y) {
+                        devrik++;
+                    }
+                }
+            }
+            dogrula(y, devrik == govde.length, "zeminde devrik kütük " + devrik + ", beklenen " + govde.length + " (kalkan "
+                    + kalkan + ")");
+        } finally {
+            bitir(y, onceki);
+        }
+        y.succeed();
+    }
+
+    /** S1 hafif kalır: ağacın tepe yaprağını alır ama tekrarlanan sütun adımlarında gövdeye dokunmaz. */
+    @GameTest(template = SAHNE, batch = "kasirga_hafif", timeoutTicks = 40)
+    public static void s1AgacGovdesineDokunmaz(GameTestHelper y) {
+        ServerLevel level = y.getLevel();
+        zemin(y, false);
+        BlockPos[] govde = agac(y, MERKEZ.getX() + 2, MERKEZ.getZ());
+        boolean onceki = blokHasari(y, true);
+        Kasirga kasirga = baslat(y, 1, false, KasirgaEvresi.DOGUS);
+        BlockPos sutun = y.absolutePos(govde[0]);
+        try {
+            int kalkan = 0;
+            for (int i = 0; i < 8; i++) {
+                kalkan += kasirga.sutunuIsleTest(level, sutun.getX(), sutun.getZ(), false);
+            }
+            dogrula(y, kalkan == 1, "S1 gövde sütunundan " + kalkan + " blok aldı (yalnız tepe yaprağı beklenir)");
+            for (BlockPos p : govde) {
+                dogrula(y, dikeyMeseKutugu(level, y.absolutePos(p)), "S1 gövde kütüğünü aldı: " + p.toShortString());
+            }
+        } finally {
+            bitir(y, onceki);
+        }
+        y.succeed();
     }
 
     /** Bölüm A.3: mob huni çekirdeğinde havaya kalkar ve hasar alır. */

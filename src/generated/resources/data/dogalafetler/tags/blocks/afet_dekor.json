@@ -1,0 +1,31 @@
+{
+  "values": [
+    "#minecraft:signs",
+    "#minecraft:all_hanging_signs",
+    "#minecraft:banners",
+    "#minecraft:flower_pots",
+    "#minecraft:candles",
+    "#minecraft:wool_carpets",
+    "#minecraft:buttons",
+    "#minecraft:pressure_plates",
+    "#minecraft:wooden_doors",
+    "#minecraft:wooden_trapdoors",
+    "#minecraft:wooden_fences",
+    "#minecraft:fence_gates",
+    "minecraft:lantern",
+    "minecraft:soul_lantern",
+    "minecraft:chain",
+    "minecraft:torch",
+    "minecraft:wall_torch",
+    "minecraft:soul_torch",
+    "minecraft:soul_wall_torch",
+    "minecraft:redstone_torch",
+    "minecraft:redstone_wall_torch",
+    "minecraft:ladder",
+    "minecraft:lever",
+    "minecraft:tripwire_hook",
+    "minecraft:end_rod",
+    "minecraft:moss_carpet",
+    "minecraft:lightning_rod"
+  ]
+}

@@ -29,11 +29,15 @@ public final class AyEgrileri {
     public static final float SARSINTI_DERECE = 2.5f;
     public static final float METEOR_BAS_SN = 10f;
 
-    public static final float MANTAR_BAS_SN = 2f;
-    public static final float MANTAR_BUYUME_SN = 45f;
-    public static final float MANTAR_TEPE_DERECE = 25f;
-    /** Ufuktaki toz sütunu kalıntısı bir Minecraft gününde söner. */
-    public static final float MANTAR_SONUM_SN = 1200f;
+    /**
+     * Havadaki 3 boyutlu patlamanın ömrü (gökyüzü-2): ateş topu, şok kabuğu, enkaz, duman ve dünya parlaması bu sürede
+     * sıfıra iner; sonra gelen oyuncu da hiçbir şey görmez (eski mantar sütunu bir gün kalıyordu).
+     */
+    public static final float PATLAMA_SN = 7f;
+    /** Patlamanın kameradan göründüğü ilk yükseklik (derece) ve dünyadaki uzaklığı (blok), ateş topunun tepe yarıçapı (blok). */
+    public static final float PATLAMA_EGIMI = 9f;
+    public static final float PATLAMA_UZAKLIK = 900f;
+    public static final float PATLAMA_YARICAP = 360f;
     /** Enkaz halkası: 3 Minecraft günü, alfa 0,6 → 0. */
     public static final float HALKA_SN = 3600f;
     public static final float HALKA_ALFA = 0.6f;
@@ -87,12 +91,73 @@ public final class AyEgrileri {
         return PARLAMA_TEPE * (1f - yumusak((snSonra - PARLAMA_SN) / 0.25f));
     }
 
-    /** Ufuktaki çarpma ışığı (gökte, 0–1): parlamada 1, 20 sn'de kızıla söner. */
-    public static float ufukIsigi(float snSonra) {
-        if (snSonra < 0f) {
+    /** Patlama çizilir mi: çarpmadan sonra {@link #PATLAMA_SN} sn. */
+    public static boolean patlamaGorunur(float snSonra) {
+        return snSonra >= 0f && snSonra < PATLAMA_SN;
+    }
+
+    /** Ateş topunun büyümesi 0–1: hızlı açılır, yavaşlar. */
+    public static float patlamaBuyume(float snSonra) {
+        return snSonra <= 0f ? 0f : 1f - (float) Math.exp(-snSonra / 0.6);
+    }
+
+    /** Renk sıcaklığı 1 (beyaz-sarı) → 0 (koyu kızıl), 3,5 sn. */
+    public static float patlamaSicakligi(float snSonra) {
+        return 1f - yumusak(snSonra / 3.5f);
+    }
+
+    /** Ateş topu alfası: 0,12 sn'de tam, 0,9 sn'den 4,5 sn'ye söner. */
+    public static float atesTopuAlfa(float snSonra) {
+        if (!patlamaGorunur(snSonra)) {
             return 0f;
         }
-        return (float) Math.exp(-snSonra / 6.0);
+        return yumusak(snSonra / 0.12f) * (1f - yumusak((snSonra - 0.9f) / 3.6f));
+    }
+
+    /** Şok kabuğunun büyümesi 0–1 (ateş topundan hızlı). */
+    public static float kabukBuyume(float snSonra) {
+        return snSonra <= 0f ? 0f : 1f - (float) Math.exp(-snSonra / 0.45);
+    }
+
+    /** Şok kabuğu alfası: anında belirir, 2,5 sn'de söner. */
+    public static float kabukAlfa(float snSonra) {
+        if (!patlamaGorunur(snSonra)) {
+            return 0f;
+        }
+        return yumusak(snSonra / 0.08f) * (1f - yumusak((snSonra - 0.3f) / 2.2f));
+    }
+
+    /** Enkazın merkezden yolu (ateş topu yarıçapı katı, en çok 1,9). */
+    public static float enkazYolu(float snSonra) {
+        return snSonra <= 0f ? 0f : 1.9f * (1f - (float) Math.exp(-snSonra / 1.8));
+    }
+
+    /** Enkaz alfası: 2 sn tam, 6,2 sn'de 0. */
+    public static float enkazAlfa(float snSonra) {
+        if (!patlamaGorunur(snSonra)) {
+            return 0f;
+        }
+        return 1f - yumusak((snSonra - 2f) / 4.2f);
+    }
+
+    /** Duman alfası: 0,6–2,2 sn'de belirir, 3,2 sn'den sonra söner, {@link #PATLAMA_SN} − 0,3 sn'de 0. */
+    public static float dumanAlfa(float snSonra) {
+        if (!patlamaGorunur(snSonra)) {
+            return 0f;
+        }
+        return yumusak((snSonra - 0.6f) / 1.6f) * (1f - yumusak((snSonra - 3.2f) / (PATLAMA_SN - 0.3f - 3.2f)));
+    }
+
+    /**
+     * Dünya parlaması 0–1 (gök, sis ve ışık haritası; {@code ay_carpmasi.parlama} çarpar): 0,1 sn'de tam, 0,5 sn tutar, sonra
+     * 0,9 sn üstel sönüm ve 4,5 sn'de kesin 0.
+     */
+    public static float dunyaParlamasi(float snSonra) {
+        if (!patlamaGorunur(snSonra)) {
+            return 0f;
+        }
+        float sonum = snSonra < 0.5f ? 1f : (float) Math.exp(-(snSonra - 0.5f) / 0.9);
+        return yumusak(snSonra / 0.1f) * sonum * (1f - yumusak((snSonra - 3f) / 1.5f));
     }
 
     /** Kamera sarsıntısının gücü (0–1): 3–15 sn, 0,5 sn'de girer, son 5 sn'de çıkar. */
@@ -103,27 +168,6 @@ public final class AyEgrileri {
         return yumusak((snSonra - SARSINTI_BAS_SN) / 0.5f) * (1f - yumusak((snSonra - (SARSINTI_SON_SN - 5f)) / 5f));
     }
 
-    /** Mantar sütununun ufuktan yüksekliği (derece): 2. sn'de başlar, 45 sn'de 25°'ye varır. */
-    public static float mantarYuksekligi(float snSonra) {
-        float u = sinirla((snSonra - MANTAR_BAS_SN) / MANTAR_BUYUME_SN);
-        return MANTAR_TEPE_DERECE * (1f - (1f - u) * (1f - u));
-    }
-
-    /** Mantar sütununun alfası: 2 sn'de belirir, 90 sn tam, 300 sn'de %35 kalıntı, bir günde 0. */
-    public static float mantarAlfa(float snSonra) {
-        if (snSonra < MANTAR_BAS_SN || snSonra >= MANTAR_SONUM_SN) {
-            return 0f;
-        }
-        float giris = yumusak((snSonra - MANTAR_BAS_SN) / 2f);
-        if (snSonra <= 90f) {
-            return giris;
-        }
-        if (snSonra <= 300f) {
-            return 1f - 0.65f * (snSonra - 90f) / 210f;
-        }
-        return 0.35f * (1f - (snSonra - 300f) / (MANTAR_SONUM_SN - 300f));
-    }
-
     /** Enkaz halkasının alfası: 20–80 sn'de belirir, 3 günde 0,6'dan 0'a doğrusal iner. */
     public static float halkaAlfa(float snSonra) {
         if (snSonra <= 20f || snSonra >= HALKA_SN) {
@@ -132,17 +176,26 @@ public final class AyEgrileri {
         return HALKA_ALFA * yumusak((snSonra - 20f) / 60f) * (1f - snSonra / HALKA_SN);
     }
 
-    /** Çarpmadan sonra gökte çizilecek bir şey kaldı mı (mantar ya da halka). */
+    /** Çarpmadan sonra gökte çizilecek bir şey kaldı mı (patlama ya da halka). */
     public static boolean carpmaIzleriSuruyor(float snSonra, boolean halkaAcik) {
-        return snSonra >= 0f && (snSonra < MANTAR_SONUM_SN || halkaAcik && snSonra < HALKA_SN);
+        return snSonra >= 0f && (snSonra < PATLAMA_SN || halkaAcik && snSonra < HALKA_SN);
     }
 
-    /** Kalite sırasına (0 Düşük … 3 Ultra) göre ay parçası ve mantar sprite sayısı (tasarım §5). */
+    /** Kalite sırasına (0 Düşük … 3 Ultra) göre ay parçası sayısı (tasarım §5). */
     public static int parcaSayisi(int kalite) {
         return new int[] {15, 25, 40, 70}[Math.max(0, Math.min(3, kalite))];
     }
 
-    public static int mantarSayisi(int kalite) {
-        return new int[] {30, 60, 100, 180}[Math.max(0, Math.min(3, kalite))];
+    /** Patlamanın enkaz parçası, duman topağı ve küre enlem dilimi sayıları (kalite sırasıyla). */
+    public static int enkazSayisi(int kalite) {
+        return new int[] {12, 24, 40, 64}[Math.max(0, Math.min(3, kalite))];
+    }
+
+    public static int dumanSayisi(int kalite) {
+        return new int[] {4, 7, 10, 14}[Math.max(0, Math.min(3, kalite))];
+    }
+
+    public static int kureDilimi(int kalite) {
+        return new int[] {8, 10, 14, 18}[Math.max(0, Math.min(3, kalite))];
     }
 }

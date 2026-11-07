@@ -304,6 +304,63 @@ def yildiz_isin(boyut=64):
     a = np.exp(-(r / 0.12) ** 2) + 0.7 * capraz
     kaydet("yildiz_isin", np.ones((boyut, boyut, 3), np.float32), np.clip(a * yumusak_basamak(1.0, 0.85, r), 0, 1))
 
+def izgara(w: int, h: int):
+    """Dikdörtgen merkezli koordinatlar: x, y ∈ [-1, 1]."""
+    xs = (np.arange(w, dtype=np.float32) + 0.5) / w * 2 - 1
+    ys = (np.arange(h, dtype=np.float32) + 0.5) / h * 2 - 1
+    y, x = np.meshgrid(ys, xs, indexing="ij")
+    return x, y
+
+
+def kara_delik(rng, boyut=256):
+    """M87/EHT benzeri: karanlık gölge, ince foton halkası, alt yanı Doppler'le parlak turuncu-sarı akresyon halkası.
+
+    Normal karışımla çizilir: gölge (siyah, alfa ~1) arkadaki yıldızları örter."""
+    x, y = kutup(boyut)
+    r = np.sqrt(x ** 2 + y ** 2)
+    phi = np.arctan2(y, x)
+    doppler = 0.3 + 0.7 * (0.5 + 0.5 * np.cos(phi - np.pi / 2)) ** 2
+    tur = 0.75 + 0.5 * fbm(boyut, boyut, 10, 10, 4, rng)
+    halka = np.exp(-((r - 0.47) / 0.09) ** 2) * doppler * tur
+    foton = np.exp(-((r - 0.395) / 0.022) ** 2) * (0.6 + 0.4 * doppler)
+    golge = yumusak_basamak(0.37, 0.31, r)
+    sicak = yumusak_basamak(0.62, 0.4, r)
+    rgb = renk("#FF6A18")[None, None, :] * (1 - sicak[..., None]) + renk("#FFE7A8")[None, None, :] * sicak[..., None]
+    parlak = np.clip(halka * 1.25 + foton, 0, 1)
+    rgb = rgb * np.clip(0.35 + parlak, 0, 1)[..., None] * (1 - golge[..., None])
+    alfa = np.clip(np.maximum(golge * 0.97, parlak), 0, 1) * yumusak_basamak(0.95, 0.8, r)
+    kaydet("kara_delik", rgb, alfa)
+
+
+def kara_delik_akis(rng, boyut=256):
+    """Halka bölgesinde iplikçikli akış (toplamalı); oyunda yavaşça döndürülür."""
+    x, y = kutup(boyut)
+    r = np.sqrt(x ** 2 + y ** 2)
+    maske = yumusak_basamak(0.36, 0.42, r) * yumusak_basamak(0.66, 0.52, r)
+    iplik = yumusak_basamak(0.45, 0.9, sirtli(boyut, boyut, 14, 14, 4, rng))
+    kaydet("kara_delik_akis", np.ones((boyut, boyut, 3), np.float32) * renk("#FFD08A")[None, None, :],
+           np.clip(maske * iplik * 0.85, 0, 1))
+
+
+def kara_delik_jet(w=64, h=512):
+    """İki kutuptan soluk ince jet (“gama ışınları”): merkezde boşluk, boyunca sönen çizgi ve M87 benzeri düğümler."""
+    x, y = izgara(w, h)
+    ay = np.abs(y)
+    cizgi = np.exp(-(x / 0.12) ** 2) * yumusak_basamak(0.06, 0.16, ay) * np.exp(-np.maximum(ay - 0.16, 0) / 0.45)
+    dugum = sum(0.6 * np.exp(-((ay - k) / 0.025) ** 2) * np.exp(-(x / 0.18) ** 2) for k in (0.3, 0.52, 0.78))
+    a = (cizgi + dugum * np.exp(-ay / 0.6)) * yumusak_basamak(1.0, 0.85, ay)
+    kaydet("kara_delik_jet", np.ones((h, w, 3), np.float32) * renk("#D4E2FF")[None, None, :], np.clip(a, 0, 1))
+
+
+def pulsar_isin(w=512, h=64):
+    """Pulsar ışını: u = 0 merkez → 1 uç; ince parlak çekirdek ve geniş soluk örtü, uçta söner."""
+    x, y = izgara(w, h)
+    u = (x + 1) / 2
+    boy = np.exp(-u / 0.42) * yumusak_basamak(1.0, 0.8, u)
+    en = np.exp(-(y / 0.14) ** 2) + 0.3 * np.exp(-(y / 0.45) ** 2)
+    kaydet("pulsar_isin", np.ones((h, w, 3), np.float32) * renk("#C4D8FF")[None, None, :], np.clip(boy * en, 0, 1))
+
+
 
 def main() -> None:
     print(f"Hedef: {HEDEF}")
@@ -323,6 +380,12 @@ def main() -> None:
     supernova_isin(rng)
     supernova_halka(rng)
     yildiz_isin()
+    # Gökyüzü-2 dokuları ayrı tohumla: önceki dokuların baytları değişmez.
+    rng2 = np.random.default_rng(20261107)
+    kara_delik(rng2)
+    kara_delik_akis(rng2)
+    kara_delik_jet()
+    pulsar_isin()
 
 
 if __name__ == "__main__":

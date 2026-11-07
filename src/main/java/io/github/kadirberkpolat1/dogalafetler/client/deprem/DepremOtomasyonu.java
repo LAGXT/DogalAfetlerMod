@@ -2,6 +2,7 @@ package io.github.kadirberkpolat1.dogalafetler.client.deprem;
 
 import com.mojang.datafixers.util.Pair;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.afet.deprem.ArtciKuyrugu;
 import io.github.kadirberkpolat1.dogalafetler.afet.deprem.Deprem;
 import io.github.kadirberkpolat1.dogalafetler.afet.deprem.DepremAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.afet.sinkhole.SinkholeAyarlari;
@@ -9,6 +10,7 @@ import io.github.kadirberkpolat1.dogalafetler.afet.sinkhole.mantik.SinkholeSeviy
 import io.github.kadirberkpolat1.dogalafetler.client.core.GorselOtomasyon;
 import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciAfetDurumu;
 import io.github.kadirberkpolat1.dogalafetler.client.esya.sismograf.IstemciSismograf;
+import io.github.kadirberkpolat1.dogalafetler.client.uyari.IstemciOrtam;
 import io.github.kadirberkpolat1.dogalafetler.core.Afet;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetAsamasi;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
@@ -25,6 +27,7 @@ import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
@@ -96,7 +99,7 @@ public final class DepremOtomasyonu {
     private static long adimKaresi;
     private static int actionBarBasi;
     private static int artciSayisi;
-    private static int sonAltAsama;
+    private static long sonArtciBaslangici = Long.MIN_VALUE;
     private static int kareAdedi;
     private static Sahne sahne;
     private static Kamera genisKamera;
@@ -190,15 +193,17 @@ public final class DepremOtomasyonu {
         }
     }
 
-    /** Depremin artçı alt aşamaları istemciye geldikçe sayılır (DS-14 kanıtı). */
+    /**
+     * Artçı gürleme katmanı ({@code deprem/artci}) istemciye geldikçe sayılır (AF-D7 kanıtı: artçı sarsıntısı bu katmandan
+     * okunur); her artçı yeni başlangıçlı bir katmandır.
+     */
     private static void artciIzle() {
-        Optional<AfetDurumPaketi> durum = IstemciAfetDurumu.aktif();
-        int alt = durum.filter(p -> p.tur() == AfetTuru.DEPREM).map(AfetDurumPaketi::altAsama).orElse(0);
-        if (alt > 0 && alt != sonAltAsama) {
+        long baslangic = IstemciOrtam.katman(ArtciKuyrugu.KATMAN).map(k -> k.paket().baslangic()).orElse(Long.MIN_VALUE);
+        if (baslangic != Long.MIN_VALUE && baslangic != sonArtciBaslangici) {
             artciSayisi++;
-            DogalAfetler.LOGGER.info(ON + "artçı sarsıntı {} istemcide (afet {})", alt, durum.get().afetNo());
+            DogalAfetler.LOGGER.info(ON + "artçı sarsıntı {} istemcide (katman başlangıcı {})", artciSayisi, baslangic);
         }
-        sonAltAsama = alt;
+        sonArtciBaslangici = baslangic;
     }
 
     private static void ekle(String ad, Runnable is, BooleanSupplier hazir, int enCokTick) {
@@ -306,7 +311,7 @@ public final class DepremOtomasyonu {
         }, olcumKapisi(40), olcumKapisiTavani(40));
         olcum("s5_deprem_yuksek", "s5_deprem_taban");
         ekle("kare aktif", () -> kare(mc, "deprem_aktif"), bekle(2), 4);
-        ekle("S5 artçılar (hız 20)", () -> komut(mc, "dogalafet hiz 20"), afetYok(mc), 2400);
+        ekle("S5 artçılar (hız 20)", () -> komut(mc, "dogalafet hiz 20"), artcilarBitti(mc), 2400);
         ekle("hız 1, aynı geniş kamera", () -> {
             komut(mc, "dogalafet hiz 1");
             kamera(mc, genisKamera);
@@ -405,6 +410,14 @@ public final class DepremOtomasyonu {
     private static BooleanSupplier afetYok(Minecraft mc) {
         return () -> adimTick >= 20 && adimTick % 10 == 0
                 && sunucuda(mc, () -> AfetYoneticisi.al(mc.getSingleplayerServer()).aktifAfet().isEmpty());
+    }
+
+    /** Afet yuvası boş ve artçı kuyruğu bitti (AF-D1: artçılar deprem bittikten sonra yuva dışında sürer). */
+    private static BooleanSupplier artcilarBitti(Minecraft mc) {
+        return () -> adimTick >= 20 && adimTick % 10 == 0 && sunucuda(mc, () -> {
+            MinecraftServer s = mc.getSingleplayerServer();
+            return AfetYoneticisi.al(s).aktifAfet().isEmpty() && !ArtciKuyrugu.suruyor(s);
+        });
     }
 
     /** Sahne yerinin çevresindeki chunk'lar sunucuda ve merkez chunk istemcide yüklü, istemci akıcı. */

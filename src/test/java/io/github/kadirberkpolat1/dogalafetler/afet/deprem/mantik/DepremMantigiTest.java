@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -111,5 +112,122 @@ class DepremMantigiTest {
         assertEquals(1.0, SarsintiZarfi.artci(40, 80), 1e-12, "ortada tam");
         assertEquals(0.5, SarsintiZarfi.artci(5, 80), 1e-12, "girişin yarısı");
         assertEquals(0.5, SarsintiZarfi.artci(65, 80), 1e-12, "sönümün yarısı");
+    }
+
+    @Test
+    void aktifArtcilariBeklemezKaziPayiyleBiter() {
+        int sure = DepremSeviyesi.varsayilan(3).sureTick();
+        assertFalse(ArtciPlani.aktifBitti(sure - 1, sure, true), "ana sarsıntı sürerken");
+        assertTrue(ArtciPlani.aktifBitti(sure, sure, true), "ana sarsıntı bitti, kazı tamam: artçı beklenmez");
+        assertFalse(ArtciPlani.aktifBitti(sure + ArtciPlani.KAZI_PAYI - 1, sure, false), "kazı sürüyor");
+        assertTrue(ArtciPlani.aktifBitti(sure + ArtciPlani.KAZI_PAYI, sure, false), "kazı payı doldu");
+    }
+
+    @Test
+    void devirArtcilariKuyrugaKaydirirSiraVeSureyiKorur() {
+        int ana = 500;
+        List<ArtciPlani.Artci> plan = ArtciPlani.olustur(ana, 3, 400, 1200, 0.15, 5L);
+        List<ArtciPlani.Artci> kuyruk = ArtciPlani.devret(plan, ana);
+        assertEquals(3, kuyruk.size());
+        for (int i = 0; i < 3; i++) {
+            assertEquals(plan.get(i).baslangic() - ana, kuyruk.get(i).baslangic(), "zaman devirden ölçülür");
+            assertEquals(plan.get(i).sure(), kuyruk.get(i).sure());
+            assertEquals(plan.get(i).kesir(), kuyruk.get(i).kesir(), 1e-12);
+        }
+        long gec = plan.get(0).baslangic() + 30;
+        List<ArtciPlani.Artci> gecikmeli = ArtciPlani.devret(plan, gec);
+        assertEquals(0, gecikmeli.get(0).baslangic(), "başlangıcı geçmiş artçı devirde başlar");
+        assertEquals(plan.get(0).sure(), gecikmeli.get(0).sure());
+        for (int i = 1; i < 3; i++) {
+            assertTrue(gecikmeli.get(i).baslangic() >= gecikmeli.get(i - 1).bitis(), "artçılar çakışmaz");
+        }
+        assertTrue(ArtciPlani.devret(List.of(), ana).isEmpty());
+    }
+
+    @Test
+    void kuyrukSinirlariSirayiIlerletirVeBiter() {
+        List<ArtciPlani.Artci> plan = List.of(new ArtciPlani.Artci(100, 160, 0.15), new ArtciPlani.Artci(500, 580, 0.12));
+        assertEquals(100, ArtciPlani.sonrakiSinir(plan, 0), "sıradaki artçının başı");
+        assertEquals(160, ArtciPlani.sonrakiSinir(plan, 100), "süren artçının sonu");
+        assertEquals(500, ArtciPlani.sonrakiSinir(plan, 160));
+        assertEquals(580, ArtciPlani.sonrakiSinir(plan, 520));
+        assertEquals(580, ArtciPlani.sonrakiSinir(plan, 580), "artçı kalmadı: son");
+        assertFalse(ArtciPlani.bitti(plan, 579));
+        assertTrue(ArtciPlani.bitti(plan, 580));
+        assertTrue(ArtciPlani.bitti(List.of(), 0), "boş kuyruk hemen biter");
+    }
+
+    @Test
+    void icYikimSeviyeEsikleri() {
+        IcYikimSeviyesi s1 = IcYikimSeviyesi.seviye(1);
+        IcYikimSeviyesi s2 = IcYikimSeviyesi.seviye(2);
+        IcYikimSeviyesi s3 = IcYikimSeviyesi.seviye(3);
+        IcYikimSeviyesi s4 = IcYikimSeviyesi.seviye(4);
+        IcYikimSeviyesi s5 = IcYikimSeviyesi.seviye(5);
+        assertTrue(s1.bos() && !s1.dekor() && !s1.yaprak() && !s1.tavan(), "S1 içeriye dokunmaz");
+        assertTrue(!s2.bos() && s2.dekor() && !s2.yaprak() && !s2.tavan(), "S2 yalnız dekor");
+        assertTrue(s3.dekor() && s3.yaprak() && !s3.tavan(), "S3 + yaprak");
+        assertTrue(s4.dekor() && s4.yaprak() && s4.tavan(), "S4 + zayıf tavan");
+        IcYikimSeviyesi onceki = s1;
+        for (int sev = 2; sev <= 5; sev++) {
+            IcYikimSeviyesi s = IcYikimSeviyesi.seviye(sev);
+            assertTrue(s.olcek() > onceki.olcek() && s.dekorOlasiligi() > onceki.dekorOlasiligi(), "S" + sev + " büyümeli");
+            assertTrue(s.yaprakOlasiligi() >= onceki.yaprakOlasiligi() && s.tavanOlasiligi() >= onceki.tavanOlasiligi());
+            assertTrue(s.dekorOlasiligi() <= 1 && s.yaprakOlasiligi() <= 1 && s.tavanOlasiligi() <= 1);
+            onceki = s;
+        }
+        assertTrue(s5.tavanOlasiligi() > s4.tavanOlasiligi() && s5.yaprakOlasiligi() > s4.yaprakOlasiligi(), "S5 daha çok");
+        assertEquals(1, IcYikimSeviyesi.seviye(0).seviye());
+        assertEquals(5, IcYikimSeviyesi.seviye(9).seviye());
+    }
+
+    @Test
+    void icYikimButcesiSeviyeOlcegiVeTpsKademesiyle() {
+        int ayar = 8;
+        assertEquals(0, IcYikimSeviyesi.seviye(1).beklenenSutun(ayar, 1), 1e-12);
+        assertEquals(4, IcYikimSeviyesi.seviye(2).beklenenSutun(ayar, 1), 1e-12);
+        assertEquals(6, IcYikimSeviyesi.seviye(3).beklenenSutun(ayar, 1), 1e-12);
+        IcYikimSeviyesi s4 = IcYikimSeviyesi.seviye(4);
+        assertEquals(8, s4.beklenenSutun(ayar, 1), 1e-12, "config S4 ölçeğindedir");
+        assertEquals(14, IcYikimSeviyesi.seviye(5).beklenenSutun(ayar, 1), 1e-12);
+        assertEquals(2, s4.beklenenSutun(ayar, 0.25), 1e-12, "TPS çeyrek kademesi");
+        assertEquals(32, s4.beklenenSutun(ayar, 4), 1e-12, "dört adımlık tick (hız)");
+        assertEquals(0, s4.beklenenSutun(-3, 1), 1e-12);
+        assertEquals(0, IcYikimSeviyesi.seviye(3).tavanSiniri(ayar), "S3'te tavan yok");
+        assertEquals(4, s4.tavanSiniri(ayar));
+        assertEquals(7, IcYikimSeviyesi.seviye(5).tavanSiniri(ayar));
+    }
+
+    @Test
+    void zayifTavanSertlikEsigi() {
+        IcYikimSeviyesi s4 = IcYikimSeviyesi.seviye(4);
+        IcYikimSeviyesi s5 = IcYikimSeviyesi.seviye(5);
+        assertTrue(s4.zayifSertlik(0.8f), "yün (0,8) S4'te zayıf");
+        assertFalse(s4.zayifSertlik(1.0f), "balkabağı (1,0) S4'te zayıf değil");
+        assertTrue(s5.zayifSertlik(1.0f));
+        assertFalse(s5.zayifSertlik(1.25f), "pişmiş kil (1,25) zayıf değil");
+        assertFalse(IcYikimSeviyesi.seviye(3).zayifSertlik(0.1f), "S3'te tavan yok");
+        assertFalse(s5.zayifSertlik(-1f), "kırılmaz blok");
+        assertEquals(0.1, IcYikimSeviyesi.YAPRAK_ESYA_ORANI, 1e-12);
+    }
+
+    @Test
+    void artciSarsintisiKatmandanGeriOkunurUzakliklaIner() {
+        double s3 = ArtciSarsintisi.genlik(DepremSeviyesi.varsayilan(3).kameraGenligi(), 0.15);
+        double s5 = ArtciSarsintisi.genlik(DepremSeviyesi.varsayilan(5).kameraGenligi(), 0.15);
+        assertEquals(0.225, s3, 1e-12);
+        assertEquals(0.6, s5, 1e-12);
+        assertEquals(s3, ArtciSarsintisi.genlikOku(ArtciSarsintisi.hacim(s3)), 1e-6, "eğri tepesinden geri okunur");
+        assertEquals(s5, ArtciSarsintisi.genlikOku(ArtciSarsintisi.hacim(s5)), 1e-6);
+        assertTrue(ArtciSarsintisi.hacim(s5) > ArtciSarsintisi.hacim(s3), "büyük depremin artçısı daha gür");
+        assertEquals(1f, ArtciSarsintisi.hacim(2), 1e-6f, "hacim kırpılır");
+        assertEquals(0.0, ArtciSarsintisi.genlikOku(0.1), 1e-12);
+        assertEquals(56, ArtciSarsintisi.yaricap(ArtciSarsintisi.menzil(56)), 1e-6);
+        float tepe = ArtciSarsintisi.hacim(s5);
+        double menzil = ArtciSarsintisi.menzil(56);
+        assertEquals(s5, ArtciSarsintisi.oyuncuGenligi(tepe, 40, 80, 0, menzil), 1e-6, "merkezde, zarf ortasında tam");
+        assertEquals(0.15 * s5, ArtciSarsintisi.oyuncuGenligi(tepe, 40, 80, 56, menzil), 1e-6, "yarıçapta %15");
+        assertEquals(0.0, ArtciSarsintisi.oyuncuGenligi(tepe, 40, 80, 56 + 65, menzil), 1e-12, "sönüm payı ötesi");
+        assertEquals(0.0, ArtciSarsintisi.oyuncuGenligi(tepe, 80, 80, 0, menzil), 1e-12, "artçı bitti");
     }
 }

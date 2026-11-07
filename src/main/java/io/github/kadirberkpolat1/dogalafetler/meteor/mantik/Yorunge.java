@@ -9,6 +9,19 @@ package io.github.kadirberkpolat1.dogalafetler.meteor.mantik;
 public record Yorunge(double baslangicX, double baslangicY, double baslangicZ, double hizX, double hizY, double hizZ,
         double tamSure) {
     public static final double EN_KUCUK_ACI = 15;
+    /** Eksen başına paket sınırı 3,9 blok/tick'in altında kalan en büyük hız. */
+    public static final double EN_BUYUK_HIZ = 3.8;
+
+    /**
+     * Hedefe {@code sureTick}'te varan yörünge: hız yol uzunluğundan çıkar ({@link #EN_BUYUK_HIZ}'la sınırlı; sınıra
+     * takılırsa uçuş uzar). Açı değişince yol, dolayısıyla hız değişir; süre değişmez.
+     */
+    public static Yorunge sureyle(double hedefX, double hedefY, double hedefZ, double aciDerece, double azimut,
+            double yukseklik, double sureTick) {
+        Yorunge birim = hesapla(hedefX, hedefY, hedefZ, aciDerece, azimut, yukseklik, 1);
+        double hiz = Math.min(EN_BUYUK_HIZ, birim.tamSure() / Math.max(1, sureTick));
+        return hesapla(hedefX, hedefY, hedefZ, aciDerece, azimut, yukseklik, hiz);
+    }
 
     public static Yorunge hesapla(double hedefX, double hedefY, double hedefZ, double aciDerece, double azimut,
             double yukseklik, double hiz) {

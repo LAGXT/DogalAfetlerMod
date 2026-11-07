@@ -208,8 +208,8 @@ public final class DonmaAyarlari {
             seviyeAdimi = k.comment("Bir chunk geçişinde ilerlemenin en çok ilerlediği puan (yetişme adımı).")
                     .defineInRange("seviyeAdimi", 5, 1, 100);
             k.comment("Adım eşikleri (sütunun etkin seviyesi, %). Donarken donma, çözülürken çözülme eşikleri. Donma sırası"
-                    + " (madde 9): kırağı (tablo, 10) < ilk kar < ilkBuzEsigi < kalın buz; bozulursa ilk kar ilkBuzEsigi-1'e"
-                    + " çekilir.").push("esikler");
+                    + " (madde 9): ilk kar (çimende karlı çimen) < ilkBuzEsigi < kalın buz; bozulursa ilk kar"
+                    + " ilkBuzEsigi-1'e çekilir.").push("esikler");
             karEsikleri = k.comment("Kar katmanı 1..n'nin geldiği seviyeler (artan; ilki ilkBuzEsigi'nden küçük).")
                     .defineList("karEsikleri", List.of(15, 55, 70, 85, 95), o -> o instanceof Integer);
             karCozulmeEsikleri = k.comment("Kar katmanı 1..n'nin kalktığı seviyeler (her biri donma eşiğinden küçük değil).")

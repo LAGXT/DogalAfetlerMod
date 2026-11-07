@@ -2,6 +2,7 @@ package io.github.kadirberkpolat1.dogalafetler.gokyuzu;
 
 import io.github.kadirberkpolat1.dogalafetler.config.AyarKaydi;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.GunesZinciri;
+import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.PulsarSecimi;
 import net.minecraftforge.common.ForgeConfigSpec;
 
 /**
@@ -46,6 +47,26 @@ public final class GokyuzuAyarlari {
         return sunucu.get().kizilCuceRenkGucu.get();
     }
 
+    /** Süpernova zincirinin doğal doğuşunda kızıl cüce yerine pulsar doğma olasılığı. */
+    public static double pulsarOlasiligi() {
+        return sunucu.get().pulsarOlasiligi.get();
+    }
+
+    /** Pulsarın ısınma süresi (ölçekli tick): dünya etkileri bu sürede tam güce çıkar. */
+    public static long pulsarIsinmaTick() {
+        return Math.round(sunucu.get().pulsarIsinmaGun.get() * GunesZinciri.GUN_TICK);
+    }
+
+    /** Tam güçte oyuncu başına dakikada pulsar yangını odak sayısı. */
+    public static double pulsarYanginDakikaBasina() {
+        return sunucu.get().pulsarYanginDakikaBasina.get();
+    }
+
+    /** Tam güçte oyuncu başına ölçekli tick'te kavrulma denemesi olasılığı (çimen → kaba toprak). */
+    public static double pulsarKavrulmaOlasiligi() {
+        return sunucu.get().pulsarKavrulmaOlasiligi.get();
+    }
+
     public static double yildizYogunlugu() {
         return istemci.get().yildizYogunlugu.get();
     }
@@ -61,6 +82,10 @@ public final class GokyuzuAyarlari {
         private final ForgeConfigSpec.DoubleValue kizilCuceBoyutOrani;
         private final ForgeConfigSpec.DoubleValue kizilCuceRenkGucu;
         private final ForgeConfigSpec.DoubleValue kalintiGenislemeGun;
+        private final ForgeConfigSpec.DoubleValue pulsarOlasiligi;
+        private final ForgeConfigSpec.DoubleValue pulsarIsinmaGun;
+        private final ForgeConfigSpec.DoubleValue pulsarYanginDakikaBasina;
+        private final ForgeConfigSpec.DoubleValue pulsarKavrulmaOlasiligi;
 
         private Sunucu(ForgeConfigSpec.Builder k) {
             GunesZinciri.Ayarlar v = GunesZinciri.Ayarlar.VARSAYILAN;
@@ -78,6 +103,18 @@ public final class GokyuzuAyarlari {
                     .defineInRange("kizilCuceRenkGucu", 1.0, 0.0, 1.0);
             kalintiGenislemeGun = k.comment("Süpernova kalıntısı nebulasının %100'den %130'a genişleme süresi, gün.")
                     .defineInRange("kalintiGenislemeGun", v.kalintiGenislemeGun(), 1.0, 1000.0);
+            pulsarOlasiligi = k.comment("Süpernova zincirinin doğal doğuşunda kızıl cüce yerine pulsar doğma olasılığı "
+                    + "(0 = hiç, 1 = her zaman). Seçim dünya tohumu ve döngüden belirlenir; /dogalafet pulsar baslat zorlar.")
+                    .defineInRange("pulsarOlasiligi", PulsarSecimi.VARSAYILAN_OLASILIK, 0.0, 1.0);
+            pulsarIsinmaGun = k.comment("Pulsar doğduktan sonra dünya etkilerinin (sıcaklık, kavrulma, yangın, buharlaşma) "
+                    + "tam güce çıkma süresi, Minecraft günü.")
+                    .defineInRange("pulsarIsinmaGun", 2.0, 0.05, 30.0);
+            pulsarYanginDakikaBasina = k.comment("Tam güçte oyuncu başına dakikada yeni yangın odağı (ortak yangın sistemi; "
+                    + "TPS kısması ve yangın tavanıyla sınırlı, afetBlokHasari=false iken yok).")
+                    .defineInRange("pulsarYanginDakikaBasina", 20.0, 0.0, 120.0);
+            pulsarKavrulmaOlasiligi = k.comment("Tam güçte oyuncu başına ölçekli tick'te güneşe açık çimenin kaba toprağa "
+                    + "dönme denemesi olasılığı (güneş patlaması kavrulmasıyla aynı kural).")
+                    .defineInRange("pulsarKavrulmaOlasiligi", 0.6, 0.0, 1.0);
         }
     }
 

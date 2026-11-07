@@ -50,9 +50,14 @@ public final class IstemciGokyuzu {
             case BUYUYEN -> GunesEvresi.NORMAL;
             case SUPERNOVA -> GunesEvresi.BUYUYEN;
             case GUNESSIZ -> GunesEvresi.SUPERNOVA;
-            case KIZIL_CUCE -> GunesEvresi.GUNESSIZ;
+            case KIZIL_CUCE, PULSAR -> GunesEvresi.GUNESSIZ;
             case NORMAL -> null;
         };
+    }
+
+    /** {@code i}. kara deliğin bu karedeki dünya yönü (görsel otomasyonun yakın kadrajı; çizimle aynı dönüş). */
+    public static org.joml.Vector3f karaDelikYonu(int i, net.minecraft.client.multiplayer.ClientLevel level, float pt) {
+        return GokyuzuCizici.karaDelikYonu(i, level.getTimeOfDay(pt), ((level.getGameTime() % 72000L) + pt) / 20f);
     }
 
     /**

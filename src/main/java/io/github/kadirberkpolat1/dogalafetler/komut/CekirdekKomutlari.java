@@ -17,6 +17,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.EtkiAlani;
 import io.github.kadirberkpolat1.dogalafetler.core.GecmisKaydi;
 import io.github.kadirberkpolat1.dogalafetler.core.TpsOlcer;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.GeciciCarpan;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.GunSaatiPenceresi;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.OyunGunu;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import io.github.kadirberkpolat1.dogalafetler.veri.CeviriYazici;
@@ -65,6 +66,10 @@ public final class CekirdekKomutlari {
     public static final String START_ZATEN_AKTIF = ON + "start.zaten_aktif";
     public static final String START_YER_UYGUN_DEGIL = ON + "start.yer_uygun_degil";
     public static final String START_HATA = ON + "start.hata";
+    /** Gökyüzü-2 istek 26: komutla başlatma gün saati penceresine bakmaz. */
+    public static final String START_PENCERE = ON + "start.pencere";
+    /** Gökyüzü-2 Gk1: doğal patlama penceresi beklenirken kalan sürenin yerine. */
+    public static final String DURUM_PENCERE = ON + "durum.pencere";
     public static final String STOP_DURDU = ON + "stop.durdu";
     public static final String STOP_AFET_YOK = ON + "stop.afet_yok";
     public static final String STOP_SURECLER = ON + "stop.surecler";
@@ -101,9 +106,11 @@ public final class CekirdekKomutlari {
         if (aktif.isPresent()) {
             Afet afet = aktif.get();
             AfetBaglami afetBaglami = afet.baglam();
+            long pencere = afet.pencereBeklemesi();
+            Component kalan = pencere >= 0 ? Component.translatable(DURUM_PENCERE, sure(pencere))
+                    : sure(yonetici.zamanOlcegi().gercekTick(yonetici.kalanOku(afet)));
             satirlar.add(Component.translatable(DURUM_AFET, afetAdi(afet.tur()), seviyeMetni(afet.seviye()),
-                    Component.translatable(afet.asama().ceviriAnahtari()), afet.altAsama(),
-                    sure(yonetici.zamanOlcegi().gercekTick(yonetici.kalanOku(afet)))));
+                    Component.translatable(afet.asama().ceviriAnahtari()), afet.altAsama(), kalan));
             Component yaricap = yonetici.etkiAlani(afet).map(CekirdekKomutlari::yaricap)
                     .orElseGet(() -> Component.translatable(BILINMIYOR));
             satirlar.add(Component.translatable(DURUM_AFET_KONUM, afetBaglami.merkez().toShortString(),
@@ -154,6 +161,8 @@ public final class CekirdekKomutlari {
                         afetBaglami.merkez().toShortString(), oyuncuAdi(kaynak.getServer(), afetBaglami.hedefOyuncu()),
                         sure(yonetici.zamanOlcegi().gercekTick(yonetici.kalanOku(afet))));
                 kaynak.sendSuccess(() -> mesaj, false);
+                GunSaatiPenceresi.dogalPatlama(tur).ifPresent(p -> kaynak.sendSuccess(() -> Component.translatable(
+                        START_PENCERE, afetAdi(tur), p.bas(), p.son()), false));
                 return 1;
             }
             case ZATEN_AKTIF -> kaynak.sendFailure(Component.translatable(START_ZATEN_AKTIF,
@@ -384,6 +393,7 @@ public final class CekirdekKomutlari {
         y.ekle(DURUM_AFET_YOK, "No active disaster.", "Aktif afet yok.");
         y.ekle(DURUM_AFET, "Active disaster: %s, %s; phase: %s (sub-phase %s), remaining: %s",
                 "Aktif afet: %s, %s; aşama: %s (alt aşama %s), kalan: %s");
+        y.ekle(DURUM_PENCERE, "time-of-day window awaited: ~%s", "patlama penceresi bekleniyor: ~%s");
         y.ekle(DURUM_AFET_KONUM, "Centre: %s (%s), impact radius: %s, target: %s",
                 "Merkez: %s (%s), etki yarıçapı: %s, hedef: %s");
         y.ekle(DURUM_GUN, "Game day: %s (offset %s), speed: x%s, TPS: %s (budget x%s)",
@@ -404,6 +414,9 @@ public final class CekirdekKomutlari {
         y.ekle(DURUM_SON_AFETLER, "Recent disasters: %s", "Son afetler: %s");
         y.ekle(START_BASLADI, "%s started (%s), centre %s, target %s; siren in %s",
                 "%s başlatıldı (%s), merkez %s, hedef %s; sirene %s");
+        y.ekle(START_PENCERE, "Started by command: the time-of-day window is ignored (a natural %s goes off only at day "
+                + "time %s–%s).", "Komutla başlatıldı: gün saati penceresine bakılmaz (doğal %s yalnız gün saati %s–%s "
+                + "arasında patlar).");
         y.ekle(START_BILINMEYEN, "Unknown disaster: %s", "Bilinmeyen afet: %s");
         y.ekle(START_KAYITLI_DEGIL, "%s is not registered yet.", "%s henüz kayıtlı değil.");
         y.ekle(START_ZATEN_AKTIF, "A disaster is already active: %s. Use /dogalafet stop first.",

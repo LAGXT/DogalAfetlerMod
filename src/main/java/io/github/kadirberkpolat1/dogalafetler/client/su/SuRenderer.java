@@ -19,6 +19,7 @@ import io.github.kadirberkpolat1.dogalafetler.su.KurulumButcesi;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSuDunyasi;
 import io.github.kadirberkpolat1.dogalafetler.su.SuAraliklari;
+import it.unimi.dsi.fastutil.longs.Long2FloatOpenHashMap;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
 import java.util.Arrays;
@@ -84,6 +85,17 @@ public final class SuRenderer {
     private static final float[] ALT = new float[N * N];
     /** 0 yok, 1 sanal (dalgalı), 2 sanal (sakin, mağara), 3 gerçek su (yalnız yan yüz komşusu), 4 çekilmede açığa çıkan dip. */
     private static final byte[] TUR = new byte[N * N];
+    /**
+     * Çizilen yakın tamponun su üstü ve türü (son yüklenen yapımın {@link #UST}/{@link #TUR} kopyası, kökeni {@link #cizOx},
+     * {@link #cizOz}): yeni yapım dizileri satır satır yazarken çizilen eski tampondur ({@link #cizilenUst}).
+     */
+    private static final float[] CIZ_UST = new float[N * N];
+    private static final byte[] CIZ_TUR = new byte[N * N];
+    private static int cizOx;
+    private static int cizOz;
+    /** Çizilen yakın tamponun yapımının başladığı tick ve bir önceki yüklenen yapımınkinden farkı ({@link #agYasi}). */
+    private static long cizTick = Long.MIN_VALUE;
+    private static long cizAralik;
     /** Köşe ızgarası ({@code (N+1)²}): dalgacık yüksekliği ve çok oktavlı yüzey eğimi (SU-28). */
     private static final float[] VH = new float[(N + 1) * (N + 1)];
     /** Mağara tavan yansıması gücü (köşe başına) ve hesaplandığı yapım (SU-35). */
@@ -130,6 +142,9 @@ public final class SuRenderer {
     private static int uzakOx;
     private static int uzakOy;
     private static int uzakOz;
+    /** Yalnız otomasyon: kurulan ve çizilen uzak LOD karolarının su üstü (karo anahtarı {@link #karo}; {@link #cizilenUst}). */
+    private static Long2FloatOpenHashMap uzakYapUst = new Long2FloatOpenHashMap();
+    private static Long2FloatOpenHashMap uzakCizilenUst = new Long2FloatOpenHashMap();
     /** Kurulmakta olan tamponun Y kökeni; köşe Y'si buna göre göreli yazılır. */
     private static int oyAktif;
     private static float u0;
@@ -329,6 +344,7 @@ public final class SuRenderer {
             yakinBos = true;
             pariltiBos = true;
             uzakBos = true;
+            cizTick = Long.MIN_VALUE;
             RENK.clear();
             ISIK.clear();
             sonSeviye = l;
@@ -800,6 +816,12 @@ public final class SuRenderer {
         } else {
             yakinDortgen = dortgen;
             yakinBos = !yukle(BB_YAKIN, true);
+            System.arraycopy(UST, 0, CIZ_UST, 0, UST.length);
+            System.arraycopy(TUR, 0, CIZ_TUR, 0, TUR.length);
+            cizOx = yapOx;
+            cizOz = yapOz;
+            cizAralik = cizTick == Long.MIN_VALUE ? 0 : yapTick - cizTick;
+            cizTick = yapTick;
             pariltiBos = !pariltiYukle();
             sonParilti = yapParilti;
             yakinOx = yapOx;
@@ -905,6 +927,7 @@ public final class SuRenderer {
         uzakSonTick = Long.MIN_VALUE;
         BB.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
         uzakYapiyor = true;
+        uzakYapUst.clear();
     }
 
     /**
@@ -927,6 +950,9 @@ public final class SuRenderer {
                     uzakOz = uzakYapCz;
                     uzakDortgen = dortgen;
                     uzakBos = !yukle(BB, false);
+                    Long2FloatOpenHashMap eski = uzakCizilenUst;
+                    uzakCizilenUst = uzakYapUst;
+                    uzakYapUst = eski;
                 }
             }
         } while (uzakYapiyor && System.nanoTime() < son);
@@ -953,6 +979,9 @@ public final class SuRenderer {
                 continue;
             }
             float y = (float) A.ust(A.adet() - 1) - 0.16f;
+            if (GorselOtomasyon.AKTIF) {
+                uzakYapUst.put(karo(gx, gz), (float) A.ust(A.adet() - 1));
+            }
             double mx = gx + LOD / 2.0;
             double mz = gz + LOD / 2.0;
             if (A.sakin(A.adet() - 1)) {
@@ -1088,6 +1117,36 @@ public final class SuRenderer {
 
     private static int komsu(int i, int j) {
         return i < 0 || j < 0 || i >= N || j >= N ? -1 : i * N + j;
+    }
+
+    /**
+     * {@code (x, z)} sütununda bu karede herhangi bir sanal su ağının çizdiği ham su üstü (dalgacıksız): önce çizilen yakın
+     * tampon ({@link #CIZ_UST}; TUR 3 yalnız gerçek suyun yan yüzü, su üstü değil), sonra çizilen uzak LOD karosu (karo
+     * ortasının yüksekliği; yalnız {@link GorselOtomasyon#AKTIF} iken kaydedilir: üretimde yalnız yakın tampon, tsunami
+     * yağmurunun halka koyduğu alan). Uzak LOD kendi yakın bölgesini çizmez: yakın tampon yokken (yavaş makinede ilk yapım
+     * ~150 tick) kameranın {@link #YAKIN} blok çevresinde sanal su çizilmez, NaN.
+     */
+    public static double cizilenUst(int x, int z) {
+        if (!yakinBos) {
+            int k = komsu(x - (cizOx - YAKIN), z - (cizOz - YAKIN));
+            if (k >= 0 && CIZ_TUR[k] != 0 && CIZ_TUR[k] != 3) {
+                return CIZ_UST[k];
+            }
+        }
+        long a = karo(Math.floorDiv(x, LOD) * LOD, Math.floorDiv(z, LOD) * LOD);
+        return !uzakBos && uzakCizilenUst.containsKey(a) ? uzakCizilenUst.get(a) : Double.NaN;
+    }
+
+    /**
+     * Yalnız otomasyon: çizilen yakın ağın yaşı (yapımının başladığı tick'ten bu yana) ve önceki yüklenen yapımın
+     * başlangıcından bununkine geçen tick (ağ yenileme aralığı); yakın ağ yoksa {@code -}.
+     */
+    public static String agYasi(long tick) {
+        return yakinBos ? "ag_yasi=- ag_araligi=-" : "ag_yasi=" + (tick - cizTick) + " ag_araligi=" + cizAralik;
+    }
+
+    private static long karo(int gx, int gz) {
+        return ((long) gx << 32) | (gz & 0xffffffffL);
     }
 
     private static void sutun(ClientLevel l, DenizAlani alan, int x, int z, int i, int j, double t, long tick) {

@@ -15,16 +15,26 @@ import net.minecraft.core.particles.SimpleParticleType;
  * Yangının kendi parçacıkları: tam parlak büyük alev, büyüyerek yükselen duman, alttan turuncu aydınlanan duman sütunu,
  * rüzgârla sürüklenip sönen kıvılcım ve sütunun tepesinde açık renkli pirokümülüs kümesi. Sütun ve küme parçacıkları
  * tavan sayımı için canlı listelerde tutulur.
+ *
+ * <p>Duman ve sütun vanilla sürtünmesiyle durmaz, sıcak hava gibi yükselir: dikey hız, ısıyla (1 − yaş oranı) azalan
+ * uç hızına yaklaşır; yatay hız ayrı sönümlenir, rüzgâr ve küçük çalkantı birikir, rüzgâr yükseldikçe güçlenir. Sütunun
+ * üretimdeki dikey hızı onun uç hızıdır.
  */
 final class YanginParcacigi extends TextureSheetParticle {
     /** Canlı sütun ve küme parçacıkları; {@link IstemciYangin} her tick ayıklar. */
     static final List<YanginParcacigi> SUTUNLAR = new ArrayList<>();
     static final List<YanginParcacigi> KUMELER = new ArrayList<>();
+    /** Sütunun görünür ucu: ortalama ömür ve uç hızında parçacığın sönmeye başladığı yükseklik; küme bunun üstünde. */
+    static final float SUTUN_BOYU = 42.0F;
+    /** Rüzgâr sürüklenmesi çıkış noktasının bu kadar blok üstünde iki katına çıkar. */
+    private static final double KESME_BOYU = 16.0;
 
     private final SpriteSet kareler;
     private final Tur tur;
     private final float ilkBoy;
     private final float gri;
+    private final float ucHizi;
+    private final double cikisY;
     long sonGorulme;
 
     enum Tur {
@@ -45,7 +55,9 @@ final class YanginParcacigi extends TextureSheetParticle {
         this.zd = vz;
         this.hasPhysics = false;
         this.gravity = 0;
+        this.cikisY = y;
         float g = 0;
+        float uc = 0;
         switch (tur) {
             case ALEV -> {
                 lifetime = 10 + random.nextInt(10);
@@ -53,18 +65,20 @@ final class YanginParcacigi extends TextureSheetParticle {
                 friction = 0.92F;
             }
             case DUMAN -> {
-                lifetime = 70 + random.nextInt(60);
+                lifetime = 140 + random.nextInt(121);
                 quadSize = 0.6F + random.nextFloat() * 0.6F;
-                friction = 0.97F;
+                friction = 1.0F;
+                uc = 0.15F + random.nextFloat() * 0.04F;
                 g = 0.18F + random.nextFloat() * 0.14F;
-                alpha = 0.75F;
+                alpha = 0;
             }
             case SUTUN -> {
-                lifetime = 200 + random.nextInt(80);
+                lifetime = 300 + random.nextInt(201);
                 quadSize = 2.5F + random.nextFloat() * 2.0F;
-                friction = 0.995F;
+                friction = 1.0F;
+                uc = (float) vy;
                 g = 0.16F + random.nextFloat() * 0.12F;
-                alpha = 0.65F;
+                alpha = 0;
                 SUTUNLAR.add(this);
             }
             case KIVILCIM -> {
@@ -85,6 +99,7 @@ final class YanginParcacigi extends TextureSheetParticle {
             default -> throw new IllegalStateException(tur.name());
         }
         gri = g;
+        ucHizi = uc;
         if (g > 0) {
             setColor(g, g, g);
         }
@@ -106,16 +121,21 @@ final class YanginParcacigi extends TextureSheetParticle {
         switch (tur) {
             case ALEV -> quadSize = ilkBoy * (1.0F - oran * 0.6F);
             case DUMAN -> {
-                quadSize = ilkBoy * (1.0F + oran * 1.5F);
-                alpha = 0.75F * (1.0F - oran * oran);
-                surukle(ruzgar, 0.004);
+                quadSize = ilkBoy * (1.0F + oran * 3.0F);
+                alpha = 0.75F * Math.min(1.0F, age / 6.0F) * (float) Math.pow(1.0F - oran, 1.5);
+                float c = gri + 0.2F * oran;
+                setColor(c, c, c);
+                yuksel(ruzgar, 1.0F - oran, 0.0025, 0.96F, 0.95F, 0.02F);
             }
             case SUTUN -> {
-                quadSize = ilkBoy * (1.0F + oran * 2.0F);
-                alpha = 0.65F * (1.0F - oran * oran);
-                float sicak = Math.max(0.0F, 1.0F - oran * 4.0F);
-                setColor(gri + 0.30F * sicak, gri + 0.10F * sicak, Math.max(0.0F, gri - 0.04F * sicak));
-                surukle(ruzgar, 0.002);
+                float yukselme = (float) (y - cikisY);
+                float boy = Math.min(1.0F, Math.max(0.0F, yukselme) / SUTUN_BOYU);
+                quadSize = ilkBoy * (1.0F + 2.2F * boy);
+                alpha = 0.65F * Math.min(1.0F, age / 10.0F) * (1.0F - oran * oran);
+                float sicak = Math.max(0.0F, 1.0F - yukselme / 8.0F);
+                float c = gri + 0.28F * boy;
+                setColor(c + 0.30F * sicak, c + 0.10F * sicak, Math.max(0.0F, c - 0.04F * sicak));
+                yuksel(ruzgar, 1.0F - oran, 0.0003, 0.985F, 0.97F, 0.01F);
             }
             case KIVILCIM -> {
                 setColor(1.0F - 0.15F * oran, 0.85F - 0.65F * oran, Math.max(0.05F, 0.45F - 0.45F * oran));
@@ -131,6 +151,13 @@ final class YanginParcacigi extends TextureSheetParticle {
             default -> {
             }
         }
+    }
+
+    private void yuksel(double[] ruzgar, float isi, double kat, float yatayDirenc, float dikeyDirenc, float calkanti) {
+        double kesme = kat * (1.0 + Math.max(0.0, y - cikisY) / KESME_BOYU);
+        xd = xd * yatayDirenc + ruzgar[0] * kesme + (random.nextFloat() - 0.5F) * calkanti;
+        zd = zd * yatayDirenc + ruzgar[1] * kesme + (random.nextFloat() - 0.5F) * calkanti;
+        yd = Math.min(ucHizi, yd * dikeyDirenc + ucHizi * (1.0F - dikeyDirenc) * isi);
     }
 
     private void surukle(double[] ruzgar, double kat) {

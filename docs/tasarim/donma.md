@@ -26,7 +26,7 @@ Bu bölüm spike-donma kararlarına ve inceleme B2'ye (çözülme sırası) gör
 | Öğe | Donma: geldiği seviye | Çözülme: kalktığı seviye | Gerçek blok değişimi | Yalnız görsel (istemci) |
 |---|---|---|---|---|
 | Ayaz | %0 | — | — | Nefes buharı (2 sn'de bir), süzülen buz kristali parıltısı, sis mavimsi |
-| Kırağı | 10 | 50 | `grass_block` ↔ `dogalafetler:kiragili_cimen` | Yaprak ve çimen biyom rengi beyaz-maviye kayar (%0→%60) |
+| Kırağı | 10 | 50 | ~~`grass_block` ↔ `dogalafetler:kiragili_cimen`~~ yok (K-E52, "Görsel cila": varsayılan tabloda yüzey satırı yok, çimen çimen kalır) | Yaprak ve çimen biyom rengi beyaz-maviye kayar (%0→%60) |
 | İlk buz (kıyıya uzaklık `c` = 0–15) | `20 + 2c` (kıyıda 20, ortada 50) | `max(10, 45 − 3c)` (kıyıda 45, 12+ blok içeride 10) | su sütununun üst bloğu ↔ buz (ilk evre `ince_buz`, aşağıda) | İnce buz koyu ve yarı saydam, altındaki su görünür |
 | Buz katmanı 2 / 3 / 4 | ilk buz + 20 / 40 / 60 | ilk buz çözülmesi + 10 / 20 / 30 | buz sütunu aşağı kalınlaşır; en alt su bloğu hiç donmaz | Buz yüzeyinde parıltı noktaları |
 | Kar katmanı 1 / 2 / 3 / 4 / 5 | 25 / 55 / 70 / 85 / 95 | 55 / 65 / 75 / 85 / 95 | `#dogalafetler:donma/kar_zemini` köklü zeminin üstü; çimen/misel üstünde en çok 1 katman | — |
@@ -146,3 +146,19 @@ Uygulama `is/donma` dalında; kararlar `.vibe/kararlar/donma.md` (K-D6…K-D21),
 - **Bu turda yapılmayanlar (açık):** vanilla çimen/yaprak biyom rengi tonlaması, kayrağı örtüsü ve sarkit çizimi, rüzgâr ve
   buz şarkısı sesleri. Blok düzeyindeki adımlar (kırağı, kar katmanları, kıyıdan içeri ince buz → buz → kalınlaşma,
   çözülme sırası) ve yukarıdaki parçacıklar vitrini taşır.
+
+## Görsel cila (2026-11-07)
+
+- **Kar tanesi parçacığı (`dogalafetler:kar_tanesi`):** vanilla `SNOWFLAKE` (gri duman topağı gibi görünüyordu) yerine kendi
+  tanemiz. Dört 16x16 kare (`tools/assets/donma_dokular.py`): minik nokta kümesi, küçük altı kollu yıldız, dallı orta yıldız,
+  yumuşak yuvarlak tane; kenarlar alfa ile yumuşak, merkez beyaz, uçlar açık buz mavisi. Kare doğuşta rastgele seçilir.
+- **Hareket:** uç hızına (0,04–0,09 blok/tick) yaklaşarak düşer, kişisel faz/frekansla iki eksende salınır, yavaşça döner,
+  günün rüzgârıyla (~0,024 blok/tick) sürüklenir; yere ya da suya değince durur ve 8 tickte söner. Ömür altındaki zemine
+  yetecek kadar (en çok 600 tick).
+- **Yoğunluk:** kar tabanı 28 → 10 tane/tick (taneler ~6 kat uzun yaşar); Yüksek kalitede ~1800, Ultra ~2700, en yüksek
+  config ile ~8000 canlı tane. Ayaz da aynı karelerin küçük ikisini kullanan pırıldayan `buz_kristali` oldu (taban 5 → 2).
+- **Karlı çimen (K-E52, K0-24 tablosu değişti):** çimen artık `kiragili_cimen`'e dönmez; çimen kalır, ilk kar eşiğinde
+  (15) üstüne tek kat `snow` gelir ve vanilla şekil güncellemesiyle `grass_block[snowy=true]` olur; çözülmede (55'in
+  altı) katman kalkar, `snowy=false`. Varsayılan tabloda yüzey satırı yok (yalnız su sütunu); "kar katmanı ekle ↔ kaldır"
+  iki yönlü dönüşümüdür. Eski dünyalardaki `kiragili_cimen` sütun işlenince aynı `snowy` ile çimene döner; blok veri
+  paketi yüzey satırı için kayıtlı kalır. Kırağı görünümü yalnız biyom rengi tonlamasıyla verilir.

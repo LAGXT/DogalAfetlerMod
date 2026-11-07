@@ -1,5 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.core;
 
+import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.GunSaatiPenceresi;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Objects;
@@ -17,6 +19,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.GameRules;
 
 /**
  * Afet yaşam döngüsü (GOREV §4): {@code ON_UYARI → SIREN → AKTIF → BITIS}. Afet işçileri bu sınıfı genişletir ve
@@ -45,6 +48,12 @@ public abstract class Afet {
     private boolean temizlendi;
     private final Set<UUID> etkilenenler = new LinkedHashSet<>();
     private final Set<UUID> olenler = new LinkedHashSet<>();
+    /** Patlama penceresi bekleme durumu (yalnız log geçişi için; kalıcı değil). */
+    private boolean pencereBekleniyor;
+    /** Pencere için beklenen gerçek tick (üst sınır {@link GunSaatiPenceresi#EN_COK_BEKLEME}; kayıtta). */
+    private long pencereBeklenen;
+    /** Pencereye kalan gerçek tick; beklenmiyorsa -1 (yalnız gösterim, kalıcı değil). */
+    private long pencereKalan = -1;
 
     protected Afet(AfetTuru tur) {
         this.tur = Objects.requireNonNull(tur, "tur");
@@ -113,6 +122,46 @@ public abstract class Afet {
 
     /** Sunucu kapanırken, durum kaydedilmeden önce (afet sürer; yeniden açılışta {@link #yuklendi}). */
     protected void kapanirken(ServerLevel level) {
+    }
+
+    /**
+     * ON_UYARI süresi dolunca SIREN'e geçiş beklemeli mi (gökyüzü-2, istek 26): doğal başlayan güneş patlaması ve ay çarpması
+     * AKTIF'e (sirenin gerçek süresi sonra) türün gün saati penceresinde ({@link GunSaatiPenceresi#dogalPatlama}) geçecek şekilde
+     * ON_UYARI'da bekler (atlanmaz; pencere kaçtıysa ertesi gün). Her tick yeniden hesaplanır: uyku, {@code /time set} ve
+     * {@code /dogalafet hiz} hesaba katılır. {@link GunSaatiPenceresi#EN_COK_BEKLEME} gerçek tick beklendiği hâlde pencere
+     * gelmediyse (saati kilitleyen başka mod) bekleme biter. Komutla başlayan afet ve {@code asama ileri} beklemez.
+     */
+    protected boolean patlamaPenceresiniBekle(ServerLevel level) {
+        Optional<GunSaatiPenceresi> pencere = GunSaatiPenceresi.dogalPatlama(tur);
+        if (pencere.isEmpty() || baglam.elle()) {
+            return false;
+        }
+        ServerLevel ust = level.getServer().overworld();
+        long siren = AfetYoneticisi.al(level.getServer()).zamanOlcegi().gercekTick(SirenTuru.sureTick(tur));
+        long gunSaati = ust.getDayTime();
+        boolean bekle = GunSaatiPenceresi.bekle(pencere, false, ust.getGameRules().getBoolean(GameRules.RULE_DAYLIGHT),
+                gunSaati, siren, pencereBeklenen);
+        pencereKalan = bekle ? pencere.get().bekleme(gunSaati, siren) : -1;
+        if (bekle) {
+            pencereBeklenen++;
+        }
+        if (bekle != pencereBekleniyor) {
+            pencereBekleniyor = bekle;
+            String durum = bekle ? "bekleniyor, bekleme " + pencereKalan + " tick"
+                    : pencereBeklenen >= GunSaatiPenceresi.EN_COK_BEKLEME
+                            ? "gelmedi, " + pencereBeklenen + " tick beklendi; bekleme bitti" : "geldi";
+            DogalAfetler.LOGGER.info("Patlama penceresi ({}): {}; dayTime={} siren {} tick, pencere [{}, {})", tur.kimlik(),
+                    durum, gunSaati, siren, pencere.get().bas(), pencere.get().son());
+        }
+        return bekle;
+    }
+
+    /**
+     * Doğal patlama penceresine kalan gerçek tick (ON_UYARI süresi doldu, pencere bekleniyor); beklenmiyorsa -1. Yalnız
+     * gösterim için ({@code /dogalafet durum}); {@link #asamaKalanTick()} bu sürede 0 kalır.
+     */
+    public final long pencereBeklemesi() {
+        return asama == AfetAsamasi.ON_UYARI ? pencereKalan : -1;
     }
 
     /** AKTIF aşamasının kalan ölçekli tick'i; bilinmiyorsa -1 (komut, radar). */
@@ -220,7 +269,7 @@ public abstract class Afet {
         asamaTick(level, asama, adim);
         switch (asama) {
             case ON_UYARI -> {
-                if (asamaGecen >= baglam.onUyariSuresi()) {
+                if (asamaGecen >= baglam.onUyariSuresi() && !patlamaPenceresiniBekle(level)) {
                     gec(level, AfetAsamasi.SIREN);
                 }
             }
@@ -310,6 +359,7 @@ public abstract class Afet {
         etiket.putString("asama", asama.kimlik());
         etiket.putLong("asamaGecen", asamaGecen);
         etiket.putInt("altAsama", altAsama);
+        etiket.putLong("pencereBeklenen", pencereBeklenen);
         etiket.put("etkilenenler", kimlikListesi(etkilenenler));
         etiket.put("olenler", kimlikListesi(olenler));
         CompoundTag ozel = new CompoundTag();
@@ -336,6 +386,7 @@ public abstract class Afet {
         asama = AfetAsamasi.kimlikIle(etiket.getString("asama")).orElse(AfetAsamasi.ON_UYARI);
         asamaGecen = Math.max(0, etiket.getLong("asamaGecen"));
         altAsama = Math.max(0, etiket.getInt("altAsama"));
+        pencereBeklenen = Math.max(0, etiket.getLong("pencereBeklenen"));
         kimlikleriOku(etiket.getList("etkilenenler", Tag.TAG_INT_ARRAY), etkilenenler);
         kimlikleriOku(etiket.getList("olenler", Tag.TAG_INT_ARRAY), olenler);
         ozelDurumOku(etiket.getCompound("ozel"));

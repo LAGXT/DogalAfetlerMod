@@ -6,7 +6,8 @@ Kendi dünyasını sıfırdan üretir: `run-server/gokyuzu-senaryo` silinir, `ru
 bağlı açılır (docs/MAKINE.md, K0-18). Oyun testi afeti kaydedilmez: güneş evresini yalnız `gokyuzu.GunesZinciriSureci`
 ilerletir; `/dogalafet gokyuzutest` yalnız geliştirme ortamında vardır.
 
-Koşu 1: kizilcuce bilgi (zincir başlamadı), gokyuzutest evre supernova, kizilcuce bilgi (kalan 1,50 gün), hiz 1000 →
+Koşu 1: gokyuzutest yildiz kizil_cuce (doğal doğuşun %15 pulsar seçimi bu senaryoda kapalı, gökyüzü-2), kizilcuce bilgi
+(zincir başlamadı), gokyuzutest evre supernova, kizilcuce bilgi (kalan 1,50 gün), hiz 1000 →
 süpernova kendiliğinden söner (GÜNEŞSİZ), hiz 1, gokyuzutest ay yok, kizilcuce bilgi (donma bekleniyor), gokyuzutest
 donma 100, kizilcuce bilgi (7 gün), hiz 1000 → kapı açılır, time set 22900 → ilk şafakta kızıl cüce doğar, hiz 1,
 durum; gün döngüsü kapalı doğuş (şef kararı G19): donma 99, gamerule doDaylightCycle false, time set 6000,
@@ -159,6 +160,7 @@ def senaryo_dunyasini_sil():
 
 def kosu1(sunucu):
     sunucu.bekle(r"Done \(", 0, ACILIS_SURESI, "açılış")
+    sunucu.komut("dogalafet gokyuzutest yildiz kizil_cuce", r"\[test\] yeni yıldız = kizil_cuce")
     sunucu.komut("dogalafet kizilcuce bilgi", r"The sun chain has not started")
     sunucu.komut("dogalafet gokyuzutest evre supernova", r"\[test\] güneş = supernova")
     sunucu.komut("dogalafet kizilcuce bilgi", r"Supernova fades into the sunless era in 1\.50 days")

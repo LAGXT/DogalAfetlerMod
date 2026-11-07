@@ -14,6 +14,8 @@ public final class GokyuzuSistemi {
     public static void kaydet() {
         GokyuzuAyarlari.kaydet();
         GunesZinciriSureci.kaydet();
+        PulsarSureci.kaydet();
+        GunSaatiSabitleyici.kaydet();
         GokyuzuKomutlari.kaydet();
         DataGenerators.ceviriEkle(GokyuzuKomutlari::cevirileriYaz);
     }

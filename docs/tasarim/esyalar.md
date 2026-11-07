@@ -117,9 +117,9 @@ https://www.amsmeteors.org/fireballs/faqf/ (bolid renkleri, iz, ses).
 
 ### Minecraft'ta gösterim
 
-- **Meteor varlığı** (`MeteorVarligi`, sunucu otoriteli): 40–70° açıyla, hedefin 140 blok üstünden 3 blok/tick düz
+- **Meteor varlığı** (`MeteorVarligi`, sunucu otoriteli): 40–70° açıyla, hedefin 200 blok üstünden ~9 sn'de (MT2-25) düz
   inen dönen kaya kümesi (güneş: magma + karataş/bazalt; ay: kalsit + pürüzsüz bazalt/tüf), önünde additive plazma
-  kabuğu ve ışık halesi, arkasında iki katmanlı additive iz şeridi (40 / 72 blok; güneş: beyaz-sarı çekirdek + turuncu,
+  kabuğu ve ışık halesi, arkasında iki katmanlı additive iz şeridi (80–140 blok, MT2-32; güneş: beyaz-sarı çekirdek + turuncu,
   ay: mavi-beyaz çekirdek + mavi) ve 8 sn'de dağılan gri duman, düşen kıvılcımlar. İnişe 1,5 sn kala zeminde büyüyen
   turuncu/mavi parlama diski oyuncuya düşüş yerini gösterir. İz, kabuk ve disk sissiz çizilir (gece görüş sisi
   uzaktan gelen izi söndürmesin); 96 blok ötesinde blok kümesi gövde yerine yalnız plazma. Işık motoruna dokunulmaz. 192 blok ötesinde parçacık yok,
@@ -150,6 +150,48 @@ Uçuşta rüzgâr ıslığı döngüsü meteoru izler, perde yaklaşırken 1,2, 
 çarpmada alçak perdeli derin patlama (büyükte 160 blok, küçükte 80 blok duyulur), suda sıçrama + cızgırtı; sıcak parça
 suya/kara değince cız. Kendi sentez dosyası yok: vanilla sesler `SoundEvents` ile (kural: tek seferlik darbe
 `level.playSound`).
+
+### Ses ve yağmur güncellemesi (meteor-2, 2026-11-07; kararlar `.vibe/kararlar/meteor-2.md`)
+
+Kullanıcı isteği: uçuş sesi her yerden duyuluyor ve vanilla gibi. Artık iki sentez dosyası var (`tools/assets/ses_uret.py`,
+ölçüm `docs/kanit/ses/meteor_*_ebur128.txt`): **uçuş** `meteor_ucus.ogg` (8 sn döngü; 35–90 / 90–220 Hz yanma kükremesi
+0,25 Hz'de çapraz kayar, 70→95 Hz süzülen kısmi ton, 6 Hz plazma çalkantısı, konuşma çentiği; −26 LUFS) yalnız meteor 48 blok
+yakınındayken çalar (52 blokta söner), kazanç `(1 − d/48)²`, perde dinleyiciye yaklaşma hızından Doppler `5,2 / (5,2 − v)` (tipik 1,3 blok/tick'te
+1,33 → 0,8; MT2-25 öncesi `12 / (12 − v)`, 3 blok/tick), ay parçaları %10 tiz; **patlama** `meteor_patlama.ogg` (7 sn tek seferlik; kırılma darbesi, 90 → 32 Hz göğüs vuruşu, 2,2 sn
+zaman sabitli 20–120 Hz uğultu kuyruğu, çakıl; −23 LUFS, ≤ −6 dBTP) büyükte 128, küçükte 96 blok içinde (küçük %70 düzey,
+büyük perde 0,85), kazanç karesel. İkisini de istemci vanilla zayıflaması kapalı çalar (konum yalnız yön için); her türden aynı anda
+en çok 6 (ses.md §4 kural 3): uçuşta en yakın altı, çarpmada en uzaktaki düşer. Sunucunun `entity.generic.explode`'u kalktı; suda
+sıçrama + cız vanilla kalır. Ay parçası görünümü mevcut `AY` varyantıdır (kalsit + pürüzsüz bazalt/tüf gövde, mavi-beyaz
+plazma); yeni doku gerekmedi.
+
+**Yağmur yoğunluğu (istek 27):** güneş patlaması ön-uyarının son 90 sn'sinde öncü yağmur başlatır (oyuncu başına 6/dk) ve
+siren boyunca 24/dk'ya çıkar; AKTIF'in başında 10 dk, sonraki günlerin başında 3 dk 90/dk, arasında bölüm D'nin 1,5 → 5/dk
+arka planı. Ay parçası yağmuru oyuncu başına 90/dk, 10 dk. Dağılım (32–160 blok halka) ve krater bütçesi (512 × TPS
+kısması) aynı; uçan meteor tavanı 48 → 96 (doluyken atılamayan meteor düşmez, kuyruk yok).
+
+**Boyut değişkenliği (istek 27):** meteorun sürekli ölçeği (`meteor.mantik.MeteorOlcegi`, senkron varlık verisi ve çarpma
+paketinde): %60 küçük 0,5–0,9×, %30 orta 0,9–1,6×, %10 büyük 1,6–2,5×, bant içinde düzgün. Eski küçük/büyük config değerleri
+tipik ölçek 0,7 ve 2,0'daki referanslardır; arası ve uçları doğrusal: gövde çapı 1,1 → 2,6 (ölçek 2,5'te 3,2), iz 86 → 125 blok (uçlarda 80–140),
+uçuş süresi ÷0,97 → ÷1,10 (uçlarda ÷0,95–1,12), krater yarıçapı 2,5 → 5,5 (2,5×'te 6,7), sarsıntı menzili 48 → 112, yangın yoğunluğu 0,45 → 0,85, patlama sesi
+96 → 128 blok ve %70 → %100 düzey, perde 1,0 → 0,85. Ödül sınıfı büyük banttır (Kozmik Çekirdek yalnız 1,6× ve üstünde).
+
+**Ödül sınırı (tur 2, şef kararı):** yağmur meteorları ödülü yalnız büyük bantta bırakır ve afet başına, hedef oyuncu başına
+en çok `meteor.odulTavaniAfetBasina` (8) eşya (`meteor.mantik.OdulTavani`); 10 dk'lık 180/dk yağmurda oyuncu başına ~58 eşyalık
+enflasyon en çok 8'e iner (büyük bantın beklenen ~9,5'i; tavan afetlerin ~%70'inde dolar). Tek düşürülen meteor (komut)
+madde 13c şanslarıyla sınırsızdır; komut yağmurları ortak `komut` sayacını paylaşır (`meteor durdur` sıfırlar).
+
+**Uçuş süresi (tur 3, şef kararı MT2-25):** gerçek hızda gökte aynı anda ~5 meteor "aşırı fazla" isteğine yetmedi;
+sorun uçuşun ~3 sn sürmesiydi. Meteor hedefin 200 blok üstünden doğar (40–70°) ve hedefe `meteor.ucusSuresi`'nde (180 tick;
+küçük 9,5 sn, büyük 8,0 sn) varır: hız yoldan çıkar (~1,0–1,9 blok/tick). Doppler (yukarıdaki 1,2/0,8 kayma) tipik hızda
+1,33/0,8 kalır (`SES_HIZI` 5,2). **Tur 4 (MT2-28):** afet yağmurları 180/dk: oyuncu başına gökte ~27 meteor, uçan meteor
+tavanı 448 (16 oyuncu); yağmur meteorunun çarpma noktası bakış yönüne ağırlıklı (2/3 ön yarı, 1/3 arka;
+`meteor.bakisYonuOrani`), komut meteoru yönsüz.
+
+**İz ve config göçü (tur 5, şef kararları MT2-31, MT2-32):** iz şeridi 80–140 blok, genişliği ve parlaklığı ×1,5, uzakta en
+az 2 piksel kalın (200 blok yukarıdaki küçük meteor da seçilir); plazma ve kıvılcım parçacıkları ×1,5 büyük, sayıları
+aynı. Var olan dünyanın SERVER config'i açılışta göç eder (`meteor.ayarSurumu`): eski varsayılanda kalan meteor ve
+yağmur değerleri (tavan, doğuş yüksekliği, yağmur yoğunluğu ve süresi, büyük meteor oranları) yeniye çekilir, elle
+değiştirilenler kalır.
 
 ## Buz altı balıkçılık (madde 15)
 
@@ -238,3 +280,13 @@ dilinde görür. `basarim.unvanGoster=false` öneki kapatır; `/dogalafet unvan 
 çerçeveli Felaket Ustası) ve sohbetteki mor duyurunun kendisinde oyuncunun adının önünde beliren altın `[Felaket Ustası]`
 (ünvan duyurudan önce verilir). Üçü aynı tick'te aynı tetikleyiciden gelir; oyunda sıraları garanti değildir. Görsel kanıt
 koşusu sırayı sabitler: tür ve seviye 3 ayrı tick'lerde verilir, doğal bitiş Felaket Ustası'nı açar.
+
+## Görsel cila (2026-11-07)
+
+Beş buz balığı ve pişmişleri vanilla balık ikonu kalitesinde yeniden çizildi (`tools/assets/balikcilik_dokular.py`, rastgelelik
+yok): çapraz duruş, 1 px seçici dış çizgi (üst açık, karın/alt-sağ en koyu), sırttan karına 4+3 tonluk ters gölgeleme, sıralı pul
+gölgesi, ışınlı açık yüzgeçler, 2 px göz, solungaç ve göğüs yüzgeci. Tür bir bakışta ayrılır: alabalık pembe şerit ve benek,
+morina alacalı sırt, yan çizgi, iki sırt yüzgeci ve bıyık; somon iri, lacivert-gümüş, derin çatal kuyruk; kefal gri boyuna
+çizgili, yuvarlak kuyruk; ringa ince parlak mavi, kırağı kenar ve parıltı. Pişmişler aynı siluette altın-kahve rampa, kıtır
+kenar, iki ızgara izi ve bulanık beyaz göz taşır. Kutup Balığı Çorbası kendi kasesini alır (parlayan ön ağız, damarlı gölgeli
+ahşap, buz mavisi krem çorbada somon/beyaz balık ve dereotu); kullanıcı isteğiyle buharsızdır, ısıtan olduğu adı ve tarifiyle okunur.

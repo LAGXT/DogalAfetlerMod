@@ -218,6 +218,64 @@ def kasirga_ruzgar() -> np.ndarray:
     return sifir_gecisine_dondur(sinyal)
 
 
+def meteor_ucus() -> np.ndarray:
+    """Meteor uçuşu (tasarım notu "Meteor" → "Ses", kullanıcı isteği 2026-11-07): vanilla rüzgâr ıslığı yerine alçak yanma
+    kükremesi. 35–90 Hz ve 90–220 Hz pembe gürültü bantları 0,25 Hz'de çapraz karışır (spektrum ağırlık merkezi aşağı-yukarı
+    kayar: geçen cismin kayması), altında 70 Hz'den 95 Hz'e süzülüp dönen kısmi ton, 6 Hz plazma çalkantısı ve çok düşük
+    3–6 kHz yanma cızırtısı; konuşma bandına −6 dB çentik. Doppler perdesi oyunda koddadır (dinleyiciye yaklaşma hızı).
+    8 sn döngü (0,25 Hz × 8 = 2, 6 Hz × 8 = 48 tur)."""
+    uretec = np.random.default_rng(20261110)
+    sure = 8.0
+    t = np.arange(int(sure * ORNEKLEME)) / ORNEKLEME
+    alt = alcak_geciren(pembe_gurultu(t.size, uretec, alt=35.0, ust=120.0), 90.0)
+    alt /= np.sqrt(np.mean(alt**2))
+    ust = alcak_geciren(pembe_gurultu(t.size, uretec, alt=90.0, ust=320.0), 220.0)
+    ust /= np.sqrt(np.mean(ust**2))
+    kayma = 0.5 + 0.5 * np.sin(2.0 * np.pi * 0.25 * t)
+    kukreme = np.sqrt(1.0 - kayma) * alt + np.sqrt(kayma) * ust * db(-3)
+    ton = np.sin(tam_turlu_faz(70.0 + 25.0 * kayma)) * db(-9)
+    calkanti = 0.85 + 0.15 * np.sin(2.0 * np.pi * 6.0 * t)
+    cizirti = pembe_gurultu(t.size, uretec, alt=3000.0, ust=6000.0) * db(-30)
+    sinyal = konusma_centigi((kukreme + ton) * calkanti + cizirti * kayma)
+    return sifir_gecisine_dondur(sinyal)
+
+
+def meteor_patlama() -> np.ndarray:
+    """Meteor çarpması (tek seferlik, 7 sn): 4 ms kırılma darbesi, 90 → 32 Hz'e çöken göğüs vuruşu, 30–300 Hz gövde
+    gürültüsü, 0,3 sn'de dolup 2,2 sn zaman sabitiyle sönen 20–120 Hz uğultu kuyruğu (0,7 Hz yuvarlanma) ve 0,2–2,5 sn'ye
+    dağılmış seyrek çakıl düşüşü; son 1 sn kosinüsle sıfıra iner. Yumuşak sınırlayıcı (tanh) tepe/ses yüksekliği oranını
+    −6 dBTP / −23 LUFS'a sığdırır (ses.md §4 kural 2)."""
+    uretec = np.random.default_rng(20261111)
+    sure = 7.0
+    n = int(sure * ORNEKLEME)
+    t = np.arange(n) / ORNEKLEME
+    darbe = alcak_geciren(uretec.normal(size=n) * (t < 0.004), 4000.0)
+    darbe *= db(-4) / np.max(np.abs(darbe))
+    vurus = np.sin(tam_turlu_faz(32.0 + 58.0 * np.exp(-t / 0.08))) * (1.0 - np.exp(-t / 0.003)) * np.exp(-t / 0.35)
+    govde = alcak_geciren(pembe_gurultu(n, uretec, alt=30.0, ust=300.0), 150.0)
+    govde *= db(-6) / np.sqrt(np.mean(govde[: ORNEKLEME // 2] ** 2)) * (1.0 - np.exp(-t / 0.01)) * np.exp(-t / 0.6)
+    kuyruk = alcak_geciren(pembe_gurultu(n, uretec, alt=20.0, ust=160.0), 120.0)
+    kuyruk /= np.sqrt(np.mean(kuyruk**2))
+    kuyruk *= db(-9) * (1.0 - np.exp(-t / 0.3)) * np.exp(-t / 2.2) * (0.8 + 0.2 * np.sin(2.0 * np.pi * 0.7 * t))
+    cakil = np.zeros(n)
+    for an in uretec.uniform(0.2, 2.5, size=60):
+        i = int(an * ORNEKLEME)
+        boy = int(0.006 * ORNEKLEME)
+        cakil[i:i + boy] += uretec.normal(size=boy) * np.exp(-np.arange(boy) / (0.0015 * ORNEKLEME)) * np.exp(-an / 1.2)
+    cakil = bant_gecirgen(cakil, 1000.0, 4000.0) * db(-24) / max(np.max(np.abs(cakil)), 1e-9)
+    sinyal = darbe + vurus + govde + kuyruk + cakil
+    sinyal *= np.where(t > sure - 1.0, yumusak((sure - t) / 1.0), 1.0)
+    sinyal /= np.max(np.abs(sinyal))
+    return np.tanh(2.5 * sinyal) / np.tanh(2.5)
+
+
+def bant_gecirgen(sinyal: np.ndarray, alt: float, ust: float) -> np.ndarray:
+    """Sinyali [alt, ust] Hz bandına sınırlar (sıfır fazlı FFT maskesi; tek seferlik seslerde döngü gerekmez)."""
+    frekanslar = np.fft.rfftfreq(sinyal.size, 1.0 / ORNEKLEME)
+    maske = (frekanslar >= alt) & (frekanslar <= ust)
+    return np.fft.irfft(np.fft.rfft(sinyal) * maske, sinyal.size)
+
+
 @dataclass(frozen=True)
 class SesTanimi:
     uret: Callable[[], np.ndarray]
@@ -227,6 +285,8 @@ class SesTanimi:
     baskin_bant_hz: tuple[float, float]
     tiz_esik_hz: float
     tiz_tavani_db: float
+    # Tek seferlik seste (çarpma) döngü dikişi ölçülmez.
+    dongu: bool = True
 
 
 SESLER: dict[str, SesTanimi] = {
@@ -240,6 +300,10 @@ SESLER: dict[str, SesTanimi] = {
     "kasirga_ugultu": SesTanimi(kasirga_ugultu, -26.0, -6.0, (40.0, 120.0), 2500.0, -30.0),
     # Kasırga yakın rüzgârı: derin kükreme 30–220 Hz baskın; 2,5 kHz üstü en az 30 dB aşağıda.
     "kasirga_ruzgar": SesTanimi(kasirga_ruzgar, -26.0, -6.0, (30.0, 220.0), 2500.0, -30.0),
+    # Meteor uçuşu: döngülü ortam sesi kuralı (−26 LUFS, −6 dBTP), alçak kükreme 35–220 Hz baskın; cızırtı 2,5 kHz üstü ≤30 dB aşağıda.
+    "meteor_ucus": SesTanimi(meteor_ucus, -26.0, -6.0, (35.0, 220.0), 2500.0, -30.0),
+    # Meteor çarpması: tek seferlik darbe (−23 LUFS, tepe ≤ −6 dBTP), vuruş ve uğultu 20–120 Hz baskın.
+    "meteor_patlama": SesTanimi(meteor_patlama, -23.0, -6.0, (20.0, 120.0), 2500.0, -25.0, dongu=False),
 }
 
 
@@ -358,8 +422,9 @@ def uret(ad: str, tanim: SesTanimi, gecici: Path) -> list[str]:
         f"Perde izi (0,5 sn pencerelerde en güçlü frekans, ilk 20): {', '.join(f'{f:.0f}' for f in iz[:20])} Hz\n"
         f"Bant enerjisi / toplam: {alt:.0f}–{ust:.0f} Hz {hedef_bant:.1f} dB; 300–3400 Hz (konuşma) {konusma:.1f} dB; "
         f">{tanim.tiz_esik_hz:.0f} Hz {tiz:.1f} dB; >8000 Hz {ust_tiz:.1f} dB\n"
-        f"Döngü dikişi: |ilk - son| / en büyük iç adım = {dikis:.3f} (<= 1 ise süreksizlik yok); ilk örnek = {sinyal[0]:+.5f}\n"
-        f"Hedefle karşılaştırma: {'UYGUN' if not hatalar else 'UYGUN DEĞİL: ' + '; '.join(hatalar)}\n\n"
+        + (f"Döngü dikişi: |ilk - son| / en büyük iç adım = {dikis:.3f} (<= 1 ise süreksizlik yok); ilk örnek = {sinyal[0]:+.5f}\n"
+           if tanim.dongu else "Tek seferlik: döngü dikişi ölçülmez (son 1 sn kosinüsle sıfıra iner).\n")
+        + f"Hedefle karşılaştırma: {'UYGUN' if not hatalar else 'UYGUN DEĞİL: ' + '; '.join(hatalar)}\n\n"
         f"ffmpeg -i {ogg.name} -af ebur128=peak=true -f null -\n{ozet}\n"
     )
     (KANIT_KLASORU / f"{ad}_ebur128.txt").write_text(rapor, encoding="utf-8")

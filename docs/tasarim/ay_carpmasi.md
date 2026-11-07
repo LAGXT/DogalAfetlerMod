@@ -22,7 +22,7 @@ Kaynaklar:
 | 0–60 sn | Siren | Ay, gündüz ya da gece fark etmeksizin gökyüzünde sabit bir yaklaşma yönünde (çarpma noktasına dönük, ufkun 35° üstü) zorla çizilir ve 1×'ten 14×'e büyür (`s = 1 + 13·t³`) |
 | 20–60 sn | Parçalanma | Ay dokusunda parlayan turuncu-beyaz kırık ağı büyür (önceden çizilmiş 3 aşamalı çatlak katmanı), kenarlardan kopan 20–40 küçük parça ayın önünde ve arkasında yörünge yayı boyunca uzar, ay ince toz haresiyle çevrelenir |
 | 50–60 sn | Son yaklaşma | Ay ufka iner, alt kenarı atmosfere girince kızarır, gökyüzü ve sis alttan turuncuya boyanır |
-| 60 sn | **Çarpma** | Siren fade-out; ufkun ötesinde (oyunculardan ≥ 2000 blok, gerçek blok değişmez) beyaz parlama, ekran 0,5 sn %70 beyaz; 2 sn sonra ufuktan yükselen kızgın mantar sütunu (gökyüzü renderer'ında ufuk çizgisine yapışan dev sprite yığını, 45 sn'de ufkun 25° üstüne büyür) |
+| 60 sn | **Çarpma** | Siren fade-out; havada, dünyada sabit bir noktada (kameradan yaklaşma yönünde ~900 blok, gerçek blok değişmez) 3 boyutlu patlama: ateş topu, şok kabuğu, enkaz ve duman, 7 sn'de kaybolur; ekran 0,5 sn %70 mavi-beyaz, gök ve arazi birkaç saniye parlar (gökyüzü-2 bölümü) |
 | 63–75 sn | **Sarsıntı** | Tüm oyuncularda 12 sn sarsıntı (deprem S4 genliği, mesafeden bağımsız), haritada yapraklar, cam, fenerler ve desteksiz bloklar düşer (deprem "sağlam olmayan" listesi, yoğunluk %30), toz perdesi yükselir |
 | 70 sn → +1–2 dk | **Meteorlar** | Ay parçaları: güneş patlaması meteorlarıyla aynı varlık, ama gri-beyaz ay kayası dokusu (bazalt + kalsit karışımı görünümü) ve mavi-beyaz plazma izi; aynı krater, yangın ve ödül kuralları |
 | + 10 dk | **Deniz yükselmesi** | Su seviyesi her yerde 0 → 4 blok, 5 dk boyunca (bkz. `sanal_su.md`) |
@@ -37,7 +37,7 @@ Kaynaklar:
 ## 3. Vitrin anları
 
 - **Parçalanan ayın son 8 saniyesi (ana vitrin, gece):** kamera bir tepede, ufka bakar (pitch +15°); ay gökyüzünün üçte birini kaplar, yüzeyinde parlayan turuncu kırıklar, çevresinde yörünge yayı boyunca uzayan parça bulutu, alt kenarı atmosferde kızarmış; ön planda silüet ağaçlar ve bir köy, zemin ay ışığıyla soluk mavi-gri.
-- **Çarpma + mantar sütunu (8 sn):** aynı kamera; ufukta beyaz parlama, ardından yükselen turuncu-kahverengi sütun, sütunun altından sola-sağa yayılan toz duvarı, gökyüzünde ilk ay parçası meteorlarının mavi-beyaz izleri.
+- **Çarpma + 3B patlama (8 sn):** aynı kamera; mavi-beyaz parlama, ardından genişleyen ateş topu ve savrulan enkaz, 7. sn'de iz kalmaz; gökyüzünde ilk ay parçası meteorlarının mavi-beyaz izleri.
 - **İlk aysız gece:** enkaz halkasının soluk yayı Samanyolu'nu çaprazlar; deniz yükselmesiyle sular altında kalmış bir iskele.
 
 ## 4. Ses tasarımı
@@ -57,14 +57,14 @@ Kaynaklar:
 
 ## 5. Performans planı
 
-| Kalite | Ay parça sprite | Mantar sütunu sprite | Sarsıntıda düşen blok (oyuncu başına) | Enkaz halkası | Toz perdesi |
+| Kalite | Ay parça sprite | Patlama (enkaz / duman / küre dilimi) | Sarsıntıda düşen blok (oyuncu başına) | Enkaz halkası | Toz perdesi |
 |---|---|---|---|---|---|
-| Düşük | 15 | 30 | 10 | tek doku | 60 |
-| Orta | 25 | 60 | 20 | + parıltı | 150 |
-| Yüksek | 40 | 100 | 35 | + parıltı | 300 |
-| Ultra | 70 | 180 | 50 | + parıltı + 2 katman | 600 |
+| Düşük | 15 | 12 / 4 / 8 | 10 | tek doku | 60 |
+| Orta | 25 | 24 / 7 / 10 | 20 | + parıltı | 150 |
+| Yüksek | 40 | 40 / 10 / 14 | 35 | + parıltı | 300 |
+| Ultra | 70 | 64 / 14 / 18 | 50 | + parıltı + 2 katman | 600 |
 
-- Ay yaklaşması, parçalanma, mantar sütunu ve halka tamamen gökyüzü renderer'ında (dünya geometrisi yok, sabit maliyet).
+- Ay yaklaşması, parçalanma, 3B patlama ve halka tamamen gökyüzü renderer'ında (dünya geometrisi yok, sabit maliyet; patlama 7 sn).
 - Sunucu: sarsıntıdaki blok düşmeleri oyuncu başına 48 blok yarıçapta, 12 sn'ye yayılmış kuyruk; meteorlar ve yangın ortak tavanlarla.
 
 ## 6. Açık noktalar — önerilen varsayılanlar
@@ -91,12 +91,12 @@ Kaynak: `.vibe/kararlar/ay-carpmasi.md` AY-01…AY-11, rapor `.vibe/rapor/ay-car
 
 **Uygulananlar.**
 - Veri modeli (G8 kapandı): `DunyaDonemi.ayVar` korunur, yanına `ayOlaySaati` (YAKLASIYOR'da siren başı, YOK'ta çarpma anı);
-  `AyDurumu` ikisinden türetilir, `DonemPaketi` son alanı. Sonradan giren oyuncu yaklaşma/mantar/halka karesini aynı saatten görür.
+  `AyDurumu` ikisinden türetilir, `DonemPaketi` son alanı. Sonradan giren oyuncu yaklaşma/patlama/halka karesini aynı saatten görür.
 - Zaman çizelgesi tablodaki gibidir: yaklaşma = SIREN (60 sn, `1 + 13·t³`, 35° → son 10 sn'de 4°), çarpma = AKTIF başı
   (ay yok, tsunami çarpanı, siren fade-out), 1,5 sn güm, 3–15 sn sarsıntı (2,5°, mesafeden bağımsız, her boyutta), 10. sn'den
   90 sn ay parçası yağmuru (`MeteorAPI`, ay görünümü), sonra doğal bitiş. Deniz yükselmesi sanal suyun süreci (10 dk + 5 dk).
 - Gökyüzü: ortak çizicinin kancasında yaklaşan ay (yüzey + 3 aşamalı çatlak + kızarma + toz haresi + kalite tablosundaki
-  sayıda parça, yörünge yayı 20° eğik), ufuk parlaması, mantar sütunu (gövde + şapka + iki yana toz duvarı, kızgın çekirdek),
+  sayıda parça, yörünge yayı 20° eğik), ufuk parlaması, mantar sütunu (gökyüzü-2'de kaldırıldı, yerine 7 sn'lik 3B patlama),
   3 günlük enkaz halkası (+24 parıltı) ve kayan yıldızlar. Sis son yaklaşmada turuncuya, parlamada sıcak beyaza çekilir.
 - Siren sırasında `stop` ayı yerine getirir (yaklaşma ulaşılmış dönem değildir); çarpmadan sonra ayın yokluğu kalıcıdır.
 
@@ -107,3 +107,40 @@ Kaynak: `.vibe/kararlar/ay-carpmasi.md` AY-01…AY-11, rapor `.vibe/rapor/ay-car
 - "Toz perdesi" parçacıkları ve "plajlarda ıslak kum parlaması" yapılmadı (rapor "yapılmadı"); tsunami çekilmesinin ×1,5'i
   tsunami işçisinindir (çarpan dönemi `DunyaDonemi.carpan(TSUNAMI) > 1` ile okunur).
 - Meteor sesi perdesi %10 tiz meteor sisteminin görünüm dalındadır (M-10); burada ayrıca yapılmadı.
+
+## Gökyüzü-2 güncellemesi, 2026-11-07 (3 boyutlu patlama, dünya parlaması)
+
+Kaynak: `.vibe/kararlar/gokyuzu-2.md` G2-2…G2-4.
+
+**Mantar sütunu kaldırıldı.** Kök neden: gök küresine yapışık düz kareler (kamera konumu yok → oyuncuyla kayar, 2B) ve bir
+MC günü süren alfa (90 sn tam, 300 sn'den sonra %35 kalıntı → "hiç gitmiyor").
+
+**Yerine: havada 3 boyutlu patlama, 7 sn.** Dünyada sabit nokta (istemcinin ilk karesinde kameradan yaklaşma yönünde, 9°
+yükseklikte, 900 blok), kamera merkezli ölçekle göğe sığdırılır: uçan/yürüyen oyuncuda paralaks, arazi önüne geçer.
+
+| An | Görünüm |
+|---|---|
+| 0–0,5 sn | beyaz-sarı ateş topu hızla açılır, mavi-beyaz şok kabuğu, ekran %70 mavi-beyaz, gök + arazi parlar |
+| 0,5–2 sn | ateş topu tepe yarıçapına (360 blok, ~22°) yaklaşır, turuncuya döner, topaklar kaynar; enkaz sıcak izlerle savrulur |
+| 2–4,5 sn | ateş topu koyu kızıla söner, duman topakları öne çıkar; dünya parlaması biter |
+| 4,5–7 sn | enkaz ve duman saydamlaşır; 7. sn'de hiçbir şey kalmaz (8. sn karesi: yok) |
+
+Kademe: enkaz 12 / 24 / 40 / 64, duman 4 / 7 / 10 / 14, küre enlem dilimi 8 / 10 / 14 / 18. Dünya parlaması: 0,1 sn'de tam,
+0,5 sn tutar, τ 0,9 sn, 4,5 sn'de 0; gök örtüsü %60, sis %60, ışık haritası %85 mavi-beyaza; `ay_carpmasi.parlama` hepsini çarpar
+(0 kapalı). Enkaz halkası ve kayan yıldızlar değişmedi.
+
+**Ay yalnız gece patlar (G2-9).** Doğal ay çarpması AKTIF'e (çarpma) yalnız gece (gün saati 13000–23000) geçer; ON_UYARI
+gerekirse akşama kadar sessizce bekler, 60 sn'lik yaklaşma (siren) gece göğünde biter. `/dogalafet start` bu pencereye bakmaz.
+
+## Meteor-2 güncellemesi, 2026-11-07 (kararlar `.vibe/kararlar/meteor-2.md`)
+
+- Ay parçası yağmuru oyuncu başına 7,5 → **180/dk** (istek 27 ve MT2-28; `ay_carpmasi.meteorDakikaBasina`, 3/sn), süre 90 sn →
+  **600 sn / 10 dk** (`meteorSuresiSn`, aralık 60–900; bölüm H'nin "1–2 dk"sı kullanıcı isteğiyle aşıldı): 10 dk'da oyuncu başına
+  1800 parça; afet yağmurla biter (çarpma + 10 sn + 10 dk). Uçan meteor tavanı 448, doluyken atılamayan parça düşmez. Var
+  olan dünyada eski varsayılanlar (7,5/30/90, 90 sn, 0,04) açılışta yeniye göç eder (MT2-31).
+- Boyut değişkenliği güneş meteorlarıyla aynı dağılım (`meteor.mantik.MeteorOlcegi`: %60 küçük 0,5–0,9×, %30 orta, %10 büyük
+  1,6–2,5×; `meteorBuyukOrani` 0,10). Görünüm mevcut `AY` varyantı (gri-beyaz kalsit + pürüzsüz bazalt/tüf gövde, mavi-beyaz
+  plazma izi); yeni doku gerekmedi. Uçuş/çarpma sesleri meteor sisteminin (`esyalar.md` "Ses ve yağmur güncellemesi").
+- **Tur 3–4 (MT2-25, MT2-28):** parçalar 8–10 sn uçar (200 blok), yoğunluk `meteorDakikaBasina` **180/dk** (10 dk'da oyuncu
+  başına 1800 parça), uçan meteor tavanı 448; çarpma noktalarının 2/3'ü oyuncunun baktığı yarıda, 1/3'ü arkada
+  (`meteor.bakisYonuOrani`): yağmur göründüğü yerde yoğundur, arkada da düşer.

@@ -24,8 +24,12 @@ public final class AsitAyarlari {
         AsitKurallari.Tablo v = AsitKurallari.Tablo.VARSAYILAN;
         return new AsitKurallari.Tablo(liste(s.yaricap, v.yaricap(), Number::intValue),
                 liste(s.sureSaniye, v.sureSaniye(), Number::intValue), liste(s.asindirma, v.asindirma(), Number::doubleValue),
-                liste(s.hasar, v.hasar(), Number::doubleValue), liste(s.hasarAraligi, v.hasarAraligi(), Number::intValue),
                 s.tasSeviyesi.get());
+    }
+
+    /** Gökyüzüne açık oyuncunun saniyede aldığı hasar (can puanı; 1 = yarım kalp), seviyeden bağımsız. */
+    public static float hasarSaniye() {
+        return sunucu.get().hasarSaniye.get().floatValue();
     }
 
     public static float minimumCan() {
@@ -63,8 +67,7 @@ public final class AsitAyarlari {
         private final ForgeConfigSpec.ConfigValue<List<? extends Number>> yaricap;
         private final ForgeConfigSpec.ConfigValue<List<? extends Number>> sureSaniye;
         private final ForgeConfigSpec.ConfigValue<List<? extends Number>> asindirma;
-        private final ForgeConfigSpec.ConfigValue<List<? extends Number>> hasar;
-        private final ForgeConfigSpec.ConfigValue<List<? extends Number>> hasarAraligi;
+        private final ForgeConfigSpec.DoubleValue hasarSaniye;
         private final ForgeConfigSpec.IntValue tasSeviyesi;
         private final ForgeConfigSpec.DoubleValue minimumCan;
         private final ForgeConfigSpec.IntValue eszamanliAsindirma;
@@ -76,10 +79,8 @@ public final class AsitAyarlari {
             sureSaniye = liste(k, "sureSaniye", "AKTIF yağış süresi (sn).", v.sureSaniye(), 10, 3600);
             asindirma = liste(k, "asindirmaBlokSaniye", "Tam yoğunlukta saniyede aşınan en çok blok.", v.asindirma(), 0,
                     256);
-            hasar = liste(k, "hasar", "Gökyüzüne açık oyuncuya her aralıkta verilen hasar (can puanı; 1 = yarım kalp).",
-                    v.hasar(), 0, 20);
-            hasarAraligi = liste(k, "hasarAraligiTick", "Açıkta kalan oyuncunun iki hasarı arası (tick).", v.hasarAraligi(),
-                    4, 1200);
+            hasarSaniye = k.comment("Gökyüzüne açık oyuncunun maruz kaldığı her saniye aldığı hasar (can puanı; 1 = yarım"
+                    + " kalp). Seviyeden bağımsız; çatı altında 0.").defineInRange("hasarSaniye", 1.0, 0.0, 20.0);
             tasSeviyesi = k.comment("Kırıktaş ve taş tuğlanın aşınmaya başladığı seviye (6: hiç).")
                     .defineInRange("tasSeviyesi", v.tasSeviyesi(), 1, 6);
             minimumCan = k.comment("Asit hasarı canı bunun altına indirmez (madde 10: Seviye 5'te bile öldürücü değil).")

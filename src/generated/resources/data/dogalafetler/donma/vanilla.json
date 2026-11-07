@@ -5,13 +5,6 @@
       "ince": "dogalafetler:ince_buz",
       "kaynak": "minecraft:water",
       "tur": "su_sutunu"
-    },
-    {
-      "cozulmeEsigi": 50,
-      "esik": 10,
-      "hedef": "dogalafetler:kiragili_cimen",
-      "kaynak": "minecraft:grass_block",
-      "tur": "yuzey"
     }
   ]
 }

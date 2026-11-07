@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.random.RandomGenerator;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.SectionPos;
 import net.minecraft.gametest.framework.AfterBatch;
 import net.minecraft.gametest.framework.GameTest;
@@ -31,12 +32,21 @@ import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.Container;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.animal.Pig;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.LanternBlock;
+import net.minecraft.world.level.block.WallTorchBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
 
@@ -117,6 +127,16 @@ public final class TsunamiOyunTestleri {
 
     @AfterBatch(batch = "tsunami_blok_hasari")
     public static void blokHasariSonrasi(ServerLevel level) {
+        temizlik(level);
+    }
+
+    @AfterBatch(batch = "tsunami_dekor")
+    public static void dekorSonrasi(ServerLevel level) {
+        temizlik(level);
+    }
+
+    @AfterBatch(batch = "tsunami_kap")
+    public static void kapSonrasi(ServerLevel level) {
         temizlik(level);
     }
 
@@ -565,8 +585,9 @@ public final class TsunamiOyunTestleri {
     }
 
     /**
-     * Madde 11 {@code afetBlokHasari=false} (izleme-inceleme-5 P2-1): S2 dalgası kıyıya vurup kendiliğinden biter, hiçbir blok
-     * kırılmaz; sahnenin (deniz, kara, cam, kalas, yaprak) blok hash'i baştakiyle aynı.
+     * Madde 11 {@code afetBlokHasari=false} (izleme-inceleme-5 P2-1): S3 dalgası kıyıya vurup kendiliğinden biter, hiçbir blok
+     * kırılmaz; sahnenin (deniz, kara, cam, kalas, yaprak, fener, içi dolu fıçı) blok hash'i baştakiyle aynı, eşya düşmez.
+     * S3: fıçı bu seviyede blok hasarı açıkken kırılırdı ({@link #kapS3teIcerigiyleKirilirS2deVeHasarKapaliykenKalir}).
      */
     @GameTest(template = "su_alani", batch = "tsunami_blok_hasari", timeoutTicks = 900)
     public static void blokHasariKapaliykenDalgaBlokKirmaz(GameTestHelper h) {
@@ -578,11 +599,15 @@ public final class TsunamiOyunTestleri {
         }
         h.setBlock(10, 3, 10, Blocks.OAK_LEAVES.defaultBlockState()
                 .setValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT, true));
+        h.setBlock(8, 3, 5, Blocks.LANTERN);
+        h.setBlock(11, 3, 4, Blocks.BARREL);
+        doldur(h, 11, 3, 4, new ItemStack(Items.DIAMOND, 3));
         OyunTestiTemizligi.blokHasari(l, false);
         BlockPos a = m(h, 0, 0, 0);
         BlockPos b = m(h, 15, 10, 15);
+        AABB alan = new AABB(a, m(h, 16, 12, 16));
         long once = SanalSu.bolgeHash(l, a.getX(), a.getY(), a.getZ(), b.getX(), b.getY(), b.getZ());
-        TsunamiAfeti t = baslat(h, 2);
+        TsunamiAfeti t = baslat(h, 3);
         h.startSequence()
                 .thenWaitUntil(() -> h.assertTrue(t.sonlandi(), "afet kendiliğinden bitmedi: " + t.asama()))
                 .thenExecute(() -> {
@@ -590,12 +615,128 @@ public final class TsunamiOyunTestleri {
                     h.assertTrue(t.kirilan() == 0, "blok hasarı kapalıyken " + t.kirilan() + " blok kırıldı");
                     h.assertTrue(sonra == once, "blok hasarı kapalıyken sahne değişti");
                     h.assertBlockPresent(Blocks.OAK_PLANKS, 9, 3, 6);
+                    h.assertBlockPresent(Blocks.LANTERN, 8, 3, 5);
+                    h.assertBlockPresent(Blocks.BARREL, 11, 3, 4);
+                    h.assertTrue(l.getEntitiesOfClass(ItemEntity.class, alan).isEmpty(), "blok hasarı kapalıyken eşya düştü");
                     DogalAfetler.LOGGER.info("Tsunami GameTest: blok hasarı kapalı, doğal bitiş, kırılan {} hash {}", t.kirilan(),
                             Long.toHexString(once));
                     t.durdur(l, true);
                     t.magaralar().forEach(id -> SanalSu.magaraBitir(l, id));
                 })
                 .thenSucceed();
+    }
+
+    /**
+     * Kullanıcı isteği 3 (dekor): ahşap evin tavanındaki asılı fener (sertlik 3,5) ve duvar meşalesi S1'de sertliğe bakılmadan
+     * kırılır, kalas (2,0) ve tabandaki ray kalır (S1'de tam 2 blok). S2'de kalas kırılınca ray (dekor değil, sınıf tablosunda
+     * yok) dayanağı gittiği için komşu denetimiyle düşer, havada kalmaz. Yıkım kuyruğu afetsiz, doğrudan sürülür.
+     */
+    @GameTest(template = "su_alani", batch = "tsunami_dekor", timeoutTicks = 100)
+    public static void dekorS1deKirilirDayanagiGidenKomsuDuser(GameTestHelper h) {
+        ServerLevel l = h.getLevel();
+        sahne(h, 2);
+        BlockState kalas = Blocks.OAK_PLANKS.defaultBlockState();
+        kutu(h, 9, 3, 6, 12, 3, 10, kalas);
+        kutu(h, 9, 4, 6, 9, 5, 10, kalas);
+        kutu(h, 9, 6, 6, 12, 6, 10, kalas);
+        h.setBlock(11, 5, 8, Blocks.LANTERN.defaultBlockState().setValue(LanternBlock.HANGING, true));
+        h.setBlock(10, 4, 8, Blocks.WALL_TORCH.defaultBlockState().setValue(WallTorchBlock.FACING, Direction.EAST));
+        h.setBlock(11, 4, 9, Blocks.RAIL);
+        long s1 = yikimSur(h, 1, 9, 12, true);
+        h.assertTrue(l.getBlockState(m(h, 11, 5, 8)).isAir(), "S1 asılı fener kaldı");
+        h.assertTrue(l.getBlockState(m(h, 10, 4, 8)).isAir(), "S1 duvar meşalesi kaldı");
+        h.assertBlockPresent(Blocks.OAK_PLANKS, 11, 6, 8);
+        h.assertBlockPresent(Blocks.OAK_PLANKS, 9, 4, 8);
+        h.assertBlockPresent(Blocks.RAIL, 11, 4, 9);
+        h.assertTrue(s1 == 2, "S1'de yalnız fener ve meşale kırılmalı: " + s1);
+        long s2 = yikimSur(h, 2, 9, 12, true);
+        h.assertTrue(l.getBlockState(m(h, 11, 3, 9)).isAir() && l.getBlockState(m(h, 11, 6, 8)).isAir(), "S2 kalas kaldı");
+        h.assertTrue(l.getBlockState(m(h, 11, 4, 9)).isAir(), "tabanı kırılan ray havada kaldı");
+        DogalAfetler.LOGGER.info("Tsunami GameTest: dekor S1 kırılan {}, S2 kırılan {} (komşu ray dahil)", s1, s2);
+        h.succeed();
+    }
+
+    /**
+     * Kullanıcı isteği 3 (kap): içi dolu iki fıçı blok hasarı kapalıyken S3'te ve açıkken S2'de kalır (S2'de fener ve kalas
+     * kırılır); S3'te ikisi de kırılır, içerikleri ve fıçı eşyaları eşya oranı 0 iken de düşer. Kap tick'in bütün eşya
+     * bütçesini kullandığı için ikinci fıçı sonraki tick'e kalır; kuyruk yine boşalır.
+     */
+    @GameTest(template = "su_alani", batch = "tsunami_kap", timeoutTicks = 100)
+    public static void kapS3teIcerigiyleKirilirS2deVeHasarKapaliykenKalir(GameTestHelper h) {
+        ServerLevel l = h.getLevel();
+        sahne(h, 2);
+        h.setBlock(10, 3, 8, Blocks.BARREL);
+        h.setBlock(10, 3, 9, Blocks.BARREL);
+        h.setBlock(11, 3, 8, Blocks.OAK_PLANKS);
+        h.setBlock(9, 3, 7, Blocks.LANTERN);
+        doldur(h, 10, 3, 8, new ItemStack(Items.DIAMOND, 3));
+        doldur(h, 10, 3, 9, new ItemStack(Items.EMERALD, 5));
+        AABB alan = new AABB(m(h, 0, 0, 0), m(h, 16, 12, 16));
+        long kapali = yikimSur(h, 3, 9, 11, false);
+        h.assertTrue(kapali == 0 && l.getEntitiesOfClass(ItemEntity.class, alan).isEmpty(),
+                "blok hasarı kapalıyken " + kapali + " blok kırıldı");
+        h.assertBlockPresent(Blocks.LANTERN, 9, 3, 7);
+        long s2 = yikimSur(h, 2, 9, 11, true);
+        h.assertBlockPresent(Blocks.BARREL, 10, 3, 8);
+        h.assertBlockPresent(Blocks.BARREL, 10, 3, 9);
+        h.assertTrue(s2 == 2 && l.getBlockState(m(h, 9, 3, 7)).isAir() && l.getBlockState(m(h, 11, 3, 8)).isAir(),
+                "S2'de fener ve kalas kırılmalı, fıçı kalmalı: kırılan " + s2);
+        h.assertTrue(l.getEntitiesOfClass(ItemEntity.class, alan).isEmpty(), "eşya oranı 0 iken enkaz düştü");
+        long s3 = yikimSur(h, 3, 9, 11, true);
+        h.assertTrue(s3 == 2 && l.getBlockState(m(h, 10, 3, 8)).isAir() && l.getBlockState(m(h, 10, 3, 9)).isAir(),
+                "S3'te fıçılar kırılmadı: kırılan " + s3);
+        int elmas = esya(l, alan, Items.DIAMOND);
+        int zumrut = esya(l, alan, Items.EMERALD);
+        int fici = esya(l, alan, Items.BARREL);
+        h.assertTrue(elmas == 3 && zumrut == 5 && fici == 2, "fıçı içeriği düşmedi: elmas " + elmas + ", zümrüt " + zumrut
+                + ", fıçı " + fici);
+        DogalAfetler.LOGGER.info("Tsunami GameTest: kap S2 kırılan {}, S3 kırılan {}, düşen elmas {} zümrüt {} fıçı {}", s2, s3,
+                elmas, zumrut, fici);
+        l.getEntitiesOfClass(ItemEntity.class, alan).forEach(Entity::discard);
+        h.succeed();
+    }
+
+    /**
+     * Yıkım kuyruğunu afetsiz, kendi döngüsünde sürer ({@link #ikinciYiginGecikmesi} gibi): x {@code x0..x1} satırları (z 4..12,
+     * taban y3), eşya oranı 0 (kap yine döker), kuyruk boşalıncaya kadar (en çok 100 tick). Kırılan blok sayısı.
+     */
+    private static long yikimSur(GameTestHelper h, int seviye, int x0, int x1, boolean blokHasari) {
+        ServerLevel l = h.getLevel();
+        TsunamiSeviyesi sv = TsunamiSeviyesi.al(seviye);
+        int butce = TsunamiYikimi.blokButcesi(sv, 1.0, 1.0);
+        TsunamiYikimi.Ayar ayar = new TsunamiYikimi.Ayar(butce, 1, 1, 1, 0, true, 4 * butce);
+        TsunamiYikimi y = new TsunamiYikimi();
+        TsunamiGeometrisi g = geometri(h);
+        int ust = m(h, 0, 10, 0).getY();
+        for (double b = x0 - 6 + 0.1; b < x1 - 6 + 1; b += 0.7) {
+            y.satirEkle(g, b, 8, ust);
+        }
+        double taban = m(h, 0, 3, 0).getY();
+        long simdi = DunyaDonemi.al(l).saat();
+        for (int t = 0; t < 100 && y.bekleyen() > 0; t++) {
+            y.tick(l, simdi + t, sv, taban, 1.0, ayar, blokHasari, p -> false);
+        }
+        h.assertTrue(y.bekleyen() == 0, "yıkım kuyruğu 100 tick'te boşalmadı: " + y.bekleyen());
+        return y.toplamKirilan();
+    }
+
+    private static void doldur(GameTestHelper h, int x, int y, int z, ItemStack yigin) {
+        if (h.getLevel().getBlockEntity(m(h, x, y, z)) instanceof Container kap) {
+            kap.setItem(0, yigin);
+        } else {
+            h.fail("kap yok: " + x + ", " + y + ", " + z);
+        }
+    }
+
+    /** Alandaki eşya varlıklarında {@code tur}'un toplam adedi. */
+    private static int esya(ServerLevel l, AABB alan, Item tur) {
+        int n = 0;
+        for (ItemEntity e : l.getEntitiesOfClass(ItemEntity.class, alan)) {
+            if (e.getItem().is(tur)) {
+                n += e.getItem().getCount();
+            }
+        }
+        return n;
     }
 
     /**

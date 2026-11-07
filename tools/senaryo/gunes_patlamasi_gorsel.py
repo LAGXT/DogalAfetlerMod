@@ -42,7 +42,8 @@ JAVA_HOME = "/home/lagxt/.jdks/jdk-17.0.21+9"
 ISARET = "GUNES_OTOMASYON"
 BEKLENEN = ["on_uyari", "siren_aurora", "siren_gunes", "aktif_gun1", "kavrulma_gun1", "meteor_yagmuru", "meteor_krater_ates",
             "kavrulma_gun4", "supernova_cokme", "supernova_parlama", "supernova_kabuk", "gunessiz",
-            "kizil_cuce_dogus", "kizil_cuce_gunduz"]
+            "kizil_cuce_dogus", "kizil_cuce_gunduz", "uzay_yildiz_1", "uzay_yildiz_2", "kara_delik_yakin", "pulsar_aksam",
+            "pulsar_yanan_dunya"]
 KARE_SATIRI = re.compile(rf"{ISARET} kare gunes_(\w+)\.png \(FPS (\d+), TPS ([\d.?]+), mspt ([\d.?]+), evre (\w+), "
                          r"ilerleme ([\d.]+), evre sn ([\d.]+), uçan meteor (\d+), parçacık (\d+), kuruluk basamağı (\d+)")
 KANIT.mkdir(parents=True, exist_ok=True)

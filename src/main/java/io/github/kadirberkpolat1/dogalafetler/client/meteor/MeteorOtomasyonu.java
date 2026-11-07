@@ -3,6 +3,7 @@ package io.github.kadirberkpolat1.dogalafetler.client.meteor;
 import com.mojang.datafixers.util.Pair;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.client.core.GorselOtomasyon;
+import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
 import io.github.kadirberkpolat1.dogalafetler.esya.MeteorEsyaKayitlari;
 import io.github.kadirberkpolat1.dogalafetler.esya.termostat.Termostat;
 import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorAPI;
@@ -10,6 +11,8 @@ import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorBoyutu;
 import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorGorunumu;
 import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorOdulleri;
+import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorVarligi;
+import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.MeteorOlcegi;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.ZirhEkleri;
 import io.github.kadirberkpolat1.dogalafetler.yangin.YanginKaynagi;
 import io.github.kadirberkpolat1.dogalafetler.yangin.YanginYoneticisi;
@@ -26,6 +29,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.enchantment.Enchantments;
@@ -47,21 +51,31 @@ import net.minecraftforge.fml.common.Mod;
  * gelen kademeli ay (mavi-beyaz) ve güneş meteorlarının izleri, çarpma anı, krater ve ateş karelenir; sonra yakın kamerayla
  * parıldayan Meteorit Parçası ve Kozmik Çekirdek, en sonda Kozmik Çekirdek ve Termostatlı zırh ipuçları. Klavye, fare ve
  * tekerlek girdileri kapanışa kadar sayılır. Kareler A-34 kapısından alınır ({@link GorselOtomasyon#kareIste}); bekleyen kare
- * varken adım ilerlemez. Vitrinde meteorlar yavaş çekimde düşer ({@code meteor.dusmeHizi} 0,6; sonra eski değere döner).
+ * varken adım ilerlemez. Vitrinde meteorlar yavaş çekimde düşer ({@code meteor.ucusSuresi} {@value #YAVAS_CEKIM}; sonra eski
+ * değere döner).
  * Ölçüm (K-E29 (b)): vitrin kamerasında meteorlardan önce afetsiz taban {@code s5_meteor_taban}, ilk atıştan itibaren yağmur
  * {@code s5_meteor_yuksek} (her biri 100 tick; öncesinde FPS kapısı, {@link GorselOtomasyon#akici}).
  * {@code -PotomasyonBolum=odul} (M-22): yalnız ödül ve ipucu kareleri, öğlen ışığında; her ipucu kendi karesinde, satırlar
- * ekran genişliğine göre sarılır (tooltip'ler üst üste binmez).
+ * ekran genişliğine göre sarılır (tooltip'ler üst üste binmez). {@code -PotomasyonBolum=yagmur} (meteor-2): aynı kamerada
+ * gerçek güneş patlamasının ön-uyarı, siren ve AKTIF başı (180/dk, karma boyut, bakış yönüne ağırlıklı) yağmuru, yakın/uzak çarpma ses denemesi ve
+ * ay parçası yağmuru karelenir; ses kararları {@code METEOR_SES}, uçan meteorun bantları {@code sayım} satırlarıdır
+ * ({@link MeteorSesi}).
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class MeteorOtomasyonu {
     private static final boolean AKTIF = "meteor".equals(System.getProperty("dogalafetler.otomasyon", ""));
     private static final String ON = "METEOR_OTOMASYON ";
     private static final boolean YALNIZ_ODUL = "odul".equals(System.getProperty("dogalafetler.otomasyon.bolum", "hepsi"));
+    private static final boolean YAGMUR = "yagmur".equals(System.getProperty("dogalafetler.otomasyon.bolum", "hepsi"));
+    /** Yağmur bölümünün adımı ({@link #adim}). */
+    private static final int YAGMUR_ADIMI = 9;
     private static final String[] IPUCLARI = {"cekirdek", "parca", "plaka", "zirh"};
     private static final int UZAKLIK = 48;
     private static final int KAMERA_YUKSEKLIGI = 18;
-    private static final double YAVAS_CEKIM = 0.6;
+    /** Yavaş çekimin uçuş süresi (tick): varsayılan 180'in 2 katı. */
+    private static final int YAVAS_CEKIM = 360;
+    /** Yağmur bölümünde kameranın göğe eğimi (derece). */
+    private static final float YAGMUR_EGIMI = 35F;
 
     /** Hedef ofseti (kameradan bakış yönünde x, sağa z), boyut, görünüm, açı, gelış yönü, başlangıç tick'i. */
     private record Atis(int dx, int dz, MeteorBoyutu boyut, MeteorGorunumu gorunum, double aci, double azimut, int tick) {
@@ -73,6 +87,13 @@ public final class MeteorOtomasyonu {
             new Atis(-6, 12, MeteorBoyutu.KUCUK, MeteorGorunumu.GUNES, 60, Math.PI / 2 - 0.5, 9),
             new Atis(16, 8, MeteorBoyutu.BUYUK, MeteorGorunumu.AY, 48, Math.PI / 2 - 0.25, 14));
 
+    /** Ses denemesi: oyuncudan yatay ofset ve boyut (19 blok küçük: duyulur; 150 büyük ve 112 küçük: patlama menzili dışı). */
+    private record SesAtisi(int dx, int dz, MeteorBoyutu boyut) {
+    }
+
+    private static final List<SesAtisi> SES_ATISLARI = List.of(new SesAtisi(18, 6, MeteorBoyutu.KUCUK),
+            new SesAtisi(150, 0, MeteorBoyutu.BUYUK), new SesAtisi(-104, 42, MeteorBoyutu.KUCUK));
+
     private static int tus;
     private static int fare;
     private static int teker;
@@ -82,7 +103,7 @@ public final class MeteorOtomasyonu {
     private static int carpmaBaslangic;
     private static volatile boolean sunucuHazir;
     private static volatile BlockPos odak;
-    private static volatile double eskiHiz = -1;
+    private static volatile int eskiSure = -1;
     /** Vitrin öncesi: 0 FPS kapısı, 1 taban ölçümü, 2 FPS kapısı, 3 vitrin. */
     private static int tabanEvresi;
     private static int carpmaSonrasiKare;
@@ -150,6 +171,8 @@ public final class MeteorOtomasyonu {
                     sonraki();
                     if (YALNIZ_ODUL) {
                         sonraki();
+                    } else if (YAGMUR) {
+                        adim = YAGMUR_ADIMI;
                     }
                 }
             }
@@ -195,6 +218,7 @@ public final class MeteorOtomasyonu {
                     mc.stop();
                 }
             }
+            case YAGMUR_ADIMI -> yagmurBolumu(server);
             default -> {
             }
         }
@@ -227,8 +251,8 @@ public final class MeteorOtomasyonu {
     private static void vitrin(Minecraft mc, IntegratedServer server) {
         if (sayac == 1) {
             server.execute(() -> {
-                eskiHiz = MeteorAyarlari.dusmeHizi();
-                MeteorAyarlari.dusmeHiziAyarla(YAVAS_CEKIM);
+                eskiSure = MeteorAyarlari.ucusSuresi();
+                MeteorAyarlari.ucusSuresiAyarla(YAVAS_CEKIM);
             });
         }
         for (Atis a : ATISLAR) {
@@ -261,8 +285,8 @@ public final class MeteorOtomasyonu {
             carpmaSonrasiKare = sayac;
             kare("carpma_son");
             server.execute(() -> {
-                if (eskiHiz > 0) {
-                    MeteorAyarlari.dusmeHiziAyarla(eskiHiz);
+                if (eskiSure > 0) {
+                    MeteorAyarlari.ucusSuresiAyarla(eskiSure);
                 }
             });
             return;
@@ -284,6 +308,143 @@ public final class MeteorOtomasyonu {
             kraterAdimi = 3;
         } else if (kraterAdimi == 3) {
             sonraki();
+        }
+    }
+
+    /**
+     * Yağmur bölümü: güneş patlaması ön-uyarısında (öncü yağmur), sirende ve AKTIF başında kare, sirende yakın/uzak
+     * çarpma ses denemesi, sonra ay parçası yağmuru. {@code _gercek} kareleri gerçek hızda ({@code meteor.ucusSuresi}), ötekiler
+     * vitrindeki gibi 2× yavaş çekimde ({@value #YAVAS_CEKIM} tick uçuş: kadrajda aynı anda 2 kat çok iz; yoğunluk
+     * değişmez). Gerçek hız karesi yavaş meteorlar indikten sonra (400 tick) alınır. Kamera göğe {@value #YAGMUR_EGIMI}°
+     * bakar (meteorlar 200 blok yükseklikten iner); {@code gunes_aktif_duz} gerçek hızda düz bakıştır (0°, MT2-32): 35°
+     * karesinden sonra, kamera dönüşünden 4 sn sonra alınır (dönüşte açılan zemin bölümleri yeniden derlenir, o anki FPS
+     * 35° karesine karışmasın). Kare isteyen tick'te bekleyen kare alınana kadar sayaç ilerlemez.
+     */
+    private static void yagmurBolumu(IntegratedServer server) {
+        switch (sayac) {
+            case 1 -> {
+                server.execute(() -> {
+                    eskiSure = MeteorAyarlari.ucusSuresi();
+                    MeteorAyarlari.ucusSuresiAyarla(YAVAS_CEKIM);
+                });
+                egim(server, YAGMUR_EGIMI);
+                komut(server, "dogalafet sifirla", "dogalafet start gunes_patlamasi");
+            }
+            case 600 -> {
+                kare("gunes_onuyari");
+                sayim(server, "güneş ön-uyarı");
+            }
+            case 601 -> komut(server, "dogalafet asama ileri");
+            case 1100 -> {
+                kare("gunes_siren");
+                sayim(server, "güneş siren");
+            }
+            case 1101 -> server.execute(() -> sesDenemesi(server));
+            case 1400 -> {
+                kare("gunes_siren_b");
+                sayim(server, "güneş siren");
+            }
+            case 1401 -> {
+                server.execute(() -> MeteorAyarlari.ucusSuresiAyarla(eskiSure));
+                komut(server, "dogalafet asama ileri");
+            }
+            case 1800 -> {
+                kare("gunes_aktif_gercek");
+                sayim(server, "güneş AKTIF gerçek hız");
+            }
+            case 1801 -> egim(server, 0F);
+            case 1880 -> {
+                kare("gunes_aktif_duz");
+                sayim(server, "güneş AKTIF düz bakış");
+            }
+            case 1881 -> {
+                egim(server, YAGMUR_EGIMI);
+                server.execute(() -> MeteorAyarlari.ucusSuresiAyarla(YAVAS_CEKIM));
+            }
+            case 2100 -> {
+                kare("gunes_aktif");
+                sayim(server, "güneş AKTIF");
+            }
+            case 2300 -> {
+                kare("gunes_aktif_b");
+                sayim(server, "güneş AKTIF");
+            }
+            case 2301 -> {
+                server.execute(() -> MeteorAyarlari.ucusSuresiAyarla(eskiSure));
+                komut(server, "dogalafet stop", "dogalafet sifirla", "dogalafet start ay_carpmasi",
+                        "dogalafet asama ileri", "dogalafet asama ileri", "dogalafet asama ileri");
+            }
+            case 2600 -> {
+                kare("ay_parcalari_gercek");
+                sayim(server, "ay parçaları gerçek hız");
+            }
+            case 2601 -> server.execute(() -> MeteorAyarlari.ucusSuresiAyarla(YAVAS_CEKIM));
+            case 2900 -> {
+                kare("ay_parcalari");
+                sayim(server, "ay parçaları");
+            }
+            case 3200 -> {
+                kare("ay_parcalari_b");
+                sayim(server, "ay parçaları");
+            }
+            case 3201 -> {
+                komut(server, "dogalafet stop", "dogalafet sifirla");
+                server.execute(() -> MeteorAyarlari.ucusSuresiAyarla(eskiSure));
+            }
+            case 3300 -> {
+                adim = 4;
+                sayac = 0;
+            }
+            default -> {
+            }
+        }
+    }
+
+    /** Yağmur kamerasının göğe eğimi (derece; 0 düz bakış), yönü değişmez. */
+    private static void egim(IntegratedServer server, float derece) {
+        server.execute(() -> {
+            ServerPlayer o = server.getPlayerList().getPlayers().get(0);
+            o.teleportTo(server.overworld(), o.getX(), o.getY(), o.getZ(), -90F, -derece);
+        });
+    }
+
+    private static void komut(IntegratedServer server, String... komutlar) {
+        server.execute(() -> {
+            for (String k : komutlar) {
+                server.getCommands().performPrefixedCommand(server.createCommandSourceStack(), k);
+                DogalAfetler.LOGGER.info(ON + "komut /{}", k);
+            }
+        });
+    }
+
+    /** Etkin afetin aşaması, uçan meteor (bant: küçük/orta/büyük) ve afetin yağmurlarının bu sunucuda attığı meteor. */
+    private static void sayim(IntegratedServer server, String ad) {
+        server.execute(() -> {
+            ServerLevel level = server.overworld();
+            int[] bant = new int[3];
+            for (Entity e : level.getAllEntities()) {
+                if (e instanceof MeteorVarligi m) {
+                    bant[MeteorOlcegi.bant(m.olcek())]++;
+                }
+            }
+            AfetYoneticisi.al(server).aktifAfet().ifPresentOrElse(afet -> DogalAfetler.LOGGER.info(
+                    ON + "sayım {}: aşama {}, uçan meteor {} (küçük/orta/büyük {}/{}/{}), atılan meteor {}", ad, afet.asama(),
+                    MeteorAPI.aktifMeteorSayisi(level), bant[0], bant[1], bant[2], MeteorAPI.atilanMeteorSayisi(level,
+                            YanginKaynagi.afet(afet.tur(), afet.baglam().baslangicSaati()))),
+                    () -> DogalAfetler.LOGGER.warn(ON + "sayım {}: etkin afet yok", ad));
+        });
+    }
+
+    /** Ses menzili denemesi (sunucu thread'i, {@link #SES_ATISLARI}); istemci {@code METEOR_SES} satırlarını yazar. */
+    private static void sesDenemesi(IntegratedServer server) {
+        ServerLevel level = server.overworld();
+        BlockPos p = server.getPlayerList().getPlayers().get(0).blockPosition();
+        for (SesAtisi a : SES_ATISLARI) {
+            BlockPos hedef = p.offset(a.dx(), 0, a.dz());
+            boolean ucan = MeteorAPI.dusur(level, hedef, a.boyut(), MeteorGorunumu.GUNES, YanginKaynagi.KOMUT, false)
+                    .isPresent();
+            DogalAfetler.LOGGER.info(ON + "ses denemesi: {} meteor → {} (yatay {} blok), uçuş {}", a.boyut(),
+                    hedef.toShortString(), Math.round(Math.hypot(a.dx(), a.dz())), ucan);
         }
     }
 

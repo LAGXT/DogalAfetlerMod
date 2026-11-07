@@ -12,7 +12,9 @@ import net.minecraft.util.Mth;
 
 /**
  * Meteor parçacıkları: tam parlak plazma (güneş beyaz-sarı → turuncu-kızıl, ay mavi-beyaz → mavi), 8 sn'de dağılan gri
- * duman şeridi, düşen kıvılcım, çarpmanın şok halkası tozu ve ödüllerin yıldız parıltısı (altın / mor-mavi).
+ * duman şeridi, düşen kıvılcım, çarpmanın şok halkası tozu ve ödüllerin yıldız parıltısı (altın / mor-mavi). Dumanın
+ * üretimdeki yukarı hızı sürtünmeyle durmaz, ısıyla ((1 − yaş oranı)²) azalan uç hız olarak kalır: çarpma dumanı yükselir,
+ * şerit dumanı havada asılı kalır.
  */
 final class MeteorParcacigi extends TextureSheetParticle {
     enum Tur {
@@ -30,6 +32,7 @@ final class MeteorParcacigi extends TextureSheetParticle {
     private final Tur tur;
     private final float ilkBoy;
     private final float faz;
+    private final float kaldirma;
     private final float r0;
     private final float g0;
     private final float b0;
@@ -48,16 +51,18 @@ final class MeteorParcacigi extends TextureSheetParticle {
         float r = 1;
         float g = 1;
         float b = 1;
+        float kaldir = 0;
         switch (tur) {
             case PLAZMA, PLAZMA_AY -> {
                 lifetime = 10 + random.nextInt(12);
-                quadSize = 0.45F + random.nextFloat() * 0.5F;
+                quadSize = 0.675F + random.nextFloat() * 0.75F;
                 friction = 0.9F;
             }
             case DUMAN -> {
                 lifetime = 140 + random.nextInt(40);
                 quadSize = 0.9F + random.nextFloat() * 0.8F;
                 friction = 0.96F;
+                kaldir = (float) Math.max(0.0, vy) * (1.0F - friction);
                 float gri = 0.32F + random.nextFloat() * 0.14F;
                 r = gri;
                 g = gri;
@@ -66,7 +71,7 @@ final class MeteorParcacigi extends TextureSheetParticle {
             }
             case KIVILCIM, KIVILCIM_AY -> {
                 lifetime = 18 + random.nextInt(24);
-                quadSize = 0.06F + random.nextFloat() * 0.07F;
+                quadSize = 0.09F + random.nextFloat() * 0.105F;
                 friction = 0.95F;
                 gravity = 0.35F;
                 hasPhysics = true;
@@ -100,6 +105,7 @@ final class MeteorParcacigi extends TextureSheetParticle {
             }
             default -> throw new IllegalStateException(tur.name());
         }
+        kaldirma = kaldir;
         r0 = r;
         g0 = g;
         b0 = b;
@@ -129,6 +135,7 @@ final class MeteorParcacigi extends TextureSheetParticle {
             case DUMAN -> {
                 quadSize = ilkBoy * (1.0F + oran * 2.6F);
                 alpha = 0.55F * (1.0F - oran) * Math.min(1.0F, age / 6.0F);
+                yd += kaldirma * (1.0F - oran) * (1.0F - oran);
             }
             case KIVILCIM -> {
                 setColor(1.0F, 0.85F - 0.6F * oran, Math.max(0.05F, 0.5F - 0.5F * oran));

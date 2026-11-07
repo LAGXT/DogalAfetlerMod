@@ -101,9 +101,11 @@ Güneş patlaması ve ay çarpması yalnız dünya yeterince yaşlanınca seçil
 ## Ortak sistemler
 
 - **Siren ve ses:** sirenler ve afet sesleri kısık tutulur; siren ses düzeyi istemci ayarıdır (varsayılan %28).
-- **Dünya dönemleri:** güneş (normal → büyüyen → süpernova → güneşsiz → kızıl cüce) ve ay (var/yok) birbirinden bağımsızdır ve
-  dünyaya kaydedilir; sonradan giren oyuncu aynı gökyüzünü görür. Güneşsiz dönemde dünya birkaç günde donar (kar, buz, kırağı;
-  donma uzaktaki chunk'lara oyuncu geldikçe yetişir). Kızıl cüce doğunca dünya kısmen çözülür; kalıcı kış bölgeleri donuk kalır.
+- **Dünya dönemleri:** güneş (normal → büyüyen → süpernova → güneşsiz → kızıl cüce ya da düşük olasılıkla pulsar) ve ay
+  (var/yok) birbirinden bağımsızdır ve dünyaya kaydedilir; sonradan giren oyuncu aynı gökyüzünü görür. Güneşsiz dönemde dünya
+  birkaç günde donar (çimenin üstüne kar katmanı, buz, kırağı rengi; donma uzaktaki chunk'lara oyuncu geldikçe yetişir). Kızıl
+  cüce doğunca dünya kısmen çözülür, kalıcı kış bölgeleri donuk kalır; pulsar dünyayı ısıtır, çimeni kavurur, yangın çıkarır ve
+  donmuş dünyayı çözer.
 - **Vücut sıcaklığı:** biyom, gün/gece, yükseklik, ısı kaynakları, yağmur ve dünya dönemi ortam sıcaklığını belirler; HUD'daki
   gösterge vücut sıcaklığını gösterir. Aşırı soğuk ve sıcak hasar verir. Zırha yün eklemek (yünlü zırh), tüy işlemek (parça
   başına en çok 30) ve Termostat Plakası eklemek (çok sıcakta aşırı ısınmayı azaltır) sıcaklığı dengeler.
@@ -130,7 +132,7 @@ Bütün komutlar `/dogalafet` altındadır ve **yalnız OP** (yetki seviyesi 2) 
 
 | Komut | Ne yapar |
 |---|---|
-| `/dogalafet start <afet> [seviye] [oyuncu]` | Afeti hemen başlatır (beklemeyi ve gamerule'ü atlar; aktif afet varken reddeder). |
+| `/dogalafet start <afet> [seviye] [oyuncu]` | Afeti hemen başlatır (beklemeyi, gamerule'ü ve gün saati penceresini atlar; aktif afet varken reddeder). Doğal güneş patlaması yalnız sabah (gün saati 0–6000), ay çarpması yalnız gece (13000–23000) patlar; komutla başlatma bu pencereye bakmaz. |
 | `/dogalafet stop` | Aktif afeti temizce durdurur; afet yoksa süren dünya dönemi süreçlerini durdurur. |
 | `/dogalafet durum` | Aktif afet, aşama, seviye, kalan süre, beklemeler, çarpanlar, deniz seviyesi, ay/güneş, donma ve buharlaşma. |
 | `/dogalafet sicaklik set <oyuncu> <değer>` | Oyuncunun vücut sıcaklığını ayarlar. |
@@ -141,6 +143,7 @@ Bütün komutlar `/dogalafet` altındadır ve **yalnız OP** (yetki seviyesi 2) 
 | `/dogalafet donma bilgi` | Donma ilerlemesi, dönem, buharlaşma, işlenen chunk kuyruğu. |
 | `/dogalafet kizilcuce baslat` | Beklemeyi atlayıp kızıl cüce doğuşunu başlatır. |
 | `/dogalafet kizilcuce bilgi` | Gökyüzü dönemi, çözülme ilerlemesi, bulunduğunuz chunk kalıcı kış mı. |
+| `/dogalafet pulsar baslat` | Kızıl cüce yerine pulsarı hemen doğurur (olasılık, donma ve şafak beklenmez; zaten pulsarsa ya da güneş patlaması sürüyorsa reddeder). |
 | `/dogalafet gun <sayı>` | Oyun gününü ayarlar ve seviye olasılıklarını gösterir. |
 | `/dogalafet odul meteor [parca\|cekirdek\|hepsi] [adet] [oyuncu]` | Test için Meteorit Parçası / Kozmik Çekirdek verir. |
 | `/dogalafet asama ileri [süreç]` | Aktif afeti ya da bir dünya dönemi sürecini sonraki aşamaya geçirir. |
@@ -227,6 +230,10 @@ hücresi). Sunucu TPS'i düşünce bu bütçeler kendiliğinden kısılır.
 | `cekirdek.tekSeferlik.gunesPatlamasiTekrarlanabilir` | `false` | Güneş patlaması kızıl cücede tekrar gelebilsin mi. |
 | `su.aysonrasiBeklemeDk`, `su.denizHedefArtis` | `10`, `4` | Ay çarpmasından sonra deniz yükselmesinin beklemesi (gerçek dakika) ve hedefi (blok). |
 | `gokyuzu.kizilCuceGecikmeGun` | `7` | Donma %100'e ulaştıktan sonra kızıl cücenin doğmasına kadar gün. |
+| `gokyuzu.pulsarOlasiligi` | `0,15` | Süpernova sonrası doğal doğuşta kızıl cüce yerine pulsar doğma olasılığı (dünya tohumundan belirlenir). |
+| `gokyuzu.pulsarIsinmaGun` | `2` | Pulsarın dünya etkilerinin (sıcaklık, kavrulma, yangın, buharlaşma) tam güce çıkma süresi, MC günü. |
+| `gokyuzu.pulsarYanginDakikaBasina` | `20` | Tam güçte oyuncu başına dakikada yeni yangın odağı (`afetBlokHasari false` iken yok). |
+| `gokyuzu.pulsarKavrulmaOlasiligi` | `0,6` | Tam güçte güneşe açık çimenin kaba toprağa dönme denemesi olasılığı (tick başına, oyuncu başına). |
 | `sicaklik.sicaklikSistemiModu` | `OTOMATIK` | `OTOMATIK`: Cold Sweat yüklüyse kendi sıcaklık sistemi kapalı; `ACIK` / `KAPALI`. |
 | `basarim.etkiAlaniPayi` | `0` | "Sağ çıkma" için afet yarıçapına eklenen pay (blok). |
 
@@ -235,8 +242,11 @@ hücresi). Sunucu TPS'i düşünce bu bütçeler kendiliğinden kısılır.
 Modun kendi başarım sekmesi **Doğal Afetler**'dir; 27 başarım vardır. "Sağ çıkmak": afetin etki alanındayken afet bitene kadar
 ölmemek. Çok oyunculuda her oyuncu kendi başarımını kazanır.
 
-**Ödüller:** görev 15 XP; hedef 40 XP ve 1–2 Sıcak Salep; meydan okuma 100 XP, bir ünvan (adın önünde görünür) ve sohbet
-duyurusu. Ünvanlar: Kozmik Kâşif, Kutup Sakini, Felaket Ustası, Her Şeyi Atlatan. XP miktarları `basarim.odul.*Xp` ile değişir.
+**Ödüller:** görev 15 XP; hedef 40 XP ve 1–2 Sıcak Salep; meydan okuma 100 XP ve bir ünvan. Ünvanlar: Kozmik Kâşif, Kutup
+Sakini, Felaket Ustası, Her Şeyi Atlatan. Modun başarımları kazanılınca sohbette duyurulur (`announceAdvancements` açıkken);
+ünvan yalnız bu duyurularda oyuncu adının önünde görünür (vanilla duyurular, sohbet, tab listesi ve ölüm mesajlarında yoktur;
+`basarim.unvanGoster` ile kapatılır). Eşya başarımları (#7, #22) eşya envantere girince, yaratıcı kipte de gelir; #15 ve #16
+hayatta kalmada üretimle, yaratıcı kipte eşya envantere girince. XP miktarları `basarim.odul.*Xp` ile değişir.
 
 | # | Başarım | Tür | Nasıl kazanılır |
 |---|---|---|---|
@@ -328,6 +338,8 @@ Sesler (mono Ogg Vorbis, 48 kHz). Ölçü: entegre ses yüksekliği / gerçek te
 | `gunes_supernova_kristal.ogg` | -29.9 LUFS / -18.2 dBTP / 20.0 sn | 151,7 KB | `tools/assets/gunes_sesleri.py` |
 | `kasirga_ruzgar.ogg` | -26.1 LUFS / -9.9 dBTP / 12.0 sn | 87,4 KB | `tools/assets/ses_uret.py` |
 | `kasirga_ugultu.ogg` | -25.9 LUFS / -9.6 dBTP / 16.0 sn | 99,9 KB | `tools/assets/ses_uret.py` |
+| `meteor_patlama.ogg` | -23.0 LUFS / -6.5 dBTP / 7.0 sn | 49,3 KB | `tools/assets/ses_uret.py` |
+| `meteor_ucus.ogg` | -26.0 LUFS / -12.0 dBTP / 8.0 sn | 51,3 KB | `tools/assets/ses_uret.py` |
 | `ortam_test.ogg` | -26.0 LUFS / -11.0 dBTP / 12.0 sn | 74,0 KB | `tools/assets/ses_uret.py` |
 | `sinkhole_cokus.ogg` | -22.0 LUFS / -7.4 dBTP / 6.0 sn | 41,8 KB | `tools/assets/deprem_ses.py` |
 | `siren_gunes.ogg` | -20.9 LUFS / -9.3 dBTP / 20.0 sn | 120,7 KB | `tools/assets/ses_uret.py` |
@@ -464,6 +476,12 @@ Gökyüzü: güneş evreleri, süpernova kabuğu, nebula, kızıl cüce, yıldı
 | `kalinti_2048.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `kalinti_512.png` | 512x512 | 321,3 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `kalinti_512.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
+| `kara_delik.png` | 256x256 | 28,2 KB | `tools/assets/gokyuzu_dokulari.py` |
+| `kara_delik.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
+| `kara_delik_akis.png` | 256x256 | 10,5 KB | `tools/assets/gokyuzu_dokulari.py` |
+| `kara_delik_akis.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
+| `kara_delik_jet.png` | 64x512 | 3,9 KB | `tools/assets/gokyuzu_dokulari.py` |
+| `kara_delik_jet.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `nebula_karisik_128.png` | 128x128 | 16,5 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `nebula_karisik_128.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `nebula_karisik_256.png` | 256x256 | 55,1 KB | `tools/assets/gokyuzu_dokulari.py` |
@@ -482,6 +500,8 @@ Gökyüzü: güneş evreleri, süpernova kabuğu, nebula, kızıl cüce, yıldı
 | `nebula_mavi_256.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `nebula_mavi_512.png` | 512x512 | 117,0 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `nebula_mavi_512.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
+| `pulsar_isin.png` | 512x64 | 2,0 KB | `tools/assets/gokyuzu_dokulari.py` |
+| `pulsar_isin.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `samanyolu.png` | 2048x256 | 422,8 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `samanyolu.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `supernova_halka.png` | 512x512 | 99,6 KB | `tools/assets/gokyuzu_dokulari.py` |
@@ -513,8 +533,6 @@ Ay çarpması gök dokuları: yaklaşan ay, parlama, enkaz halkası.
 | `ay_yuzey.png.mcmeta` | — | 0,1 KB | `tools/assets/ay_carpmasi_dokular.py` |
 | `enkaz_halkasi.png` | 512x32 | 7,5 KB | `tools/assets/ay_carpmasi_dokular.py` |
 | `enkaz_halkasi.png.mcmeta` | — | 0,1 KB | `tools/assets/ay_carpmasi_dokular.py` |
-| `mantar.png` | 128x128 | 15,4 KB | `tools/assets/ay_carpmasi_dokular.py` |
-| `mantar.png.mcmeta` | — | 0,1 KB | `tools/assets/ay_carpmasi_dokular.py` |
 
 #### `assets/dogalafetler/textures/misc/`
 
@@ -598,7 +616,8 @@ Başarım sekmesi arka planı.
   dolar.
 - **Donma:** yaprak çıkıntısının altındaki su donmaz; oyuncunun koyduğu kar ve buz kalınlaştırılmaz. Buharlaşmada kuruyan
   suyun içindeki yosun/deniz çimi ilk komşu güncellemesine kadar havada kalabilir. Uçurum kenarında kış bölgesi sınırı keskin
-  olabilir. Yaratıcı modda konan Kırağılı Çimen çözülmede çimene döner.
+  olabilir. Eski dünyalardaki ve yaratıcı modda konan Kırağılı Çimen, sütunu bir sonraki donma/çözülme eşiğinde işlenince
+  çimene döner (varsayılan tablo artık çimeni kırağılı çimene çevirmez).
 - **`/dogalafet sifirla`:** kalıcı kış bölgelerini o anki config ile yeniden hesaplar; config dünya içinde değiştiyse eski kış
   bölgesi kayabilir.
 - **Başka gökyüzü modları:** gökyüzünü tamamen değiştiren bir mod varsa yaklaşan ay ve güneş evreleri vanilla ay/güneşin üstüne

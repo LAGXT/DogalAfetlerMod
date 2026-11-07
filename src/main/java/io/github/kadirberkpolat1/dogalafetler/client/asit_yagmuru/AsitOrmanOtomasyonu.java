@@ -170,6 +170,18 @@ public final class AsitOrmanOtomasyonu {
         ADIMLAR.add(sunucu(s -> olcum(s, ad + "_vitrin")));
         ADIMLAR.add(kare(ad + "_vitrin"));
         if (asit) {
+            ADIMLAR.add(sunucu(s -> oyunKipi(s, GameType.SURVIVAL)));
+            ADIMLAR.add(arayuz(true));
+            ADIMLAR.add(bekle(30));
+            ADIMLAR.add((mc, s, t) -> {
+                DogalAfetler.LOGGER.info(ON + "maruziyet: istemci koşulu {}, ekran efekti gücü {}",
+                        IstemciAsitYagmuru.maruzMu(mc.level, mc.player),
+                        String.format(Locale.ROOT, "%.2f", AsitEkranEfekti.maruziyet()));
+                return true;
+            });
+            ADIMLAR.add(kare(ad + "_maruz"));
+            ADIMLAR.add(arayuz(false));
+            ADIMLAR.add(sunucu(s -> oyunKipi(s, GameType.CREATIVE)));
             olc("s5_" + ad + "_yuksek", null, taban);
             ADIMLAR.add(sunucu(s -> olcum(s, ad + "_s5_yuksek")));
             ADIMLAR.add(yakinKamera());
@@ -582,6 +594,16 @@ public final class AsitOrmanOtomasyonu {
     private static void dur(IntegratedServer s) {
         AfetYoneticisi.al(s).durdur();
         DogalAfetler.LOGGER.info(ON + "durduruldu; kalan yanan hücre {}", YanginYoneticisi.aktifSayi(s.overworld()));
+    }
+
+    /** Maruziyet karesi için hayatta kalma kipi (yaratıcı oyuncu maruz sayılmaz, Gc2); uçuş açık kalır ki kamera düşmesin. */
+    private static void oyunKipi(IntegratedServer s, GameType kip) {
+        ServerPlayer o = oyuncu(s);
+        o.setGameMode(kip);
+        o.getAbilities().mayfly = true;
+        o.getAbilities().flying = true;
+        o.onUpdateAbilities();
+        DogalAfetler.LOGGER.info(ON + "oyun kipi {}", kip.getName());
     }
 
     private static void olcum(IntegratedServer s, String ad) {

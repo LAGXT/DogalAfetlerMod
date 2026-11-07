@@ -48,7 +48,7 @@ Kaynak: `.vibe/kararlar/spike-gokyuzu.md` G1…G6, `docs/KARARLAR.md` K0-23, K0-
 2. Derin uzay katmanı (görünürlük `uzayAlfa`): Samanyolu bandı → galaksiler → nebulalar → yıldızlar (additive, derinlik yazımı kapalı), gökyüzü dönüşüyle (`getTimeOfDay`) birlikte döner.
 3. Güneş / süpernova / kızıl cüce (evreye göre).
 4. Ay (yalnız `ayVar`), ay çarpması sırasında yaklaşan ay ve parçaları, sonra enkaz halkası.
-5. Ufuk efektleri: ay çarpması mantar sütunu, kızıl cüce doğuş ışığı, aurora.
+5. Ufuk efektleri: ay çarpmasının havadaki 3B patlaması (7 sn; gökyüzü-2'de mantar sütununun yerine), kızıl cüce doğuş ışığı, aurora.
 6. Vanilla'nın ufuk altı koyu diski.
 
 **Yıldızlar.** Açılışta tek seferlik `VertexBuffer` (vanilla 1500 yıldız yerine Yüksek'te 6000). Yön: birim kürede düzgün rastgele, %35'i Samanyolu düzlemine ±12° içinde yoğunlaştırılmış. Parlaklık: `m = -ln(U)` ile üstel dağılım, boyut 0,08–0,45 (en parlak %1'i 4 kollu küçük ışın dokusu). Renk: %70 beyaz `#F4F6FF`, %12 mavi-beyaz `#AFC8FF`, %10 sarı `#FFE7B0`, %8 turuncu-kırmızı `#FFB08A`. Titreme: yıldızlar 4 gruba bölünür, her grubun alfası farklı fazlı 1,1–2,3 Hz sinüsle ±%15 değişir (VBO yeniden yazılmaz, grup başına tek uniform renk); ufka yakın 15°'de alfa yarıya iner.
@@ -144,3 +144,47 @@ doğuya bakış; koşu 4 (`KOK/.vibe/kanit/gokyuzu/kareler-kosu4/`, önizleme `o
 
 Ezilme denemesi (K0-26): `kareler-ezilme/` (ikinci kademe: normal durumda sahte modun göğü, aysız ve güneşsiz durumda
 bizim gök, sahte ay/güneş %0), `kareler-ezilme-yansimasiz/` (üçüncü kademe: sahte ay ve güneş görünür, BILİNEN SINIR).
+
+## Gökyüzü-2 güncellemesi, 2026-11-07 (canlı uzay, kara delikler, pulsar, gün saati)
+
+Kaynak: `.vibe/kararlar/gokyuzu-2.md` G2-1, G2-5…G2-8.
+
+**Gerçek olay.** EHT'nin M87* (2019) ve Sgr A* (2022) görüntüleri: karanlık gölge, ince foton halkası, turuncu-sarı
+akresyon halkası; relativistik Doppler yüzünden halkanın bir yanı (M87'de güney) belirgin parlak. M87 jeti kutuptan çıkan ince,
+düğümlü mavi-beyaz ışın. Pulsar (Yengeç pulsarı): süpernova kalıntısının ortasında dönen nötron yıldızı; manyetik kutup
+ışınları bakıştan geçtikçe nabız.
+- https://www.eso.org/public/news/eso1907/
+- https://science.nasa.gov/asset/hubble/crab-nebula-pulsar/
+
+**Canlı uzay.** Derin uzay gün dönüşüne ek olarak eğik eksende 600 sn'de bir tur döner (oyun zamanından; gün döngüsü
+kapalıyken de). Kırpışma grubu Düşük 1 (sabit) / Orta 3 / Yüksek 6 / Ultra 8; iki frekanslı ±%32 parlaklık ve ±%7 kırmızı-mavi
+kayma. Yıldız renkleri yedi tayf sınıfı (O/B `#9BB0FF` %6, A `#CAD7FF` %12, F `#F8F7FF` %22, G `#FFF4EA` %25, K `#FFD2A1` %20,
+M `#FFB56C` %12, kızıl dev `#FF8A5C` %3). Galaksiler saatte bir tur, sırayla zıt yönde. Kalıntı nebulası güneş yolunda kalır.
+
+**Kara delikler** (yalnız zengin uzayda, `nebulaKatmani` açıkken).
+
+| Kademe | Sayı | Jet | Akış dokusu |
+|---|---|---|---|
+| Düşük | 1 | yok | yok |
+| Orta | 2 | var | var |
+| Yüksek | 3 | var | var |
+| Ultra | 4 | var | var |
+
+Açısal çap 1,0–1,6°; gölge 0,34, foton halkası 0,395, halka 0,47 (doku yarıçapı oranı), Doppler alt yan %100 / üst %30; gölge
+yıldızları örter (normal karışım), akış 12–22°/sn döner, jet 6,5 yarıçap boyunda, üç düğümlü, %50 alfa ve hafif titreşim.
+Maliyet kara delik başına 3 çizim çağrısı.
+
+**Pulsar** (`GunesEvresi.PULSAR`, kızıl cücenin yerine %15). Güneş yolunda, kalıntının ortasında: mavi-beyaz çekirdek ve hale,
+4 sn'de bir dönen eksenin iki ince ışını (gök düzlemine izdüşüm, 75 birime kadar), ışın bakıştan geçerken nabız. Gök gece
+`#060A1C`, gündüz ısınmayla kızıl-sıcak pus `#8A3A22` (sis `#B0522C`), uzay gündüz %55, ışık haritası sıcak. Dünya: sıcaklık
++45,6 °C, kavrulma, yangın, buharlaşma, donmanın çözülmesi (`.vibe/kararlar/gokyuzu-2.md` §A.3–4).
+
+| Evre \ Ay | Ay var | Ay yok |
+|---|---|---|
+| PULSAR | pulsar + mavimsi ay; gündüz uzay %55 | pulsar + kara delikli zengin uzay |
+
+**Gün saati (G2-1, G2-9).** Güneş patlaması doğal yolla yalnız sabah patlar (AKTIF anı gün saati 0–6000; ON_UYARI
+gerekirse ertesi sabaha kadar sessizce bekler) ve AKTIF (5 gün) boyunca gün saati o sabah saatinde donar: büyüyen güneş
+doğu göğünde kalır, gece olmaz. Komutla pencere dışında başlatılan patlama gelecek öğleye alınıp orada donar. Siren
+gecesi (aurora) ve süpernova sonrası dönemler vanilla döngüyle sürer. `doDaylightCycle`'a dokunulmaz.
+

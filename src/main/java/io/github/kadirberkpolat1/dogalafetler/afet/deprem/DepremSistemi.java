@@ -16,8 +16,8 @@ import net.minecraftforge.registries.RegistryObject;
 
 /**
  * Deprem (bölüm C) ve sinkhole'un ortak kayıtları ve depremin mod kurucusundan çağrılan tek kayıt noktası (K-C33): afet
- * fabrikası, config bölümleri, iki ses ({@code deprem.gurleme} döngülü ortam katmanı, {@code sinkhole.cokus} tek seferlik
- * güm), {@code dogalafetler:deprem_kirilgan} etiketi ve dil katkıları.
+ * fabrikası, config bölümleri, artçı kuyruğu dönem süreci ({@link ArtciKuyrugu}), iki ses ({@code deprem.gurleme} döngülü
+ * ortam katmanı, {@code sinkhole.cokus} tek seferlik güm), {@code dogalafetler:deprem_kirilgan} etiketi ve dil katkıları.
  */
 public final class DepremSistemi {
     private static final DeferredRegister<SoundEvent> SESLER = DeferredRegister.create(Registries.SOUND_EVENT,
@@ -38,6 +38,7 @@ public final class DepremSistemi {
         DepremAyarlari.kaydet();
         DepremIstemciAyarlari.kaydet();
         AfetKaydi.kaydet(AfetTuru.DEPREM, Deprem::new);
+        ArtciKuyrugu.kaydet();
         DataGenerators.sesEkle(DepremSistemi::sesleriTanimla);
         DataGenerators.ceviriEkle(DepremSistemi::cevirileriYaz);
         DataGenerators.saglayiciEkle(DepremEtiketleri::ekle);
@@ -54,5 +55,9 @@ public final class DepremSistemi {
     private static void cevirileriYaz(CeviriYazici y) {
         y.ekle("subtitles.dogalafetler.deprem.gurleme", "Ground rumbles", "Yer gürlüyor");
         y.ekle("subtitles.dogalafetler.sinkhole.cokus", "Ground collapses", "Zemin çöküyor");
+        y.ekle(ArtciKuyrugu.AD_ANAHTARI, "Earthquake aftershocks", "Deprem artçıları");
+        y.ekle(ArtciKuyrugu.ASAMA_ARTCI, "%s: aftershock %s/%s", "%s: artçı sarsıntı %s/%s");
+        y.ekle(ArtciKuyrugu.ASAMA_ARA, "%s: waiting for aftershock %s/%s", "%s: artçı sarsıntı %s/%s bekleniyor");
+        y.ekle(ArtciKuyrugu.ASAMA_BITTI, "%s ended.", "%s bitti.");
     }
 }

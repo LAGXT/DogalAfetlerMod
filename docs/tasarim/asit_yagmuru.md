@@ -103,3 +103,13 @@ Notun üzerinden değişenler:
   vanilla hasar sesi.
 - **Afet sonrası 30 sn buhar:** yapılmadı (afet bitince istemci verisi gelmez); buhar ve cızlama yağış süresince.
 - **Çatı Altı:** başarım için hasar sayacı tutulmaz; asit hasar verdiği an `BasarimIpucuEvent(HASAR_ALDI)` yayınlanır.
+
+## Görsel cila (2026-11-07)
+
+- **Maruziyet:** yağmur sürdükçe (AKTIF, yoğunluk > 0; giriş/çıkış çisesi dahil) alan içinde başı gökyüzüne açık
+  oyuncu seviyeden bağımsız saniyede `asit_yagmuru.hasarSaniye` (1 = yarım kalp) hasar alır; seviye başına `hasar` /
+  `hasarAraligiTick` listeleri kalktı. `asitMinimumCan` (4) korunur: madde 10 "öldürücü değil". Çatı altı 0; Çatı Altı
+  başarımı aynı `HASAR_ALDI` ipucuyla bozulur.
+- **Ekran:** maruz kaldıkça sürekli sarı-yeşil kenar vinyeti ve kenarlardan döngüyle akan damla izleri (0,5 sn'de belirir ve
+  söner, vuruşun %45'i); her hasarda 0,3 sn'lik vuruş üstüne biner. Üçüncü kişi kamerada oyuncunun başından seyrek cızlama
+  dumanı. Koşul istemcide sunucuyla aynı kuralı okur (ham yoğunluk, alan yarıçapı, `MOTION_BLOCKING`), yeni paket yok.

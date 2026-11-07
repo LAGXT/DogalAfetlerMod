@@ -38,6 +38,7 @@ public final class DonmaSistemi {
     public static void kaydet(IEventBus modBus) {
         DonmaAyarlari.kaydet();
         DonmaBloklari.kaydet(modBus);
+        DonmaParcaciklari.kaydet(modBus);
         modBus.addListener(ChunkDonmaVerisi::kaydet);
         IEventBus forge = MinecraftForge.EVENT_BUS;
         forge.addGenericListener(LevelChunk.class, ChunkDonmaVerisi::ekle);
@@ -81,12 +82,12 @@ public final class DonmaSistemi {
         switch (olay.alan()) {
             case GUNES_EVRESI -> {
                 GunesEvresi evre = d.gunesEvresi();
-                if (evre == GunesEvresi.SUPERNOVA) {
+                if (evre == GunesEvresi.SUPERNOVA || evre == GunesEvresi.PULSAR) {
                     d.cozulmeDonemiAyarla(false);
                 } else if (evre == GunesEvresi.KIZIL_CUCE && !DonmaAyarlari.kalici()) {
                     d.cozulmeDonemiAyarla(true);
                 }
-                if (evre != GunesEvresi.BUYUYEN && d.buharlasmaDerinligi() > 0f) {
+                if (evre != GunesEvresi.BUYUYEN && evre != GunesEvresi.PULSAR && d.buharlasmaDerinligi() > 0f) {
                     d.buharlasmaDerinligiAyarla(0f);
                 }
             }

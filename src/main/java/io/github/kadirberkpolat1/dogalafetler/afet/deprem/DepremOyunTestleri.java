@@ -10,7 +10,6 @@ import io.github.kadirberkpolat1.dogalafetler.core.AfetKaydi;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
 import io.github.kadirberkpolat1.dogalafetler.core.CekirdekOyunTestleri;
-import io.github.kadirberkpolat1.dogalafetler.core.olay.AfetAsamaDegistiEvent;
 import io.github.kadirberkpolat1.dogalafetler.core.olay.AfetBittiEvent;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
@@ -21,14 +20,19 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import net.minecraft.advancements.Advancement;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.AfterBatch;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.decoration.ItemFrame;
 import net.minecraft.world.entity.item.FallingBlockEntity;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -45,7 +49,8 @@ import net.minecraftforge.gametest.PrefixGameTestTemplate;
  * olduğundan kazı tabanı test süresince dünya tabanına iner, {@link DepremAyarlari#geciciEnAltY}); deprem merkezi
  * kutunun ortasına sabitlenir (geçici kayıt, başlatılır başlatılmaz geri alınır). Her test tek afet yuvasını kullandığı
  * için kendi batch'indedir. Sahne yardımcılarını sinkhole testleri de kullanır. Başarısız biten test de batch sonunda
- * temizlenir ({@link #batchSonu}: afet durur, kazı tabanı, {@code afetBlokHasari}, dinleyiciler ve sahte oyuncular geri; K-E15).
+ * temizlenir ({@link #batchSonu}: afet ve artçı kuyruğu durur, kazı tabanı, {@code afetBlokHasari}, dinleyiciler ve sahte
+ * oyuncular geri; K-E15).
  */
 @GameTestHolder(DogalAfetler.MOD_ID)
 @PrefixGameTestTemplate(false)
@@ -91,9 +96,28 @@ public final class DepremOyunTestleri {
         batchSonu(level);
     }
 
-    /** Batch sonu (geçen ya da başarısız test): afet durur, kazı tabanı, kural, dinleyici ve sahte oyuncular geri döner. */
+    @AfterBatch(batch = "deprem_ic")
+    public static void icSonrasi(ServerLevel level) {
+        batchSonu(level);
+    }
+
+    @AfterBatch(batch = "deprem_ic_kapali")
+    public static void icKapaliSonrasi(ServerLevel level) {
+        batchSonu(level);
+    }
+
+    @AfterBatch(batch = "deprem_bitis")
+    public static void bitisSonrasi(ServerLevel level) {
+        batchSonu(level);
+    }
+
+    /**
+     * Batch sonu (geçen ya da başarısız test): afet ve artçı kuyruğu durur, kazı tabanı, kural, dinleyici ve sahte oyuncular
+     * geri döner.
+     */
     public static void batchSonu(ServerLevel level) {
         AfetYoneticisi.al(level.getServer()).durdur();
+        ArtciKuyrugu.sifirla(level.getServer());
         DepremAyarlari.geciciEnAltY(null);
         kuraliGeriKoy(level);
         DINLEYICILER.forEach(MinecraftForge.EVENT_BUS::unregister);
@@ -170,10 +194,12 @@ public final class DepremOyunTestleri {
     }
 
     /**
-     * Test geçince: afet durur, kural geri gelir, sahte oyuncular çıkar, düşen blok ve eşyalar kalkar, kutu havayla boşalır.
+     * Test geçince: afet ve artçı kuyruğu durur, kural geri gelir, sahte oyuncular çıkar, düşen blok ve eşyalar kalkar, kutu
+     * havayla boşalır.
      */
     public static void sahneyiTemizle(GameTestHelper y) {
         AfetYoneticisi.al(y.getLevel().getServer()).durdur();
+        ArtciKuyrugu.sifirla(y.getLevel().getServer());
         DepremAyarlari.geciciEnAltY(null);
         kuraliGeriKoy(y.getLevel());
         oyunculariCikar(y.getLevel());
@@ -368,51 +394,184 @@ public final class DepremOyunTestleri {
     }
 
     /**
-     * DS-14: seviye 3'te ana sarsıntıdan 20–60 sn sonra bir artçı (config 0, 0, 1, 2, 3): sürerken {@code altAsama} 1 ve
-     * {@code deprem/artci} katmanı açık; deprem son artçı bitmeden doğal bitmez. Blok hasarı kapalı (S3 yarığı 96 blok,
-     * komşu test alanlarına taşmasın): kutunun hash'i ve değişen blok sayısı artçı boyunca da değişmez.
+     * AF-D1 (DS-14'ün yerine): seviye 3 deprem ana sarsıntı bitince doğal biter ve afet yuvası boşalır; tek artçı (config 0, 0,
+     * 1, 2, 3) yuva dışındaki kuyrukta ana sarsıntıdan 20–60 sn sonra gelir: sürerken kuyruğun sırası 1 ve {@code deprem/artci}
+     * katmanı açık, sonra kuyruk boşalır. Blok hasarı kapalı (S3 yarığı 96 blok, komşu test alanlarına taşmasın): kutunun
+     * hash'i ve değişen blok sayısı artçı boyunca da değişmez.
      */
     @GameTest(template = SAHNE, batch = "deprem_artci", timeoutTicks = 2400)
-    public static void depremArtciSarsintilariPlanlaBlokYikmaz(GameTestHelper y) {
+    public static void depremArtcilariYuvaDisindaSurerBlokYikmaz(GameTestHelper y) {
         zemin(y, YUZEY);
         yapilar(y);
         blokHasari(y, false);
         long once = kutuHash(y);
-        List<Integer> artcilar = new ArrayList<>();
-        List<Boolean> katmanAcik = new ArrayList<>();
         List<AfetBittiEvent> bitisler = new ArrayList<>();
-        Consumer<AfetAsamaDegistiEvent> asama = olay -> {
-            if (olay.afet().tur() == AfetTuru.DEPREM && olay.yeniAltAsama() > 0) {
-                artcilar.add(olay.yeniAltAsama());
-                katmanAcik.add(OrtamSesi.aktifMi(Deprem.ARTCI_KATMANI));
-            }
-        };
-        Consumer<AfetBittiEvent> bitis = olay -> {
+        dinle(AfetBittiEvent.class, olay -> {
             if (olay.tur() == AfetTuru.DEPREM) {
                 bitisler.add(olay);
             }
-        };
-        dinle(AfetAsamaDegistiEvent.class, asama);
-        dinle(AfetBittiEvent.class, bitis);
+        });
         Deprem deprem = baslat(y, 3);
-        AfetYoneticisi yonetici = AfetYoneticisi.al(y.getLevel().getServer());
+        MinecraftServer server = y.getLevel().getServer();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(server);
         int sure = deprem.seviyeBilgisi().sureTick();
         List<ArtciPlani.Artci> plan = deprem.artcilar();
         y.assertTrue(plan.size() == 1, "S3 artçı sayısı " + plan.size());
         long ilk = plan.get(0).baslangic() - sure;
         y.assertTrue(ilk >= 400 && ilk <= 1200, "ilk artçı ana sarsıntıdan " + ilk + " tick sonra");
-        y.assertTrue(deprem.aktifKalanTick() >= plan.get(0).bitis() - 1, "kalan süre artçıyı kapsamalı");
+        y.assertTrue(deprem.aktifKalanTick() == sure, "AKTIF kalan yalnız ana sarsıntı olmalı: " + deprem.aktifKalanTick());
+        List<Integer> surenler = new ArrayList<>();
+        List<Boolean> katmanAcik = new ArrayList<>();
+        boolean[] kuyrukGoruldu = {false};
+        boolean[] yuvaDolu = {false};
         y.succeedWhen(() -> {
-            y.assertTrue(yonetici.aktifAfet().isEmpty(), "deprem sürüyor");
-            MinecraftForge.EVENT_BUS.unregister(asama);
-            MinecraftForge.EVENT_BUS.unregister(bitis);
-            y.assertTrue(artcilar.equals(List.of(1)), "artçı alt aşamaları " + artcilar);
-            y.assertTrue(katmanAcik.equals(List.of(true)), "artçı gürleme katmanı açılmadı");
+            boolean suruyor = ArtciKuyrugu.suruyor(server);
+            int suren = suruyor ? ArtciKuyrugu.suren(server) : 0;
+            if (suruyor) {
+                kuyrukGoruldu[0] = true;
+                // Devir BITIS'e geçilen tick'te olur; yuva bir sonraki tick'te boşalır (afet tick başına bir aşama geçer).
+                yuvaDolu[0] |= yonetici.aktifAfet().filter(a -> a.asama() != AfetAsamasi.BITIS).isPresent();
+            }
+            if (suren > 0 && (surenler.isEmpty() || surenler.get(surenler.size() - 1) != suren)) {
+                surenler.add(suren);
+                katmanAcik.add(OrtamSesi.aktifMi(ArtciKuyrugu.KATMAN));
+            }
+            y.assertTrue(kuyrukGoruldu[0] && !suruyor, "artçı kuyruğu bitmedi");
+            y.assertTrue(!yuvaDolu[0], "artçı kuyruğu sürerken afet yuvası doluydu");
             y.assertTrue(bitisler.size() == 1 && bitisler.get(0).dogalBitti(), "doğal bitiş yok");
-            y.assertTrue(!OrtamSesi.aktifMi(Deprem.ARTCI_KATMANI) && !OrtamSesi.aktifMi(Deprem.SES_KATMANI),
+            y.assertTrue(surenler.equals(List.of(1)), "artçı sıraları " + surenler);
+            y.assertTrue(katmanAcik.equals(List.of(true)), "artçı gürleme katmanı açılmadı");
+            y.assertTrue(!OrtamSesi.aktifMi(ArtciKuyrugu.KATMAN) && !OrtamSesi.aktifMi(Deprem.SES_KATMANI),
                     "ortam katmanı kaldı");
             y.assertTrue(kutuHash(y) == once && deprem.isler().degisenBlok() == 0, "artçılı depremde blok değişti");
             sahneyiTemizle(y);
         });
+    }
+
+    /**
+     * Kullanıcı isteği 24 (AF-D1): S3 deprem doğal bitince artçılar beklenmeden afet yuvası boşalır; komutun kullandığı
+     * {@code elleBaslat} hemen yeni afeti kabul eder. Araya Af15: deprem kuralı kapanınca kuyruk planını korur (K-C41), afet
+     * yokken {@code stop} onu KOMUT'a çevirince plan bırakılır. Blok hasarı kapalı; kural geri konur (K-E15).
+     */
+    @GameTest(template = SAHNE, batch = "deprem_bitis", timeoutTicks = 1300)
+    public static void depremBitinceYeniAfetHemenBaslar(GameTestHelper y) {
+        zemin(y, YUZEY);
+        blokHasari(y, false);
+        Deprem deprem = baslat(y, 3);
+        ServerPlayer oyuncu = OYUNCULAR.get(OYUNCULAR.size() - 1);
+        MinecraftServer server = y.getLevel().getServer();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(server);
+        y.assertTrue(!deprem.artcilar().isEmpty(), "S3 artçı planı boş");
+        y.startSequence()
+                .thenWaitUntil(() -> y.assertTrue(yonetici.aktifAfet().isEmpty(), "deprem sürüyor: " + deprem.asama()))
+                .thenExecute(() -> {
+                    y.assertTrue(deprem.sonlandi(), "deprem sonlanmadı");
+                    y.assertTrue(ArtciKuyrugu.suruyor(server) && ArtciKuyrugu.suren(server) == 0,
+                            "artçılar kuyruğa geçmedi");
+                    var depremKurali = server.getGameRules().getRule(Kurallar.DEPREM_AFETI);
+                    boolean eskiKural = depremKurali.get();
+                    try {
+                        depremKurali.set(false, server);
+                        y.assertTrue(yonetici.kurallariDenetle().contains(ArtciKuyrugu.ORNEK) && ArtciKuyrugu.suruyor(server),
+                                "kural kapanınca artçı kuyruğu planını korumalı (K-C41)");
+                        y.assertTrue(yonetici.donemSurecleriniDurdur().contains(ArtciKuyrugu.ORNEK) && !ArtciKuyrugu.suruyor(server),
+                                "kural ile duran artçı kuyruğu stop ile KOMUT'a çevrilince planını bırakmadı (Af15)");
+                    } finally {
+                        depremKurali.set(eskiKural, server);
+                    }
+                    yonetici.kurallariDenetle();
+                    AfetYoneticisi.BaslatmaSonucu sonuc = yonetici.elleBaslat(AfetTuru.DEPREM, 1, oyuncu, y.getLevel(),
+                            y.absolutePos(MERKEZ));
+                    y.assertTrue(sonuc == AfetYoneticisi.BaslatmaSonucu.BASLADI,
+                            "deprem bitince yeni afet reddedildi: " + sonuc);
+                    sahneyiTemizle(y);
+                })
+                .thenSucceed();
+    }
+
+    /** İç yıkım sahnesi: altı hava olan kalas tavan, zeminde fener, taş duvarda elmaslı eşya çerçevesi. */
+    private record IcSahne(BlockPos tavan, BlockPos fener, ItemFrame cerceve) {
+        boolean yerinde(GameTestHelper y) {
+            return y.getBlockState(tavan).is(Blocks.OAK_PLANKS) && y.getBlockState(fener).is(Blocks.LANTERN)
+                    && cerceve.isAlive();
+        }
+    }
+
+    private static IcSahne icSahne(GameTestHelper y) {
+        BlockPos tavan = new BlockPos(8, YUZEY + 4, 8);
+        BlockPos fener = new BlockPos(8, YUZEY + 1, 12);
+        BlockPos duvar = new BlockPos(12, YUZEY + 2, 9);
+        y.setBlock(tavan, Blocks.OAK_PLANKS);
+        y.setBlock(fener, Blocks.LANTERN);
+        y.setBlock(duvar, Blocks.STONE);
+        ItemFrame cerceve = new ItemFrame(y.getLevel(), y.absolutePos(duvar.north()), Direction.NORTH);
+        cerceve.setItem(new ItemStack(Items.DIAMOND));
+        y.getLevel().addFreshEntity(cerceve);
+        return new IcSahne(tavan, fener, cerceve);
+    }
+
+    /** Tavanın ve fenerin sütunları ile kutudaki asılı varlıklar, olasılıksız kancayla; toplam etki. */
+    private static int icYikimUygula(GameTestHelper y, Deprem deprem, IcSahne s) {
+        ServerLevel level = y.getLevel();
+        BlockPos t = y.absolutePos(s.tavan());
+        BlockPos f = y.absolutePos(s.fener());
+        return deprem.icYikimSutunu(level, t.getX(), t.getZ(), t.getY() + 1, t.getY() - 3)
+                + deprem.icYikimSutunu(level, f.getX(), f.getZ(), f.getY(), f.getY())
+                + deprem.icYikimAsililari(level, kutu(y));
+    }
+
+    /** Kutudaki eşya varlıkları. Komşu sahnelerin (tsunami dalgasının sürüklediği) eşyası sayılmasın: testler farkı sınar. */
+    private static int esyaSayisi(GameTestHelper y) {
+        return y.getLevel().getEntitiesOfClass(ItemEntity.class, kutu(y)).size();
+    }
+
+    /**
+     * AF-D2/AF-D3: aynı sahnede S1 içeriye dokunmaz; S4'te altı hava olan kalas tavan düşen blok olur, fener ve eşya çerçevesi
+     * eşya olarak düşer. Kanca, AKTIF'in ilk tick'inden önce iç yıkım adımını sahnenin sütunlarında olasılıksız çalıştırır; deprem
+     * hemen durdurulur (S4 yarığı komşu test alanlarına taşmasın).
+     */
+    @GameTest(template = SAHNE, batch = "deprem_ic", timeoutTicks = 100)
+    public static void depremIcYikimS4TavanDusururS1Dokunmaz(GameTestHelper y) {
+        zemin(y, YUZEY);
+        blokHasari(y, true);
+        IcSahne s = icSahne(y);
+        int dusenOnce = dusenSayisi(y);
+        int esyaOnce = esyaSayisi(y);
+        AfetYoneticisi yonetici = AfetYoneticisi.al(y.getLevel().getServer());
+        int etki1 = icYikimUygula(y, baslat(y, 1), s);
+        yonetici.durdur();
+        y.assertTrue(etki1 == 0 && s.yerinde(y) && dusenSayisi(y) == dusenOnce,
+                "S1 iç yıkım yapmamalı (etki " + etki1 + ")");
+        int etki4 = icYikimUygula(y, baslat(y, 4), s);
+        y.assertTrue(y.getBlockState(s.tavan()).isAir() && dusenSayisi(y) > dusenOnce, "S4 tavan bloğu düşmedi");
+        y.assertTrue(y.getBlockState(s.fener()).isAir(), "S4 fener düşmedi");
+        y.assertTrue(!s.cerceve().isAlive(), "S4 eşya çerçevesi düşmedi");
+        int esya = esyaSayisi(y) - esyaOnce;
+        y.assertTrue(esya >= 3, "fener, çerçeve ve elmas eşya olarak düşmeli: " + esya);
+        y.assertTrue(etki4 == 3, "S4 etki sayısı " + etki4);
+        sahneyiTemizle(y);
+        y.succeed();
+    }
+
+    /** {@code afetBlokHasari=false}: S5'te bile iç yıkım tavanı, feneri ve çerçeveyi yerinde bırakır; kutunun hash'i aynı. */
+    @GameTest(template = SAHNE, batch = "deprem_ic_kapali", timeoutTicks = 100)
+    public static void depremIcYikimBlokHasariKapaliykenHicbirSeyDusmez(GameTestHelper y) {
+        zemin(y, YUZEY);
+        blokHasari(y, false);
+        IcSahne s = icSahne(y);
+        long once = kutuHash(y);
+        int dusenOnce = dusenSayisi(y);
+        int esyaOnce = esyaSayisi(y);
+        int etki = icYikimUygula(y, baslat(y, 5), s);
+        AfetYoneticisi.al(y.getLevel().getServer()).durdur();
+        boolean yerinde = s.yerinde(y);
+        s.cerceve().discard();
+        y.assertTrue(etki == 0 && yerinde, "blok hasarı kapalıyken iç yıkım oldu (etki " + etki + ")");
+        y.assertTrue(kutuHash(y) == once, "blok hasarı kapalıyken kutunun blokları değişti");
+        int dusen = dusenSayisi(y) - dusenOnce;
+        int esya = esyaSayisi(y) - esyaOnce;
+        y.assertTrue(dusen == 0 && esya == 0, "blok hasarı kapalıyken düşen blok " + dusen + ", eşya " + esya);
+        sahneyiTemizle(y);
+        y.succeed();
     }
 }

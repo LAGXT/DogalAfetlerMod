@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.github.kadirberkpolat1.dogalafetler.afet.ortak.mantik.BlokRolu;
 import io.github.kadirberkpolat1.dogalafetler.su.Dalga;
 import org.junit.jupiter.api.Test;
 
@@ -36,6 +37,31 @@ class TsunamiSeviyesiTest {
         assertTrue(s5.ikinciDalga() && s5.tasYikar());
         assertEquals(48, s5.yikimButcesi());
         assertEquals(0.4, s5.hizTick(), 1e-12);
+    }
+
+    /**
+     * Rol karar tablosu (seviye × rol): dekor S1'den, kap S3'ten sertliğe bakılmadan yıkılır; DIGER hiçbir seviyede rolle
+     * yıkılmaz (sınıf tablosuna kalır). Kap eşiği sınır dışı seviyede de tablonun ucundan okunur.
+     */
+    @Test
+    void rolKarariSeviyeTablosu() {
+        boolean[][] beklenen = {
+            // DEKOR, KAP, DIGER
+            {true, false, false},
+            {true, false, false},
+            {true, true, false},
+            {true, true, false},
+            {true, true, false},
+        };
+        for (int s = 1; s <= 5; s++) {
+            TsunamiSeviyesi sv = TsunamiSeviyesi.al(s);
+            for (BlokRolu rol : BlokRolu.values()) {
+                assertEquals(beklenen[s - 1][rol.ordinal()], sv.rolYikar(rol), "S" + s + " " + rol);
+            }
+            assertEquals(s >= 3, sv.kapYikar(), "S" + s);
+        }
+        assertFalse(TsunamiSeviyesi.al(0).rolYikar(BlokRolu.KAP));
+        assertTrue(TsunamiSeviyesi.al(9).rolYikar(BlokRolu.KAP));
     }
 
     /** Sığlaşma: açıkta pay {@code ACIK_PAY}, kıyıda tam yükseklik, aradaki yolda monoton artar. */

@@ -14,16 +14,16 @@ import net.minecraftforge.eventbus.api.Event;
 public class MeteorCarptiEvent extends Event {
     private final ServerLevel level;
     private final BlockPos konum;
-    private final MeteorBoyutu boyut;
+    private final double olcek;
     private final YanginKaynagi kaynak;
     private final OdulZari.Sonuc odul;
     private final boolean suya;
 
-    public MeteorCarptiEvent(ServerLevel level, BlockPos konum, MeteorBoyutu boyut, YanginKaynagi kaynak,
+    public MeteorCarptiEvent(ServerLevel level, BlockPos konum, double olcek, YanginKaynagi kaynak,
             OdulZari.Sonuc odul, boolean suya) {
         this.level = level;
         this.konum = konum;
-        this.boyut = boyut;
+        this.olcek = olcek;
         this.kaynak = kaynak;
         this.odul = odul;
         this.suya = suya;
@@ -38,8 +38,14 @@ public class MeteorCarptiEvent extends Event {
         return konum;
     }
 
+    /** Ödül sınıfı (ölçeğin bantı). */
     public MeteorBoyutu boyut() {
-        return boyut;
+        return MeteorBoyutu.olcekten(olcek);
+    }
+
+    /** Sürekli ölçek ({@code mantik.MeteorOlcegi}). */
+    public double olcek() {
+        return olcek;
     }
 
     public YanginKaynagi kaynak() {

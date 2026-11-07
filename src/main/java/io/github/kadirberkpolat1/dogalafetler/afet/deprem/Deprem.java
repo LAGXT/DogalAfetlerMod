@@ -2,8 +2,10 @@ package io.github.kadirberkpolat1.dogalafetler.afet.deprem;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.afet.deprem.mantik.ArtciPlani;
+import io.github.kadirberkpolat1.dogalafetler.afet.deprem.mantik.ArtciSarsintisi;
 import io.github.kadirberkpolat1.dogalafetler.afet.deprem.mantik.DepremSeviyesi;
 import io.github.kadirberkpolat1.dogalafetler.afet.deprem.mantik.FayHatti;
+import io.github.kadirberkpolat1.dogalafetler.afet.deprem.mantik.IcYikimSeviyesi;
 import io.github.kadirberkpolat1.dogalafetler.core.Afet;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetAsamasi;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
@@ -40,14 +42,15 @@ import net.minecraft.world.phys.Vec3;
  * yüzeyde çatlak örtüsü büyür; açılan her sütunda toz fışkırır, kaya kırılır, sütun tick bütçesiyle yukarıdan aşağı
  * boşaltılır ve sütunların beşte birinde yüzey bloğu yarığa düşer (dipteki moloz). Etki yarıçapında {@code deprem_kirilgan}
  * bloklar yerinden kopar (yaprak kırılır, diğerleri düşer), S4–5'te dik toprak/kum/çakıl yamaları kayar ve yarığa yakın
- * canlılar hasar alır. {@code deprem_dayanikli} ve diğer bloklar yalnız yarık hattında kırılır. {@code afetBlokHasari=false} iken
- * hiçbir blok değişmez (örtü, toz, ses ve sarsıntı sürer). Ana sarsıntı bitince yıkım ve hasar durur; S3+'te AKTIF aşama
- * artçı sarsıntılar ({@link ArtciPlani}) bitene kadar sürer: süren artçının sırası {@code altAsama()}'dır (değişimi durum paketini
- * hemen gönderir), artçı blok yıkmaz; kısa gürleme ve yarıktan toz. Ekran sarsıntısı istemcidedir ({@code client.deprem}).
+ * canlılar hasar alır; iç yıkım ({@link IcYikici}, S2+) dekoru, yaprakları ve zayıf tavanları düşürür.
+ * {@code deprem_dayanikli} ve diğer bloklar yalnız yarık hattında kırılır. {@code afetBlokHasari=false} iken hiçbir blok
+ * değişmez (örtü, toz, ses ve sarsıntı sürer). Ana sarsıntı bitince yıkım ve hasar durur; AKTIF yarık kazısı bitince
+ * (en çok {@link ArtciPlani#KAZI_PAYI} tick sonra) kapanır ve afet yuvası boşalır. Artçı sarsıntılar ({@link ArtciPlani}, S3+)
+ * yuvayı tutmaz: doğal bitişte kalan plan {@link ArtciKuyrugu}'na geçer (AF-D1); {@code asama ileri} ile biten depremde
+ * artçı yoktur. Ekran sarsıntısı istemcidedir ({@code client.deprem}).
  */
 public final class Deprem extends Afet {
     static final String SES_KATMANI = "deprem/gurleme";
-    static final String ARTCI_KATMANI = "deprem/artci";
     private static final int ORTU_TABANI = -1_000_000;
     private static final double ORTU_ONU = 3;
     private static final int TUR_YARIK = 0;
@@ -86,14 +89,17 @@ public final class Deprem extends Afet {
     private int hasarSayaci;
     private boolean tamamYazildi;
     private boolean anaSesBitti;
+    private boolean artcisizBitir;
     private List<ArtciPlani.Artci> artcilar;
     private final BitSet tamam = new BitSet();
     private final List<Sutun> aktif = new ArrayList<>();
     private int[] kayitliAktif = new int[0];
     private DepremSeviyesi seviyeBilgisi;
+    private IcYikimSeviyesi icSeviye;
     private FayHatti.Plan plan;
     private List<Is> sira;
     private BlokIsleri isler;
+    private IcYikici icYikici;
 
     public Deprem() {
         this(null);
@@ -116,6 +122,13 @@ public final class Deprem extends Afet {
         return seviyeBilgisi;
     }
 
+    IcYikimSeviyesi icSeviye() {
+        if (icSeviye == null) {
+            icSeviye = IcYikimSeviyesi.seviye(seviye());
+        }
+        return icSeviye;
+    }
+
     /** Yarık planı (AKTIF'te kurulur; test). */
     FayHatti.Plan plan() {
         return plan;
@@ -125,7 +138,7 @@ public final class Deprem extends Afet {
         return isler;
     }
 
-    /** Artçı planı (tohum ve seviyeden; kayıttan dönüşte aynısı). */
+    /** Artçı planı (tohum ve seviyeden, zamanlar AKTIF'in başından; kayıttan dönüşte aynısı). */
     List<ArtciPlani.Artci> artcilar() {
         if (artcilar == null) {
             artcilar = DepremAyarlari.artciPlani(seviyeBilgisi(), tohum);
@@ -175,15 +188,47 @@ public final class Deprem extends Afet {
             sesiBaslat(level);
         } else if (yeni == AfetAsamasi.BITIS) {
             OrtamSesi.durdur(level.getServer(), SES_KATMANI, 60);
-            OrtamSesi.durdur(level.getServer(), ARTCI_KATMANI, 30);
             if (isler != null) {
                 isler.ortuleriKaldir();
+            }
+            if (!artcisizBitir) {
+                artcilariDevret(level);
             }
         }
     }
 
+    /** {@code /dogalafet asama ileri} AKTIF'te: alt aşama yok, deprem artçıları kuyruğa vermeden biter (DS-14 korunur). */
+    @Override
+    protected boolean altAsamaIleri(ServerLevel level) {
+        artcisizBitir = true;
+        return false;
+    }
+
+    /** AF-D1: kalan artçılar afet yuvası dışındaki kuyruğa geçer; toz noktaları yarık boyunca eş aralıklıdır. */
+    private void artcilariDevret(ServerLevel level) {
+        List<ArtciPlani.Artci> kalan = ArtciPlani.devret(artcilar(), gecen);
+        if (kalan.isEmpty()) {
+            return;
+        }
+        long[] toz = new long[0];
+        if (plan != null && !plan.yarik().isEmpty()) {
+            List<FayHatti.Hucre> yarik = plan.yarik();
+            toz = new long[Math.min(ArtciKuyrugu.TOZ_NOKTASI, yarik.size())];
+            for (int k = 0; k < toz.length; k++) {
+                FayHatti.Hucre h = yarik.get((int) ((long) k * yarik.size() / toz.length));
+                toz[k] = BlockPos.asLong(h.x(), 0, h.z());
+            }
+        }
+        ArtciKuyrugu.devral(level, baglam().baslangicSaati(), seviye(), baglam().merkez(),
+                ArtciSarsintisi.menzil(etkiAlani().yaricap()), kalan, toz);
+    }
+
     @Override
     protected void yuklendi(ServerLevel level) {
+        // Eski kayıtta AKTIF içinde süren artçının sırası kalmış olabilir; artçılar artık kuyrukta, alt aşama hep 0.
+        if (altAsama() != 0) {
+            altAsamaAyarla(0);
+        }
         if (asama() != AfetAsamasi.AKTIF) {
             return;
         }
@@ -191,9 +236,6 @@ public final class Deprem extends Afet {
             sesiBaslat(level);
         } else {
             anaSesBitti = true;
-        }
-        if (altAsama() > 0 && altAsama() <= artcilar().size()) {
-            artciSesi(level, artcilar().get(altAsama() - 1));
         }
     }
 
@@ -218,10 +260,8 @@ public final class Deprem extends Afet {
         if (!anaSarsinti && !anaSesBitti) {
             anaSesBitti = true;
             OrtamSesi.durdur(level.getServer(), SES_KATMANI, 60);
-        }
-        int artci = ArtciPlani.suren(artcilar(), gecen);
-        if (artci != altAsama()) {
-            artciDegisti(level, artci);
+            DogalAfetler.LOGGER.info("[deprem] ana sarsıntı bitti: seviye {}, iç yıkım ({}), merkez {}", s.seviye(),
+                    icYikici.ozet(), baglam().merkez().toShortString());
         }
         double cephe = s.acilmaHizi() * gecen / 20.0;
         boolean hasar = Kurallar.blokHasariAcik(level.getGameRules());
@@ -261,6 +301,7 @@ public final class Deprem extends Afet {
                 if (s.heyelan()) {
                     heyelan(s, kisma);
                 }
+                icYikici.tick(icSeviye(), baglam().merkez(), s.yikimYaricapi(), kisma, adim);
             }
         }
         if (!tamamYazildi && kazmaBitti()) {
@@ -278,39 +319,31 @@ public final class Deprem extends Afet {
         isler.bildir();
     }
 
-    /** Süren artçı değişti (0: artçı yok): kısa gürleme katmanı ve yarık boyunca toz; blok değişmez. */
-    private void artciDegisti(ServerLevel level, int yeni) {
-        if (altAsama() > 0) {
-            OrtamSesi.durdur(level.getServer(), ARTCI_KATMANI, 30);
+    /**
+     * Yalnız GameTest: iç yıkımın tek sütununu {@code ust}'ten {@code alt}'a olasılıksız uygular; {@code afetBlokHasari} ve
+     * seviye eşikleri geçerlidir. Etki sayısını döner.
+     */
+    int icYikimSutunu(ServerLevel level, int x, int z, int ust, int alt) {
+        if (!Kurallar.blokHasariAcik(level.getGameRules())) {
+            return 0;
         }
-        altAsamaAyarla(yeni);
-        if (yeni == 0) {
-            return;
+        if (isler == null) {
+            hazirla(level);
         }
-        ArtciPlani.Artci a = artcilar().get(yeni - 1);
-        artciSesi(level, a);
-        DogalAfetler.LOGGER.info("[deprem] artçı sarsıntı {}/{}: şiddet %{}, süre {} tick, merkez {}", yeni, artcilar().size(),
-                Math.round(a.kesir() * 100), a.sure(), baglam().merkez().toShortString());
-        List<FayHatti.Hucre> yarik = plan.yarik();
-        for (int k = 0; k < 16 && !yarik.isEmpty(); k++) {
-            FayHatti.Hucre h = yarik.get(rastgele.nextInt(yarik.size()));
-            int y = isler.ust(h.x(), h.z());
-            if (y != Integer.MIN_VALUE) {
-                isler.parcacik(ParticleTypes.CAMPFIRE_COSY_SMOKE, h.x() + 0.5, y + 1, h.z() + 0.5, 2, 0.4, 0.02);
-                isler.parcacik(new BlockParticleOption(ParticleTypes.BLOCK, Blocks.GRAVEL.defaultBlockState()), h.x() + 0.5,
-                        y + 1, h.z() + 0.5, 4, 0.3, 0.15);
-            }
-        }
+        int n = icYikici.sutun(icSeviye(), x, z, ust, alt, true);
+        isler.bildir();
+        return n;
     }
 
-    private void artciSesi(ServerLevel level, ArtciPlani.Artci a) {
-        int sure = Math.max(4, a.sure());
-        float hacim = (float) Math.max(0.2, Math.min(1, 0.4 + a.kesir()));
-        OrtamSesi.baslat(level.getServer(), ARTCI_KATMANI, baglam().baslangicSaati(), DepremSistemi.GURLEME_ADI,
-                SoundSource.BLOCKS, OrtamSesi.Yer.nokta(level.dimension(), Vec3.atCenterOf(baglam().merkez()),
-                        (float) (etkiAlani().yaricap() + 32)),
-                HacimEgrisi.of(new HacimEgrisi.Nokta(0, 0f), new HacimEgrisi.Nokta(sure / 4, hacim),
-                        new HacimEgrisi.Nokta(sure / 2, hacim), new HacimEgrisi.Nokta(sure, 0f)));
+    /** Yalnız GameTest: kutudaki eşya çerçevesi ve tabloları olasılıksız düşürür; kural ve seviye eşikleri geçerlidir. */
+    int icYikimAsililari(ServerLevel level, AABB kutu) {
+        if (!Kurallar.blokHasariAcik(level.getGameRules())) {
+            return 0;
+        }
+        if (isler == null) {
+            hazirla(level);
+        }
+        return icYikici.asililar(icSeviye(), kutu, Integer.MAX_VALUE, true);
     }
 
     private void hazirla(ServerLevel level) {
@@ -324,6 +357,7 @@ public final class Deprem extends Afet {
         liste.sort(Comparator.comparingDouble((Is is) -> is.h().yol()).thenComparingInt(Is::tur));
         sira = List.copyOf(liste);
         isler = new BlokIsleri(level, ORTU_TABANI);
+        icYikici = new IcYikici(isler, rastgele);
         for (int k = 0; k + 3 < kayitliAktif.length; k += 4) {
             int i = kayitliAktif[k];
             if (i >= 0 && i < sira.size()) {
@@ -497,19 +531,18 @@ public final class Deprem extends Afet {
 
     @Override
     protected boolean aktifBitti() {
-        DepremSeviyesi s = seviyeBilgisi();
-        return gecen >= ArtciPlani.son(artcilar(), s.sureTick()) && (kazmaBitti() || gecen >= s.sureTick() + 600L);
+        return ArtciPlani.aktifBitti(gecen, seviyeBilgisi().sureTick(), kazmaBitti());
     }
 
+    /** Ana sarsıntının kalanı (artçılar afet yuvası dışında; radar "Kalan" gerçek bitişi gösterir). */
     @Override
     public long aktifKalanTick() {
-        return Math.max(0, ArtciPlani.son(artcilar(), seviyeBilgisi().sureTick()) - gecen);
+        return Math.max(0, seviyeBilgisi().sureTick() - gecen);
     }
 
     @Override
     protected void temizle(ServerLevel level, boolean temiz) {
         OrtamSesi.durdur(level.getServer(), SES_KATMANI, temiz ? 20 : 40);
-        OrtamSesi.durdur(level.getServer(), ARTCI_KATMANI, temiz ? 20 : 40);
         if (isler != null) {
             isler.ortuleriKaldir();
             if (temiz) {
@@ -531,13 +564,6 @@ public final class Deprem extends Afet {
         t.putFloat("aci", (float) aci);
         t.putFloat("L", (float) yarim);
         t.putFloat("f", (float) Math.min(yarim, s.acilmaHizi() * gecen / 20.0));
-        int k = altAsama();
-        if (k > 0 && k <= artcilar().size()) {
-            ArtciPlani.Artci a = artcilar().get(k - 1);
-            t.putInt("ab", (int) a.baslangic());
-            t.putInt("ae", (int) a.bitis());
-            t.putFloat("af", (float) a.kesir());
-        }
     }
 
     @Override

@@ -2,6 +2,7 @@ package io.github.kadirberkpolat1.dogalafetler.afet.gunes_patlamasi;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.afet.gunes_patlamasi.mantik.GunesPatlamasiEgrileri;
+import io.github.kadirberkpolat1.dogalafetler.afet.gunes_patlamasi.mantik.MeteorYagmuruEgrisi;
 import io.github.kadirberkpolat1.dogalafetler.core.Afet;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetAsamasi;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
@@ -17,6 +18,7 @@ import io.github.kadirberkpolat1.dogalafetler.uyari.HacimEgrisi;
 import io.github.kadirberkpolat1.dogalafetler.uyari.OrtamSesi;
 import io.github.kadirberkpolat1.dogalafetler.yangin.YanginKaynagi;
 import java.util.List;
+import java.util.Locale;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
@@ -31,14 +33,16 @@ import net.minecraft.world.level.levelgen.Heightmap;
 /**
  * Güneş patlaması (bölüm D): seviyesiz, sunucu geneli. Siren başlayınca güneş BÜYÜYEN olur ve 60 sn'de 1,6 kata
  * büyür; AKTIF {@code aktifSureGun} (5 gün) sürer: evre ilerlemesi doğrusal 1'e (gökyüzü 3,2 kat, sıcaklık artışı ve
- * buharlaşma bu evreden okur), her oyuncunun çevresine {@link MeteorAPI#yagmur} ile dengeli meteorlar (1/40 sn → 1/12 sn,
- * dakikalık ardışık yağmurlar), 3. günden sonra çimenler kavrulur. Doğal bitişte (BITIS) evre SÜPERNOVA olur ve
+ * buharlaşma bu evreden okur), her oyuncunun çevresine {@link MeteorAPI#yagmur} ile dengeli meteorlar, 3. günden sonra
+ * çimenler kavrulur. Meteor yoğunluğu {@link MeteorYagmuruEgrisi}'dir: ön-uyarının sonunda başlayıp sirende artan öncü
+ * yağmur, AKTIF'in ve her günün başında {@code meteorYagmuruSaniye} süren meteor yağmuru, arasında 1/40 sn → 1/12 sn
+ * arka plan; afetin tek yağmuru eğriyi her tick izler. Doğal bitişte (BITIS) evre SÜPERNOVA olur ve
  * gökyüzünün {@code GunesZinciriSureci}'i devralır (güneşsiz dönem, donma, kızıl cüce). Doğal olmayan bitişte
  * tamamlanmamış BÜYÜYEN'i çekirdek NORMAL'e döndürür (K-C26). Alt aşama AKTIF'in günüdür; {@code asama ileri} bir gün atlar.
  */
 public final class GunesPatlamasi extends Afet {
-    /** Ardışık meteor yağmurlarının uzunluğu (oyun tick'i); yoğunluk her yağmurda yeniden hesaplanır. */
-    static final int YAGMUR_DILIMI_TICK = 1_200;
+    /** Öncü ve günlük yağmur pencerelerinin INFO satırındaki yoğunluk biçimi. */
+    private static final String YOGUNLUK = "%.1f";
     /** Kavurucu rüzgâr katmanı ({@code OrtamSesi}, global). */
     static final String RUZGAR_KATMANI = "gunes/kavrulma";
     /** Oyuncu başına bir tick'teki en çok kavrulma denemesi ({@code /dogalafet hiz} yüksekken TPS korunur). */
@@ -46,8 +50,10 @@ public final class GunesPatlamasi extends Afet {
 
     private long aktifSure = -1;
     private long aktifGecen;
-    /** Sonraki yağmura kalan oyun tick'i; kalıcı değil (yağmur kaydedilmez, yüklenince hemen yeniden başlar). */
-    private int yagmurBekleme;
+    /** Afetin yağmuru (-1: yok); kalıcı değil (yağmur kaydedilmez, yüklenince ilk tick'te yeniden kurulur). */
+    private int yagmurKimlik = -1;
+    /** Öncü ya da günlük yağmur penceresinde mi (yalnız INFO satırı için). */
+    private boolean yogunYagmur;
 
     public GunesPatlamasi() {
         super(AfetTuru.GUNES_PATLAMASI);
@@ -82,7 +88,6 @@ public final class GunesPatlamasi extends Afet {
                 }
             }
             case AKTIF -> {
-                yagmurBekleme = 0;
                 DogalAfetler.LOGGER.info("Güneş patlaması: meteorlar başlıyor, süreç {} gün ({} ölçekli tick)",
                         GunesPatlamasiEgrileri.gunSayisi(aktifSure), aktifSure);
                 if (donem.gunesEvresi() == GunesEvresi.BUYUYEN) {
@@ -105,10 +110,24 @@ public final class GunesPatlamasi extends Afet {
     protected void asamaTick(ServerLevel level, AfetAsamasi asama, int adim) {
         DunyaDonemi donem = DunyaDonemi.al(level);
         boolean buyuyen = donem.gunesEvresi() == GunesEvresi.BUYUYEN;
+        long sirenSure = SirenTuru.sureTick(tur());
+        long oncuTick = GunesPatlamasiAyarlari.meteorYagmuruOncuSaniye() * 20L;
+        double oncuBas = GunesPatlamasiAyarlari.meteorYagmuruOncuDakikaBasina();
+        double oncuSon = GunesPatlamasiAyarlari.meteorYagmuruOncuSonDakikaBasina();
+        if (asama == AfetAsamasi.ON_UYARI) {
+            double y = pencereBeklemesi() >= 0
+                    ? MeteorYagmuruEgrisi.pencereBeklerken(baglam().onUyariSuresi(), oncuTick, oncuBas)
+                    : MeteorYagmuruEgrisi.onUyari(asamaKalanTick(), baglam().onUyariSuresi(), sirenSure, oncuTick, oncuBas,
+                            oncuSon);
+            yagmurSur(level, y, y > 0);
+            return;
+        }
         if (asama == AfetAsamasi.SIREN) {
             if (buyuyen) {
-                donem.evreIlerlemesiAyarla(GunesPatlamasiEgrileri.sirenIlerlemesi(asamaGecenTick(), SirenTuru.sureTick(tur())));
+                donem.evreIlerlemesiAyarla(GunesPatlamasiEgrileri.sirenIlerlemesi(asamaGecenTick(), (int) sirenSure));
             }
+            yagmurSur(level, MeteorYagmuruEgrisi.siren(asamaGecenTick(), baglam().onUyariSuresi(), sirenSure, oncuTick,
+                    oncuBas, oncuSon), true);
             return;
         }
         if (asama != AfetAsamasi.AKTIF) {
@@ -122,23 +141,32 @@ public final class GunesPatlamasi extends Afet {
         if (gun != altAsama()) {
             altAsamaAyarla(gun);
         }
-        if (--yagmurBekleme <= 0) {
-            yagmurBekleme = YAGMUR_DILIMI_TICK;
-            yagmurBaslat(level);
-        }
+        long ilkGunTick = GunesPatlamasiAyarlari.meteorYagmuruSaniye() * 20L;
+        long gunlukTick = GunesPatlamasiAyarlari.meteorYagmuruGunlukSaniye() * 20L;
+        yagmurSur(level, MeteorYagmuruEgrisi.aktif(aktifGecen, aktifSure, GunesPatlamasiAyarlari.meteorBaslangic(),
+                GunesPatlamasiAyarlari.meteorSon(), ilkGunTick, gunlukTick, GunesPatlamasiAyarlari.meteorYagmuruDakikaBasina()),
+                MeteorYagmuruEgrisi.yagmurda(aktifGecen, ilkGunTick, gunlukTick));
         kavur(level, GunesPatlamasiEgrileri.kavrulmaOlasiligi(aktifGecen, aktifSure,
                 GunesPatlamasiAyarlari.kavrulmaBaslangicGun(), GunesPatlamasiAyarlari.kavrulmaOlasiligi()), adim);
     }
 
-    private void yagmurBaslat(ServerLevel level) {
-        double adet = GunesPatlamasiEgrileri.dakikaBasinaMeteor(aktifGecen, aktifSure, GunesPatlamasiAyarlari.meteorBaslangic(),
-                GunesPatlamasiAyarlari.meteorSon());
-        if (adet <= 0) {
+    /**
+     * Afetin tek yağmuru eğriyi izler: varsa yoğunluğu güncellenir (0'da durmaz, birikim kalır), yoksa yoğunluk pozitifken
+     * kurulur. {@code yogun}: öncü ya da günlük yağmur penceresi; değişince bir INFO satırı.
+     */
+    private void yagmurSur(ServerLevel level, double yogunluk, boolean yogun) {
+        if (yogun != yogunYagmur) {
+            yogunYagmur = yogun;
+            DogalAfetler.LOGGER.info("Güneş patlaması: meteor yağmuru {} ({}, gün {}; oyuncu başına dakikada {})",
+                    yogun ? "başladı" : "seyreldi", asama(), altAsama(), String.format(Locale.ROOT, YOGUNLUK, yogunluk));
+        }
+        if (yagmurKimlik >= 0 && MeteorAPI.yagmurYogunluguAyarla(level, yagmurKimlik, yogunluk)) {
             return;
         }
-        int kimlik = MeteorAPI.yagmur(level, List.of(), YAGMUR_DILIMI_TICK, adet, GunesPatlamasiAyarlari.buyukMeteorOrani(),
-                kaynak());
-        DogalAfetler.LOGGER.debug("Güneş patlaması: meteor yağmuru {} (oyuncu başına dakikada {})", kimlik, adet);
+        if (yogunluk > 0) {
+            yagmurKimlik = MeteorAPI.yagmur(level, List.of(), Integer.MAX_VALUE, yogunluk,
+                    GunesPatlamasiAyarlari.buyukMeteorOrani(), kaynak());
+        }
     }
 
     /**
@@ -188,7 +216,7 @@ public final class GunesPatlamasi extends Afet {
      * çevirir (yangın sistemi dışı, {@code afetBlokHasari} ile); değişen chunk sanal suya bildirilir. Yükseklik haritası
      * blok değişiminde eşzamanlı güncellenir; gökyüzü ışığı gecikebilir. Değişti mi.
      */
-    static boolean kavur(ServerLevel level, BlockPos konum) {
+    public static boolean kavur(ServerLevel level, BlockPos konum) {
         if (!Kurallar.blokHasariAcik(level.getGameRules()) || !level.getBlockState(konum).is(Blocks.GRASS_BLOCK)
                 || level.getHeight(Heightmap.Types.MOTION_BLOCKING, konum.getX(), konum.getZ()) > konum.getY() + 1) {
             return false;
@@ -236,7 +264,7 @@ public final class GunesPatlamasi extends Afet {
 
     @Override
     protected void yuklendi(ServerLevel level) {
-        yagmurBekleme = 0;
+        yagmurKimlik = -1;
         if (asama() == AfetAsamasi.AKTIF) {
             ruzgarBaslat(level);
         }
@@ -260,12 +288,17 @@ public final class GunesPatlamasi extends Afet {
         aktifGecen = Math.max(0L, etiket.getLong("aktifGecen"));
     }
 
-    private YanginKaynagi kaynak() {
+    YanginKaynagi kaynak() {
         return YanginKaynagi.afet(tur(), baglam().baslangicSaati());
     }
 
     /** Test ve komut okuması. */
     long aktifGecen() {
         return aktifGecen;
+    }
+
+    /** Test okuması: afetin yağmuru (-1: yok). */
+    int yagmurKimlik() {
+        return yagmurKimlik;
     }
 }

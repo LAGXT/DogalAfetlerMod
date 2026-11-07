@@ -28,6 +28,7 @@ public final class DepremAyarlari {
     private final ForgeConfigSpec.IntValue artciEnAzAralik;
     private final ForgeConfigSpec.IntValue artciEnCokAralik;
     private final ForgeConfigSpec.DoubleValue artciSiddeti;
+    private final ForgeConfigSpec.IntValue icYikimButcesi;
     private static volatile Integer testEnAltY;
 
     private DepremAyarlari(ForgeConfigSpec.Builder k) {
@@ -56,6 +57,8 @@ public final class DepremAyarlari {
                 .defineInRange("artciEnCokAralik", 60, 1, 600);
         artciSiddeti = k.comment("İlk artçının ana sarsıntıya göre genliği (sonrakiler 0,8 kat zayıflar)")
                 .defineInRange("artciSiddeti", 0.15, 0.0, 1.0);
+        icYikimButcesi = k.comment("İç yıkımda tick başına taranan sütun (S4 ölçeği; S2 x0,5, S3 x0,75, S5 x1,75; TPS düşünce "
+                + "yarıya/çeyreğe iner; 0 kapalı)").defineInRange("icYikimButcesi", 8, 0, 64);
     }
 
     public static void kaydet() {
@@ -110,6 +113,11 @@ public final class DepremAyarlari {
 
     public static int dusenBlokTavani() {
         return bolum.get().dusenBlokTavani.get();
+    }
+
+    /** İç yıkımın S4 ölçeğindeki tick başına sütun bütçesi (seviye ölçeği {@code IcYikimSeviyesi}'nde). */
+    public static int icYikimButcesi() {
+        return bolum.get().icYikimButcesi.get();
     }
 
     public static ForgeConfigSpec.ConfigValue<List<? extends Integer>> tamsayilar(ForgeConfigSpec.Builder k, String ad,

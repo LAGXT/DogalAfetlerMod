@@ -663,6 +663,9 @@ public final class TsunamiOtomasyonu {
             }
             case 's' -> GorselOtomasyon.kareIste("tsunami", deger + ".png", k -> {
                 log("KARE {} {} kopuk={}", deger, TsunamiYagmuru.ozet(), TsunamiKopugu.sonSegment());
+                for (String halka : TsunamiYagmuru.halkaDokumu()) {
+                    log("HALKA {} {}", deger, halka);
+                }
                 log("FOTO {} fps={} yeni_kare={} bekleme_sn={} kapi={}", deger, k.fps(), k.yeniKare(),
                         String.format(Locale.ROOT, "%.1f", k.beklemeSn()), k.gecerli() ? "acik" : "GECERSIZ");
             });
