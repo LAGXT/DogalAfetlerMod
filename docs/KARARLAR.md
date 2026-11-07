@@ -3485,6 +3485,8 @@ geçer, `finally`'de öncekini koyar. Üretim ve geliştirme sunucusu etkilenmez
 Cold Sweat varken atlamak (`-Puyum=coldsweat` koşusunda kendi sistemimizin 12 testi sınanmazdı); her test sınıfına ayrı
 `@BeforeBatch`/`@AfterBatch` (12 test dört sınıf, dokuz batch; unutulan biri sonraki batch'e sızar). **Ek:** `kapiKapaliykenYalnizAclik` artık "hiç efekt yok" değil "modumuzun efekti yok" der: Cold Sweat yüklüyken yeni
 oyuncuya kendi Grace efektini verir (`EntityTempManager`, `Grace Period Enabled = true`); testin ölçtüğü şey kendi efektimizdir.
+**Rev. (K-E51, kullanıcı kararı):** `-Puyum=coldsweat` GameTest koşusu kabul zincirinde ve GOREV §6 #9'da artık istenmez (isteğe
+bağlı). Bu karar, `SicaklikKapisi.coldSweatTesti` ve köprü kodu kalır; README değişmez.
 
 **K-E42 Üretimde ölçüm/tanı kodu yok (şef kararı, 2026-11-07; inceleme-su-gorsel P2-3 ve doğrulayıcı-2, P1 düzeyinde temizlik).**
 `GorselOtomasyon.AKTIF` (`-Potomasyon=<ad>` → `dogalafetler.otomasyon` dolu) açık değilken: `SuKareTanisi` oyun veri yoluna hiç
@@ -3534,6 +3536,9 @@ ve geçici worktree) 216/216 + 216/216, 3 dk 17 sn / 3 dk 56 sn; üçüncü iş 
 876 MiB (`ram-paralel.txt`). Reddedilen: üç yuva (iki işte pay 0,5 GiB); pc2'de `runClient` ve omp (istemci ~5–6 GiB, 8 GB'ta
 başka işle sığmaz; RV620 OpenGL 3.3 açabilir ama FPS kuralları (K0-33, K-E29 b) için geçersiz [ölçülmedi]; görsel betikler
 Hyprland/hypruse ister); aynı klasörün yuva başına ayrı uzak kopyası (mutlak `--kanit`/log yolları kopyalar arasında kayıp olur).
+**Rev. (K-E51):** pc2'nin içinde kapı yuvadır: `gradle_kapisi.sh` ve `agir_surec_kapisi` `UZAK_ICINDE`'de Gradle/RAM saymaz (port ve
+senaryo kilidi sürer); kapı doluysa iş `sira.py` kuyruğuna girer; `UZAK_YUVA_TUTULU=1` (kuyruğun pc2 istemci işi yuva kilitlerinin
+hepsini tutar) uzak.sh'in yuva beklemesini atlatır.
 
 ## Faz 5 — Görsel otomasyon
 
@@ -4355,6 +4360,9 @@ düzeltme), entegratör birleştirmede uygular ya da açık noktaya yazar. Gerek
 `dogrulayici-2` (25631–25640); işçi dedicated portu 25640 + (workspace − 90). (e) **Yoklama yok** (GOREV §2): işçi,
 doğrulayıcı ve entegratör `sleep N` döngüsüyle yoklamaz; arka plan işini bloklayan `wait` ile bekler. Faz 4 görev taslakları
 `.vibe/gorev/4-<parça>.md` bu kuralları ve GameTest filtresini (`-Ptest_filtre=<regex>`, K-E20, dal `is/gametest-filtre`) taşır.
+**Rev. (K-E51, kullanıcı kararı, 2026-11-07):** (b) daemon ana makinede açık (`~/.gradle/gradle.properties` `org.gradle.daemon=true`;
+ikinci `help` 3,0 sn, daemon'suz 20,2 sn), proje `gradle.properties`'inde kapalı kalır (pc2 ile paylaşılır, 8 GB); `org.gradle.caching=true`.
+(c) yerine test defteri + kapsam + tek doğrulama (GameTest tek koşu). (a) tavanı kapı ve kuyruk uygular (`sira.py`); kapı dolu → kuyruk.
 
 **K-E20 GameTest filtresi: işçi yalnız kendi testlerini koşar; kabul ve entegrasyon filtresiz (şef kararı, dal
 `is/gametest-filtre` `62ed7f4`).** `runGameTestServer` her koşuda bütün testleri koşuyordu. Sistem özelliği
@@ -4389,6 +4397,8 @@ geçirir; `tools/senaryo/gradle_kapisi.sh` `TEST_FILTRE` ortam değişkenini `-P
 
 İşçi kullanımı: `TEST_FILTRE='Meteor|meteor_' tools/senaryo/gradle_kapisi.sh <log> runGameTestServer` ya da
 `JAVA_HOME=/home/lagxt/.jdks/jdk-17.0.21+9 ./gradlew runGameTestServer --offline -Ptest_filtre='Meteor|meteor_'`.
+**Rev. (K-E51, kullanıcı kararı):** kabul artık filtresiz değil: filtre `tools/senaryo/kapsam.py`'den, filtresiz GameTest yalnız `main`
+birleştirmesinde ve bir kez (kapsam filtresiz derse). `FILTRE=` satırı ve Gf4 değişmedi; kanıt defter satırı `gametest[:<filtre>]`.
 
 **K-E21 `simulasyonDisiGorunenChunkDonar` hedef chunk'ı ve 8 komşusunu eşzamanlı üretir; dünya üretimi tick sayacının dışında
 kalır (şef kararı, dal `is/donma-aralikli` `0bf06bb`).** Belirti: "simülasyon dışı chunk 60'a ve geri 0'a yetişmedi (aşama 0)"
@@ -4957,6 +4967,73 @@ yukarıda (K-E49 sonucu), `uyari_sunucu` iptal (e). TEST-RAPORU §6: 10 yeşil /
 261 yeşil / 7 bilinen sınır / 0 kısmi / 0 yapılmadı. `gorsel-otomasyon` worktree'si kaldırıldı (patch `.vibe/diff/gorsel-otomasyon.patch`), dalı
 `is/gorsel-otomasyon` silindi (`main`'e birleşik); doğrulayıcı `matris-5-son` worktree'sini kendisi kaldırdı; `worktree list` yalnız
 `main`. Faz 5'in dört görevi kabul; teslim `cikti/dogalafetler-0.1.0.jar`.
+
+## Teslim sonrası — hızlandırma
+
+**K-E51 Hızlandırma (kullanıcı kararı, 2026-11-07; dal `is/hizlandirma`).** Kullanıcı: "hız berbattı"; neden testlerin fazlalığı ve
+yavaşlığı. Ölçülen kayıplar: her kabul turu `build --rerun-tasks` + filtresiz GameTest ×2 (normal ve `-Puyum=coldsweat`) +
+senaryolar, aynı kod için üç kez (`f1954dc`, `00d1500`, `6169b46`); doğrulayıcı turu 17–25 dk; `gradle_kapisi.sh` RAM/flock kapısında
+işçi turu bloklu beklerken pc2'nin ikinci yuvası boş kaldı (7 deneme ~7 dk; bir kez 20 dk → çıkış 3); daemon kapalı (K-E19 b) → her
+çağrı 30–60 sn JVM açılışı; `--rerun-tasks` önbelleği boşa harcıyor; tur başına belge yükü (DURUM + AGENTS + KARARLAR +
+entegrasyon-5 §8x) ve K-E numara çakışmaları (şefin K-E44…K-E46'sı K-E45…K-E48 oldu) ek tur yedi. Kurallar (GOREV §2–§3, §6):
+(a) **Test defteri:** geçen test aynı girdi hash'inde bir daha koşmaz; kabul = defterde yeşil satır. `KÖK/.vibe/test-defteri.tsv`
+(git'te, `.gitignore` istisnası; worktree'ler de ana kopyaya yazar; sütunlar `test_kimligi girdi_hash sonuc makine HEAD tarih log`),
+`tools/senaryo/defter.py hash|bak|yaz|kimlik`. Girdi hash'i: kimliğin yollarının `git ls-tree HEAD` hash'leri, `git diff HEAD --binary`
+ve izlenmeyen dosyaların `hash-object`'i; sha256 ilk 12 hane. Yol haritası GOREV §2 tablosunda; istenen haritaya `src/generated`
+(datagen çıktısı mod kaynağıdır) ve derlemeye `settings.gradle` eklendi, istenen `git diff`'e staged fark ve izlenmeyen dosyalar
+(yeni sınıf hash'i değiştirmeliydi). Bağlantılar: `gradle_kapisi.sh` (kimlik görevlerden: `build`, `test`, `gametest[:<TEST_FILTRE>]`,
+uyum modu `@<uyum>`; `clean`/`compileJava` gibi yutulan görevler kimliği değiştirmez, başka görev ya da `-x` varsa defter yok),
+`cekirdek_sunucu.argumanlar` → `defterli_kos` (17 senaryo; kimlik `<ad>_sunucu[:<seçenek>]`, kanıt klasörü ve port girmez),
+`*_gorsel.py`/`*_istemci.py` ana bloğu `defter.sarmala(main, KANIT)` (kimlik betik + yol olmayan argümanlar). Çıkış 0 → `gecti`;
+2/3/4/130/143 (kullanım, kapı, pc2 kapalı, kesildi) yazılmaz; diğerleri `kaldi`. `DEFTER_ZORLA=1` koşuyu zorlar. HEAD sütunu yollarda
+commit'lenmemiş fark varsa `+` ile biter. (b) **Kapsam:** `tools/senaryo/kapsam.py <taban>..<uç> | --dosya <yol>` → `TEST_FILTRE=<regex>`
+(`afet/<x>/**` → klasöründeki `*OyunTestleri` sınıfları), `yok` (yalnız `client/**`, `tools/**`, `docs/**`, `src/test/**`, `assets/**`,
+kök `*.md`) ya da `filtresiz` (`core/**`, `network/**`, `DogalAfetler.java`, mixin, `build.gradle`, Gradle ayarları ve diğer her yol).
+Filtresiz GameTest yalnız `main` birleştirmesinde ve bir kez. (c) **`--rerun-tasks` yasak;** `org.gradle.caching=true` (proje
+`gradle.properties`); daemon ana makinede açık (`~/.gradle/gradle.properties`, kullanıcı dizinindeki ayar proje dosyasını ezer),
+proje dosyasında `org.gradle.daemon=false` kalır (pc2 ile paylaşılır; pc2 daemon denemesi `pc2-istemci` oturumunda). K-E19 (b) revize.
+(d) **Doğrulayıcı baştan koşmaz:** işçi (koşar, deftere yazar) → inceleyici (statik, P0/P1) → birleştirme → tek doğrulama (defter
+hash'leri birleştirme HEAD'iyle tutuyor mu, log'lar var mı, statik denetim; yalnız `kapsam.py` filtresiz derse bir GameTest). GameTest
+tek koşu (ikinci koşu defterden döner). (e) **Kuyruk, bloklu bekleme yok:** `tools/senaryo/sira.py ekle [--makine ana|pc2|oto]
+[--yuva 1|2] [--istemci] [--log] -- <komut>` spool'a (`~/.cache/dogalafet-sira/<makine>/bekleyen|kosan|biten/<id>.json`: komut,
+cwd, env `TEST_FILTRE`/`KAPI_*`/`UZAK*`/`JAVA_HOME`/`VIBE_OTURUM` (+ ana kuyrukta ekran değişkenleri), çıkış, süre, log) yazar ve
+hemen döner; `durum`, `bekle`, `iptal` (oturumun bütün süreçlerine TERM, `timeout`'un açtığı grup dahil), `dolu-mu`. Koşucu
+`sira_kosucu.py --makine ana|pc2 --yuva 2` (systemd --user `dogalafet-sira@.service`, `KillMode=process`), her işi `--kos` kipinde
+kendi oturumundaki bir koşturucuyla koşar (çıkışı koşturucu yazar), `KÖK/.vibe/pano.md`'yi (iş / makine / başlangıç / durum / süre)
+günceller; pc2 koşucusu panoyu pc2'deki aynı yola kopyalar (`watch cat`). **İki koşucu da ana makinede** (seçilen basit yol):
+pc2 kuyruğunun işi komutun kendisi (K-E44: `gradle_kapisi.sh`, `./gradlew`, `*_sunucu.py`; kendiliğinden gitmeyen komut `uzak.sh`
+ile sarılır) pc2'ye taşır; eşitleme, yuva/klasör kilidi ve geri çekme `uzak.sh`'te hazır. pc2 koşucusu kuyruk dışından tutulan
+`uzak.sh` yuvalarını ve klasör kilidini sayar (iş `uzak.sh` içinde bekleyip `UZAK_BEKLE_DK`'da düşmesin), aynı klasörün ikinci işi
+arkadakine sıra verir; baştaki iş sığmıyorsa arkadakiler öne geçmez. `--istemci` (runClient) iki yuva tutar; pc2'de koşturucu ayrıca
+`uzak.sh` yuva kilitlerinin hepsini alır ve `UZAK_YUVA_TUTULU=1` verir (arayüz `pc2-istemci` oturumuna bildirildi). `gradle_kapisi.sh`
+ve `defterli_kos`: kapı doluysa (pc2: iki yuva ya da bu klasörün işi; yerel: Gradle ≥ 2, boş RAM < `KAPI_RAM_MB`, port; ya da
+kuyrukta bekleyen) iş kuyruğa, `SIRA: kapı dolu (…); kuyrukta <id>`, çıkış 0; 5×60 sn/20 dk döngüsü yalnız `KAPI_BLOKLA=1`, kuyruğun
+koştuğu iş (`SIRA_ICINDE`) ve defterli bir betik içinden çağrı (`DEFTER_ICINDE`) için. **pc2'nin içinde kapı yuvadır:** ikinci yuvanın
+boş kalmasının kökü, yuvayı almış işin pc2'de `KAPI_RAM_MB=2500` için beklemesiydi; K-E44 ölçümü iki GameTest'in sığdığını
+gösterdi, `UZAK_ICINDE`'de Gradle/RAM sayılmaz (port ve senaryo kilidi sürer). (f) **Cold Sweat kabulden çıktı:** `-Puyum=coldsweat`
+GameTest'i kabul zincirinde ve GOREV §6 #9'da isteğe bağlı; K-E41 testi ve köprü kalır, README değişmez. (g) **Belge diyeti:** tur
+başına yalnız DURUM "Kaldığımız yer" (+ gerekirse KARARLAR kararı); AGENTS "Proje özeti" ve `entegrasyon-*.md` faz/parça sonunda;
+K-E numarası `tools/senaryo/karar_no.sh` (`KÖK/.vibe/karar-sayaci`, `flock`; bu kararın numarası oradan alındı); işçi cevabı 5 satır
+DURUM / DEGISEN / KANIT / HEAD / AÇIK.
+
+| Ölçü | Önce (2026-11-07 referansı) | Sonra (K-E51 ölçümü) |
+|---|---|---|
+| Aynı kodda GameTest yeniden | filtresiz 2–4 dk ×2 (+ coldsweat), tur başına | `DEFTER: geçti`, `gradle_kapisi.sh` 0,44 sn (`gametest:Cekirdek @6b4045c786bd`) |
+| İlk filtreli GameTest | — | `TEST_FILTRE=Cekirdek` 12/216, pc2'de 82 sn, deftere `gecti` |
+| `build` | 62 sn (pc2, `--rerun-tasks`) | önbellek/up-to-date; ana makinede `UZAK=0 compileJava` ilk 22,0 sn, güncel 2,8 sn |
+| Gradle çağrı açılışı (ana makine `help`) | 20,2 sn (daemon'suz) | daemon ilk 18,9 sn, ikinci 3,0 sn |
+| Kapı dolu (pc2 iki yuva dolu) | işçi turu bloklu ~7 dk (bir kez 20 dk → çıkış 3) | `gradle_kapisi.sh` 0,46 sn'de döndü, iş kuyrukta; yuva açılınca koştu |
+| `sira.py ekle` | — | 0,13–0,16 sn; 2×`sleep 20` paralel + `sleep 5` sırada → son iş 25,5 sn'de bitti |
+| Doğrulayıcı turu | 17–25 dk (komutlar baştan) | tek doğrulama: defter + log + statik; GameTest yalnız filtresiz birleştirmede bir kez |
+
+Kanıt `.vibe/kanit/hizlandirma/` (GameTest log'u), defter satırı `gametest:Cekirdek`. Reddedilen: koşucuyu pc2'de çalıştırmak (spool,
+pano ve kanıt ana makinede, pc2'de depo ve `.vibe` yok; pc2'de kullanıcı lingering'i `sudo` ister); doğrulayıcının defterdeki testi
+yeniden koşması (aynı hash = aynı girdi; aralıklı şüphede `DEFTER_ZORLA=1`); kapsamda ortak alt sistem paketlerini (yangın, su,
+sıcaklık, başarım, meteor) kendi testine indirmek (birden çok afetin testi onları kullanır; güvenli varsayılan filtresiz); kapı
+doluyken çıkışı ≠ 0 yapmak (kullanıcı "çıkış 0 + iş kimliği" istedi; tamamlanmayı defter gösterir). **Açık (birleşmeden sonra):**
+koşucu birimleri kurulup açılır (`ln -sf KÖK/tools/senaryo/dogalafet-sira@.service ~/.config/systemd/user/`, `systemctl --user
+daemon-reload`, `systemctl --user enable --now dogalafet-sira@ana dogalafet-sira@pc2`); `.vibe/test-defteri.tsv` `main`'de commit'lenir;
+ana makinede `Linger=no`: oturum kapanınca koşucular durur (kalıcı için kullanıcı `sudo loginctl enable-linger lagxt`).
 
 ## Açık noktalar (Faz 2b)
 

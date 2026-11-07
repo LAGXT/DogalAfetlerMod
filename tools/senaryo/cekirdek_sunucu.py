@@ -31,8 +31,9 @@ Kullanım (worktree kökünden): python3 tools/senaryo/cekirdek_sunucu.py <log k
 
 Ortak komut satırı ve kapı (K-E13, diğer `*_sunucu.py` betikleri de kullanır): `--port` (varsayılan 25565) senaryo süresince
 `server.properties`'e `server-port` olarak yazılır; başka worktree'deki paralel senaryo ayrı portla çakışmaz (aynı worktree'de
-`run-server/` paylaşıldığı için senaryolar yine sırayla koşar). Ağır süreç kapısı: Gradle < 2, boş RAM >= 4 GB ve portı
-başka süreç dinlemiyor; 60 sn'de bir, en çok 20 dk bekler.
+`run-server/` paylaşıldığı için senaryolar yine sırayla koşar). Dış çağrı test defterine bakar, işi pc2'ye gönderir ya da
+kapı doluysa kuyruğa atar (`defterli_kos`, K-E51). Ağır süreç kapısı: port boş ve senaryo kilidi; ana makinede ayrıca
+Gradle < 2 ve boş RAM >= 4 GB; 60 sn'de bir, en çok 20 dk bekler.
 """
 import argparse
 import fcntl
@@ -186,22 +187,50 @@ def argumanlar(aciklama=None, varsayilan_port=VARSAYILAN_PORT, varsayilan_kanit=
     if not 1024 <= a.port <= 65535:
         ayristirici.error(f"geçersiz port {a.port}")
     PORT = a.port
-    if (Path(sys.argv[0]).name.endswith("_sunucu.py") and not getattr(a, "yalniz_istemci", False)
-            and not os.environ.get("UZAK_ICINDE") and os.environ.get("UZAK", "1") != "0"):
-        uzaga_gec(ayristirici, a.kanit)
+    if Path(sys.argv[0]).name.endswith("_sunucu.py") and not os.environ.get("UZAK_ICINDE"):
+        defterli_kos(ayristirici, a)
     return a
 
 
-def uzaga_gec(ayristirici, kanit):
-    """K-E44: dedicated senaryo bütünüyle pc2'de koşar; bu süreç `tools/senaryo/uzak.sh`'e dönüşür (kanıt klasörü geri çekilir,
-    çıkış kodu senaryonunkidir; pc2 kapalıysa 4). İstemci tarafı (`uyari_sunucu.py --yalniz-istemci`, K-E46) ve `UZAK=0`
-    yerelde kalır."""
+def defterli_kos(ayristirici, a):
+    """Dış çağrı (K-E44, K-E51); süreç senaryonun çıkış koduyla biter. Test defterinde aynı girdi hash'inde `gecti` varsa
+    koşmadan 0. Dedicated senaryo (`--yalniz-istemci`siz, `UZAK=0`'sız) `uzak.sh -g <kanıt>/ python3 <betik> ...` ile pc2'de
+    koşar (kanıt klasörü geri çekilir; pc2 kapalıysa 4); pc2 kapısı doluysa beklemez: `sira.py ekle` ile kuyruğa, iş kimliği,
+    çıkış 0 (`KAPI_BLOKLA=1` ve kuyruğun koştuğu iş bekler). İstemci tarafı (`uyari_sunucu.py --yalniz-istemci`, K-E46) ve
+    `UZAK=0` yerelde: aynı betik alt süreçte. Sonuç deftere yazılır. `DEFTER_ICINDE` (defterli bir çağrının içi): defter
+    ve kuyruk yok, pc2'ye yönlendirme sürer."""
+    import defter
+    uzak = not getattr(a, "yalniz_istemci", False) and os.environ.get("UZAK", "1") != "0"
+    defterli = not os.environ.get("DEFTER_ICINDE")
+    if not (uzak or defterli):
+        return
     if Path.cwd().resolve() != KOK:
-        ayristirici.error(f"pc2'ye göndermek için worktree kökünden çalıştır ({KOK})")
-    betik = Path(sys.argv[0]).resolve().relative_to(KOK)
-    uzak = str(KOK / "tools" / "senaryo" / "uzak.sh")
-    sys.stdout.flush()
-    os.execv(uzak, [uzak, "-g", f"{Path(kanit).resolve()}/", "python3", str(betik), *sys.argv[1:]])
+        ayristirici.error(f"worktree kökünden çalıştır ({KOK})")
+    if defterli:
+        kimlik = defter.senaryo_kimligi(ayristirici, a)
+        girdi = defter.girdi_hash(kimlik)
+        if defter.bak(kimlik, girdi):
+            sys.exit(0)
+    betik = str(Path(sys.argv[0]).resolve().relative_to(KOK))
+    makine = None
+    if uzak:
+        makine = os.environ.get("UZAK_MAKINE", "pc2")
+        if defterli and not os.environ.get("SIRA_ICINDE") and os.environ.get("KAPI_BLOKLA") != "1":
+            sira_py = [sys.executable, str(KOK / "tools" / "senaryo" / "sira.py")]
+            dolu = subprocess.run([*sira_py, "dolu-mu", "--makine", "pc2"], capture_output=True, text=True)
+            if dolu.returncode == 0:
+                is_no = subprocess.run([*sira_py, "ekle", "--makine", "pc2", "--", "python3", betik, *sys.argv[1:]],
+                                       stdout=subprocess.PIPE, text=True, check=True).stdout.strip()
+                print(f"SIRA: kapı dolu ({dolu.stdout.strip()}); kuyrukta {is_no} — sonuç: tools/senaryo/sira.py bekle {is_no}")
+                sys.exit(0)
+        komut = [str(KOK / "tools" / "senaryo" / "uzak.sh"), "-g", f"{Path(a.kanit).resolve()}/", "python3", betik,
+                 *sys.argv[1:]]
+    else:
+        komut = [sys.executable, betik, *sys.argv[1:]]
+    kod = defter.alt_surec(komut, {**os.environ, "DEFTER_ICINDE": "1"})
+    if defterli:
+        defter.yaz(kimlik, kod, a.kanit, girdi=girdi, makine=makine)
+    sys.exit(kod)
 
 
 def port_bos(port):
@@ -253,16 +282,19 @@ def port_araligi_denetimi(port, log=print):
 
 
 def agir_surec_kapisi(port, log=print, en_cok_dk=20, ram_mb=None):
-    """Gradle < 2, boş RAM >= `ram_mb` (vars. `KAPI_RAM_MB` ya da 4096), `port` boş ve senaryo kilidi alınana dek 60 sn'de bir
-    bekler; `en_cok_dk` dakikada açılmazsa False."""
+    """`port` boş ve senaryo kilidi alınana dek 60 sn'de bir bekler; ana makinede ayrıca Gradle < 2 ve boş RAM >= `ram_mb`
+    (vars. `KAPI_RAM_MB` ya da 4096). pc2'de (`UZAK_ICINDE`) Gradle/RAM ölçülmez: kapı uzak.sh yuvasıdır (iki iş sığar,
+    K-E44; K-E51). `en_cok_dk` dakikada açılmazsa False."""
     ram_mb = ram_mb or int(os.environ.get("KAPI_RAM_MB", "4096"))
+    kaynak_kapisi = not os.environ.get("UZAK_ICINDE")
     port_araligi_denetimi(port, log)
     for deneme in range(en_cok_dk + 1):
         gradle = int(subprocess.run(["pgrep", "-fc", "GradleWrapperMain"], capture_output=True, text=True).stdout.strip()
                      or 0)
         bos = int(Path("/proc/meminfo").read_text().split("MemAvailable:")[1].split()[0]) // 1024
         port_uygun = port_bos(port)
-        kilit = gradle < 2 and bos >= ram_mb and port_uygun and senaryo_kilidi_al()
+        kaynak = not kaynak_kapisi or (gradle < 2 and bos >= ram_mb)
+        kilit = kaynak and port_uygun and senaryo_kilidi_al()
         log(f"kapı: gradle={gradle} bos={bos} MB port {port} {'boş' if port_uygun else 'DOLU'} "
             f"senaryo kilidi {'alındı' if kilit else 'bekleniyor'}")
         if kilit:

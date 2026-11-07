@@ -35,6 +35,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import defter  # noqa: E402
 import olcum_tablosu  # noqa: E402
 import runclient_kilit  # noqa: E402
 
@@ -249,4 +250,4 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(defter.sarmala(main, KANIT))

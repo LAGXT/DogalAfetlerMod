@@ -1,0 +1,16 @@
+# İş kuyruğu koşucusu (K-E51), ana makinede iki örnek: dogalafet-sira@ana ve dogalafet-sira@pc2.
+# Kurulum: ln -sf /home/lagxt/LagOS/DogalAfetlerMod/tools/senaryo/dogalafet-sira@.service ~/.config/systemd/user/
+#          systemctl --user daemon-reload && systemctl --user enable --now dogalafet-sira@ana dogalafet-sira@pc2
+# Betik güncellenince: systemctl --user restart dogalafet-sira@ana dogalafet-sira@pc2 (koşan işler sürer).
+[Unit]
+Description=DogalAfetlerMod iş kuyruğu koşucusu (%i)
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 %h/LagOS/DogalAfetlerMod/tools/senaryo/sira_kosucu.py --makine %i --yuva 2
+Restart=on-failure
+RestartSec=5
+KillMode=process
+
+[Install]
+WantedBy=default.target
