@@ -27,7 +27,7 @@ public final class KasirgaBulutCizimi {
     @SubscribeEvent
     public static void asama(RenderLevelStageEvent olay) {
         if (olay.getStage() != RenderLevelStageEvent.Stage.AFTER_PARTICLES || IstemciKasirga.KASIRGALAR.isEmpty()
-                || IstemciKasirga.gizli) {
+                || IstemciKasirga.gizli || IstemciKasirga.yalnizTozGizli) {
             return;
         }
         Minecraft mc = Minecraft.getInstance();

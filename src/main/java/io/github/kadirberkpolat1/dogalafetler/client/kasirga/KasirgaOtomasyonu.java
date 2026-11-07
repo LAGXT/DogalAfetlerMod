@@ -41,7 +41,8 @@ import net.minecraftforge.registries.ForgeRegistries;
  * Görsel kanıt otomasyonu (K0-21 rev. 2, GOREV §6 #6/#10). Yalnız {@code -Ddogalafetler.otomasyon=kasirga} ile tek
  * oyunculu dünyada çalışır; üretimde etkisizdir. Sırayla: S5 kasırga oyuncuyu hedefler; ön-uyarı karesi (Gelişmiş Hava
  * Radarı elde, arayüz açık), siren (duvar bulutu alçalır), aktif doğuş, vitrin (olgun evre, {@link #VITRIN} kamerası) ve
- * aynı kameranın kasırgasız kontrol karesi; vitrinde Düşük/Yüksek/Ultra ve kasırgasız (çizimi atlanmış) FPS; LOD
+ * aynı kameranın kontrol karesi (K-E49: yalnız huni, toz/etek, duvar bulutu ve sis gizli; uçan bloklar ve enkaz çizilir);
+ * vitrinde Düşük/Yüksek/Ultra ve kasırgasız (çizimi atlanmış) FPS; LOD
  * kademeleri (120 ve 180 blok); K0-33 mesafeleri 52/36/20/5 blok Yüksek (sunucuda en az {@link #UCAN_EN_AZ} uçan blok
  * varken, Kv2-2); yakın ve iç kare; {@code stop} sonrası istemci varlık sayımı ve aynı noktada afetsiz taban FPS; S1 S5
  * izinin {@link #S1_UZAKLIK} blok yanındaki taze zeminde, aynı vitrin kamerasından (kaldırılan ve görsel enkaz varken),
@@ -187,6 +188,14 @@ public final class KasirgaOtomasyonu {
                 ON + "kare {} (FPS {}, çizilen kare {}, kapı {}, kasırga {}, görsel enkaz {})", k.dosya(), k.fps(), k.yeniKare(),
                 k.gecerli() ? "açık" : "60 sn doldu, GEÇERSİZ", IstemciKasirga.kasirgaSayisi(),
                 IstemciKasirga.gorselEnkazSayisi()));
+    }
+
+    /** K-17 kontrol karesinin kipi (K-E49); satır betiğin {@code kontrol=yalnizToz} işareti. */
+    private static void yalnizTozGizle(boolean gizle) {
+        IstemciKasirga.yalnizTozGizli = gizle;
+        if (gizle) {
+            DogalAfetler.LOGGER.info(ON + "kontrol kipi yalnizToz (K-E49)");
+        }
     }
 
     private static void olcBasla(IntegratedServer server, String etiket, String sahne, String taban, Kamera kam,
@@ -342,15 +351,15 @@ public final class KasirgaOtomasyonu {
         adim("olgun", 20, () -> ilerletEger(server, k -> k.durum().evre() == KasirgaEvresi.DOGUS));
         adim("vitrin kamerası", 100, () -> kamera(server, VITRIN));
         adim("vitrin karesi", 30, () -> kare("s5_vitrin"));
-        adim("kontrol", 5, () -> IstemciKasirga.gizli = true);
+        adim("kontrol", 5, () -> yalnizTozGizle(true));
         adim("kontrol karesi", 10, () -> kare("s5_vitrin_kontrol"));
-        adim("kontrol bitti", 5, () -> IstemciKasirga.gizli = false);
+        adim("kontrol bitti", 5, () -> yalnizTozGizle(false));
         adim("vitrin karesi b", 60, () -> kare("s5_vitrin_b"));
         adim("uzak taban kamerası", 10, () -> kamera(server, UZAK));
         adim("uzak taban karesi", 30, () -> kare("s5_taban_uzak"));
-        adim("uzak kontrol", 5, () -> IstemciKasirga.gizli = true);
+        adim("uzak kontrol", 5, () -> yalnizTozGizle(true));
         adim("uzak kontrol karesi", 10, () -> kare("s5_taban_uzak_kontrol"));
-        adim("uzak kontrol bitti", 5, () -> IstemciKasirga.gizli = false);
+        adim("uzak kontrol bitti", 5, () -> yalnizTozGizle(false));
         fps(server, "S5 55 blok DÜŞÜK", "s5_55_dusuk", VITRIN, EfektKalitesi.DUSUK, false, false);
         fps(server, "S5 55 blok YÜKSEK", "s5_55_yuksek", VITRIN, EfektKalitesi.YUKSEK, false, false);
         fps(server, "S5 55 blok ULTRA", "s5_55_ultra", VITRIN, EfektKalitesi.ULTRA, false, false);

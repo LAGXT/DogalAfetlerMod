@@ -41,8 +41,13 @@ public final class IstemciKasirga {
     private static final Random RASTGELE = new Random(20261105);
     /** Görsel otomasyonun kalite karşılaştırması için (null: istemcinin {@code efektKalitesi} ayarı). */
     static EfektKalitesi zorlananKalite;
-    /** Görsel otomasyonun kasırgasız kontrol karesi için (simülasyon sürer, yalnız çizim atlanır). */
+    /** Görsel otomasyonun kasırgasız FPS ölçümü için (simülasyon sürer, bütün kasırga çizimi atlanır). */
     static boolean gizli;
+    /**
+     * Görsel otomasyonun K-17 kontrol karesi için (K-E49): yalnız huni, toz/etek, duvar bulutu ve kasırga sisi atlanır; uçan
+     * bloklar ve görsel enkaz kopyaları çizilir, fark maskesi yalnız toz katmanını tutar.
+     */
+    static boolean yalnizTozGizli;
 
     private IstemciKasirga() {
     }

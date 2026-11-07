@@ -48,7 +48,7 @@ public final class KasirgaOrtami {
     }
 
     private static float sisEtkisi(Camera kamera) {
-        if (IstemciKasirga.KASIRGALAR.isEmpty() || !KasirgaAyarlari.sisEtkisi()) {
+        if (IstemciKasirga.KASIRGALAR.isEmpty() || IstemciKasirga.yalnizTozGizli || !KasirgaAyarlari.sisEtkisi()) {
             return 0;
         }
         double[] y = enYakin(kamera.getPosition());

@@ -2927,7 +2927,9 @@ fırtına ışığı (yağmurda gök ışığı çarpanı ~0,65, mavimsi ışık
 `#5E6B5A`, uzaktaki gök/arazi için); toz ve etek paleti doygun ve açık: `TOZ` 0,80/0,56/0,30, `ETEK_ALT` 0,62/0,42/0,22,
 `ETEK_UST` 0,78/0,60/0,40 (huni taban bandı `TOZ`'a kaydığı için o da ısınır). Kanıt: `kasirga_gorsel.py` her koşuda vitrin ve
 sis dışı (huni kenarına ~73 blok, `UZAK` 90 blok) taban karesi için `taban rengi …: R G B, R>G>B payı, tuttu/TUTMADI` satırı
-yazar (aynı yöntem: vitrin ↔ kontrol farkı > 60, alt üçte bir). (b) S1: önceki koşularda S1 S5'in soyduğu şeritte başlıyordu
+yazar (aynı yöntem: vitrin ↔ kontrol farkı > 60, alt üçte bir). **Rev. (K-E49):** kontrol karesi yalnız huni, toz/etek, duvar bulutu ve
+sis gizlenerek alınır (uçan bloklar ve görsel enkaz iki karede de çizilir); satır `maske N piksel`, ΔR/ΔG/ΔB ve `kontrol=yalnizToz`
+yazar. (b) S1: önceki koşularda S1 S5'in soyduğu şeritte başlıyordu
 (kaldırılan 0, görsel enkaz 0). Otomasyon S5 izinin başı/sonunu kaydeder, oyuncuyu izin orta noktasından 220 blok dik yöne
 (yükseklik 140, chunk'lar yüklensin diye 200 tick) taşır, S1'i orada başlatır; S1 karesi `kaldırılan > 0` ve `görsel enkaz > 0`
 iken (en çok 60 sn) aynı göreli vitrin kamerasından alınır. Bitiş izi kamera S1'in dağılma noktasının 10 blok önünden, 28 blok
@@ -4880,6 +4882,51 @@ yalnız GPU belleğidir. Yalnız `client/su/**` değişti; K-E42 kapısı aynen.
 kapasiteyi küçültme eşiği (karmaşıklık, titreme; şef); çift tampon (P2-1 şef kararı); access transformer (decompile/kurulum yenilemesi
 ister, tek sınıf için yansıma yeterli).
 
+**K-E49 Kasırga K-17 kontrol karesi yalnız tozu gizler (şef kararı, 2026-11-07; t30, `matris-5-son` `9ec1b3f`).** Doğrulayıcı-3
+`matris-5-son` koşusunda K-E45 çalıştı (merkez (120, 68, −29) uygun kara, 13 kare, kapı 13/0), ama K-17 `taban rengi` iki sahnede
+tutmadı: `s5_vitrin` R>G>B payı %22, `s5_taban_uzak` %16, renk yeşil-gri. Eski geçen koşu (76, 67, −67) kumsal, tutmayan 5/6 su
+kenarı, 7 çimen: ölçü zeminin rengini izliyor. **Kök neden (kod):** kontrol karesi `IstemciKasirga.gizli = true` ile alınıyordu;
+bu bayrak huni ve bulutun (`KasirgaBulutCizimi`) yanında görsel enkaz kopyalarını (`KasirgaRenderer.render`) ve uçan blokları da
+(`UcanBlokRenderer`, `renderSingleBlock(blok.blok())`: yerden sökülen gerçek blok modelleri) gizler. Fark maskesi bu yüzden toz
+katmanı + uçan zemin blokları + enkazdır (koşu 7'de görsel enkaz 162): çimende yeşil, kumda sarı, su kenarında gri; kesişim
+yöntemiyle çözülen "alfa" 1,1–1,7 (opak örtü, yarı saydam tonlama değil). Şefin ilk önerisi (göreli ölçü: aynı maskede
+Δ(R−B) = ort(R−B)vitrin − ort(R−B)kontrol ≥ +15, ΔR ≥ ΔG, maske ≥ 2000) mevcut karelerle kalibre edilemedi. "Ters" = vitrin ile
+kontrol yer değiştirilmiş çift (yanlış pozitif denetimi); D = kesişimle çözülen katman rengi; koşu 1–3 K-17 paleti öncesi; kareler
+`.vibe/kanit/kasirga/kareler/` (5–7 `matris-5/wt` ve `matris-5-son` kopyalarıyla aynı sonuç):
+
+| koşu | sahne | maske | Δ(R−B) | ΔR / ΔG | D | eski pay | göreli ölçü | ters |
+|---|---|---|---|---|---|---|---|---|
+| 1 | s5_vitrin | 353740 | +4,9 | +8,3 / −1,0 | 53/54/54 | %52 | tutmaz | −4,9 → tutmaz |
+| 2 | s5_vitrin | 326225 | +30,7 | −3,8 / −17,9 | 57/65/78 | %44 | tutar | −30,7 → tutmaz |
+| 3 | s5_vitrin | 309297 | +5,8 | −3,2 / −13,7 | 62/62/64 | %59 | tutmaz | −5,8 → tutmaz |
+| 4 | s5_vitrin | 383120 | +32,1 | +17,7 / −0,7 | 80/68/55 | %71 | tutar | −32,1 → tutmaz |
+| 4 | s5_taban_uzak | 503195 | +86,9 | +40,9 / +6,9 | 63/62/75 | %68 | tutar | −86,9 → tutmaz |
+| 5 | s5_vitrin | 414281 | +65,2 | +24,1 / −1,2 | 74/60/52 | %82 | tutar | −65,2 → tutmaz |
+| 5 | s5_taban_uzak | 173804 | −9,0 | +10,5 / +10,8 | 61/79/127 | %17 | tutmaz | +9,0 → tutmaz |
+| 6 | s5_vitrin | 311093 | +35,4 | −1,9 / −16,8 | 57/64/75 | %55 | tutar | −35,4 → tutmaz |
+| 6 | s5_taban_uzak | 157716 | −0,2 | +0,2 / +0,7 | 66/73/64 | %26 | tutmaz | +0,2 → tutmaz |
+| 7 | s5_vitrin | 213733 | −0,4 | +3,2 / +0,3 | 53/67/57 | %22 | tutmaz | +0,4 → tutmaz |
+| 7 | s5_taban_uzak | 176291 | +6,5 | +7,8 / +2,4 | 40/57/43 | %16 | tutmaz | −6,5 → tutmaz |
+
+Çimen koşusu 7 iki sahnede de tutmuyor ve vitrinde ters çift +0,4 veriyor (7'yi geçirecek her eşik tersini de geçirir); K-17
+öncesi mavimsi koşu 2 tutuyor (koyulaşmada mavi kırmızıdan çok düşer). Orta bant, alt yarı, ısınan ve sıcak piksel payı adayları
+da üç durumu birlikte ayırmadı. İnceleyici (`.vibe/rapor/inceleme-matris-5-son-kasirga.md`) koşu 7'de paletin bozuk olmadığını
+gösterdi: maskenin alt üçte biri ön plan çimenine düşüyor; ufuk −120 … +40 px bantında `s5_taban_uzak` 85/71/58, R>G>B %70, Δ
++37/+6/−14 (ΔR>ΔG>ΔB %63); `s5_vitrin` 47/47/45, %66, Δ −40/−55/−76 (ΔR>ΔG>ΔB %88). **Karar (a):** ikinci bayrak
+`IstemciKasirga.yalnizTozGizli`: `KasirgaBulutCizimi` (huni, alt girdaplar, toz/etek, duvar bulutu) ve `KasirgaOrtami` sisi (renk ve
+uzak düzlem) çizilmez; uçan bloklar ve görsel enkaz kopyaları çizilir; kamera yuvarlanması ve görüş açısı daralması iki karede
+aynıdır (geometri değişmesin). `KasirgaOtomasyonu`'nun iki kontrol adımı (`s5_vitrin_kontrol`, `s5_taban_uzak_kontrol`) bu bayrağı
+kurar ve `kontrol kipi yalnizToz (K-E49)` yazar; `gizli` eski anlamıyla kasırgasız FPS ölçümlerinde (`s5_55_cizimsiz`,
+`s5_5_cizimsiz`) kalır. Bayrak yalnız otomasyon adımından kurulur (`-Ddogalafetler.otomasyon=kasirga`, K-E42 benzeri); üretimde
+sıcak yolda ek maliyet bulut ve sis denetiminde birer boolean okumasıdır. K-17 ölçüsü değişmez (alt üçte bir, |Δ| > 60, ortalama
+R>G>B; pay bilgi); `kasirga_gorsel.py` satıra bilgi olarak `maske N piksel`, `ΔR/ΔG/ΔB` (maskede vitrin − kontrol) ve
+`kontrol=yalnizToz|gizli` yazar (kip istemci log'undaki satırdan; eski koşular `gizli`). **Kalibrasyon:** yeni kare gerektiği için
+doğrulayıcı-3'ün yeniden koşusunda. **Yedek yol (b):** o koşuda da tutmazsa K-17 karesi kabul ölçüsünden çıkar ve satır bilgi
+olur; palet `TOZ` 0,80/0,56/0,30 sabitiyle ve inceleyicinin gözle hükmüyle (palet sıcak; ufuk bantı 85/71/58, %70) kabul edilir.
+Kabul: pc2 `compileJava compileTestJava` 0 (`MAKINE=LAGXT2`), `TEST_FILTRE=Kasirga runGameTestServer` `All 11 required tests
+passed` (filtreli), `py_compile` 62/0 (`.vibe/kanit/k-e49/`); runClient yok. Reddedilen: göreli Δ ölçüsü (tablo); ufuk bantı
+ölçüsü (şef: ölçü değişmez, önce maske düzelsin); kontrol karesinde uçan blokları da gizleyen eski bayrağı korumak.
+
 ## Açık noktalar (Faz 2b)
 
 Entegratöre bırakılan notlardan işlenenler: kancalar (K-E1), protokol (K-C47), `asama ileri [süreç]` (K-C48), sanal su §3a istisnası
@@ -5022,6 +5069,8 @@ P2-9 `5-matris` kabulünde. Açık kalanlar:
   yeniden ölçümü doğrulayıcının `su_istemci.py hepsi` koşusunda.
 - **Sanal su görseli (inceleme-su-gorsel):** P2-5 köpük paylaşılan kenar hesabı yapılmadı (isteğe bağlı); köpük CPU'su, tampon büyümesi
   (`tampon_buyume`) ve SU-45 duvar saati `5-matris` #10; Ts2-1 tam kare ve yeni `SuOtomasyon` kareleri `5-matris` #6 (bu turda runClient yok).
+- **Kasırga K-17 taban rengi (K-E49):** kontrol karesi yalnız tozu gizler; kalibrasyon doğrulayıcı-3'ün yeniden koşusunda, tutmazsa
+  yedek yol (b): K-17 karesi bilgi, palet sabiti ve gözle hüküm.
 
 ## N17 — Sayısal varsayılanlar
 

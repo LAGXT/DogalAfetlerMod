@@ -267,9 +267,17 @@ def girdi_sayilari(istemci_log):
 
 
 def taban_rengi(no):
-    """K-17: vitrin ↔ kontrol fark maskesinin (|ΔR|+|ΔG|+|ΔB| > 60) alt üçte birinde vitrin pikselleri ortalaması."""
+    """K-17: vitrin ↔ kontrol fark maskesinin (|ΔR|+|ΔG|+|ΔB| > 60) alt üçte birinde vitrin pikselleri ortalaması.
+
+    K-E49: kontrol karesi yalnız huni, toz/etek, duvar bulutu ve sis gizlenerek alınır (uçan bloklar ve enkaz iki karede de
+    çizilir); kip istemci log'undaki `kontrol kipi yalnizToz` satırından okunur, yoksa `gizli` (eski koşular: her şey gizli).
+    Ölçü ve eşik aynı; ΔR/ΔG/ΔB (maskede vitrin − kontrol ortalaması) bilgi.
+    """
     import numpy as np
     from PIL import Image
+    istemci = KANIT / f"latest-{no}.log"
+    kip = ("yalnizToz" if "kontrol kipi yalnizToz" in istemci.read_text(errors="replace") else "gizli") \
+        if istemci.exists() else "bilinmiyor"
     sonuc = True
     for ad in ("s5_vitrin", "s5_taban_uzak"):
         vitrin, kontrol = KARELER / f"kasirga_{ad}-{no}.png", KARELER / f"kasirga_{ad}_kontrol-{no}.png"
@@ -283,15 +291,16 @@ def taban_rengi(no):
         maske[: 2 * maske.shape[0] // 3] = False
         piksel = v[maske]
         if len(piksel) == 0:
-            log(f"taban rengi {ad}: fark pikseli yok")
+            log(f"taban rengi {ad}: fark pikseli yok, kontrol={kip}")
             sonuc = False
             continue
         r, g, b = piksel.mean(0)
+        dr, dg, db = piksel.mean(0) - k[maske].mean(0)
         pay = ((piksel[:, 0] > piksel[:, 1]) & (piksel[:, 1] > piksel[:, 2])).mean()
         tutar = r > g > b
         sonuc = sonuc and tutar
-        log(f"taban rengi {ad}: R {r:.1f} G {g:.1f} B {b:.1f}, piksel {len(piksel)}, R>G>B payı %{100 * pay:.0f} → "
-            + ("R>G>B tuttu" if tutar else "TUTMADI"))
+        log(f"taban rengi {ad}: R {r:.1f} G {g:.1f} B {b:.1f}, maske {len(piksel)} piksel, R>G>B payı %{100 * pay:.0f}, "
+            f"ΔR {dr:+.1f} ΔG {dg:+.1f} ΔB {db:+.1f}, kontrol={kip} → " + ("R>G>B tuttu" if tutar else "TUTMADI"))
     return sonuc
 
 
