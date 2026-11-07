@@ -6,7 +6,10 @@
 (c) Pencere doğrulaması: pid'in penceresine `set_prop no_focus=1`, `focus_on_activate=0` (lock) yazılır; `getprop no_focus`
     true ve workspace 94 değilse öldürülür.
 (d) Bekçi: sahibin etkin penceresi kaydedilir; 5 sn'de bir `hyprctl activewindow -j`; etkin pencere bizim pid'imizse ALARM:
-    süreç öldürülür, odak kaydedilen pencereye verilir, koşu geçersiz.
+    süreç öldürülür, odak kaydedilen pencereye verilir, koşu geçersiz. Kapanış K-E27
+    `runclient_kilit.KapanisBekcisi` ile: istemcinin kendi kapanış bekçisi (`TsunamiOtomasyonu`, 30 sn `Runtime.halt`)
+    tutmazsa `BITTI`'den ya da kilit bırakıldıktan 90 sn sonra yaşayan istemci ve tek kullanımlık Gradle daemon'ı
+    öldürülür; ölçümler BITTI'den önce tamamdır.
 (e) Oyun içi girdi günlüğü (`client.tsunami.TsunamiOtomasyonu`): `TSUNAMI-OTOMASYON GIRDI` satırları sayılır; sıfırdan
     farklıysa geçersiz.
 (i) Ağır süreç kapısı ve aynı anda tek runClient.
@@ -24,13 +27,14 @@ import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import runclient_kilit  # noqa: E402
+
 KOK = Path(__file__).resolve().parents[2]
 RUN = KOK / "run"
 JAVA_HOME = "/home/lagxt/.jdks/jdk-17.0.21+9"
 WS = 94
 KURAL = f"[workspace {WS} silent; no_initial_focus; no_focus on; focus_on_activate off]"
-# İstemcinin kendi kapanış bekçisi (TsunamiOtomasyonu, 30 sn) tutmazsa BITTI'den bu kadar sn sonra artıklar öldürülür.
-KAPANIS_SN = 90
 
 
 def sh(komut, zaman=30):
@@ -95,50 +99,17 @@ def pencere(pid):
     return None
 
 
-def oldur(gradle):
-    try:
-        os.killpg(gradle.pid, signal.SIGTERM)
-    except ProcessLookupError:
-        pass
-    pid = istemci_pid()
-    if pid:
-        try:
-            os.kill(pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-
-
-def artiklari_oldur(pid, log):
-    """Kapanışı asılı istemci JVM'i ve onu başlatan tek kullanımlık Gradle daemon'ı (`--no-daemon`; `timeout` yalnız Gradle
-    istemcisini öldürür, daemon ve oyun yetim kalır). Yalnız bu worktree'nin süreçleri: daemon'ın cwd'si KOK olmalı."""
-    hedef = [pid]
-    try:
-        ata = int((Path("/proc") / str(pid) / "stat").read_text().rsplit(")", 1)[1].split()[1])
-        if (os.readlink(f"/proc/{ata}/cwd") == str(KOK)
-                and b"GradleDaemon" in Path(f"/proc/{ata}/cmdline").read_bytes()):
-            hedef.append(ata)
-    except (OSError, ValueError, IndexError):
-        pass
-    olen = []
-    for h in hedef:
-        try:
-            os.kill(h, signal.SIGKILL)
-            olen.append(h)
-        except ProcessLookupError:
-            pass
-    log(f"artıklar öldürüldü: {olen}")
-
-
 def _sayi(desen, metin, tur=float):
     r = re.search(desen, metin)
     return tur(r.group(1)) if r else None
 
 
 def fps_tablosu(metin, log):
-    """Ts1 kabulü (TS-16 rev. 2, şef kararı tur 5): her S5 sahnesinde Yüksek'te "sonra" tabanı (aynı sahne, stop'tan 200 tick
-    sonra) < 10 ms ise mutlak ölçü: karada ortanca kare ≤ 33,3 ms (≥ 30 FPS); değilse sonra / karada oranı ≥ 0,5. "Önce" ve
-    "sonra" oranları bilgi. Ölçüm geçerli ancak karada ve sonra pencerelerinde sunucu mspt < 50, yabancı GradleWrapperMain
-    (kendi runClient'ımız dışında) ≤ 1 ve sonra tabanı temiz (parçacık ≤ önce + 100) ise. Kırılan blok ve tick başına en
+    """Ts1 kabulü (TS-16 rev. 3, K0-33 tsunami istisnası): her S5 sahnesinde Yüksek'te "sonra" tabanı (aynı sahne, stop'tan
+    200 tick sonra) < 10 ms ise mutlak ölçü: karada render thread CPU ms/kare ≤ 33,3; değilse sonra / karada oranı ≥ 0,5.
+    Duvar saati FPS, "önce" ve "sonra" oranları bilgi (≥ 30 FPS duvar saati Faz 5 görünür koşu tetikleyicisi). Ölçüm geçerli
+    ancak karada ve sonra pencerelerinde sunucu mspt < 50, yabancı GradleWrapperMain (kendi runClient'ımız dışında) ≤ 1 ve
+    sonra tabanı temiz (parçacık ≤ önce + 100) ise. Kırılan blok ve tick başına en
     çok bölüm karada penceresinden sonraki ilk `Tsunami: temizlendi` satırından. K26-1: karada `sicrama_varlik_sn` > 1 ise
     sahne "K-E26b bekliyor" (kabulde bekleyen sahne dışındakiler sayılır). Sonuç (geçerli, hepsi geçti)."""
     sahne = {}
@@ -175,14 +146,14 @@ def fps_tablosu(metin, log):
         gecerli = not neden
         oran = s["ms"] / k["ms"]
         mutlak = s["ms"] < 10
-        gecti = k["ms"] <= 1000 / 30 if mutlak else oran >= 0.5
+        gecti = k["cpu"] is not None and k["cpu"] <= 1000 / 30 if mutlak else oran >= 0.5
         k26b = k["sicrama"] is not None and k["sicrama"] > 1
         hepsi_gecerli &= gecerli
         hepsi_gecti &= gecti
         bekleyen_disi &= gecti or k26b
         log(f"TABLO {ad} once={o['ms']:.2f}ms karada={k['ms']:.2f}ms ({1000 / k['ms']:.1f} FPS) sonra={s['ms']:.2f}ms "
             f"cpu={o['cpu']}/{k['cpu']}/{s['cpu']}ms "
-            f"olcu={'mutlak>=30FPS' if mutlak else 'oran_sonra>=50%'} oran_sonra={oran:.0%} "
+            f"olcu={'mutlak_cpu<=33.3ms' if mutlak else 'oran_sonra>=50%'} oran_sonra={oran:.0%} "
             f"cpu_oran_sonra={s['cpu'] / k['cpu']:.0%} oran_once={o['ms'] / k['ms']:.0%} "
             f"mspt={o['mspt']}/{k['mspt']}/{s['mspt']} yabanci_gradle={o['yabanci']}/{k['yabanci']}/{s['yabanci']} "
             f"afet_kirilan/bolum/birim_tick_encok/kirli/bekleyen={k.get('yikim')} pencere=[{k['pencere']}] "
@@ -236,10 +207,6 @@ def main():
     log(f"exec kuralıyla başlatılıyor: {ifade} -> {sh(['hyprctl', 'dispatch', ifade])}")
     baslangic = time.monotonic()
 
-    class Grup:
-        pid = None
-
-    gradle = Grup()
     pid = None
     while time.monotonic() - baslangic < 600:
         pid = istemci_pid()
@@ -249,10 +216,6 @@ def main():
     if not pid:
         log("istemci JVM'i 10 dk'da görünmedi")
         return 2
-    try:
-        gradle.pid = os.getpgid(pid)
-    except ProcessLookupError:
-        gradle.pid = pid
     if not belirtec_var(pid):
         log(f"ALARM: pid={pid} ortamında HL_EXEC_RULE_TOKEN yok; pencere eşlenmeden öldürülüyor")
         os.kill(pid, signal.SIGKILL)
@@ -286,9 +249,8 @@ def main():
         return 1
     yoklama = 0
     alarm = 0
-    asili = False
-    bitti_an = None
-    while istemci_pid() == pid:
+    bekci = runclient_kilit.KapanisBekcisi(KOK, pid, (oyun_log,), "TSUNAMI-OTOMASYON BITTI", log)
+    while not bekci.bitti_mi():
         time.sleep(5)
         yoklama += 1
         a = hypr_json("activewindow") or {}
@@ -303,21 +265,11 @@ def main():
             p = pencere(pid) or {}
             log(f"denetim: etkin={a.get('address')} {a.get('class')}; benim ws={p.get('workspace', {}).get('id')}; "
                 f"gradle={sh('pgrep -c -f [G]radleWrapperMain')}")
-        metin = oyun_log.read_text(encoding="utf-8", errors="replace")
-        if bitti_an is None and "TSUNAMI-OTOMASYON BITTI" in metin:
-            bitti_an = time.monotonic()
-        if istemci_pid() != pid:
-            break
-        if "cikis=" in metin or bitti_an is not None and time.monotonic() - bitti_an > KAPANIS_SN:
-            asili = True
-            log(f"KAPANIS ASILI: BITTI'den {time.monotonic() - bitti_an:.0f} sn sonra istemci JVM'i yaşıyor"
-                if bitti_an is not None else "KAPANIS ASILI: runClient döndü, istemci JVM'i yaşıyor")
-            artiklari_oldur(pid, log)
-            break
     son = time.monotonic() + 120
     while time.monotonic() < son and "cikis=" not in oyun_log.read_text(encoding="utf-8", errors="replace"):
         time.sleep(2)
     metin = oyun_log.read_text(encoding="utf-8", errors="replace")
+    asili = bekci.olduruldu or "K-E27: asılı istemci öldürüldü" in metin
     girdi = len(re.findall(r"TSUNAMI-OTOMASYON GIRDI", metin))
     bitti = re.search(r"TSUNAMI-OTOMASYON BITTI girdi tus=(\d+) fare=(\d+) teker=(\d+)", metin)
     cikis = re.search(r"cikis=(\d+)", metin)

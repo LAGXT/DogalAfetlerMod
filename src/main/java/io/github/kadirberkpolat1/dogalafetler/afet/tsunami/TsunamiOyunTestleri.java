@@ -10,6 +10,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
 import io.github.kadirberkpolat1.dogalafetler.core.CekirdekOyunTestleri;
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.AfetZamanlayicisi;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.BeklemeDurumu;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SonumTipi;
 import io.github.kadirberkpolat1.dogalafetler.su.Dalga;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
@@ -17,8 +18,10 @@ import io.github.kadirberkpolat1.dogalafetler.su.SanalSuDunyasi;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.random.RandomGenerator;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -319,7 +322,8 @@ public final class TsunamiOyunTestleri {
         ServerPlayer oyuncu = CekirdekOyunTestleri.sahteOyuncu(h, ayak.getX() + 0.5, ayak.getY(), ayak.getZ() + 0.5);
         oyuncu.setGameMode(GameType.SURVIVAL);
         // Hasar dalga ilerlerken verilir (menzilde duran su itmez): domuz kıyıya yakın, cephenin uzun süre geçtiği yerde;
-        // yürüyüp dalga şeridinden çıkmasın diye yapay zekâsız (dalga onu yine sürükler).
+        // yürüyüp dalga şeridinden çıkmasın diye yapay zekâsız. Yapay zekâsız mob travel etmediği için dalga onu sürüklemez:
+        // domuzda yalnız hasar sınanır (mob sürüklemesi SuOyunTestleri.dalgaMobuVeEsyayiSurukler).
         Pig domuz = h.spawn(EntityType.PIG, 7, 3, 11);
         domuz.setNoAi(true);
         h.onEachTick(oyuncu::doTick);
@@ -404,8 +408,9 @@ public final class TsunamiOyunTestleri {
     }
 
     /**
-     * H.5: ay çarpmasından sonraki tsunami çarpanı {@link DunyaDonemi#carpan}'dan okunur: zamanlayıcının tsunami oranı
-     * çarpanla artar, çekilme {@code tsunami.ayCekilmeCarpani} ile derinleşir. Çarpan ay yolundaki gibi
+     * H.5: ay çarpmasından sonraki tsunami çarpanı {@link DunyaDonemi#carpan}'dan okunur: zamanlayıcının seçimi (girdi
+     * yöneticideki gibi {@code donem::carpan}) tsunamiyi çarpan kadar daha sık seçer, çekilme {@code tsunami.ayCekilmeCarpani}
+     * ile derinleşir. Çarpan ay yolundaki gibi
      * {@link DunyaDonemi#carpanEkle} ile ama 40 tick'lik eklenir: süresi dolunca 1'e iner, global dönem eski değerine
      * döner (K-E15) ve çekilme yeniden normal derinlikte.
      */
@@ -418,12 +423,16 @@ public final class TsunamiOyunTestleri {
         double once = donem.carpan(AfetTuru.TSUNAMI);
         h.assertTrue(once == 1.0, "başta tsunami çarpanı 1 değil: " + once);
         double derinOnce = cekilmeDerinligi(h);
+        double payOnce = tsunamiSecimPayi(ayar, donem);
+        h.assertTrue(payOnce > 0 && payOnce < 1, "kasırga/tsunami seçim payı sınanamaz: " + payOnce);
         double tepe = ayar.tsunamiCarpani();
         donem.carpanEkle(AfetTuru.TSUNAMI, tepe, 20, 20, SonumTipi.DOGRUSAL);
-        double oranOnce = AfetZamanlayicisi.turOrani(ayar.zamanlayici(), AfetTuru.TSUNAMI, once, 1);
-        double oranAy = AfetZamanlayicisi.turOrani(ayar.zamanlayici(), AfetTuru.TSUNAMI, donem.carpan(AfetTuru.TSUNAMI), 1);
-        h.assertTrue(tepe > 1 && oranAy > oranOnce && Math.abs(oranAy - oranOnce * tepe) < 1e-9 * oranAy,
-                "tsunami oranı çarpanla artmadı: " + oranOnce + " -> " + oranAy + " (çarpan " + tepe + ")");
+        double carpan = donem.carpan(AfetTuru.TSUNAMI);
+        double payAy = tsunamiSecimPayi(ayar, donem);
+        double oranKati = payAy / (1 - payAy) / (payOnce / (1 - payOnce));
+        h.assertTrue(carpan > 1 && Math.abs(oranKati - carpan) < 0.01 * carpan,
+                "zamanlayıcı tsunamiyi çarpan kadar sık seçmedi: pay " + payOnce + " -> " + payAy + ", kat " + oranKati
+                        + " (çarpan " + carpan + ", config " + tepe + ")");
         double derinAy = cekilmeDerinligi(h);
         double kat = TsunamiAyarlari.al().ayCekilmeCarpani.get();
         h.assertTrue(Math.abs(derinAy - Math.min(8, derinOnce * kat)) < 1e-9,
@@ -434,10 +443,31 @@ public final class TsunamiOyunTestleri {
                 .thenExecute(() -> {
                     double derinSonra = cekilmeDerinligi(h);
                     h.assertTrue(derinSonra == derinOnce, "çarpan bitince çekilme normale dönmedi: " + derinSonra);
-                    DogalAfetler.LOGGER.info("Tsunami GameTest: H.5 oran {} -> {} (x{}), çekilme derinliği {} -> {} -> {}",
-                            oranOnce, oranAy, tepe, derinOnce, derinAy, derinSonra);
+                    DogalAfetler.LOGGER.info("Tsunami GameTest: H.5 seçim payı {} -> {} (kat {}, çarpan {}), çekilme derinliği "
+                            + "{} -> {} -> {}", payOnce, payAy, oranKati, carpan, derinOnce, derinAy, derinSonra);
                 })
                 .thenSucceed();
+    }
+
+    /**
+     * Zamanlayıcının seçim yolu (H.5, Ts3-2): {@link AfetZamanlayicisi#sec} girdisi yöneticideki gibi {@code donem::carpan}
+     * ile kurulur; uygun türler kasırga ve tsunami, zorlamalı (bekleme ve olay olasılığı yok). Seçim rastgelesi [0, 1)'i eşit
+     * adımla tarar; dönen tsunami payı {@code a·c / (a·c + b)} (a, b ağırlıklar, c çarpan), payların oran katı {@code c}.
+     */
+    private static double tsunamiSecimPayi(CekirdekAyarlari ayar, DunyaDonemi donem) {
+        int adim = 20_000;
+        double[] r = new double[1];
+        RandomGenerator izgara = () -> (long) (r[0] * 0x1.0p53) << 11;
+        AfetZamanlayicisi.Girdi girdi = new AfetZamanlayicisi.Girdi(false, donem.saat(), 1, new BeklemeDurumu(),
+                EnumSet.of(AfetTuru.KASIRGA, AfetTuru.TSUNAMI), donem::carpan, 1, true);
+        int tsunami = 0;
+        for (int i = 0; i < adim; i++) {
+            r[0] = (i + 0.5) / adim;
+            if (AfetZamanlayicisi.sec(ayar.zamanlayici(), girdi, izgara).orElse(null) == AfetTuru.TSUNAMI) {
+                tsunami++;
+            }
+        }
+        return (double) tsunami / adim;
     }
 
     /** S1 afeti AKTIF'e geçirip sanal sudaki çekilmesinin derinliğini okur ve afeti temiz durdurur. */
