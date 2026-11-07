@@ -309,8 +309,10 @@ public final class MeteorOtomasyonu {
 
     /**
      * Yağmur bölümü: güneş patlaması ön-uyarısında (öncü yağmur), sirende ve AKTIF başında kare, sirende yakın/uzak
-     * çarpma ses denemesi, sonra ay parçası yağmuru. Meteorlar vitrindeki gibi yavaş çekimde düşer (uçuş 5 kat uzun: kadrajda
-     * aynı anda daha çok iz; yoğunluk değişmez). Kare isteyen tick'te bekleyen kare alınana kadar sayaç ilerlemez.
+     * çarpma ses denemesi, sonra ay parçası yağmuru. {@code _gercek} kareleri gerçek hızda ({@code meteor.dusmeHizi}), ötekiler
+     * vitrindeki gibi 5× yavaş çekimde ({@value #YAVAS_CEKIM} blok/tick: uçuş 5 kat uzun, kadrajda aynı anda 5 kat çok iz;
+     * yoğunluk değişmez). Gerçek hız karesi yavaş meteorlar indikten sonra (400 tick) alınır. Kare isteyen tick'te bekleyen
+     * kare alınana kadar sayaç ilerlemez.
      */
     private static void yagmurBolumu(IntegratedServer server) {
         switch (sayac) {
@@ -335,30 +337,46 @@ public final class MeteorOtomasyonu {
                 kare("gunes_siren_b");
                 sayim(server, "güneş siren");
             }
-            case 1401 -> komut(server, "dogalafet asama ileri");
-            case 1700 -> {
+            case 1401 -> {
+                server.execute(() -> MeteorAyarlari.dusmeHiziAyarla(eskiHiz));
+                komut(server, "dogalafet asama ileri");
+            }
+            case 1800 -> {
+                kare("gunes_aktif_gercek");
+                sayim(server, "güneş AKTIF gerçek hız");
+            }
+            case 1801 -> server.execute(() -> MeteorAyarlari.dusmeHiziAyarla(YAVAS_CEKIM));
+            case 2100 -> {
                 kare("gunes_aktif");
                 sayim(server, "güneş AKTIF");
             }
-            case 1900 -> {
+            case 2300 -> {
                 kare("gunes_aktif_b");
                 sayim(server, "güneş AKTIF");
             }
-            case 1901 -> komut(server, "dogalafet stop", "dogalafet sifirla", "dogalafet start ay_carpmasi",
-                    "dogalafet asama ileri", "dogalafet asama ileri", "dogalafet asama ileri");
-            case 2300 -> {
+            case 2301 -> {
+                server.execute(() -> MeteorAyarlari.dusmeHiziAyarla(eskiHiz));
+                komut(server, "dogalafet stop", "dogalafet sifirla", "dogalafet start ay_carpmasi",
+                        "dogalafet asama ileri", "dogalafet asama ileri", "dogalafet asama ileri");
+            }
+            case 2600 -> {
+                kare("ay_parcalari_gercek");
+                sayim(server, "ay parçaları gerçek hız");
+            }
+            case 2601 -> server.execute(() -> MeteorAyarlari.dusmeHiziAyarla(YAVAS_CEKIM));
+            case 2900 -> {
                 kare("ay_parcalari");
                 sayim(server, "ay parçaları");
             }
-            case 2600 -> {
+            case 3200 -> {
                 kare("ay_parcalari_b");
                 sayim(server, "ay parçaları");
             }
-            case 2601 -> {
+            case 3201 -> {
                 komut(server, "dogalafet stop", "dogalafet sifirla");
                 server.execute(() -> MeteorAyarlari.dusmeHiziAyarla(eskiHiz));
             }
-            case 2700 -> {
+            case 3300 -> {
                 adim = 4;
                 sayac = 0;
             }
