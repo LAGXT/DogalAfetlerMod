@@ -28,6 +28,7 @@ class AyarGocuTest {
         Path dosya = klasor.resolve(AyarKaydi.SUNUCU_DOSYASI);
         Files.writeString(dosya, ESKI, StandardCharsets.UTF_8);
         String satir = AyarGocu.uygula(dosya, GOC);
+        Path yedek = klasor.resolve(AyarKaydi.SUNUCU_DOSYASI + ".bak-ayarSurumu0");
         assertTrue(satir != null && satir.contains("meteor.ayarSurumu 0 → 1")
                 && satir.contains(yedek.getFileName().toString()), "özet: " + satir);
         assertEquals(ESKI, Files.readString(yedek, StandardCharsets.UTF_8), "yedek özgün içerik");
