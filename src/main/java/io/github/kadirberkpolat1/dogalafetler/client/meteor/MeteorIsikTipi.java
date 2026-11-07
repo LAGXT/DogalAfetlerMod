@@ -11,7 +11,7 @@ import net.minecraft.resources.ResourceLocation;
 /**
  * Meteor izi, plazma kabuğu ve yer diskinin sissiz additive çizimi (M-24): {@code RenderType.eyes} ile aynı gölgelendirici,
  * doku, toplamalı karışım ve yalnız renk yazımı; tek fark çizim sırasında sis başlangıcının sonsuza alınması ({@code eyes}
- * parça gölgelendiricisi rengi {@code linear_fog_fade} ile çarpar; gece görüş sisi 140 blok yükseklikten gelen izi
+ * parça gölgelendiricisi rengi {@code linear_fog_fade} ile çarpar; gece görüş sisi 140–200 blok yükseklikten gelen izi
  * söndürüyordu). Sis eski değerine çizimden hemen sonra döner.
  */
 final class MeteorIsikTipi extends RenderType {

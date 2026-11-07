@@ -51,7 +51,8 @@ import net.minecraftforge.fml.common.Mod;
  * gelen kademeli ay (mavi-beyaz) ve güneş meteorlarının izleri, çarpma anı, krater ve ateş karelenir; sonra yakın kamerayla
  * parıldayan Meteorit Parçası ve Kozmik Çekirdek, en sonda Kozmik Çekirdek ve Termostatlı zırh ipuçları. Klavye, fare ve
  * tekerlek girdileri kapanışa kadar sayılır. Kareler A-34 kapısından alınır ({@link GorselOtomasyon#kareIste}); bekleyen kare
- * varken adım ilerlemez. Vitrinde meteorlar yavaş çekimde düşer ({@code meteor.dusmeHizi} 0,6; sonra eski değere döner).
+ * varken adım ilerlemez. Vitrinde meteorlar yavaş çekimde düşer ({@code meteor.ucusSuresi} {@value #YAVAS_CEKIM}; sonra eski
+ * değere döner).
  * Ölçüm (K-E29 (b)): vitrin kamerasında meteorlardan önce afetsiz taban {@code s5_meteor_taban}, ilk atıştan itibaren yağmur
  * {@code s5_meteor_yuksek} (her biri 100 tick; öncesinde FPS kapısı, {@link GorselOtomasyon#akici}).
  * {@code -PotomasyonBolum=odul} (M-22): yalnız ödül ve ipucu kareleri, öğlen ışığında; her ipucu kendi karesinde, satırlar
@@ -71,7 +72,8 @@ public final class MeteorOtomasyonu {
     private static final String[] IPUCLARI = {"cekirdek", "parca", "plaka", "zirh"};
     private static final int UZAKLIK = 48;
     private static final int KAMERA_YUKSEKLIGI = 18;
-    private static final double YAVAS_CEKIM = 0.6;
+    /** Yavaş çekimin uçuş süresi (tick): varsayılan 180'in 2 katı. */
+    private static final int YAVAS_CEKIM = 360;
 
     /** Hedef ofseti (kameradan bakış yönünde x, sağa z), boyut, görünüm, açı, gelış yönü, başlangıç tick'i. */
     private record Atis(int dx, int dz, MeteorBoyutu boyut, MeteorGorunumu gorunum, double aci, double azimut, int tick) {
@@ -99,7 +101,7 @@ public final class MeteorOtomasyonu {
     private static int carpmaBaslangic;
     private static volatile boolean sunucuHazir;
     private static volatile BlockPos odak;
-    private static volatile double eskiHiz = -1;
+    private static volatile int eskiSure = -1;
     /** Vitrin öncesi: 0 FPS kapısı, 1 taban ölçümü, 2 FPS kapısı, 3 vitrin. */
     private static int tabanEvresi;
     private static int carpmaSonrasiKare;
@@ -247,8 +249,8 @@ public final class MeteorOtomasyonu {
     private static void vitrin(Minecraft mc, IntegratedServer server) {
         if (sayac == 1) {
             server.execute(() -> {
-                eskiHiz = MeteorAyarlari.dusmeHizi();
-                MeteorAyarlari.dusmeHiziAyarla(YAVAS_CEKIM);
+                eskiSure = MeteorAyarlari.ucusSuresi();
+                MeteorAyarlari.ucusSuresiAyarla(YAVAS_CEKIM);
             });
         }
         for (Atis a : ATISLAR) {
@@ -281,8 +283,8 @@ public final class MeteorOtomasyonu {
             carpmaSonrasiKare = sayac;
             kare("carpma_son");
             server.execute(() -> {
-                if (eskiHiz > 0) {
-                    MeteorAyarlari.dusmeHiziAyarla(eskiHiz);
+                if (eskiSure > 0) {
+                    MeteorAyarlari.ucusSuresiAyarla(eskiSure);
                 }
             });
             return;
@@ -309,17 +311,17 @@ public final class MeteorOtomasyonu {
 
     /**
      * Yağmur bölümü: güneş patlaması ön-uyarısında (öncü yağmur), sirende ve AKTIF başında kare, sirende yakın/uzak
-     * çarpma ses denemesi, sonra ay parçası yağmuru. {@code _gercek} kareleri gerçek hızda ({@code meteor.dusmeHizi}), ötekiler
-     * vitrindeki gibi 5× yavaş çekimde ({@value #YAVAS_CEKIM} blok/tick: uçuş 5 kat uzun, kadrajda aynı anda 5 kat çok iz;
-     * yoğunluk değişmez). Gerçek hız karesi yavaş meteorlar indikten sonra (400 tick) alınır. Kare isteyen tick'te bekleyen
+     * çarpma ses denemesi, sonra ay parçası yağmuru. {@code _gercek} kareleri gerçek hızda ({@code meteor.ucusSuresi}), ötekiler
+     * vitrindeki gibi 2× yavaş çekimde ({@value #YAVAS_CEKIM} tick uçuş: kadrajda aynı anda 2 kat çok iz; yoğunluk
+     * değişmez). Gerçek hız karesi yavaş meteorlar indikten sonra (400 tick) alınır. Kare isteyen tick'te bekleyen
      * kare alınana kadar sayaç ilerlemez.
      */
     private static void yagmurBolumu(IntegratedServer server) {
         switch (sayac) {
             case 1 -> {
                 server.execute(() -> {
-                    eskiHiz = MeteorAyarlari.dusmeHizi();
-                    MeteorAyarlari.dusmeHiziAyarla(YAVAS_CEKIM);
+                    eskiSure = MeteorAyarlari.ucusSuresi();
+                    MeteorAyarlari.ucusSuresiAyarla(YAVAS_CEKIM);
                 });
                 komut(server, "dogalafet sifirla", "dogalafet start gunes_patlamasi");
             }
@@ -338,14 +340,14 @@ public final class MeteorOtomasyonu {
                 sayim(server, "güneş siren");
             }
             case 1401 -> {
-                server.execute(() -> MeteorAyarlari.dusmeHiziAyarla(eskiHiz));
+                server.execute(() -> MeteorAyarlari.ucusSuresiAyarla(eskiSure));
                 komut(server, "dogalafet asama ileri");
             }
             case 1800 -> {
                 kare("gunes_aktif_gercek");
                 sayim(server, "güneş AKTIF gerçek hız");
             }
-            case 1801 -> server.execute(() -> MeteorAyarlari.dusmeHiziAyarla(YAVAS_CEKIM));
+            case 1801 -> server.execute(() -> MeteorAyarlari.ucusSuresiAyarla(YAVAS_CEKIM));
             case 2100 -> {
                 kare("gunes_aktif");
                 sayim(server, "güneş AKTIF");
@@ -355,7 +357,7 @@ public final class MeteorOtomasyonu {
                 sayim(server, "güneş AKTIF");
             }
             case 2301 -> {
-                server.execute(() -> MeteorAyarlari.dusmeHiziAyarla(eskiHiz));
+                server.execute(() -> MeteorAyarlari.ucusSuresiAyarla(eskiSure));
                 komut(server, "dogalafet stop", "dogalafet sifirla", "dogalafet start ay_carpmasi",
                         "dogalafet asama ileri", "dogalafet asama ileri", "dogalafet asama ileri");
             }
@@ -363,7 +365,7 @@ public final class MeteorOtomasyonu {
                 kare("ay_parcalari_gercek");
                 sayim(server, "ay parçaları gerçek hız");
             }
-            case 2601 -> server.execute(() -> MeteorAyarlari.dusmeHiziAyarla(YAVAS_CEKIM));
+            case 2601 -> server.execute(() -> MeteorAyarlari.ucusSuresiAyarla(YAVAS_CEKIM));
             case 2900 -> {
                 kare("ay_parcalari");
                 sayim(server, "ay parçaları");
@@ -374,7 +376,7 @@ public final class MeteorOtomasyonu {
             }
             case 3201 -> {
                 komut(server, "dogalafet stop", "dogalafet sifirla");
-                server.execute(() -> MeteorAyarlari.dusmeHiziAyarla(eskiHiz));
+                server.execute(() -> MeteorAyarlari.ucusSuresiAyarla(eskiSure));
             }
             case 3300 -> {
                 adim = 4;

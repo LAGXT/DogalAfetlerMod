@@ -36,7 +36,7 @@ import cekirdek_sunucu as cs  # noqa: E402
 cs.SENARYO_DUNYASI = "meteor-senaryo"
 cs.SENARYO_OZELLIKLERI = {"level-name": cs.SENARYO_DUNYASI, "level-seed": "20261106", "online-mode": "false"}
 
-TAVAN = 96
+TAVAN = 240
 KRATER = (r"meteor krateri tamam: -?\d+, -?\d+, -?\d+ \(ölçek {olcek}, {gorunum}, minecraft:overworld\): kazılan (\d+), "
           r"korunan \d+")
 TPS_SURESI = 200

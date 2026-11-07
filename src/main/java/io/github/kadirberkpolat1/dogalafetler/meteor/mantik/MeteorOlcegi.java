@@ -63,4 +63,12 @@ public final class MeteorOlcegi {
     public static double ara(double olcek, double kucuk, double buyuk, double enAz, double enCok) {
         return Math.max(enAz, Math.min(enCok, ara(olcek, kucuk, buyuk)));
     }
+
+    /**
+     * Uçuş süresi (tick): büyük meteor biraz hızlı, {@code ortaSure} ({@code meteor.ucusSuresi}) tipik küçükte ÷0,97,
+     * tipik büyükte ÷1,10, uçlarda ÷0,95–1,12 (180 tick'le 8,0–9,5 sn).
+     */
+    public static double ucusSuresi(double ortaSure, double olcek) {
+        return ortaSure / ara(olcek, 0.97, 1.10, 0.95, 1.12);
+    }
 }

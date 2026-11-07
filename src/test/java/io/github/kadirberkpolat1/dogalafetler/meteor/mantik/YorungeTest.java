@@ -25,6 +25,26 @@ class YorungeTest {
         }
     }
 
+    /** MT2-25: süreyle yörünge her açıda hedefe aynı tick'te varar; 200 blok ve 160–190 tick'te hız ~1–2 blok/tick. */
+    @Test
+    void sureyleHerAcidaAyniSureHizYoldanCikar() {
+        for (double aci : new double[] {40, 55, 70, 90}) {
+            for (double sure : new double[] {160, 180, 190}) {
+                Yorunge y = Yorunge.sureyle(0.5, 64, 0.5, aci, 1.0, 200, sure);
+                assertEquals(sure, y.tamSure(), 1e-9, "açı " + aci);
+                assertEquals(264.0, y.baslangicY(), 1e-9);
+                double[] varis = y.konum(y.tamSure());
+                assertEquals(64.0, varis[1], 1e-9);
+                double hiz = Math.sqrt(y.hizX() * y.hizX() + y.hizY() * y.hizY() + y.hizZ() * y.hizZ());
+                assertTrue(hiz >= 1.0 && hiz <= 2.0, "açı " + aci + " süre " + sure + ": hız " + hiz);
+            }
+        }
+        Yorunge kisa = Yorunge.sureyle(0, 0, 0, 40, 0, 200, 10);
+        double hiz = Math.sqrt(kisa.hizX() * kisa.hizX() + kisa.hizY() * kisa.hizY() + kisa.hizZ() * kisa.hizZ());
+        assertEquals(Yorunge.EN_BUYUK_HIZ, hiz, 1e-9, "paket sınırı");
+        assertTrue(kisa.tamSure() > 10, "sınıra takılan uçuş uzar");
+    }
+
     @Test
     void dikGiriseYatayUzaklikSifirSigGiriseUzak() {
         Yorunge dik = Yorunge.hesapla(0, 0, 0, 90, 1.0, 140, 3.0);

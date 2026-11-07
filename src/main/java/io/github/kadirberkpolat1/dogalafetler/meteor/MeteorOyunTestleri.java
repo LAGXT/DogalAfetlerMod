@@ -385,10 +385,10 @@ public final class MeteorOyunTestleri {
     }
 
     /**
-     * Yağmur: iki oyuncuya sırayla (fark ≤ 1) ve uçan meteor tavanı ({@code meteor.varlikTavani} 96) aşılmaz. Dağıtım
+     * Yağmur: iki oyuncuya sırayla (fark ≤ 1) ve uçan meteor tavanı ({@code meteor.varlikTavani} 240) aşılmaz. Dağıtım
      * halkası 0–2 blok ve giriş dik: meteorlar sahneye düşer.
      */
-    @GameTest(template = SAHNE, batch = "meteor_yagmur", timeoutTicks = 300)
+    @GameTest(template = SAHNE, batch = "meteor_yagmur", timeoutTicks = 400)
     public static void yagmurOyuncularaDengeliTavanAsilmaz(GameTestHelper y) {
         zemin(y, Blocks.STONE);
         ServerLevel level = y.getLevel();
@@ -402,8 +402,8 @@ public final class MeteorOyunTestleri {
         MinecraftForge.EVENT_BUS.addListener(EventPriority.NORMAL, false, MeteorCarptiEvent.class, dinleyici);
         int[] enCok = {0};
         int tavan = MeteorAyarlari.varlikTavani();
-        // Tick başına 2 × 36000/1200 = 60 meteor isteği: ilk tick'te tavan dolar.
-        MeteorAPI.yagmur(level, List.of(a, b), 2, 36000, 0, YanginKaynagi.KOMUT, 0, 2, 90);
+        // Tick başına 2 × 90000/1200 = 150 meteor isteği: ikinci tick'te tavan dolar.
+        MeteorAPI.yagmur(level, List.of(a, b), 2, 90000, 0, YanginKaynagi.KOMUT, 0, 2, 90);
         y.onEachTick(() -> enCok[0] = Math.max(enCok[0], MeteorAPI.aktifMeteorSayisi(level)));
         y.succeedWhen(() -> {
             y.assertTrue(MeteorAPI.aktifYagmurSayisi(level) == 0, "yağmur sürüyor");
@@ -524,14 +524,16 @@ public final class MeteorOyunTestleri {
         });
     }
 
-    /** Hızlandırılmış 10 dk: oyuncu başına 90/dk × 10 dk = 900 meteor bu kadar tick'e sıkıştırılır (20× yoğunluk). */
-    private static final int ON_DAKIKA_TICK = 600;
+    /** Hızlandırılmış 10 dk: oyuncu başına 90/dk × 10 dk = 900 meteor bu kadar tick'e sıkıştırılır (tick başına tam 1,25). */
+    private static final int ON_DAKIKA_TICK = 720;
+    private static final int ON_DAKIKA_METEOR = 900;
 
     /**
-     * meteor-2 (istek 27): 10 dakikalık yağmurun meteor sayısı (900) 30 sn'ye sıkıştırılır: tick başına 1,5 meteor, dik
-     * girişle (uçuş ~47 tick) gökteki yük 16 oyuncunun gerçek 90/dk'sına (1,2/tick, 40–70° giriş) eşit (~70). Uçan meteor her
-     * tick tavanın altında, yağmur bitince bekleyen meteor kalmaz (kuyruk yok). Ölçek dağılımı (%10 büyük, %30 orta)
-     * çarpmalarda görülür. {@code afetBlokHasari} kapalı: krater yok (bütçe kanıtı {@code meteor_butce}), sahne değişmez.
+     * meteor-2 (istek 27, MT2-25): 10 dakikalık yağmurun meteor sayısı (900) 36 sn'ye sıkıştırılır: tick başına 1,25
+     * meteor, uçuş açıdan bağımsız ~9 sn: gökteki yük (~226, en çok 1,25 × 190 ≈ 238) 16 oyuncunun gerçek 1,2/tick'inden
+     * biraz ağır. Uçan meteor her tick tavanın altında, yağmur bitince bekleyen meteor kalmaz (kuyruk yok). Ölçek
+     * dağılımı (%10 büyük, %30 orta) çarpmalarda görülür. {@code afetBlokHasari} kapalı: krater yok (bütçe kanıtı
+     * {@code meteor_butce}), sahne değişmez.
      */
     @GameTest(template = SAHNE, batch = "meteor_on_dakika", timeoutTicks = ON_DAKIKA_TICK + 300)
     public static void onDakikalikYogunYagmurTavanVeButceyiAsmazBoyutlarDegisir(GameTestHelper y) {
@@ -547,7 +549,8 @@ public final class MeteorOyunTestleri {
         int tavan = MeteorAyarlari.varlikTavani();
         int[] enCokUcan = {0};
         int[] asim = {Integer.MIN_VALUE};
-        int kimlik = MeteorAPI.yagmur(level, List.of(a), ON_DAKIKA_TICK, 90.0 * 20, 0.10, YanginKaynagi.KOMUT, 0, 2, 90);
+        int kimlik = MeteorAPI.yagmur(level, List.of(a), ON_DAKIKA_TICK, ON_DAKIKA_METEOR * 1200.0 / ON_DAKIKA_TICK, 0.10,
+                YanginKaynagi.KOMUT, 0, 2, 90);
         int[] atilan = {0};
         y.onEachTick(() -> {
             enCokUcan[0] = Math.max(enCokUcan[0], MeteorAPI.aktifMeteorSayisi(level));
@@ -573,7 +576,7 @@ public final class MeteorOyunTestleri {
             kural.set(true, level.getServer());
             level.getServer().getPlayerList().remove(a);
             sahneyiTemizle(y);
-            y.assertTrue(atilan[0] == ON_DAKIKA_TICK * 90 * 20 / 1200, "900 meteor atılmalı: " + atilan[0]);
+            y.assertTrue(atilan[0] == ON_DAKIKA_METEOR, "900 meteor atılmalı: " + atilan[0]);
             y.assertTrue(enCokUcan[0] <= tavan, "uçan meteor tavanı aşıldı: " + enCokUcan[0] + " / " + tavan);
             y.assertTrue(asim[0] <= 0, "krater bütçesi aşıldı: " + asim[0]);
             y.assertTrue(n > 0 && n <= atilan[0], "çarpan " + n + " / atılan " + atilan[0]);

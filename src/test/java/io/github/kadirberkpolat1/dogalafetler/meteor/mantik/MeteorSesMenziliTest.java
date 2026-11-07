@@ -31,10 +31,10 @@ class MeteorSesMenziliTest {
     @Test
     void dopplerYaklasirkenTizUzaklasirkenPesSinirda() {
         assertEquals(1.0, MeteorSesMenzili.dopplerPerdesi(0), EPS);
-        assertEquals(12.0 / 9.0, MeteorSesMenzili.dopplerPerdesi(3), EPS);
-        assertEquals(0.8, MeteorSesMenzili.dopplerPerdesi(-3), EPS);
+        assertEquals(5.2 / 3.9, MeteorSesMenzili.dopplerPerdesi(1.3), EPS);
+        assertEquals(0.8, MeteorSesMenzili.dopplerPerdesi(-1.3), EPS);
         assertEquals(2.0, MeteorSesMenzili.dopplerPerdesi(100), EPS);
-        assertEquals(12.0 / 22.8, MeteorSesMenzili.dopplerPerdesi(-100), EPS, "hız ±0,9 c'de kırpılır");
+        assertEquals(5.2 / 9.88, MeteorSesMenzili.dopplerPerdesi(-100), EPS, "hız ±0,9 c'de kırpılır");
     }
 
     @Test

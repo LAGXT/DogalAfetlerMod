@@ -62,4 +62,27 @@ class MeteorOlcegiTest {
         assertEquals(0, MeteorOlcegi.bant(MeteorOlcegi.tipik(false)));
         assertEquals(2, MeteorOlcegi.bant(MeteorOlcegi.tipik(true)));
     }
+
+    /**
+     * MT2-25: varsayılan 180 tick'le her bantta uçuş 8–10 sn; 90/dk (1,5/sn) yağmurda oyuncu başına gökte ortalama
+     * 12–15 meteor, 16 oyuncuda {@code meteor.varlikTavani} 240'ın altında.
+     */
+    @Test
+    void ucusSuresiSekizOnSaniyeGoktekiYukOnIkiOnBes() {
+        for (double o = MeteorOlcegi.KUCUK_ALT; o <= MeteorOlcegi.UST; o += 0.05) {
+            double sn = MeteorOlcegi.ucusSuresi(180, o) / 20;
+            assertTrue(sn >= 8.0 && sn <= 10.0, "ölçek " + o + ": " + sn + " sn");
+        }
+        assertTrue(MeteorOlcegi.ucusSuresi(180, MeteorOlcegi.UST) < MeteorOlcegi.ucusSuresi(180, MeteorOlcegi.KUCUK_ALT),
+                "büyük meteor daha kısa uçar");
+        Random r = new Random(20261107);
+        int n = 100_000;
+        double toplam = 0;
+        for (int i = 0; i < n; i++) {
+            toplam += MeteorOlcegi.ucusSuresi(180, MeteorOlcegi.ornekle(r, 0.10, 0.30));
+        }
+        double gokte = 1.5 * toplam / n / 20;
+        assertTrue(gokte >= 12 && gokte <= 15, "oyuncu başına gökte " + gokte);
+        assertTrue(16 * gokte < 240, "16 oyuncu: " + 16 * gokte);
+    }
 }

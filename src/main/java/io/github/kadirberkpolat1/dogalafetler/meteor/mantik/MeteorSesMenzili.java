@@ -21,8 +21,11 @@ public final class MeteorSesMenzili {
     /** Tipik küçük çarpmanın düzeyi tipik büyüğe göre (aynı mesafede). */
     public static final double KUCUK_CARPMA_DUZEYI = 0.7;
     public static final int AYNI_TUR_TAVANI = 6;
-    /** Oyundaki ses hızı (blok/tick): 3 blok/tick'lik meteorda perde 0,8 (uzaklaşan) ile 1,33 (yaklaşan) arası kayar. */
-    public static final double SES_HIZI = 12;
+    /**
+     * Oyundaki ses hızı (blok/tick): tipik 1,3 blok/tick'lik meteorda (200 blok yükseklik, ~9 sn uçuş) perde 0,8
+     * (uzaklaşan) ile 1,33 (yaklaşan) arası kayar.
+     */
+    public static final double SES_HIZI = 5.2;
 
     private MeteorSesMenzili() {
     }
@@ -46,7 +49,7 @@ public final class MeteorSesMenzili {
         return kazanc(mesafe, UCUS_MENZILI);
     }
 
-    /** Doppler perdesi: hız ±0,9 ses hızında kırpılır, sonuç 0,526–2 (oyunda hız ≤ 3,8 blok/tick: 0,76–1,46). {@code yaklasmaHizi} blok/tick, uzaklaşırken eksi. */
+    /** Doppler perdesi: hız ±0,9 ses hızında kırpılır, sonuç 0,526–2 (oyunda hız ~1,0–1,9 blok/tick: 0,73–1,58). {@code yaklasmaHizi} blok/tick, uzaklaşırken eksi. */
     public static double dopplerPerdesi(double yaklasmaHizi) {
         double v = Math.max(-0.9 * SES_HIZI, Math.min(0.9 * SES_HIZI, yaklasmaHizi));
         return Math.max(0.5, Math.min(2.0, SES_HIZI / (SES_HIZI - v)));
