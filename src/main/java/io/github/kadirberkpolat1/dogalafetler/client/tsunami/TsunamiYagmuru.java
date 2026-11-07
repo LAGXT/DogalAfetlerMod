@@ -112,8 +112,8 @@ public final class TsunamiYagmuru {
      * gerçek suyun üst yüzü çizilmiyor, sanal su sütununu hiçbir ağ çizmiyor ya da çizilen su üstü halkadan
      * {@link #SANAL_PAYI}'ndan alçak: {@link SuRenderer#cizilenUst}); {@code kenarsiz} dört ucundan birinin altında 0,5 blok
      * içinde çizilen yüzey olmayan (ve ucu bir bloka ya da suya gömülü olmayan) halka. {@code dalga_alti} üstüne çizilen ya
-     * da yükselen sanal su gelmiş halka (havada değil, suyun altında), üç ana sayıya girmez; {@code goz_ustu_ham} göz hizasının
-     * üstündeki bütün halkalar.
+     * da yükselen sanal su gelmiş halka (havada değil, suyun altında; tick başında söner, karede kalanı aynı tick'in
+     * yükselişidir), üç ana sayıya girmez; {@code goz_ustu_ham} göz hizasının üstündeki bütün halkalar.
      */
     static String olcut() {
         int gozUstu = 0;
@@ -280,7 +280,7 @@ public final class TsunamiYagmuru {
         }
         yogunluk = Mth.clamp(yogunluk + (aktif() ? 1 / 60.0 : -1 / 60.0), 0, 1);
         Vec3 kam = mc.gameRenderer.getMainCamera().getPosition();
-        ilerlet(l);
+        ilerlet(l, kam.y);
         if (yogunluk <= 0) {
             return;
         }
@@ -316,12 +316,14 @@ public final class TsunamiYagmuru {
 
     /**
      * Damlaları bir tick ilerletir; gerçek bir yüzeye üstten değen yakın damla, halkanın sığdığı düz yüzeyde ({@link #tabanli})
-     * halka bırakır ({@link #carpma}); yandan çarpan ya da dar tepeye (direk, fener, çatı kenarı) düşen halkasız söner. Sanal
-     * su halkası her tick yüzeye taşınır ({@link #yuzeydeKal}).
+     * ve göz hizasının altında ({@link YagmurCarpmasi#ustYuzGorunur}) halka bırakır ({@link #carpma}); yandan çarpan ya da dar
+     * tepeye (direk, fener, çatı kenarı) düşen halkasız söner. Sanal su halkası her tick yüzeye taşınır ({@link #yuzeydeKal});
+     * üstüne sanal su yükselen ya da gözün üstünde kalan halka söner.
      */
-    private static void ilerlet(ClientLevel l) {
+    private static void ilerlet(ClientLevel l, double gozY) {
         for (int i = 0; i < halka; ) {
-            if (++HYAS[i] >= HALKA_OMRU || HSANAL[i] && !yuzeydeKal(l, i)) {
+            if (++HYAS[i] >= HALKA_OMRU || (HSANAL[i] ? !yuzeydeKal(l, i) : batti(l, i))
+                    || !YagmurCarpmasi.ustYuzGorunur(HY[i] - 0.02, gozY)) {
                 halkaSil(i);
             } else {
                 i++;
@@ -338,7 +340,7 @@ public final class TsunamiYagmuru {
                 i++;
                 continue;
             }
-            if (yuzey != YagmurCarpmasi.YAN && YAKIN[i] && halka < MAKS_HALKA
+            if (yuzey != YagmurCarpmasi.YAN && YAKIN[i] && halka < MAKS_HALKA && YagmurCarpmasi.ustYuzGorunur(yuzey, gozY)
                     && (sonSanal ? sanalCizili(DX[i], yuzey, DZ[i]) : tabanli(l, DX[i], yuzey, DZ[i]))) {
                 HX[halka] = DX[i];
                 HY[halka] = (float) yuzey + 0.02f;
@@ -362,6 +364,11 @@ public final class TsunamiYagmuru {
         }
         HY[i] = (float) su + 0.02f;
         return sanalCizili(HX[i], su, HZ[i]);
+    }
+
+    /** Blok ya da gerçek su halkasının üstüne sanal su yükseldi: halka batık zeminde kalır, su ağının içinden görünürdü. */
+    private static boolean batti(ClientLevel l, int i) {
+        return SanalSu.suSeviyesi(l, Mth.floor(HX[i]), Mth.floor(HZ[i])) > HY[i] + 0.03;
     }
 
     /**

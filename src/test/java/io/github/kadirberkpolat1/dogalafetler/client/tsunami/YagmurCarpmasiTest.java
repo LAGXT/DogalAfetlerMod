@@ -1,6 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.client.tsunami;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -48,5 +49,12 @@ class YagmurCarpmasiTest {
         assertEquals(YagmurCarpmasi.YAN, YagmurCarpmasi.karar(60.3, 59.15, gizli, 58.0), "sanal yüzey daha aşağıda: görünmez suda asılı kalmasın");
         assertEquals(60.6, YagmurCarpmasi.karar(61.2, 60.05, gizli, 60.6), "alçalmış sanal yüzeyi bu tick geçti");
         assertEquals(YagmurCarpmasi.YAN, YagmurCarpmasi.karar(60.3, 59.15, gizli, 60.6), "sanal yüzeyin zaten altındaydı");
+    }
+
+    @Test
+    void gozHizasininUstundekiYuzeydeHalkaGorunmez() {
+        assertTrue(YagmurCarpmasi.ustYuzGorunur(64.0, 64.62), "gözün altındaki kum");
+        assertFalse(YagmurCarpmasi.ustYuzGorunur(65.0, 64.62), "gözün 0,38 üstündeki kum tepesi (tur 4 karesi)");
+        assertFalse(YagmurCarpmasi.ustYuzGorunur(64.62, 64.62), "göz hizası: yüz kenardan, görünmez");
     }
 }

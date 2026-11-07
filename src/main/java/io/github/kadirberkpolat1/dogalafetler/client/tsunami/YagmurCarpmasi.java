@@ -42,4 +42,12 @@ final class YagmurCarpmasi {
         }
         return Double.isNaN(suya) ? ust : Math.max(ust, suya);
     }
+
+    /**
+     * Halka {@code yuzey} yüksekliğindeki üst yüze yatay çizilir; üst yüz yalnız göz ondan yüksekteyse görünür. Göz hizasının
+     * üstündeki yüzeyde (kum tepesi, çatı, korkuluk) halka blokların kenarında gökyüzünün önünde asılı durur.
+     */
+    static boolean ustYuzGorunur(double yuzey, double gozY) {
+        return yuzey < gozY;
+    }
 }
