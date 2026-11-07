@@ -10,6 +10,7 @@ import io.github.kadirberkpolat1.dogalafetler.donma.mantik.KisKaynagi;
 import io.github.kadirberkpolat1.dogalafetler.donma.mantik.KiyiUzakligi;
 import io.github.kadirberkpolat1.dogalafetler.donma.mantik.SuSutunu;
 import io.github.kadirberkpolat1.dogalafetler.donma.mantik.ZeminKari;
+import io.github.kadirberkpolat1.dogalafetler.gokyuzu.PulsarKayitlari;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -44,7 +45,9 @@ import net.minecraft.world.ticks.LevelTicks;
  * ya da oyuncunun) dokunulmaz.</li>
  * <li>Eski sürümün {@code kiragili_cimen}'i (tablo onu tanımıyorsa) sütun işlendiğinde aynı {@code snowy} ile çimene
  * döner.</li>
- * <li>Zeminin üstü hava ya da bizim karımız değilse (bitki, oyuncunun karı, başka blok) sütuna dokunulmaz.</li>
+ * <li>Zeminin üstü hava, bizim karımız ya da pulsar külü değilse (bitki, oyuncunun karı, başka blok) sütuna dokunulmaz.
+ * Kül katmanı kar gelince karla değişir (PL-5, K0-24 tek yönlü: çözülünce kar erir, kül geri gelmez; altındaki kül
+ * bloğu ya da toprak kalır).</li>
  * <li>Üst blok yüzey tablosundaysa zincirde yönlü ilerler; aynı adlı blok durumu özellikleri korunur. Varsayılan tabloda
  * yüzey satırı yok: çimen çimen kalır, üstüne gelen kar örtüsü onu vanilla şekil güncellemesiyle {@code snowy} yapar.</li>
  * <li>Kök {@code #dogalafetler:donma/kar_zemini} etiketindeyse kar katmanı ({@link ZeminKari}) ayarlanır ve kar biti
@@ -272,7 +275,8 @@ public final class DonmaIsleyici {
         BlockPos yukari = new BlockPos(x, y + 1, z);
         BlockState ustundeki = chunk.getBlockState(yukari);
         boolean bizimKar = ustundeki.is(Blocks.SNOW) && durum.kar(i);
-        if (!ustundeki.isAir() && !bizimKar) {
+        boolean kul = ustundeki.is(PulsarKayitlari.KUL_KATMANI.get());
+        if (!ustundeki.isAir() && !bizimKar && !kul) {
             return;
         }
         Block kok = tablo.yuzey().kok(ust.getBlock());

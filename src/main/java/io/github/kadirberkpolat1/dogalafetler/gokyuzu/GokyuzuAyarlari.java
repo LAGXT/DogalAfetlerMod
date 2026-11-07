@@ -1,14 +1,16 @@
 package io.github.kadirberkpolat1.dogalafetler.gokyuzu;
 
 import io.github.kadirberkpolat1.dogalafetler.config.AyarKaydi;
+import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.GokyuzuAyarGocu;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.GunesZinciri;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.PulsarSecimi;
 import net.minecraftforge.common.ForgeConfigSpec;
 
 /**
  * {@code gokyuzu} config bölümleri (N17). SERVER: güneş zinciri süreleri ve kızıl cücenin dünya görünümü (boyut,
- * gök/sis tonu); Forge sunucu config'ini istemciye eşitlediği için bütün oyuncular aynı göğü görür (madde 3). CLIENT:
- * yalnız oyuncunun kendi makinesine dair yoğunluk ayarları (madde 1, N13).
+ * gök/sis tonu) ve pulsar zinciri (pulsar-2); Forge sunucu config'ini istemciye eşitlediği için bütün oyuncular aynı göğü
+ * görür (madde 3). Değişen varsayılanlar {@link GokyuzuAyarGocu} ile göç eder (K-E61). CLIENT: yalnız oyuncunun kendi
+ * makinesine dair yoğunluk ayarları (madde 1, N13).
  */
 public final class GokyuzuAyarlari {
     private static AyarKaydi.Bolum<Sunucu> sunucu;
@@ -21,6 +23,7 @@ public final class GokyuzuAyarlari {
     public static void kaydet() {
         sunucu = AyarKaydi.sunucuBolumu("gokyuzu", "Ortak gökyüzü ve güneş zinciri (madde 16, bölüm D ve H)", Sunucu::new);
         istemci = AyarKaydi.istemciBolumu("gokyuzu", "Gökyüzü görseli (madde 16, N13)", Istemci::new);
+        AyarKaydi.sunucuGocu(GokyuzuAyarGocu.SURUM_YOLU, GokyuzuAyarGocu.GUNCEL, GokyuzuAyarGocu::plan);
     }
 
     /** Güneş zinciri ayarları; süreç her tick okur, değerler değişmedikçe aynı kayıt döner. */
@@ -67,6 +70,36 @@ public final class GokyuzuAyarlari {
         return sunucu.get().pulsarKavrulmaOlasiligi.get();
     }
 
+    /** Pulsar döneminin süresi, oyun günü (K-C29): dolunca kara delik yutar. */
+    public static int pulsarGun() {
+        return sunucu.get().pulsarGun.get();
+    }
+
+    /** Tam güçte oyuncu başına gerçek dakikada pulsar meteoru. */
+    public static double pulsarMeteorDakikaBasina() {
+        return sunucu.get().pulsarMeteorDakikaBasina.get();
+    }
+
+    /** Pulsar kavurma kuyruğunun tick başına blok değişimi tavanı (TPS kısmasından önce). */
+    public static int pulsarBlokButcesi() {
+        return sunucu.get().pulsarBlokButcesi.get();
+    }
+
+    /** Pulsarda yüzeyde seyrek lav gözesi açılır mı. */
+    public static boolean pulsarLav() {
+        return sunucu.get().pulsarLav.get();
+    }
+
+    /** Kara delik yutmasından sonraki buzul kıyametin süresi, oyun günü (ardından ilk şafakta kızıl cüce doğar). */
+    public static int pulsarSonrasiGunessizGun() {
+        return sunucu.get().pulsarSonrasiGunessizGun.get();
+    }
+
+    /** Pulsar titreşiminin şiddet çarpanı (0 = sabit, yalnız yavaş sarsıntı; fotosensitivite). */
+    public static double pulsarTitresim() {
+        return istemci.get().pulsarTitresim.get();
+    }
+
     public static double yildizYogunlugu() {
         return istemci.get().yildizYogunlugu.get();
     }
@@ -86,9 +119,17 @@ public final class GokyuzuAyarlari {
         private final ForgeConfigSpec.DoubleValue pulsarIsinmaGun;
         private final ForgeConfigSpec.DoubleValue pulsarYanginDakikaBasina;
         private final ForgeConfigSpec.DoubleValue pulsarKavrulmaOlasiligi;
+        private final ForgeConfigSpec.IntValue pulsarGun;
+        private final ForgeConfigSpec.DoubleValue pulsarMeteorDakikaBasina;
+        private final ForgeConfigSpec.IntValue pulsarBlokButcesi;
+        private final ForgeConfigSpec.BooleanValue pulsarLav;
+        private final ForgeConfigSpec.IntValue pulsarSonrasiGunessizGun;
 
         private Sunucu(ForgeConfigSpec.Builder k) {
             GunesZinciri.Ayarlar v = GunesZinciri.Ayarlar.VARSAYILAN;
+            k.comment("Config göçünün sürümü (K-E61): dosya bundan eskiyse açılışta eski varsayılanında kalan gökyüzü değerleri "
+                    + "yeni varsayılana çekilir, elle değiştirilenlere dokunulmaz. Elle değiştirmeyin.")
+                    .defineInRange("ayarSurumu", GokyuzuAyarGocu.GUNCEL, 0, Integer.MAX_VALUE);
             supernovaSuresiGun = k.comment("Süpernovanın gök yüzünde göründüğü süre, Minecraft günü (bölüm D: 1–2 gün).")
                     .defineInRange("supernovaSuresiGun", v.supernovaSuresiGun(), 1.0, 2.0);
             kizilCuceGecikmeGun = k.comment("Donma %100 olduktan kaç gün sonra kızıl cüce doğar (ilk şafakta); "
@@ -108,19 +149,35 @@ public final class GokyuzuAyarlari {
                     .defineInRange("pulsarOlasiligi", PulsarSecimi.VARSAYILAN_OLASILIK, 0.0, 1.0);
             pulsarIsinmaGun = k.comment("Pulsar doğduktan sonra dünya etkilerinin (sıcaklık, kavrulma, yangın, buharlaşma) "
                     + "tam güce çıkma süresi, Minecraft günü.")
-                    .defineInRange("pulsarIsinmaGun", 2.0, 0.05, 30.0);
+                    .defineInRange("pulsarIsinmaGun", 1.0, 0.05, 30.0);
             pulsarYanginDakikaBasina = k.comment("Tam güçte oyuncu başına dakikada yeni yangın odağı (ortak yangın sistemi; "
                     + "TPS kısması ve yangın tavanıyla sınırlı, afetBlokHasari=false iken yok).")
-                    .defineInRange("pulsarYanginDakikaBasina", 20.0, 0.0, 120.0);
+                    .defineInRange("pulsarYanginDakikaBasina", 24.0, 0.0, 120.0);
             pulsarKavrulmaOlasiligi = k.comment("Tam güçte oyuncu başına ölçekli tick'te güneşe açık çimenin kaba toprağa "
                     + "dönme denemesi olasılığı (güneş patlaması kavrulmasıyla aynı kural).")
                     .defineInRange("pulsarKavrulmaOlasiligi", 0.6, 0.0, 1.0);
+            pulsarGun = k.comment("Pulsar döneminin süresi, Minecraft günü (oyun günü: uyku ve /dogalafet gun sayılır, "
+                    + "/dogalafet hiz sayılmaz). Dolunca pulsarı uzak bir kara delik yutar.")
+                    .defineInRange("pulsarGun", 15, 1, 120);
+            pulsarMeteorDakikaBasina = k.comment("Tam güçte oyuncu başına gerçek dakikada pulsar meteoru (güneş/ay "
+                    + "yağmurunun 180'inden seyrek; uçan meteor tavanı ortak).")
+                    .defineInRange("pulsarMeteorDakikaBasina", 12.0, 0.0, 180.0);
+            pulsarBlokButcesi = k.comment("Pulsar kavurmasının (kül, kömürleşme, cam, lav) tick başına en çok blok değişimi; "
+                    + "TPS kısmasıyla çarpılır.")
+                    .defineInRange("pulsarBlokButcesi", 256, 0, 4096);
+            pulsarLav = k.comment("Pulsarda deniz seviyesinin üstünde, oyunculardan uzakta çok seyrek tek bloklu lav gözesi "
+                    + "açılır (afetBlokHasari=false iken yok).")
+                    .define("pulsarLav", true);
+            pulsarSonrasiGunessizGun = k.comment("Kara delik pulsarı yuttuktan sonraki buzul kıyametin süresi, Minecraft günü; "
+                    + "ardından ilk şafakta kızıl cüce doğar ve doğuş bitince eski güneş geri gelir.")
+                    .defineInRange("pulsarSonrasiGunessizGun", 10, 1, 120);
         }
     }
 
     private static final class Istemci {
         private final ForgeConfigSpec.DoubleValue yildizYogunlugu;
         private final ForgeConfigSpec.BooleanValue nebulaKatmani;
+        private final ForgeConfigSpec.DoubleValue pulsarTitresim;
 
         private Istemci(ForgeConfigSpec.Builder k) {
             yildizYogunlugu = k.comment("Yıldız sayısı çarpanı (efekt kalitesinin yıldız sayısıyla çarpılır: Düşük 2000, Orta 4000, "
@@ -128,6 +185,9 @@ public final class GokyuzuAyarlari {
                     .defineInRange("yildizYogunlugu", 1.0, 0.25, 2.0);
             nebulaKatmani = k.comment("Samanyolu, galaksi ve gece nebulası katmanı (kapalıyken yalnız yıldız ve süpernova kalıntısı).")
                     .define("nebulaKatmani", true);
+            pulsarTitresim = k.comment("Pulsarın hızlı yanal titreşiminin ve çatırtı parlamalarının şiddeti (0 = sabit, yalnız "
+                    + "yavaş sarsıntı; ışığa duyarlı oyuncular için).")
+                    .defineInRange("pulsarTitresim", 1.0, 0.0, 1.0);
         }
     }
 }

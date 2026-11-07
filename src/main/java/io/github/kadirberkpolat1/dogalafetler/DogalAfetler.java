@@ -74,7 +74,7 @@ public final class DogalAfetler {
         SanalSu.kaydet();
         Sicaklik.kaydet(modBus);
         Uyari.kaydet(modBus);
-        GokyuzuSistemi.kaydet();
+        GokyuzuSistemi.kaydet(modBus);
         YanginSistemi.kaydet(modBus);
         DonmaSistemi.kaydet(modBus);
         Yiyecek.kaydet(modBus);

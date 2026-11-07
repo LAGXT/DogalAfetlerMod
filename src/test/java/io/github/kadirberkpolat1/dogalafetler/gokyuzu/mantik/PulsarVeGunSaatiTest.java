@@ -8,7 +8,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.OrtamSicakligi;
 import org.junit.jupiter.api.Test;
 
-/** Gökyüzü-2 saf mantığı: pulsar seçimi, pulsar eğrileri ve ısısı, güneş patlamasında gün saati sabitleme. */
+/** Gökyüzü-2 saf mantığı: pulsar seçimi, ısınma eğrisi ve ısısı, evre sırası, güneş patlamasında gün saati sabitleme. */
 class PulsarVeGunSaatiTest {
     @Test
     void pulsarOlasiligiVarsayilanaYakinVeBelirlenimci() {
@@ -38,14 +38,12 @@ class PulsarVeGunSaatiTest {
     }
 
     @Test
-    void pulsarIsiniDonerNabizYalnizHizalanincaParlar() {
-        assertEquals(0f, PulsarEgrileri.isinAcisi(0), 1e-5f);
-        assertEquals(PulsarEgrileri.isinAcisi(1.0), PulsarEgrileri.isinAcisi(1.0 + PulsarEgrileri.DONUS_SN), 1e-4f);
-        assertEquals(1f, PulsarEgrileri.nabiz(1f), 1e-6f);
-        assertTrue(PulsarEgrileri.nabiz(0.8f) < 0.1f, "ışın bakıştan biraz sapınca nabız söner");
-        assertEquals(0f, PulsarEgrileri.nabiz(-1f), 1e-6f);
+    void pulsarYogunluguYumusakBasamak() {
         assertEquals(0f, PulsarEgrileri.yogunluk(0f), 1e-6f);
+        assertEquals(0.5f, PulsarEgrileri.yogunluk(0.5f), 1e-6f);
         assertEquals(1f, PulsarEgrileri.yogunluk(1f), 1e-6f);
+        assertEquals(0f, PulsarEgrileri.yogunluk(-2f), 1e-6f);
+        assertEquals(1f, PulsarEgrileri.yogunluk(3f), 1e-6f);
     }
 
     @Test
@@ -53,9 +51,12 @@ class PulsarVeGunSaatiTest {
         OrtamSicakligi.Ayarlar a = OrtamSicakligi.Ayarlar.VARSAYILAN;
         double tam = OrtamSicakligi.PULSAR_ARTIS_CARPANI * a.gunesPatlamasiArtisi();
         assertTrue(tam > a.gunesPatlamasiArtisi() && tam > 40, "pulsar ısısı güneş patlaması tepesini aşar: " + tam);
-        assertTrue(GunesEvresi.values()[GunesEvresi.values().length - 1] == GunesEvresi.PULSAR,
-                "PULSAR en sonda (paket sıra numarası değişmez)");
+        GunesEvresi[] evreler = GunesEvresi.values();
+        assertTrue(evreler[evreler.length - 1] == GunesEvresi.KARADELIK_YUTMA
+                && evreler[evreler.length - 2] == GunesEvresi.PULSAR,
+                "PULSAR ve ardından KARADELIK_YUTMA en sonda (paket sıra numarası değişmez)");
         assertEquals(GunesEvresi.PULSAR, GunesEvresi.kimlikIle("pulsar"));
+        assertEquals(GunesEvresi.KARADELIK_YUTMA, GunesEvresi.kimlikIle("karadelik_yutma"));
     }
 
     @Test

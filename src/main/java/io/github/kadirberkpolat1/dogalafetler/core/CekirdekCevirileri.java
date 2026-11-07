@@ -44,5 +44,6 @@ public final class CekirdekCevirileri {
         yazici.ekle(GunesEvresi.GUNESSIZ.ceviriAnahtari(), "Sunless era", "Güneşsiz dönem");
         yazici.ekle(GunesEvresi.KIZIL_CUCE.ceviriAnahtari(), "Red dwarf era", "Kızıl cüce dönemi");
         yazici.ekle(GunesEvresi.PULSAR.ceviriAnahtari(), "Pulsar era", "Pulsar dönemi");
+        yazici.ekle(GunesEvresi.KARADELIK_YUTMA.ceviriAnahtari(), "Black hole swallow", "Kara delik yutması");
     }
 }

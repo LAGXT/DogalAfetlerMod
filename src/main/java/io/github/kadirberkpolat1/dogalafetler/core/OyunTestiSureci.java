@@ -12,8 +12,8 @@ import net.minecraftforge.eventbus.api.EventPriority;
 
 /**
  * Güneş patlamasından sonraki dönem sürecinin davranışsız taklidi (yalnız geliştirme sunucusu ve senaryo, K-C41): güneş
- * SUPERNOVA ya da GUNESSIZ evresindeyken aktiftir; durdurulmamışsa evre ilerlemesini {@value #EVRE_SURESI} ölçekli tick'te
- * 1'e çıkarır ve evreyi bir sonrakine geçirir (SUPERNOVA → GUNESSIZ → KIZIL_CUCE). Gökyüzü, donma ya da su yoktur. Sahip
+ * SUPERNOVA ya da (pulsar yolu dışında, {@link PulsarYolu}) GUNESSIZ evresindeyken aktiftir; durdurulmamışsa evre
+ * ilerlemesini {@value #EVRE_SURESI} ölçekli tick'te 1'e çıkarır ve evreyi bir sonrakine geçirir (SUPERNOVA → GUNESSIZ → KIZIL_CUCE). Gökyüzü, donma ya da su yoktur. Sahip
  * deseni (sözleşme §3a): her ilerlemeden önce {@link AfetYoneticisi#surecDurdu} sorulur; döngünün başladığı SUPERNOVA
  * {@code evreBaslangicSaati} kendi ek verisinde tutulur, değişince (yeni döngü) {@link AfetYoneticisi#donemSureciBasladi}
  * çağrılır. {@link OyunTestiAfeti} güneş patlaması türüyle özellikten kaydedilince birlikte kaydedilir.
@@ -44,8 +44,9 @@ public final class OyunTestiSureci implements DonemSureci {
 
     @Override
     public boolean aktifMi(ServerLevel ustDunya) {
-        GunesEvresi evre = DunyaDonemi.al(ustDunya).gunesEvresi();
-        return evre == GunesEvresi.SUPERNOVA || evre == GunesEvresi.GUNESSIZ;
+        DunyaDonemi donem = DunyaDonemi.al(ustDunya);
+        GunesEvresi evre = donem.gunesEvresi();
+        return evre == GunesEvresi.SUPERNOVA || evre == GunesEvresi.GUNESSIZ && !PulsarYolu.donusYolu(donem);
     }
 
     @Override

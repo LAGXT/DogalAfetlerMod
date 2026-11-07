@@ -9,13 +9,21 @@ import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
 import io.github.kadirberkpolat1.dogalafetler.core.AyDurumu;
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
+import io.github.kadirberkpolat1.dogalafetler.core.PulsarYolu;
+import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.PulsarZinciri;
 import io.github.kadirberkpolat1.dogalafetler.komut.DogalAfetKomutu;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
+import io.github.kadirberkpolat1.dogalafetler.network.DonemPaketi;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.AfterBatch;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.GameRules;
@@ -23,10 +31,13 @@ import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
 
 /**
- * Gökyüzü-2 oyun içi testleri: pulsar dönemi (başlar, döneme yazılır, kayıttan döner; donmayı çözer, buharlaştırır;
- * zincirin doğal doğuşu seçimi izler), güneş patlaması AKTIF'te gün saatinin sabitliği ve ay patlamasının sunucu
- * saatinden ömrü. Her test dönemi değiştirdiği için kendi {@code batch}'indedir; başta ve sonda {@code sifirla} (K-E15),
- * değiştirilen gamerule ve gün saati geri konur; config dosyasına yazılmaz (K-E28).
+ * Gökyüzü-2 ve pulsar-2 oyun içi testleri: pulsar dönemi (başlar, döneme yazılır, kayıttan döner; donmayı çözer,
+ * buharlaştırır; zincirin doğal doğuşu seçimi izler), pulsar zinciri (PULSAR → KARADELİK_YUTMA → GÜNEŞSİZ → KIZIL CÜCE
+ * → NORMAL: {@code asama ileri}, oyun günü süreleri, 90 sn yutma, eski güneşin dönüşü, {@code sifirla}, {@code durum}
+ * satırı, kayıt gidiş-dönüşü), güneş patlaması AKTIF'te gün saatinin sabitliği ve ay patlamasının sunucu saatinden
+ * ömrü. Pulsarın dünya etkileri {@code PulsarDunyaOyunTestleri}'ndedir. Her test dönemi değiştirdiği için kendi
+ * {@code batch}'indedir; başta ve sonda {@code sifirla} (K-E15), değiştirilen gamerule ve gün saati geri konur; config
+ * dosyasına yazılmaz (K-E28). Zincir testleri blok hasarını kapatır (etkiler süreci sarsmasın).
  */
 @GameTestHolder(DogalAfetler.MOD_ID)
 @PrefixGameTestTemplate(false)
@@ -60,6 +71,41 @@ public final class PulsarOyunTestleri {
 
     @AfterBatch(batch = "gokyuzu2_dogus")
     public static void dogusSonrasi(ServerLevel level) {
+        temizle(level.getServer());
+    }
+
+    @AfterBatch(batch = "pulsar2_asama")
+    public static void asamaSonrasi(ServerLevel level) {
+        temizle(level.getServer());
+    }
+
+    @AfterBatch(batch = "pulsar2_gun")
+    public static void gunSonrasi(ServerLevel level) {
+        temizle(level.getServer());
+    }
+
+    @AfterBatch(batch = "pulsar2_yutma")
+    public static void yutmaSonrasi(ServerLevel level) {
+        temizle(level.getServer());
+    }
+
+    @AfterBatch(batch = "pulsar2_donus")
+    public static void donusSonrasi(ServerLevel level) {
+        temizle(level.getServer());
+    }
+
+    @AfterBatch(batch = "pulsar2_sifirla")
+    public static void sifirlaSonrasi(ServerLevel level) {
+        temizle(level.getServer());
+    }
+
+    @AfterBatch(batch = "pulsar2_durum")
+    public static void durumSonrasi(ServerLevel level) {
+        temizle(level.getServer());
+    }
+
+    @AfterBatch(batch = "pulsar2_kayit")
+    public static void kayitSonrasi(ServerLevel level) {
         temizle(level.getServer());
     }
 
@@ -121,19 +167,18 @@ public final class PulsarOyunTestleri {
         y.assertTrue(komut(y, "dogalafet pulsar baslat") == 1, "pulsar baslat");
         y.assertTrue(donem.gunesEvresi() == GunesEvresi.PULSAR && surec.aktifMi(ust), "pulsar doğmalı: " + donem.ozet());
         y.assertTrue(komut(y, "dogalafet pulsar baslat") == 0, "ikinci baslat reddedilmeli");
-        yonetici.hizAyarla(1000);
+        yonetici.hizAyarla(20);
         y.succeedWhen(() -> {
-            CompoundTag veri = donem.ekVeri(PulsarSureci.KIMLIK);
-            y.assertTrue(veri.contains(PulsarSureci.DONGU) && veri.getLong(PulsarSureci.DONGU) == donem.evreBaslangicSaati(),
+            y.assertTrue(PulsarYolu.donguVar(donem) && PulsarYolu.dongu(donem) == donem.evreBaslangicSaati(),
                     "döngü kimliği pulsar başlangıcı olmalı");
-            y.assertTrue(donem.evreIlerlemesi() > 0f, "ısınma ilerlemeli: " + donem.ozet());
+            y.assertTrue(donem.evreIlerlemesi() > 0f && donem.evreIlerlemesi() < 1f, "ısınma ilerlemeli: " + donem.ozet());
             DunyaDonemi geri = DunyaDonemi.yukle(donem.save(new CompoundTag()));
             y.assertTrue(geri.gunesEvresi() == GunesEvresi.PULSAR && geri.evreIlerlemesi() == donem.evreIlerlemesi()
                     && geri.evreBaslangicSaati() == donem.evreBaslangicSaati()
-                    && geri.ekVeri(PulsarSureci.KIMLIK).getLong(PulsarSureci.DONGU) == donem.evreBaslangicSaati(),
+                    && PulsarYolu.dongu(geri) == donem.evreBaslangicSaati(),
                     "pulsar kayıt/okumada korunmalı");
-            y.assertTrue(komut(y, "dogalafet asama ileri pulsar") == 1 && donem.evreIlerlemesi() == 1f,
-                    "asama ileri ısınmayı tamamlar");
+            y.assertTrue(komut(y, "dogalafet asama ileri pulsar") == 1 && donem.evreIlerlemesi() == 1f
+                    && donem.gunesEvresi() == GunesEvresi.PULSAR, "asama ileri önce ısınmayı tamamlar");
             y.assertTrue(komut(y, "dogalafet sifirla") == 1, "sifirla");
             y.assertTrue(donem.gunesEvresi() == GunesEvresi.NORMAL && !surec.aktifMi(ust), "sifirla sonrası NORMAL");
             yonetici.sifirla();
@@ -236,5 +281,256 @@ public final class PulsarOyunTestleri {
                     "ömür dolunca patlama ve izleri kaybolmalı: " + s);
             temizle(y.getLevel().getServer());
         });
+    }
+
+    @GameTest(template = "bos", batch = "pulsar2_asama", timeoutTicks = 100)
+    public static void asamaIleriPulsarZinciriniEskiGuneseGoturur(GameTestHelper y) {
+        AfetYoneticisi yonetici = temizBasla(y);
+        DunyaDonemi donem = yonetici.donem();
+        MinecraftServer server = y.getLevel().getServer();
+        ServerLevel ust = server.overworld();
+        kurallar(y, true, 6_000L);
+        y.assertTrue(komut(y, "dogalafet pulsar baslat") == 1, "pulsar baslat");
+        y.assertTrue(komut(y, "dogalafet asama ileri karadelik") == 0, "takma ad yalnız kendi aşamasında geçer");
+        y.assertTrue(komut(y, "dogalafet asama ileri pulsar") == 1 && donem.gunesEvresi() == GunesEvresi.PULSAR
+                && donem.evreIlerlemesi() == 1f, "önce ısınma tamamlanır: " + donem.ozet());
+        y.assertTrue(komut(y, "dogalafet asama ileri pulsar") == 1
+                && donem.gunesEvresi() == GunesEvresi.KARADELIK_YUTMA && !PulsarYolu.donusYolu(donem),
+                "kara delik yutması: " + donem.ozet());
+        y.assertTrue(komut(y, "dogalafet asama ileri karadelik") == 1 && donem.gunesEvresi() == GunesEvresi.GUNESSIZ
+                && PulsarYolu.donusYolu(donem) && PulsarYolu.gunessizBaslangicVar(donem), "buzul kıyamet: " + donem.ozet());
+        y.assertTrue(PulsarSureci.al().aktifMi(ust) && !GunesZinciriSureci.al().aktifMi(ust),
+                "pulsar yolunda güneşsiz dönem pulsar sürecinin, güneş zinciri devre dışı");
+        y.assertTrue(DonemPaketi.den(donem, 1.0, false).donusYolu() && !DonemPaketi.den(donem, 1.0, false).blokHasari(),
+                "paket bayrakları");
+        y.assertTrue(komut(y, "dogalafet asama ileri gunessiz") == 1 && donem.gunesEvresi() == GunesEvresi.KIZIL_CUCE
+                && PulsarYolu.donusYolu(donem) && donem.cozulmeDonemi(), "kızıl cüce doğuşu: " + donem.ozet());
+        y.assertTrue(komut(y, "dogalafet asama ileri kizilcuce") == 1 && donem.gunesEvresi() == GunesEvresi.NORMAL
+                && !PulsarYolu.donusYolu(donem) && PulsarYolu.gunesDondu(donem), "eski güneş: " + donem.ozet());
+        y.assertTrue(DonemPaketi.den(donem, 1.0, true).gunesDondu() && !DonemPaketi.den(donem, 1.0, true).donusYolu(),
+                "paket güneş döndü bayrağı");
+        y.assertTrue(komut(y, "dogalafet asama ileri pulsar") == 0, "zincir bitti");
+        y.succeedWhen(() -> {
+            y.assertTrue(!PulsarYolu.gunesDondu(donem) && !donem.cozulmeDonemi(),
+                    "donma 0'ken dönüş bayrağı ve çözülme dönemi kapanmalı: " + donem.ozet());
+            temizle(server);
+        });
+    }
+
+    @GameTest(template = "bos", batch = "pulsar2_gun", timeoutTicks = 100)
+    public static void pulsarOyunGunuDoluncaKaraDelikBaslar(GameTestHelper y) {
+        AfetYoneticisi yonetici = temizBasla(y);
+        DunyaDonemi donem = yonetici.donem();
+        kurallar(y, true, 6_000L);
+        y.assertTrue(komut(y, "dogalafet pulsar baslat") == 1, "pulsar baslat");
+        int[] adim = {0};
+        y.succeedWhen(() -> {
+            if (adim[0] == 0) {
+                y.assertTrue(PulsarYolu.baslangicVar(donem) && PulsarYolu.dongu(donem) == donem.evreBaslangicSaati(),
+                        "başlangıç döngü başında yazılmalı");
+                donem.gunOfsetiAyarla(donem.gunOfseti() + GokyuzuAyarlari.pulsarGun() - 1);
+                adim[0] = 1;
+                y.fail("bir gün kala");
+            }
+            if (adim[0] == 1) {
+                y.assertTrue(donem.gunesEvresi() == GunesEvresi.PULSAR, "süre dolmadan evre değişmemeli: " + donem.ozet());
+                donem.gunOfsetiAyarla(donem.gunOfseti() + 1);
+                adim[0] = 2;
+                y.fail("süre doluyor");
+            }
+            y.assertTrue(donem.gunesEvresi() == GunesEvresi.KARADELIK_YUTMA,
+                    "pulsarGun oyun günü dolunca kara delik: " + donem.ozet());
+            temizle(y.getLevel().getServer());
+        });
+    }
+
+    @GameTest(template = "bos", batch = "pulsar2_yutma", timeoutTicks = 200)
+    public static void karaDelikDoksanSaniyedeBuzulaGecer(GameTestHelper y) {
+        AfetYoneticisi yonetici = temizBasla(y);
+        DunyaDonemi donem = yonetici.donem();
+        kurallar(y, true, 6_000L);
+        y.assertTrue(komut(y, "dogalafet pulsar baslat") == 1, "pulsar baslat");
+        y.assertTrue(komut(y, "dogalafet asama ileri pulsar") == 1 && komut(y, "dogalafet asama ileri pulsar") == 1
+                && donem.gunesEvresi() == GunesEvresi.KARADELIK_YUTMA, "kara delik: " + donem.ozet());
+        int once = PulsarSureci.yutmaPatlamasiSayisi();
+        boolean[] parlamaGoruldu = {false};
+        yonetici.hizAyarla(50);
+        y.succeedWhen(() -> {
+            if (donem.gunesEvresi() == GunesEvresi.KARADELIK_YUTMA) {
+                float sn = PulsarZinciri.yutmaSaniyesi(donem.evreBaslangicSaati(), donem.saat());
+                if (PulsarYolu.yutmaPatlamasiOldu(donem)) {
+                    y.assertTrue(sn >= PulsarZinciri.YUTMA_PARLAMA_SN, "parlama 55. sn'den önce: " + sn);
+                    parlamaGoruldu[0] = true;
+                }
+                y.fail("yutma sürüyor: " + sn + " sn");
+            }
+            y.assertTrue(donem.gunesEvresi() == GunesEvresi.GUNESSIZ && PulsarYolu.donusYolu(donem),
+                    "90 sn sonra pulsar yolunda güneşsiz dönem: " + donem.ozet());
+            y.assertTrue(parlamaGoruldu[0] && PulsarYolu.yutmaPatlamasiOldu(donem), "parlama yutma sürerken gelmeli");
+            y.assertTrue(PulsarSureci.yutmaPatlamasiSayisi() - once == 1,
+                    "55. sn sarsıntısı bir kez: " + (PulsarSureci.yutmaPatlamasiSayisi() - once));
+            y.assertTrue(DonemPaketi.den(donem, 50.0).donusYolu(), "evreyle aynı pakette dönüş yolu bayrağı");
+            temizle(y.getLevel().getServer());
+        });
+    }
+
+    @GameTest(template = "bos", batch = "pulsar2_donus", timeoutTicks = 400)
+    public static void buzulKiyamettenSonraEskiGunesDoner(GameTestHelper y) {
+        AfetYoneticisi yonetici = temizBasla(y);
+        DunyaDonemi donem = yonetici.donem();
+        MinecraftServer server = y.getLevel().getServer();
+        ServerLevel ust = server.overworld();
+        kurallar(y, false, 1_000L);
+        y.assertTrue(komut(y, "dogalafet pulsar baslat") == 1, "pulsar baslat");
+        for (String surec : new String[] {"pulsar", "pulsar", "karadelik"}) {
+            y.assertTrue(komut(y, "dogalafet asama ileri " + surec) == 1, "asama ileri " + surec);
+        }
+        y.assertTrue(donem.gunesEvresi() == GunesEvresi.GUNESSIZ && PulsarYolu.donusYolu(donem), "buzul: " + donem.ozet());
+        donem.donmaIlerlemesiAyarla(50f);
+        yonetici.hizAyarla(1000);
+        int[] adim = {0};
+        boolean[] kizilCuce = {false};
+        y.succeedWhen(() -> {
+            if (adim[0] == 0) {
+                y.assertTrue(donem.gunesEvresi() == GunesEvresi.GUNESSIZ, "süre dolmadan buzul sürmeli: " + donem.ozet());
+                donem.gunOfsetiAyarla(donem.gunOfseti() + GokyuzuAyarlari.pulsarSonrasiGunessizGun());
+                adim[0] = 1;
+                y.fail("buzul süresi doldu");
+            }
+            if (donem.gunesEvresi() == GunesEvresi.KIZIL_CUCE) {
+                y.assertTrue(PulsarYolu.donusYolu(donem) && donem.cozulmeDonemi() && !GunesZinciriSureci.al().aktifMi(ust),
+                        "pulsar yolunda kızıl cüce doğuşu: " + donem.ozet());
+                kizilCuce[0] = true;
+                y.fail("doğuş sürüyor");
+            }
+            y.assertTrue(kizilCuce[0] && donem.gunesEvresi() == GunesEvresi.NORMAL,
+                    "gün döngüsü kapalıyken kızıl cüce doğup eski güneşe dönmeli: " + donem.ozet());
+            if (adim[0] == 1) {
+                y.assertTrue(PulsarYolu.gunesDondu(donem) && donem.donmaIlerlemesi() > 1f,
+                        "eski güneş döndü, donma çözülüyor: " + donem.ozet());
+                adim[0] = 2;
+                y.fail("çözülme bekleniyor");
+            }
+            y.assertTrue(donem.donmaIlerlemesi() <= 1e-3f && !PulsarYolu.gunesDondu(donem) && !donem.cozulmeDonemi(),
+                    "donma 0'a çözülünce bayrak silinmeli: " + donem.ozet());
+            temizle(server);
+        });
+    }
+
+    @GameTest(template = "bos", batch = "pulsar2_sifirla", timeoutTicks = 100)
+    public static void sifirlaHerAsamadanNormaleDoner(GameTestHelper y) {
+        AfetYoneticisi yonetici = temizBasla(y);
+        DunyaDonemi donem = yonetici.donem();
+        ServerLevel ust = y.getLevel().getServer().overworld();
+        kurallar(y, true, 6_000L);
+        for (int adim = 0; adim <= 5; adim++) {
+            y.assertTrue(komut(y, "dogalafet pulsar baslat") == 1, "pulsar baslat");
+            for (int i = 0; i < adim; i++) {
+                y.assertTrue(komut(y, "dogalafet asama ileri pulsar") == 1, "asama ileri " + i + "/" + adim);
+            }
+            String once = donem.gunesEvresi().kimlik() + " ilerleme " + donem.evreIlerlemesi();
+            y.assertTrue(komut(y, "dogalafet sifirla") == 1, "sifirla");
+            y.assertTrue(donem.gunesEvresi() == GunesEvresi.NORMAL && donem.ekVeri(PulsarSureci.KIMLIK).isEmpty()
+                    && !PulsarSureci.al().aktifMi(ust) && !DonemPaketi.den(donem, 1.0).donusYolu()
+                    && !DonemPaketi.den(donem, 1.0).gunesDondu(), "sifirla (" + once + "): " + donem.ozet());
+        }
+        y.succeed();
+    }
+
+    @GameTest(template = "bos", batch = "pulsar2_durum", timeoutTicks = 100)
+    public static void durumSatiriKalanGunuYazar(GameTestHelper y) {
+        AfetYoneticisi yonetici = temizBasla(y);
+        DunyaDonemi donem = yonetici.donem();
+        ServerLevel ust = y.getLevel().getServer().overworld();
+        PulsarSureci surec = PulsarSureci.al();
+        kurallar(y, true, 6_000L);
+        y.assertTrue(surec.durumSatiri(ust).isEmpty(), "zincir yokken durum satırı yok");
+        y.assertTrue(komut(y, "dogalafet pulsar baslat") == 1, "pulsar baslat");
+        y.succeedWhen(() -> {
+            y.assertTrue(PulsarYolu.baslangicVar(donem), "başlangıç bekleniyor");
+            int gun = GokyuzuAyarlari.pulsarGun();
+            y.assertTrue(sayiVar(surec.durumSatiri(ust), gun), "başta kalan " + gun + " gün: " + sayilar(surec.durumSatiri(ust)));
+            y.assertTrue(komut(y, "dogalafet durum") == 1, "durum");
+            donem.gunOfsetiAyarla(donem.gunOfseti() + 5);
+            y.assertTrue(sayiVar(surec.durumSatiri(ust), gun - 5), "5 gün sonra: " + sayilar(surec.durumSatiri(ust)));
+            y.assertTrue(komut(y, "dogalafet asama ileri pulsar") == 1 && komut(y, "dogalafet asama ileri pulsar") == 1
+                    && sayiVar(surec.durumSatiri(ust), PulsarZinciri.YUTMA_SN), "yutmada kalan saniye: "
+                    + sayilar(surec.durumSatiri(ust)));
+            y.assertTrue(komut(y, "dogalafet asama ileri karadelik") == 1
+                    && sayiVar(surec.durumSatiri(ust), GokyuzuAyarlari.pulsarSonrasiGunessizGun()),
+                    "buzulda kalan gün: " + sayilar(surec.durumSatiri(ust)));
+            temizle(y.getLevel().getServer());
+        });
+    }
+
+    @GameTest(template = "bos", batch = "pulsar2_kayit", timeoutTicks = 100)
+    public static void zincirKayittanAsamaVeBaslangiciKorur(GameTestHelper y) {
+        AfetYoneticisi yonetici = temizBasla(y);
+        DunyaDonemi donem = yonetici.donem();
+        kurallar(y, true, 6_000L);
+        y.assertTrue(komut(y, "dogalafet pulsar baslat") == 1, "pulsar baslat");
+        y.succeedWhen(() -> {
+            y.assertTrue(PulsarYolu.baslangicVar(donem), "başlangıç bekleniyor");
+            kayitKorur(y, donem, "pulsar");
+            y.assertTrue(komut(y, "dogalafet asama ileri pulsar") == 1 && komut(y, "dogalafet asama ileri pulsar") == 1,
+                    "kara deliğe");
+            PulsarYolu.yutmaPatlamasiAyarla(donem, true);
+            kayitKorur(y, donem, "karadelik");
+            y.assertTrue(komut(y, "dogalafet asama ileri karadelik") == 1, "buzula");
+            kayitKorur(y, donem, "gunessiz");
+            y.assertTrue(komut(y, "dogalafet asama ileri gunessiz") == 1, "kızıl cüceye");
+            donem.evreIlerlemesiAyarla(0.4f);
+            kayitKorur(y, donem, "kizilcuce");
+            y.assertTrue(komut(y, "dogalafet asama ileri kizilcuce") == 1, "eski güneşe");
+            kayitKorur(y, donem, "normal");
+            temizle(y.getLevel().getServer());
+        });
+    }
+
+    /** Dönem NBT gidiş-dönüşünde (kayıt/yükleme) evre, süre başlangıçları ve pulsar yolu bayrakları korunur. */
+    private static void kayitKorur(GameTestHelper y, DunyaDonemi donem, String asama) {
+        DunyaDonemi geri = DunyaDonemi.yukle(donem.save(new CompoundTag()));
+        y.assertTrue(geri.gunesEvresi() == donem.gunesEvresi() && geri.evreIlerlemesi() == donem.evreIlerlemesi()
+                && geri.evreBaslangicSaati() == donem.evreBaslangicSaati() && geri.saat() == donem.saat()
+                && PulsarYolu.dongu(geri) == PulsarYolu.dongu(donem)
+                && PulsarYolu.baslangic(geri) == PulsarYolu.baslangic(donem)
+                && PulsarYolu.gunessizBaslangicVar(geri) == PulsarYolu.gunessizBaslangicVar(donem)
+                && PulsarYolu.gunessizBaslangic(geri) == PulsarYolu.gunessizBaslangic(donem)
+                && PulsarYolu.yutmaPatlamasiOldu(geri) == PulsarYolu.yutmaPatlamasiOldu(donem)
+                && PulsarYolu.donusYolu(geri) == PulsarYolu.donusYolu(donem)
+                && PulsarYolu.gunesDondu(geri) == PulsarYolu.gunesDondu(donem),
+                "kayıt gidiş-dönüşü (" + asama + "): " + donem.ozet() + " / " + geri.ozet());
+    }
+
+    /** Satırın iç içe çeviri argümanlarında {@code beklenen}'e 0,01 yakın bir sayı var mı. */
+    private static boolean sayiVar(Optional<Component> satir, double beklenen) {
+        return sayilar(satir).stream().anyMatch(sayi -> Math.abs(sayi - beklenen) < 0.01);
+    }
+
+    private static List<Double> sayilar(Optional<Component> satir) {
+        List<Double> sonuc = new ArrayList<>();
+        satir.ifPresent(metin -> sayilariTopla(metin, sonuc));
+        return sonuc;
+    }
+
+    private static void sayilariTopla(Object arguman, List<Double> sonuc) {
+        if (arguman instanceof Component metin) {
+            if (metin.getContents() instanceof TranslatableContents ceviri) {
+                for (Object ic : ceviri.getArgs()) {
+                    sayilariTopla(ic, sonuc);
+                }
+            } else {
+                sayilariTopla(metin.getString(), sonuc);
+            }
+            for (Component kardes : metin.getSiblings()) {
+                sayilariTopla(kardes, sonuc);
+            }
+        } else if (arguman != null) {
+            try {
+                sonuc.add(Double.parseDouble(String.valueOf(arguman)));
+            } catch (NumberFormatException sayiDegil) {
+                // metin argümanı (evre adı vb.)
+            }
+        }
     }
 }

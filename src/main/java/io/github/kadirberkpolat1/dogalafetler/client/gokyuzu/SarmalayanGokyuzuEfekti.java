@@ -70,7 +70,7 @@ public final class SarmalayanGokyuzuEfekti extends DimensionSpecialEffects {
             return r;
         }
         return switch (d.evre()) {
-            case GUNESSIZ, SUPERNOVA -> null;
+            case GUNESSIZ, SUPERNOVA, KARADELIK_YUTMA -> null;
             case KIZIL_CUCE -> {
                 // Doğuş (ilerleme < 1): ufuktaki kızıl yay daha yoğun; renk gücü 0 iken vanilla yelpaze.
                 float k = d.renkGucu();
@@ -120,7 +120,8 @@ public final class SarmalayanGokyuzuEfekti extends DimensionSpecialEffects {
     public boolean renderClouds(ClientLevel level, int ticks, float pt, PoseStack poz, double x, double y, double z,
             Matrix4f izdusum) {
         IstemciGokyuzu.Gorunum d = IstemciGokyuzu.gorunum(pt);
-        if (bizCiziyoruz(level, level.getTimeOfDay(pt), d) && d.evre() == GunesEvresi.GUNESSIZ) {
+        if (bizCiziyoruz(level, level.getTimeOfDay(pt), d)
+                && (d.evre() == GunesEvresi.GUNESSIZ || d.evre() == GunesEvresi.KARADELIK_YUTMA)) {
             // Karanlık uzay göğünde parlak beyaz bulut tutarsız (tasarım notu §2 Bulutlar).
             return true;
         }
@@ -146,6 +147,7 @@ public final class SarmalayanGokyuzuEfekti extends DimensionSpecialEffects {
         if (overworldMu(level) && !d.vanillaMi()) {
             GokyuzuRenkleri.isikHaritasi(d, gokKararmasi, gokIsigi, renk);
             IstemciAyEfektleri.isikHaritasi(pt, renk);
+            PulsarIstemciEfektleri.isikHaritasi(d, renk);
         }
     }
 }

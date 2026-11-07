@@ -276,6 +276,36 @@ def bant_gecirgen(sinyal: np.ndarray, alt: float, ust: float) -> np.ndarray:
     return np.fft.irfft(np.fft.rfft(sinyal) * maske, sinyal.size)
 
 
+def karadelik_yutma() -> np.ndarray:
+    """Kara delik yutması (tek seferlik, 8 sn; pulsar-2 PL-4 "kütleçekim dalgası"): tersine çevrilmiş chirp, 90 Hz'den
+    25 Hz'e 7 sn'de logaritmik düşen bas (ikinci harmonik −10 dB; 0,15 sn'de dolar, yavaşça söner), altında 20–100 Hz
+    gürleme ve üstünde ilk saniyelerde yoğun, sonra seyrekleşen çatırtı (300–2400 Hz kısa kıvılcımlar, 0,1–5 sn);
+    son 1 sn kosinüsle sıfıra iner. Yumuşak sınırlayıcı (tanh) tepe/ses yüksekliği oranını −6 dBTP / −23 LUFS'a
+    sığdırır (ses.md §4 kural 2, meteor_patlama ile aynı kural)."""
+    uretec = np.random.default_rng(20261112)
+    sure = 8.0
+    n = int(sure * ORNEKLEME)
+    t = np.arange(n) / ORNEKLEME
+    frekans = 90.0 * (25.0 / 90.0) ** np.clip(t / 7.0, 0.0, 1.0)
+    faz = 2.0 * np.pi * np.cumsum(frekans) / ORNEKLEME
+    zarf = (1.0 - np.exp(-t / 0.15)) * (0.55 + 0.45 * np.exp(-t / 2.5))
+    bas = (np.sin(faz) + db(-10) * np.sin(2.0 * faz)) * zarf
+    gurleme = alcak_geciren(pembe_gurultu(n, uretec, alt=20.0, ust=100.0), 80.0)
+    gurleme *= db(-12) / np.sqrt(np.mean(gurleme**2)) * zarf
+    catirti = np.zeros(n)
+    boy = int(0.008 * ORNEKLEME)
+    for an in 0.1 + 4.9 * uretec.power(0.5, size=140):
+        i = int(an * ORNEKLEME)
+        catirti[i:i + boy] += (uretec.normal(size=boy) * np.exp(-np.arange(boy) / (0.0015 * ORNEKLEME))
+                               * np.exp(-an / 2.0))[: n - i]
+    catirti = bant_gecirgen(catirti, 300.0, 2400.0)
+    catirti *= db(-6) / max(np.max(np.abs(catirti)), 1e-9)
+    sinyal = bas + gurleme + catirti
+    sinyal *= np.where(t > sure - 1.0, yumusak((sure - t) / 1.0), 1.0)
+    sinyal /= np.max(np.abs(sinyal))
+    return np.tanh(2.0 * sinyal) / np.tanh(2.0)
+
+
 @dataclass(frozen=True)
 class SesTanimi:
     uret: Callable[[], np.ndarray]
@@ -304,6 +334,8 @@ SESLER: dict[str, SesTanimi] = {
     "meteor_ucus": SesTanimi(meteor_ucus, -26.0, -6.0, (35.0, 220.0), 2500.0, -30.0),
     # Meteor çarpması: tek seferlik darbe (−23 LUFS, tepe ≤ −6 dBTP), vuruş ve uğultu 20–120 Hz baskın.
     "meteor_patlama": SesTanimi(meteor_patlama, -23.0, -6.0, (20.0, 120.0), 2500.0, -25.0, dongu=False),
+    # Kara delik yutması: tek seferlik (−23 LUFS, tepe ≤ −6 dBTP; meteor_patlama ile aynı), 90 → 25 Hz düşen bas baskın.
+    "karadelik_yutma": SesTanimi(karadelik_yutma, -23.0, -6.0, (20.0, 120.0), 2500.0, -25.0, dongu=False),
 }
 
 

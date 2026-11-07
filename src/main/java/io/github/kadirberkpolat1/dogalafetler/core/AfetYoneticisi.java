@@ -463,14 +463,15 @@ public final class AfetYoneticisi {
 
     /**
      * {@code /dogalafet asama ileri [süreç]} aktif afet yokken (ya da süreç adı verilince): önce süren, sonra durdurulmuş
-     * dönem süreçlerine sorar; ilk dolu çıktı döner. {@code kimlik} verilirse yalnız o süreç sorulur (K-C48). Durdurulmuş
+     * dönem süreçlerine sorar; ilk dolu çıktı döner. {@code kimlik} verilirse yalnız onu kimliği ya da o anki takma adı
+     * olarak tanıyan süreç sorulur (K-C48, {@link DonemSureci#kimlikEsler}). Durdurulmuş
      * süreç durmuş kalır, yalnız bir aşama geçer (K-C41); böylece tamamlanırsa kaydı silinir.
      */
     public Optional<Component> donemAsamaIleri(Optional<String> kimlik) {
         ServerLevel ust = server.overworld();
         List<DonemSureci> sira = new ArrayList<>(aktifDonemSurecleri());
         sira.addAll(durdurulmusDonemSurecleri().keySet());
-        kimlik.ifPresent(k -> sira.removeIf(surec -> !surec.kimlik().equals(k)));
+        kimlik.ifPresent(k -> sira.removeIf(surec -> !surec.kimlikEsler(k)));
         for (DonemSureci surec : sira) {
             try {
                 Optional<Component> sonuc = surec.asamaIleri(ust);
@@ -1176,7 +1177,8 @@ public final class AfetYoneticisi {
     }
 
     private void donemGonder(ServerPlayer oyuncu) {
-        AgKanali.oyuncuyaGonder(oyuncu, DonemPaketi.den(donem(), zamanOlcegi.carpan()));
+        AgKanali.oyuncuyaGonder(oyuncu, DonemPaketi.den(donem(), zamanOlcegi.carpan(),
+                Kurallar.blokHasariAcik(server.getGameRules())));
     }
 
     private void donemSenkronu(DunyaDonemi donem, CekirdekAyarlari ayar) {
@@ -1186,7 +1188,8 @@ public final class AfetYoneticisi {
             return;
         }
         if (!server.getPlayerList().getPlayers().isEmpty()) {
-            AgKanali.herkeseGonder(DonemPaketi.den(donem, zamanOlcegi.carpan()));
+            AgKanali.herkeseGonder(DonemPaketi.den(donem, zamanOlcegi.carpan(),
+                    Kurallar.blokHasariAcik(server.getGameRules())));
         }
         donem.senkronTamam();
         sonDonemPaketi = tickSayaci;

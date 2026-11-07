@@ -1,5 +1,6 @@
 package io.github.kadirberkpolat1.dogalafetler.core;
 
+import java.util.List;
 import java.util.Optional;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -62,5 +63,20 @@ public interface DonemSureci {
      */
     default Optional<Component> asamaIleri(ServerLevel ustDunya) {
         return Optional.empty();
+    }
+
+    /** {@code /dogalafet durum}'da sürecin kendi satırı (aşama ve kalan süre); yoksa boş. Yalnız aktif süreçte sorulur. */
+    default Optional<Component> durumSatiri(ServerLevel ustDunya) {
+        return Optional.empty();
+    }
+
+    /** {@code asama ileri <süreç>} argümanı bu süreci seçiyor mu: kimlik ya da o an geçerli bir takma ad. */
+    default boolean kimlikEsler(String ad) {
+        return kimlik().equals(ad);
+    }
+
+    /** O an geçerli takma adlar (komut önerisi; {@link #kimlikEsler} bunları kabul eder). */
+    default List<String> takmaAdlar(ServerLevel ustDunya) {
+        return List.of();
     }
 }
