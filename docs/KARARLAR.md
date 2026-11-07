@@ -4926,6 +4926,11 @@ olur; palet `TOZ` 0,80/0,56/0,30 sabitiyle ve inceleyicinin gözle hükmüyle (p
 Kabul: pc2 `compileJava compileTestJava` 0 (`MAKINE=LAGXT2`), `TEST_FILTRE=Kasirga runGameTestServer` `All 11 required tests
 passed` (filtreli), `py_compile` 62/0 (`.vibe/kanit/k-e49/`); runClient yok. Reddedilen: göreli Δ ölçüsü (tablo); ufuk bantı
 ölçüsü (şef: ölçü değişmez, önce maske düzelsin); kontrol karesinde uçan blokları da gizleyen eski bayrağı korumak.
+**Sonuç (doğrulayıcı-3 `matris-5-son`, `9d90fb7`):** koşu 8'in merkezi (188, 90, 34) uygun değildi (K-E45 yeniden deneme), koşu 9
+merkez (57, 96, 32) uygun kara; log'da `kontrol kipi yalnizToz (K-E49)`. `s5_vitrin` R 53,0 / G 51,8 / B 48,4, maske 280 666 piksel, R>G>B
+payı %53, ΔR +19,2 ΔG +3,4 ΔB +4,2 → **tuttu**; `s5_taban_uzak` R 36,7 / G 52,4 / B 49,3, maske 222 700 piksel, pay %10, Δ +2,2 / +0,2 /
++1,2 → **tutmadı** (`.vibe/rapor/matris-5-son.md`). Maske düzeldi (vitrin tozu ısıtıyor: ΔR en büyük), ama uzak sahnede alt üçte
+bir yine ön plan çimenine düşüyor (Δ ≈ 0). Yedek yol (b) uygulandı (K-E50 b): satır bilgi, yeniden koşu yok.
 
 **K-E50 Faz 5 kapanışı ve teslim (kullanıcı kararı, 2026-11-07; t32, "test tekrarı yok, bitirelim").** Kullanıcı kareleri gözle
 inceledi ve kabul etti. (a) `5-matris` #6, #11, #12, #13 ve #15 kareleri kullanıcı incelemesiyle kabul; inceleyici puanları bilgi
@@ -4943,6 +4948,15 @@ worktree'si (`spike-donma`, `-gokyuzu`, `-kasirga`, `-sanal-su`, `-siren`) `work
 doğrulayıcı-3'ün `matris-5-son` worktree'si kendisinde. `docs/tasarim/`: son değişikliği `524c338` (Faz 4); Faz 5 sapmaları
 (SU-43…SU-45, K-E42, K-E48, K-E49) bu belgede, tasarım notlarının "Faz 5 cilası" diye andığı ama yapılmayan parçalar (tsunami su
 perdesi ve yüzen enkaz, çöken kütle varlığı) README bilinen sınırlarında; notlar hedef tarif olarak kalır, değişiklik yok.
+(g) Tekrar koşusu gerektiren kalan kısmi kanıtlar bilinen sınır (kullanıcı "test tekrarı yok"): IZLEME 4.1 (canlı sunucuda otomatik
+seçim gözlenmedi), 12.27 ("Hepsini Atlattım" gerçek afetle kanıtlanmadı), 13b.2 (oyun içi ses kaydı ölçümü R4).
+**Tamamlanma (t33, 2026-11-07):** doğrulayıcı-3 `matris-5-son` raporu (`9ec1b3f` / `6169b46` / `9d90fb7`) işlendi: 15 istemci adımı
+çıkış 0, SU-45 kapandı (deniz 2,00 / dalga 2,05 / mağara 2,24 ms, bütçe aşan tick 0; K-E48 doğrulandı), tsunami `AVCI GECERSIZ` 0 ve
+`fell out` 0 (inceleme-matris-5 P2-2 kapandı), asit-orman bitiş karesi tabandan %67,9 farklı ve `yangın söndü` (P2-4 kapandı), kasırga
+yukarıda (K-E49 sonucu), `uyari_sunucu` iptal (e). TEST-RAPORU §6: 10 yeşil / 6 bilinen sınır / 0 kısmi / 0 bekliyor; SARTNAME-IZLEME:
+261 yeşil / 7 bilinen sınır / 0 kısmi / 0 yapılmadı. `gorsel-otomasyon` worktree'si kaldırıldı (patch `.vibe/diff/gorsel-otomasyon.patch`), dalı
+`is/gorsel-otomasyon` silindi (`main`'e birleşik); doğrulayıcı `matris-5-son` worktree'sini kendisi kaldırdı; `worktree list` yalnız
+`main`. Faz 5'in dört görevi kabul; teslim `cikti/dogalafetler-0.1.0.jar`.
 
 ## Açık noktalar (Faz 2b)
 
@@ -5088,12 +5102,22 @@ P2-9 `5-matris` kabulünde. Kapanış eşlemesi (K-E50) her maddenin sonunda:
   (a); #7 (e), #5 ve #9 (c) bilinen sınır; birleşik HEAD istemci koşusu doğrulayıcı-3'ün `matris-5-son` (`9ec1b3f`) koşusu, sonucu
   TEST-RAPORU §6'ya işlenir; yeni tekrar yok.
 - **Su tampon kapasitesi küçülmüyor (doğrulayıcı-2 P2-2):** kapandı (K-E48): kapasite yalnız GPU deposudur, dolgu yazılmaz; SU-45
-  yeniden ölçümü doğrulayıcı-3'ün `matris-5-son` raporunda.
+  yeniden ölçümü `matris-5-son`'da geçti (2,00 / 2,05 / 2,24 ms, bütçe aşan tick 0).
 - **Sanal su görseli (inceleme-su-gorsel):** P2-5 köpük paylaşılan kenar hesabı yapılmadı (isteğe bağlı); köpük CPU'su, tampon büyümesi
   (`tampon_buyume`) ve SU-45 duvar saati `5-matris` #10; Ts2-1 tam kare ve yeni `SuOtomasyon` kareleri `5-matris` #6 (bu turda runClient yok).
   **→** P2-5 bilinen sınır (isteğe bağlı cila); duvar saati #10 bilinen sınır (K-E50 d); kareler kullanıcı kabulü (K-E50 a).
 - **Kasırga K-17 taban rengi (K-E49):** kontrol karesi yalnız tozu gizler; kalibrasyon doğrulayıcı-3'ün yeniden koşusunda, tutmazsa
   yedek yol (b): K-17 karesi bilgi, palet sabiti ve gözle hüküm. **→ kapandı (K-E50 b):** yedek yol; satır bilgi, palet sabiti + gözle kabul.
+- **Donma yetişme karesinin anı (inceleme-matris-5 P2-7, kısmi):** `matris-5-son` (`9ec1b3f`) `yetisme_60_surerken` (dönüşten beri 2039
+  blok, "kuyruk dolu") ve `yetisme_60_bitti` (5804 blok) karelerini aldı (`runClient-7.log:755-759`). `bitti` kapısı (`yetisti(20)`)
+  `DonmaZamanlayici.kuyrukBos()`'un 60 tick boş kalmasını bekler; ama kareden bir saniye önceki sunucu özeti `bekleyen=54` chunk
+  gösteriyor, yani kare yetişme tam bitmeden alınmış olabilir [çıkarım: `kuyrukBos` bayrağı adım kuyruğunu izliyor, bekleyen chunk
+  sayısını değil; incelenmedi]. **→ bilinen sınır** (yetişme davranışı GameTest `chunkYetismesiAdimAdimVeButceAsilmaz`'la kanıtlı;
+  kare kullanıcı kabulü K-E50 a; düzeltme ve yeniden koşu yok, K-E50).
+- **S18 istemcisinde "girdi sayıları satırı yok" (betik):** dedicated + runClient `A` koşusu `5-matris` ve `matris-5-son`'da (iki koşu)
+  istemci tarafında geçersiz sayıldı (`koşu hud-1 GEÇERSİZ`); sunucu tarafı (`logged in`, `Set A's body temperature to -95`, can
+  20 → 20) geçerli. `sicaklik_gorsel.py` istemci log'unda `SICAKLIK_OTOMASYON kapanıyor; girdi sayıları` satırını arıyor; dedicated
+  kipte bu satır çıkmıyor (nedeni incelenmedi). **→ bilinen sınır** (betik; S-18 ölçümü etkilenmez, K-E50).
 
 ## N17 — Sayısal varsayılanlar
 
