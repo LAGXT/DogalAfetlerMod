@@ -117,6 +117,30 @@ süreç ~9 GiB ister ve 4 GiB payı korunamaz. Tavan **iki** `./gradlew` kalır 
 Kazanç yalnız sıcak daemon'la (C koşu 2). Daemon boşta 3 saat yaşar, `-Xmx3G`'ye kadar büyür ve ağır süreç kapısının sayacına
 girmez; iki Gradle tavanlı bu makinede RAM payını yer. Daemon kapalı kalır, `gradle.properties` değişmedi.
 
+## İkinci makine pc2 (2026-11-07, K-E43)
+
+Ekransız ağır iş ana makineyi kasmasın diye eski PC'ye Windows'un yanına CachyOS kuruldu. İş `tools/senaryo/uzak.sh` ile
+gönderilir (GOREV §2); ajan ana makinede kalır.
+
+| Öğe | Değer | Nasıl ölçüldü |
+|---|---|---|
+| Erişim | `ssh pc2` (`~/.ssh/config`: 192.168.1.105, `lagxt`, anahtar `~/.ssh/id_ed25519`); bilgisayar adı `LAGXT2`; giriş kabuğu **fish** (uzak komutlar `bash -s` ile) | `ssh pc2 true` |
+| İşletim sistemi | CachyOS, çekirdek `7.3.1-1-cachyos`, XFCE (LightDM), eski BIOS + MBR, GRUB (Windows'la çift açılış) | `uname -r`, `lsblk -f` |
+| CPU | AMD FX-4100, 4 iş parçacığı, x86-64-v2 (CachyOS v3 paketleri yok) | `nproc`, msinfo32 |
+| RAM | 7 662 MiB; boşta (XFCE açık) kullanılabilir ~6,9 GiB; filtresiz GameTest sırasında kullanılabilir 3,8 GiB, swap 0 | `free -m` |
+| Disk | SSD, `/dev/sda4` ext4 40 GiB (28 GiB boş) | `df -h /` |
+| GPU / ekran | Radeon 3000 (VGA), monitör EDID vermiyor; Xorg `1024x768_60`'a sabit (`/etc/X11/xorg.conf.d/10-monitor.conf`), GRUB düz yazı | Xorg log |
+| Java / Gradle | JDK aynı yolda (`~/.jdks/jdk-17.0.21+9`, ana makineden kopya); `~/.gradle` ana makineden kopyalandı, `--offline` çalışır | `java -version` |
+| Ayarlar | uyku hedefleri `masked`, donanım saati yerel saat (Windows uyumu), `sudo` parola ister (ajan yazamaz) | `systemctl is-enabled`, `timedatectl` |
+
+| Koşu (`uzak.sh` + `gradle_kapisi.sh`) | pc2 | Ana makine | Kanıt |
+|---|---|---|---|
+| `cleanTest test` (JUnit) | 56 sn | 48–53 sn (K-E19 b) | `.vibe/kanit/uzak-pc2/test.log` |
+| `runGameTestServer` filtresiz | 2 dk, 216/216 | 2–2,5 dk (`matris-5`) | `.vibe/kanit/uzak-pc2/gametest.log` |
+
+Testler CPU'ya değil tick'e bağlı olduğu için yavaş işlemcide süre neredeyse aynı. 8 GB'ta aynı anda **tek** uzak iş (`uzak.sh`
+kilidi); ana makinenin iki Gradle tavanı (K-E19) yerel iş için ayrıca geçer. pc2 Windows'la açıksa ya da kapalıysa `uzak.sh` çıkış 4 verir.
+
 ## Pratik notlar
 
 - **Gradle sayacı:** `pgrep -fc GradleWrapperMain`, komut satırında aynı kelimeyi taşıyan çağıran kabuğu da sayar

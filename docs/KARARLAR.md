@@ -3493,6 +3493,23 @@ var). Sıcak yolda kapı kapalıyken sistem çağrısı ve allocation yok. Kanı
 derleme/JUnit; dedicated `su_sunucu.py` log'unda `SU-TANI`/köpük satırı 0 (istemci sınıfları sunucuda yüklenmez). Bayraksız
 runClient bu turda koşmadı.
 
+**K-E43 Ekransız ağır iş ikinci makinede (pc2) koşar (kullanıcı kararı, 2026-11-07).** Ana makine Gradle/GameTest/sunucu
+koşarken kasıyordu. Eski PC'ye (FX-4100, 8 GB, SSD) Windows'un yanına CachyOS + XFCE kuruldu (`docs/MAKINE.md` "İkinci makine
+pc2"); aynı kullanıcı, aynı JDK yolu, `~/.gradle` kopyası (`--offline` çalışır). Karar: `gradle_kapisi.sh` ile `build`/`test`/
+`runGameTestServer` ve `*_sunucu.py` senaryoları `tools/senaryo/uzak.sh -g <log|kanıt/> <komut...>` ile pc2'de koşar: betik
+çalışma klasörünü aynı yola rsync'ler (`build/`, `.gradle/`, `run*/`, `.vibe/`, `.venv/`, `.git` hariç), komutu orada `setsid` ile
+koşar, çıktıyı aktırır, `-g` yollarını hata ya da kesmede de geri çeker, komutun çıkış kodunu döner; yerel kesme pc2'deki süreç
+grubunu durdurur. 8 GB'ta aynı anda tek uzak iş: ana makinedeki `~/.cache/uzak-pc2.kilit` flock'u (en çok `UZAK_BEKLE_DK`=60 dk,
+sonra çıkış 3). pc2'ye ulaşılamazsa (kapalı ya da Windows açık) **çıkış 4 ve iş yerelde başlatılmaz** (kullanıcı isteği: sessizce
+ana makineye dönmek amacı bozar); oturum şefe/kullanıcıya sorar. `gradle_kapisi.sh`: `KAPI_SURE` (vars. 1500 sn; `uzak.sh` 4500
+verir) ve log'un ikinci satırı `MAKINE=<ad>` (ilk satır `FILTRE=` kuralı değişmedi). Ana makinede kalır: `runClient`, `*_gorsel.py`,
+`*_istemci.py` (Hyprland, hypruse), `runData` (çıktısı `src/generated/`'a yazılır; uzakta üretilen bir sonraki eşitlemede
+silinirdi). K-E19 iki Gradle tavanı ana makinedeki yerel iş için sürer; K-E40 port aralıkları ve senaryo kilidi pc2'de de
+geçerlidir (pc2'nin kendi `run-server/`'ı). Kanıt `.vibe/kanit/uzak-pc2/`: `cleanTest test` 56 sn, filtresiz `runGameTestServer`
+216/216, 2 dk (ana makine 2–2,5 dk; testler tick'e bağlı). Reddedilen: ajanı pc2'de çalıştırmak (`runClient` ve hypruse ana
+makinenin masaüstünde, 8 GB istemciye yetmez); kapalı pc2'de yerele sessiz düşmek; Gradle'ı pc2'de `-Xmx2g`'ye indirmek
+(decompile en az 3 GB ister, `gradle.properties`).
+
 ## Faz 5 — Görsel otomasyon
 
 Parça `5-gorsel-otomasyon`, dal `is/gorsel-otomasyon` `08246dd`, `main`'e birleştirme `cc7e3b2`. Rapor

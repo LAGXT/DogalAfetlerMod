@@ -3,8 +3,10 @@
 # 20 dk), sonra verilen görevi JDK 17 ile çalıştırır. Kapı 20 dk'da açılmazsa görev başlatılmaz: log'a "KAPI: açılmadı
 # (20 dk)", çıkış 3 (K-E23; agir_surec_kapisi ile aynı). Kullanım: tools/senaryo/gradle_kapisi.sh <log> <gradle argümanları...>
 # KAPI_PORT verilirse o portu dinleyen süreç kalmamasını da bekler (runServer; K-E13). KAPI_DK bekleme üst sınırı (dk, varsayılan 20).
+# KAPI_SURE görevin süre sınırı (sn, varsayılan 1500; uzak.sh pc2'de 4500 verir, K-E43).
 # TEST_FILTRE verilirse -Ptest_filtre=<regex> olarak geçer: runGameTestServer yalnız uyan testleri koşar (K-E20). Log'un ilk
-# satırı FILTRE=<regex> (kabul için geçersiz koşu) ya da FILTRE=yok; kabul loglarında FILTRE=yok aranır (Gf4).
+# satırı FILTRE=<regex> (kabul için geçersiz koşu) ya da FILTRE=yok; kabul loglarında FILTRE=yok aranır (Gf4). İkinci satırı
+# MAKINE=<ana bilgisayar adı>: koşunun hangi makinede geçtiği (K-E43).
 # Gradle LC_ALL=C.UTF-8 ile başlar: tr_TR altında sonuç satırı "BUİLD" yazılır ve BUILD grep'leri kaçırır (K-E13).
 log="$1"
 shift
@@ -39,7 +41,8 @@ if [ $acik -eq 0 ]; then
     exit 3
 fi
 echo "$filtre_satiri" > "$log"
-LC_ALL=C.UTF-8 JAVA_HOME=/home/lagxt/.jdks/jdk-17.0.21+9 timeout 1500 ./gradlew "$@" --offline --console=plain >> "$log" 2>&1
+echo "MAKINE=$(cat /etc/hostname)" >> "$log"
+LC_ALL=C.UTF-8 JAVA_HOME=/home/lagxt/.jdks/jdk-17.0.21+9 timeout "${KAPI_SURE:-1500}" ./gradlew "$@" --offline --console=plain >> "$log" 2>&1
 kod=$?
 echo "çıkış=$kod"
 exit $kod
