@@ -3513,6 +3513,26 @@ makinenin masaüstünde, 8 GB istemciye yetmez); kapalı pc2'de yerele sessiz d�
 (decompile en az 3 GB ister, `gradle.properties`). **Onay (2026-11-07):** kullanıcı `f1954dc`'yi kendisinin
 yazdığını doğruladı; inceleme-entegrasyon-5-son P1-1 kapandı.
 
+**K-E44 Ekransız iş pc2'ye kendiliğinden gider; pc2'de iki yuva (kullanıcı kararı, 2026-11-07).** K-E43 elle `uzak.sh` istiyordu;
+kuralı bilmeyen ya da eski oturumlar işi ana makinede koştu (14:25 ölçümü: ana makinede `matris-5` istemcisi %463 CPU, pc2 boş).
+Kullanıcı: "ne olursa olsun her zaman pc2'ye gitsin, alabildiği kadar alsın". Karar: (a) `gradlew` kancası (`APP_HOME` sonrası):
+`UZAK_ICINDE` ve `UZAK=0` yoksa `uzak.sh --gradle` görevleri sınıflandırır; hepsi ekransız kümedeyse (`test`, `cleanTest`, `build`,
+`assemble`, `check`, `clean`, `compileJava`, `compileTestJava`, `classes`, `testClasses`, `jar`, `reobfJar`, `runGameTestServer`) pc2'de,
+değilse (`runClient`, `runData`, `runServer`, görevsiz) yerelde koşar; uzakta `build/reports/`, `build/test-results/`, `build/libs/`
+geri gelir. (b) `gradle_kapisi.sh` aynı sınıflamayla kendini pc2'de yeniden başlatır (log geri gelir); kapı RAM eşiği `KAPI_RAM_MB`
+(vars. 4096, satır `bos=<MB>M`). (c) `cekirdek_sunucu.argumanlar` betik adı `*_sunucu.py` ise (`--istemci`siz) süreci
+`uzak.sh -g <kanıt>/ python3 <betik> <argümanlar>`'a çevirir; 17 senaryonun hepsi bu fonksiyondan geçer; `agir_surec_kapisi`
+eşiği `KAPI_RAM_MB`. (d) `uzak.sh`: `UZAK_YUVA`=2 yuva + klasör başına kilit (`~/.cache/uzak-pc2/`; aynı klasörün iki işi
+rsync `--delete` ve ortak `build/`, `run-gametest/` yüzünden yarışır), uzak ortamda `UZAK_ICINDE=1`, `KAPI_RAM_MB=2500`, `KAPI_SURE=4500`,
+`JAVA_HOME`/`LC_ALL`/`GRADLE_OPTS` geçer; `-g` yalnız klasör dışı ya da `.vibe/`, `build/`, `logs/`, `run*/` altı (P2-4 kapandı),
+eksik kaynak sessiz (`--ignore-missing-args`). pc2 kapalıysa yine çıkış 4. Betikler koşarken yerinde değişmez, geçici dosya + `mv`
+(önceki `uzak.sh` düzenlemesi koşan kopyayı "beklenmedik dosya sonu" ile düşürdü). Kanıt `.vibe/kanit/uzak-pc2/`: doğrudan
+`./gradlew cleanTest test` ana makinede bu klasörden 0 `java`, pc2'de 3 `java`, çıkış 0; iki filtresiz GameTest aynı anda (ana klasör
+ve geçici worktree) 216/216 + 216/216, 3 dk 17 sn / 3 dk 56 sn; üçüncü iş yuva bekleyip başladı; en az kullanılabilir 537 MiB, zram
+876 MiB (`ram-paralel.txt`). Reddedilen: üç yuva (iki işte pay 0,5 GiB); pc2'de `runClient` ve omp (istemci ~5–6 GiB, 8 GB'ta
+başka işle sığmaz; RV620 OpenGL 3.3 açabilir ama FPS kuralları (K0-33, K-E29 b) için geçersiz [ölçülmedi]; görsel betikler
+Hyprland/hypruse ister); aynı klasörün yuva başına ayrı uzak kopyası (mutlak `--kanit`/log yolları kopyalar arasında kayıp olur).
+
 ## Faz 5 — Görsel otomasyon
 
 Parça `5-gorsel-otomasyon`, dal `is/gorsel-otomasyon` `08246dd`, `main`'e birleştirme `cc7e3b2`. Rapor
@@ -4926,8 +4946,8 @@ P2-9 `5-matris` kabulünde. Açık kalanlar:
 - **K-E33 (P2-6):** şef kabul, düzeltme yok (K-E33 notu).
 - **Görsel otomasyon §E:** kapandı — `SuOtomasyon` ortak `GorselOtomasyon`'a çevrildi, `TsunamiOtomasyonu` kendiliğinden birleşti
   (`af87dd1` ve sonrası, SU-44 notu). Kadrajlar ve `5-matris` #6/#10 ölçümleri yeni HEAD'de.
-- **`uzak.sh -g` geri çekmesinin yol sınırı yok (inceleme-entegrasyon-5-son P2-4; P1-1 kullanıcı onayıyla kapandı):** `rsync -a` ile geri çekilen
-  `-g src/` ya da `-g ./` yerel düzenlemeleri pc2'deki eski kopyayla ezebilir; `-g` `.vibe/` altıyla sınırlanacak (ya da `--update`).
+- **`uzak.sh -g` geri çekmesinin yol sınırı (inceleme-entegrasyon-5-son P2-4):** kapandı (K-E44) — `-g` yalnız klasör dışı ya da `.vibe/`,
+  `build/`, `logs/`, `run*/` altı; `-g src/` ve `-g ./` çıkış 2 ile reddedilir (denendi).
 - **Su tampon kapasitesi küçülmüyor (doğrulayıcı-2 P2-2):** `SuRenderer.yukle` kapasiteyi yalnız büyütür; büyük bir yapımdan (tsunami)
   sonra küçük yapımlar (mağara) da en büyük boyda yüklenir (~14 000 boş dolgu dörtgeni; rasterleşmez ama yükleme ve köşe işi sürer).
   Küçültme kuralı (ör. kapasitenin < %40'ı birkaç yapım üst üste) `5-matris` #10 `tampon_buyume` ve yükleme ölçümünden sonra.
