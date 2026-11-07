@@ -11,8 +11,8 @@ Sahnede `start tsunami 3`, `asama ileri` x2 → çekilme ve dalga, kıyıya vuru
 çekilme ve mağara kalmaz, yıkılan blok > 0. Sonra `start tsunami 1` AKTIF'e ilerletilir ve sunucu kapatılır (kalıcılık).
 Koşu 2 (aynı dünya): afet kayıttan yüklenir, dalga aynı kimlikle sürüyor, kendiliğinden biter (doğal bitiş), `su bilgi`
 (dalga 0), `sifirla`, `su bilgi` (dalga 0, mağara 0).
-Her iki koşu `-PoyunTestiAfeti=tsunami,deprem` ile açılır (K-E22): iki türün de gerçek afeti kayıtlı olduğu için test afeti
-ikisini de atlar (WARN), mod yüklenir. Koşu 1'de dalga doğduğunda uğultu ortam katmanı başlar.
+Her iki koşu bayraksız açılır (gerçek afetler; 5-entegrasyon betik temizliği, K-E22/K-E23): log'da oyun testi afeti satırı
+yok. Koşu 1'de dalga doğduğunda uğultu ortam katmanı başlar.
 Sonda iki log da denetlenir: `invalid dist` yok, istisna yok, config düzeltme uyarısı yok, `[basarim] ... yayıncı olarak
 kayıtlı değil` yok, iki süreç de 0 ile çıktı.
 
@@ -50,32 +50,10 @@ SAHNE = [
 ]
 
 
-class TsunamiSunucu(c.Sunucu):
-    """Çekirdeğin `Sunucu`'su; `-PoyunTestiAfeti=tsunami,deprem` ile açılır (K-E22 kayıt sırası kanıtı)."""
-
-    def __init__(self, ad, log_yolu):
-        import os
-        import subprocess
-        import threading
-        import time
-        self.ad = ad
-        self.satirlar = []
-        self.kilit = threading.Condition()
-        self.baslangic = time.monotonic()
-        self.log = log_yolu.open("w", encoding="utf-8")
-        ortam = dict(os.environ, JAVA_HOME=c.JAVA_HOME)
-        self.surec = subprocess.Popen(
-            ["timeout", "1500", "./gradlew", "runServer", "--console=plain", "--offline", "-PoyunTestiAfeti=tsunami,deprem"],
-            cwd=c.KOK, env=ortam,
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8",
-            errors="replace", bufsize=1, start_new_session=True)
-        threading.Thread(target=self._oku, daemon=True).start()
-
-
 def kosu1(s):
     s.bekle(r"Done \(", 0, c.ACILIS_SURESI, "açılış")
-    s.bekle(r"Oyun testi afeti tsunami atlandı .*gerçek afet kayıtlı \(K-E22\)", 0, 5, "K-E22: test afeti tsunamiyi atladı")
-    s.bekle(r"Oyun testi afeti deprem atlandı .*gerçek afet kayıtlı \(K-E22\)", 0, 5, "K-E22: test afeti depremi atladı")
+    if any("Oyun testi afeti" in satir for satir in s.satirlar):
+        raise c.SenaryoHatasi("bayraksız açılışta oyun testi afeti kaydedildi")
     s.komut("execute positioned ~3000 100 ~3000 run dogalafet start tsunami 3", r"No suitable place found for Tsunami",
             "denizsiz yerde başlamaz (N14)")
     for komut in SAHNE:
@@ -127,7 +105,7 @@ def main():
     kodlar = []
     try:
         for ad, adimlar in (("kosu1", kosu1), ("kosu2", kosu2)):
-            sunucu = TsunamiSunucu(ad, klasor / f"{ad}.log")
+            sunucu = c.Sunucu(ad, klasor / f"{ad}.log")
             try:
                 adimlar(sunucu)
             except c.SenaryoHatasi as hata:

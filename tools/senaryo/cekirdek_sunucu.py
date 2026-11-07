@@ -20,8 +20,11 @@ gamerule gunesPatlamasiAfeti false + durum (durduruldu (kural)), gamerule true +
 ileri x2, durum, stop, start deprem 3, asama ileri x2 (aktif), durum, sunucuya `stop`.
 Koşu 2 (aynı dünya): açılışta dönem okundu (gün ofseti, son afetler, bekleme) ve aktif deprem geri yüklendi; durum
 (gün 42, aktif deprem seviye 3; uyku 0, durdurma kaydı 0), stop, sifirla, `stop`.
-Sonda iki log da denetlenir: `invalid dist` yok, istisna yok, bizim config dosyalarımız için Forge düzeltme WARN'ı yok,
-iki süreç de 0 ile çıktı.
+Koşu 3 (aynı dünya, bayraksız: gerçek afetler; 5-entegrasyon, §6 #4): oyun testi afeti kaydedilmedi; doğuşun üstünde küçük
+deniz; kasırga, tsunami, deprem, sinkhole, asit yağmuru, orman yangını, güneş patlaması ve ay çarpmasının her biri için
+start, asama ileri (siren), stop, durum (aktif afet yok); sifirla.
+Sonda üç log da denetlenir: `invalid dist` yok, istisna yok, bizim config dosyalarımız için Forge düzeltme WARN'ı yok,
+üç süreç de 0 ile çıktı.
 
 Kullanım (worktree kökünden): python3 tools/senaryo/cekirdek_sunucu.py <log klasörü> | --kanit <dizin> [--port <n>]
 Çıkış: 0 geçti, 1 senaryo/denetim hatası, 2 sunucu süreci sıfır dışı kodla çıktı, 3 ağır süreç kapısı açılmadı.
@@ -53,9 +56,7 @@ ADIM_SURESI = 60
 KAPANIS_SURESI = 180
 VARSAYILAN_PORT = 25565
 PORT = VARSAYILAN_PORT
-# Ortak Sunucu'nun varsayılan bayrağı (diğer *_sunucu.py betikleri): kayıtsız türlere taklit, gerçek afet varsa o (K-E22).
-OYUN_TESTI_AFETI = "deprem,gunes_patlamasi"
-# Çekirdek senaryosu: taklit gerçek afetin yerine geçer (K-E23).
+# Çekirdek senaryosu koşu 1-2: taklit gerçek afetin yerine geçer (K-E23). Ortak Sunucu varsayılanı bayraksız (gerçek afetler).
 CEKIRDEK_OYUN_TESTI_AFETI = "!deprem,!gunes_patlamasi"
 
 
@@ -66,7 +67,7 @@ class SenaryoHatasi(Exception):
 class Sunucu:
     """Bir runServer süreci: çıktıyı log'a ve belleğe yazar, komut gönderir, desen bekler."""
 
-    def __init__(self, ad, log_yolu, oyun_testi=OYUN_TESTI_AFETI):
+    def __init__(self, ad, log_yolu, oyun_testi=None):
         self.ad = ad
         self.satirlar = []
         self.kilit = threading.Condition()
@@ -74,7 +75,8 @@ class Sunucu:
         self.log = log_yolu.open("w", encoding="utf-8")
         ortam = dict(os.environ, JAVA_HOME=JAVA_HOME)
         self.surec = subprocess.Popen(
-            ["./gradlew", "runServer", "--console=plain", "--offline", f"-PoyunTestiAfeti={oyun_testi}"], cwd=KOK, env=ortam,
+            ["./gradlew", "runServer", "--console=plain", "--offline"] + ([f"-PoyunTestiAfeti={oyun_testi}"] if oyun_testi else []),
+            cwd=KOK, env=ortam,
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8",
             errors="replace", bufsize=1, start_new_session=True)
         threading.Thread(target=self._oku, daemon=True).start()
@@ -319,6 +321,42 @@ def kosu2(sunucu):
     sunucu.komut("dogalafet sifirla", r"disaster and era state was reset")
 
 
+# Koşu 3 (5-entegrasyon, §6 #4): sekiz gerçek afetin her biri başlar ve temiz durur. Tsunami için doğuşun üstünde küçük deniz.
+TSUNAMI_SAHNESI = [
+    "fill ~-30 200 ~-20 ~20 200 ~20 stone",
+    "fill ~-30 201 ~-20 ~-30 203 ~20 stone",
+    "fill ~-29 201 ~-20 ~-1 203 ~-20 stone",
+    "fill ~-29 201 ~20 ~-1 203 ~20 stone",
+    "fill ~-29 201 ~-19 ~-1 203 ~19 water",
+    "fill ~0 201 ~-20 ~20 203 ~20 dirt",
+]
+SEKIZ_AFET = [
+    ("dogalafet start kasirga 3", "Tornado"),
+    ("execute positioned ~10 204 ~ run dogalafet start tsunami 1", "Tsunami"),
+    ("dogalafet start deprem 2", "Earthquake"),
+    ("execute positioned ~48 ~ ~48 run dogalafet start sinkhole 1", "Sinkhole"),
+    ("dogalafet start asit_yagmuru 2", "Acid Rain"),
+    ("dogalafet start orman_yangini 2", "Wildfire"),
+    ("dogalafet start gunes_patlamasi", "Solar Flare"),
+    ("dogalafet start ay_carpmasi", "Moon Impact"),
+]
+
+
+def kosu3(sunucu):
+    sunucu.bekle(r"Done \(", 0, ACILIS_SURESI, "açılış")
+    if any("Oyun testi afeti" in s for s in sunucu.satirlar):
+        raise SenaryoHatasi("bayraksız açılışta oyun testi afeti kaydedildi (gerçek afetler bekleniyordu)")
+    sunucu.komut("forceload add ~-64 ~-64 ~64 ~64", r"to be force loaded|already marked")
+    for komut in TSUNAMI_SAHNESI:
+        sunucu.komut(komut, r"Successfully filled \d+ block", komut)
+    for komut, ad in SEKIZ_AFET:
+        sunucu.komut(komut, rf"{ad} started", f"start {ad} (gerçek afet)")
+        sunucu.komut("dogalafet asama ileri", rf"{ad} phase: Siren", f"{ad} siren")
+        sunucu.komut("dogalafet stop", rf"{ad} stopped", f"stop {ad}")
+        sunucu.komut("dogalafet durum", r"No active disaster\.", f"durum ({ad} sonrası aktif afet yok)")
+    sunucu.komut("dogalafet sifirla", r"disaster and era state was reset")
+
+
 def log_denetimi(yol):
     metin = yol.read_text(encoding="utf-8")
     hatalar = []
@@ -346,8 +384,9 @@ def main():
     sonuc = 0
     kodlar = []
     try:
-        for ad, adimlar in (("kosu1", kosu1), ("kosu2", kosu2)):
-            sunucu = Sunucu(ad, klasor / f"{ad}.log", CEKIRDEK_OYUN_TESTI_AFETI)
+        for ad, adimlar, bayrak in (("kosu1", kosu1, CEKIRDEK_OYUN_TESTI_AFETI), ("kosu2", kosu2, CEKIRDEK_OYUN_TESTI_AFETI),
+                                    ("kosu3", kosu3, None)):
+            sunucu = Sunucu(ad, klasor / f"{ad}.log", bayrak)
             try:
                 adimlar(sunucu)
             except SenaryoHatasi as hata:
@@ -360,7 +399,7 @@ def main():
                 break
     finally:
         ozellikleri_geri_al(ozgun)
-    for ad in ("kosu1", "kosu2"):
+    for ad in ("kosu1", "kosu2", "kosu3"):
         yol = klasor / f"{ad}.log"
         if yol.exists():
             for hata in log_denetimi(yol):

@@ -23,6 +23,9 @@ import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import runclient_kilit  # noqa: E402
+
 KOK = Path(__file__).resolve().parents[2]
 RUN = KOK / "run"
 JAVA_HOME = "/home/lagxt/.jdks/jdk-17.0.21+9"
@@ -191,7 +194,8 @@ def main():
         return 1
     yoklama = 0
     alarm = 0
-    while istemci_pid() == pid:
+    bekci = runclient_kilit.KapanisBekcisi(KOK, pid, (oyun_log,), "SU-OTOMASYON BITTI", log)
+    while not bekci.bitti_mi():
         time.sleep(5)
         yoklama += 1
         a = hypr_json("activewindow") or {}

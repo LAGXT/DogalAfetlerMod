@@ -19,6 +19,9 @@ import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import runclient_kilit  # noqa: E402
+
 WS = 92
 PORT = 25592
 W = Path(__file__).resolve().parents[2]
@@ -208,9 +211,9 @@ def istemci_calistir(kip, no, ek_ozellikler, bitince=None, her_turda=None):
     dogrulandi = False
     alarm = False
     bitti_cagrildi = False
-    while True:
-        if not Path(f"/proc/{pid}").exists():
-            break
+    bekci = runclient_kilit.KapanisBekcisi(W, pid, (W / "run/logs/latest.log", istemci_log),
+                                           "SICAKLIK_OTOMASYON kapanıyor; girdi sayıları", log)
+    while not bekci.bitti_mi():
         pencereler = [c for c in (hypr_json("clients") or []) if c.get("pid") == pid]
         if pencereler and not dogrulandi:
             for ozellik, deger in (("no_focus", "1"), ("focus_on_activate", "0")):

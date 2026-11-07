@@ -14,9 +14,12 @@ Koşu 1:
 - Orman yangını S5: döşeme yeniden, start, AKTIF, `forge tps`; §6 #10: yangın sürerken 144 uzak chunk forceload ile
   üretilir, yönetici `yangın kısma: ... bütçe 64 -> 32|16` yazar; asama ileri (doğal bitiş: yayılma durur, hücreler en
   geç 30 sn'de yanıp biter), bilgi 0'a iner. Son olarak asit yağmuru S2 AKTIF bırakılır ve sunucu kapanır.
-Koşu 2 (aynı dünya): açılışta aktif asit yağmuru geri yüklenir (seviye 2, AKTIF), durum, stop, sifirla.
-Sonda iki log denetlenir: `invalid dist` yok, istisna yok, config düzeltme WARN'ı yok, `[basarim] ... yayıncı olarak kayıtlı
-değil` satırı yok, iki süreç de 0 ile çıktı.
+Koşu 2 (aynı dünya): açılışta aktif asit yağmuru geri yüklenir (seviye 2, AKTIF), durum, stop, sifirla; döşeme yeniden,
+orman yangını S2 AKTIF'e getirilir (bilgi > 0) ve sunucu kapanır.
+Koşu 3 (aynı dünya, inceleme AOi-8, kasırga Kn5 deseni): açılışta aktif orman yangını geri yüklenir (seviye 2, AKTIF), durum,
+stop (yangının temiz kaynağı kapanır), bilgi 0, döşemede `afet_atesi` kalmadı, sifirla.
+Sonda üç log denetlenir: `invalid dist` yok, istisna yok, config düzeltme WARN'ı yok, `[basarim] ... yayıncı olarak kayıtlı
+değil` satırı yok, üç süreç de 0 ile çıktı.
 
 Kullanım (worktree kökünden): python3 tools/senaryo/asit_orman_yangini_sunucu.py --kanit <dizin> [--port <n>]
 Çıkış: 0 geçti, 1 senaryo/denetim hatası, 2 sunucu süreci sıfır dışı kodla çıktı, 3 ağır süreç kapısı açılmadı.
@@ -142,6 +145,27 @@ def kosu2(sunucu):
     sunucu.komut("dogalafet durum", r"Active disaster: Acid Rain, Level 2 .*phase: Active", "durum (asit korundu)")
     sunucu.komut("dogalafet stop", r"Acid Rain stopped\.")
     sunucu.komut("dogalafet sifirla", r"disaster and era state was reset")
+    doseme(sunucu)
+    sunucu.komut("execute positioned 0 201 0 run dogalafet start orman_yangini 2", r"Wildfire started \(Level 2 ")
+    sunucu.komut("dogalafet asama ileri", r"Wildfire phase: Siren")
+    isaret = sunucu.isaret()
+    sunucu.komut("dogalafet asama ileri", r"Wildfire phase: Active")
+    sunucu.bekle(r"orman yangını: seviye 2 başlangıç alanı 0, 201, 0", isaret, 10, "S2 başlangıç (kayıttan dönüş için)")
+    time.sleep(3)
+    sunucu.komut("dogalafet yangin bilgi", rf"Burning cells: [1-9][0-9]*/{TAVAN}", "bilgi (S2 yanıyor, kapanmadan önce)")
+
+
+def kosu3(sunucu):
+    sunucu.bekle(r"Done \(", 0, cs.ACILIS_SURESI, "açılış")
+    sunucu.bekle(r"Aktif afet geri yüklendi: orman_yangini seviye 2 aşama aktif", 0, 30, "aktif orman yangını geri yüklendi")
+    sunucu.komut("dogalafet durum", r"Active disaster: Wildfire, Level 2 .*phase: Active", "durum (orman korundu)")
+    isaret = sunucu.isaret()
+    sunucu.komut("dogalafet stop", r"Wildfire stopped\.")
+    sunucu.bekle(r"orman yangını bitti: seviye 2 en çok [0-9]+ hücre", isaret, 10, "kayıttan dönen orman temiz durdu")
+    sunucu.komut("dogalafet yangin bilgi", rf"Burning cells: 0/{TAVAN}", "bilgi (stop sonrası 0)")
+    sunucu.komut("fill -16 195 -16 16 215 16 minecraft:air replace dogalafetler:afet_atesi", r"No blocks were filled",
+                 "kayıttan dönen yangın stop sonrası ateş bloğu bırakmadı")
+    sunucu.komut("dogalafet sifirla", r"disaster and era state was reset")
 
 
 def log_denetimi(yol):
@@ -165,7 +189,7 @@ def main():
     sonuc = 0
     kodlar = []
     try:
-        for ad, adimlar in (("kosu1", kosu1), ("kosu2", kosu2)):
+        for ad, adimlar in (("kosu1", kosu1), ("kosu2", kosu2), ("kosu3", kosu3)):
             sunucu = cs.Sunucu(ad, klasor / f"{ad}.log")
             try:
                 adimlar(sunucu)
@@ -179,7 +203,7 @@ def main():
                 break
     finally:
         cs.ozellikleri_geri_al(ozgun)
-    for ad in ("kosu1", "kosu2"):
+    for ad in ("kosu1", "kosu2", "kosu3"):
         yol = klasor / f"{ad}.log"
         if yol.exists():
             for hata in log_denetimi(yol):

@@ -34,6 +34,9 @@ import threading
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import runclient_kilit  # noqa: E402
+
 KOK = Path(__file__).resolve().parents[2]
 RUN = KOK / "run"
 WORKSPACE = 94
@@ -240,7 +243,8 @@ def _kos(kanit, log, otomasyon, gradle_ek, wav):
     gecerli = True
     yoklama = 0
     cihaz = None
-    while istemci_jvm() is not None:
+    bekci = runclient_kilit.KapanisBekcisi(KOK, java_pid, (istemci_log,), "options.txt'e yazıldı; kapanış", log)
+    while not bekci.bitti_mi():
         if time.monotonic() - basla > TOPLAM_SURE:
             oldur(log, java_pid, "toplam süre aşıldı")
             gecerli = False

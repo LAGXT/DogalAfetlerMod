@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Güneş patlaması + kızıl cüce dedicated server senaryosu (bölüm D, GOREV §6 #4, #8, #12, #14), gerçek afetle.
 
-Çekirdeğin `cekirdek_sunucu.py` altyapısı (ortak `Sunucu`, `-PoyunTestiAfeti=deprem,gunes_patlamasi`) kullanılır: K-E22'den beri
-gerçek güneş patlaması `ozelliktenKaydet`'ten önce kaydedilir ve taklit bu türü uyarıyla atlar (log'da "Oyun testi afeti
-gunes_patlamasi atlandı"; `oyuntesti_gunes` süreci kaydedilmez). Kendi dünyası silinip yeniden üretilir, `server.properties`
+Çekirdeğin `cekirdek_sunucu.py` altyapısı (ortak `Sunucu`, bayraksız: gerçek afetler) kullanılır: log'da oyun testi afeti
+satırı yok, `oyuntesti_gunes` süreci kaydedilmez (5-entegrasyon betik temizliği, K-E22/K-E23). Kendi dünyası silinip yeniden üretilir, `server.properties`
 sonda geri döner. Üç açılış:
 
 koşu 1: start gunes_patlamasi, durum (normal güneş, ön-uyarıda gök değişmez), asama ileri (siren: güneş büyümeye başlar),
@@ -115,10 +114,8 @@ def ek_denetim(yol):
     hatalar = []
     if "yayıncı olarak kayıtlı değil" in metin:
         hatalar.append("[basarim] yayıncı olarak kayıtlı değil satırı var")
-    if "Oyun testi afeti gunes_patlamasi atlandı" not in metin:
-        hatalar.append("taklit güneş patlamasını atlamadı (K-E22 kayıt sırası)")
-    if "Oyun testi afeti gunes_patlamasi için kaydedildi" in metin:
-        hatalar.append("güneş patlaması taklitle kayıtlı (gerçek afet yok)")
+    if "Oyun testi afeti" in metin:
+        hatalar.append("bayraksız açılışta oyun testi afeti kaydedildi (gerçek afet bekleniyordu)")
     if re.search(r"Incorrect key gunes_patlamasi\b", metin):
         hatalar.append("gunes_patlamasi config bölümü düzeltildi")
     return hatalar
