@@ -93,6 +93,9 @@ public final class SuRenderer {
     private static final byte[] CIZ_TUR = new byte[N * N];
     private static int cizOx;
     private static int cizOz;
+    /** Çizilen yakın tamponun yapımının başladığı tick ve bir önceki yüklenen yapımınkinden farkı ({@link #agYasi}). */
+    private static long cizTick = Long.MIN_VALUE;
+    private static long cizAralik;
     /** Köşe ızgarası ({@code (N+1)²}): dalgacık yüksekliği ve çok oktavlı yüzey eğimi (SU-28). */
     private static final float[] VH = new float[(N + 1) * (N + 1)];
     /** Mağara tavan yansıması gücü (köşe başına) ve hesaplandığı yapım (SU-35). */
@@ -341,6 +344,7 @@ public final class SuRenderer {
             yakinBos = true;
             pariltiBos = true;
             uzakBos = true;
+            cizTick = Long.MIN_VALUE;
             RENK.clear();
             ISIK.clear();
             sonSeviye = l;
@@ -816,6 +820,8 @@ public final class SuRenderer {
             System.arraycopy(TUR, 0, CIZ_TUR, 0, TUR.length);
             cizOx = yapOx;
             cizOz = yapOz;
+            cizAralik = cizTick == Long.MIN_VALUE ? 0 : yapTick - cizTick;
+            cizTick = yapTick;
             pariltiBos = !pariltiYukle();
             sonParilti = yapParilti;
             yakinOx = yapOx;
@@ -1116,8 +1122,9 @@ public final class SuRenderer {
     /**
      * {@code (x, z)} sütununda bu karede herhangi bir sanal su ağının çizdiği ham su üstü (dalgacıksız): önce çizilen yakın
      * tampon ({@link #CIZ_UST}; TUR 3 yalnız gerçek suyun yan yüzü, su üstü değil), sonra çizilen uzak LOD karosu (karo
-     * ortasının yüksekliği; yalnız {@link GorselOtomasyon#AKTIF} iken kaydedilir). Uzak LOD kendi yakın bölgesini çizmez: yakın
-     * tampon yokken (yavaş makinede ilk yapım ~150 tick) kameranın {@link #YAKIN} blok çevresinde sanal su çizilmez, NaN.
+     * ortasının yüksekliği; yalnız {@link GorselOtomasyon#AKTIF} iken kaydedilir: üretimde yalnız yakın tampon, tsunami
+     * yağmurunun halka koyduğu alan). Uzak LOD kendi yakın bölgesini çizmez: yakın tampon yokken (yavaş makinede ilk yapım
+     * ~150 tick) kameranın {@link #YAKIN} blok çevresinde sanal su çizilmez, NaN.
      */
     public static double cizilenUst(int x, int z) {
         if (!yakinBos) {
@@ -1128,6 +1135,14 @@ public final class SuRenderer {
         }
         long a = karo(Math.floorDiv(x, LOD) * LOD, Math.floorDiv(z, LOD) * LOD);
         return !uzakBos && uzakCizilenUst.containsKey(a) ? uzakCizilenUst.get(a) : Double.NaN;
+    }
+
+    /**
+     * Yalnız otomasyon: çizilen yakın ağın yaşı (yapımının başladığı tick'ten bu yana) ve önceki yüklenen yapımın
+     * başlangıcından bununkine geçen tick (ağ yenileme aralığı); yakın ağ yoksa {@code -}.
+     */
+    public static String agYasi(long tick) {
+        return yakinBos ? "ag_yasi=- ag_araligi=-" : "ag_yasi=" + (tick - cizTick) + " ag_araligi=" + cizAralik;
     }
 
     private static long karo(int gx, int gz) {

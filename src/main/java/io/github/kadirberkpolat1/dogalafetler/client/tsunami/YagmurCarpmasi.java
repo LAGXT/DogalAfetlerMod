@@ -4,7 +4,7 @@ package io.github.kadirberkpolat1.dogalafetler.client.tsunami;
  * Yağmur damlasının bir tick'teki çarpma kararı (saf; dünya sorguları {@link TsunamiYagmuru}'da). Damla {@code once}'den
  * {@code y}'ye iner; {@code ust} yolundaki hücrelerde bulunan en üst blok yüzeyi (katı bloğun damlanın noktasındaki görünen
  * tepesi ya da üst yüzü çizilen gerçek sıvının yüzeyi; yoksa {@link #YAN}, üst yüzü çizilmeyen gerçek suya girdiyse
- * {@link #GIZLI}), {@code su} sütunun sanal su yüzeyi (yoksa NaN).
+ * {@link #GIZLI}), {@code su} sütunun bu karede çizilen sanal su yüzeyi (yoksa ya da analitik yüzey suyu yok diyorsa NaN).
  */
 final class YagmurCarpmasi {
     /** Çarpmadı, düşmeye devam eder. */
@@ -49,5 +49,14 @@ final class YagmurCarpmasi {
      */
     static boolean ustYuzGorunur(double yuzey, double gozY) {
         return yuzey < gozY;
+    }
+
+    /**
+     * Sanal su halkasının bir ucu, o ucun sütununda çizilen su üstü ({@code uc}) halkanın {@code yuzey}'inden en çok
+     * {@code pay} alçaksa desteklidir (daha yüksek su ucu örter). Çizilen su yoksa (NaN: kara ya da gerçek su) ya da su daha
+     * alçaksa uç boşta kalır: dalga cephesinde ve kıyıda halka suyun kenarından havaya taşardı.
+     */
+    static boolean sanalUcDestekli(double uc, double yuzey, double pay) {
+        return uc >= yuzey - pay;
     }
 }

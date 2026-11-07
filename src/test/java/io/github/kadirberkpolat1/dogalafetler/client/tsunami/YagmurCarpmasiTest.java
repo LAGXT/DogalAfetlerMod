@@ -57,4 +57,13 @@ class YagmurCarpmasiTest {
         assertFalse(YagmurCarpmasi.ustYuzGorunur(65.0, 64.62), "gözün 0,38 üstündeki kum tepesi (tur 4 karesi)");
         assertFalse(YagmurCarpmasi.ustYuzGorunur(64.62, 64.62), "göz hizası: yüz kenardan, görünmez");
     }
+
+    @Test
+    void sanalHalkaUcuCizilenSuyunUstundeOlmali() {
+        assertTrue(YagmurCarpmasi.sanalUcDestekli(66.0, 66.0, 0.125), "açık deniz: uç aynı yüzeyde");
+        assertTrue(YagmurCarpmasi.sanalUcDestekli(65.9, 66.0, 0.125), "pay içinde alçak su");
+        assertTrue(YagmurCarpmasi.sanalUcDestekli(68.5, 66.0, 0.125), "yükselen dalga yüzü ucu örter");
+        assertFalse(YagmurCarpmasi.sanalUcDestekli(64.0, 66.0, 0.125), "dalga cephesinden havaya taşar");
+        assertFalse(YagmurCarpmasi.sanalUcDestekli(Double.NaN, 66.0, 0.125), "uçta çizilen su yok (kıyı, gerçek su)");
+    }
 }

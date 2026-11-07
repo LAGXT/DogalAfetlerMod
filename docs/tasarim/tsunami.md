@@ -116,9 +116,12 @@ Kullanıcı istekleri 2 ("yağmur havada patlıyor") ve 3 ("evler yıkılınca f
 
 - **Yağmur halkası:** damla yükseklik haritasına değil, yolundaki görünen yüzeye çarpar: bloğun çizilen şeklinin o noktadaki
   tepesi (çit ve duvarın 1,5 blokluk çarpışma kutusu değil), üst yüzü çizilen gerçek sıvı ya da bu karede çizilen sanal su
-  yüzeyi, hangisi yüksekse. Halka yalnız sığdığı düz yüzeye (dört ucu aynı yüzeyde) ve göz hizasının altındaki üst yüze konur;
-  sanal sudaki halka yüzeyle iner kalkar, üstüne su yükselen zemin halkası söner. Bloka yandan ya da suya alttan giren damla
-  halkasız söner; çatı, ağaç ve çıkıntı altında damla doğmaz. Böylece her halka ekranda ufuk çizgisinin altında kalır.
+  ağının yüzeyi, hangisi yüksekse. Sanal su yüzeyi ağın çizdiği yükseklik; analitik yüzey yalnız "bu sütunda su var mı"
+  kapısıdır, çizilmeyen sanal su (yakın ağ kurulmadan) damlayı durdurmaz. Halka yalnız sığdığı yüzeye (dört ucu aynı yüzeyde;
+  sanal suda dört ucu çizilen suyun üstünde) ve göz hizasının altındaki üst yüze konur; sanal sudaki halka çizilen ağın
+  yüzeyinde durur ve ağ yenilenince onunla iner kalkar, üstünde çizilen su olan zemin halkası söner. Bloka yandan ya da suya
+  alttan giren damla halkasız söner; çatı, ağaç ve çıkıntı altında damla doğmaz. Böylece her halka ekranda ufuk çizgisinin
+  altında ve görünen bir yüzeyin üstünde kalır.
 - **Dekor:** ortak `#dogalafetler:afet_dekor` bloğu (fener, zincir, meşale, tabela, bayrak, saksı, mum, halı, ahşap kapı/kapak/çit, basınç plakası) her seviyede sertliğe bakılmadan, camla birlikte anında kırılır (tavandan önce).
 - **Kap:** fıçı, sandık, fırın gibi envanterli bloklar S3+'ta ahşapla birlikte kırılır; içerik ve blok eşyası her zaman düşer. Kap tick'in bütün eşya bütçesini (2) kullanır, bütçe doluysa sonraki tick'e kalır ve o tick rastgele enkaz düşmez; afet başına enkaz sınırı (`16·seviye`) kabı durdurmaz. Diğer blok varlıklılar (yatak) yıkılmaz.
 - **Dayanağı giden komşu:** blok komşu güncellemesiz silindiği için (TS-12) kırılan her bloğun altı komşusuna `canSurvive` bakılır; duvar meşalesi, asılı fener, halı, ray, kapının üst yarısı aynı birimin jetonundan kırılır. Başka chunk sütunundaki komşu ve zincirin sonraki halkası iş olarak kuyruğa girer (sütun bütçesi ve birim bütünlüğü korunur, özyineleme yok).
