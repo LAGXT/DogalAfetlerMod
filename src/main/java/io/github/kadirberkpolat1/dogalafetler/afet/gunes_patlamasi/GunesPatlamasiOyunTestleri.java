@@ -53,6 +53,11 @@ public final class GunesPatlamasiOyunTestleri {
         batchSonuTemizligi(level);
     }
 
+    @AfterBatch(batch = "gunes_patlamasi_buharlasma")
+    public static void buharlasmaSonrasi(ServerLevel level) {
+        batchSonuTemizligi(level);
+    }
+
     @AfterBatch(batch = "gunes_patlamasi_zincir")
     public static void zincirSonrasi(ServerLevel level) {
         batchSonuTemizligi(level);
@@ -146,6 +151,44 @@ public final class GunesPatlamasiOyunTestleri {
             y.assertTrue(normal, "tamamlanmamış büyüme stop ile NORMAL'e dönmeli (K-C26)");
             y.assertTrue(yagmur == 0 && ucan == 0, "stop sonrası yağmur " + yagmur + ", uçan meteor " + ucan);
         });
+    }
+
+    /**
+     * N9 / D.12 gerçek zincir (izleme-inceleme-5 P2-3): gerçek güneş patlamasının sireninde evre BUYUYEN olur, buharlaşma süreci
+     * aktifleşir ve global buharlaşma derinliği artar; stop tamamlanmamış büyümeyi NORMAL'e döndürünce derinlik 0'a iner.
+     */
+    @GameTest(template = "bos", batch = "gunes_patlamasi_buharlasma", timeoutTicks = 200)
+    public static void sirendeBuyuyenGunesBuharlasmaDerinliginiArtirir(GameTestHelper y) {
+        AfetYoneticisi yonetici = temizBasla(y);
+        MinecraftServer server = y.getLevel().getServer();
+        DunyaDonemi donem = yonetici.donem();
+        GameRules.BooleanValue hasar = blokHasari(y);
+        eskiBlokHasari = hasar.get();
+        hasar.set(false, server);
+        y.assertTrue(donem.buharlasmaDerinligi() == 0f, "başta buharlaşma derinliği 0 olmalı: " + donem.buharlasmaDerinligi());
+        GunesPatlamasi afet = baslat(y, yonetici);
+        yonetici.asamaIleri();
+        y.assertTrue(afet.asama() == AfetAsamasi.SIREN && donem.gunesEvresi() == GunesEvresi.BUYUYEN,
+                "sirende güneş büyümeli: " + donem.ozet());
+        float[] derinlik = {0f};
+        y.startSequence()
+                .thenWaitUntil(() -> y.assertTrue(donem.buharlasmaDerinligi() > 0f, "BUYUYEN güneşte buharlaşma başlamadı"))
+                .thenExecute(() -> {
+                    derinlik[0] = donem.buharlasmaDerinligi();
+                    y.assertTrue(yonetici.aktifDonemSurecleri().stream().anyMatch(s -> s.kimlik().equals("buharlasma")),
+                            "buharlaşma süreci aktif değil");
+                    yonetici.durdur();
+                    y.assertTrue(donem.gunesEvresi() == GunesEvresi.NORMAL, "stop tamamlanmamış büyümeyi NORMAL'e döndürmeli");
+                })
+                .thenWaitUntil(() -> y.assertTrue(donem.buharlasmaDerinligi() == 0f,
+                        "evre BUYUYEN'den çıkınca derinlik 0'a inmeli: " + donem.buharlasmaDerinligi()))
+                .thenExecute(() -> {
+                    DogalAfetler.LOGGER.info("Güneş GameTest: siren buharlaşması {} blok, stop sonrası 0", derinlik[0]);
+                    hasar.set(eskiBlokHasari, server);
+                    eskiBlokHasari = null;
+                    yonetici.sifirla();
+                })
+                .thenSucceed();
     }
 
     @GameTest(template = "bos", batch = "gunes_patlamasi_dogal", timeoutTicks = 100)
