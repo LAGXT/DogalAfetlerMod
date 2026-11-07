@@ -134,9 +134,10 @@ def log_denetimi(yol):
 
 
 def tps_ornegi(sunucu, etiket, ornekler):
-    satir = sunucu.komut("forge tps", r"Overall: Mean tick time: [\d.]+ ms\. Mean TPS: [\d.]+")
-    eslesme = re.search(r"Mean tick time: ([\d.]+) ms\. Mean TPS: ([\d.]+)", satir)
-    ornekler.append((etiket, float(eslesme.group(1)), float(eslesme.group(2))))
+    # Sunucu makinenin yerel ayarıyla yazar: tr_TR'de ondalık virgül ("3,754 ms").
+    satir = sunucu.komut("forge tps", r"Overall: Mean tick time: [\d.,]+ ms\. Mean TPS: [\d.,]+")
+    eslesme = re.search(r"Mean tick time: ([\d.,]+) ms\. Mean TPS: ([\d.,]+)", satir)
+    ornekler.append((etiket, float(eslesme.group(1).replace(",", ".")), float(eslesme.group(2).replace(",", "."))))
 
 
 def tps_kosusu(sunucu, klasor):
