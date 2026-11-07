@@ -116,3 +116,6 @@ Kaynak: `.vibe/kararlar/ay-carpmasi.md` AY-01…AY-11, rapor `.vibe/rapor/ay-car
 - Boyut değişkenliği güneş meteorlarıyla aynı dağılım (`meteor.mantik.MeteorOlcegi`: %60 küçük 0,5–0,9×, %30 orta, %10 büyük
   1,6–2,5×; `meteorBuyukOrani` 0,10). Görünüm mevcut `AY` varyantı (gri-beyaz kalsit + pürüzsüz bazalt/tüf gövde, mavi-beyaz
   plazma izi); yeni doku gerekmedi. Uçuş/çarpma sesleri meteor sisteminin (`esyalar.md` "Ses ve yağmur güncellemesi").
+- **Tur 3–4 (MT2-25, MT2-28):** parçalar 8–10 sn uçar (200 blok), yoğunluk `meteorDakikaBasina` **180/dk** (10 dk'da oyuncu
+  başına 1800 parça), uçan meteor tavanı 448; çarpma noktalarının 2/3'ü oyuncunun baktığı yarıda, 1/3'ü arkada
+  (`meteor.bakisYonuOrani`): yağmur göründüğü yerde yoğundur, arkada da düşer.

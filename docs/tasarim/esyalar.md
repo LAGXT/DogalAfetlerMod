@@ -181,8 +181,10 @@ enflasyon ~5'e (en çok 8) iner. Tek düşürülen meteor (komut) madde 13c şan
 
 **Uçuş süresi (tur 3, şef kararı MT2-25):** gerçek hızda gökte aynı anda ~5 meteor "aşırı fazla" isteğine yetmedi;
 sorun uçuşun ~3 sn sürmesiydi. Meteor hedefin 200 blok üstünden doğar (40–70°) ve hedefe `meteor.ucusSuresi`'nde (180 tick;
-küçük 9,5 sn, büyük 8,0 sn) varır: hız yoldan çıkar (~1,0–1,9 blok/tick). 90/dk'da oyuncu başına gökte ~13,5 meteor;
-uçan meteor tavanı 240 (16 oyuncu). Doppler (yukarıdaki 1,2/0,8 kayma) tipik hızda 1,33/0,8 kalır (`SES_HIZI` 5,2).
+küçük 9,5 sn, büyük 8,0 sn) varır: hız yoldan çıkar (~1,0–1,9 blok/tick). Doppler (yukarıdaki 1,2/0,8 kayma) tipik hızda
+1,33/0,8 kalır (`SES_HIZI` 5,2). **Tur 4 (MT2-28):** afet yağmurları 180/dk: oyuncu başına gökte ~27 meteor, uçan meteor
+tavanı 448 (16 oyuncu); yağmur meteorunun çarpma noktası bakış yönüne ağırlıklı (2/3 ön yarı, 1/3 arka;
+`meteor.bakisYonuOrani`), komut meteoru yönsüz.
 
 ## Buz altı balıkçılık (madde 15)
 
