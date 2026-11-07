@@ -97,13 +97,19 @@ public final class ArtciKuyrugu implements DonemSureci {
         return DunyaDonemi.al(ustDunya).ekVeri(KIMLIK).contains(PLAN);
     }
 
-    /** Süren artçının gürlemesi söner; kural açılınca henüz sürüyorsa yeniden başlar. */
+    /**
+     * Süren artçının gürlemesi söner. Kural ile duran plan kalır, kural açılınca sürer (K-C41); komutla duran planı bırakır
+     * ({@link #aktifMi} false, çekirdek kaydı siler; {@code durum}'da süresiz kalmaz).
+     */
     @Override
     public void durdur(ServerLevel ustDunya, DurdurmaNedeni neden) {
         DunyaDonemi donem = DunyaDonemi.al(ustDunya);
         CompoundTag v = donem.ekVeri(KIMLIK);
         OrtamSesi.durdur(ustDunya.getServer(), KATMAN, 20);
-        if (v.getInt(SUREN) != 0) {
+        if (neden == DurdurmaNedeni.KOMUT && v.contains(PLAN)) {
+            bosalt(v);
+            donem.ekVeriDegisti(KIMLIK);
+        } else if (v.getInt(SUREN) != 0) {
             v.putInt(SUREN, 0);
             donem.setDirty();
         }

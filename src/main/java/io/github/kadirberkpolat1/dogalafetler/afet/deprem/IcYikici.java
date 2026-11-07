@@ -16,6 +16,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.common.Tags;
 
 /**
  * Depremin iç yıkımı (AF-D2…AF-D5): ana sarsıntı boyunca tick bütçesiyle sınırlı sütun taraması. Sütunların yarısı etki
@@ -159,15 +160,17 @@ final class IcYikici {
     }
 
     /**
-     * AF-D3 zayıf tavan: altı hava; blok varlığı, iki parçalı blok (kapı, yatak, uzun bitki), {@code deprem_dayanikli} ve yaprak
-     * değil; {@code deprem_kirilgan} etiketinde ya da sertliği seviye eşiğinin altında ve kazma/kürek/çapa ile kazılmayan
-     * (yün, ışık taşı, mantar bloğu; doğal zemin — taş, toprak, kum, buz, kar, yosun, sculk, pişmiş kil — hep bu
-     * aletlerle kazılır, mağara tavanı çökmez).
+     * AF-D3 zayıf tavan: altı hava; blok varlığı, iki parçalı blok (kapı, yatak, uzun bitki), {@code deprem_dayanikli}, yaprak,
+     * cam ve cam panel (düşen blok olarak sağlam inerdi; fay hattında kırılgan olarak kırılır) ve çarpışmasız blok (sarmaşık,
+     * sarkan kök, spor çiçeği: tavan değil) değil; {@code deprem_kirilgan} etiketinde ya da sertliği seviye eşiğinin altında ve
+     * kazma/kürek/çapa ile kazılmayan (yün, ışık taşı, mantar bloğu; doğal zemin — taş, toprak, kum, buz, kar, yosun, sculk,
+     * pişmiş kil — hep bu aletlerle kazılır, mağara tavanı çökmez).
      */
     private boolean zayifTavan(ServerLevel level, BlockState st, IcYikimSeviyesi s) {
         if (!s.tavan() || st.hasBlockEntity() || st.is(DepremEtiketleri.DAYANIKLI)
                 || st.hasProperty(BlockStateProperties.DOUBLE_BLOCK_HALF) || st.hasProperty(BlockStateProperties.BED_PART)
-                || !st.getFluidState().isEmpty()) {
+                || !st.getFluidState().isEmpty() || st.is(BlockTags.IMPERMEABLE) || st.is(Tags.Blocks.GLASS_PANES)
+                || st.getCollisionShape(level, p).isEmpty()) {
             return false;
         }
         boolean zayif = st.is(DepremEtiketleri.KIRILGAN) || (s.zayifSertlik(st.getDestroySpeed(level, p))
