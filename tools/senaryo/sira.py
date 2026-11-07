@@ -176,6 +176,17 @@ def ekle(makine, komut, yuva=1, istemci=False, log=None, cwd=None, cikti=print):
     return kimlik
 
 
+def uzak_dolu_yuva():
+    """uzak.sh'in pc2 yuva kilitlerinden (`~/.cache/uzak-pc2/yuva-<n>`) tutulanların sayısı."""
+    return sum(kilit_dolu(UZAK_KILITLERI / f"yuva-{n}") for n in range(1, int(os.environ.get("UZAK_YUVA", "2")) + 1))
+
+
+def uzak_klasor_dolu(cwd):
+    """Bu klasörün uzak.sh klasör kilidi tutuluyorsa True (pc2'de aynı klasörden tek iş)."""
+    klasor = str(Path(cwd).resolve())
+    return kilit_dolu(UZAK_KILITLERI / f"klasor-{hashlib.md5(klasor.encode()).hexdigest()[:12]}")
+
+
 def dolu_mu(makine, cwd=None):
     """Kapı doluysa gerekçe, değilse None. pc2: kuyrukta bekleyen, kuyruğun yuvaları, uzak.sh yuva ve klasör kilitleri;
     ana: kuyrukta bekleyen, Gradle >= 2, boş RAM < KAPI_RAM_MB (vars. 4096), KAPI_PORT dinleniyor."""
@@ -186,11 +197,10 @@ def dolu_mu(makine, cwd=None):
         return f"{makine} kuyruğunun {YUVA} yuvası dolu"
     if makine == "pc2":
         yuvalar = int(os.environ.get("UZAK_YUVA", "2"))
-        if all(kilit_dolu(UZAK_KILITLERI / f"yuva-{n}") for n in range(1, yuvalar + 1)):
+        if uzak_dolu_yuva() >= yuvalar:
             return f"pc2'nin {yuvalar} yuvası dolu (uzak.sh)"
-        klasor = str(Path(cwd or os.getcwd()).resolve())
-        if kilit_dolu(UZAK_KILITLERI / f"klasor-{hashlib.md5(klasor.encode()).hexdigest()[:12]}"):
-            return f"bu klasörden pc2'de koşan iş var ({klasor})"
+        if uzak_klasor_dolu(cwd or os.getcwd()):
+            return f"bu klasörden pc2'de koşan iş var ({Path(cwd or os.getcwd()).resolve()})"
         return None
     gradle = subprocess.run(["pgrep", "-fc", "GradleWrapperMain"], capture_output=True, text=True).stdout.strip()
     if int(gradle or 0) >= 2:

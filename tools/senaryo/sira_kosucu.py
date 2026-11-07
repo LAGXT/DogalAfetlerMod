@@ -7,7 +7,8 @@ Ayakta kalma: systemd --user `dogalafet-sira@<makine>` (tools/senaryo/dogalafet-
 yeniden başlarken koşan işler sürer). İki koşucu da ana makinede koşar: pc2'de depo (.git, .vibe) ve spool yok, işi
 komutun kendisi K-E44 ile pc2'ye taşır (uzak.sh eşitler, yuva/klasör kilidi alır, log ve kanıtı geri çeker).
 Sıra eklenme sırasıdır; baştaki iş sığmıyorsa arkadakiler öne geçmez (iki yuvalı istemci işi aç kalmasın); yalnız
-pc2'de koşan bir işle aynı klasörden gelen iş (uzak.sh klasör kilidi) atlanır. Her iş kendi oturumunda `--kos` kipindeki
+pc2'de koşan bir işle aynı klasörden gelen iş (uzak.sh klasör kilidi) atlanır. pc2 kuyruğu kuyruk dışından tutulan uzak.sh
+yuvalarını da sayar (iş uzak.sh içinde bekleyip UZAK_BEKLE_DK'da düşmesin). Her iş kendi oturumunda `--kos` kipindeki
 koşturucuyla koşar; koşturucu çıkışı kendisi yazar, koşucu ölse de kayıt tamamlanır. pc2'nin `--istemci` işi süresince
 koşturucu ana makinedeki uzak.sh yuva kilitlerinin hepsini tutar ve işe UZAK_YUVA_TUTULU=1 verir.
 """
@@ -119,11 +120,12 @@ class Kosucu:
         kosan = [v for _, v in sira.isler(self.makine, "kosan")]
         dolu = sum(v.get("yuva", 1) for v in kosan)
         klasorler = {v["cwd"] for v in kosan}
+        uzak_dolu = sira.uzak_dolu_yuva() if self.makine == "pc2" else 0
         for yol, veri in sira.isler(self.makine, "bekleyen"):
             gerek = min(veri.get("yuva", 1), self.yuva)
-            if self.makine == "pc2" and veri["cwd"] in klasorler:
+            if self.makine == "pc2" and (veri["cwd"] in klasorler or sira.uzak_klasor_dolu(veri["cwd"])):
                 continue
-            if dolu + gerek > self.yuva:
+            if max(dolu, uzak_dolu) + gerek > self.yuva:
                 break
             hedef = sira.dizin(self.makine, "kosan") / yol.name
             try:
@@ -136,6 +138,7 @@ class Kosucu:
                 [sys.executable, str(Path(__file__).resolve()), "--kos", str(hedef)], start_new_session=True,
                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             dolu += gerek
+            uzak_dolu += gerek if self.makine == "pc2" else 0
             klasorler.add(veri["cwd"])
 
     def imza(self):

@@ -16,6 +16,7 @@
 # --rerun-tasks yasak (K-E51): yeniden koşu gerekiyorsa DEFTER_ZORLA=1 ya da cleanTest.
 log="$1"
 shift
+mkdir -p "$(dirname -- "$log")"
 py=python3
 
 kapi_bekle() {
