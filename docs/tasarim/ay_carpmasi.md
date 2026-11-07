@@ -128,3 +128,6 @@ yükseklikte, 900 blok), kamera merkezli ölçekle göğe sığdırılır: uçan
 Kademe: enkaz 12 / 24 / 40 / 64, duman 4 / 7 / 10 / 14, küre enlem dilimi 8 / 10 / 14 / 18. Dünya parlaması: 0,1 sn'de tam,
 0,5 sn tutar, τ 0,9 sn, 4,5 sn'de 0; gök örtüsü %60, sis %60, ışık haritası %85 mavi-beyaza; `ay_carpmasi.parlama` hepsini çarpar
 (0 kapalı). Enkaz halkası ve kayan yıldızlar değişmedi.
+
+**Ay yalnız gece patlar (G2-9).** Doğal ay çarpması AKTIF'e (çarpma) yalnız gece (gün saati 13000–23000) geçer; ON_UYARI
+gerekirse akşama kadar sessizce bekler, 60 sn'lik yaklaşma (siren) gece göğünde biter. `/dogalafet start` bu pencereye bakmaz.

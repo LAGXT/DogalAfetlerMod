@@ -183,6 +183,8 @@ Maliyet kara delik başına 3 çizim çağrısı.
 |---|---|---|
 | PULSAR | pulsar + mavimsi ay; gündüz uzay %55 | pulsar + kara delikli zengin uzay |
 
-**Gün saati (G2-1).** Güneş patlaması AKTIF (5 gün) boyunca gün saati öğlede sabit; büyüyen güneş tepede kalır, gece
-olmaz. Siren gecesi (aurora) ve süpernova sonrası dönemler vanilla döngüyle sürer. `doDaylightCycle`'a dokunulmaz.
+**Gün saati (G2-1, G2-9).** Güneş patlaması doğal yolla yalnız sabah patlar (AKTIF anı gün saati 0–6000; ON_UYARI
+gerekirse ertesi sabaha kadar sessizce bekler) ve AKTIF (5 gün) boyunca gün saati o sabah saatinde donar: büyüyen güneş
+doğu göğünde kalır, gece olmaz. Komutla pencere dışında başlatılan patlama gelecek öğleye alınıp orada donar. Siren
+gecesi (aurora) ve süpernova sonrası dönemler vanilla döngüyle sürer. `doDaylightCycle`'a dokunulmaz.
 
