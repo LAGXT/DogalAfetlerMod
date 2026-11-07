@@ -54,6 +54,14 @@ def bitir(yol, veri, **alanlar):
     yol.unlink(missing_ok=True)
 
 
+def is_ortami(veri):
+    """İşin süreç ortamı: koşucununki + kayıt + kuyruk değişkenleri; JAVA_HOME yoksa JDK 17 (K-E54: kuyruktan giren
+    `./gradlew` Java 21 daemon'u doğurmaz), varsa ezilmez."""
+    env = {**os.environ, **veri["env"], "SIRA_ICINDE": "1", "SIRA_IS": veri["id"], "SIRA_MAKINE": veri["makine"]}
+    env.setdefault("JAVA_HOME", sira.JAVA_HOME)
+    return env
+
+
 def kostur(yol):
     """`--kos` kipi: tek iş. Oturum lideri (koşucu `start_new_session` ile açar); `sira.py iptal` oturuma TERM yollar."""
     veri = sira.json_oku(yol)
@@ -61,7 +69,7 @@ def kostur(yol):
     sira.json_yaz(yol, veri)
     Path(veri["log"]).parent.mkdir(parents=True, exist_ok=True)
     log = open(veri["log"], "ab", buffering=0)
-    env = {**os.environ, **veri["env"], "SIRA_ICINDE": "1", "SIRA_IS": veri["id"], "SIRA_MAKINE": veri["makine"]}
+    env = is_ortami(veri)
     log.write(f"SIRA: {veri['id']} {veri['makine']} başladı {time.strftime('%Y-%m-%d %H:%M:%S')} cwd={veri['cwd']}\n"
               f"SIRA: komut {shlex.join(veri['komut'])}\n".encode())
     iptal = []

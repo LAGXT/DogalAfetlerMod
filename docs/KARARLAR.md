@@ -5091,6 +5091,20 @@ ikinci işi bekler, kendi oturumunu açan Gradle işin kendisi sayılır, tek is
 `bekle` ile bulunması, makine seçimi ve istemci çevirisi). Canlı geçiş 20:36:04 (`restart`, koşan `1107-200450560-e7` sürdü): 9 eski
 iş `oto`'ya taşındı, ana makine 20:36:05'te ilkini (`1107-200716577-44`, `gradle_kapisi.sh compileJava test`) aldı.
 
+**K-E54 Ana makinede daemon 15 dk boşta yaşar, kuyruk JDK 17 verir (şef kararı, 2026-11-07; dal `is/sira-3`).** K-E51'in "ana
+makinede daemon açık" hükmü değişmez. Teşhis (20:52): daemon'u `~/.gradle/gradle.properties` `org.gradle.daemon=true` açıyor,
+boşta süre Gradle varsayılanı (daemon log'larında `idleTimeout=10800000`, 3 sa); eşzamanlı her derleme kendi daemon'unu açtığından
+ana makinede üç boş daemon (1,5 GiB + 0,4 + 0,4) kaldı, iki GameTest yan yanayken boş RAM 1 856 MB'a indi. Üçüncüsü mise Java
+21 daemon'uydu: kuyruğun `./gradlew runData` işi (`1107-201035521-a0`) kaydında işçinin kabuğundaki `JAVA_HOME` (mise Java 21)
+taşıyordu (`gradle_kapisi.sh:54` ve `cekirdek_sunucu.py:78` JDK 17'yi kendileri sabitler). Karar: (1) `~/.gradle/gradle.properties`'e
+`org.gradle.daemon.idletimeout=900000` (15 dk, pc2 ile aynı; dosya git dışı, satır `docs/MAKINE.md`'de). Yalnız yeni açılan daemon'a
+uygulanır; o an yaşayan JDK 17 daemon'ları (koşan GameTest'ler) 3 sa ile kalır. (2) Kuyruk koşturucusu (`sira_kosucu.is_ortami`) iş
+ortamında `JAVA_HOME` yoksa JDK 17 verir, varsa ezmez (K0-13: sistem Java'sına dokunulmaz); `sira.py ekle` kabuğun `JAVA_HOME`'unu
+artık kaydetmez (kayıtta olsaydı "varsa ezilmez" kuralı Java 21'i korurdu ve kararın amacı tutmazdı). Eski `sira.py`'li worktree'lerin
+kayıtları `main`'i alana dek Java 21 taşıyabilir. (3) Boştaki Java 21 daemon'u `568572` (20:11:28'den beri `idle`, tek çocuğu
+Gradle'ın havuz worker'ı `568787`) 20:55:16'da `kill -TERM` ile kapatıldı, worker onunla gitti; JDK 17 daemon'larına dokunulmadı.
+Sınama `tools/senaryo/test_sira.py` 10/10 (`test_java_home_varsayilani`).
+
 ## Açık noktalar (Faz 2b)
 
 Entegratöre bırakılan notlardan işlenenler: kancalar (K-E1), protokol (K-C47), `asama ileri [süreç]` (K-C48), sanal su §3a istisnası
