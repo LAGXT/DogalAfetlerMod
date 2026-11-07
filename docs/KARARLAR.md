@@ -3694,6 +3694,34 @@ havası 260/300 (`gametest-filtre.log:178`). Reddedilen: tsunami tarafında par�
 mağara suyunda sürerdi, sıçrama sesi her tick çalardı); yalnız sanal su bayrağı (`sudaydi = h > 0`; gerçek sudan sanal suya
 geçişte vanilla'da olmayan bir sıçrama verirdi). Tsunami S5 FPS'i bu düzeltmeyle (`merge main`) yeniden ölçülür.
 
+**K-E27 Asılı runClient kapanışı: ortak bekçi kuralı (şef kararı, 2026-11-07; tsunami `gorsel-12`).** Belirti: tsunami
+işçisinin `gorsel-12` koşusunda istemci `TSUNAMI-OTOMASYON BITTI` yazdı, `Stopping!` dedi, dünyayı kaydetti
+(`.vibe/kanit/tsunami/gorsel-12/runClient-kabul.log:626-633`), ama JVM çıkmadı. `timeout 1200 ./gradlew runClient` yalnız Gradle
+istemcisini öldürdü (`cikis=124`, `:645`), `kos` döndü ve kilidi bıraktı (`:643-644`); oyun JVM'i ve tek kullanımlık Gradle
+daemon'ı yetim kaldı. Görsel betiğin bekçisi `/proc/<pid>` var olduğu sürece döndüğü için 30 sn'de bir `denetim` satırı yazarak
+~3,5 saat sürdü (`pencere.log`, 385 satır, 02:23 → 05:37); kilit boş göründüğü için başka bir runClient açılabilirdi (aynı anda
+tek istemci, RAM). Kök neden bilinmiyor: Render thread ve iki `dogalafetler-su` iş parçacığı futex'te bekliyordu; jstack
+bağlanamadı, ptrace kapalı; bir kez görüldü (`gorsel-13`, `-14` normal kapandı). Karar savunma önlemidir, iki katmanı
+`tools/senaryo/runclient_kilit.py`'de: (a) `kos`, komut bittiğinde (`timeout` dahil) `<worktree>/run`'da çalışan runClient JVM'i
+(komut satırında `forgeclientuserdev`, çalışma dizini denetimi) yaşıyorsa en çok `KAPANIS_SN` = 90 sn bekler, sonra yalnız o
+JVM'i ve ana süreci `GradleDaemon` ise o daemon'ı SIGKILL ile öldürür; kilit JVM ölmeden bırakılmaz. (b) `KapanisBekcisi`:
+görsel betiğin bekçi döngüsü `while not bekci.bitti_mi()` olur; JVM çıkınca hemen biter; otomasyonun kapanış satırından
+(`<önek> kapanıyor; girdi sayıları`, her otomasyonda `mc.stop()`'tan hemen önce) ya da kilidin bırakılmasından 90 sn sonra JVM
+yaşıyorsa (a)'daki öldürmeyi yapar ve `K-E27: asılı istemci öldürüldü pid=…` yazar. Kapanış satırı görüldüyse koşu geçerli
+kalır: kareler ve girdi sayıları o satırdan önce yazılır, çıkış kodu eskisi gibi o satırdan hesaplanır. SIGKILL: kapanışı
+zaten başlamış ve asılı kalmış JVM'in SIGTERM'le çıkacağı varsayılamaz. (b)'ye bağlananlar: `kasirga`, `deprem`,
+`asit_orman_yangini`, `ay_carpmasi`, `gunes_patlamasi`, `basarim`, `radar`, `meteor` `_gorsel.py`. Faz 2b/3 betikleri
+(`yangin`, `donma`, `sicaklik`, `yiyecek`, `balikcilik` görsel, `uyari_istemci`, `su_istemci`) yalnız (a)'yı alır: asılı
+JVM en geç Gradle `timeout`'u + 90 sn'de ölür. Tsunaminin kendi bekçisi (`tsunami_gorsel.py`, `TsunamiOtomasyonu` 30 sn
+`Runtime.halt`) 6/6 birleştirmesinde (b)'ye bağlanır.
+Kanıt `.vibe/kanit/k-e27/`: `py_compile` 9/9, `test_runclient_kilit.py` 8/8, sahte süreçli deneme 22/22: bitiş satırından ve
+kilitten `KAPANIS_SN` sonra öldürme, başka worktree'nin JVM'ine ve daemon olmayan ana sürece dokunulmaması, `kos`'un kilidi
+JVM öldükten sonra bırakması, kendiliğinden çıkan JVM'de öldürme olmaması. runClient koşulmadı. Reddedilen: yalnız süreç
+grubuna (`killpg`) ya da `timeout --kill-after`'a dayanmak (`gorsel-12`'de `timeout`'un sinyalinden sonra daemon ve oyun yaşıyordu;
+ayrı grupta mıydılar, kapanış sırasında sinyali mi yok saydılar bilinmiyor; çalışma dizini + komut satırı denetimi ikisinden de
+bağımsız); her görsel betikte ayrı kapanış kopyası (tek yer); tsunaminin Java tarafındaki `Runtime.halt` bekçisini bütün
+otomasyonlara yaymak (istemci koduna zorla çıkış; dışarıdan öldürme aynı sonucu kodsuz verir).
+
 ### Yiyecek
 
 **F-17 Kutup Balığı Çorbası koşullu tarif (şef kararı, inceleme Yi1).** Tarif ve tarif kitabı başarımı Forge'un üst düzey

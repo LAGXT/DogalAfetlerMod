@@ -25,6 +25,9 @@ import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import runclient_kilit  # noqa: E402
+
 WS = 92
 BOLUM = sys.argv[1] if len(sys.argv) > 1 else "hepsi"
 W = Path(__file__).resolve().parents[2]
@@ -165,7 +168,9 @@ def main():
     dogrulandi = False
     alarm = False
     yoklama = 0
-    while Path(f"/proc/{pid}").exists():
+    bekci = runclient_kilit.KapanisBekcisi(W, pid, (W / "run/logs/latest.log", istemci_log),
+                                           f"{ISARET} kapanıyor; girdi sayıları", log)
+    while not bekci.bitti_mi():
         pencereler = [c for c in (hypr_json("clients") or []) if c.get("pid") == pid]
         if pencereler and not dogrulandi:
             for ozellik, deger in (("no_focus", "1"), ("focus_on_activate", "0")):

@@ -28,6 +28,9 @@ import sys
 import time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import runclient_kilit  # noqa: E402
+
 WS = 92
 W = Path(__file__).resolve().parents[2]
 KOK = W.parents[1] if W.parent.name == ".worktrees" else W
@@ -181,7 +184,9 @@ def main():
     dogrulandi = False
     alarm = False
     yoklama = 0
-    while Path(f"/proc/{pid}").exists():
+    bekci = runclient_kilit.KapanisBekcisi(W, pid, (W / "run/logs/latest.log", istemci_log),
+                                           f"{ISARET} kapanıyor; girdi sayıları", log)
+    while not bekci.bitti_mi():
         pencereler = [c for c in (hypr_json("clients") or []) if c.get("pid") == pid]
         if pencereler and not dogrulandi:
             for ozellik, deger in (("no_focus", "1"), ("focus_on_activate", "0")):
