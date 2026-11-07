@@ -338,8 +338,9 @@ public final class KasirgaOyunTestleri {
 
     /**
      * S4 sütun taraması ağacın tepe yaprağını alıp gövdeye iner ve gövdeyi devirir; uçan blok tavanı doluyken kütükler
-     * rüzgârın teğet yönüne yatay konur (K-05 devrik kütük). {@code afetBlokHasari=false} iken aynı adım hiçbir bloğu
-     * değiştirmez. Doğuşun ilk yarısında evre payı 0 olduğu için kasırganın kendi tick'i blok kaldırmaz; adım testten sürülür.
+     * rüzgârın teğet yönüne yatay konur (K-05 devrik kütük). Yatırılan kütük parça bütçesinden düştüğü için (S4 3/tick)
+     * beş kat gövde iki sütun adımında devrilir. {@code afetBlokHasari=false} iken aynı adım hiçbir bloğu değiştirmez.
+     * Doğuşun ilk yarısında evre payı 0 olduğu için kasırganın kendi tick'i blok kaldırmaz; adım testten sürülür.
      */
     @GameTest(template = SAHNE, batch = "kasirga_devrik", timeoutTicks = 40)
     public static void s4AgacGovdesiniDevirirKuralKapaliykenDokunmaz(GameTestHelper y) {
@@ -357,7 +358,8 @@ public final class KasirgaOyunTestleri {
             dogrula(y, once == SanalSu.bolgeHash(level, a.getX(), a.getY(), a.getZ(), b.getX(), b.getY(), b.getZ()),
                     "kural kapalıyken sahne değişti");
             blokHasari(y, true);
-            int kalkan = kasirga.sutunuIsleTest(level, sutun.getX(), sutun.getZ(), false);
+            int kalkan = kasirga.sutunuIsleTest(level, sutun.getX(), sutun.getZ(), false)
+                    + kasirga.sutunuIsleTest(level, sutun.getX(), sutun.getZ(), false);
             for (BlockPos p : govde) {
                 dogrula(y, !dikeyMeseKutugu(level, y.absolutePos(p)), "gövde kütüğü yerinde: " + p.toShortString());
             }

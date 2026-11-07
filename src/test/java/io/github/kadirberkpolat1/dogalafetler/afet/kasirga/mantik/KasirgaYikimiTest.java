@@ -104,7 +104,7 @@ class KasirgaYikimiTest {
                         double eskiEsya = KasirgaYikimi.eskiParcaTavani(taban) * KasirgaYikimi.ESKI_ESYA_PAYI;
                         String ad = "S" + l + " blok " + blok + " pay " + pay + " kısma " + kisma;
                         assertTrue(b.parca() * b.esyaPayi() <= eskiEsya + E, "tick başına eşya K-04'ü aşmaz: " + ad);
-                        assertTrue(b.parca() >= KasirgaYikimi.eskiParcaTavani(taban), "parça tavanı eskiden az değil: " + ad);
+                        assertEquals(KasirgaYikimi.eskiParcaTavani(taban), b.parca(), "parça tavanı K-04 ile aynı: " + ad);
                         assertTrue(b.deneme() >= taban && b.parca() >= 1, ad);
                         assertTrue(b.esyaPayi() > 0 && b.esyaPayi() <= KasirgaYikimi.ESKI_ESYA_PAYI, ad);
                         assertEquals(l >= 4, b.kutuk() > 0, "kütük bütçesi yalnız S4-5: " + ad);
@@ -116,16 +116,9 @@ class KasirgaYikimiTest {
         KasirgaYikimi.Butce s5 = KasirgaYikimi.butce(5, 20, 1, 1);
         assertEquals(new KasirgaYikimi.Butce(2, 1, 0, 1.0 / 16), s1, "S1 K-04 ile aynı");
         assertEquals(50, s5.deneme());
-        assertEquals(8, s5.parca(), "S5 parça payı 0,4 (eskiden ¼: 5)");
+        assertEquals(5, s5.parca(), "S5 parça tavanı K-04 ile aynı (¼)");
         assertEquals(12, s5.kutuk());
-        assertEquals(5.0 / 16 / 8, s5.esyaPayi(), E);
-        double onceki = 0;
-        for (int l = 1; l <= 5; l++) {
-            int tablo = KasirgaSeviyesi.icin(l).blokKaldirmaTick();
-            double parcaPayi = (double) KasirgaYikimi.butce(l, tablo, 1, 1).parca() / tablo;
-            assertTrue(parcaPayi >= onceki - E || l <= 2, "parça payı seviyeyle artar S" + l);
-            onceki = parcaPayi;
-        }
+        assertEquals(1.0 / 16, s5.esyaPayi(), E);
         assertSame(KasirgaYikimi.Butce.YOK, KasirgaYikimi.butce(3, 8, 0, 1), "evre payı 0: yıkım yok");
         assertSame(KasirgaYikimi.Butce.YOK, KasirgaYikimi.butce(3, 0, 1, 1), "blokCarpani 0: yıkım yok");
         assertEquals(2, KasirgaYikimi.butce(4, 14, 1, 0.25).kutuk(), "kütük tavanı TPS kısmasıyla iner");

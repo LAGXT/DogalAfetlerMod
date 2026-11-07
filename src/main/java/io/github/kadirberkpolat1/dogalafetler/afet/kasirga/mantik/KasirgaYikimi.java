@@ -7,7 +7,7 @@ package io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik;
  * ({@code Kasirga#kaldirilabilir}) ayrıca uygulanır.
  */
 public final class KasirgaYikimi {
-    /** Uçan blok tavanı doluyken parçalanan bloğun K-04'teki eşya düşürme olasılığı; yeni pay bu hızı aşmaz. */
+    /** Uçan blok tavanı doluyken parçalanan bloğun eşya düşürme olasılığı (K-04). */
     public static final double ESKI_ESYA_PAYI = 1.0 / 16;
     /** Yıkım (sütun seçimi) yarıçapı / çekim yarıçapı: K-04'ün %60'ı, taban enkaz eteğinin yarıçapına eşit. */
     public static final double YIKIM_ORANI = 0.6;
@@ -16,7 +16,6 @@ public final class KasirgaYikimi {
     private static final double[] CEKIRDEK_OLASILIGI = {0.6, 0.75, 0.9, 1, 1};
     private static final double[] KENAR_OLASILIGI = {0.15, 0.2, 0.25, 0.3, 0.35};
     private static final double[] DENEME_KATI = {1, 1, 1.5, 2, 2.5};
-    private static final double[] PARCA_PAYI = {0.25, 0.25, 0.3, 0.375, 0.4};
     private static final int[] KUTUK_TICK = {0, 0, 0, 8, 12};
 
     /** Sütundaki blok sınıfı (etiketlerden; N12). */
@@ -36,7 +35,7 @@ public final class KasirgaYikimi {
      * Bir tick'in yıkım bütçesi.
      *
      * @param deneme   rastgele sütun denemesi
-     * @param parca    uçan blok tavanı doluyken en çok parçalanan blok
+     * @param parca    uçan blok tavanı doluyken en çok parçalanan ya da yatırılan blok (K-04 tavanı)
      * @param kutuk    en çok devrilen (yatırılan ya da uçan) gövde kütüğü
      * @param esyaPayi parçalanan bloğun eşya düşürme olasılığı
      */
@@ -107,9 +106,10 @@ public final class KasirgaYikimi {
 
     /**
      * Tick bütçesi. {@code blokKaldirmaTick} seviye tablosu × {@code blokCarpani}, {@code pay} evre payı, {@code kisma}
-     * TPS kısması. K-04'ün denemesi {@code taban = blok × pay × kisma}; sütun denemesi bunun seviyeyle artan katı, parça
-     * tavanı tabanın seviyeyle artan payı (eskiden ¼). Eşya payı, parça tavanı × eşya payı K-04'ün tick başına eşya hızını
-     * ({@code max(1, taban/4) × 1/16}) aşmayacak biçimde küçülür.
+     * TPS kısması. K-04'ün denemesi {@code taban = blok × pay × kisma}; sütun denemesi bunun seviyeyle artan katı (okuma
+     * ucuz). Parça tavanı ve eşya payı K-04 ile aynı ({@code max(1, taban/4)}, 1/16): tavan doluyken tick başına değişen
+     * blok ve eşya K-04'ü aşmaz. Seviyeyle artan parça payı (S5 8) dedicated S5'te ortalama tick'i 4,3 ms'den 7,4 ms'ye
+     * çıkardı (AF-23 rev.).
      */
     public static Butce butce(int seviye, int blokKaldirmaTick, double pay, double kisma) {
         int i = sira(seviye);
@@ -117,11 +117,9 @@ public final class KasirgaYikimi {
             return Butce.YOK;
         }
         int taban = Math.max(1, (int) Math.round(blokKaldirmaTick * pay * kisma));
-        int eskiParca = eskiParcaTavani(taban);
         int deneme = Math.max(1, (int) Math.round(taban * DENEME_KATI[i]));
-        int parca = Math.max(1, (int) (taban * PARCA_PAYI[i]));
         int kutuk = KUTUK_TICK[i] == 0 ? 0 : Math.max(1, (int) Math.round(KUTUK_TICK[i] * pay * kisma));
-        return new Butce(deneme, parca, kutuk, ESKI_ESYA_PAYI * eskiParca / parca);
+        return new Butce(deneme, eskiParcaTavani(taban), kutuk, ESKI_ESYA_PAYI);
     }
 
     /** K-04'ün parça tavanı: denemenin dörtte biri, en az 1. */

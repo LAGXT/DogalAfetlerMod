@@ -580,7 +580,8 @@ public final class Kasirga extends Afet {
      * S4-5 ağaç devrilmesi (K-05 devrik kütük): {@code tepe}'den aşağı kesintisiz dikey kütükler tepeden başlayarak tick'in
      * kütük bütçesi kadar kalkar. Tavanda yer varsa kütük uçar; yoksa rüzgârın teğet yönüne ({@link
      * KasirgaYikimi#devrilmeYonu}) yatar: tepeden {@code j}. kütük gövde dibinden {@code boy - j} blok ötedeki zemine yatay
-     * konur. Yer yoksa parçalanır; o da olmazsa gövdenin kalanı kütük olarak kalır.
+     * konur. Yer yoksa parçalanır. Yatırılan kütük de parça bütçesinden düşer: tavan doluyken tick başına değişen blok
+     * K-04'ün parça tavanını aşmaz (AF-23 rev.); bütçe bitince gövdenin kalanı kütük kalır, sonraki ziyaret sürdürür.
      */
     private int govdeyiDevir(ServerLevel level, BlockPos tepe, KasirgaSeviyesi s, YikimTuru tur, boolean ucurabilir) {
         int x = tepe.getX();
@@ -606,14 +607,18 @@ public final class Kasirga extends Afet {
             if (ucabilir(level, m, tur, ucurabilir)) {
                 ucur(level, m, kutuk);
             } else {
+                if (tur.parca <= 0) {
+                    break;
+                }
                 BlockPos yatis = yatisYeri(level, x + yon[0] * (boy - j), z + yon[1] * (boy - j), dipY);
                 if (yatis != null) {
+                    tur.parca--;
                     level.removeBlock(m, false);
                     level.setBlock(yatis, kutuk.hasProperty(BlockStateProperties.AXIS)
                             ? kutuk.setValue(BlockStateProperties.AXIS, eksen) : kutuk, Block.UPDATE_ALL);
                     tur.degisti(yatis);
-                } else if (!parcala(level, m, kutuk, tur)) {
-                    break;
+                } else {
+                    parcala(level, m, kutuk, tur);
                 }
             }
             tur.degisti(m);
@@ -680,9 +685,9 @@ public final class Kasirga extends Afet {
             this.kutuk = butce.kutuk();
         }
 
-        /** Tavan dolu, parça ve kütük bütçesi bitti: bu tick başka blok kalkamaz. */
+        /** Tavan dolu ve parça bütçesi bitti (yatırılan kütük de ondan düşer): bu tick başka blok kalkamaz. */
         boolean tukendi(int ucan) {
-            return parca <= 0 && kutuk <= 0 && ucan >= tavan;
+            return parca <= 0 && ucan >= tavan;
         }
 
         void degisti(BlockPos p) {
