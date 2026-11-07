@@ -174,10 +174,8 @@ Açısal çap 1,0–1,6°; gölge 0,34, foton halkası 0,395, halka 0,47 (doku y
 yıldızları örter (normal karışım), akış 12–22°/sn döner, jet 6,5 yarıçap boyunda, üç düğümlü, %50 alfa ve hafif titreşim.
 Maliyet kara delik başına 3 çizim çağrısı.
 
-**Pulsar** (`GunesEvresi.PULSAR`, kızıl cücenin yerine %15). Güneş yolunda, kalıntının ortasında: mavi-beyaz çekirdek ve hale,
-4 sn'de bir dönen eksenin iki ince ışını (gök düzlemine izdüşüm, 75 birime kadar), ışın bakıştan geçerken nabız. Gök gece
-`#060A1C`, gündüz ısınmayla kızıl-sıcak pus `#8A3A22` (sis `#B0522C`), uzay gündüz %55, ışık haritası sıcak. Dünya: sıcaklık
-+45,6 °C, kavrulma, yangın, buharlaşma, donmanın çözülmesi (`.vibe/kararlar/gokyuzu-2.md` §A.3–4).
+**Pulsar** (`GunesEvresi.PULSAR`, kızıl cücenin yerine %15). Güneş yolunda, kalıntının ortasında. Görünüm ve dünya etkileri
+pulsar-2'de yenilendi (aşağıdaki bölüm); dönen ışın ve nabız (G2-7) kalktı.
 
 | Evre \ Ay | Ay var | Ay yok |
 |---|---|---|
@@ -187,4 +185,53 @@ Maliyet kara delik başına 3 çizim çağrısı.
 gerekirse ertesi sabaha kadar sessizce bekler) ve AKTIF (5 gün) boyunca gün saati o sabah saatinde donar: büyüyen güneş
 doğu göğünde kalır, gece olmaz. Komutla pencere dışında başlatılan patlama gelecek öğleye alınıp orada donar. Siren
 gecesi (aurora) ve süpernova sonrası dönemler vanilla döngüyle sürer. `doDaylightCycle`'a dokunulmaz.
+
+## Pulsar-2 güncellemesi, 2026-11-08 (korkunç pulsar, cehennem dünya, kara delik yutması, eski güneşin dönüşü)
+
+Kaynak: `.vibe/kararlar/pulsar-2.md` (PL-1…). Kullanıcı isteği: pulsar "yetersiz"; daha büyük, korkutucu, dönmeyen ama sağa sola
+çok hızlı titreşen bir nötron yıldızı; dünya cehenneme döner; 15 gün sonra uzak bir kara delik pulsarı yutar; 10 gün buzul
+kıyamet; kızıl cüce doğuşu bitince eski güneş geri gelir. Astronomik doğruluk değil kullanıcının tasarım niyeti esas.
+
+**Zincir.** PULSAR (15 oyun günü, ilk gün ısınma) → KARADELIK_YUTMA (90 sn, doğal geçişte gündüz penceresinde başlar: gün
+saati 3000–7200) → GÜNEŞSİZ (pulsar yolu, 10 oyun günü, buzul kıyamet, kalıntı nebulası yok) → KIZIL CÜCE doğuşu → NORMAL
+(vanilla güneş, 20 sn geçişle kızıl cüce diski söner; donma doğal çözülür). Normal süpernova → kızıl cüce yolu değişmedi.
+
+**Pulsar görünümü (dönme yok).** Çekirdek diski 10°, hale ~34°, korona ~54° (vanilla güneş diski ~8,6°; görünür ışıma
+6 katın üstü), bakışta büyümez. Renk mavi-beyaz → ısınmayla mor-beyaz/çelik. Titreşim iki bileşen: 16 Hz yatay kare dalga
+(her yarım periyodun genliği zamandan karmayla 0,6–1,0°, makine gibi düzgün görünmesin; dikey testere, genliğin 0,45'i) +
+1–2 Hz iki sinüslü büyük sarsıntı (1,5° + güç); şiddet ısınma gücüyle artar, gerçek zamandan hesaplanır (kare süresinden
+bağımsız). Hale iki kopya, zıt ofset, %50 alfa (bulanık çift görüntü). Keskin iki yönlü ışınlar gök kubbesini aşar (uç
+köşeleri kamera yönünde 100 birime çekilir: kısa görüş mesafesinde kırpılmaz). Nabız yerine düzensiz "çatırtı": 0,25 sn'lik
+yuvalarda %50 olasılıkla 0,10–0,15 sn beyaz patlama (~2/sn). Gök gündüz kavrulmuş turuncu-kızıl `#C0401A`, gece koyu kan
+kırmızısı `#2A0608`, sis `#A83A1A` / `#240608` ve yakın (görüş ×(1 − 0,5·güç)), ışık haritası kızıl-sıcak; ufukta titreyen
+ısı dalgası şeridi (gök aşaması, UV kayması); kül yağışı parçacığı (kamera çevresi 24 blok, göğe açık yerde, yalnız blok
+hasarı açıkken). **Erişilebilirlik:** CLIENT `gokyuzu.pulsarTitresim` (0 = hızlı titreşim ve çatırtı kapalı, yavaş sarsıntı kalır).
+
+| Kademe | Titreşim | Hale kopyası | Işın çifti | Kül yağışı (tick başına × güç) |
+|---|---|---|---|---|
+| Düşük | 8 Hz | 1 | 1 | 2 |
+| Orta | 16 Hz | 2 | 2 | 4 |
+| Yüksek | 16 Hz | 2 | 2 | 7 |
+| Ultra | 16 Hz | 2 | 2 | 10 |
+
+**Kara delik yutması (90 sn, evre başlangıcından deterministik).** Yeni kara delik güneş yolunda pulsardan 40° ötede.
+0–20 sn hızlanarak yaklaşır (1,5° → 20°; açısal boyut uzaklıkla ters orantılı), çevresinde yerel koyu mercek halkası ve Einstein
+halkası (göğün geri kalanının yıldızları sönmez). 20–60 sn pulsar kara deliğe çekilir ve spagettileşir (kara deliğe uzanan eğik
+kuyruk, mor-mavi-beyaz Doppler'li akresyon diski, titreşim zirvede); 55. sn'de aradaki yolun %80'i, 56,5. sn'de pulsar yok.
+55–60 sn kör edici mor-beyaz parlama (0,1 sn'de tepe, 1,5 sn tutar, τ 0,9 sn; ekran örtüsü, ışık haritası, sis) + sunucudan
+tüm oyunculara konumsuz kütleçekim dalgası sesi (`karadelik_yutma.ogg`, 8 sn düşen bas 90 → 25 Hz + çatırtı, −23 LUFS) ve 3°,
+100 tick ekran sarsıntısı (hızlı bileşeni `pulsarTitresim`'le). 60–90 sn kara delik küçülüp uzaklaşır ve söner, gök simsiyah, uzay
+%100, kalıntı nebulası yok. Gök koyu mor `#1C0A2E` → siyah; parlamada `#E8DAFF`'ye %85. Yutmada en çok 16 kuad.
+
+**Cehennem dünya (sunucu, `afetBlokHasari` kapısı arkasında, tek bütçe).** Çimen → kaba toprak → kül bloğu; yaprak yanar,
+altına kül katmanı düşer; kütük → kömürleşmiş kütük (siyah çatlaklı, içi kızıl parlayan, ışık 3); çiçek/ot/kaktüs/mantar yanar;
+kar ve buz buharlaşır; kum seyrek cama döner; seyrek tek bloklu lav gözeleri; yangın odakları, kor parçacığı; oyuncu başına dakikada
+12 meteor (kızıl-beyaz iz). Buzul kıyamette kül katmanı karın altında kalır (kar katmanına döner), çözülünce kül geri gelmez:
+toprak ve kül bloğu kalır.
+
+| Evre \ Ay | Ay var | Ay yok |
+|---|---|---|
+| PULSAR | titreşen pulsar + mavimsi ay; gündüz uzay %55 | titreşen pulsar + kara delikli zengin uzay |
+| KARADELIK_YUTMA | yutma koreografisi + mor tonlu ay | yutma koreografisi |
+| GÜNEŞSİZ (pulsar yolu) | uzay, soluk gri ay, kalıntı yok | yalnız uzay, kalıntı yok |
 
