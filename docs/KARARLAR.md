@@ -5056,6 +5056,106 @@ kuyruğundan (iş `1107-192207410-83`): `FILTRE=yok`, 216/216, Gradle 1 dk 53 sn
 **Açık:** iki makinede de `Linger=no`: oturum kapanınca ana makinedeki koşucular ve pc2'deki daemon durur (kalıcı için kullanıcı ana
 makinede ve pc2'de `sudo loginctl enable-linger lagxt`).
 
+**K-E53 Kuyruk iki makineye dağılır: ortak `oto` kuyruğu ve backfill (şef kararı, kullanıcı adına, 2026-11-07; dal `is/sira-2`;
+şefin metninde "K-E52", sayaç K-E53 verdi).** Kanıt (pano 20:27, kullanıcı gözlemi): pc2'de tek iş koşuyordu (2 yuvalı
+`pc2_istemci.sh`, ~18 dk), pc2 kuyruğunda 15 iş bekliyordu (9'u 1 yuvalı `gradle_kapisi.sh`/`*_sunucu.py`, başta 2 yuvalı istemci
+işleri), ana makinenin kuyruğu boş, iki yuvası boştaydı. İki kök neden: `sira.py --makine oto` ekransız işi hep pc2'ye koyuyordu
+(K-E44 "hep pc2") ve `sira_kosucu.py` katı FIFO'ydu (baştaki iş sığmayınca arkadakiler beklerdi). Karar: (1) **pc2 öncelikli, taşan
+iş ana makineye** (K-E44'ün "hep pc2"si yerine): `sira.py ekle` varsayılanı `--makine oto` ekransız işi (`gradle_kapisi.sh`,
+`./gradlew` ekransız görevler, `*_sunucu.py`) ortak `~/.cache/dogalafet-sira/oto/` kuyruğuna koyar; iki koşucu da önce kendi
+kuyruğuna, sonra `oto`'ya bakar, işi `rename` ile kendi `kosan/`'ına alır (kayıtta `makine` koşan makine, `kaynak: oto`; kimlik
+değişmez, `bekle`/`durum` makineden bağımsız arar). Ana koşucu `oto` işini yalnız pc2 alamıyorsa (pc2'de koşan + uzak.sh yuvaları
++ pc2'de bekleyen yük işe yer bırakmıyor, aynı klasörden pc2 işi koşuyor ya da pc2 koşucusu yok) ya da iş 60 sn
+(`SIRA_OTO_BEKLE_SN`) beklediyse alır; ana makinede `UZAK=0` ile yerelde koşar: ağır süreç ≤ 2 (kuyruğun işleri + kuyruk dışı
+`GradleWrapperMain`, K-E19 a), boş RAM ≥ `KAPI_RAM_MB` (4096), aynı klasörden tek oto işi (worktree'nin `build/` ve `run-server/`
+klasörü tek). pc2 doluysa ana beklemeden alır: ilk sürümdeki "iki oto işi arasında 60 sn" (`SIRA_ANA_ARA_SN`) 20:39'da kalktı (canlı
+ölçüm: işler 16–22 sn sürdüğünden ikinci iş başlamadan ilki bitiyor, ana 1/2 kalıyordu; RAM 4 662 MB eşiğin üstündeydi). Kuyruk
+dışı Gradle sayımı (20:45 düzeltmesi): istemcinin (`org.gradle.wrapper.GradleWrapperMain`) kuyruk işine ait olduğu oturumdan değil
+ata süreçlerinden anlaşılır; `*_sunucu.py` Gradle'ı kendi oturumunda açtığından ana makinede koşan sunucu işi hem yuva hem kuyruk
+dışı Gradle sayılıyor, ikinci yuva "ana makinede 2 ağır süreç" engeliyle boş kalıyordu (20:42–20:45, RAM yer yer > 4 096 MB). (2) **İstemci işi makineden bağımsız:** `sira.py ekle --istemci -- python3 tools/senaryo/x_gorsel.py
+<kanıt/> …` (kanıt klasörü betiğin ilk argümanı, `--kanit` argümanı ya da `sira.py ekle --kanit`) `oto`'da saklanır; pc2 alırsa
+`pc2_istemci.sh <kanıt/> <betik> …` ile iki yuva, ana alırsa betiğin kendisi (gizli workspace, `runclient_kilit`) tek yuva ve tek
+istemci (kuyruğun istemci işi ya da yaşayan runClient kilidi varken alınmaz). `--olcum` (FPS/CPU, K0-33, K-E29 b) yalnız ana;
+`pc2_istemci.sh` doğrudan verilirse pc2'ye sabit (geriye uyum); kanıtı belirsiz istemci işi ana. (3) **Backfill:** koşucu
+bekleyenleri sırayla gezer, sığan ilk işi alır (tek yuvalı iş sığmayan iki yuvalının önüne geçer); açlık koruması: sığmayan iki
+yuvalı iş 10 dk'dan (`SIRA_ACLIK_SN`) uzun bekliyorsa o makine arkasından iş almaz, iki yuva boşalınca onu koşar; pc2'de aynı
+klasörün ikinci işi atlanmaya devam eder. (4) **Geçiş:** pc2 koşucusu eski `sira.py`'nin (`surum` alanı yok; işçilerin eski
+worktree'lerindeki `gradle_kapisi.sh`/`cekirdek_sunucu` hep `--makine pc2` verir) pc2'ye koyduğu tek yuvalı ekransız işi sürekli
+`oto`'ya taşır; eski `sira.py bekle` `oto`'yu aramadığı için `pc2/bekleyen/<id>.json` `oto`'daki kayda bağ (symlink) olarak kalır, iş
+başlayınca sarkan bağ silinir. Yeni `gradle_kapisi.sh`/`cekirdek_sunucu` kapı doluyken ekransız işi doğrudan `oto`'ya atar; pc2'nin
+`dolu-mu`'su `oto` bekleyenini de sayar. (5) Pano başlığına `Yuva: ana n/2 · pc2 n/2 · oto bekleyen N`; oto'dan gelen koşan iş
+`ana (oto)`. Reddedilen: oto işini pc2 kuyruğunda bayrakla tutmak (karar `oto` spool'unu istedi; eski istemciler bağla çözüldü),
+ana makinenin oto işini hemen alması (ana makine kullanıcınındır). Sınama `tools/senaryo/test_sira.py` 9/9 (`sleep` işleri: backfill,
+`SIRA_ACLIK_SN=2` açlık, pc2 dolu → ana alır, 60 sn bekleyeni ana alır, ana iki yuvayı aynı turda doldurur ve aynı klasörün
+ikinci işi bekler, kendi oturumunu açan Gradle işin kendisi sayılır, tek istemci, eski işin taşınması ve kimliğin
+`bekle` ile bulunması, makine seçimi ve istemci çevirisi). Canlı geçiş 20:36:04 (`restart`, koşan `1107-200450560-e7` sürdü): 9 eski
+iş `oto`'ya taşındı, ana makine 20:36:05'te ilkini (`1107-200716577-44`, `gradle_kapisi.sh compileJava test`) aldı.
+
+**K-E54 Ana makinede daemon 15 dk boşta yaşar, kuyruk JDK 17 verir (şef kararı, 2026-11-07; dal `is/sira-3`).** K-E51'in "ana
+makinede daemon açık" hükmü değişmez. Teşhis (20:52): daemon'u `~/.gradle/gradle.properties` `org.gradle.daemon=true` açıyor,
+boşta süre Gradle varsayılanı (daemon log'larında `idleTimeout=10800000`, 3 sa); eşzamanlı her derleme kendi daemon'unu açtığından
+ana makinede üç boş daemon (1,5 GiB + 0,4 + 0,4) kaldı, iki GameTest yan yanayken boş RAM 1 856 MB'a indi. Üçüncüsü mise Java
+21 daemon'uydu: kuyruğun `./gradlew runData` işi (`1107-201035521-a0`) kaydında işçinin kabuğundaki `JAVA_HOME` (mise Java 21)
+taşıyordu (`gradle_kapisi.sh:54` ve `cekirdek_sunucu.py:78` JDK 17'yi kendileri sabitler). Karar: (1) `~/.gradle/gradle.properties`'e
+`org.gradle.daemon.idletimeout=900000` (15 dk, pc2 ile aynı; dosya git dışı, satır `docs/MAKINE.md`'de). Yalnız yeni açılan daemon'a
+uygulanır; o an yaşayan JDK 17 daemon'ları (koşan GameTest'ler) 3 sa ile kalır. (2) Kuyruk koşturucusu (`sira_kosucu.is_ortami`) iş
+ortamında `JAVA_HOME` yoksa JDK 17 verir, varsa ezmez (K0-13: sistem Java'sına dokunulmaz); `sira.py ekle` kabuğun `JAVA_HOME`'unu
+artık kaydetmez (kayıtta olsaydı "varsa ezilmez" kuralı Java 21'i korurdu ve kararın amacı tutmazdı). Eski `sira.py`'li worktree'lerin
+kayıtları `main`'i alana dek Java 21 taşıyabilir. (3) Boştaki Java 21 daemon'u `568572` (20:11:28'den beri `idle`, tek çocuğu
+Gradle'ın havuz worker'ı `568787`) 20:55:16'da `kill -TERM` ile kapatıldı, worker onunla gitti; JDK 17 daemon'larına dokunulmadı.
+Sınama `tools/senaryo/test_sira.py` 10/10 (`test_java_home_varsayilani`).
+
+
+**K-E60 Tek giriş kuyruk: ağır iş kendini kuyruğa ekler, kuyruk dışı Gradle panoda (şef kararı, kullanıcı şikayeti üzerine,
+2026-11-07; dal `is/sira-4`; şefin metninde "K-E55", sayaç K-E60 verdi).** Şikayet: "pc2'de 1 test çalışıyor, ana makinede hiç
+çalışmıyor"; pano 22:45:58 `Yuva: ana 0/2 · pc2 0/2 · oto bekleyen 0` gösterirken pc2'de test koşuyordu. Teşhis (22:48): pc2'deki
+Gradle afet-fizik'in `gradle_kapisi.sh … junit-6.log test`'iydi; ebeveyn zinciri `omp` (işçi oturumu) → `gradle_kapisi.sh` → `uzak.sh` →
+`ssh pc2`, kuyruk kaydı yok. İşçiler betikleri kabuktan doğrudan çağırıyor; K-E51'in kapısı boşken iş yerinde (ekransızsa pc2'de)
+koşuyor, kuyruğa yalnız kapı doluyken düşüyordu. Defter kanıtı: 19:00'dan sonraki 42 koşunun pc2'deki 15'inin 12'si kuyruğu
+atlamış (3'ü kuyruktan), ana makinedeki 27'nin 26'sı kuyruktan. Pano yalnız kuyruk kayıtlarını saydığı ve kayıt değişmedikçe
+yenilenmediği için bunu göremiyordu. İkinci bulgu: ana makinedeki istemci işi (afet-fizik `tsunami-yagmur-2`, çıkış 2) eksik değil
+**eski** `HYPRLAND_INSTANCE_SIGNATURE` taşıyordu: işçi kabukları 11-06'da açılan `herdr` sunucusundan bir önceki Hyprland örneğinin
+imzasını miras alıyor (soket dosyası duruyor, dinlenmiyor; `hyprctl` "Couldn't connect"). Karar: (1) **Tek giriş:** ağır süreç
+açan her betik (`gradle_kapisi.sh`, `uzak.sh`, `pc2_istemci.sh`, `*_sunucu.py` — `cekirdek_sunucu.defterli_kos`, `*_gorsel.py`/
+`*_istemci.py` — `defter.sarmala`, `runclient_kilit.py kos`) bir kuyruk işinin içinde değilse (koşturucunun `SIRA_IS`'i; pc2'de
+`UZAK_ICINDE`) defter bakışından sonra kendini `sira.py ekle --bekle --makine oto -- <aynı argv>` ile kuyruğa ekler ve bekler
+(`sira.kuyruga_gir`, exec): işin log'u akar, çıkış kodu işinki, bekleyen TERM/INT/HUP alırsa iş iptal (sinyal yakalayıcı iş kaydı
+yazılmadan kurulur). "Kapı boşsa yerinde koş" yolu, `KAPI_BLOKLA`, `kapi_bekle` ve `sira.py dolu-mu` kalktı. `gradlew` iş dışında
+reddeder (çıkış 3, `sira.py ekle -- ./gradlew …` iletisi); `SIRA_SERBEST=1` bilerek atlar. Hyprland exec kuralı çocuk sürece ortamı
+geçirmediğinden `runclient_kilit.istemci_baslat` `SIRA_IS`/`SIRA_SERBEST`'i `env` ile verir (`kos` işin içinde kalır). Ana makinenin
+her işi `UZAK=0` taşır (makine = koşan makine; eskiden yalnız oto'dan gelen). `sira.py ekle`'de `--makine` verilmezse komuttan seçilir
+(türsüz komut ana), `--makine oto` türsüz komutu da oto'ya koyar (pc2 alırsa uzak.sh ile sarılır); görsel/istemci betikleri ve
+`runclient_kilit.py` bayraksız da istemci sayılır. (2) **Kuyruk dışı görünür ve sayılır:** ana makinede işe ait olmayan Gradle
+istemcisi (`org.gradle.wrapper.GradleWrapperMain`, süreç ortamında ana makinede koşan bir işin `SIRA_IS`'i yok; eski ata zinciri
+sayımının yerine), pc2'de pc2 koşucusunun 5 sn'de bir ssh ile okuduğu `ps` + uzak.sh oturum dosyaları (`/tmp/uzak-<yerel pid>-<yuva>.pid`;
+atası bir kuyruk işinin uzak.sh'sine bağlanmayan Gradle; `pc2/surecler.json`, 60 sn'den eskiyse "bilinmiyor"). Pano `kuyruk dışı`
+satırı (pid, makine, başlangıç, süre, proje + görevler) yazar; `Yuva:` ve koşucular onları sayar (pc2'de uzak.sh kilidi tutan dış iş
+kilit sayımında, kilitsiz elle ssh üstüne). Pano değişiklikte (kuyruk ya da dış süreç) ve 30 sn'de bir yenilenir. (3) **Dağıtım:**
+K-E53'ün pc2 önceliği kalır (ana makine kullanıcınındır); kural "sırada iş varken boş yuvalı makine kalmaz": pc2 işi alamıyorsa ana
+hemen alır. Aynı klasör: makine başına tek iş (ana makinede de, spool fark etmeksizin); iki makinede birer iş olur — uzak.sh
+`build/`, `.gradle/`, `run*/`, `logs/`, `.vibe/` eşitlemez ve pc2'de korur, iş pc2'de kendi kopyasında koşar, geri yalnız `-g` yolları
+(log, kanıt klasörü) gelir — tek istisna pc2'deki doğrudan `./gradlew` işi: kanca `build/reports|test-results|libs`'i aynı klasöre
+geri çeker, ana makinedeki Gradle'ın yazdığı yere; onunla yan yana koşmaz. (4) **İstemci ana makinede:** koşturucu ana makinenin
+işine kullanıcı oturumunun ekranını verir (`runclient_kilit.oturum_ekrani`: `systemctl --user show-environment` + soketi bağlantı kabul
+eden Hyprland imzası, `canli_hyprland`); yaşayan Hyprland yoksa ana koşucu istemci işi almaz, oto istemci işi pc2'ye kalır.
+`_hypr_ortam` da ilk dizin yerine yaşayan imzayı seçer. İşçi kural metni `KÖK/.vibe/KUYRUK-KURALI.md` (25 satır). Reddedilen: kapıyı
+koruyup panoya yalnız dış süreç eklemek (işçi atlamaya devam eder, ana makine yine boş kalır), her işi eşit dağıtmak (K-E53'ü
+bozar). Sınama `tools/senaryo/test_sira.py` 17/17 (öz-kuyruklama: altı giriş noktası iş dışından kuyruğa düşer, kesilince iptal;
+`gradlew` reddi; `--bekle` log akışı ve çıkış kodu; ana ve pc2 kuyruk dışı sayımı; yaşayan Hyprland seçimi; Hyprland yokken istemci
+ana'ya verilmez; iki makinede aynı klasör kuralı), `test_runclient_kilit.py` 8/8. Canlı kanıt `.vibe/kanit/sira-4/`. Eski
+worktree'lerin betikleri `main`'i alana dek kuyruğu atlar; atladıkları iş panoda `kuyruk dışı` görünür ve yuva tutar.
+
+**K-E60 rev. Dağıtım: boş yuvası çok olan makine alır, eşitlikte pc2 (şef kararı, 2026-11-07; dal `is/sira-5`).** Kullanıcı şikayeti:
+2 iş varken ikisi pc2'ye gidiyor, ana makine boş kalıyordu (K-E53'ün "pc2 öncelikli, taşan iş ana makineye" kuralı ve 60 sn bekleme).
+Karar: oto işi, onu alabilen makinelerden boş yuvası en çok olana gider (boş yuva = 2 − koşan kuyruk işleri − kuyruk dışı ağır
+süreçler; pc2'de uzak.sh yuva kilitleri de), eşitlikte pc2: 2/2 yuvayla 1. iş pc2, 2. ana, 3. pc2, 4. ana. Bir makine alamıyorsa
+(boş yuvası yetmiyor, aynı klasörden işi koşuyor, koşucusu yok, ana makinede boş RAM < `KAPI_RAM_MB`) öteki alır. İstemci işi aynı
+kurala uyar; ana makinede yaşayan Hyprland yoksa ya da istemci zaten koşuyorsa pc2. `--olcum` yalnız ana (değişmez); makine başına
+klasör başına tek iş kalır. `SIRA_OTO_BEKLE_SN` (60 sn) ve "pc2 alamıyorsa ana alır" kuralı kalktı. Uygulama: her koşucu oto işini
+yalnız `oto_hedefi` kendi makinesiyse alır (`sira_kosucu.engel`/`bos`; iki koşucu aynı hesabı yapar, `rename` yarışı kazananı seçer).
+Sınama `test_sira.py` 18/18 (`test_dagitim_bos_yuvasi_cok_olana_esitlikte_pc2`: 2 iş → pc2, ana, `Yuva: ana 1/2 · pc2 1/2`; 4 iş →
+pc2, ana, pc2, ana, `2/2 · 2/2`; `test_dagitim_dolu_makine_atlanir`: pc2 dolu → ana, ana dolu → pc2). Canlı kanıt
+`.vibe/kanit/sira-4/dagitim-2.md`.
 ## Açık noktalar (Faz 2b)
 
 Entegratöre bırakılan notlardan işlenenler: kancalar (K-E1), protokol (K-C47), `asama ileri [süreç]` (K-C48), sanal su §3a istisnası

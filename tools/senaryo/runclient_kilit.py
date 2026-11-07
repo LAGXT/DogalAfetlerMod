@@ -35,6 +35,8 @@ Ekran protokolü (K0-21 rev. 2 (a)–(e)) görsel betiklerin tek ortak yoludur: 
 olmadığından (a)–(d) uygulanmaz, (e) sayılır ama koşuyu geçersiz kılmaz; kareler oyun içi (`GorselOtomasyon.kareIste` →
 `Screenshot.grab`, ana render hedefi) olduğundan yakalama aracı gerekmez. FPS/CPU ölçümü pc2'de geçersizdir: log'a
 `MAKINE=<ad>` yazılır, `olcum_tablosu.py` o klasörün `OLCUM` satırlarını `bilgi` sayar.
+Kuyruk (K-E60): `kos` bir kuyruk işinin dışında çağrılırsa kendini ana makine istemci işi olarak kuyruğa ekleyip bekler;
+`istemci_baslat` Hyprland'den açılan sürece işin SIRA_IS'ini (ve SIRA_SERBEST'i) `env` ile geçirir.
 """
 import argparse
 import contextlib
@@ -42,6 +44,7 @@ import fcntl
 import json
 import os
 import signal
+import socket
 import subprocess
 import sys
 import time
@@ -78,12 +81,54 @@ def makine():
 HYPR_KURALI = "[workspace {ws} silent; no_initial_focus; no_focus on; focus_on_activate off]"
 
 
+def oturum_ortami():
+    """Kullanıcı oturumunun ortamı (`systemctl --user show-environment`, Hyprland açılışta içeri aktarır); yalnız düz
+    `K=V` satırları."""
+    try:
+        cikti = subprocess.run(["systemctl", "--user", "show-environment"], capture_output=True, text=True,
+                               timeout=5).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return {}
+    return dict(s.split("=", 1) for s in cikti.splitlines() if "=" in s and "=$'" not in s)
+
+
+def canli_hyprland(calisma=None):
+    """Yaşayan Hyprland örneğinin imzası ya da None: soketi bağlantı kabul eden ilk aday; adaylar önce oturumun imzası,
+    sonra `<calisma>/hypr/*` yeniden eskiye. Ortamdaki imza eski olabilir: uzun ömürlü terminal sunucusu önceki Hyprland
+    örneğinin imzasını taşır, onun soket dosyası durur ama dinlenmez."""
+    calisma = Path(calisma or f"/run/user/{os.getuid()}")
+    adaylar = [oturum_ortami().get("HYPRLAND_INSTANCE_SIGNATURE")]
+    with contextlib.suppress(OSError):
+        adaylar += [d.name for d in sorted((calisma / "hypr").iterdir(), key=lambda d: d.stat().st_mtime, reverse=True)]
+    for imza in dict.fromkeys(filter(None, adaylar)):
+        with socket.socket(socket.AF_UNIX) as baglanti:
+            baglanti.settimeout(1)
+            try:
+                baglanti.connect(str(calisma / "hypr" / imza / ".socket.sock"))
+            except OSError:
+                continue
+            return imza
+    return None
+
+
+def oturum_ekrani():
+    """Ana makinedeki kuyruk işinin ekran ortamı: oturumun DISPLAY, WAYLAND_DISPLAY, XDG_RUNTIME_DIR, DBUS adresi ve yaşayan
+    Hyprland imzası; yaşayan Hyprland yoksa boş."""
+    imza = canli_hyprland()
+    if not imza:
+        return {}
+    oturum = oturum_ortami()
+    ekran = {k: oturum[k] for k in ("DISPLAY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS") if k in oturum}
+    return {**ekran, "HYPRLAND_INSTANCE_SIGNATURE": imza}
+
+
 def _hypr_ortam():
-    """hyprctl ortamı: oturum değişkeni yoksa (ör. sunucu betiğinin yan thread'i) ilk Hyprland örneğine bağlanır."""
+    """hyprctl ortamı: oturum değişkeni yoksa (ör. sunucu betiğinin yan thread'i) yaşayan Hyprland örneğine bağlanır."""
     if os.environ.get("HYPRLAND_INSTANCE_SIGNATURE"):
         return None
     calisma = f"/run/user/{os.getuid()}"
-    return dict(os.environ, HYPRLAND_INSTANCE_SIGNATURE=os.listdir(f"{calisma}/hypr")[0], XDG_RUNTIME_DIR=calisma)
+    imza = canli_hyprland(calisma) or os.listdir(f"{calisma}/hypr")[0]
+    return dict(os.environ, HYPRLAND_INSTANCE_SIGNATURE=imza, XDG_RUNTIME_DIR=calisma)
 
 
 def hyprctl(*arg):
@@ -103,7 +148,8 @@ def hypr_json(*arg):
 def istemci_baslat(betik, ws, log):
     """(a) Başlatma betiğini (`sh <betik>`, içinde `runclient_kilit.py kos`) açar; sahibin etkin pencere adresini döner (pc2'de
     None). Hyprland: exec kuralıyla `ws` workspace'ine, odaksız. pc2: `DISPLAY` ortamdan, görünür; betik aynı süreç grubunda
-    kalır, `uzak.sh` kesmesi grubu durdurunca `kos` da sinyal alır."""
+    kalır, `uzak.sh` kesmesi grubu durdurunca `kos` da sinyal alır. Hyprland'den açılan süreç bu sürecin ortamını almaz:
+    SIRA_IS ve SIRA_SERBEST `env` ile geçer (K-E60: `kos` kuyruk işinin içinde kalır, istemcinin Gradle'ı o işin sayılır)."""
     if ekran_pc2():
         ekran = os.environ.get("DISPLAY")
         if not ekran:
@@ -117,7 +163,9 @@ def istemci_baslat(betik, ws, log):
     log(f"(a) sahibin etkin penceresi: {sahip.get('address')} {sahip.get('class')} "
         f"ws={(sahip.get('workspace') or {}).get('id')}")
     kural = HYPR_KURALI.format(ws=ws)
-    ifade = f'hl.dsp.exec_cmd("{kural} sh {betik}")'
+    tasinan = [f"{d}={os.environ[d]}" for d in ("SIRA_IS", "SIRA_SERBEST") if os.environ.get(d)]
+    komut = " ".join(["env", *tasinan, "sh", str(betik)] if tasinan else ["sh", str(betik)])
+    ifade = f'hl.dsp.exec_cmd("{kural} {komut}")'
     log(f"(a) exec kuralıyla başlatıldı: {ifade} -> {hyprctl('dispatch', ifade)}")
     return sahip.get("address")
 
@@ -477,6 +525,7 @@ def kos(worktree, satir, bekle_sn=1800, log=print):
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
+    ozgun = list(argv)
     satir = []
     if "--" in argv:
         ayrac = argv.index("--")
@@ -504,6 +553,8 @@ def main(argv=None):
         return 0
     if not satir:
         ayr.error("kos: komut satırı gerekli (-- sonrası)")
+    import sira
+    sira.kuyruga_gir([sys.executable, str(Path(__file__).resolve()), *ozgun], makine="ana", istemci=True)
     return kos(arg.worktree, satir, arg.bekle)
 
 

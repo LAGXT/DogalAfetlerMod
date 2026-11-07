@@ -168,7 +168,7 @@ tercih edin ya da yereli önce yedekleyin.
 | Araçlar | var: `import`/`identify` (ImageMagick), `xprop`, `glxinfo`, `xfce4-screenshooter`, `flock`, `rsync`, Python 3.14; yok: `xdotool`, `scrot`, `maim`, `xwd`, `xrandr`, `xdpyinfo`, `bc` (hiçbiri gerekmiyor) | `command -v` |
 | Radar koşusu | iki koşu GEÇERLİ, 8/8 kare, kare kapısı 8 açık / 0 geçersiz (FPS 15–20); toplam 191 sn (ilk, derleme dahil) ve 165 sn; istemci 188 / 163 sn (ana makine 141 sn) | `.vibe/kanit/pc2-istemci/` |
 | RAM | istemci koşusunda en az kullanılabilir 1 321 MiB (ilk koşu, Gradle derlemesiyle) ve 3 681 MiB (yapı güncel); takas 222 MiB | 3–5 sn'lik `free -m` örnekleri |
-| Gradle daemon | yalnız pc2 `~/.gradle/gradle.properties`: `org.gradle.daemon=true`, `idletimeout=900000` (15 dk). `./gradlew help` soğuk 12,4 sn, sıcak 2,7 sn (`--no-daemon` 12,5 sn); filtresiz GameTest 216/216, 1 dk 52 sn, en az kullanılabilir 3 937 MiB. Boştaki daemon ~0,5 GiB; `gradle_kapisi.sh` ortamı (`LC_ALL`) farklı olduğundan ikinci daemon açılır. `pc2_istemci.sh` istemciden önce `./gradlew --stop` (~0,85 GiB geri) | zamanlayıcı + `free -m` |
+| Gradle daemon | iki makinede de `~/.gradle/gradle.properties` (git dışı): `org.gradle.daemon=true`, `org.gradle.daemon.idletimeout=900000` (15 dk; ana makinede K-E54'ten beri, öncesi varsayılan 3 sa). Kuyruk işi JAVA_HOME'sız gelirse JDK 17 alır (K-E54). `./gradlew help` soğuk 12,4 sn, sıcak 2,7 sn (`--no-daemon` 12,5 sn); filtresiz GameTest 216/216, 1 dk 52 sn, en az kullanılabilir 3 937 MiB. Boştaki daemon ~0,5 GiB; `gradle_kapisi.sh` ortamı (`LC_ALL`) farklı olduğundan ikinci daemon açılır. `pc2_istemci.sh` istemciden önce `./gradlew --stop` (~0,85 GiB geri) | zamanlayıcı + `free -m` |
 
 ## Pratik notlar
 
