@@ -3,14 +3,17 @@ package io.github.kadirberkpolat1.dogalafetler.config;
 import com.electronwill.nightconfig.core.CommentedConfig;
 import com.electronwill.nightconfig.core.io.ParsingException;
 import com.electronwill.nightconfig.core.io.ParsingMode;
+import com.electronwill.nightconfig.core.io.WritingException;
 import com.electronwill.nightconfig.core.io.WritingMode;
 import com.electronwill.nightconfig.toml.TomlFormat;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import java.io.IOException;
 import java.io.Reader;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -21,8 +24,10 @@ import java.util.Map;
  * olaylarından önce, varsayılanla doldurur: eski varsayılanda kalan değer öyle kalır, sürüm anahtarı olmayan eski dosya da
  * {@code ModConfigEvent}'ten bakınca yeni dosyadan ayırt edilemez. Bu yüzden göç dosya işleyicisinde, Forge dosyayı okuyup
  * izlemeye almadan önce yapılır: dosya ayrıştırılır, sürümü eski her göçün planı uygulanır, değişiklik varsa dosya bir kez
- * yazılır (art arda {@code ConfigValue.set} dosya izleyicisiyle yarışır, K-E28). Çalışırken elle düzenlenen dosya (Forge'un
- * yeniden yüklemesi) göç ettirilmez.
+ * yazılır (art arda {@code ConfigValue.set} dosya izleyicisiyle yarışır, K-E28). Yazım kesilmesin diye yeni içerik aynı
+ * klasörde geçici dosyaya yazılır, özgün dosya {@code <dosya>.bak-ayarSurumu<eski>}'ye (varsa {@code -2}, {@code -3}, …)
+ * kopyalanır, sonra geçici dosya atomik taşınır. Okuma ya da yazma hatasında tek WARN, dosyaya dokunulmaz, Forge eski
+ * değerlerle sürer. Çalışırken elle düzenlenen dosya (Forge'un yeniden yüklemesi) göç ettirilmez.
  */
 final class AyarGocu {
     record Kayit(String surumYolu, int guncel, AyarKaydi.GocPlani plan) {
@@ -31,7 +36,7 @@ final class AyarGocu {
     private AyarGocu() {
     }
 
-    /** Değişiklik varsa dosyayı yazar ve tek satırlık özeti döndürür; dosya yoksa ya da göçler güncelse null. */
+    /** Değişiklik varsa dosyayı yazar ve tek satırlık özeti döndürür; dosya yoksa, göçler güncelse ya da hata olursa null. */
     static String uygula(Path dosya, List<Kayit> kayitlar) {
         if (kayitlar.isEmpty() || !Files.isRegularFile(dosya)) {
             return null;
@@ -44,12 +49,14 @@ final class AyarGocu {
             return null;
         }
         List<String> ozet = new ArrayList<>();
+        int enEski = Integer.MAX_VALUE;
         for (Kayit k : kayitlar) {
             Object okunan = icerik.get(k.surumYolu());
             int surum = okunan instanceof Number n ? n.intValue() : 0;
             if (surum >= k.guncel()) {
                 continue;
             }
+            enEski = Math.min(enEski, surum);
             List<String> degisen = new ArrayList<>();
             for (Map.Entry<String, ?> e : k.plan().plan(surum, icerik::get).entrySet()) {
                 degisen.add(e.getKey() + " " + icerik.get(e.getKey()) + " → " + e.getValue());
@@ -62,7 +69,37 @@ final class AyarGocu {
         if (ozet.isEmpty()) {
             return null;
         }
-        TomlFormat.instance().createWriter().write(icerik, dosya, WritingMode.REPLACE);
-        return "Config göçü " + dosya.getFileName() + ": " + String.join("; ", ozet);
+        Path gecici = null;
+        try {
+            gecici = Files.createTempFile(dosya.toAbsolutePath().getParent(), dosya.getFileName().toString(), ".gecici");
+            TomlFormat.instance().createWriter().write(icerik, gecici, WritingMode.REPLACE);
+            Path yedek = yedekYolu(dosya, enEski);
+            Files.copy(dosya, yedek, StandardCopyOption.COPY_ATTRIBUTES);
+            Files.move(gecici, dosya, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            return "Config göçü " + dosya.getFileName() + " (yedek " + yedek.getFileName() + "): "
+                    + String.join("; ", ozet);
+        } catch (IOException | UncheckedIOException | WritingException hata) {
+            DogalAfetler.LOGGER.warn("Config göçü yazılamadı, {} değişmedi (eski değerlerle sürüyor): {}", dosya,
+                    hata.toString());
+            return null;
+        } finally {
+            if (gecici != null) {
+                try {
+                    Files.deleteIfExists(gecici);
+                } catch (IOException silinemedi) {
+                    DogalAfetler.LOGGER.warn("Config göçünün geçici dosyası silinemedi: {}", gecici);
+                }
+            }
+        }
+    }
+
+    /** {@code <dosya>.bak-ayarSurumu<surum>}; varsa üzerine yazılmaz, {@code -2}, {@code -3}, … eklenir. */
+    static Path yedekYolu(Path dosya, int surum) {
+        String ad = dosya.getFileName() + ".bak-ayarSurumu" + surum;
+        Path yedek = dosya.resolveSibling(ad);
+        for (int i = 2; Files.exists(yedek); i++) {
+            yedek = dosya.resolveSibling(ad + "-" + i);
+        }
+        return yedek;
     }
 }
