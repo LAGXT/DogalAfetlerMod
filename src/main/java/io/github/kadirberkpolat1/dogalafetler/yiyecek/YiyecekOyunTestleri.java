@@ -51,6 +51,7 @@ import net.minecraftforge.event.ForgeEventFactory;
 import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
+import net.minecraftforge.registries.ForgeRegistries;
 
 /**
  * Yiyecek oyun içi testleri (GOREV §6 #2, #3; madde 14). Yeme gerçek yoldan sınanır: eşyanın {@code finishUsingItem}'ı (yemek
@@ -252,7 +253,8 @@ public final class YiyecekOyunTestleri {
             dogrula(y, o.getFoodData().getFoodLevel() == 10 + SALEP_BESIN, "yemek değeri verilmeli");
             dogrula(y, VucutSicakligi.al(o) == 0, "kapı kapalıyken vücut değişti: " + VucutSicakligi.al(o));
             dogrula(y, VucutSicakligi.etkiler(o).isEmpty(), "kapı kapalıyken süreli etki kaydedildi");
-            dogrula(y, o.getActiveEffects().isEmpty(), "kapı kapalıyken efekt verildi");
+            dogrula(y, o.getActiveEffects().stream().noneMatch(e -> DogalAfetler.MOD_ID.equals(
+                    ForgeRegistries.MOB_EFFECTS.getKey(e.getEffect()).getNamespace())), "kapı kapalıyken efekt verildi");
             dogrula(y, YiyecekAPI.surenPencereler(o).isEmpty(), "kapı kapalıyken azalan verim kaydı yazıldı");
             dogrula(y, kalan.is(Items.GLASS_BOTTLE), "kap yine geri gelmeli");
             y.succeed();

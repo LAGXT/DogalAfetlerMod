@@ -3477,7 +3477,8 @@ GameTest sunucusu açılınca (yalnız `GameTestServer`, Cold Sweat yüklüyse) 
 yok sayılıyor (K-E41)" yazar, sunucu durunca `null`. F-18 testi (`coldSweatYukluykenYiyecekCekirdegeGider`) gövdesinde gerçek değere
 geçer, `finally`'de öncekini koyar. Üretim ve geliştirme sunucusu etkilenmez (geçersiz kılma hiç kurulmaz). Reddedilen: testleri
 Cold Sweat varken atlamak (`-Puyum=coldsweat` koşusunda kendi sistemimizin 12 testi sınanmazdı); her test sınıfına ayrı
-`@BeforeBatch`/`@AfterBatch` (12 test dört sınıf, dokuz batch; unutulan biri sonraki batch'e sızar).
+`@BeforeBatch`/`@AfterBatch` (12 test dört sınıf, dokuz batch; unutulan biri sonraki batch'e sızar). **Ek:** `kapiKapaliykenYalnizAclik` artık "hiç efekt yok" değil "modumuzun efekti yok" der: Cold Sweat yüklüyken yeni
+oyuncuya kendi Grace efektini verir (`EntityTempManager`, `Grace Period Enabled = true`); testin ölçtüğü şey kendi efektimizdir.
 
 ## Faz 5 — Görsel otomasyon
 
