@@ -26,6 +26,15 @@ bırakılmasından `KAPANIS_SN` sn sonra JVM yaşıyorsa onu öldürerek.
 `al` ile kaydedilen pid, runClient boyunca yaşayan süreç olmalı (ör. koşu betiğinin `$$`'ı); kısa ömürlü bir pid ile alınan
 kilidi bir sonraki bekleyen "sahibi ölü" diye devralır. Çıkış kodları: 0 tamam, 3 bekleme süresi doldu, 4 kilit başkasının.
 Yol `DOGALAFETLER_RUNCLIENT_KILIT` ortam değişkeniyle değiştirilebilir (testler).
+
+Ekran protokolü (K0-21 rev. 2 (a)–(e)) görsel betiklerin tek ortak yoludur: `istemci_baslat` (a), `pencere_dogrula` (b)+(c),
+`odak_denetle` (d), `girdi_ozeti` (e). Kip `DOGALAFETLER_EKRAN`'dan okunur (`ekran_pc2()`). Varsayılan Hyprland kipi: exec kuralı
+`[workspace N silent; no_initial_focus; no_focus on; focus_on_activate off]`, `HL_EXEC_RULE_TOKEN` kapısı, `set_prop` +
+`getprop no_focus` ve workspace doğrulaması, etkin pencere istemciyse ALARM, oyun içi girdi koşuyu geçersiz kılar.
+`pc2` kipinde görsel betik ikinci makinede (XFCE/X11) koşar ve istemci görünür açılır (`pc2_istemci.sh`): kullanıcının oturumu
+olmadığından (a)–(d) uygulanmaz, (e) sayılır ama koşuyu geçersiz kılmaz; kareler oyun içi (`GorselOtomasyon.kareIste` →
+`Screenshot.grab`, ana render hedefi) olduğundan yakalama aracı gerekmez. FPS/CPU ölçümü pc2'de geçersizdir: log'a
+`MAKINE=<ad>` yazılır, `olcum_tablosu.py` o klasörün `OLCUM` satırlarını `bilgi` sayar.
 """
 import argparse
 import contextlib
@@ -52,6 +61,133 @@ def kok():
 def kilit_yolu():
     ortam = os.environ.get("DOGALAFETLER_RUNCLIENT_KILIT")
     return Path(ortam) if ortam else kok() / ".vibe" / "runclient.lock"
+
+
+def ekran_pc2():
+    """Görsel betik pc2 kipinde mi (`DOGALAFETLER_EKRAN=pc2`, `pc2_istemci.sh` verir)."""
+    return os.environ.get("DOGALAFETLER_EKRAN", "") == "pc2"
+
+
+def makine():
+    """Bilgisayar adı (`gradle_kapisi.sh` `MAKINE=` satırıyla aynı kaynak)."""
+    with contextlib.suppress(OSError):
+        return Path("/etc/hostname").read_text().strip()
+    return os.uname().nodename
+
+
+HYPR_KURALI = "[workspace {ws} silent; no_initial_focus; no_focus on; focus_on_activate off]"
+
+
+def _hypr_ortam():
+    """hyprctl ortamı: oturum değişkeni yoksa (ör. sunucu betiğinin yan thread'i) ilk Hyprland örneğine bağlanır."""
+    if os.environ.get("HYPRLAND_INSTANCE_SIGNATURE"):
+        return None
+    calisma = f"/run/user/{os.getuid()}"
+    return dict(os.environ, HYPRLAND_INSTANCE_SIGNATURE=os.listdir(f"{calisma}/hypr")[0], XDG_RUNTIME_DIR=calisma)
+
+
+def hyprctl(*arg):
+    try:
+        return subprocess.run(["hyprctl", *arg], capture_output=True, text=True, env=_hypr_ortam(), timeout=10).stdout.strip()
+    except subprocess.TimeoutExpired:
+        return ""
+
+
+def hypr_json(*arg):
+    try:
+        return json.loads(hyprctl(*arg, "-j"))
+    except json.JSONDecodeError:
+        return None
+
+
+def istemci_baslat(betik, ws, log):
+    """(a) Başlatma betiğini (`sh <betik>`, içinde `runclient_kilit.py kos`) açar; sahibin etkin pencere adresini döner (pc2'de
+    None). Hyprland: exec kuralıyla `ws` workspace'ine, odaksız. pc2: `DISPLAY` ortamdan, görünür; betik aynı süreç grubunda
+    kalır, `uzak.sh` kesmesi grubu durdurunca `kos` da sinyal alır."""
+    if ekran_pc2():
+        ekran = os.environ.get("DISPLAY")
+        if not ekran:
+            raise RuntimeError("pc2 kipi DISPLAY ister (pc2_istemci.sh DISPLAY=:0 verir)")
+        log(f"(a) pc2 kipi: MAKINE={makine()} DISPLAY={ekran}; istemci görünür açılıyor, Hyprland kuralı ve (b)/(c)/(d) "
+            "denetimleri uygulanmaz; kareler oyun içi, OLCUM satırları bilgi")
+        subprocess.Popen(["sh", str(betik)], stdin=subprocess.DEVNULL)
+        return None
+    sahip = hypr_json("activewindow")
+    sahip = sahip if isinstance(sahip, dict) else {}
+    log(f"(a) sahibin etkin penceresi: {sahip.get('address')} {sahip.get('class')} "
+        f"ws={(sahip.get('workspace') or {}).get('id')}")
+    kural = HYPR_KURALI.format(ws=ws)
+    ifade = f'hl.dsp.exec_cmd("{kural} sh {betik}")'
+    log(f"(a) exec kuralıyla başlatıldı: {ifade} -> {hyprctl('dispatch', ifade)}")
+    return sahip.get("address")
+
+
+def _surec_yok(pid):
+    durum = _stat(pid)
+    return durum is None or durum[0] == "Z"
+
+
+def pencere_dogrula(pid, ws, log, bekle_sn=600):
+    """(b) belirteç ve (c) pencere doğrulaması; tamamsa None, değilse istemciyi öldürme nedeni (öldürmek çağıranın işi).
+    Hyprland: JVM ortamında `HL_EXEC_RULE_TOKEN`; pid'in pencereleri en çok `bekle_sn` sn beklenir, `no_focus=1`,
+    `focus_on_activate=0` (lock) yazılır, `getprop no_focus` true ve hepsi `ws`'de olmalı. pc2: denetim yok."""
+    if ekran_pc2():
+        log(f"(b) istemci JVM pid={pid}; pc2: belirteç ve pencere denetimi yok")
+        return None
+    try:
+        belirtec = b"HL_EXEC_RULE_TOKEN=" in Path(f"/proc/{pid}/environ").read_bytes()
+    except OSError:
+        belirtec = False
+    log(f"(b) istemci JVM pid={pid}; HL_EXEC_RULE_TOKEN ortamda: {belirtec}")
+    if not belirtec:
+        return "HL_EXEC_RULE_TOKEN yok (belirteç kapısı)"
+    son = time.monotonic() + bekle_sn
+    while True:
+        pencereler = [c for c in hypr_json("clients") or [] if c.get("pid") == pid and c.get("mapped", True)]
+        if pencereler:
+            break
+        if _surec_yok(pid):
+            return "istemci pencere açmadan çıktı"
+        if time.monotonic() >= son:
+            return f"pencere {bekle_sn} sn'de eşlenmedi"
+        time.sleep(0.25)
+    yazim = [hyprctl("dispatch", f'hl.dsp.window.set_prop({{ window = "pid:{pid}", prop = "{p}", value = "{v}", lock = true }})')
+             for p, v in (("no_focus", "1"), ("focus_on_activate", "0"))]
+    no_focus = hyprctl("getprop", f"pid:{pid}", "no_focus")
+    wsler = [(c.get("workspace") or {}).get("id") for c in pencereler]
+    etkin = hypr_json("activewindow")
+    log(f"(c) pencerem {[c.get('address') for c in pencereler]} ws={wsler}; set_prop -> {yazim}; getprop no_focus={no_focus!r}; "
+        f"etkin={etkin.get('address') if isinstance(etkin, dict) else None}")
+    if "true" not in no_focus.lower() or any(w != ws for w in wsler):
+        return "pencere doğrulaması tutmadı"
+    return None
+
+
+def odak_denetle(pid, sahip_adres, log, oldur):
+    """(d) bekçi adımı (5 sn'de bir): etkin pencere istemciyse ALARM, `oldur(neden)` çağrılır, odak sahibin penceresine verilir
+    ve True döner (koşu geçersiz). pc2: hep False."""
+    if ekran_pc2():
+        return False
+    etkin = hypr_json("activewindow")
+    if not (isinstance(etkin, dict) and etkin.get("pid") == pid):
+        return False
+    log(f"(d) ALARM: etkin pencere istemci ({etkin.get('address')}); süreç öldürülüyor, koşu geçersiz")
+    oldur("odak alarmı")
+    if sahip_adres:
+        for ifade in (f'hl.dsp.focus({{ window = "address:{sahip_adres}" }})',
+                      f'hl.dsp.window.focus({{ window = "address:{sahip_adres}" }})'):
+            log(f"(d) odak geri: {ifade} -> {hyprctl('dispatch', ifade)}")
+    return True
+
+
+def girdi_ozeti(temiz, metin, log):
+    """(e) oyun içi girdi satırını yazar; koşu girdi yüzünden geçersiz değilse True. Hyprland: `temiz` (girdi yok) değilse
+    " → GEÇERSİZ" eklenir ve False. pc2: girdi sayılır ama uygulanmaz, True."""
+    if ekran_pc2():
+        log(f"{metin} (pc2: geçersiz değil, uygulanmaz; pencere görünür, sahibin masaüstü değil)")
+        return True
+    log(metin + ("" if temiz else " → GEÇERSİZ"))
+    return bool(temiz)
 
 
 def _stat(pid):

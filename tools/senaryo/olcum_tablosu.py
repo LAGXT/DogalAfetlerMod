@@ -14,12 +14,15 @@ Tek FPS kuralı (K-E29 (b)) taban sahnesi verilmiş satırlara uygulanır. Taban
 - taban duvar_ms ≥ 10 → `oran`: duvar_ms ≤ 2 × taban;
 - taban duvar_ms < 10 → `mutlak`: cpu_ms ≤ 33,3 ve mspt < 50 ve yabanci ≤ 1.
 Sonuç: `gecti` / `kaldi`; tabanı bulunamayan `taban_yok`; kare sayısı 0 olan `olcum_yok`; tabansız satır `bilgi`.
+Log ya da aynı klasördeki başka bir `*.log` `MAKINE=LAGXT2` (pc2, `pc2_istemci.sh`) taşıyorsa kural uygulanmaz: satırlar `bilgi`,
+kural sütunu `pc2` (yavaş CPU ve RV620 ile FPS/CPU ölçümü geçersiz; ölçüm ana makinede).
 `tetik` sütunu duvar saati 30 FPS'in altındaki satırda `fps<30` yazar (K-E29 (b) görünür koşu tetikleyicisi; kural sonucunu değiştirmez).
 Log başına `KARE-KAPISI` özeti (alınan / geçersiz kare, A-34) ve kural sayımları stderr'e yazılır.
 
 Çıkış: 0 en az bir `OLCUM` satırı yazıldı, 1 hiç satır yok, 2 kullanım hatası.
 """
 import argparse
+import contextlib
 import math
 import re
 import sys
@@ -28,6 +31,8 @@ from pathlib import Path
 OLCUM = re.compile(r"\bOLCUM (\S+) (.*)$")
 ALAN = re.compile(r"(\w+)=(\S+)")
 KAPI = re.compile(r"\bKARE-KAPISI \S+ \S+ kapi=(acik|GECERSIZ)\b")
+MAKINE = re.compile(r"\bMAKINE=(\S+)")
+OLCUMSUZ_MAKINELER = ("LAGXT2",)
 SUTUNLAR = ("log", "satir", "otomasyon", "sahne", "kademe", "duvar_ms", "fps", "cpu_ms", "mspt", "gradle", "yabanci",
             "kare", "taban", "taban_ms", "kural", "sonuc", "tetik")
 TETIK_FPS = 30.0
@@ -85,6 +90,16 @@ def kural(satir, tabanlar):
     return taban["duvar_ms"], "mutlak", "gecti" if gecti else "kaldi"
 
 
+def makine(log):
+    """Log'un ya da klasöründeki başka bir `*.log`'un ilk `MAKINE=<ad>` değeri; yoksa boş."""
+    for yol in [log, *sorted(log.parent.glob("*.log"))]:
+        with contextlib.suppress(OSError):
+            bulunan = MAKINE.search(yol.read_text(encoding="utf-8", errors="replace"))
+            if bulunan:
+                return bulunan.group(1)
+    return ""
+
+
 def loglar(yollar, desen):
     bulunan = []
     for yol in yollar:
@@ -116,8 +131,11 @@ def tablo(yollar, desen=VARSAYILAN_DESEN):
             continue
         gorulen |= anahtarlar
         sonuclar = {}
+        olcumsuz = makine(log) in OLCUMSUZ_MAKINELER
         for s in satirlar:
             taban_ms, ad, sonuc = kural(s, satirlar)
+            if olcumsuz and sonuc != "olcum_yok":
+                ad, sonuc = "pc2", "bilgi"
             sonuclar[sonuc] = sonuclar.get(sonuc, 0) + 1
             duvar = sayi(s["duvar_ms"])
             fps = f"{1000 / duvar:.1f}" if duvar > 0 else ""
