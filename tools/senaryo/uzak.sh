@@ -12,7 +12,9 @@
 # orada aynı klasörde koşar, çıktısı buraya akar. Bitince (hata ya da kesmede de) her -g yolu buraya geri çekilir; sonu / olan yol
 # klasördür. -g yolu klasörün dışında ya da .vibe/, build/, logs/, run*/ altında olmalı (eşitlenen kaynak geri ezilmez).
 # Geçen ortam: TEST_FILTRE, KAPI_PORT, KAPI_DK, VIBE_OTURUM, JAVA_HOME, LC_ALL, GRADLE_OPTS; KAPI_SURE vars. 4500 sn,
-# KAPI_RAM_MB vars. 2500 (pc2'de iki iş yan yana sığsın diye; K-E44). UZAK_MAKINE ssh adı (vars. pc2).
+# KAPI_RAM_MB vars. 2500 (pc2'de iki iş yan yana sığsın diye; K-E44). UZAK_MAKINE ssh adı (vars. pc2). UZAK_YUVA_TUTULU=1:
+# yuva kilitlerini çağıran tutuyor (kuyruğun istemci işi, K-E51), yuva beklenmez; klasör kilidi yine alınır. Bloklamadan sıra
+# için gradle_kapisi.sh / *_sunucu.py kapı doluysa işi kuyruğa atar (tools/senaryo/sira.py, K-E51).
 set -u
 makine=${UZAK_MAKINE:-pc2}
 ssh_ac=(ssh -o BatchMode=yes -o ConnectTimeout=5 "$makine")
@@ -92,6 +94,8 @@ if ! flock -n 8; then
 fi
 yuva_sayisi=${UZAK_YUVA:-2}
 yuva=0
+# K-E51: kuyruğun pc2 istemci işi (sira.py ekle --makine pc2 --istemci) yuva kilitlerinin hepsini kendisi tutar.
+[ "${UZAK_YUVA_TUTULU:-}" = 1 ] && yuva=kuyruk
 while [ $yuva = 0 ]; do
     for ((n = 1; n <= yuva_sayisi; n++)); do
         exec 9>"$kilitler/yuva-$n"

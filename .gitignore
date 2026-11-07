@@ -23,7 +23,9 @@ run*/
 
 # Vibe düzeni, Python ortamı, teslim çıktısı, eski sürüm arşivi
 .worktrees/
-.vibe/
+# .vibe/ git dışı; yalnız test defteri tutulur (K-E51)
+.vibe/*
+!.vibe/test-defteri.tsv
 .venv/
 cikti/
 _eski-surum-*/
