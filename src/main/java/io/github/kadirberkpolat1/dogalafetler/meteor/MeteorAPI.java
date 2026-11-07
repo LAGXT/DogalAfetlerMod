@@ -73,6 +73,12 @@ public final class MeteorAPI {
 
     static Optional<MeteorVarligi> dusur(ServerLevel level, BlockPos hedef, double olcek, MeteorGorunumu gorunum,
             YanginKaynagi kaynak, boolean sarsinti, double aci, double azimut, OdulZari.Sanslar sanslar) {
+        return dusur(level, hedef, olcek, gorunum, kaynak, sarsinti, aci, azimut, sanslar, null);
+    }
+
+    /** {@code odulOyuncu}: yağmurun hedef oyuncusu (ödül tavanı ona sayılır; tek düşürülen meteorda null, sınırsız). */
+    static Optional<MeteorVarligi> dusur(ServerLevel level, BlockPos hedef, double olcek, MeteorGorunumu gorunum,
+            YanginKaynagi kaynak, boolean sarsinti, double aci, double azimut, OdulZari.Sanslar sanslar, UUID odulOyuncu) {
         Objects.requireNonNull(kaynak, "kaynak");
         if (!level.hasChunkAt(hedef)) {
             return Optional.empty();
@@ -88,7 +94,7 @@ public final class MeteorAPI {
             double sanal = SanalSu.suSeviyesi(level, zemin.getX(), zemin.getZ());
             boolean suya = level.getFluidState(zemin).is(FluidTags.WATER) || !Double.isNaN(sanal) && sanal > nokta.y;
             MeteorCarpmasi.carp(level, zemin, nokta, olcek, gorunum, kaynak, sarsinti,
-                    sanslar != null ? sanslar : MeteorAyarlari.sanslar(), suya);
+                    sanslar != null ? sanslar : MeteorAyarlari.sanslar(), suya, odulOyuncu);
             return Optional.empty();
         }
         double girisAcisi = aci;
@@ -102,7 +108,7 @@ public final class MeteorAPI {
             }
             girisAcisi = deneme == 4 ? 90 : Math.min(90, girisAcisi + 10);
         }
-        MeteorVarligi m = MeteorVarligi.olustur(level, yorunge, olcek, gorunum, kaynak, sarsinti, sanslar);
+        MeteorVarligi m = MeteorVarligi.olustur(level, yorunge, olcek, gorunum, kaynak, sarsinti, sanslar, odulOyuncu);
         level.addFreshEntity(m);
         MeteorYoneticisi.meteorEkle(level, m);
         return Optional.of(m);
@@ -131,13 +137,19 @@ public final class MeteorAPI {
     /** Test: dağıtım halkası ve giriş açısı sabit yağmur (meteorlar test sahnesine düşsün). */
     static int yagmur(ServerLevel level, Collection<ServerPlayer> oyuncular, int sureTick, double dakikaBasinaAdet,
             double buyukOran, YanginKaynagi kaynak, int ic, int dis, double aci) {
+        return yagmur(level, oyuncular, sureTick, dakikaBasinaAdet, buyukOran, kaynak, ic, dis, aci, null);
+    }
+
+    /** Test: ayrıca sabit ödül şansları (null: config). */
+    static int yagmur(ServerLevel level, Collection<ServerPlayer> oyuncular, int sureTick, double dakikaBasinaAdet,
+            double buyukOran, YanginKaynagi kaynak, int ic, int dis, double aci, OdulZari.Sanslar sanslar) {
         Set<UUID> kimlikler = new HashSet<>();
         for (ServerPlayer o : oyuncular) {
             kimlikler.add(o.getUUID());
         }
         long tohum = level.random.nextLong();
         return MeteorYoneticisi.yagmurEkle(level, k -> new MeteorYagmuru(k, kimlikler, sureTick, dakikaBasinaAdet, buyukOran,
-                kaynak, tohum).testAyari(ic, dis, aci));
+                kaynak, tohum).testAyari(ic, dis, aci, sanslar));
     }
 
     public static boolean yagmurDurdur(ServerLevel level, int kimlik) {

@@ -2,6 +2,7 @@ package io.github.kadirberkpolat1.dogalafetler.meteor;
 
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.MeteorDagitimi;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.MeteorOlcegi;
+import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.OdulZari;
 import io.github.kadirberkpolat1.dogalafetler.yangin.YanginKaynagi;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -21,6 +22,8 @@ import net.minecraft.server.level.ServerPlayer;
  * yoğunlukta da kesir kaybolmaz). Kaydedilmez: afet yüklenince yeniden başlatır.
  */
 final class MeteorYagmuru {
+    /** Oyuncusuz sunucuda doğuş noktası hedefinin ödül tavanı kimliği. */
+    static final UUID DOGUS_HEDEFI = new UUID(0L, 0L);
     final int kimlik;
     final YanginKaynagi kaynak;
     private final Set<UUID> oyuncular;
@@ -33,10 +36,11 @@ final class MeteorYagmuru {
     private double birikim;
     /** Atmaya kalkışılan meteor (tavan ya da yüklü olmayan chunk yüzünden uçmayan dahil). */
     private int atilan;
-    /** Test: sabit dağıtım halkası (− 1: config) ve giriş açısı (NaN: rastgele). */
+    /** Test: sabit dağıtım halkası (− 1: config), giriş açısı (NaN: rastgele) ve ödül şansları (null: config). */
     private int icYaricap = -1;
     private int disYaricap = -1;
     private double aci = Double.NaN;
+    private OdulZari.Sanslar sanslar;
 
     MeteorYagmuru(int kimlik, Set<UUID> oyuncular, int sureTick, double dakikaBasina, double buyukOran,
             YanginKaynagi kaynak, long tohum) {
@@ -67,10 +71,11 @@ final class MeteorYagmuru {
         dakikaBasina = Math.max(0, yeni);
     }
 
-    MeteorYagmuru testAyari(int ic, int dis, double girisAcisi) {
+    MeteorYagmuru testAyari(int ic, int dis, double girisAcisi, OdulZari.Sanslar odulSanslari) {
         icYaricap = ic;
         disYaricap = dis;
         aci = girisAcisi;
+        sanslar = odulSanslari;
         return this;
     }
 
@@ -79,26 +84,30 @@ final class MeteorYagmuru {
         if (kalanTick-- <= 0) {
             return false;
         }
-        List<BlockPos> merkezler = merkezler(level);
-        birikim += merkezler.size() * dakikaBasina / 1200.0;
+        List<ServerPlayer> hedefler = hedefler(level);
+        int n = Math.max(1, hedefler.size());
+        birikim += n * dakikaBasina / 1200.0;
         int ic = icYaricap >= 0 ? icYaricap : MeteorAyarlari.dagitimIcYaricap();
         int dis = disYaricap >= 0 ? disYaricap : MeteorAyarlari.dagitimDisYaricap();
         while (birikim >= 1) {
             birikim -= 1;
             atilan++;
-            BlockPos merkez = merkezler.get(dagitim.siradaki(merkezler.size()));
-            double[] o = MeteorDagitimi.ofset(rastgele, ic, dis);
-            BlockPos hedef = merkez.offset((int) Math.round(o[0]), 0, (int) Math.round(o[1]));
+            ServerPlayer o = hedefler.isEmpty() ? null : hedefler.get(dagitim.siradaki(n));
+            BlockPos merkez = o == null ? level.getSharedSpawnPos() : o.blockPosition();
+            double[] ofset = MeteorDagitimi.ofset(rastgele, ic, dis);
+            BlockPos hedef = merkez.offset((int) Math.round(ofset[0]), 0, (int) Math.round(ofset[1]));
             double olcek = MeteorOlcegi.ornekle(rastgele, buyukOran, MeteorAyarlari.ortaMeteorOrani());
             double a = Double.isNaN(aci) ? MeteorAyarlari.girisAcisiEnAz()
                     + rastgele.nextDouble() * Math.max(0, MeteorAyarlari.girisAcisiEnCok() - MeteorAyarlari.girisAcisiEnAz())
                     : aci;
-            MeteorAPI.dusur(level, hedef, olcek, gorunum, kaynak, true, a, rastgele.nextDouble() * 2 * Math.PI, null);
+            MeteorAPI.dusur(level, hedef, olcek, gorunum, kaynak, true, a, rastgele.nextDouble() * 2 * Math.PI, sanslar,
+                    o == null ? DOGUS_HEDEFI : o.getUUID());
         }
         return true;
     }
 
-    private List<BlockPos> merkezler(ServerLevel level) {
+    /** Hedef oyuncular UUID sırasıyla (boşsa doğuş noktası tek hedeftir, ödül tavanı {@link #DOGUS_HEDEFI}'ne sayılır). */
+    private List<ServerPlayer> hedefler(ServerLevel level) {
         List<ServerPlayer> secilen = new ArrayList<>();
         for (ServerPlayer o : level.players()) {
             if (!o.isSpectator() && o.isAlive() && (oyuncular.isEmpty() || oyuncular.contains(o.getUUID()))) {
@@ -106,13 +115,6 @@ final class MeteorYagmuru {
             }
         }
         secilen.sort(Comparator.comparing(ServerPlayer::getUUID));
-        List<BlockPos> sonuc = new ArrayList<>(secilen.size());
-        for (ServerPlayer o : secilen) {
-            sonuc.add(o.blockPosition());
-        }
-        if (sonuc.isEmpty()) {
-            sonuc.add(level.getSharedSpawnPos());
-        }
-        return sonuc;
+        return secilen;
     }
 }

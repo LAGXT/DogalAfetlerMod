@@ -7,6 +7,7 @@ import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.OdulZari;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.Yorunge;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
 import io.github.kadirberkpolat1.dogalafetler.yangin.YanginKaynagi;
+import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraft.nbt.CompoundTag;
@@ -51,6 +52,8 @@ public final class MeteorVarligi extends Entity {
     private YanginKaynagi kaynak = YanginKaynagi.KOMUT;
     private boolean sarsinti = true;
     private OdulZari.Sanslar sanslar;
+    /** Yağmurun hedef oyuncusu (ödül tavanı; yalnız sunucu, null: tek düşürülen meteor). */
+    private UUID odulOyuncu;
     private int yas;
     private Vec3 inis;
     private double inisKalanTick = -1;
@@ -61,7 +64,7 @@ public final class MeteorVarligi extends Entity {
     }
 
     static MeteorVarligi olustur(ServerLevel level, Yorunge y, double olcek, MeteorGorunumu gorunum,
-            YanginKaynagi kaynak, boolean sarsinti, OdulZari.Sanslar sanslar) {
+            YanginKaynagi kaynak, boolean sarsinti, OdulZari.Sanslar sanslar, UUID odulOyuncu) {
         MeteorVarligi m = new MeteorVarligi(MeteorKayitlari.METEOR.get(), level);
         m.setPos(y.baslangicX(), y.baslangicY(), y.baslangicZ());
         m.setDeltaMovement(y.hizX(), y.hizY(), y.hizZ());
@@ -70,6 +73,7 @@ public final class MeteorVarligi extends Entity {
         m.kaynak = kaynak;
         m.sarsinti = sarsinti;
         m.sanslar = sanslar;
+        m.odulOyuncu = odulOyuncu;
         return m;
     }
 
@@ -133,7 +137,7 @@ public final class MeteorVarligi extends Entity {
             if (c != null) {
                 discard();
                 MeteorCarpmasi.carp(sunucu, c.zemin(), c.nokta(), olcek(), gorunum(), kaynak, sarsinti,
-                        sanslar != null ? sanslar : MeteorAyarlari.sanslar(), c.suya());
+                        sanslar != null ? sanslar : MeteorAyarlari.sanslar(), c.suya(), odulOyuncu);
                 return;
             }
         } else {

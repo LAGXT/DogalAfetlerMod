@@ -175,6 +175,10 @@ tipik ölçek 0,7 ve 2,0'daki referanslardır; arası ve uçları doğrusal: gö
 hız ×0,95 → ×1,15, krater yarıçapı 2,5 → 5,5 (2,5×'te 6,7), sarsıntı menzili 48 → 112, yangın yoğunluğu 0,45 → 0,85, patlama sesi
 96 → 128 blok ve %70 → %100 düzey, perde 1,0 → 0,85. Ödül sınıfı büyük banttır (Kozmik Çekirdek yalnız 1,6× ve üstünde).
 
+**Ödül sınırı (tur 2, şef kararı):** yağmur meteorları ödülü yalnız büyük bantta bırakır ve afet başına, hedef oyuncu başına
+en çok `meteor.odulTavaniAfetBasina` (8) eşya (`meteor.mantik.OdulTavani`); 10 dk'lık yağmurda oyuncu başına ~29 eşyalık
+enflasyon ~5'e (en çok 8) iner. Tek düşürülen meteor (komut) madde 13c şanslarıyla sınırsızdır.
+
 ## Buz altı balıkçılık (madde 15)
 
 ### Gerçek olay

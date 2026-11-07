@@ -5,7 +5,9 @@ import io.github.kadirberkpolat1.dogalafetler.core.DonemAlani;
 import io.github.kadirberkpolat1.dogalafetler.core.TpsOlcer;
 import io.github.kadirberkpolat1.dogalafetler.core.olay.DonemDegistiEvent;
 import io.github.kadirberkpolat1.dogalafetler.core.olay.AfetBittiEvent;
+import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.OdulTavani;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.OdulZamani;
+import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.OdulZari;
 import io.github.kadirberkpolat1.dogalafetler.yangin.YanginKaynagi;
 import io.github.kadirberkpolat1.dogalafetler.yangin.mantik.YanginMantigi;
 import java.util.ArrayList;
@@ -13,6 +15,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.BiPredicate;
 import java.util.function.IntFunction;
 import net.minecraft.core.BlockPos;
@@ -50,6 +53,11 @@ public final class MeteorYoneticisi {
         final List<MeteorVarligi> meteorlar = new ArrayList<>();
         final List<MeteorYagmuru> yagmurlar = new ArrayList<>();
         final List<ItemEntity> sicaklar = new ArrayList<>();
+        /**
+         * Yağmur ödülü: kaynak (afet) ve hedef oyuncu başına bırakılan eşya (MT2-20). Kaydedilmez; temiz durdurmada (uçanlar da
+         * kalkar) kaynağınki silinir, doğal bitişte uçmaya devam eden meteorlar için kalır (afet başına bir girdi).
+         */
+        final Map<YanginKaynagi, Map<UUID, Integer>> oduller = new HashMap<>();
         /** Son tick'te krater işlerinin kullandığı blok işlemi ve o tick'in bütçesi. */
         int kraterIslemi;
         int kraterButcesi;
@@ -193,6 +201,20 @@ public final class MeteorYoneticisi {
         return d == null ? new int[] {0, 0} : new int[] {d.kraterIslemi, d.kraterButcesi};
     }
 
+    /** Yağmur meteorunun zar sonucunu {@link OdulTavani} ile kısar ve bırakılacak eşyayı sayar. */
+    static OdulZari.Sonuc odulSinirla(ServerLevel level, YanginKaynagi kaynak, UUID oyuncu, OdulZari.Sonuc zar, boolean buyuk) {
+        if (zar.bos()) {
+            return zar;
+        }
+        Map<UUID, Integer> sayilar = durum(level).oduller.computeIfAbsent(kaynak, k -> new HashMap<>());
+        int verilen = sayilar.getOrDefault(oyuncu, 0);
+        OdulZari.Sonuc sonuc = OdulTavani.uygula(zar, buyuk, verilen, MeteorAyarlari.odulTavaniAfetBasina());
+        if (!sonuc.bos()) {
+            sayilar.put(oyuncu, verilen + OdulTavani.adet(sonuc));
+        }
+        return sonuc;
+    }
+
     /** Kaynağın (null: hepsinin) yağmurlarını durdurur; {@code ucanlariAt} ise uçan meteorlarını da kaldırır. */
     static int durdur(MinecraftServer server, YanginKaynagi kaynak, boolean ucanlariAt) {
         int sayi = 0;
@@ -212,6 +234,7 @@ public final class MeteorYoneticisi {
                     }
                 }
                 d.meteorlar.removeIf(MeteorVarligi::isRemoved);
+                d.oduller.keySet().removeIf(k -> kaynak == null || k.equals(kaynak));
             }
         }
         return sayi;

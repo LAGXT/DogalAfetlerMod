@@ -122,6 +122,11 @@ public final class MeteorAyarlari {
         return sunucu.get().ortaMeteorOrani.get();
     }
 
+    /** Yağmur meteorlarında kaynak (afet) başına, oyuncu başına en çok ödül eşyası (yalnız büyük bant ödül verir). */
+    public static int odulTavaniAfetBasina() {
+        return sunucu.get().odulTavaniAfetBasina.get();
+    }
+
     public static double izYogunlugu() {
         return istemci.get().izYogunlugu.get();
     }
@@ -164,6 +169,7 @@ public final class MeteorAyarlari {
         private final ForgeConfigSpec.IntValue kraterSicaklikSaniye;
         private final ForgeConfigSpec.DoubleValue yagmurBuyukOrani;
         private final ForgeConfigSpec.DoubleValue ortaMeteorOrani;
+        private final ForgeConfigSpec.IntValue odulTavaniAfetBasina;
 
         private Sunucu(ForgeConfigSpec.Builder k) {
             OdulZari.Sanslar v = OdulZari.Sanslar.VARSAYILAN;
@@ -217,8 +223,13 @@ public final class MeteorAyarlari {
             yagmurBuyukOrani = k.comment("/dogalafet meteor yagmur komutunda büyük bant (1,6–2,5×) olasılığı.")
                     .defineInRange("yagmurBuyukOrani", 0.10, 0.0, 1.0);
             ortaMeteorOrani = k.comment("Yağmurlarda orta bant (0,9–1,6×) olasılığı; küçük bant (0,5–0,9×) = 1 − büyük − orta "
-                    + "(büyük oranı afetin config'i: gunes_patlamasi.buyukMeteorOrani, ay_carpmasi.meteorBuyukOrani).")
+                    + "(büyük oranı afetin config'i: gunes_patlamasi.buyukMeteorOrani, ay_carpmasi.meteorBuyukOrani).",
+                    "Orta oran büyükle toplam 1'i aşarsa kısılır (orta = 1 − büyük).")
                     .defineInRange("ortaMeteorOrani", 0.30, 0.0, 1.0);
+            odulTavaniAfetBasina = k.comment("Yağmur meteorları ödülü (Meteorit Parçası, Kozmik Çekirdek) yalnız büyük bantta (1,6× ve "
+                    + "üstü) bırakır ve afet başına, hedef oyuncu başına en çok bu kadar eşya (ödül enflasyonu sınırı; 0: hiç). "
+                    + "Tek düşürülen meteor (komut, test) sınırsızdır.")
+                    .defineInRange("odulTavaniAfetBasina", 8, 0, 1000);
         }
     }
 

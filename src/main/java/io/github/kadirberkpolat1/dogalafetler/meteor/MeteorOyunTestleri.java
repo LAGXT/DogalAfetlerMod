@@ -116,7 +116,7 @@ public final class MeteorOyunTestleri {
     private static KraterIsi carp(GameTestHelper y, MeteorBoyutu boyut, YanginKaynagi kaynak, OdulZari.Sanslar sanslar) {
         BlockPos zemin = y.absolutePos(MERKEZ);
         return MeteorCarpmasi.carp(y.getLevel(), zemin, Vec3.atBottomCenterOf(zemin.above()), boyut.tipikOlcek(),
-                MeteorGorunumu.GUNES, kaynak, false, sanslar, false);
+                MeteorGorunumu.GUNES, kaynak, false, sanslar, false, null);
     }
 
     /**
@@ -432,13 +432,19 @@ public final class MeteorOyunTestleri {
 
     /**
      * meteor-2: yoğun yağmurda aynı anda bekleyen krater işleri tick başına ortak bütçeyi ({@code meteor.kraterBlokButcesi}
-     * × TPS kısması) aşmaz; 16 küçük krater bütçeyi en az bir tick tam doldurur (bütçe gerçekten sınırlar).
+     * × TPS kısması) aşmaz; 16 küçük ve bir en büyük ölçekli (2,5×, r ≈ 6,7) krater bütçeyi en az bir tick tam doldurur
+     * (bütçe gerçekten sınırlar; inceleme-meteor-2-2 Mt8).
      */
     @GameTest(template = SAHNE, batch = "meteor_butce", timeoutTicks = 300)
     public static void yogunCarpmadaKraterIslemiButceyiAsmaz(GameTestHelper y) {
         blokHasari(y, true);
         zemin(y, Blocks.DIRT);
         ServerLevel level = y.getLevel();
+        BlockPos merkez = y.absolutePos(MERKEZ);
+        KraterIsi dev = MeteorCarpmasi.carp(level, merkez, Vec3.atBottomCenterOf(merkez.above()), MeteorOlcegi.UST,
+                MeteorGorunumu.GUNES, YanginKaynagi.KOMUT, false, HIC, false, null);
+        dogrula(y, dev != null && MeteorAyarlari.kraterYaricapi(MeteorOlcegi.UST) > MeteorAyarlari.kraterYaricapi(
+                MeteorBoyutu.BUYUK.tipikOlcek()), "2,5× krater işi tipik büyükten geniş olmalı");
         for (int i = 0; i < 16; i++) {
             carp(y, MeteorBoyutu.KUCUK, YanginKaynagi.KOMUT, HIC);
         }
@@ -466,14 +472,66 @@ public final class MeteorOyunTestleri {
         });
     }
 
+    /** Ödül tavanı testinin yağmuru: 60 meteor, yarısı büyük bant, her zar ödül verir. */
+    private static final int ODUL_METEORU = 60;
+
+    /**
+     * meteor-2 (şef kararı, inceleme-meteor-2-2 Mt10): yağmur meteorunun ödülü yalnız büyük bantta ve kaynak başına, oyuncu
+     * başına {@code meteor.odulTavaniAfetBasina} (8) eşya. Zar her meteorda ödül verir ({@link #HEP}): sınırsız durumda
+     * küçük/orta başına 1, büyük başına 2 eşya olurdu (önce), sınırla tam tavan kadar ve hepsi büyük bantta (sonra).
+     * {@code afetBlokHasari} kapalı: krater yok, ödül eşyası yine düşer (M-04).
+     */
+    @GameTest(template = SAHNE, batch = "meteor_odul_tavan", timeoutTicks = 400)
+    public static void yagmurOdulleriYalnizBuyukBantVeAfetBasinaTavanli(GameTestHelper y) {
+        GameRules.BooleanValue kural = blokHasari(y, false);
+        zemin(y, Blocks.STONE);
+        ServerLevel level = y.getLevel();
+        MeteorAPI.yagmurlariDurdur(level.getServer(), YanginKaynagi.KOMUT, true);
+        BlockPos m = y.absolutePos(BlockPos.ZERO);
+        ServerPlayer a = CekirdekOyunTestleri.sahteOyuncu(y, new GameProfile(UUID.randomUUID(), "meteor-odul-tavan"),
+                m.getX() + 7.5, m.getY() + 6, m.getZ() + 7.5);
+        List<MeteorCarptiEvent> olaylar = new ArrayList<>();
+        Consumer<MeteorCarptiEvent> dinleyici = olaylar::add;
+        MinecraftForge.EVENT_BUS.addListener(EventPriority.NORMAL, false, MeteorCarptiEvent.class, dinleyici);
+        int tavan = MeteorAyarlari.odulTavaniAfetBasina();
+        int sure = 40;
+        MeteorAPI.yagmur(level, List.of(a), sure, ODUL_METEORU * 1200.0 / sure, 0.5, YanginKaynagi.KOMUT, 0, 2, 90, HEP);
+        y.succeedWhen(() -> {
+            y.assertTrue(MeteorAPI.aktifYagmurSayisi(level) == 0 && MeteorAPI.aktifMeteorSayisi(level) == 0
+                    && bekleyenKrater(y) == 0 && olaylar.size() == ODUL_METEORU, "yağmur sürüyor: çarpan " + olaylar.size());
+            MinecraftForge.EVENT_BUS.unregister(dinleyici);
+            int once = 0;
+            int sonra = 0;
+            int buyuk = 0;
+            boolean kucukOdul = false;
+            for (MeteorCarptiEvent o : olaylar) {
+                boolean b = o.boyut().buyuk();
+                buyuk += b ? 1 : 0;
+                once += b ? 2 : 1;
+                int adet = (o.odul().parca() ? 1 : 0) + (o.odul().cekirdek() ? 1 : 0);
+                sonra += adet;
+                kucukOdul |= !b && adet > 0;
+            }
+            DogalAfetler.LOGGER.info("meteor ödül tavanı GameTest: {} meteor ({} büyük bant), ödül eşyası sınırsız {} → sınırlı {} "
+                    + "(tavan {})", olaylar.size(), buyuk, once, sonra, tavan);
+            kural.set(true, level.getServer());
+            level.getServer().getPlayerList().remove(a);
+            MeteorAPI.yagmurlariDurdur(level.getServer(), YanginKaynagi.KOMUT, true);
+            sahneyiTemizle(y);
+            y.assertTrue(buyuk * 2 > tavan, "tavanı aşacak kadar büyük meteor gerekli: " + buyuk);
+            y.assertFalse(kucukOdul, "küçük/orta bant ödül vermemeli");
+            y.assertTrue(sonra == tavan, "ödül tam tavan kadar olmalı: " + sonra + " / " + tavan);
+        });
+    }
+
     /** Hızlandırılmış 10 dk: oyuncu başına 90/dk × 10 dk = 900 meteor bu kadar tick'e sıkıştırılır (20× yoğunluk). */
     private static final int ON_DAKIKA_TICK = 600;
 
     /**
-     * meteor-2 (istek 27): 10 dakikalık yağmurun meteor sayısı (900) 30 sn'ye sıkıştırılır: tick başına 1,5 meteor, 16 oyuncunun
-     * gerçek 90/dk yoğunluğundan (1,2/tick) ağır. Uçan meteor her tick tavanın altında, krater bütçesi aşılmaz, yağmur
-     * bitince bekleyen meteor kalmaz (kuyruk yok). Ölçek dağılımı (%10 büyük, %30 orta) çarpmalarda görülür. {@code afetBlokHasari}
-     * kapalı: krater yok, sahne değişmez.
+     * meteor-2 (istek 27): 10 dakikalık yağmurun meteor sayısı (900) 30 sn'ye sıkıştırılır: tick başına 1,5 meteor, dik
+     * girişle (uçuş ~47 tick) gökteki yük 16 oyuncunun gerçek 90/dk'sına (1,2/tick, 40–70° giriş) eşit (~70). Uçan meteor her
+     * tick tavanın altında, yağmur bitince bekleyen meteor kalmaz (kuyruk yok). Ölçek dağılımı (%10 büyük, %30 orta)
+     * çarpmalarda görülür. {@code afetBlokHasari} kapalı: krater yok (bütçe kanıtı {@code meteor_butce}), sahne değişmez.
      */
     @GameTest(template = SAHNE, batch = "meteor_on_dakika", timeoutTicks = ON_DAKIKA_TICK + 300)
     public static void onDakikalikYogunYagmurTavanVeButceyiAsmazBoyutlarDegisir(GameTestHelper y) {

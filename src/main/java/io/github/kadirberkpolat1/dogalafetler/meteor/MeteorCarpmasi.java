@@ -9,6 +9,7 @@ import io.github.kadirberkpolat1.dogalafetler.network.AgKanali;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.SicaklikKancalari;
 import io.github.kadirberkpolat1.dogalafetler.yangin.YanginKaynagi;
 import java.util.Random;
+import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
@@ -22,7 +23,8 @@ import net.minecraftforge.common.MinecraftForge;
  * Çarpma anı: sarsıntı/görsel paketi, krater sıcaklığı ve krater işi. Patlama sesini paketi alan istemci menzil ve mesafe
  * kazancıyla çalar ({@code client.meteor.MeteorSesi}). Krater blokları, yangın ve ödüller {@link KraterIsi}'nde tick'lere
  * yayılır. Suya düşen meteor sıçrama ve buhar çıkarır; krater, ateş ve ödül yoktur. Büyüklüğe bağlı her değer sürekli
- * ölçekten ({@link MeteorOlcegi#ara}); ödül sınıfı ölçeğin bantıdır.
+ * ölçekten ({@link MeteorOlcegi#ara}); ödül sınıfı ölçeğin bantıdır. Yağmur meteorunun ({@code odulOyuncu} dolu) ödülü yalnız büyük
+ * bantta ve afet başına, oyuncu başına tavanlıdır ({@code mantik.OdulTavani}).
  */
 final class MeteorCarpmasi {
     /** Çarpılan yüzeyin üstünde boşaltılan blok (bitki, kar, asılı blok). */
@@ -34,7 +36,7 @@ final class MeteorCarpmasi {
     }
 
     static KraterIsi carp(ServerLevel level, BlockPos zemin, Vec3 nokta, double olcek, MeteorGorunumu gorunum,
-            YanginKaynagi kaynak, boolean sarsinti, OdulZari.Sanslar sanslar, boolean suya) {
+            YanginKaynagi kaynak, boolean sarsinti, OdulZari.Sanslar sanslar, boolean suya, UUID odulOyuncu) {
         paketGonder(level, nokta, olcek, gorunum, suya, sarsinti);
         boolean ay = gorunum == MeteorGorunumu.AY;
         MeteorBoyutu boyut = MeteorBoyutu.olcekten(olcek);
@@ -60,6 +62,9 @@ final class MeteorCarpmasi {
         boolean blokHasari = Kurallar.blokHasariAcik(level.getGameRules());
         long tohum = level.random.nextLong();
         OdulZari.Sonuc odul = OdulZari.at(boyut.buyuk(), sanslar, new Random(tohum ^ 0x5DEECE66DL));
+        if (odulOyuncu != null) {
+            odul = MeteorYoneticisi.odulSinirla(level, kaynak, odulOyuncu, odul, boyut.buyuk());
+        }
         KraterIsi is = new KraterIsi(zemin, yaricap, derinlik, tohum, olcek, gorunum, kaynak, odul, blokHasari);
         MeteorYoneticisi.kraterEkle(level, is);
         return is;
