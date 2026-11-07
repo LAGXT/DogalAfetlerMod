@@ -153,11 +153,13 @@ public final class IstemciAsitYagmuru {
     }
 
     /**
-     * Sunucudaki hasar denetimiyle aynı koşul: AKTIF yağmur (ham yoğunluk > 0), alanın içinde ve başın üstü gökyüzüne açık.
+     * Sunucudaki hasar denetimiyle aynı koşul: AKTIF yağmur (ham yoğunluk > 0), hayatta, yaratıcı ve izleyici değil, alanın
+     * içinde ve başın üstü gökyüzüne açık.
      * Ekran efekti ve oyuncunun üstündeki cızlama bu sürece görünür.
      */
     static boolean maruzMu(ClientLevel level, LocalPlayer oyuncu) {
-        return oyuncu != null && aktif && hamYogunluk > 0 && !oyuncu.isSpectator()
+        return oyuncu != null && aktif && hamYogunluk > 0 && !oyuncu.isSpectator() && !oyuncu.isCreative()
+                && oyuncu.isAlive()
                 && Math.hypot(oyuncu.getX() - x, oyuncu.getZ() - z) <= yaricap
                 && acikta(level, oyuncu.getX(), oyuncu.getEyeY(), oyuncu.getZ());
     }

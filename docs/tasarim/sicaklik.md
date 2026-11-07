@@ -57,6 +57,6 @@ vinyeti, dikey dalga deseni).
 ## Görsel cila (2026-11-07)
 
 - Kalpler ve açlık barı işaretçinin tepesinden 2 px yukarıda (`leftHeight/rightHeight` 54 → 56): vanilla düşük canda
-  kalpleri 1 px aşağı titrettiği için boşluğsuz düzende kalpler işaretçiye biniyordu.
-- Cold Sweat istemcide yüklüyse bar hiç çizilmez ve vanilla barlar kaydırılmaz (sunucu kapısı `ACIK` zorlansa ya da
-  sunucuda Cold Sweat olmasa da). Cold Sweat'in vücut sıcaklığı göstergesinin konumu kendi işidir.
+  kalpleri 1 px aşağı titrettiği için boşluksuz düzende kalpler işaretçiye biniyordu.
+- Bar ve kaydırma yalnız sunucunun sıcaklık kapısı açıkken: Cold Sweat sunucuda yüklüyken (OTOMATIK) bar çizilmez ve vanilla
+  barlar kaydırılmaz; sistem bizimse bar görünür. Cold Sweat'in vücut sıcaklığı göstergesinin konumu kendi işidir.

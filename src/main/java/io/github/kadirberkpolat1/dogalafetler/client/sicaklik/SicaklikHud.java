@@ -4,7 +4,6 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.SicaklikDurumPaketi;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.SicaklikIstemciAyarlari;
-import io.github.kadirberkpolat1.dogalafetler.sicaklik.SicaklikKapisi;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Kademe;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -20,9 +19,9 @@ import net.minecraftforge.fml.common.Mod;
 /**
  * Sıcaklık barı (madde 7d): XP barının hemen üstünde, onunla aynı genişlikte; mavi → nötr → kırmızı renk geçişi, üstte
  * vücut işaretçisi, altta ortam oku. Hasar kademesinde bar titrer ve işaretçi uyarı renginde yanıp söner. Kalpler ve
- * açlık barı Forge'un {@code leftHeight/rightHeight} yüksekliğiyle barın üstüne kayar. Yazı yoktur (N6). Cold Sweat
- * istemcide yüklüyse (sunucu kapısı açık kalsa da, ör. {@code sicaklikSistemiModu=ACIK} ya da Cold Sweat'siz sunucu) bar
- * çizilmez ve vanilla barlar kaydırılmaz: Cold Sweat kendi göstergesini çizer.
+ * açlık barı Forge'un {@code leftHeight/rightHeight} yüksekliğiyle barın üstüne kayar. Yazı yoktur (N6). Bar ve kaydırma
+ * yalnız sunucunun sıcaklık kapısı açıkken ({@code SicaklikKapisi}, S-12 paketi): Cold Sweat sunucuda yüklüyken
+ * (OTOMATIK) kapı kapalıdır, bar çizilmez ve vanilla barlar kaydırılmaz; sistem bizimse oyuncu barı görür.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
 public final class SicaklikHud {
@@ -55,7 +54,7 @@ public final class SicaklikHud {
     private static void ciz(ForgeGui gui, GuiGraphics g, float partialTick, int w, int h) {
         Minecraft mc = Minecraft.getInstance();
         if (!IstemciSicaklik.acik() || mc.options.hideGui || !gui.shouldDrawSurvivalElements()
-                || !SicaklikIstemciAyarlari.hudGorunur() || SicaklikKapisi.coldSweatYuklu()) {
+                || !SicaklikIstemciAyarlari.hudGorunur()) {
             return;
         }
         SicaklikDurumPaketi d = IstemciSicaklik.durum();
