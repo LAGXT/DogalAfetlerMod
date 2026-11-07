@@ -33,6 +33,7 @@ import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.gametest.GameTestHolder;
@@ -86,6 +87,11 @@ public final class KasirgaOyunTestleri {
 
     @AfterBatch(batch = "kasirga_kayit")
     public static void kayitSonrasi(ServerLevel level) {
+        OyunTestiTemizligi.batchSonu(level);
+    }
+
+    @AfterBatch(batch = "kasirga_isleme")
+    public static void islemeSonrasi(ServerLevel level) {
         OyunTestiTemizligi.batchSonu(level);
     }
 
@@ -235,6 +241,40 @@ public final class KasirgaOyunTestleri {
             }
             y.succeed();
         });
+    }
+
+    /**
+     * Kn4: varlık işlemeyen (yüklü ama biletsiz, K-E21 gibi eşzamanlı üretilmiş) uzak chunk'taki uçan blok kasırganın tick'inde
+     * yere konur ve varlık kalkar; blok kaybolmaz.
+     */
+    @GameTest(template = SAHNE, batch = "kasirga_isleme", timeoutTicks = 40)
+    public static void isleyemeyenKonumdakiUcanBlokYereKonur(GameTestHelper y) {
+        ServerLevel level = y.getLevel();
+        boolean onceki = blokHasari(y, true);
+        Kasirga kasirga = baslat(y, 2, false, KasirgaEvresi.DOGUS);
+        BlockPos uzak = y.absolutePos(MERKEZ).offset(4096, 0, 4096);
+        BlockPos[] konan = new BlockPos[1];
+        try {
+            level.getChunk(uzak);
+            dogrula(y, !level.isPositionEntityTicking(uzak), "uzak chunk varlık işliyor (sahne geçersiz)");
+            UcanBlokVarligi ucan = UcanBlokVarligi.olustur(level, Blocks.OAK_PLANKS.defaultBlockState(), kasirga, -1, 0, 0, 0);
+            ucan.setPos(uzak.getX() + 0.5, uzak.getY() + 20, uzak.getZ() + 0.5);
+            level.addFreshEntity(ucan);
+            kasirga.ucanEkle(ucan);
+            kasirga.isleyemeyenUcanlariBirak(level);
+            int zemin = level.getHeight(Heightmap.Types.MOTION_BLOCKING, uzak.getX(), uzak.getZ()) - 1;
+            konan[0] = new BlockPos(uzak.getX(), zemin, uzak.getZ());
+            dogrula(y, ucan.isRemoved(), "işlemeyen konumdaki uçan blok varlığı kalkmadı");
+            dogrula(y, level.getBlockState(konan[0]).is(Blocks.OAK_PLANKS),
+                    "blok yere konmadı: " + konan[0].toShortString() + " = " + level.getBlockState(konan[0]));
+            dogrula(y, kasirga.ucanBlokSayisi() == 0, "kasırga listesinde uçan blok kaldı");
+        } finally {
+            if (konan[0] != null && level.getBlockState(konan[0]).is(Blocks.OAK_PLANKS)) {
+                level.setBlock(konan[0], Blocks.AIR.defaultBlockState(), 2);
+            }
+            bitir(y, onceki);
+        }
+        y.succeed();
     }
 
     /** GOREV §6 #3: {@code afetBlokHasari=false} iken kasırga hiçbir bloğu değiştirmez. */

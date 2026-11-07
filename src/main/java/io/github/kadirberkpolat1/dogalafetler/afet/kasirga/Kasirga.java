@@ -208,6 +208,7 @@ public final class Kasirga extends Afet {
     @Override
     protected void asamaTick(ServerLevel level, AfetAsamasi asama, int adim) {
         tick++;
+        isleyemeyenUcanlariBirak(level);
         switch (asama) {
             case SIREN -> {
                 double p = (double) asamaGecenTick() / Math.max(1, SirenTuru.sureTick(tur()));
@@ -403,6 +404,24 @@ public final class Kasirga extends Afet {
             y += (zemin - y) * 0.2;
         }
         konum = new Vec3(nx, y, nz);
+    }
+
+    /**
+     * Kn4: varlık işlemeyen konumdaki uçan blok donar ve chunk boşalınca kaydedilmediği ({@code noSave}) için bloğuyla silinir;
+     * o konumda hemen yere bırakılır (chunk yüklüyse blok olarak, değilse eşyası da kaybolmadan önce).
+     */
+    void isleyemeyenUcanlariBirak(ServerLevel level) {
+        for (UcanBlokVarligi blok : ucanlar) {
+            if (!blok.isRemoved() && !level.isPositionEntityTicking(blok.blockPosition())) {
+                blok.yereBirak();
+            }
+        }
+        ucanlar.removeIf(Entity::isRemoved);
+    }
+
+    /** GameTest: uçan bloklar listesine elle ekler. */
+    void ucanEkle(UcanBlokVarligi blok) {
+        ucanlar.add(blok);
     }
 
     /** Görüntü varlığı: konum entity-ticking iken var, değilken yok (kasırga soyut ilerler). */

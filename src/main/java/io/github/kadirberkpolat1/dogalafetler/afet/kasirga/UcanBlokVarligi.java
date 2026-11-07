@@ -147,6 +147,9 @@ public class UcanBlokVarligi extends Entity {
         }
         Vec3 hiz = getDeltaMovement().add(0, -0.04, 0).scale(0.98);
         setDeltaMovement(hiz);
+        if (isleyenAlanDisinda(position().add(hiz))) {
+            return;
+        }
         move(MoverType.SELF, hiz);
         if (onGround()) {
             yereKon(blockPosition());
@@ -164,15 +167,34 @@ public class UcanBlokVarligi extends Entity {
         // Siklonik: yukarıdan bakınca saat yönünün tersi (x doğu, z güney olduğu için açı azalır).
         aci -= profil.acisalHiz(yaricap) / 20;
         yukseklik += dikeyHiz / 20;
+        if (isleyenAlanDisinda(yorungeKonumu())) {
+            return;
+        }
         konumla();
         if (yukseklik >= hedefYukseklik) {
             birak(profil.tegetHiz(yaricap) / 20);
         }
     }
 
-    private void konumla() {
+    private Vec3 yorungeKonumu() {
         Vec3 merkez = sahip.konum();
-        setPos(merkez.x + Math.cos(aci) * yaricap, merkez.y + yukseklik, merkez.z + Math.sin(aci) * yaricap);
+        return new Vec3(merkez.x + Math.cos(aci) * yaricap, merkez.y + yukseklik, merkez.z + Math.sin(aci) * yaricap);
+    }
+
+    private void konumla() {
+        setPos(yorungeKonumu());
+    }
+
+    /**
+     * Kn4: sonraki konum varlık işlemeyen yerdeyse blok şimdiki (işleyen, yüklü) yerinde bırakılır; oraya giden {@code noSave}
+     * varlık donar ve chunk boşalınca bloğuyla silinirdi.
+     */
+    private boolean isleyenAlanDisinda(Vec3 hedef) {
+        if (level() instanceof ServerLevel sl && !sl.isPositionEntityTicking(BlockPos.containing(hedef))) {
+            yereBirak();
+            return true;
+        }
+        return false;
     }
 
     /** Teğet hızını koruyarak dışa ve hafif yukarı savrulur, sonra vanilla çarpışmasıyla düşer. */
