@@ -218,10 +218,10 @@ hasarı açıkken). **Erişilebilirlik:** CLIENT `gokyuzu.pulsarTitresim` (0 = h
 0–20 sn hızlanarak yaklaşır (1,5° → 20°; açısal boyut uzaklıkla ters orantılı), çevresinde yerel koyu mercek halkası ve Einstein
 halkası (göğün geri kalanının yıldızları sönmez). 20–60 sn pulsar kara deliğe çekilir ve spagettileşir (kara deliğe uzanan eğik
 kuyruk, mor-mavi-beyaz Doppler'li akresyon diski, titreşim zirvede); 55. sn'de aradaki yolun %80'i, 56,5. sn'de pulsar yok.
-55–60 sn kör edici mor-beyaz parlama (0,1 sn'de tepe, 1,5 sn tutar, τ 0,9 sn; ekran örtüsü, ışık haritası, sis) + sunucudan
+55–60 sn kör edici mor-beyaz parlama (0,1 sn'de tepe, 1,5 sn tutar, τ 0,9 sn; ekran örtüsü %50, ışık haritası %85, gök ve sis %60) + sunucudan
 tüm oyunculara konumsuz kütleçekim dalgası sesi (`karadelik_yutma.ogg`, 8 sn düşen bas 90 → 25 Hz + çatırtı, −23 LUFS) ve 3°,
-100 tick ekran sarsıntısı (hızlı bileşeni `pulsarTitresim`'le). 60–90 sn kara delik küçülüp uzaklaşır ve söner, gök simsiyah, uzay
-%100, kalıntı nebulası yok. Gök koyu mor `#1C0A2E` → siyah; parlamada `#E8DAFF`'ye %85. Yutmada en çok 16 kuad.
+100 tick ekran sarsıntısı (hızlı bileşeni `pulsarTitresim`'le). 60–90 sn kara delik küçülüp uzaklaşır (diski yutumdan sonra
+parlak) ve söner, gök simsiyah, uzay %100, kalıntı nebulası yok. Gök koyu mor `#1C0A2E` → siyah. Yutmada en çok 16 kuad.
 
 **Cehennem dünya (sunucu, `afetBlokHasari` kapısı arkasında, tek bütçe).** Çimen → kaba toprak → kül bloğu; yaprak yanar,
 altına kül katmanı düşer; kütük → kömürleşmiş kütük (siyah çatlaklı, içi kızıl parlayan, ışık 3); çiçek/ot/kaktüs/mantar yanar;
