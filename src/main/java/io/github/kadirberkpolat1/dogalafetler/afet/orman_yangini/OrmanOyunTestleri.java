@@ -126,7 +126,8 @@ public final class OrmanOyunTestleri {
      * Gerçek orman yangını → "Yanmadan Çıktım" uçtan uca (AOi-4, başarım §A.3 #5): yanan hücreye 8 blok yakın oyuncu 30 olay
      * saniyesi biriktirip doğal bitişten sağ çıkınca başarımı alır; yangına 12–16 blok uzaktaki oyuncuya ipucu gitmez, almaz.
      * Yangın {@code afetBlokHasari=false} ile veri olarak sürer; yakıt meşe kütüğü (hücre 444 tick yanar, yaprak 180 tick'te
- * 30 sn dolmadan söner); sahte oyuncular yaratıcı.
+     * 30 sn dolmadan söner); sahte oyuncular yaratıcı ve afet başladıktan sonra girer (çevrim içi oyuncu varken {@code elleBaslat}
+     * merkezi oyuncunun yakınındaki rastgele yakıttan seçer; komşu sahnenin yaprağına kayabilirdi).
      */
     @GameTest(template = SAHNE, batch = "orman_basarim", timeoutTicks = 900)
     public static void dogalBitenOrmanYanginiYanmadanCiktimVerir(GameTestHelper y) {
@@ -138,6 +139,7 @@ public final class OrmanOyunTestleri {
         for (BlockPos p : BlockPos.betweenClosed(new BlockPos(1, 1, 1), new BlockPos(7, 3, 7))) {
             y.setBlock(p, Blocks.OAK_LOG);
         }
+        OrmanYangini afet = baslat(y, 2, y.absolutePos(new BlockPos(4, 3, 4)));
         BlockPos yakinP = y.absolutePos(new BlockPos(4, 5, 4));
         BlockPos uzakP = y.absolutePos(new BlockPos(4, 1, 21));
         ServerPlayer yakin = OyunTestiTemizligi.oyuncu(y, yakinP.getX() + 0.5, yakinP.getY(), yakinP.getZ() + 0.5);
@@ -151,7 +153,6 @@ public final class OrmanOyunTestleri {
                 (olay.oyuncu() == yakin ? yakinIpucu : olay.oyuncu() == uzak ? uzakIpucu : new AtomicInteger()).incrementAndGet();
             }
         });
-        OrmanYangini afet = baslat(y, 2, y.absolutePos(new BlockPos(4, 3, 4)));
         y.runAfterDelay(700, () -> {
             for (int i = 0; i < 6 && yonetici.aktifAfet().isPresent(); i++) {
                 yonetici.asamaIleri();
@@ -229,6 +230,8 @@ public final class OrmanOyunTestleri {
         AfetYoneticisi.BaslatmaSonucu sonuc = yonetici.elleBaslat(AfetTuru.ORMAN_YANGINI, seviye, null, level, merkez);
         y.assertTrue(sonuc == AfetYoneticisi.BaslatmaSonucu.BASLADI, "orman yangını başlamadı: " + sonuc);
         OrmanYangini afet = (OrmanYangini) yonetici.aktifAfet().orElseThrow();
+        y.assertTrue(afet.baglam().merkez().equals(merkez), "afet istenen merkezde başlamalı (çevrim içi oyuncu varken elleBaslat "
+                + "oyuncunun yakınındaki yakıtı seçer): " + afet.baglam().merkez().toShortString());
         yonetici.asamaIleri();
         yonetici.asamaIleri();
         y.assertTrue(afet.asama() == AfetAsamasi.AKTIF, "AKTIF'e geçmeli: " + afet.asama());
