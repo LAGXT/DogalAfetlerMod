@@ -3,6 +3,8 @@ package io.github.kadirberkpolat1.dogalafetler.afet.deprem;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.afet.deprem.mantik.ArtciPlani;
 import io.github.kadirberkpolat1.dogalafetler.afet.deprem.mantik.FayHatti;
+import io.github.kadirberkpolat1.dogalafetler.basarim.BasarimKimlikleri;
+import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.Basarimlar;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetAsamasi;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetKaydi;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
@@ -17,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import net.minecraft.advancements.Advancement;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.AfterBatch;
 import net.minecraft.gametest.framework.GameTest;
@@ -26,6 +29,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.FallingBlockEntity;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.AABB;
@@ -74,6 +78,11 @@ public final class DepremOyunTestleri {
 
     @AfterBatch(batch = "deprem_stop")
     public static void stopSonrasi(ServerLevel level) {
+        batchSonu(level);
+    }
+
+    @AfterBatch(batch = "deprem_basarim")
+    public static void basarimSonrasi(ServerLevel level) {
         batchSonu(level);
     }
 
@@ -280,6 +289,37 @@ public final class DepremOyunTestleri {
             y.assertTrue(kirilganSayisi(y) < kirilganOnce, "kırılgan blok yıkılmadı (" + kirilganOnce + ")");
             y.assertTrue(deprem.isler().degisenBlok() > 0, "blok değişimi sayılmadı");
             blokHasari(y, eski);
+            sahneyiTemizle(y);
+        });
+    }
+
+    /**
+     * Başarım §A.3 #3 gerçek depremle uçtan uca (izleme-inceleme-5 P2-4): doğal biten S1 depremin etki alanındaki oyuncu
+     * "Sallanan Zemin"i alır; 600 blok uzaktaki (etki alanı dışı) oyuncu almaz. Blok hasarı kapalı; oyuncular yaratıcı.
+     */
+    @GameTest(template = SAHNE, batch = "deprem_basarim", timeoutTicks = 600)
+    public static void dogalBitenDepremSallananZeminVerir(GameTestHelper y) {
+        zemin(y, YUZEY);
+        blokHasari(y, false);
+        BlockPos merkez = y.absolutePos(MERKEZ);
+        ServerPlayer uzak = oyuncu(y, merkez.getX() + 600.5, merkez.getY(), merkez.getZ() + 0.5);
+        uzak.setGameMode(GameType.CREATIVE);
+        Deprem deprem = baslat(y, 1);
+        ServerPlayer yakin = OYUNCULAR.get(OYUNCULAR.size() - 1);
+        yakin.setGameMode(GameType.CREATIVE);
+        AfetYoneticisi yonetici = AfetYoneticisi.al(y.getLevel().getServer());
+        Advancement sallanan = y.getLevel().getServer().getAdvancements()
+                .getAdvancement(BasarimKimlikleri.basarim(Basarimlar.SALLANAN_ZEMIN));
+        y.assertTrue(sallanan != null, "advancement yüklü değil (runData?)");
+        y.succeedWhen(() -> {
+            y.assertTrue(yonetici.aktifAfet().isEmpty() && deprem.sonlandi(), "deprem sürüyor: " + deprem.asama());
+            y.assertTrue(deprem.etkilenenler().contains(yakin.getUUID()) && !deprem.etkilenenler().contains(uzak.getUUID()),
+                    "etkilenen yalnız alandaki oyuncu olmalı: " + deprem.etkilenenler());
+            y.assertTrue(yakin.getAdvancements().getOrStartProgress(sallanan).isDone(),
+                    "doğal biten depremden sağ çıkan Sallanan Zemin almalı");
+            y.assertTrue(!uzak.getAdvancements().getOrStartProgress(sallanan).isDone(), "alan dışındaki oyuncu almamalı");
+            DogalAfetler.LOGGER.info("Deprem GameTest: Sallanan Zemin gerçek depremle verildi (etkilenen {})",
+                    deprem.etkilenenler().size());
             sahneyiTemizle(y);
         });
     }
