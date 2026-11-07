@@ -4,12 +4,16 @@ import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.afet.ay_carpmasi.AyCarpmasiAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.afet.ay_carpmasi.mantik.AyEgrileri;
 import io.github.kadirberkpolat1.dogalafetler.client.core.GorselOtomasyon;
+import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
+import io.github.kadirberkpolat1.dogalafetler.core.AyDurumu;
+import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import io.github.kadirberkpolat1.dogalafetler.core.TpsOlcer;
 import java.util.Locale;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.GameType;
@@ -25,7 +29,8 @@ import net.minecraftforge.fml.common.Mod;
  * çalışır; üretimde etkisizdir. Gece, seyirci kamera doğuş noktasının {@value #KAMERA_YUKSEKLIGI} blok üstünde (ağaçlar
  * ve arazi ufku kapatmaz) yaklaşma yönüne (doğu-güneydoğu) bakar. Sıra: tepeye bakan önce karesi; vitrin açısından
  * afetsiz FPS tabanı ({@code s5_ay_taban}); ön-uyarı (değişiklik yok); siren boyunca ufkun 12° üstüne bakarak büyüyen ve
- * parçalanan ay; son saniyeler yavaş çekimde ({@code /dogalafet hiz 0.2}) vitrin açısından (ufkun 4° üstü: ay, parlama ve
+ * parçalanan ay; son saniyeler ağır çekimde (sunucu tick'inde: 47. sn'den hız 0,05, 58,5. sn'den 0,01) vitrin açısından
+ * (ufkun 4° üstü: ay, parlama ve
  * patlama aynı kadrajda); 3 boyutlu patlama 0 / 2 sn, 3. sn'de kamera {@value #YUKSELTME} blok yükseltilmiş (patlama dünyada
  * sabit: kadrajda aşağı kayar), 8. sn'de patlama yok (tam genlikte kısa sarsıntı dizisinden sonra, H.3); meteorlar
  * başlayınca en ağır an ölçülür ({@code s5_ay_yuksek}, taban {@code s5_ay_taban}); doğal bitiş, enkaz halkalı aysız gece
@@ -83,11 +88,40 @@ public final class AyCarpmasiOtomasyonu {
     private static int sonSarsinti = -SARSINTI_ARA;
     private static int olcumBas = -1;
     private static boolean olcumBitti;
-    private static boolean yavas;
+    /** Ağır çekim adımları {yaklaşma saniyesi, hız}: istemci kare kapısında beklerken (pc2'de kare başına ~60 sn) an kaçmasın. */
+    private static final float[][] YAVASLATMA = {{47f, 0.05f}, {58.5f, 0.01f}};
+    private static volatile int yavaslatma;
     private static volatile boolean sunucuHazir;
     private static volatile BlockPos kamera;
 
     private AyCarpmasiOtomasyonu() {
+    }
+
+    /**
+     * Sunucu thread'inde: ağır çekim yaklaşma saniyesinden kurulur, istemci kare kapısında (FPS &lt; 15 iken 60 sn) beklese de
+     * gecikmez. Son yaklaşma ve patlamanın ilk 3 sn'si 0,05 / 0,01 hızda geçer (60 sn bekleme ≤ 0,6 patlama saniyesi); 3. sn
+     * karesinden sonra istemci hızı 1'e döndürür.
+     */
+    @SubscribeEvent
+    public static void sunucuTick(TickEvent.ServerTickEvent olay) {
+        if (!AKTIF || olay.phase != TickEvent.Phase.END || !sunucuHazir || yavaslatma >= YAVASLATMA.length) {
+            return;
+        }
+        MinecraftServer server = olay.getServer();
+        DunyaDonemi d = DunyaDonemi.al(server);
+        if (d.ayDurumu() != AyDurumu.YAKLASIYOR || d.ayOlaySaati() < 0) {
+            return;
+        }
+        float s = (d.saat() - d.ayOlaySaati()) / 20f;
+        if (s >= YAVASLATMA[yavaslatma][0]) {
+            float hiz = YAVASLATMA[yavaslatma][1];
+            AfetYoneticisi.al(server).hizAyarla(hiz);
+            if (yavaslatma == 0) {
+                bak(server, VITRIN_PITCH);
+            }
+            DogalAfetler.LOGGER.info(ON + "ağır çekim x{} (yaklaşma sn {})", hiz, sayi(s));
+            yavaslatma++;
+        }
     }
 
     @SubscribeEvent
@@ -175,12 +209,6 @@ public final class AyCarpmasiOtomasyonu {
                 }
             }
             case 5 -> {
-                if (!yavas && d.yaklasiyor() && d.saniye() >= 48f) {
-                    // Son yaklaşma ve vitrin saniyeleri yavaş çekimde: kare kapısı beklerken an kaçmasın.
-                    komut(server, "dogalafet hiz 0.2");
-                    server.execute(() -> bak(server, VITRIN_PITCH));
-                    yavas = true;
-                }
                 if (d.yaklasiyor() && kareSirasi < YAKLASMA.length && d.saniye() >= YAKLASMA[kareSirasi].saniye()) {
                     kare(YAKLASMA[kareSirasi++].ad());
                 } else if (d.carpti()) {
@@ -295,7 +323,7 @@ public final class AyCarpmasiOtomasyonu {
         sunucuHazir = true;
     }
 
-    private static void bak(IntegratedServer server, float pitch) {
+    private static void bak(MinecraftServer server, float pitch) {
         ServerPlayer oyuncu = server.getPlayerList().getPlayers().get(0);
         oyuncu.teleportTo(server.overworld(), kamera.getX() + 0.5, kamera.getY() + yukseltme, kamera.getZ() + 0.5, BAKIS_YAW,
                 pitch);

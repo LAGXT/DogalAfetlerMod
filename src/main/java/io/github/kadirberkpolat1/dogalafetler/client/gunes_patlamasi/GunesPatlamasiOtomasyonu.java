@@ -201,6 +201,7 @@ public final class GunesPatlamasiOtomasyonu {
             new Adim("kara delik yakın kadraj", GunesPatlamasiOtomasyonu::karaDelikBak, () -> sayac >= 40,
                     "kara_delik_yakin", 200),
             new Adim("pulsar akşam", s -> {
+                karaDelikTakip = -1;
                 gorusAcisi(-1);
                 komut(s, "dogalafet pulsar baslat", "dogalafet asama ileri pulsar", "time set 11600");
                 gunesBak(s);
@@ -216,6 +217,8 @@ public final class GunesPatlamasiOtomasyonu {
 
     /** Yakın kadraj için değiştirilen görüş açısının eski değeri (-1: değişmedi); config dosyasına yazılmaz. */
     private static volatile int eskiGorusAcisi = -1;
+    /** Yakın kadrajda takip edilen kara delik (-1: yok); kamera kare kapısında beklenirken de her tick ona çevrilir. */
+    private static volatile int karaDelikTakip = -1;
 
     private GunesPatlamasiOtomasyonu() {
     }
@@ -262,6 +265,9 @@ public final class GunesPatlamasiOtomasyonu {
         }
         // Başarım toast'ları (Felaket Başlıyor, Güneşi Atlattım, Süpernova Tanığı) F1'de de çizilir; vitrin karesine girmesin.
         mc.getToasts().clear();
+        if (karaDelikTakip >= 0 && mc.player != null && mc.level != null) {
+            karaDelikeCevir(mc, karaDelikTakip);
+        }
         IntegratedServer server = mc.getSingleplayerServer();
         if (mc.player == null || mc.level == null || server == null || GorselOtomasyon.kareBekliyor()) {
             return;
@@ -375,28 +381,36 @@ public final class GunesPatlamasiOtomasyonu {
     }
 
     /**
-     * Kamera göğün en yüksekteki kara deliğine döner, görüş açısı 30° (yakın kadraj). Yön çizimle aynı hesaptan (gün
-     * dönüşü + yavaş dönüş; ana thread'den okunan istemci dünyasıyla).
+     * Göğün en yüksekteki kara deliği seçilir, görüş açısı 30° (yakın kadraj); kamera her istemci tick'inde ona çevrilir
+     * (yavaş dönüşle kayar; pc2'de kare kapısı 60 sn bekleyebilir). Yön çizimle aynı hesaptan.
      */
     private static void karaDelikBak(IntegratedServer s) {
         Minecraft.getInstance().execute(() -> {
             Minecraft mc = Minecraft.getInstance();
-            org.joml.Vector3f en = null;
-            for (int i = 0; i < 3; i++) {
-                org.joml.Vector3f y = IstemciGokyuzu.karaDelikYonu(i, mc.level, 1f);
-                if (en == null || y.y > en.y) {
-                    en = y;
+            int en = 0;
+            for (int i = 1; i < 3; i++) {
+                if (IstemciGokyuzu.karaDelikYonu(i, mc.level, 1f).y > IstemciGokyuzu.karaDelikYonu(en, mc.level, 1f).y) {
+                    en = i;
                 }
             }
-            float yaw = (float) Math.toDegrees(Math.atan2(-en.x, en.z));
-            float pitch = (float) -Math.toDegrees(Math.asin(Math.max(-1f, Math.min(1f, en.y))));
             gorusAcisi(30);
-            float ky = yaw;
-            float kp = pitch;
-            s.execute(() -> kamera(s, ky, kp));
-            DogalAfetler.LOGGER.info(ON + "kara delik kadrajı: yaw {}, pitch {}", String.format(Locale.ROOT, "%.1f", yaw),
-                    String.format(Locale.ROOT, "%.1f", pitch));
+            karaDelikTakip = en;
+            float[] aci = karaDelikeCevir(mc, en);
+            DogalAfetler.LOGGER.info(ON + "kara delik kadrajı: {}. kara delik, yaw {}, pitch {} (takip)", en,
+                    String.format(Locale.ROOT, "%.1f", aci[0]), String.format(Locale.ROOT, "%.1f", aci[1]));
         });
+    }
+
+    /** İstemci oyuncusunu (kamera) {@code i}. kara deliğe çevirir; ara kare yumuşatması olmasın diye önceki açı da. */
+    private static float[] karaDelikeCevir(Minecraft mc, int i) {
+        org.joml.Vector3f y = IstemciGokyuzu.karaDelikYonu(i, mc.level, 1f);
+        float yaw = (float) Math.toDegrees(Math.atan2(-y.x, y.z));
+        float pitch = (float) -Math.toDegrees(Math.asin(Math.max(-1f, Math.min(1f, y.y))));
+        mc.player.setYRot(yaw);
+        mc.player.setXRot(pitch);
+        mc.player.yRotO = yaw;
+        mc.player.xRotO = pitch;
+        return new float[] {yaw, pitch};
     }
 
     private static void sonraki() {
