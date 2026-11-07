@@ -8,6 +8,8 @@
 (d) Bekçi: sahibin etkin penceresi kaydedilir; 5 sn'de bir `hyprctl activewindow -j`; etkin pencere bizim pid'imizse ALARM:
     süreç öldürülür, odak kaydedilen pencereye verilir, koşu geçersiz.
 (e) Oyun içi girdi günlüğü (`client.su.SuOtomasyon`): `SU-OTOMASYON GIRDI` satırları sayılır; sıfırdan farklıysa geçersiz.
+(f) A-34 kare kapısı ortak `client.core.GorselOtomasyon`'da: `KARE-KAPISI su ... kapi=GECERSIZ` satırı varsa koşu geçersiz;
+    `OLCUM su` satırları `olcum_tablosu.py` ile `<kanıt>/olcum.tsv`'ye (K-E29 (b)).
 (i) Ağır süreç kapısı ve aynı anda tek runClient.
 
 Kullanım (worktree kökünden): python3 tools/senaryo/su_istemci.py <kanıt klasörü> [bölüm]
@@ -24,6 +26,7 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import olcum_tablosu  # noqa: E402
 import runclient_kilit  # noqa: E402
 
 KOK = Path(__file__).resolve().parents[2]
@@ -214,13 +217,19 @@ def main():
         time.sleep(2)
     metin = oyun_log.read_text(encoding="utf-8", errors="replace")
     girdi = len(re.findall(r"SU-OTOMASYON GIRDI", metin))
-    kapi_uyari = len(re.findall(r"SU-OTOMASYON KAPI \S+ UYARI", metin))
+    kapi_uyari = len(re.findall(r"KARE-KAPISI su \S+ kapi=GECERSIZ", metin))
     bitti = re.search(r"SU-OTOMASYON BITTI girdi tus=(\d+) fare=(\d+) teker=(\d+)", metin)
     cikis = re.search(r"cikis=(\d+)", metin)
     log(f"bitti: yoklama={yoklama} ALARM={alarm} girdi_satiri={girdi} kapi_uyari={kapi_uyari} "
         f"otomasyon_ozeti={bitti.groups() if bitti else None} gradle_{cikis.group(0) if cikis else 'cikis=?'}")
-    for satir in re.findall(r".*(?:SU-OTOMASYON (?:FPS|FOTO|OYUNCU|KAPI)|SU-TANI |Sanal su: kurulum).*", metin):
-        log("  " + re.split(r"SU-OTOMASYON |DogalAfetler/\]: ", satir, maxsplit=1)[-1])
+    for satir in re.findall(r".*(?:SU-OTOMASYON (?:FPS|FOTO|OYUNCU)|OLCUM su |KARE-KAPISI su |SU-TANI |Sanal su: kurulum).*",
+                            metin):
+        log("  " + re.split(r"SU-OTOMASYON |DogalAfetler/\]: |\]: ", satir, maxsplit=1)[-1])
+    satirlar, ozet = olcum_tablosu.tablo([oyun_log])
+    (kanit / "olcum.tsv").write_text("\n".join(satirlar) + "\n", encoding="utf-8")
+    log(f"OLCUM tablosu: {len(satirlar) - 1} satır → olcum.tsv")
+    for o in ozet:
+        log("  " + o)
     for png in (RUN / "screenshots").glob("sanal-su-*.png"):
         if png.stat().st_mtime > duvar_baslangic:
             shutil.copy2(png, kanit / png.name)

@@ -1196,7 +1196,9 @@ Bitince cep silinir; cep kutusu (+2 blok) başlangıç ve bitiş hash'i log'a ya
 
 **SU-17 Render kalite bağları (N13).** Dalgacık bileşeni Düşük 1 / Orta 2 / Yüksek 3 / Ultra 4; eğim köpüğü Düşük'te kapalı;
 uzak LOD mesafesi `min(görüş, Düşük 8 / Orta 12 / üst kalite sınırsız, su.lodMesafeChunk)`; kıyı şeridinde (derinlik
-< 0,8) 2 sn periyotla "yalayan" köpük bandı; derinliğe göre alfa (sığda 0,25, derinde 0,85).
+< 0,8) 2 sn periyotla "yalayan" köpük bandı; derinliğe göre alfa (sığda 0,25, derinde 0,85). **Faz 5 (SU-42, inceleme-su-gorsel
+P2-2):** mağara parıltısı Düşük'te kapalı, tavan yansıması ışını Düşük'te 12 blok (üst kademelerde 24); tsunami köpüğü Düşük'te
+yalnız tepe şeridi (SU-43).
 
 **SU-18 Paket kodlaması (SU-10 B9 kısmen).** Mağara sütun aralıkları varint + zigzag delta (sütunlar sıralı, x/z farkı;
 y'ler önceki y'ye göre). Cep kimlikli artımlı paket ve yakın oyuncu süzgeci yapılmadı: arkadaş ölçeğinde (≤ 10 oyuncu, birkaç
@@ -1263,7 +1265,8 @@ hendekte, her koşul gerçekleştiği ilk tick'te kilitlenir. Üç ardışık Ga
 **SU-28 Şader'siz su görünümü (görsel değerlendirme 2b: beş kare sönüktü).** Köşe başına gölgeleme: dağınık ışık
 (normal · güneş), Fresnel (Schlick) ile ufuk/gök rengi yansıması ve alfa artışı, güneş parıltısı; çok oktavlı yüzey eğimi
 (köşe ızgarası). Kendi köpük dokumuz `textures/block/su_kopuk.png` (16 kare, döşenebilir; üretim
-`tools/assets/su_kopuk.py`, N19): kıyı şeridi, dalga tepesi bandı ve kırılan dudak (LOD'da da tepe köpüğü). Dalga tepesi
+`tools/assets/su_kopuk.py`, N19): kıyı şeridi, dalga tepesi bandı ve kırılan dudak (LOD'da da tepe köpüğü; Faz 5: tsunami
+köpüğünün üç şeridi de bu dokuyu blok atlasından kullanır, SU-43; doku değişmedi). Dalga tepesi
 boyunca serpinti ve sıçrama parçacıkları (kalite çarpanlı), çekilen suyun ardında ıslak dip. Su altı: yüzeyden inen ışık
 demetleri, sis rengi biyom su sisi %30 + su rengi %70, kamera noktasının ışığıyla ölçekli (gündüz sığ su okunur, gece/mağara
 karanlık), sis uzaklığı 56 blok. Mağara suyu: dalgacığın %55'i yükseklikte, tavan ışığı parlaması, duvara değen kenarda ince
@@ -1304,7 +1307,8 @@ parlama, başka bloka vuran o noktanın blok ışığıyla amber; Fresnel ile ya
 bir kez. Mağara dalgacığı %55 → %90 yükseklik, eğim ×1,8. Işık demetleri enine üç bant (dış köşeler alfa 0), aşağı %60
 genişler, genişlik yavaşça dalgalanır; gökyüzü ışığı düşükse renk sıcak; sayı Orta 10 / Yüksek 18 / Ultra 26. Su altı sisi
 gök görmeyen ama blok ışığı alan suda amber tona kayar. `ciz` sonunda harmanlama kapatılır; seviye değişiminde eski tamponlar
-çizilmez.
+çizilmez. **Rev. (SU-42, Faz 5):** ışın artık yarım blok adımla değil ızgarada hücre hücre (`IsinIzi`, Amanatides–Woo) 24 blok;
+Düşük'te 12 (inceleme-su-gorsel P2-2, P2-6).
 
 **SU-36 Dalga tabanı önce canlı zeminden (doğrulama-2 madde 4).** Kök neden: dalga aralığının tabanı deniz alanının okuduğu
 zemindendi ve alan zemini **bayat** olabilir (kodla değişen blok olay atmaz, tazeleme periyodik). Doğrulayıcının düşen koşusunda
@@ -3480,6 +3484,15 @@ Cold Sweat varken atlamak (`-Puyum=coldsweat` koşusunda kendi sistemimizin 12 t
 `@BeforeBatch`/`@AfterBatch` (12 test dört sınıf, dokuz batch; unutulan biri sonraki batch'e sızar). **Ek:** `kapiKapaliykenYalnizAclik` artık "hiç efekt yok" değil "modumuzun efekti yok" der: Cold Sweat yüklüyken yeni
 oyuncuya kendi Grace efektini verir (`EntityTempManager`, `Grace Period Enabled = true`); testin ölçtüğü şey kendi efektimizdir.
 
+**K-E42 Üretimde ölçüm/tanı kodu yok (şef kararı, 2026-11-07; inceleme-su-gorsel P2-3 ve doğrulayıcı-2, P1 düzeyinde temizlik).**
+`GorselOtomasyon.AKTIF` (`-Potomasyon=<ad>` → `dogalafetler.otomasyon` dolu) açık değilken: `SuKareTanisi` oyun veri yoluna hiç
+kaydedilmez (mod veri yolundaki `Kayit` yalnız bayrakla `EVENT_BUS.register` çağırır; F2'de `SU-TANI` yok, kare/tick sayacı yok);
+`TsunamiKopugu` her karede `getCurrentThreadCpuTime` çağırmaz ve 10 sn'lik `Tsunami köpüğü:` satırını yazmaz; `SuRenderer.kurulumIlerlet`
+CPU okumaz (10 sn'lik `Sanal su: kurulum` satırında `tick_cpu_en_cok=-`; duvar saati alanları ve satırın kendisi Faz 2b'den beri
+var). Sıcak yolda kapı kapalıyken sistem çağrısı ve allocation yok. Kanıt çalışma zamanı değil kaynak: üç dosyada kapı satırları,
+derleme/JUnit; dedicated `su_sunucu.py` log'unda `SU-TANI`/köpük satırı 0 (istemci sınıfları sunucuda yüklenmez). Bayraksız
+runClient bu turda koşmadı.
+
 ## Faz 5 — Görsel otomasyon
 
 Parça `5-gorsel-otomasyon`, dal `is/gorsel-otomasyon` `08246dd`, `main`'e birleştirme `cc7e3b2`. Rapor
@@ -3601,6 +3614,125 @@ olduğu için Faz 4 karelerinin hiçbirinde kayan yıldız yoktu (KARARLAR "Ay �
 üretim yolunu değiştirmez. Otomasyon (yalnız `-Potomasyon=ay_carpmasi`) `14_halka_aysiz_gece` isteğinden 8 tick önce çağırır
 (alfa `sin(πt)`, en parlak an 10. tick; kapı akıcıyken 2 kare < 3 tick); kare satırı `kayan yıldız <n>` yazar, 0 ise kapı yıldızın
 ömrünü aşmıştır (5-matris #6 satırdan okur). Reddedilen: otomasyonda yansımayla `KAYANLAR`'a yazmak (özel kayıt türü, kırılgan).
+
+## Faz 5 — Sanal su görseli
+
+Parça `5-su-gorsel` (K-E38), dal `is/su-gorsel` `b1eb45c`, `main`'e birleştirme `af87dd1`. Rapor `.vibe/rapor/su-gorsel.md`,
+inceleme `.vibe/rapor/inceleme-su-gorsel.md` (P0/P1 = 0, P2 = 6), patch `.vibe/diff/su-gorsel.patch`. Sözleşmeler (`SU-TANI`, `olcumOzeti`
+alanları) `.vibe/kararlar/su-gorsel.md` §A. Sunucu mantığı (`su/`, `afet/tsunami`) değişmedi.
+
+**SU-41 Kurulum zaman dilimleri: tek tick'in aşımı bir birim (SU-38 devamı).** Kök neden: Faz 4 ölçümlerinde
+`yakin_tick_en_cok` S5 kabul sahnelerinde 4,73 / 4,85 / 3,20 / 11,69 ms (`tsunami/gorsel-16`), S5 yaklaşmada 22,46 ms, 10 sn'lik
+log'da 65,43 ms (`tsunami/gorsel`). Parçalar sabit iş miktarıydı (yakın halkada 16 sütun, uzak LOD'da bir `gx` sütununun
+tümü, Yüksek'te ~97 karo); bütçe parça bittikten sonra denetleniyordu ve ölçüm duvar saatiydi (GC duraklaması ve
+başka Gradle'ın CPU'su da parçaya yazılıyordu). Karar: sıradaki iş en çok 0,25 ms (ve kalan bütçe) çalışır, ilk birim
+sınırında durur (yakında 4 sütun, uzakta 8 karo; satır, aşama ve LOD sütunu sınırlarını geçer), iki iş bekliyorsa dilimler
+`KurulumButcesi.siradaki` ile sırayla; tek bölünmeyen iş tampon yüklemesi (büyüme anında 10–12 ms: sürücü deposu yeniden ayrılıyor, inceleme-su-gorsel P2-1;
+birleştirmede kapasite payıyla seyrekleşti, aşağıda). Ölçüm: tick başına render thread CPU
+(`ThreadMXBean`), en uzun dilim, en uzun yükleme ve bütçeyi 0,5 ms'den fazla aşan tick sayısı (duvar / CPU). Sonuç (ölçüm
+pencereleri, `tsunami-son` `6828ff1`, `tsunami-kopuk` `abf106b`, `su-istemci-son` `6828ff1`): render thread CPU tick başına en çok
+1,85–2,76 ms (bütçe 2,0 + bir birim); istisna tek tampon yüklemesinin baskın olduğu tick'ler (S5 kabul sahnesi 1: CPU 7,63 / 10,86
+ms, yükleme 12,02 / 10,65 ms; tampon büyümesi, P2-1). CPU'da bütçeyi aşan tick 0–1 / 19–100. **Duvar saati `yakin_tick_en_cok` hedefe
+inmedi:** 3,37–19,02 ms (önce `gorsel-16` kabul 3,20 / 4,85 / 4,73 / 11,69, `gorsel` S5 yaklaşma 22,46); fark CPU dışı zaman: tek
+dilimin duvar saati 18,25 ms iken o tick'in CPU'sı 1,85 ms (GC duraklaması ve önalım; ölçümlerde yük ortalaması 8 çekirdekte
+7–18, başka işçilerin GameTest/`runServer`/`runClient`'ı). Duvar saatinde bütçeyi aşan tick 2–21 / 19–100. Kabul ölçüsü
+SU-45.
+
+**SU-42 Mağara görseli: izleyici kamera, ızgara ışını yansıması, karanlık tavan + toplamalı parıltı, serin taban, güçlü sıcak sis
+(SU-40 devamı).** Faz 4
+ölçümü: `tsunami-magara` su pikseli %2,2 amber %0, `tsunami-magara-sualti` sıcak ton %0. Görüntü alan modelle yeniden
+puan (aynı ölçü, kare başına üç örnek): eski tsunami dolu 3 (tek örnek), su altı 2/2/2; eski `kosu14` dolu 2/2, su altı 2.
+Kök nedenler (`SU-TANI` satırı ve kod): (1) tsunami mağara sahnesi oyuncu kipini ayarlamıyordu; `test` dünyasının kayıtlı
+kipi hayatta kalma (level.dat `GameType` 0), tek başına `magara` bölümünde oyuncu çakıla düşer, gözü (12,6) yüzeyin (13,0)
+altında kalır ve `yansimaGucu` 0 döner (SU-40'ın kendi kök nedeni); `hepsi` koşusunda kamera önceki vitrinin izleyici
+kipiyle üstteydi. (2) Su altı sisinin sıcak payı en çok 0,5 ve hedef mavi biyom suyu üstüne karışıyordu: sonuç mavi-gri
+(eski su altı karesi ortalama (58, 59, 71)). (3) Tavan yansıması: yarım blok adımlı ışın 12 blokta duruyordu (2,7 blok
+yükseklikten bakışta uzak yüzeyin yansıması tavana ulaşmıyordu), kaynak vuruşu Fresnel × yayım (dik bakışta 0,3), amber
+karışımı ≤ 0,9 · g mavi tabanı örtmüyordu, duvar vuruşu ((ışık − 9) / 6)² ≈ 0. (4) Mağara kipinin sabit genel yansıması
+(koyu gri → sıcak, %33–45) yatık bakışta Fresnel'le yüzeyi ışıklı taş zeminin sıcak gri tonuna getiriyordu: geçen ve kalan
+karelerde su gelince yalnız piksellerin %7–12'si değişiyor, su pikseli zeminden aydınlık ve gri ((55, 53, 38) → (84, 85, 81)),
+parlak piksel %0; normal karışımda yansıma lekesi doku × ışık haritasıyla çarpıldığı için zeminden parlak olamıyordu.
+Karar: (a) tsunami mağara kurulumunda `gamemode spectator`; (b) yansıma ışını ızgarada hücre hücre (`IsinIzi`,
+Amanatides–Woo) 24 blok; (c) kaynak vuruşu (0,55 + 0,45 F) · yayım / 15 (parlak kaynak dik bakışta da seçilir),
+aydınlatılmış duvar/tavan F · ışık · 0,45, renk `SICAK_ISIK_RENGI`'ne en çok 0,92; (d) gökyüzü görmeyen mağarada genel
+yansıma karanlık tavan (`0x0A1216` → `0x5C4630`, 0,3 · blok ışığı), sıcak tonu ışın izi verir; (e) köşe yansıması ≥ 0,15
+olan hücreye köpük dokulu sıcak dörtgen, yakın halkayla aynı yapımda ayrı tamponda (`BB_PARILTI`) kurulur ve toplamalı
+karışımla çizilir (alfa (g − 0,05) · 1,2, tam ışık): ışıltaşı yamaları suda parlar; (f) gökyüzü görmeyen mağara suyunda biyom
+rengi %50 serin turkuaza (`0x2A6468`), alfa en az 0,72: su zeminden ayrı bir katman; (g) sıcak pay min(1, blok/15 · 1,3) ·
+(1 − gök/15) · 0,85, uzak düzlem max(24, 56 − 64 · pay); (h) su altı ışık demeti kendi sütununun yüzeyinden iner, o
+sütunun derinliğinden uzun olmaz, su olmayan sütunda yok. Ara koşular: `tsunami-magara-1..3` (koyu taban %45 "karanlık";
+duvar yansıması 0,75 iken "su seçilmiyor"; koşu 3 dolu 4/3/3 ama su altı 3/1/2), `su-istemci-1` ve `su-magara-2` (sanal su
+odasında dolu 2/1/1 ve 1/1/3, "gri, su seçilmiyor": kök neden (4)), `su-magara-3` ((d)–(f) ile dolu 4/4/3, su altı 3/3/3,
+sıcak su pikseli %34,3, parlak sıcak %12,9). Sonuç (son kod `6828ff1`; mağara yolu sonradan değişmedi): `tsunami-son`
+`tsunami-magara` **4/4/4**, `tsunami-magara-sualti` **4/4/4** (sıcak su %43,4, parlak sıcak %16,0, su altı sıcak %28,2; önce
+%3,0 / %0,3 / %0,0); `su-istemci-son` `sanal-su-magara` **3/3/3**, `sanal-su-magara-sualti` **3/4/4** (%24,1 / %4,8 / %28,0; önce
+`kosu14` %0 / %0 / %0,1). Kamera: dolu karede yüzeyin 2,62 üstü, su altında 0,38 altı (`SU-TANI`), su altı sıcak pay 0,74, sis
+24 blok. Diğer su kareleri gerilemedi (deniz vitrini 4/3, dalga 3/3, su altı 3/3, kuruyor 2/3; `kosu14` 3/3, 3/3, 2/3, 3/3).
+
+**SU-43 Tsunami köpüğü dokulu (Ts2-1).** İnceleme: tepe şeridi `POSITION_COLOR`, alfa şerit boyunca sabit, "düz sentetik
+bant"; görüntü alan model `tsunami/gorsel-2/tsunami-s5-carpma` karesinde "düz bant", 2/4. İlk adım (`6828ff1`, yalnız tepe
+şeridi dokulu, ön kenar 0,57–0,95, arka kenar 4,5 ± 0,6) `tsunami-son` S5 vitrin karesinde yine "düz bant" 2/2/1: dalga önden
+görülüyor, beyazın çoğunu dokusuz ön yüz çizgileri ve bore veriyordu, bant boyunca beyaz payı 20 piksellik dilimlerde %5–8
+(tekdüze). Karar (`abf106b`): üç şerit de tek `POSITION_TEX_COLOR` tamponda `su_kopuk` dokusuyla (blok atlası, animasyonlu;
+renkli tampon kalktı); doku yanal 2 blokta bir döşenir (1 blokluk segment karonun tek/çift yarısı, uzun segment tamamı;
+uzakta mipmap'le düz banda dönmesin); tepe iki katman (ikincisi aynalı, %80 alfa), ön kenar alfası 0,35–1, orta çizgi 0,5–1,
+arka kenar 3,5–5,5 blok; ön yüz çizgisi alfası min(1, 1,3 · desen) · (0,5–1), bore alfası 1 / 0,55 / 0,9 (doku alfası örtüyü
+belirler); parlaklık 0,8–1 · gün ışığı. Hepsi aynı yanal gürültüden (üç sürüklenen sinüs, 7,6 / 2,7 / 1,2 blok; ayrı fazlar),
+komşu segmentler aynı `u`'da aynı değeri alır (dikiş yok). Düşük'te yalnız tepe şeridi (N13). Sonuç (`tsunami-kopuk`,
+`abf106b`; görüntü alan model, üç örnek): 2× büyütülmüş kırpıntıda (S5 vitrin ve çarpma) "dokulu" **3/3/3** (önce "düz bant"
+2/2/2); tam karede (vitrin) hâlâ "düz bant" **2/2/2**. Neden: S5 çarpma/karada karelerinde kamera dalganın içinde (yüzeyin
+9–11 blok altı, Ts7), vitrinde tepe şeridi kadrajda ~10 piksel kalınlığında ve doku deseni bu genişlikte seçilmiyor; bant
+boyunca beyaz payının değişkenlik katsayısı 0,45 (önce 20 piksellik dilimlerde %5–8, tekdüze). Maliyet: köpük aşaması
+(`AFTER_TRIPWIRE_BLOCKS`) render thread CPU 0,31–0,65 → 1,42–1,82 ms/kare (`gorsel-16` → `tsunami-son`, ilk adım `6828ff1`);
+yükün en yakın olduğu S5 sahne 4'te +1,1 ms, yani ≈ +1 ms/kare (ölçümler kirli, rapor FPS bölümü). Açık: Ts7 kamerası
+`5-gorsel-otomasyon`'da çözüldü (`main` `cc7e3b2`); birleşince tam kare yeniden puanlanır. **Birleştirme:** köpüğün kendi CPU ölçümü ve 10 sn satırı (`Tsunami köpüğü:`) yalnız `-Potomasyon` ile (K-E42); kabul kanıtı değil,
+`5-matris` #10 (`olcum_tablosu.py`) ölçer. Ts2-1 tam kare kabul karesi `tsunami_gorsel.py kopuk` bölümü (şef kararı; Ts7 kameralarına
+dokunmaz): ayrı S5 koşusunda kamera kıyıdan 2 blok içeride, göz dalga tepesinde, cephe 11 bloka yaklaşınca
+`tsunami-s5-kopuk-yakin` (Yüksek) ve `-yakin-dusuk` (Düşük) kareleri; `5-matris` #6 koşar, SU-43 sonucu o kareyle yazılır.
+
+**SU-44 Görsel koşu otomasyonu ve kare tanısı.** `SuOtomasyon` kareleri A-34 kapısından sonra alır (FPS ≥ 15 ve istekten
+sonra ≥ 2 yeni çizilmiş kare, iç imleç köşede, en çok 60 sn; açılmazsa `KAPI … UYARI` ve `su_istemci.py` koşuyu geçersiz
+sayar); FPS satırı K-E29 (b) alanlarıyla (§A). `SuKareTanisi` her karede `SU-TANI` satırı yazar: tsunami kareleri
+`TsunamiOtomasyonu`'nun kapısız `Screenshot.grab`'ıyla alınır; A-34 koşulu bu satırdan sonradan denetlenir (`fps`,
+`son_20_tick_kare`). `tsunami_gorsel.py` `DOGALAFETLER_WS` ile workspace 91'de koştu. Sonuç: `su_istemci.py` iki tam koşu ve
+üç mağara koşusunda `KAPI … açık` (UYARI 0); tsunami mağara kareleri `fps` 338–339, `son_20_tick_kare` 343–357; köpük vitrin
+karesi 94 / 81. S5 çarpma/karada karelerinde kamera dalganın içinde (yüzeyin 9–11 blok altı): Ts7 kamera konusu
+(`5-gorsel-otomasyon`). **Birleştirme düzeltmesi (`af87dd1` sonrası, K-E42):** `SuOtomasyon` kendi kapısı ve FPS satırı yerine ortak `GorselOtomasyon`'ı kullanır
+(`OLCUM su` satırı, `-afet` sahnesinin tabanı aynı adın `-afetsiz`'i; `KARE-KAPISI su`; `cizimAyari`); `SU-OTOMASYON FPS` satırı yalnız
+`fps_ortanca`, `mc_fps` ve `su=` özetini taşır. `su_istemci.py` koşuyu `KARE-KAPISI su … kapi=GECERSIZ` ile geçersiz sayar ve
+`<kanıt>/olcum.tsv` yazar. `SuKareTanisi` yalnız `-Potomasyon` ile oyun veri yoluna kaydedilir (üretimde F2 `SU-TANI` yazmaz).
+
+**SU-45 SU-38 ölçüsü: render thread CPU ≤ 2 ms + borç.** → Şef kararları (Faz 5).
+
+### Birleştirme düzeltmeleri (inceleme-su-gorsel P2-1…P2-6, şef kararları)
+
+- **P2-1 tampon büyümesi:** `VertexBuffer.upload` her yüklemede tam boyla `glBufferData` çağırır (bytecode: `RenderSystem.glBufferData`);
+  büyüyen depo sürücüde yeniden ayrılır. `SuRenderer.yukle` kurucuyu dörtgen kapasitesine kadar sıfır, saydam (rasterleşmeyen)
+  dörtgenlerle doldurur; boy kapasite aşılana dek sabit, aşılınca %25 payla büyür (şef: kapasite payı, çift tampon değil). Sıralı
+  indeks tamponu (`AutoStorageIndexBuffer`) zaten 2× büyür. `olcumOzeti` sonuna `tampon_buyume=<n>`; etkisi `5-matris` #10.
+- **P2-2:** mağara parıltısı yalnız `bilesen > 1`; Düşük'te tavan yansıması ışını 12 blok (SU-17, SU-35 notları).
+- **P2-3:** şef kararıyla P1 düzeyinde (K-E42).
+- **P2-4:** Ts2-1 yakın/alçak köpük karesi `tsunami_gorsel.py kopuk` (SU-43 notu); `5-matris` #6.
+- **P2-5 (köpük paylaşılan kenar çift hesabı):** isteğe bağlı; yapılmadı, maliyet `5-matris` #10 ölçümünden sonra.
+- **P2-6:** SU-35 ve SU-17 revizyon notları, SU-41 "bölünemez" ifadesi düzeltildi, SU-45 şef kararlarında.
+- `tools/senaryo/tsunami_gorsel.py` tek çakışma: özet deseni iki tarafın birleşimi (`KAMERA`, `OLCUM tsunami`, `KARE-KAPISI tsunami` +
+  `SU-TANI`, `Sanal su: kurulum`, `Tsunami köpüğü:`; sonradan `DALGA`). `TsunamiOtomasyonu.kalite` de config dosyasına yazmadan
+  `IstemciAyarlari.otomasyonKalitesi` ile (K-E28 deseni; `q:-` kullanıcı değeri).
+
+### Reddedilen yollar
+
+- **Kurulum bütçesini kodda CPU zamanına bağlamak:** kare süresi duvar saatidir; GC duraklaması ve önalım karede de vardır.
+  Bütçe denetimi duvar saatiyle kalır; CPU kabul ölçüsüdür (SU-45), modun kendi işini dış etkenlerden ayırır.
+- **`KurulumButcesi`'ni değiştirmek:** `su/` sunucu ortak paketi; dilimleme istemci tarafında yeterli, sınıfın sözleşmesi ve
+  JUnit'i aynı kaldı.
+- **Mağara suyunu şader ya da ekran-uzay yansımasıyla çizmek:** SU-35 şader'siz kuralı.
+- **Mağara suyunu düz amber boyamak:** yüzey su olarak okunmaz; sıcak ton yansımadan (kaynak ve aydınlatılmış duvar) gelir.
+- **Kamerayı taşımak:** SU-40'ın y 14 kamerası (yüzeyin 2,6 blok üstü) korundu; eksik olan izleyici kipiydi.
+- **Yansıma lekesini normal karışımla parlatmak (köşe rengi/alfası artırılarak):** köşe rengi en çok 1, doku ve ışık
+  haritasıyla çarpılıyor; leke aydınlatılmış zeminin üstüne çıkmıyordu. Parıltı ayrı tamponda toplamalı (SU-42 (e)).
+- **Parlak duvar yansıması (F · ışık · 0,75):** `tsunami-magara-2`'de yüzey zemin gibi sıcaklaşıp "su seçilmiyor" dendi; 0,45.
+- **Büyüyen tampon için çift tampon ya da parçalı `glBufferSubData` (P2-1):** şef kararıyla kapasite payı; SU-45 tetikleyicisi
+  tutmazsa yeniden.
 
 ## Şef kararları (Faz 0–1)
 
@@ -4625,6 +4757,21 @@ ipucu (`BasarimOlaylari.java:241`) için yapar. Vanilla'da oyuncu hareketi istem
 tarafında" ifadesinin kabul edilen yorumu budur: sunucu otoriter dalga, istemcide deterministik uygulama (K0-25, SU-03).
 IZLEME B.3 yeşil.
 
+**SU-45 SU-38 ölçüsü: render thread CPU ≤ 2 ms + borç (şef kararı).** TS-16 rev. 3 ile aynı mantık: kurulum bütçesinin
+kabul ölçüsü tick başına render thread CPU (`kurulum_tick_cpu_en_cok`) ≤ 2,0 ms + borç. Borç `KurulumButcesi.tickBasla`'nın
+sonraki tick'e taşıdığı aşımdır (max(0, harcanan − bütçe), sonraki tick'in bütçesinden düşülür); SU-41 dilimlemesiyle bir
+tick'in aşımı en çok bir birim: son dilim (0,25 ms + ilk birim sınırı) ya da tek tampon yüklemesi. Sonuç: tutuyor. Ölçüm
+pencerelerinin en yükseği 2,76 ms (`tsunami-kopuk` S5 kabul 3) = 2,0 + 0,76 ms aşım; aynı pencerenin en uzun yüklemesi
+2,08 ms, yani aşım bir birimden küçük ve borç içinde (pencere en büyükleri; aynı tick olduğu satırdan okunmaz). Öteki
+pencereler 1,85–2,65 ms (aşım ≤ 0,65 ms, en uzun yükleme 0,09–1,62 ms). CPU'da bütçeyi 0,5 ms'den fazla aşan tick pencere
+başına 0–1; bütçeyi birden çok kat aşan tek durum tampon yüklemesinin baskın olduğu tick (S5 kabul 1: CPU 10,86 / 7,63 ms,
+yükleme 10,65 / 12,02 ms). Duvar saati `yakin_tick_en_cok` (3,37–19,02 ms: GC duraklaması, önalım ve bölünemeyen yükleme
+7,6–10,9 ms) gizli workspace'te yüklü makinede ölçülemeyen kısım; **Faz 5 görünür koşusunun tetikleyicisi**: orada da
+≤ 2 ms + borç tutmazsa tampon yüklemesi dilimlenir (yeni tampon ayrılıp `glBufferSubData` ile tick başına bir dilim yüklenir,
+bu sırada eski tampon çizilir, son dilimde ikisi takas edilir). Kodda bütçe denetimi duvar saatiyle kalır (§D). SU-38
+kapandı. Protokol (şef kararı): mağara ve kurulum ölçüm koşuları `6828ff1`/`abf106b`'de alındı, `b1eb45c`'de yeniden koşulmadı;
+`client/su` o tarihten beri değişmediği için (`b1eb45c` yalnız köpüğün CPU ölçümü) ölçümler geçerlidir.
+
 ## Açık noktalar (Faz 2b)
 
 Entegratöre bırakılan notlardan işlenenler: kancalar (K-E1), protokol (K-C47), `asama ileri [süreç]` (K-C48), sanal su §3a istisnası
@@ -4639,7 +4786,8 @@ worktree kaldırıldı, beş spike kalır). Açık kalanlar:
 - **Faz 4 kuralı (sanal su §E):** kodla blok değiştiren her afet (tsunami, deprem, sinkhole, meteor) değişen chunk için
   `SanalSu.chunkDegisti(level, chunkPos)` çağırır; Faz 4 görev metinlerine girer.
 - **Görsel yeniden puanlama Faz 4'te:** mağara suyu ve mağara-sualtı kareleri (SU-40), uzak LOD kurulum tepesi ve FPS (SU-38),
-  buharlaşma göl yatağı karesi (K-D38). **Durum (Faz 5):** SU-38/SU-40 `5-su-gorsel` (K-E38); K-D38 `5-matris` #6.
+  buharlaşma göl yatağı karesi (K-D38). **Durum (Faz 5):** SU-40 kapandı (SU-42, `af87dd1`; mağara 4/4/4, su altı 4/4/4),
+  SU-38 kapandı (SU-45, şef kararı; duvar saati görünür koşu tetikleyicisi); K-D38 `5-matris` #6.
 - **Ölçümler:** FPS oranları Faz 4 başsız kalibrasyonu ve Faz 5 (K0-21 rev. 2 (j)); Cold Sweat çift hasar ölçümü Faz 5 (S-18);
   `-Puyum=coldsweat` ile sanal su mixin'lerinin refmap yolu runClient'ta sınanmadı (K-E2).
 - **GameTest dünyasında sızan gerçek su (donma/su ortak bulgusu; K-E6, inceleme E3):** birleşik `main`'de `su_alani`
@@ -4740,7 +4888,8 @@ listede; her madde "→" ile Faz 5 görevine eşlendi (`.vibe/gorev/5-entegrasyo
   **→ `5-entegrasyon §2`** **Kapandı** (`dd81d6a`; K-E32).
 - **Tsunami — görsel (Ts7, Ts2-1, SU-38/SU-40):** otomasyon kameraları çekilmeyi ve ufku seçmiyor, S1 dalgası zor görünüyor
   (`client/tsunami/TsunamiOtomasyonu.java:150-151`); köpük tepe şeridi dokusuz bant (`TsunamiKopugu.java:125-126, 151-158`); sanal su
-  mağara kareleri ve uzak LOD kurulum tepesi (şef kararı 6). **→ `5-entegrasyon §4 ve §6`, `5-matris #6`** **Durum:** Ts2-1 ve SU-38/SU-40 `5-su-gorsel`, Ts7 `5-gorsel-otomasyon` (K-E38, şef açar); kare `5-matris` #6.
+  mağara kareleri ve uzak LOD kurulum tepesi (şef kararı 6). **→ `5-entegrasyon §4 ve §6`, `5-matris #6`** **Durum:** Ts7 `main`'de (`cc7e3b2`, GO-08); SU-40 SU-42 ile, SU-38 SU-45 ile kapalı (`af87dd1`);
+  Ts2-1 dokulu köpük `main`'de (SU-43), tam kare kabul karesi `tsunami_gorsel.py kopuk` → `5-matris` #6.
 - **Tsunami — FPS (TS-16 rev. 3):** "Şef kararları (Faz 4) → Tsunami" Faz 5 tetikleyicisi (her S5 sahnesi Yüksek'te, iki tekrar,
   duvar saati ≥ 30 FPS; tutmazsa önce yağmur, sonra köpük bütçesi). **→ `5-matris #10`** **Durum:** `5-matris` #10, K-E29 (b).
 
@@ -4754,9 +4903,10 @@ P2-9 `5-matris` kabulünde. Açık kalanlar:
 - **F-18 testi varsayılan pakette koşulsuz geçer (P2-3):** `coldSweatYukluykenYiyecekCekirdegeGider` yalnız `-Puyum=coldsweat` ile
   sınar; TEST-RAPORU #3 "213 + 1 koşullu", Cold Sweat'le istemci mixin karesi `5-matris` #9.
 - **K-E33 (P2-6):** şef kabul, düzeltme yok (K-E33 notu).
-- **Görsel otomasyon §E (birleştirmeden):** `SuOtomasyon` (`is/su-gorsel`) henüz ortak `GorselOtomasyon.kareIste`'ye geçmedi → su-gorsel
-  birleşince entegratör çevirir; `TsunamiOtomasyonu.kamera()` su-gorsel'in değiştirdiği `magara()`'ya bitişik (birleştirmede yakın çakışma
-  beklenir). Kadrajlar ve 5-matris #6/#10 ölçümleri yeni HEAD'de (şef kararı matris raporundan sonra).
+- **Görsel otomasyon §E:** kapandı — `SuOtomasyon` ortak `GorselOtomasyon`'a çevrildi, `TsunamiOtomasyonu` kendiliğinden birleşti
+  (`af87dd1` ve sonrası, SU-44 notu). Kadrajlar ve `5-matris` #6/#10 ölçümleri yeni HEAD'de.
+- **Sanal su görseli (inceleme-su-gorsel):** P2-5 köpük paylaşılan kenar hesabı yapılmadı (isteğe bağlı); köpük CPU'su, tampon büyümesi
+  (`tampon_buyume`) ve SU-45 duvar saati `5-matris` #10; Ts2-1 tam kare ve yeni `SuOtomasyon` kareleri `5-matris` #6 (bu turda runClient yok).
 
 ## N17 — Sayısal varsayılanlar
 
@@ -5111,6 +5261,13 @@ P2-9 `5-matris` kabulünde. Açık kalanlar:
 | tsunami (CLIENT, kod) | yağmur damlası / sn | 400 / 900 / 1600 / 2600 | damla | tasarım notu §5 (N13) |
 | tsunami (ses) | `tsunami_ugultu` / `tsunami_carpma` | −26 / −23 LUFS, tepe ≤ −6 dBTP | — | uyarı-ses §A4 kural 1 (ortam) ve 2 (darbe) |
 | tsunami (kod) | uğultu katmanı | %35 → %100, menzil 96 + genişlik/2, fade 60 / 20 tick | — | TS-09 |
+| su (kod) | kurulum dilimi / birim (yakın, uzak) | 0,25 / 4 sütun, 8 LOD karosu | ms / — | iki iş sırayla; tick aşımı bir birim (SU-41) |
+| su (kod) | mağara tavan yansıması ışın erimi | 24 | blok | 2,7 blok yükseklikten 9 bloğa kadar yüzey tavana ulaşır (SU-42) |
+| su (kod) | su altı sıcak sis payı üst sınırı / uzak düzlem alt sınırı | 0,85 / 24 | — / blok | 0,5 mavi biyom suyunu mavi-griye çekiyordu; 24 SU-40'tan (SU-42) |
+| su (kod) | mağara parıltı eşiği / alfa | 0,15 / (g − 0,05) · 1,2 | köşe yansıma gücü | duvar vuruşu soluk, kaynak vuruşu parlak leke (SU-42) |
+| su (kod) | gökyüzüsüz mağara suyu tonu / en az alfa | `0x2A6468` %50 / 0,72 | — | su ışıklı taş zeminden ayrı katman (SU-42) |
+| su (kod) | tavan yansıması ışın erimi, Düşük | 12 | blok | N13: SU-35 değeri; parıltı da Düşük'te kapalı (inceleme-su-gorsel P2-2) |
+| su (kod) | yakın/uzak tampon kapasite payı | 1,25 | × dörtgen | büyüme anında 10–12 ms yükleme seyrekleşsin (P2-1, şef: çift tampon değil) |
 
 Config dışı sabitler (oynanış değeri değil, sınır/biçim): siren 200/1200 tick (şartname, K0-19); son afet geçmişi 5
 (madde 13a); tek çarpan ≤ 100, toplam ≤ 1000 (K-C22); hız 0,1–1000; TPS ölçüm aralığı 20 tick; dönem kaydı sınırları

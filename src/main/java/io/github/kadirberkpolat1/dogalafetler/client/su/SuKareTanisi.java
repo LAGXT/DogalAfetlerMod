@@ -1,6 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.client.su;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.client.core.GorselOtomasyon;
 import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciDonem;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSuDunyasi;
@@ -14,16 +15,19 @@ import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.ScreenshotEvent;
+import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 
 /**
- * Kare tanısı (SU-44): her ekran görüntüsünde (Forge {@link ScreenshotEvent}, otomasyondan bağımsız) kameranın sanal su
- * yüzeyine göre konumu, blok ve gök ışığı, su altı sisinin sıcak payı ve uzak düzlemi, son yapımın mağara tavan
- * yansıması ve kare kapısı bilgisi (FPS, son 20 tick'te çizilen kare; A-34) {@code SU-TANI} satırı olarak log'a yazılır.
+ * Kare tanısı (SU-44): yalnız görsel otomasyon açıkken ({@code -Potomasyon}, {@link GorselOtomasyon#AKTIF}) her ekran
+ * görüntüsünde (Forge {@link ScreenshotEvent}; hangi otomasyon alırsa alsın) kameranın sanal su yüzeyine göre konumu, blok
+ * ve gök ışığı, su altı sisinin sıcak payı ve uzak düzlemi, son yapımın mağara tavan yansıması ve kare kapısı bilgisi (FPS,
+ * son 20 tick'te çizilen kare; A-34) {@code SU-TANI} satırı olarak log'a yazılır. Sınıf oyun veri yoluna yalnız o zaman
+ * kaydedilir ({@link Kayit}); üretimde F2 satır yazmaz, kare ve tick sayacı çalışmaz.
  */
-@Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class SuKareTanisi {
     private static final int[] TICK_KARESI = new int[20];
     private static final SuAraliklari A = new SuAraliklari();
@@ -31,6 +35,20 @@ public final class SuKareTanisi {
     private static int buTick;
 
     private SuKareTanisi() {
+    }
+
+    /** İstemci kurulumunda tanıyı yalnız otomasyon açıkken oyun veri yoluna kaydeder (mod veri yolu). */
+    @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
+    public static final class Kayit {
+        private Kayit() {
+        }
+
+        @SubscribeEvent
+        public static void kurulum(FMLClientSetupEvent olay) {
+            if (GorselOtomasyon.AKTIF) {
+                MinecraftForge.EVENT_BUS.register(SuKareTanisi.class);
+            }
+        }
     }
 
     @SubscribeEvent

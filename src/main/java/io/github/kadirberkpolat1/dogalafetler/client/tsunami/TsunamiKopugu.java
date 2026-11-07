@@ -6,6 +6,7 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.client.core.GorselOtomasyon;
 import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciAfetDurumu;
 import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciDonem;
 import io.github.kadirberkpolat1.dogalafetler.config.EfektKalitesi;
@@ -54,7 +55,10 @@ public final class TsunamiKopugu {
     private static float kv0;
     private static float kv1;
     private static final ThreadMXBean IPLIK = ManagementFactory.getThreadMXBean();
-    /** 10 sn'lik ölçüm: köpüğün kendi render thread CPU'sı (köşe üretimi, tampon yükleme, çizim çağrısı), kare başına. */
+    /**
+     * 10 sn'lik ölçüm: köpüğün kendi render thread CPU'sı (köşe üretimi, tampon yükleme, çizim çağrısı), kare başına. Yalnız
+     * {@code -Potomasyon} ile ({@link GorselOtomasyon#AKTIF}); üretimde CPU okuması ve log satırı yok.
+     */
     private static long logCpuNs;
     private static long logEnCokNs;
     private static int logKare;
@@ -80,7 +84,7 @@ public final class TsunamiKopugu {
                 || IstemciAfetDurumu.aktif().filter(p -> p.tur() == AfetTuru.TSUNAMI).isEmpty()) {
             return;
         }
-        long cpu0 = IPLIK.getCurrentThreadCpuTime();
+        long cpu0 = GorselOtomasyon.AKTIF ? IPLIK.getCurrentThreadCpuTime() : 0;
         float pt = e.getPartialTick();
         double t = IstemciDonem.saat(pt);
         Vec3 kam = e.getCamera().getPosition();
@@ -114,11 +118,15 @@ public final class TsunamiKopugu {
         RenderSystem.depthMask(true);
         RenderSystem.enableCull();
         RenderSystem.disableBlend();
-        long g = IPLIK.getCurrentThreadCpuTime() - cpu0;
+        if (GorselOtomasyon.AKTIF) {
+            olcum(IPLIK.getCurrentThreadCpuTime() - cpu0, mc.level.getGameTime(), segment);
+        }
+    }
+
+    private static void olcum(long g, long tick, int segment) {
         logCpuNs += g;
         logEnCokNs = Math.max(logEnCokNs, g);
         logKare++;
-        long tick = mc.level.getGameTime();
         if (tick - logTick >= 200) {
             DogalAfetler.LOGGER.info("Tsunami köpüğü: kare_cpu_ort={} ms en_cok={} ms kare={} segment={}",
                     String.format(Locale.ROOT, "%.3f", logCpuNs / 1e6 / logKare), String.format(Locale.ROOT, "%.3f", logEnCokNs / 1e6),

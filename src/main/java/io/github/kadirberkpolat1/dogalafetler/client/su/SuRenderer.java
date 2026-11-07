@@ -8,6 +8,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexBuffer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.client.core.GorselOtomasyon;
 import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciDonem;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.su.Cekilme;
@@ -68,8 +69,9 @@ public final class SuRenderer {
     private static final int ISIK_RENGI = 0xBFE6FF;
     /** Gökyüzü görmeyen suda (mağara) demetler fener/ışıltaşı ışığının sıcak rengini alır. */
     private static final int SICAK_ISIK_RENGI = 0xFFC27A;
-    /** Tavan yansıması ışın erimi (blok; tavanı uzak yüzeyden de bulsun) ve yürüyücüsü (SU-42). */
+    /** Tavan yansıması ışın erimi (blok; tavanı uzak yüzeyden de bulsun) ve yürüyücüsü (SU-42); Düşük'te SU-35'in 12'si (N13). */
     private static final double YANSIMA_ERIM = 24;
+    private static final double YANSIMA_ERIM_DUSUK = 12;
     private static final IsinIzi IZ = new IsinIzi();
     /**
      * Gökyüzü görmeyen mağara suyunun taban tonu ve en az saydamsızlığı: serin turkuaz, belirgin bir katman; sıcak ışıklı
@@ -113,6 +115,9 @@ public final class SuRenderer {
     private static ClientLevel sonSeviye;
     private static VertexBuffer vbYakin;
     private static VertexBuffer vbUzak;
+    /** Tamponların dörtgen kapasitesi (yakın, uzak): yükleme hep bu boyda, aşılınca %25 payla büyür (P2-1). */
+    private static final int[] KAPASITE = new int[2];
+    private static final float KAPASITE_PAYI = 1.25f;
     private static boolean yakinBos = true;
     private static boolean uzakBos = true;
     private static VertexBuffer vbParilti;
@@ -235,11 +240,16 @@ public final class SuRenderer {
     private static long logTickToplam;
     private static long logUzak;
     private static long logUzakNs;
-    /** Tick'in render thread CPU süresi (GC duraklaması ve işletim sistemi beklemesi hariç), en uzun dilim, tampon yüklemesi. */
+    /**
+     * Tick'in render thread CPU süresi (GC duraklaması ve işletim sistemi beklemesi hariç; yalnız {@code -Potomasyon} ile
+     * ölçülür, {@link GorselOtomasyon#AKTIF}), en uzun dilim, tampon yüklemesi.
+     */
     private static long tickCpuNs;
     private static long olcEnCokTickCpuNs;
     private static long olcEnCokParcaNs;
     private static long olcEnCokYuklemeNs;
+    /** Tampon büyümesi (kapasite payı aşıldı, sürücü deposu yeniden ayrıldı) sayısı. */
+    private static int olcBuyume;
     private static long logEnCokTickCpuNs;
     private static long logEnCokParcaNs;
     private static long logEnCokYuklemeNs;
@@ -273,6 +283,7 @@ public final class SuRenderer {
         olcEnCokTickCpuNs = 0;
         olcEnCokParcaNs = 0;
         olcEnCokYuklemeNs = 0;
+        olcBuyume = 0;
         olcKurulumTick = 0;
         olcAsanDuvar = 0;
         olcAsanCpu = 0;
@@ -285,11 +296,12 @@ public final class SuRenderer {
                 "kare=%d su_cpu_kare_basina=%.2fms (yakin_kurulum_ort=%.2fms x%d, yakin_tick_en_cok=%.2fms yayilma=%.1f tick, "
                         + "uzak_kurulum_ort=%.2fms x%d, uzak_yayilma=%.1f tick, cizim_ort=%.3fms) dortgen yakin=%d uzak=%d "
                         + "kurulum_tick_cpu_en_cok=%.2fms dilim_en_cok=%.2fms yukleme_en_cok=%.2fms kurulum_tick=%d "
-                        + "butce_asan_tick_duvar=%d butce_asan_tick_cpu=%d",
+                        + "butce_asan_tick_duvar=%d butce_asan_tick_cpu=%d tampon_buyume=%d",
                 olcKare, (olcYakinNs + olcUzakNs + olcCizimNs) / kare / 1e6, olcYakinNs / Math.max(1.0, olcYakin) / 1e6,
                 olcYakin, olcEnCokTickNs / 1e6, olcTickToplam / Math.max(1.0, olcYakin), olcUzakNs / Math.max(1.0, olcUzak) / 1e6,
                 olcUzak, olcUzakTickToplam / Math.max(1.0, olcUzak), olcCizimNs / kare / 1e6, yakinDortgen, uzakDortgen,
-                olcEnCokTickCpuNs / 1e6, olcEnCokParcaNs / 1e6, olcEnCokYuklemeNs / 1e6, olcKurulumTick, olcAsanDuvar, olcAsanCpu);
+                olcEnCokTickCpuNs / 1e6, olcEnCokParcaNs / 1e6, olcEnCokYuklemeNs / 1e6, olcKurulumTick, olcAsanDuvar, olcAsanCpu,
+                olcBuyume);
     }
 
     /** Son biten yakın halka yapımında mağara tavan yansıması: güçlü / hesaplanan köşe ve ortalama güç (SU-44 tanı). */
@@ -685,7 +697,7 @@ public final class SuRenderer {
             tickCpuNs = 0;
         }
         long t0 = System.nanoTime();
-        long cpu0 = IPLIK.getCurrentThreadCpuTime();
+        long cpu0 = GorselOtomasyon.AKTIF ? IPLIK.getCurrentThreadCpuTime() : 0;
         long onceki = t0;
         while (BUTCE.calisabilir()) {
             int is = BUTCE.siradaki(yapAsama != 0, uzakYapiyor);
@@ -734,7 +746,9 @@ public final class SuRenderer {
             }
         }
         tickIsNs += System.nanoTime() - t0;
-        tickCpuNs += IPLIK.getCurrentThreadCpuTime() - cpu0;
+        if (GorselOtomasyon.AKTIF) {
+            tickCpuNs += IPLIK.getCurrentThreadCpuTime() - cpu0;
+        }
         olcEnCokTickNs = Math.max(olcEnCokTickNs, tickIsNs);
         logEnCokTickNs = Math.max(logEnCokTickNs, tickIsNs);
         olcEnCokTickCpuNs = Math.max(olcEnCokTickCpuNs, tickCpuNs);
@@ -860,7 +874,7 @@ public final class SuRenderer {
                         + "yükleme_en_cok={} (bütçe {}) yayılma={} tick yapım={} uzak_ort={} x{} uzak_yayılma={} tick",
                 String.format(Locale.ROOT, "%.2f", logYapimNs / Math.max(1.0, logYapim) / 1e6),
                 String.format(Locale.ROOT, "%.2f", logEnCokTickNs / 1e6),
-                String.format(Locale.ROOT, "%.2f", logEnCokTickCpuNs / 1e6),
+                GorselOtomasyon.AKTIF ? String.format(Locale.ROOT, "%.2f", logEnCokTickCpuNs / 1e6) : "-",
                 String.format(Locale.ROOT, "%.2f", logEnCokParcaNs / 1e6),
                 String.format(Locale.ROOT, "%.2f", logEnCokYuklemeNs / 1e6),
                 String.format(Locale.ROOT, "%.2f", SuAyarlari.istemci().yakinKurulumButcesiMs.get()),
@@ -1019,7 +1033,12 @@ public final class SuRenderer {
         return true;
     }
 
-    /** Kurucuyu ilgili tampona yükler; boşsa {@code false}. */
+    /**
+     * Kurucuyu ilgili tampona yükler; boşsa {@code false}. {@code VertexBuffer.upload} her yüklemede tam boyla
+     * {@code glBufferData} çağırır; depo büyüdüğünde sürücü yeniden ayırır (10–12 ms, inceleme-su-gorsel P2-1). Kurucu
+     * {@link #KAPASITE}'ye kadar alanı sıfır, saydam dörtgenlerle doldurulur: boy kapasite aşılana dek değişmez, aşılınca
+     * {@link #KAPASITE_PAYI} payıyla büyür (çift tampon değil, şef kararı). Boş dörtgen rasterleşmez.
+     */
     private static boolean yukle(BufferBuilder kurucu, boolean yakin) {
         if (dortgen == 0) {
             kurucu.end().release();
@@ -1027,12 +1046,23 @@ public final class SuRenderer {
         }
         long t0 = System.nanoTime();
         VertexBuffer vb = yakin ? vbYakin : vbUzak;
+        int k = yakin ? 0 : 1;
         if (vb == null) {
             vb = new VertexBuffer(VertexBuffer.Usage.DYNAMIC);
+            KAPASITE[k] = 0;
             if (yakin) {
                 vbYakin = vb;
             } else {
                 vbUzak = vb;
+            }
+        }
+        if (dortgen > KAPASITE[k]) {
+            KAPASITE[k] = (int) Math.ceil(dortgen * KAPASITE_PAYI);
+            olcBuyume++;
+        }
+        for (int i = dortgen; i < KAPASITE[k]; i++) {
+            for (int q = 0; q < 4; q++) {
+                kurucu.vertex(0, 0, 0).color(0, 0, 0, 0).uv(0, 0).uv2(0).normal(0, 1, 0).endVertex();
             }
         }
         vb.bind();
@@ -1190,7 +1220,9 @@ public final class SuRenderer {
             tavanYansimasi(l, 2, x + 1, y11, z + 1, v11);
             tavanYansimasi(l, 3, x + 1, y10, z, v10);
             dortgenSerbest(rx, y00, rz, rx, y01, rz + 1, rx + 1, y11, rz + 1, rx + 1, y10, rz, false, x, z);
-            parilti(rx, rz, y00, y01, y11, y10, v00, v01, v11, v10, x, z);
+            if (bilesen > 1) {
+                parilti(rx, rz, y00, y01, y11, y10, v00, v01, v11, v10, x, z);
+            }
             if (kopuk > 0.08f) {
                 for (int q = 0; q < 4; q++) {
                     QC[q] = 0xFFF4E0;
@@ -1264,7 +1296,7 @@ public final class SuRenderer {
 
     /**
      * Mağara suyunda tavan yansıması (SU-35, SU-42; şader'siz): köşeden kameraya bakış dalgacık normaline göre yansıtılır,
-     * ışın ızgarada hücre hücre ({@link IsinIzi}) en çok {@link #YANSIMA_ERIM} blok izlenir. Işık kaynağına (ışıltaşı, fener)
+     * ışın ızgarada hücre hücre ({@link IsinIzi}) en çok {@link #YANSIMA_ERIM} blok (Düşük'te {@link #YANSIMA_ERIM_DUSUK}) izlenir. Işık kaynağına (ışıltaşı, fener)
      * vuran ışın kaynağın sıcak rengini neredeyse tam alır (biyom mavisini örter), başka bloka vuran o noktanın blok ışığıyla
      * amber; Fresnel ile yatık bakışta güçlenir. Dalgacık ışını oynattığı için yansıma titrer. Köşe başına yapım başına bir
      * kez hesaplanır ({@link #YANSIMA}).
@@ -1312,7 +1344,7 @@ public final class SuRenderer {
             return 0;
         }
         double fresnel = 0.3 + 0.7 * Math.pow(1 - Math.max(0, d), 3);
-        IZ.baslat(px, py, pz, rx, ry, rz, YANSIMA_ERIM);
+        IZ.baslat(px, py, pz, rx, ry, rz, bilesen > 1 ? YANSIMA_ERIM : YANSIMA_ERIM_DUSUK);
         boolean ilk = true;
         int ox = 0;
         int oy = 0;
@@ -1388,6 +1420,7 @@ public final class SuRenderer {
      * Mağara yansımasının parıltısı (SU-42): köşe yansıması {@link #PARILTI_ESIK}'i geçen hücreye köpük dokusuyla sıcak
      * dörtgen, ayrı tamponda ({@link #BB_PARILTI}) toplamalı karışımla çizilir. Normal karışımda yansıma rengi doku ve ışık
      * haritasıyla çarpıldığı için leke aydınlatılmış taş zeminden parlak olamıyordu; ışık eklenince yamalar suda parlar.
+     * Düşük kademede yok (N13, SU-17).
      */
     private static void parilti(float rx, float rz, float y00, float y01, float y11, float y10, int v00, int v01, int v11,
             int v10, int x, int z) {

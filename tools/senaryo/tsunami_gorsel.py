@@ -14,7 +14,9 @@
     farklıysa geçersiz.
 (i) Ağır süreç kapısı ve aynı anda tek runClient.
 
-Kullanım (worktree kökünden): python3 tools/senaryo/tsunami_gorsel.py <kanıt klasörü> [bölüm: hepsi|s5|s1|magara|kabul|...]
+Kullanım (worktree kökünden): python3 tools/senaryo/tsunami_gorsel.py <kanıt klasörü> [bölüm: hepsi|s5|s1|kopuk|magara|kabul|...]
+`kopuk` (hepsi'de de): Ts2-1 kabul karesi, ayrı S5 koşusunda köpük yakından ve alçaktan (tepe göz hizasında, cepheye 8–12 blok;
+`tsunami-s5-kopuk-yakin.png` Yüksek, `-yakin-dusuk.png` Düşük; `KAMERA kopuk` ve `DALGA` satırları özette). Ts7 kameraları değişmez.
 Çıkış: 0 geçerli koşu, 1 protokol ihlali/iptal, 2 istemci hatası. FPS pencereleri varsa sonda `TABLO` satırları (Ts1 kabulü, tur 4).
 """
 import json
@@ -276,7 +278,7 @@ def main():
     cikis = re.search(r"cikis=(\d+)", metin)
     log(f"bitti: yoklama={yoklama} ALARM={alarm} girdi_satiri={girdi} kapanis_asili={'E' if asili else 'H'} "
         f"otomasyon_ozeti={bitti.groups() if bitti else None} gradle_{cikis.group(0) if cikis else 'cikis=?'}")
-    desen = (r".*(?:TSUNAMI-OTOMASYON (?:FPS|FOTO|KARE|KAMERA|KALITE|AVCI|AYAR|KAPANIS|PROFIL)|OLCUM tsunami |"
+    desen = (r".*(?:TSUNAMI-OTOMASYON (?:FPS|FOTO|KARE|KAMERA|DALGA|KALITE|AVCI|AYAR|KAPANIS|PROFIL)|OLCUM tsunami |"
              r"KARE-KAPISI tsunami |Tsunami: |\[CHAT\]|SU-TANI |Sanal su: kurulum|Tsunami köpüğü: |"
              r"has (?:made|reached|completed) the).*")
     for satir in re.findall(desen, metin):

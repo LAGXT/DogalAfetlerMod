@@ -46,7 +46,11 @@ public final class GorselOtomasyon {
     public static final int AKICI_FPS = 15;
     /** A-34 kapısının en uzun beklemesi (sn); aşılırsa kare geçersizdir. */
     public static final int KAPI_SN = 60;
-    private static final boolean AKTIF = !System.getProperty("dogalafetler.otomasyon", "").isEmpty();
+    /**
+     * Herhangi bir görsel otomasyon ({@code -Potomasyon=<ad>}) açık mı. Ölçüm ve tanı kodu (tanı satırları, render thread CPU
+     * okuması) bu kapının arkasındadır; üretimde çalışmaz.
+     */
+    public static final boolean AKTIF = !System.getProperty("dogalafetler.otomasyon", "").isEmpty();
     private static final ThreadMXBean IPLIK = ManagementFactory.getThreadMXBean();
 
     /** Çizilmiş kare sayacı ({@code RenderTickEvent} END). */

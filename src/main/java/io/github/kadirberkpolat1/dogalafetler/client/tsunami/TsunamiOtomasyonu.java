@@ -4,12 +4,16 @@ import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.afet.tsunami.TsunamiAfeti;
 import io.github.kadirberkpolat1.dogalafetler.client.core.GorselOtomasyon;
 import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciAfetDurumu;
+import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciDonem;
 import io.github.kadirberkpolat1.dogalafetler.client.su.SuRenderer;
 import io.github.kadirberkpolat1.dogalafetler.config.EfektKalitesi;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
 import io.github.kadirberkpolat1.dogalafetler.network.AfetDurumPaketi;
+import io.github.kadirberkpolat1.dogalafetler.su.Dalga;
+import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
+import io.github.kadirberkpolat1.dogalafetler.su.SanalSuDunyasi;
 import java.lang.reflect.Field;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -69,6 +73,9 @@ public final class TsunamiOtomasyonu {
     private static int teker;
     private static boolean girdi;
     private static long bekle = 200;
+    /** {@code w:} adımı: dalga cephesi kameraya bu kadar bloka yaklaşana dek beklenir (negatif: beklenmiyor). */
+    private static double dalgaYakin = -1;
+    private static int dalgaTick;
     private static long sonKare;
     /** Ölçüm penceresinin en uzun kare süresi (duvar saati, ns). */
     private static long enUzunKare;
@@ -168,6 +175,20 @@ public final class TsunamiOtomasyonu {
         return a;
     }
 
+    /**
+     * Ts2-1 kabul karesi (şef kararı; Ts7 kameralarına dokunmaz, ayrı S5 koşusu): dalga kıyıya yaklaşırken köpük yakından
+     * ve alçaktan, dalga tepesi göz hizasında, cepheye 8–12 blok ({@code v:kopuk}, {@code w:}); aynı anın Yüksek ve Düşük eşi
+     * (Düşük'te yalnız tepe şeridi, N13). İlk {@code v:kopuk} dalga yokken taban + 4'e, dalga doğunca ikincisi tepeye konar.
+     */
+    private static List<String> kopukYakin() {
+        String on = "tsunami-s5-kopuk";
+        return List.of("k:dogalafet su vitrin", "b:300", "k:time set 10500", "k:dogalafet su vitrin kamera tepe", "b:200",
+                "k:gamerule sendCommandFeedback false", "k:dogalafet start tsunami 5", "b:50", "k:dogalafet asama ileri", "b:60",
+                "k:dogalafet asama ileri", "k:gamemode spectator", "b:5", "v:kopuk", "w:14", "v:kopuk", "w:11",
+                "s:" + on + "-yakin", "q:DUSUK", "b:2", "s:" + on + "-yakin-dusuk", "q:-", "k:gamerule sendCommandFeedback true",
+                "k:dogalafet stop", "b:100", "k:dogalafet su temizle", "b:40");
+    }
+
     /** Tabanlı {@code f:} adımı: {@code taban} aynı kameranın afetsiz ölçümü ({@code OLCUM ... taban=}, K-E29 (b)). */
     private static String olc(String ad, String taban) {
         return "f:" + ad + " " + taban;
@@ -226,6 +247,9 @@ public final class TsunamiOtomasyonu {
         }
         if (hepsi || BOLUM.contains("s1")) {
             a.addAll(tsunami(1, "tsunami-s1"));
+        }
+        if (hepsi || BOLUM.contains("kopuk")) {
+            a.addAll(kopukYakin());
         }
         if (hepsi || BOLUM.contains("magara")) {
             a.addAll(List.of("m:kur", "b:200", "s:tsunami-magara-once", "m:doldur", "b:160", "f:magara", "s:tsunami-magara",
@@ -593,6 +617,16 @@ public final class TsunamiOtomasyonu {
         if (GorselOtomasyon.kareBekliyor()) {
             return;
         }
+        if (dalgaYakin >= 0) {
+            double u = dalgaUzakligi(mc);
+            boolean geldi = u <= dalgaYakin;
+            if (geldi || ++dalgaTick >= 1200) {
+                log("DALGA cepheye uzaklık {} blok, {} tick{}", String.format(Locale.ROOT, "%.1f", u), dalgaTick,
+                        geldi ? "" : " (süre doldu)");
+                dalgaYakin = -1;
+            }
+            return;
+        }
         if (--bekle > 0) {
             return;
         }
@@ -638,10 +672,14 @@ public final class TsunamiOtomasyonu {
             }
             case 'm' -> magara(mc, deger);
             case 'y' -> TsunamiYagmuru.kapali = "0".equals(deger);
-            case 'q' -> kalite(EfektKalitesi.valueOf(deger));
+            case 'q' -> kalite("-".equals(deger) ? null : EfektKalitesi.valueOf(deger));
             case 'c' -> sunucuAyari(deger);
             case 'a' -> avciAdimi(mc, deger);
             case 'v' -> kamera(mc, deger);
+            case 'w' -> {
+                dalgaYakin = Double.parseDouble(deger);
+                dalgaTick = 0;
+            }
             case 'g' -> mc.options.hideGui = !"1".equals(deger);
             case 'x' -> {
                 GorselOtomasyon.kareOzetiYaz("tsunami");
@@ -673,16 +711,13 @@ public final class TsunamiOtomasyonu {
         t.start();
     }
 
-    /** Efekt kalitesini (CLIENT {@code gorsel.efektKalitesi}) çalışma anında değiştirir; dosyaya yazılmaz. */
-    @SuppressWarnings("unchecked")
+    /**
+     * Efekt kalitesini çalışma anında geçersiz kılar (config dosyasına yazılmaz, K-E28; {@code q:-} kullanıcının değerine
+     * döner).
+     */
     private static void kalite(EfektKalitesi k) {
-        for (ModConfig c : ConfigTracker.INSTANCE.configSets().get(ModConfig.Type.CLIENT)) {
-            if (DogalAfetler.MOD_ID.equals(c.getModId()) && c.getSpec() instanceof ForgeConfigSpec spec
-                    && spec.getValues().get("gorsel.efektKalitesi") instanceof ForgeConfigSpec.EnumValue<?> deger) {
-                ((ForgeConfigSpec.EnumValue<EfektKalitesi>) deger).set(k);
-            }
-        }
-        log("KALITE istenen={} etkin={}", k, IstemciAyarlari.efektKalitesi());
+        IstemciAyarlari.otomasyonKalitesi(k);
+        log("KALITE istenen={} etkin={}", k == null ? "kullanıcı" : k, IstemciAyarlari.efektKalitesi());
     }
 
     /**
@@ -762,6 +797,10 @@ public final class TsunamiOtomasyonu {
             mc.player.connection.sendCommand("dogalafet su vitrin kamera tepe");
             return;
         }
+        if ("kopuk".equals(ne)) {
+            kopukKamerasi(mc);
+            return;
+        }
         CompoundTag o = IstemciAfetDurumu.aktif().filter(d -> d.tur() == AfetTuru.TSUNAMI).map(AfetDurumPaketi::ozel)
                 .orElse(null);
         if (o == null || !o.contains("kx")) {
@@ -783,6 +822,60 @@ public final class TsunamiOtomasyonu {
         mc.player.connection.sendCommand(komut);
         log("KAMERA {} {} (kıyı {} {}, yön {} {}, taban {}, zemin {})", ne, komut, o.getFloat("kx"), o.getFloat("kz"), yx, yz,
                 tb, zemin);
+    }
+
+    /**
+     * Ts2-1 köpük kamerası ({@code v:kopuk}): tsunaminin kıyı noktasından 2 blok içeride, denize yatay bakar; göz dalga
+     * tepesinde ({@code taban + yukseklik}, en yüksek dalga; dalga yoksa kıyı tabanı + 4), en az zemin + 1,8.
+     */
+    private static void kopukKamerasi(Minecraft mc) {
+        CompoundTag o = IstemciAfetDurumu.aktif().filter(d -> d.tur() == AfetTuru.TSUNAMI).map(AfetDurumPaketi::ozel)
+                .orElse(null);
+        if (o == null || !o.contains("kx")) {
+            log("KAMERA kopuk tsunami verisi yok; kamera değişmedi");
+            return;
+        }
+        float yx = o.getFloat("yx");
+        float yz = o.getFloat("yz");
+        double x = o.getFloat("kx") + yx * 2;
+        double z = o.getFloat("kz") + yz * 2;
+        double tepe = o.getFloat("tb") + 4;
+        SanalSuDunyasi d = SanalSu.istemci;
+        double t = IstemciDonem.saat(0f);
+        boolean dalga = false;
+        if (d != null) {
+            for (Dalga w : d.dalgaDizisi()) {
+                if (!w.bitti(t)) {
+                    tepe = dalga ? Math.max(tepe, w.taban() + w.yukseklik()) : w.taban() + w.yukseklik();
+                    dalga = true;
+                }
+            }
+        }
+        int zemin = mc.level.getHeight(Heightmap.Types.MOTION_BLOCKING, Mth.floor(x), Mth.floor(z));
+        double goz = Math.max(zemin + 1.8, tepe);
+        float yaw = (float) Math.toDegrees(Math.atan2(yx, -yz));
+        String komut = String.format(Locale.ROOT, "tp @s %.2f %.2f %.2f %.1f 0.0", x, goz - mc.player.getEyeHeight(), z, yaw);
+        mc.player.connection.sendCommand(komut);
+        log("KAMERA kopuk {} (tepe {} {}, zemin {})", komut, String.format(Locale.ROOT, "%.1f", tepe),
+                dalga ? "dalgadan" : "tahmin", zemin);
+    }
+
+    /** Kameranın en yakın gelen dalga cephesine uzaklığı (blok; cephe geçtiyse negatif, dalga yoksa sonsuz). */
+    private static double dalgaUzakligi(Minecraft mc) {
+        SanalSuDunyasi d = SanalSu.istemci;
+        if (d == null) {
+            return Double.POSITIVE_INFINITY;
+        }
+        double t = IstemciDonem.saat(0f);
+        double x = mc.player.getX();
+        double z = mc.player.getZ();
+        double en = Double.POSITIVE_INFINITY;
+        for (Dalga w : d.dalgaDizisi()) {
+            if (!w.bitti(t) && w.cephe(t) > 0) {
+                en = Math.min(en, -w.cepheyeUzaklik(x, z, t));
+            }
+        }
+        return en;
     }
 
     /**
