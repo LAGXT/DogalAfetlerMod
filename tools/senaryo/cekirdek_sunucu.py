@@ -226,9 +226,21 @@ def senaryo_kilidi_al():
     return True
 
 
+# K-E40: oturum başına port aralığı (worktree'ler arası tek koruma). Doğrulayıcı aralığını başka oturum kullanırsa WARN.
+DOGRULAYICI_PORTLARI = range(25611, 25641)
+
+
+def port_araligi_denetimi(port, log=print):
+    oturum = os.environ.get("VIBE_OTURUM", "")
+    if port in DOGRULAYICI_PORTLARI and not oturum.startswith("dogrulayici"):
+        log(f"WARN K-E40: port {port} doğrulayıcı aralığında (25611–25640), VIBE_OTURUM={oturum or '-'}; "
+            "entegratör 25651–25660, işçiler 25641+ws")
+
+
 def agir_surec_kapisi(port, log=print, en_cok_dk=20, ram_mb=4096):
     """Gradle < 2, boş RAM >= `ram_mb`, `port` boş ve senaryo kilidi alınana dek 60 sn'de bir bekler; `en_cok_dk` dakikada
     açılmazsa False."""
+    port_araligi_denetimi(port, log)
     for deneme in range(en_cok_dk + 1):
         gradle = int(subprocess.run(["pgrep", "-fc", "GradleWrapperMain"], capture_output=True, text=True).stdout.strip()
                      or 0)

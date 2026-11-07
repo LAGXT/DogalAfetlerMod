@@ -51,6 +51,8 @@ Ağır süreç = bir `./gradlew` çağrısı (Gradle JVM'i ve başlattığı Min
 
 **Yoklama yok (K-E19 e):** işçi, doğrulayıcı ve entegratör bir arka plan işini `sleep N` döngüsüyle ya da log kuyruğunu tekrar tekrar okuyarak beklemez; işi arka planda başlatır, beklemek zorundaysa bloklayan `wait` aracını kullanır, beklerken başka işi sürdürür. Her yoklama turu kota ve bağlam harcar.
 
+**Senaryo ve port (K-E40):** aynı anda iki oturum aynı worktree'de `*_sunucu.py`/`runServer` koşmaz (kapı `run-server/.senaryo.lock` flock'unu tutar); her oturum kendi worktree'sinde (gerekirse `worktree add --detach <geçici> <commit>`, bitince `worktree remove`) ve kendi port aralığında koşar: `dogrulayici` 25611–25620, `dogrulayici-2` 25631–25640, işçiler 25641+ws, entegratör 25651–25660. GameTest (`run-gametest/`) ve `build` ayrı dizinde, serbest.
+
 **GameTest filtresi (K-E20):** işçi geliştirirken yalnız kendi test sınıfını/batch'ini koşar: `TEST_FILTRE='<regex>' tools/senaryo/gradle_kapisi.sh <log> runGameTestServer` ya da `JAVA_HOME=/home/lagxt/.jdks/jdk-17.0.21+9 ./gradlew runGameTestServer --offline -Ptest_filtre='<regex>'` (sınıf, batch ya da test adında `find`, büyük/küçük harfe duyarlı; bekçi her koşuda kalır; bekçi dışında hiçbir teste uymayan ya da geçersiz regex sunucuyu açmadan çıkış ≠ 0 verir). Kabul, doğrulama ve entegrasyon koşuları filtresizdir.
 
 ### Kota ve hız sınırı

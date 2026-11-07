@@ -3459,7 +3459,12 @@ aynı anda koşunca iki koşu birbirini bozdu (K-E39 `asit_orman_yangini_sunucu.
 farklı portta, Gradle ≤ 1 anında başlar). Karar: `cekirdek_sunucu.agir_surec_kapisi` (17 betiğin hepsinin kapısı)
 `run-server/.senaryo.lock` üzerinde `flock` alır ve süreç ömür boyu tutar (süreç ölünce çekirdek bırakır, kalıntı kilit
 olmaz); doluyken kapı "senaryo kilidi bekleniyor" yazar, 60 sn'de bir dener (en çok 20 dk, sonra çıkış 3). Kilit dosyası
-sahibinin pid ve komut satırını tutar. Worktree'lerin `run-server/`'ı ayrı olduğu için kilit worktree başınadır. Reddedilen:
+sahibinin pid ve komut satırını tutar. **Aynı worktree: flock; farklı worktree: ayrı port aralığı zorunlu** (şef kararı): her
+oturum kendi (gerekirse ayrık geçici, `worktree add --detach`) worktree'sinde ve kendi aralığında koşar: `dogrulayici`
+25611–25620, `dogrulayici-2` 25631–25640, işçiler 25641+ws, entegratör 25651–25660. Aynı worktree'de iki oturum aynı anda
+`*_sunucu.py`/`runServer` koşmaz; GameTest (`run-gametest/`) ve `build` ayrı dizinde, serbest. Kapı, port 25611–25640'taysa ve
+`VIBE_OTURUM` `dogrulayici` ile başlamıyorsa WARN satırı yazar (zorunlu kılmaz). Yarışın kökü entegratörün doğrulayıcı aralığındaki
+portu (25612) kullanmasıydı. Reddedilen:
 senaryo başına ayrı `run-server` klasörü (Gradle `runServer` çalışma dizini tek, `build.gradle` değişirdi); yalnız
 özelliklerin yazımını kilitlemek (sunucu çalışırken ikinci senaryo aynı dosyayı yine değiştirirdi).
 
