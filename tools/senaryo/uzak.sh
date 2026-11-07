@@ -143,7 +143,8 @@ wait "$ssh_pid"
 kod=$?
 if [ "$iptal" = 1 ]; then
     echo "UZAK: kesildi, $makine'deki iş durduruluyor" >&2
-    "${ssh_ac[@]}" bash -s <<<"kill -TERM -- -\$(cat $pid_dosyasi) 2>/dev/null; rm -f $pid_dosyasi"
+    # Oturumun hepsi: `timeout` (gradle_kapisi.sh) kendi süreç grubunu açar, grup sinyali Gradle'a ulaşmaz (K-E51).
+    "${ssh_ac[@]}" bash -s <<<"pkill -TERM -s \$(cat $pid_dosyasi) 2>/dev/null; rm -f $pid_dosyasi"
     wait "$ssh_pid"
     kod=130
 fi
