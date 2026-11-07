@@ -31,8 +31,8 @@ Kullanım (worktree kökünden): python3 tools/senaryo/cekirdek_sunucu.py <log k
 
 Ortak komut satırı ve kapı (K-E13, diğer `*_sunucu.py` betikleri de kullanır): `--port` (varsayılan 25565) senaryo süresince
 `server.properties`'e `server-port` olarak yazılır; başka worktree'deki paralel senaryo ayrı portla çakışmaz (aynı worktree'de
-`run-server/` paylaşıldığı için senaryolar yine sırayla koşar). Dış çağrı test defterine bakar, işi pc2'ye gönderir ya da
-kapı doluysa kuyruğa atar (`defterli_kos`, K-E51). Ağır süreç kapısı: port boş ve senaryo kilidi; ana makinede ayrıca
+`run-server/` paylaşıldığı için senaryolar yine sırayla koşar). Dış çağrı test defterine bakar, kuyruk işinin dışındaysa
+kendini kuyruğa ekleyip bekler, işin içinde pc2'ye gönderir ya da yerelde koşar (`defterli_kos`, K-E51, K-E60). Ağır süreç kapısı: port boş ve senaryo kilidi; ana makinede ayrıca
 Gradle < 2 ve boş RAM >= 4 GB; 60 sn'de bir, en çok 20 dk bekler.
 """
 import argparse
@@ -193,13 +193,14 @@ def argumanlar(aciklama=None, varsayilan_port=VARSAYILAN_PORT, varsayilan_kanit=
 
 
 def defterli_kos(ayristirici, a):
-    """Dış çağrı (K-E44, K-E51); süreç senaryonun çıkış koduyla biter. Test defterinde aynı girdi hash'inde `gecti` varsa
-    koşmadan 0. Dedicated senaryo (`--yalniz-istemci`siz, `UZAK=0`'sız) `uzak.sh -g <kanıt>/ python3 <betik> ...` ile pc2'de
-    koşar (kanıt klasörü geri çekilir; pc2 kapalıysa 4); pc2 kapısı doluysa beklemez: `sira.py ekle` ile kuyruğa, iş kimliği,
-    çıkış 0 (`KAPI_BLOKLA=1` ve kuyruğun koştuğu iş bekler). İstemci tarafı (`uyari_sunucu.py --yalniz-istemci`, K-E46) ve
-    `UZAK=0` yerelde: aynı betik alt süreçte. Sonuç deftere yazılır. `DEFTER_ICINDE` (defterli bir çağrının içi): defter
-    ve kuyruk yok, pc2'ye yönlendirme sürer."""
+    """Dış çağrı (K-E44, K-E51, K-E60); süreç senaryonun çıkış koduyla biter. Test defterinde aynı girdi hash'inde `gecti`
+    varsa koşmadan 0. Kuyruk işinin dışındaki çağrı kendini `sira.py ekle --bekle --makine oto` ile kuyruğa ekler ve bekler
+    (ekransız senaryo oto'ya, istemcili ana'ya). İşin içinde dedicated senaryo (`--yalniz-istemci`siz, `UZAK=0`'sız: pc2
+    işi) `uzak.sh -g <kanıt>/ python3 <betik> ...` ile pc2'de koşar (kanıt klasörü geri çekilir; pc2 kapalıysa 4); istemci
+    tarafı (`uyari_sunucu.py --yalniz-istemci`, K-E46) ve ana makinenin işi (`UZAK=0`) yerelde: aynı betik alt süreçte.
+    Sonuç deftere yazılır. `DEFTER_ICINDE` (defterli bir çağrının içi): defter ve kuyruk yok, pc2'ye yönlendirme sürer."""
     import defter
+    import sira
     uzak = not getattr(a, "yalniz_istemci", False) and os.environ.get("UZAK", "1") != "0"
     defterli = not os.environ.get("DEFTER_ICINDE")
     if not (uzak or defterli):
@@ -212,17 +213,11 @@ def defterli_kos(ayristirici, a):
         if defter.bak(kimlik, girdi):
             sys.exit(0)
     betik = str(Path(sys.argv[0]).resolve().relative_to(KOK))
+    if defterli:
+        sira.kuyruga_gir(["python3", betik, *sys.argv[1:]])
     makine = None
     if uzak:
         makine = os.environ.get("UZAK_MAKINE", "pc2")
-        if defterli and not os.environ.get("SIRA_ICINDE") and os.environ.get("KAPI_BLOKLA") != "1":
-            sira_py = [sys.executable, str(KOK / "tools" / "senaryo" / "sira.py")]
-            dolu = subprocess.run([*sira_py, "dolu-mu", "--makine", "pc2"], capture_output=True, text=True)
-            if dolu.returncode == 0:
-                is_no = subprocess.run([*sira_py, "ekle", "--makine", "pc2", "--", "python3", betik, *sys.argv[1:]],
-                                       stdout=subprocess.PIPE, text=True, check=True).stdout.strip()
-                print(f"SIRA: kapı dolu ({dolu.stdout.strip()}); kuyrukta {is_no} — sonuç: tools/senaryo/sira.py bekle {is_no}")
-                sys.exit(0)
         komut = [str(KOK / "tools" / "senaryo" / "uzak.sh"), "-g", f"{Path(a.kanit).resolve()}/", "python3", betik,
                  *sys.argv[1:]]
     else:
