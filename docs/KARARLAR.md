@@ -5734,6 +5734,14 @@ Yağmur meteorunun çarpma noktası bakış yönüne ağırlıklı: `meteor.baki
 yarısına, 1/3'ü arkaya; `MeteorDagitimi.ofset`; 0,5 eski yönsüz); komut meteoru ve oyuncusuz doğuş yönsüz, geliş azimutu
 rastgele. Görsel otomasyonların yavaş çekimi `ucusSuresi` 360 (2×). TPS (`meteor_sunucu.py --tps`, ana makine `--olcum`, tek
 oyuncu): 180/dk 200 sn blok hasarı açık, ortalama tick 5,54 ms (boşta 3,68), en düşük TPS 20,00, 525 krater (Mt9 kapandı).
+**Var olan dünyalar (MT2-31, K-E61; meteor-2 `590629e`, entegrasyon `7745c47`):** `meteor.ayarSurumu` 0 → 1 göçü eski
+varsayılan zincirini yeniye çeker (`MeteorAyarGocu.ADIMLAR`): `meteor.varlikTavani` 48/96/240 → 448,
+`gunes_patlamasi.meteorYagmuruDakikaBasina` 24/90 → 180, `ay_carpmasi.meteorDakikaBasina` 7,5/30/90 → 180,
+`ay_carpmasi.meteorSuresiSn` 90 → 600, `gunes_patlamasi.meteorYagmuruSaniye` 180 → 600, `meteor.yagmurBuyukOrani` ve
+`gunes_patlamasi.buyukMeteorOrani` 0,05 → 0,10, `ay_carpmasi.meteorBuyukOrani` 0,04 → 0,10, `meteor.girisYuksekligi` 140 → 200
+(96, 240, 30 ve 90 ara değerleri yalnız `is/meteor-2` yapılarında varsayılandı). **İz (MT2-32, Mt19):** iz uzunluğu 80–140 blok
+(ölçek 0,5 → 80, 2,5 → 140; eski 40–72; uçtuğu yoldan uzun olmaz), şerit genişliği ve parlaklığı ×1,5, ekranda dışı en az
+2 px, içi 1 px (200 blok yukarıdaki küçük meteor da seçilsin); plazma ve kıvılcım parçacığı boyu ×1,5, sayı aynı.
 Öncü meteorlar N7 gizli ön-uyarısını ve bölüm D'nin "siren başladıktan 60 sn sonra"sını bilerek bozar (MT2-2;
 `meteorYagmuruOncuSaniye=0` eski davranış). Meteor başına ödül şansı değişmedi. SARTNAME N21. **Mt11 şef kararı (Gk2, MT2-18):**
 doğal patlama penceresi beklenirken (`Afet.pencereBeklemesi() >= 0`, ön-uyarı sayacı 0'da) güneşin öncü yağmuru
@@ -5741,7 +5749,7 @@ doğal patlama penceresi beklenirken (`Afet.pencereBeklemesi() >= 0`, ön-uyarı
 JUnit `pencereBeklenirkenOncuBastaSabitKalir`); pencere gelince siren eğriden sürer. MT2-28'in 180/dk'sı yalnız AKTIF yağmur
 anahtarını değiştirir; öncü anahtarları ve çağrı noktası aynı, karar geçerli. Mt10 meteor-2'de çözüldü (`4d4449e`: ödül
 yalnız büyük bantta, afet başına oyuncu başına tavan `meteor.odulTavaniAfetBasina` 8, `OdulTavani`). Mt7 (gerçek hızda AKTIF
-karesi) MT2-25/MT2-28 ile ele alındı; görsel kabul meteor-2 incelemesinde.
+karesi) MT2-25/MT2-28 ile ele alındı, `inceleme-meteor-2-3` kabul; MT2-31/32 meteor-2 tur 4 incelemesinde.
 
 **K-E57 Ünvan yalnız modun başarım duyurusunda; eşya başarımları yaratıcı kipte de (istek 16, 19; N16 netleştirmesi,
 kullanıcı Berk adına).** SARTNAME N16'nın "sohbet adının ve tab listesindeki adın önünde (`NameFormat`, `TabListNameFormat`)"
@@ -5787,7 +5795,13 @@ kendiliğinden; gokyuzu-2'nin otomasyon satırları ayrık, `dusmeHizi` kullanı
 Kanıt (`9283fa1`, kuyruktan): `runData` (ana, `1107-235610456-0b`) yazılan 0; JUnit 607 PASSED / 0 FAILED (ana,
 `1107-235610364-ab`, `test @ebdb35ad992f`); filtresiz GameTest (pc2, `1107-235610272-7d`) "All 240 required tests passed",
 protokol 7, en büyük batch 7, iki kasıtlı deprem `/ERROR]` (`gametest @f22d60f32817`); N19 186/186, fark 0; pano `Yuva: ana 1/2 ·
-pc2 1/2` (`pano-3.txt`). meteor-2 MT2-25/28 incelemesi sürüyor: düzelt çıkarsa yeni HEAD yeniden `merge --no-ff`.
+pc2 1/2` (`pano-3.txt`). **Ek tur 3:** `inceleme-meteor-2-3` kabul; `7745c47` meteor-2 `590629e` (MT2-31 config göçü K-E61,
+MT2-32 iz 80–140 blok ×1,5, MT2-33 belgeler) çakışmasız (`MeteorParcacigi.java` gorsel-cila satırlarından ayrık, `ay_carpmasi.md`,
+`esyalar.md` kendiliğinden). Kanıt (`7745c47`, kuyruktan): `runData` (ana, `1108-003713351-09`) yazılan 0; JUnit 613 PASSED / 0
+FAILED (ana, `1108-003713249-77`, `test @da5f90613d0e`); filtresiz GameTest (pc2, `1108-003713154-80`) "All 241 required tests
+passed", protokol 7, en büyük batch 7, göç GameTest'i `Config göçü … meteor.ayarSurumu 0 → 1` satırı, iki kasıtlı deprem
+`/ERROR]` (`gametest @574b42278318`); N19 186/186; pano `Yuva: ana 1/2 · pc2 1/2` (`pano-4.txt`). Bekleyen: meteor-2 tur 4
+incelemesi; düzelt çıkarsa yeni HEAD yeniden `merge --no-ff`.
 
 ### Bilinen sınırlar (güncelleme turu 1)
 
@@ -5797,6 +5811,10 @@ pc2 1/2` (`pano-3.txt`). meteor-2 MT2-25/28 incelemesi sürüyor: düzelt çıka
   pencerenin son 90 sn'sine almak karara girmedi).
 - **K-E29 (b) CPU ölçümü yok (Gk5):** canlı uzay, 1–4 kara delik ve 3B ay patlamasının render thread CPU ms/karesi ana makinede
   ölçülmedi; pc2 FPS'leri (20–42) yalnız bilgi.
+- **pc2'de düz bakışta 180/dk yağmurda FPS 15–18 (K-E29, MT2-32 ölçümü):** ufka bakan kadrajda 180/dk çarpma dumanı/ateşi ve
+  ufka kadar zemin; 35° kadrajda 20–21. Taban deneyi (`.vibe/kanit/meteor-2/deney-fps/`: `590629e` + üç iz dosyası `6210fde`
+  hâlinde) düz bakışta MT2-32'siz 15, MT2-32'li 18 ve 15 FPS verdi: düşüş MT2-32'den değil sahneden. Ana makinede ölçülmedi:
+  gizli workspace'teki istemci FPS ölçemez (K0-21 rev. 2 j).
 - **Meteor yoğunluğu karede okunmuyor (Mt6, Mt7):** kanıt log sayacı; görsel otomasyonların yavaş çekimi `ucusSuresi` 360
   (2×, MT2-25). Gerçek hızda (180 tick uçuş, 180/dk) gökte oyuncu başına ~27 meteor, kadrajda ~10–13 iz beklenir [ÇIKARIM].
 - **Dünya hasarı (MT2-21, Mt10; kullanıcı isteği):** 10 dk yağmurda duran oyuncunun 32–160 blok halkasına 180/dk'da ~1800
@@ -5834,8 +5852,8 @@ pc2 1/2` (`pano-3.txt`). meteor-2 MT2-25/28 incelemesi sürüyor: düzelt çıka
   atılamayan meteor düşmez, oyuncu başına 180/dk tutmaz, log uyarısı yok. `meteor.varlikTavani` (≤ 512) elle yükselir.
 - **Düz bakan oyuncu daha az iz görür (Mt19):** ağırlık yalnız yatay baş (`getYRot`); ufka bakan oyuncunun kadrajında inen
   izlerin çoğu üst kenarın dışında kalır (~10–13 iz beklentisi göğe dönük kadraj için).
-- **Var olan dünyalar eski meteor varsayılanlarını korur (Mt22):** `serverconfig` dünya klasöründe; eski dünya 90/dk ve eski
-  tavanla açılır. MT2-31 göçü (K-E61) birleşince kapanır.
+- **Var olan dünyalar eski meteor varsayılanlarını korur (Mt22):** kapandı: MT2-31 göçü (K-E61) entegrasyon `7745c47`'de; elle
+  değiştirilmiş değer bilerek korunur.
 
 ## Teslim sonrası — hızlandırma (devam: kuyruk)
 
@@ -5889,15 +5907,26 @@ yalnız `oto_hedefi` kendi makinesiyse alır (`sira_kosucu.engel`/`bos`; iki ko�
 Sınama `test_sira.py` 18/18 (`test_dagitim_bos_yuvasi_cok_olana_esitlikte_pc2`: 2 iş → pc2, ana, `Yuva: ana 1/2 · pc2 1/2`; 4 iş →
 pc2, ana, pc2, ana, `2/2 · 2/2`; `test_dagitim_dolu_makine_atlanir`: pc2 dolu → ana, ana dolu → pc2). Canlı kanıt
 `.vibe/kanit/sira-4/dagitim-2.md`.
-#
 
 **K-E61 Sunucu config göçü: `ayarSurumu` ile eski varsayılan yeni varsayılana çekilir, elle değer korunur (şef kararı MT2-31,
-Mt22; 2026-11-08).** Forge `serverconfig` dünya klasöründe yaşar; varsayılan değişince var olan dünya eski değeri okur
-(meteor 90 → 180/dk, tavan 240 → 448). Kalıp: sunucu config'inde tamsayı `ayarSurumu`; yüklemede kayıtlı sürüm koddakinden
-küçükse, değişen her anahtarın değeri o sürümün eski varsayılanına eşitse yeni varsayılana çekilir, farklıysa (elle değiştirilmiş)
-korunur; sonra `ayarSurumu` güncellenir, değişen her anahtar için bir INFO satırı. Kalkan anahtar (`dusmeHizi`) yok sayılır.
-Sonraki varsayılan değişiklikleri tabloya sürüm ekler. Uygulama meteor-2 (MT2-31); kanıt JUnit (eski varsayılan → yeni, elle
-değer korunur, yeni dünya dokunulmaz) ve entegrasyon dalında tam kapı.
+Mt22; 2026-11-08; uygulama meteor-2 `20fe851`, entegrasyon `7745c47`).** Forge `serverconfig` dünya klasöründe yaşar ve var
+olan dosyada aralık içindeki değere dokunmaz; varsayılan değişince var olan dünya eski değeri okur (meteor 90 → 180/dk, tavan
+240 → 448). Kalıp: SERVER config'inde tamsayı sürüm anahtarı (`meteor.ayarSurumu`, varsayılanı güncel sürüm 1; dosyada yoksa 0
+sayılır). Göç `ModConfigEvent`'te değil, **dosya işleyicisinde, Forge dosyayı okuyup izlemeye almadan önce** yapılır
+(`VarsayilanYazanIsleyici.reader` → `AyarKaydi.sunucuDosyasiniGocEt` → `config.AyarGocu`): dosya TOML olarak ayrıştırılır,
+kayıtlı sürümü güncelden küçük her göçün planı (`AyarKaydi.sunucuGocu`; meteorda `MeteorAyarGocu.plan`) uygulanır: değeri o
+anahtarın eski varsayılanlarından birine eşit olan (sayı türü önemsiz: 96 = 96,0) yeni varsayılana çekilir, eşit olmayan (elle
+değiştirilmiş) korunur, dosyada olmayan anahtara dokunulmaz (Forge yeni varsayılanla doldurur); sürüm güncele yazılır, dosya
+**bir kez** yazılır ve tek INFO satırı (`Config göçü …: meteor.ayarSurumu 0 → 1: <anahtar> <eski> → <yeni>, …`). Gerekçe: (1) Forge
+eksik anahtarı mod olaylarından önce varsayılanla doldurur; olayda sürüm anahtarı olmayan eski dosya yeni dosyadan ayırt
+edilemez; (2) olayda art arda `ConfigValue.set` Forge'un dosya izleyicisiyle yarışır (K-E28 `declared twice`). Yeni dünyanın
+dosyası güncel sürümle yazılır, göç dokunmaz; çalışırken elle düzenlenen dosyanın yeniden yüklemesi göç ettirilmez; okunamayan
+dosyada WARN ve atlama. Kalkan anahtara (`dusmeHizi`) göç dokunmaz (spec dışı anahtar Forge'un düzeltmesine kalır). Sonraki bir
+varsayılan değişikliği yeni sürümlü adım ekler ve güncel sürümü artırır; eski sürümden gelen dosya adımları sırayla geçer.
+Meteor zinciri K-E56 rev.'de. Reddedilen: `ModConfigEvent.Loading`'de `set` (iki neden yukarıda), `ayarSurumu` varsayılanı 0
+(olayda göç için), sürüm notunda "toml'u silin" (elle seçilen değerler de kaybolur). Kanıt: JUnit `MeteorAyarGocuTest` (eski
+varsayılan → yeni, ara sürüm zinciri, elle değer korunur, güncel sürüme dokunulmaz, sayı türü), GameTest
+`eskiAyarDosyasiAcilistaGocEderElleDegerKorunur` (batch `meteor_goc`); entegrasyon dalında tam kapı (K-E59).
 
 ## Açık noktalar (Faz 2b)
 
@@ -6289,6 +6318,7 @@ P2-9 `5-matris` kabulünde. Kapanış eşlemesi (K-E50) her maddenin sonunda:
 | meteor | `meteor.dagitimIcYaricap` / `meteor.dagitimDisYaricap` | 32 / 160 | blok | tasarım §2 "32–160 blok çevresinde" |
 | meteor | `meteor.girisYuksekligi` | 200 (eski 140) | blok (40–300) | MT2-25: şefin y+160–220 aralığı; doğuş varlık işleyen chunk'ta kalır |
 | meteor | `meteor.ucusSuresi` (yeni; `dusmeHizi` 3,0 kalktı) | 180 | tick (40–500) | MT2-25: uçuş 8–10 sn (küçük 9,5, büyük 8,0 sn); hız yoldan, en çok 3,8 blok/tick; yavaş çekim 360 |
+| meteor | `meteor.ayarSurumu` (yeni) | 1 | sürüm (0–) | MT2-31 (K-E61): dosyada yoksa 0; eski sürümde eski varsayılanlar göç eder; elle değiştirilmez |
 | meteor | `meteor.girisAcisiEnAz` / `meteor.girisAcisiEnCok` | 40 / 70 | — | tasarım "40–70°" |
 | meteor | `meteor.sarsintiMenziliKucuk` / `meteor.sarsintiMenziliBuyuk` | 48 / 112 | — | M-11 |
 | meteor | `meteor.kucukYanginYogunlugu` / `meteor.buyukYanginYogunlugu` | 0,45 / 0,85 | alan oranı | yangın §1: alan oranı %62 / %90 |
@@ -6297,7 +6327,7 @@ P2-9 `5-matris` kabulünde. Kapanış eşlemesi (K-E50) her maddenin sonunda:
 | meteor | `meteor.kraterSicaklikSaniye` | 30 | sn | magma soğuduktan bir süre sonra ortam normale döner |
 | meteor | `meteor.yagmurBuyukOrani` | 0,10 (eski 0,05) | oran | MT2-13: komut yağmuru afetlerle aynı dağılım (yalnız komut; afetler kendi oranını verir) |
 | meteor | `meteor.ortaMeteorOrani` | 0,30 | olasılık | MT2-13: orta bant 0,9–1,6×; büyük afetin oranı (0,10), küçük (0,5–0,9×) kalanı |
-| meteor (kod) | sürekli ölçek `MeteorOlcegi` | küçük 0,5–0,9× / orta 0,9–1,6× / büyük 1,6–2,5× | çarpan | MT2-13/14: krater, yangın, sarsıntı, parlama, iz, ses ve hız (× 0,95 → 1,15, en çok 3,8) ölçekle; küçük/büyük config çiftleri tipik ölçeklerin (0,7 / 2,0) referansı |
+| meteor (kod) | sürekli ölçek `MeteorOlcegi` | küçük 0,5–0,9× / orta 0,9–1,6× / büyük 1,6–2,5× | çarpan | MT2-13/14: krater, yangın, sarsıntı, parlama, iz, ses ve hız (MT2-25'ten beri uçuş süresi ÷ 0,95–1,12, en çok 3,8) ölçekle; küçük/büyük config çiftleri tipik ölçeklerin (0,7 / 2,0) referansı |
 | meteor (istemci) | `meteor.izYogunlugu` | 1,0 | çarpan | parçacık çarpanı (× kalite 0,25 / 0,5 / 1 / 1,75) |
 | meteor (istemci) | `meteor.sarsintiOlcegi` | 1,0 | çarpan | 0 kapalı |
 | meteor (istemci) | `meteor.parlamaOlcegi` | 1,0 | çarpan | 0 kapalı (ışığa duyarlı oyuncular) |
@@ -6305,6 +6335,10 @@ P2-9 `5-matris` kabulünde. Kapanış eşlemesi (K-E50) her maddenin sonunda:
 | meteor (istemci sabiti) | `CARPMA_MENZILI_BUYUK` / `_KUCUK` | 128 / 96 | blok | MT2-6: kullanıcı ~128; küçük ¾ (ölçekle 0,5× ~91, 2,5× ~139) |
 | meteor (istemci sabiti) | `AYNI_TUR_TAVANI` | 6 | ses | MT2-7: ses.md §4 kural 3 |
 | meteor (istemci sabiti) | `SES_HIZI` | 5,2 (eski 12) | blok/tick | MT2-25: tipik hızda (1,3 blok/tick) Doppler 1,33 / 0,8 korunur |
+| meteor (istemci sabiti) | `MeteorVarligi.izUzunlugu` | 80–140 (eski 40–72) | blok | MT2-32: ölçek 0,5 → 80, 2,5 → 140; uçtuğu yoldan uzun olmaz |
+| meteor (istemci sabiti) | `MeteorCizici` iz genişliği / parlaklığı | dış 1,95 / 1,125, iç 0,75 / 1,5 (×1,5) | gövde ölçeği / çarpan | MT2-32 |
+| meteor (istemci sabiti) | `DIS_EN_AZ_PIKSEL` / `IC_EN_AZ_PIKSEL` | 2 / 1 | piksel | MT2-32: şef "küçük meteorda da en az 2 px" |
+| meteor (istemci sabiti) | plazma / kıvılcım parçacık boyu | 0,675–1,425 / 0,09–0,195 (×1,5) | blok | MT2-32; sayı aynı |
 | balıkçılık | `balikcilik.aktiflikEsigi` | 30 | % (G) | madde 15 varsayılanı |
 | balıkçılık | `balikcilik.delikOmruEnAzSn` / `delikOmruEnCokSn` | 240 / 300 | sn | madde 15 "4–5 dakika"; her delik aralıktan rastgele |
 | balıkçılık | `balikcilik.donmaAsamasiSn` | 15 | sn (× 3 aşama) | "yavaşça yeniden donarak": son 45 sn görünür zar; oyuncu kapanacağını görür |
