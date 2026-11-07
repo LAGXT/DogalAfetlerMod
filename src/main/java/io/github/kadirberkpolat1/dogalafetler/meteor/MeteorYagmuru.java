@@ -1,6 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.meteor;
 
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.MeteorDagitimi;
+import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.MeteorOlcegi;
 import io.github.kadirberkpolat1.dogalafetler.yangin.YanginKaynagi;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -16,19 +17,22 @@ import net.minecraft.server.level.ServerPlayer;
  * Süreli meteor yağmuru: oyuncu başına dakikada {@code dakikaBasina} meteor, sırayla oyunculara dağıtılır ({@link
  * MeteorDagitimi}), her biri oyuncunun {@code dagitimIcYaricap}–{@code dagitimDisYaricap} halkasına düşer. Oyuncu
  * kümesi boşsa boyuttaki bütün (izleyici olmayan) oyuncular her tick yeniden okunur; hiç oyuncu yoksa dünya doğuş
- * noktası tek hedeftir (oyuncusuz sunucu). Kaydedilmez: afet yüklenince yeniden başlatır.
+ * noktası tek hedeftir (oyuncusuz sunucu). Yoğunluk çalışırken değişebilir ({@link #yogunlukAyarla}; birikim korunur, düşük
+ * yoğunlukta da kesir kaybolmaz). Kaydedilmez: afet yüklenince yeniden başlatır.
  */
 final class MeteorYagmuru {
     final int kimlik;
     final YanginKaynagi kaynak;
     private final Set<UUID> oyuncular;
-    private final double dakikaBasina;
+    private double dakikaBasina;
     private final double buyukOran;
     private final MeteorGorunumu gorunum;
     private final MeteorDagitimi dagitim;
     private final Random rastgele;
     private int kalanTick;
     private double birikim;
+    /** Atmaya kalkışılan meteor (tavan ya da yüklü olmayan chunk yüzünden uçmayan dahil). */
+    private int atilan;
     /** Test: sabit dağıtım halkası (− 1: config) ve giriş açısı (NaN: rastgele). */
     private int icYaricap = -1;
     private int disYaricap = -1;
@@ -51,6 +55,18 @@ final class MeteorYagmuru {
         return kalanTick;
     }
 
+    double yogunluk() {
+        return dakikaBasina;
+    }
+
+    int atilan() {
+        return atilan;
+    }
+
+    void yogunlukAyarla(double yeni) {
+        dakikaBasina = Math.max(0, yeni);
+    }
+
     MeteorYagmuru testAyari(int ic, int dis, double girisAcisi) {
         icYaricap = ic;
         disYaricap = dis;
@@ -69,15 +85,15 @@ final class MeteorYagmuru {
         int dis = disYaricap >= 0 ? disYaricap : MeteorAyarlari.dagitimDisYaricap();
         while (birikim >= 1) {
             birikim -= 1;
+            atilan++;
             BlockPos merkez = merkezler.get(dagitim.siradaki(merkezler.size()));
             double[] o = MeteorDagitimi.ofset(rastgele, ic, dis);
             BlockPos hedef = merkez.offset((int) Math.round(o[0]), 0, (int) Math.round(o[1]));
-            MeteorBoyutu boyut = rastgele.nextDouble() < buyukOran ? MeteorBoyutu.BUYUK : MeteorBoyutu.KUCUK;
-            if (Double.isNaN(aci)) {
-                MeteorAPI.dusur(level, hedef, boyut, gorunum, kaynak, true);
-            } else {
-                MeteorAPI.dusur(level, hedef, boyut, gorunum, kaynak, true, aci, rastgele.nextDouble() * 2 * Math.PI);
-            }
+            double olcek = MeteorOlcegi.ornekle(rastgele, buyukOran, MeteorAyarlari.ortaMeteorOrani());
+            double a = Double.isNaN(aci) ? MeteorAyarlari.girisAcisiEnAz()
+                    + rastgele.nextDouble() * Math.max(0, MeteorAyarlari.girisAcisiEnCok() - MeteorAyarlari.girisAcisiEnAz())
+                    : aci;
+            MeteorAPI.dusur(level, hedef, olcek, gorunum, kaynak, true, a, rastgele.nextDouble() * 2 * Math.PI, null);
         }
         return true;
     }

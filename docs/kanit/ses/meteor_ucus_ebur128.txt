@@ -1,0 +1,24 @@
+Dosya: src/main/resources/assets/dogalafetler/sounds/meteor_ucus.ogg (52491 bayt, 8.0 sn, mono, 48000 Hz, Vorbis q5)
+Hedef (docs/tasarim/ses.md §4): -26.0 LUFS ±1, gerçek tepe <= -6.0 dBTP, baskın frekans 35–220 Hz, 2500 Hz üstü <= -30 dB
+Ölçülen (ogg): I = -26.0 LUFS, gerçek tepe = -12.0 dBTP
+Baskın frekanslar (20 Hz kümeleri, güçlüden zayıfa): 40 Hz, 60 Hz, 100 Hz
+Perde izi (0,5 sn pencerelerde en güçlü frekans, ilk 20): 48, 110, 94, 56, 38, 54, 46, 44, 96, 94, 92, 88, 38, 58, 96, 36 Hz
+Bant enerjisi / toplam: 35–220 Hz -0.2 dB; 300–3400 Hz (konuşma) -24.6 dB; >2500 Hz -33.3 dB; >8000 Hz -79.5 dB
+Döngü dikişi: |ilk - son| / en büyük iç adım = 0.216 (<= 1 ise süreksizlik yok); ilk örnek = +0.00021
+Hedefle karşılaştırma: UYGUN
+
+ffmpeg -i meteor_ucus.ogg -af ebur128=peak=true -f null -
+Summary:
+
+  Integrated loudness:
+    I:         -26.0 LUFS
+    Threshold: -36.0 LUFS
+
+  Loudness range:
+    LRA:         0.3 LU
+    Threshold: -45.9 LUFS
+    LRA low:   -26.1 LUFS
+    LRA high:  -25.8 LUFS
+
+  True peak:
+    Peak:      -12.0 dBFS

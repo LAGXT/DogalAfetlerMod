@@ -50,6 +50,9 @@ public final class MeteorYoneticisi {
         final List<MeteorVarligi> meteorlar = new ArrayList<>();
         final List<MeteorYagmuru> yagmurlar = new ArrayList<>();
         final List<ItemEntity> sicaklar = new ArrayList<>();
+        /** Son tick'te krater işlerinin kullandığı blok işlemi ve o tick'in bütçesi. */
+        int kraterIslemi;
+        int kraterButcesi;
 
         Durum(MeteorVerisi veri) {
             this.veri = veri;
@@ -145,6 +148,51 @@ public final class MeteorYoneticisi {
         return d == null ? 0 : d.yagmurlar.size();
     }
 
+    private static MeteorYagmuru yagmur(ServerLevel level, int kimlik) {
+        Durum d = DURUMLAR.get(level.dimension());
+        if (d != null) {
+            for (MeteorYagmuru y : d.yagmurlar) {
+                if (y.kimlik == kimlik) {
+                    return y;
+                }
+            }
+        }
+        return null;
+    }
+
+    /** Yağmurun oyuncu başına dakikadaki yoğunluğunu değiştirir; yağmur yoksa (bitti, durduruldu) {@code false}. */
+    static boolean yogunlukAyarla(ServerLevel level, int kimlik, double dakikaBasina) {
+        MeteorYagmuru y = yagmur(level, kimlik);
+        if (y != null) {
+            y.yogunlukAyarla(dakikaBasina);
+        }
+        return y != null;
+    }
+
+    static double yogunluk(ServerLevel level, int kimlik) {
+        MeteorYagmuru y = yagmur(level, kimlik);
+        return y == null ? Double.NaN : y.yogunluk();
+    }
+
+    static int atilanSayisi(ServerLevel level, YanginKaynagi kaynak) {
+        Durum d = DURUMLAR.get(level.dimension());
+        int sayi = 0;
+        if (d != null) {
+            for (MeteorYagmuru y : d.yagmurlar) {
+                if (y.kaynak.equals(kaynak)) {
+                    sayi += y.atilan();
+                }
+            }
+        }
+        return sayi;
+    }
+
+    /** Son tick'te krater işlerinin kullandığı blok işlemi ({@code [0]}) ve bütçesi ({@code [1]}). */
+    static int[] kraterIslemi(ServerLevel level) {
+        Durum d = DURUMLAR.get(level.dimension());
+        return d == null ? new int[] {0, 0} : new int[] {d.kraterIslemi, d.kraterButcesi};
+    }
+
     /** Kaynağın (null: hepsinin) yağmurlarını durdurur; {@code ucanlariAt} ise uçan meteorlarını da kaldırır. */
     static int durdur(MinecraftServer server, YanginKaynagi kaynak, boolean ucanlariAt) {
         int sayi = 0;
@@ -234,7 +282,7 @@ public final class MeteorYoneticisi {
             return;
         }
         d.yagmurlar.removeIf(y -> !y.tick(level));
-        kraterleriIlerlet(level, d.veri);
+        kraterleriIlerlet(level, d);
         if (!d.veri.sogumalar.isEmpty() && level.getGameTime() % SOGUMA_ARALIGI == 0) {
             sogumalariIsle(level, d.veri, false);
         }
@@ -247,8 +295,10 @@ public final class MeteorYoneticisi {
      * Krater işleri sırayla, ortak bütçeyle. Bekleyen (chunk'ı yüklü olmayan) iş sırayı tıkamaz. İndeksli döngü: bir işin
      * bitiş olayı yeni krater ekleyebilir.
      */
-    private static void kraterleriIlerlet(ServerLevel level, MeteorVerisi veri) {
+    private static void kraterleriIlerlet(ServerLevel level, Durum d) {
+        MeteorVerisi veri = d.veri;
         int butce = Math.max(1, (int) Math.round(MeteorAyarlari.kraterBlokButcesi() * TpsOlcer.kismaCarpani()));
+        d.kraterButcesi = butce;
         int i = 0;
         while (butce > 0 && i < veri.kraterler.size()) {
             KraterIsi is = veri.kraterler.get(i);
@@ -264,6 +314,7 @@ public final class MeteorYoneticisi {
                 i++;
             }
         }
+        d.kraterIslemi = d.kraterButcesi - butce;
     }
 
     /** Zamanı gelmiş (ya da {@code hepsi}) soğumalar: chunk yüklüyse magma kayaya döner, değilse kayıt bekler. */

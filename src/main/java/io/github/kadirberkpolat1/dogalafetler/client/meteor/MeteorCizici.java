@@ -6,6 +6,7 @@ import com.mojang.math.Axis;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorGorunumu;
 import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorVarligi;
+import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.MeteorOlcegi;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
@@ -51,8 +52,8 @@ final class MeteorCizici extends EntityRenderer<MeteorVarligi> {
     @Override
     public void render(MeteorVarligi m, float yaw, float kismi, PoseStack ps, MultiBufferSource tampon, int isik) {
         boolean ay = m.gorunum() == MeteorGorunumu.AY;
-        boolean buyuk = m.boyut().buyuk();
-        float olcek = buyuk ? 2.6F : 1.1F;
+        double boyOlcegi = m.olcek();
+        float olcek = (float) MeteorOlcegi.ara(boyOlcegi, 1.1, 2.6, 0.6, 3.4);
         Vec3 hiz = m.getDeltaMovement();
         if (hiz.lengthSqr() < 1e-8) {
             return;
@@ -90,7 +91,7 @@ final class MeteorCizici extends EntityRenderer<MeteorVarligi> {
         double kalan = m.inisKalanTick();
         if (inis != null && kalan >= 0 && kalan <= DISK_ONCESI) {
             float k = (float) (1 - kalan / DISK_ONCESI);
-            float boy = (buyuk ? 5.5F : 2.6F) * (0.3F + 0.7F * k);
+            float boy = (float) MeteorOlcegi.ara(boyOlcegi, 2.6, 5.5, 1.6, 7.0) * (0.3F + 0.7F * k);
             float guc = 0.25F + 0.75F * k;
             Vec3 p = inis.subtract(merkez).add(0, 0.04, 0);
             if (ay) {

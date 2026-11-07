@@ -151,6 +151,30 @@ Uçuşta rüzgâr ıslığı döngüsü meteoru izler, perde yaklaşırken 1,2, 
 suya/kara değince cız. Kendi sentez dosyası yok: vanilla sesler `SoundEvents` ile (kural: tek seferlik darbe
 `level.playSound`).
 
+### Ses ve yağmur güncellemesi (meteor-2, 2026-11-07; kararlar `.vibe/kararlar/meteor-2.md`)
+
+Kullanıcı isteği: uçuş sesi her yerden duyuluyor ve vanilla gibi. Artık iki sentez dosyası var (`tools/assets/ses_uret.py`,
+ölçüm `docs/kanit/ses/meteor_*_ebur128.txt`): **uçuş** `meteor_ucus.ogg` (8 sn döngü; 35–90 / 90–220 Hz yanma kükremesi
+0,25 Hz'de çapraz kayar, 70→95 Hz süzülen kısmi ton, 6 Hz plazma çalkantısı, konuşma çentiği; −26 LUFS) yalnız meteor 48 blok
+yakınındayken çalar (52 blokta söner), kazanç `(1 − d/48)²`, perde dinleyiciye yaklaşma hızından Doppler `12 / (12 − v)` (3 blok/tick'te
+1,33 → 0,8), ay parçaları %10 tiz; **patlama** `meteor_patlama.ogg` (7 sn tek seferlik; kırılma darbesi, 90 → 32 Hz göğüs vuruşu, 2,2 sn
+zaman sabitli 20–120 Hz uğultu kuyruğu, çakıl; −23 LUFS, ≤ −6 dBTP) büyükte 128, küçükte 96 blok içinde (küçük %70 düzey,
+büyük perde 0,85), kazanç karesel. İkisini de istemci vanilla zayıflaması kapalı çalar (konum yalnız yön için); her türden aynı anda
+en çok 6 (ses.md §4 kural 3): uçuşta en yakın altı, çarpmada en uzaktaki düşer. Sunucunun `entity.generic.explode`'u kalktı; suda
+sıçrama + cız vanilla kalır. Ay parçası görünümü mevcut `AY` varyantıdır (kalsit + pürüzsüz bazalt/tüf gövde, mavi-beyaz
+plazma); yeni doku gerekmedi.
+
+**Yağmur yoğunluğu (istek 27):** güneş patlaması ön-uyarının son 90 sn'sinde öncü yağmur başlatır (oyuncu başına 6/dk) ve
+siren boyunca 24/dk'ya çıkar; AKTIF'in başında 10 dk, sonraki günlerin başında 3 dk 90/dk, arasında bölüm D'nin 1,5 → 5/dk
+arka planı. Ay parçası yağmuru oyuncu başına 90/dk, 10 dk. Dağılım (32–160 blok halka) ve krater bütçesi (512 × TPS
+kısması) aynı; uçan meteor tavanı 48 → 96 (doluyken atılamayan meteor düşmez, kuyruk yok).
+
+**Boyut değişkenliği (istek 27):** meteorun sürekli ölçeği (`meteor.mantik.MeteorOlcegi`, senkron varlık verisi ve çarpma
+paketinde): %60 küçük 0,5–0,9×, %30 orta 0,9–1,6×, %10 büyük 1,6–2,5×, bant içinde düzgün. Eski küçük/büyük config değerleri
+tipik ölçek 0,7 ve 2,0'daki referanslardır; arası ve uçları doğrusal: gövde çapı 1,1 → 2,6 (ölçek 2,5'te 3,2), iz 40 → 72 blok,
+hız ×0,95 → ×1,15, krater yarıçapı 2,5 → 5,5 (2,5×'te 6,7), sarsıntı menzili 48 → 112, yangın yoğunluğu 0,45 → 0,85, patlama sesi
+96 → 128 blok ve %70 → %100 düzey, perde 1,0 → 0,85. Ödül sınıfı büyük banttır (Kozmik Çekirdek yalnız 1,6× ve üstünde).
+
 ## Buz altı balıkçılık (madde 15)
 
 ### Gerçek olay

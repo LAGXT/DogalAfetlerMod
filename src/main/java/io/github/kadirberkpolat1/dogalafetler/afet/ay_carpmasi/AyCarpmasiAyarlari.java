@@ -76,12 +76,14 @@ public final class AyCarpmasiAyarlari {
         private final ForgeConfigSpec.BooleanValue halka;
 
         private Sunucu(ForgeConfigSpec.Builder k) {
-            meteorSuresiSn = k.comment("Çarpmadan 10 sn sonra başlayan ay parçası yağmurunun süresi (sn; bölüm H: 1-2 dk).")
-                    .defineInRange("meteorSuresiSn", 90, 60, 120);
-            meteorDakikaBasina = k.comment("Oyuncu başına dakikada düşen ay parçası (7,5 = 8 sn'de bir).")
-                    .defineInRange("meteorDakikaBasina", 7.5, 0.0, 60.0);
-            meteorBuyukOrani = k.comment("Ay parçası yağmurunda büyük meteor olasılığı.")
-                    .defineInRange("meteorBuyukOrani", 0.04, 0.0, 1.0);
+            meteorSuresiSn = k.comment("Çarpmadan 10 sn sonra başlayan ay parçası yağmurunun süresi (sn; bölüm H 1-2 dk, kullanıcı "
+                    + "isteği 27: 10 dk); afet yağmurla biter.")
+                    .defineInRange("meteorSuresiSn", 600, 60, 900);
+            meteorDakikaBasina = k.comment("Oyuncu başına dakikada düşen ay parçası (90 = 1,5/sn; 10 dk'da oyuncu başına 900); "
+                    + "tavan doluyken atılamayan parça düşmez.")
+                    .defineInRange("meteorDakikaBasina", 90.0, 0.0, 300.0);
+            meteorBuyukOrani = k.comment("Ay parçası yağmurunda büyük bant (1,6–2,5×) olasılığı; orta bant meteor.ortaMeteorOrani.")
+                    .defineInRange("meteorBuyukOrani", 0.10, 0.0, 1.0);
             sarsintiBlokSayisi = k.comment("Çarpma sarsıntısında (12 sn) oyuncu başına en çok düşen blok "
                     + "(#dogalafetler:ay_sarsintisi_duser; afetBlokHasari kapalıyken hiç).")
                     .defineInRange("sarsintiBlokSayisi", 35, 0, 200);

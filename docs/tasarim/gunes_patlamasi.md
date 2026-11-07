@@ -102,3 +102,17 @@ Kaynaklar:
   ve kızıl cüce şafak tonu görünüm uzayında (F1'de de); sesler kavurucu rüzgâr (`OrtamSesi`), süpernova basıncı + kristal
   uğultu ve kızıl cüce akoru (`tools/assets/gunes_sesleri.py`). Yapılmayanlar: çarpma anının ayrı beyaz örtüsü, süpernova
   çökmesinde öteki ortam seslerinin susturulması.
+
+## 8. Meteor yağmuru güncellemesi (meteor-2, 2026-11-07; kararlar `.vibe/kararlar/meteor-2.md`)
+
+Kullanıcı: patlamadan önce ve patlama sırasında meteor az; istek 27 ("koskoca güneş patlıyor, 5–6 tane düşüyor"): aşırı fazla,
+10 dk, boyutlar farklı. Yoğunluk `mantik.MeteorYagmuruEgrisi`: ön-uyarının son `meteorYagmuruOncuSaniye` (90) saniyesinde öncü
+yağmur oyuncu başına 6/dk başlar, siren (güneş büyürken) boyunca doğrusal `meteorYagmuruOncuSonDakikaBasina` 24/dk'ya çıkar;
+AKTIF'in başında `meteorYagmuruSaniye` **600 sn (10 dk)**, sonraki her günün başında `meteorYagmuruGunlukSaniye` 180 sn
+`meteorYagmuruDakikaBasina` **90/dk** (1,5/sn) gerçek meteor yağmuru, arasında §2'nin 1/40 sn → 1/12 sn arka planı. Pencereler AKTIF
+sayacından ölçülür (uyku sayılmaz); afet erken biterse yağmur afetle biter. Afetin tek yağmuru eğriyi her tick izler
+(`MeteorAPI.yagmurYogunluguAyarla`). Dağılım (32–160 blok halka) ve krater bütçesi aynı; uçan meteor tavanı 48 → 96, doluyken
+atılamayan meteor düşmez. **Boyut:** her meteorun sürekli ölçeği (`meteor.mantik.MeteorOlcegi`): %60 küçük 0,5–0,9×, %30 orta
+0,9–1,6×, %10 büyük 1,6–2,5× (`buyukMeteorOrani` 0,10, `meteor.ortaMeteorOrani` 0,30); görünür boyut, hız (×0,9–1,2),
+iz, krater, yangın, sarsıntı ve patlama sesi ölçekle. Not: öncü meteorlar N7'nin gizli ön-uyarısını bilerek bozar (kullanıcı
+isteği; radar yine göstermez).

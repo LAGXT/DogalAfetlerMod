@@ -10,6 +10,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.olay.DonemDegistiEvent;
 import io.github.kadirberkpolat1.dogalafetler.esya.MeteorEsyaKayitlari;
 import io.github.kadirberkpolat1.dogalafetler.esya.termostat.Termostat;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
+import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.MeteorOlcegi;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.OdulZamani;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.OdulZari;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.SicaklikAyarlari;
@@ -114,8 +115,8 @@ public final class MeteorOyunTestleri {
     /** Doğrudan çarpma (uçuşsuz): krater işi döner. */
     private static KraterIsi carp(GameTestHelper y, MeteorBoyutu boyut, YanginKaynagi kaynak, OdulZari.Sanslar sanslar) {
         BlockPos zemin = y.absolutePos(MERKEZ);
-        return MeteorCarpmasi.carp(y.getLevel(), zemin, Vec3.atBottomCenterOf(zemin.above()), boyut, MeteorGorunumu.GUNES,
-                kaynak, false, sanslar, false);
+        return MeteorCarpmasi.carp(y.getLevel(), zemin, Vec3.atBottomCenterOf(zemin.above()), boyut.tipikOlcek(),
+                MeteorGorunumu.GUNES, kaynak, false, sanslar, false);
     }
 
     /**
@@ -153,7 +154,8 @@ public final class MeteorOyunTestleri {
         y.setBlock(sert, Blocks.OBSIDIAN);
         y.setBlock(MERKEZ.offset(0, -1, 1), Blocks.BEDROCK);
         ServerLevel level = y.getLevel();
-        Optional<MeteorVarligi> m = MeteorAPI.dusur(level, y.absolutePos(MERKEZ), MeteorBoyutu.BUYUK, MeteorGorunumu.GUNES,
+        Optional<MeteorVarligi> m = MeteorAPI.dusur(level, y.absolutePos(MERKEZ), MeteorBoyutu.BUYUK.tipikOlcek(),
+                MeteorGorunumu.GUNES,
                 YanginKaynagi.KOMUT, false, 90, 0, HIC);
         dogrula(y, m.isPresent(), "meteor varlığı oluşmalı");
         dogrula(y, m.get().getY() > y.absolutePos(MERKEZ).getY() + 100, "meteor yukarıdan başlamalı: " + m.get().getY());
@@ -363,7 +365,8 @@ public final class MeteorOyunTestleri {
         List<MeteorCarptiEvent> olaylar = new ArrayList<>();
         Consumer<MeteorCarptiEvent> dinleyici = olaylar::add;
         MinecraftForge.EVENT_BUS.addListener(EventPriority.NORMAL, false, MeteorCarptiEvent.class, dinleyici);
-        Optional<MeteorVarligi> m = MeteorAPI.dusur(level, y.absolutePos(MERKEZ), MeteorBoyutu.BUYUK, MeteorGorunumu.GUNES,
+        Optional<MeteorVarligi> m = MeteorAPI.dusur(level, y.absolutePos(MERKEZ), MeteorBoyutu.BUYUK.tipikOlcek(),
+                MeteorGorunumu.GUNES,
                 YanginKaynagi.KOMUT, false, 90, 0, HEP);
         dogrula(y, m.isPresent(), "meteor varlığı oluşmalı");
         y.succeedWhen(() -> {
@@ -382,7 +385,7 @@ public final class MeteorOyunTestleri {
     }
 
     /**
-     * Yağmur: iki oyuncuya sırayla (fark ≤ 1) ve uçan meteor tavanı ({@code meteor.varlikTavani} 48) aşılmaz. Dağıtım
+     * Yağmur: iki oyuncuya sırayla (fark ≤ 1) ve uçan meteor tavanı ({@code meteor.varlikTavani} 96) aşılmaz. Dağıtım
      * halkası 0–2 blok ve giriş dik: meteorlar sahneye düşer.
      */
     @GameTest(template = SAHNE, batch = "meteor_yagmur", timeoutTicks = 300)
@@ -424,6 +427,101 @@ public final class MeteorOyunTestleri {
             level.getServer().getPlayerList().remove(a);
             level.getServer().getPlayerList().remove(b);
             sahneyiTemizle(y);
+        });
+    }
+
+    /**
+     * meteor-2: yoğun yağmurda aynı anda bekleyen krater işleri tick başına ortak bütçeyi ({@code meteor.kraterBlokButcesi}
+     * × TPS kısması) aşmaz; 16 küçük krater bütçeyi en az bir tick tam doldurur (bütçe gerçekten sınırlar).
+     */
+    @GameTest(template = SAHNE, batch = "meteor_butce", timeoutTicks = 300)
+    public static void yogunCarpmadaKraterIslemiButceyiAsmaz(GameTestHelper y) {
+        blokHasari(y, true);
+        zemin(y, Blocks.DIRT);
+        ServerLevel level = y.getLevel();
+        for (int i = 0; i < 16; i++) {
+            carp(y, MeteorBoyutu.KUCUK, YanginKaynagi.KOMUT, HIC);
+        }
+        int[] asim = {Integer.MIN_VALUE};
+        int[] toplam = {0};
+        int[] tick = {0};
+        boolean[] doldu = {false};
+        y.onEachTick(() -> {
+            int islem = MeteorAPI.sonKraterIslemi(level);
+            int butce = MeteorAPI.sonKraterButcesi(level);
+            if (islem > 0) {
+                tick[0]++;
+                toplam[0] += islem;
+                asim[0] = Math.max(asim[0], islem - butce);
+                doldu[0] |= islem == butce;
+            }
+        });
+        y.succeedWhen(() -> {
+            y.assertTrue(bekleyenKrater(y) == 0, "krater işleri sürüyor");
+            DogalAfetler.LOGGER.info("meteor bütçe GameTest: {} işlem {} tick'te, en büyük aşım {}, bütçe doldu {}", toplam[0],
+                    tick[0], asim[0], doldu[0]);
+            y.assertTrue(asim[0] <= 0, "tick başına krater bütçesi aşıldı: " + asim[0]);
+            y.assertTrue(doldu[0] && tick[0] >= 2, "bütçe sınırlamalı (16 krater birkaç tick'e yayılmalı): " + tick[0]);
+            sahneyiTemizle(y);
+        });
+    }
+
+    /** Hızlandırılmış 10 dk: oyuncu başına 90/dk × 10 dk = 900 meteor bu kadar tick'e sıkıştırılır (20× yoğunluk). */
+    private static final int ON_DAKIKA_TICK = 600;
+
+    /**
+     * meteor-2 (istek 27): 10 dakikalık yağmurun meteor sayısı (900) 30 sn'ye sıkıştırılır: tick başına 1,5 meteor, 16 oyuncunun
+     * gerçek 90/dk yoğunluğundan (1,2/tick) ağır. Uçan meteor her tick tavanın altında, krater bütçesi aşılmaz, yağmur
+     * bitince bekleyen meteor kalmaz (kuyruk yok). Ölçek dağılımı (%10 büyük, %30 orta) çarpmalarda görülür. {@code afetBlokHasari}
+     * kapalı: krater yok, sahne değişmez.
+     */
+    @GameTest(template = SAHNE, batch = "meteor_on_dakika", timeoutTicks = ON_DAKIKA_TICK + 300)
+    public static void onDakikalikYogunYagmurTavanVeButceyiAsmazBoyutlarDegisir(GameTestHelper y) {
+        GameRules.BooleanValue kural = blokHasari(y, false);
+        zemin(y, Blocks.STONE);
+        ServerLevel level = y.getLevel();
+        BlockPos m = y.absolutePos(BlockPos.ZERO);
+        ServerPlayer a = CekirdekOyunTestleri.sahteOyuncu(y, new GameProfile(UUID.randomUUID(), "meteor-on-dakika"),
+                m.getX() + 7.5, m.getY() + 6, m.getZ() + 7.5);
+        List<MeteorCarptiEvent> olaylar = new ArrayList<>();
+        Consumer<MeteorCarptiEvent> dinleyici = olaylar::add;
+        MinecraftForge.EVENT_BUS.addListener(EventPriority.NORMAL, false, MeteorCarptiEvent.class, dinleyici);
+        int tavan = MeteorAyarlari.varlikTavani();
+        int[] enCokUcan = {0};
+        int[] asim = {Integer.MIN_VALUE};
+        int kimlik = MeteorAPI.yagmur(level, List.of(a), ON_DAKIKA_TICK, 90.0 * 20, 0.10, YanginKaynagi.KOMUT, 0, 2, 90);
+        int[] atilan = {0};
+        y.onEachTick(() -> {
+            enCokUcan[0] = Math.max(enCokUcan[0], MeteorAPI.aktifMeteorSayisi(level));
+            asim[0] = Math.max(asim[0], MeteorAPI.sonKraterIslemi(level) - MeteorAPI.sonKraterButcesi(level));
+            atilan[0] = Math.max(atilan[0], MeteorAPI.atilanMeteorSayisi(level, YanginKaynagi.KOMUT));
+        });
+        y.succeedWhen(() -> {
+            y.assertTrue(MeteorAPI.aktifYagmurSayisi(level) == 0 && MeteorAPI.aktifMeteorSayisi(level) == 0,
+                    "yağmur ya da uçan meteor sürüyor (yağmur " + kimlik + ")");
+            MinecraftForge.EVENT_BUS.unregister(dinleyici);
+            int[] bant = new int[3];
+            double enAz = Double.MAX_VALUE;
+            double enCok = 0;
+            for (MeteorCarptiEvent o : olaylar) {
+                bant[MeteorOlcegi.bant(o.olcek())]++;
+                enAz = Math.min(enAz, o.olcek());
+                enCok = Math.max(enCok, o.olcek());
+            }
+            int n = olaylar.size();
+            DogalAfetler.LOGGER.info("meteor 10 dk GameTest: atılan {}, çarpan {}, en çok uçan {}/{}, bütçe aşımı {}; bant "
+                    + "küçük/orta/büyük {}/{}/{}, ölçek {}–{}", atilan[0], n, enCokUcan[0], tavan, asim[0], bant[0], bant[1],
+                    bant[2], (float) enAz, (float) enCok);
+            kural.set(true, level.getServer());
+            level.getServer().getPlayerList().remove(a);
+            sahneyiTemizle(y);
+            y.assertTrue(atilan[0] == ON_DAKIKA_TICK * 90 * 20 / 1200, "900 meteor atılmalı: " + atilan[0]);
+            y.assertTrue(enCokUcan[0] <= tavan, "uçan meteor tavanı aşıldı: " + enCokUcan[0] + " / " + tavan);
+            y.assertTrue(asim[0] <= 0, "krater bütçesi aşıldı: " + asim[0]);
+            y.assertTrue(n > 0 && n <= atilan[0], "çarpan " + n + " / atılan " + atilan[0]);
+            y.assertTrue(bant[2] >= n * 0.04 && bant[2] <= n * 0.18 && bant[1] >= n * 0.2 && bant[0] >= n * 0.45,
+                    "bant dağılımı " + bant[0] + "/" + bant[1] + "/" + bant[2]);
+            y.assertTrue(enAz < MeteorOlcegi.ORTA_ALT && enCok >= MeteorOlcegi.BUYUK_ALT, "ölçek değişmeli: " + enAz + "–" + enCok);
         });
     }
 
@@ -583,7 +681,8 @@ public final class MeteorOyunTestleri {
     public static void sifirlamaUcanMeteorVeSicakParcayiTemizler(GameTestHelper y) {
         zemin(y, Blocks.STONE);
         ServerLevel level = y.getLevel();
-        Optional<MeteorVarligi> m = MeteorAPI.dusur(level, y.absolutePos(MERKEZ), MeteorBoyutu.KUCUK, MeteorGorunumu.GUNES,
+        Optional<MeteorVarligi> m = MeteorAPI.dusur(level, y.absolutePos(MERKEZ), MeteorBoyutu.KUCUK.tipikOlcek(),
+                MeteorGorunumu.GUNES,
                 YanginKaynagi.KOMUT, false, 90, 0, HIC);
         int yagmur = MeteorAPI.yagmur(level, List.of(), 2000, 1, 0, YanginKaynagi.KOMUT);
         ItemEntity sicak = MeteorOdulleri.birak(level, Vec3.atBottomCenterOf(y.absolutePos(new BlockPos(3, 6, 3))),

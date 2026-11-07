@@ -11,26 +11,24 @@ import net.minecraftforge.network.NetworkEvent;
  * {@code meteor/sarsinti}: bir çarpma (sunucu → istemci, 256 blok içindeki oyunculara, çarpma başına bir kez). İstemci
  * çarpma parçacıklarını, parlamayı ve {@code siddet} &gt; 0 ise ekran sarsıntısını o oyuncuya özgü çalar (madde 3).
  *
+ * @param olcek meteorun sürekli ölçeği ({@code mantik.MeteorOlcegi}; okurken 0,1–4'e kırpılır)
  * @param siddet bu oyuncunun sarsıntı şiddeti (0–1; mesafeyle, {@code Sarsinti.siddet})
  */
-public record MeteorSarsintiPaketi(double x, double y, double z, byte boyut, byte gorunum, boolean suya, float siddet) {
+public record MeteorSarsintiPaketi(double x, double y, double z, float olcek, byte gorunum, boolean suya, float siddet) {
     public static void yaz(MeteorSarsintiPaketi p, FriendlyByteBuf t) {
         t.writeDouble(p.x);
         t.writeDouble(p.y);
         t.writeDouble(p.z);
-        t.writeByte(p.boyut);
+        t.writeFloat(p.olcek);
         t.writeByte(p.gorunum);
         t.writeBoolean(p.suya);
         t.writeFloat(p.siddet);
     }
 
     public static MeteorSarsintiPaketi oku(FriendlyByteBuf t) {
-        return new MeteorSarsintiPaketi(t.readDouble(), t.readDouble(), t.readDouble(), t.readByte(), t.readByte(),
-                t.readBoolean(), Math.max(0f, Math.min(1f, t.readFloat())));
-    }
-
-    public MeteorBoyutu boyutu() {
-        return MeteorBoyutu.kimlik(boyut);
+        return new MeteorSarsintiPaketi(t.readDouble(), t.readDouble(), t.readDouble(),
+                Math.max(0.1f, Math.min(4f, t.readFloat())), t.readByte(), t.readBoolean(),
+                Math.max(0f, Math.min(1f, t.readFloat())));
     }
 
     public MeteorGorunumu gorunumu() {

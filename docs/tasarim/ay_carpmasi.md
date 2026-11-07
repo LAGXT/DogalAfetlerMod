@@ -131,3 +131,12 @@ Kademe: enkaz 12 / 24 / 40 / 64, duman 4 / 7 / 10 / 14, küre enlem dilimi 8 / 1
 
 **Ay yalnız gece patlar (G2-9).** Doğal ay çarpması AKTIF'e (çarpma) yalnız gece (gün saati 13000–23000) geçer; ON_UYARI
 gerekirse akşama kadar sessizce bekler, 60 sn'lik yaklaşma (siren) gece göğünde biter. `/dogalafet start` bu pencereye bakmaz.
+
+## Meteor-2 güncellemesi, 2026-11-07 (kararlar `.vibe/kararlar/meteor-2.md`)
+
+- Ay parçası yağmuru oyuncu başına 7,5 → 30 → **90/dk** (istek 27; `ay_carpmasi.meteorDakikaBasina`, 1,5/sn), süre 90 sn →
+  **600 sn / 10 dk** (`meteorSuresiSn`, aralık 60–900; bölüm H'nin "1–2 dk"sı kullanıcı isteğiyle aşıldı): 10 dk'da oyuncu başına
+  900 parça; afet yağmurla biter (çarpma + 10 sn + 10 dk). Uçan meteor tavanı 96, doluyken atılamayan parça düşmez.
+- Boyut değişkenliği güneş meteorlarıyla aynı dağılım (`meteor.mantik.MeteorOlcegi`: %60 küçük 0,5–0,9×, %30 orta, %10 büyük
+  1,6–2,5×; `meteorBuyukOrani` 0,10). Görünüm mevcut `AY` varyantı (gri-beyaz kalsit + pürüzsüz bazalt/tüf gövde, mavi-beyaz
+  plazma izi); yeni doku gerekmedi. Uçuş/çarpma sesleri meteor sisteminin (`esyalar.md` "Ses ve yağmur güncellemesi").

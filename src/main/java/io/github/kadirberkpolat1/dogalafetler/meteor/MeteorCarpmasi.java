@@ -2,6 +2,7 @@ package io.github.kadirberkpolat1.dogalafetler.meteor;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
+import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.MeteorOlcegi;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.OdulZari;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.Sarsinti;
 import io.github.kadirberkpolat1.dogalafetler.network.AgKanali;
@@ -18,8 +19,10 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.common.MinecraftForge;
 
 /**
- * Çarpma anı: sarsıntı/görsel paketi, gümbürtü, krater sıcaklığı ve krater işi. Krater blokları, yangın ve ödüller
- * {@link KraterIsi}'nde tick'lere yayılır. Suya düşen meteor buhar çıkarır; krater, ateş ve ödül yoktur.
+ * Çarpma anı: sarsıntı/görsel paketi, krater sıcaklığı ve krater işi. Patlama sesini paketi alan istemci menzil ve mesafe
+ * kazancıyla çalar ({@code client.meteor.MeteorSesi}). Krater blokları, yangın ve ödüller {@link KraterIsi}'nde tick'lere
+ * yayılır. Suya düşen meteor sıçrama ve buhar çıkarır; krater, ateş ve ödül yoktur. Büyüklüğe bağlı her değer sürekli
+ * ölçekten ({@link MeteorOlcegi#ara}); ödül sınıfı ölçeğin bantıdır.
  */
 final class MeteorCarpmasi {
     /** Çarpılan yüzeyin üstünde boşaltılan blok (bitki, kar, asılı blok). */
@@ -30,50 +33,49 @@ final class MeteorCarpmasi {
     private MeteorCarpmasi() {
     }
 
-    static KraterIsi carp(ServerLevel level, BlockPos zemin, Vec3 nokta, MeteorBoyutu boyut, MeteorGorunumu gorunum,
+    static KraterIsi carp(ServerLevel level, BlockPos zemin, Vec3 nokta, double olcek, MeteorGorunumu gorunum,
             YanginKaynagi kaynak, boolean sarsinti, OdulZari.Sanslar sanslar, boolean suya) {
-        paketGonder(level, nokta, boyut, gorunum, suya, sarsinti);
+        paketGonder(level, nokta, olcek, gorunum, suya, sarsinti);
         boolean ay = gorunum == MeteorGorunumu.AY;
+        MeteorBoyutu boyut = MeteorBoyutu.olcekten(olcek);
         if (suya) {
-            level.playSound(null, nokta.x, nokta.y, nokta.z, SoundEvents.GENERIC_SPLASH, SoundSource.BLOCKS,
-                    boyut.buyuk() ? 6f : 3f, ay ? 0.7f : 0.6f);
-            level.playSound(null, nokta.x, nokta.y, nokta.z, SoundEvents.LAVA_EXTINGUISH, SoundSource.BLOCKS,
-                    boyut.buyuk() ? 6f : 3f, 0.5f);
-            level.sendParticles(ParticleTypes.CLOUD, nokta.x, nokta.y + 0.5, nokta.z, boyut.buyuk() ? 60 : 24, 1.2, 0.6,
-                    1.2, 0.06);
-            DogalAfetler.LOGGER.info("meteor suya düştü: {} ({}, {}): buhar, krater yok", zemin.toShortString(),
-                    boyut, level.dimension().location());
-            MinecraftForge.EVENT_BUS.post(new MeteorCarptiEvent(level, zemin, boyut, kaynak, OdulZari.Sonuc.YOK, true));
+            float hacim = (float) MeteorOlcegi.ara(olcek, 3, 6, 2, 8);
+            level.playSound(null, nokta.x, nokta.y, nokta.z, SoundEvents.GENERIC_SPLASH, SoundSource.BLOCKS, hacim,
+                    ay ? 0.7f : 0.6f);
+            level.playSound(null, nokta.x, nokta.y, nokta.z, SoundEvents.LAVA_EXTINGUISH, SoundSource.BLOCKS, hacim, 0.5f);
+            level.sendParticles(ParticleTypes.CLOUD, nokta.x, nokta.y + 0.5, nokta.z,
+                    (int) Math.round(MeteorOlcegi.ara(olcek, 24, 60, 12, 80)), 1.2, 0.6, 1.2, 0.06);
+            DogalAfetler.LOGGER.info("meteor suya düştü: {} ({}, ölçek {}, {}): buhar, krater yok", zemin.toShortString(),
+                    boyut, (float) olcek, level.dimension().location());
+            MinecraftForge.EVENT_BUS.post(new MeteorCarptiEvent(level, zemin, olcek, kaynak, OdulZari.Sonuc.YOK, true));
             return null;
         }
-        level.playSound(null, nokta.x, nokta.y, nokta.z, SoundEvents.GENERIC_EXPLODE, SoundSource.BLOCKS,
-                boyut.buyuk() ? 10f : 5f, (boyut.buyuk() ? 0.55f : 0.75f) * (ay ? 1.1f : 1f));
-        double yaricap = MeteorAyarlari.kraterYaricapi(boyut);
-        double derinlik = MeteorAyarlari.kraterDerinligi(boyut);
+        double yaricap = MeteorAyarlari.kraterYaricapi(olcek);
+        double derinlik = MeteorAyarlari.kraterDerinligi(olcek);
         int sicaklikSaniye = MeteorAyarlari.kraterSicaklikSaniye();
         if (sicaklikSaniye > 0) {
-            SicaklikKancalari.ortamKaynagiEkle(level, Vec3.atCenterOf(zemin), MeteorAyarlari.kraterSicakligi(boyut),
+            SicaklikKancalari.ortamKaynagiEkle(level, Vec3.atCenterOf(zemin), MeteorAyarlari.kraterSicakligi(olcek),
                     Math.min(64, Math.max(6, yaricap * 4)), sicaklikSaniye * 20);
         }
         boolean blokHasari = Kurallar.blokHasariAcik(level.getGameRules());
         long tohum = level.random.nextLong();
         OdulZari.Sonuc odul = OdulZari.at(boyut.buyuk(), sanslar, new Random(tohum ^ 0x5DEECE66DL));
-        KraterIsi is = new KraterIsi(zemin, yaricap, derinlik, tohum, boyut, gorunum, kaynak, odul, blokHasari);
+        KraterIsi is = new KraterIsi(zemin, yaricap, derinlik, tohum, olcek, gorunum, kaynak, odul, blokHasari);
         MeteorYoneticisi.kraterEkle(level, is);
         return is;
     }
 
-    private static void paketGonder(ServerLevel level, Vec3 nokta, MeteorBoyutu boyut, MeteorGorunumu gorunum,
+    private static void paketGonder(ServerLevel level, Vec3 nokta, double olcek, MeteorGorunumu gorunum,
             boolean suya, boolean sarsinti) {
-        int menzil = MeteorAyarlari.sarsintiMenzili(boyut);
-        double temel = (boyut.buyuk() ? 0.8 : 0.35) * (suya ? 0.5 : 1.0);
+        double menzil = MeteorAyarlari.sarsintiMenzili(olcek);
+        double temel = MeteorOlcegi.ara(olcek, 0.35, 0.8, 0.2, 1.0) * (suya ? 0.5 : 1.0);
         for (ServerPlayer oyuncu : level.players()) {
             double mesafe = oyuncu.position().distanceTo(nokta);
             if (mesafe > GORSEL_MENZIL) {
                 continue;
             }
             float siddet = sarsinti ? (float) Sarsinti.siddet(mesafe, menzil, temel) : 0f;
-            AgKanali.oyuncuyaGonder(oyuncu, new MeteorSarsintiPaketi(nokta.x, nokta.y, nokta.z, (byte) boyut.ordinal(),
+            AgKanali.oyuncuyaGonder(oyuncu, new MeteorSarsintiPaketi(nokta.x, nokta.y, nokta.z, (float) olcek,
                     (byte) gorunum.ordinal(), suya, siddet));
         }
     }
