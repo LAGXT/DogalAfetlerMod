@@ -305,11 +305,18 @@ public final class MeteorOtomasyonu {
 
     /**
      * Yağmur bölümü: güneş patlaması ön-uyarısında (öncü yağmur) ve sirende kare, sirende yakın/uzak çarpma ses denemesi,
-     * sonra ay parçası yağmuru. Kare isteyen tick'te bekleyen kare alınana kadar sayaç ilerlemez.
+     * sonra ay parçası yağmuru. Meteorlar vitrindeki gibi yavaş çekimde düşer (uçuş 5 kat uzun: kadrajda aynı anda daha çok
+     * iz; yoğunluk değişmez). Kare isteyen tick'te bekleyen kare alınana kadar sayaç ilerlemez.
      */
     private static void yagmurBolumu(IntegratedServer server) {
         switch (sayac) {
-            case 1 -> komut(server, "dogalafet sifirla", "dogalafet start gunes_patlamasi");
+            case 1 -> {
+                server.execute(() -> {
+                    eskiHiz = MeteorAyarlari.dusmeHizi();
+                    MeteorAyarlari.dusmeHiziAyarla(YAVAS_CEKIM);
+                });
+                komut(server, "dogalafet sifirla", "dogalafet start gunes_patlamasi");
+            }
             case 600 -> {
                 kare("gunes_onuyari");
                 sayim(server, "güneş ön-uyarı");
@@ -334,7 +341,10 @@ public final class MeteorOtomasyonu {
                 kare("ay_parcalari_b");
                 sayim(server, "ay parçaları");
             }
-            case 2101 -> komut(server, "dogalafet stop", "dogalafet sifirla");
+            case 2101 -> {
+                komut(server, "dogalafet stop", "dogalafet sifirla");
+                server.execute(() -> MeteorAyarlari.dusmeHiziAyarla(eskiHiz));
+            }
             case 2200 -> {
                 adim = 4;
                 sayac = 0;

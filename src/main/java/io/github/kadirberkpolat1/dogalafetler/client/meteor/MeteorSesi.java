@@ -7,20 +7,14 @@ import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorSesleri;
 import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorVarligi;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.MeteorSesMenzili;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.AbstractTickableSoundInstance;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.sounds.SoundManager;
 import net.minecraft.sounds.SoundSource;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -38,52 +32,78 @@ final class MeteorSesi {
     private record Patlama(SimpleSoundInstance ses, double mesafe, long baslangic) {
     }
 
-    private static final Map<MeteorVarligi, Ucus> UCUSLAR = new HashMap<>();
-    private static final Set<Integer> GORULEN = new HashSet<>();
+    /** İstemciye giren meteor, çalan uçuş sesi (yoksa null), sesi hiç çaldı mı ve dinleyiciye en yakın mesafesi. */
+    private static final class Izlenen {
+        final MeteorVarligi meteor;
+        Ucus ucus;
+        boolean caldi;
+        double enYakin = Double.MAX_VALUE;
+
+        Izlenen(MeteorVarligi meteor) {
+            this.meteor = meteor;
+        }
+    }
+
+    private static final List<Izlenen> METEORLAR = new ArrayList<>();
     private static final List<Patlama> PATLAMALAR = new ArrayList<>();
     private static long saat;
 
     private MeteorSesi() {
     }
 
+    /** İstemci dünyasına meteor girdi ({@code EntityJoinLevelEvent}). */
+    static void ekle(MeteorVarligi meteor) {
+        METEORLAR.add(new Izlenen(meteor));
+    }
+
     /** Her istemci tick'i: duyulan meteorlardan en yakın altısının uçuş sesi çalar, menzilden çıkanınki söner. */
     static void tick(Minecraft mc) {
         saat++;
-        UCUSLAR.entrySet().removeIf(g -> g.getValue().isStopped() || g.getKey().isRemoved());
-        List<MeteorVarligi> meteorlar = new ArrayList<>();
-        for (Entity e : mc.level.entitiesForRendering()) {
-            if (e instanceof MeteorVarligi m && !m.isRemoved()) {
-                meteorlar.add(m);
+        METEORLAR.removeIf(iz -> {
+            if (!iz.meteor.isRemoved()) {
+                return false;
             }
+            if (iz.ucus != null) {
+                iz.ucus.bitir();
+            }
+            if (!iz.caldi) {
+                log(iz.enYakin <= MeteorSesMenzili.UCUS_MENZILI ? "uçuş çalmadı: meteor {} en yakın {}, tavan dolu"
+                        : "uçuş çalmadı: meteor {} en yakın {} > menzil {}", iz.meteor.getId(), iz.enYakin,
+                        MeteorSesMenzili.UCUS_MENZILI);
+            }
+            return true;
+        });
+        if (METEORLAR.isEmpty()) {
+            return;
         }
         Vec3 dinleyici = mc.player.getEyePosition();
-        double[] mesafeler = new double[meteorlar.size()];
-        boolean[] caliyor = new boolean[meteorlar.size()];
-        for (int i = 0; i < mesafeler.length; i++) {
-            mesafeler[i] = meteorlar.get(i).position().distanceTo(dinleyici);
-            caliyor[i] = UCUSLAR.containsKey(meteorlar.get(i));
+        int n = METEORLAR.size();
+        double[] mesafeler = new double[n];
+        boolean[] caliyor = new boolean[n];
+        for (int i = 0; i < n; i++) {
+            Izlenen iz = METEORLAR.get(i);
+            if (iz.ucus != null && iz.ucus.isStopped()) {
+                iz.ucus = null;
+            }
+            mesafeler[i] = iz.meteor.position().distanceTo(dinleyici);
+            iz.enYakin = Math.min(iz.enYakin, mesafeler[i]);
+            caliyor[i] = iz.ucus != null;
         }
         boolean[] secildi = MeteorSesMenzili.ucusSecimi(mesafeler, caliyor, MeteorSesMenzili.AYNI_TUR_TAVANI);
-        Set<Integer> simdiki = new HashSet<>();
-        for (int i = 0; i < mesafeler.length; i++) {
-            MeteorVarligi m = meteorlar.get(i);
-            simdiki.add(m.getId());
-            boolean ilk = GORULEN.add(m.getId());
+        for (int i = 0; i < n; i++) {
+            Izlenen iz = METEORLAR.get(i);
             if (secildi[i] && !caliyor[i]) {
-                Ucus u = new Ucus(m);
-                UCUSLAR.put(m, u);
-                mc.getSoundManager().play(u);
-                log("uçuş başladı: meteor {} mesafe {} (menzil {})", m.getId(), sayi(mesafeler[i]),
-                        sayi(MeteorSesMenzili.UCUS_MENZILI));
+                iz.ucus = new Ucus(iz.meteor);
+                iz.caldi = true;
+                mc.getSoundManager().play(iz.ucus);
+                log("uçuş başladı: meteor {} mesafe {} (menzil {})", iz.meteor.getId(), mesafeler[i],
+                        MeteorSesMenzili.UCUS_MENZILI);
             } else if (!secildi[i] && caliyor[i]) {
-                UCUSLAR.remove(m).bitir();
-                log("uçuş söndü: meteor {} mesafe {}", m.getId(), sayi(mesafeler[i]));
-            } else if (ilk && !secildi[i]) {
-                log("uçuş çalmadı: meteor {} mesafe {} > menzil {}", m.getId(), sayi(mesafeler[i]),
-                        sayi(MeteorSesMenzili.UCUS_MENZILI));
+                iz.ucus.bitir();
+                iz.ucus = null;
+                log("uçuş söndü: meteor {} mesafe {}", iz.meteor.getId(), mesafeler[i]);
             }
         }
-        GORULEN.retainAll(simdiki);
     }
 
     /** Çarpma paketi geldi: menzildeyse patlama mesafe kazancıyla çalar; tavan doluysa en uzaktaki patlama söner. */
@@ -91,7 +111,7 @@ final class MeteorSesi {
         double kazanc = MeteorSesMenzili.carpmaKazanci(mesafe, buyuk);
         String boy = buyuk ? "büyük" : "küçük";
         if (kazanc <= 0) {
-            log("çarpma çalmadı: {} mesafe {} > menzil {}", boy, sayi(mesafe), sayi(MeteorSesMenzili.carpmaMenzili(buyuk)));
+            log("çarpma çalmadı: {} mesafe {} > menzil {}", boy, mesafe, MeteorSesMenzili.carpmaMenzili(buyuk));
             return;
         }
         SoundManager sesler = Minecraft.getInstance().getSoundManager();
@@ -102,7 +122,7 @@ final class MeteorSesi {
         }
         int yer = MeteorSesMenzili.yer(calan, mesafe, MeteorSesMenzili.AYNI_TUR_TAVANI);
         if (yer == -2) {
-            log("çarpma çalmadı: {} mesafe {}, tavan dolu ({} daha yakın patlama)", boy, sayi(mesafe), calan.length);
+            log("çarpma çalmadı: {} mesafe {}, tavan dolu ({} daha yakın patlama)", boy, mesafe, calan.length);
             return;
         }
         if (yer >= 0) {
@@ -113,26 +133,30 @@ final class MeteorSesi {
                 SoundInstance.Attenuation.NONE, nokta.x, nokta.y, nokta.z, false);
         sesler.play(ses);
         PATLAMALAR.add(new Patlama(ses, mesafe, saat));
-        log("çarpma çaldı: {} mesafe {} kazanç {}", boy, sayi(mesafe), sayi(kazanc));
+        log("çarpma çaldı: {} mesafe {} kazanç {}", boy, mesafe, kazanc);
     }
 
     static void temizle() {
-        for (Iterator<Ucus> it = UCUSLAR.values().iterator(); it.hasNext();) {
-            it.next().bitir();
-            it.remove();
+        for (Izlenen iz : METEORLAR) {
+            if (iz.ucus != null) {
+                iz.ucus.bitir();
+            }
         }
-        GORULEN.clear();
+        METEORLAR.clear();
         PATLAMALAR.clear();
     }
 
+    /** Yalnız görsel otomasyonda; ondalıklı argümanlar burada biçimlenir (üretimde biçimleme yok). */
     private static void log(String metin, Object... arg) {
-        if (GorselOtomasyon.AKTIF) {
-            DogalAfetler.LOGGER.info(ON + metin, arg);
+        if (!GorselOtomasyon.AKTIF) {
+            return;
         }
-    }
-
-    private static String sayi(double d) {
-        return String.format(Locale.ROOT, "%.1f", d);
+        for (int i = 0; i < arg.length; i++) {
+            if (arg[i] instanceof Double d) {
+                arg[i] = String.format(Locale.ROOT, "%.1f", d);
+            }
+        }
+        DogalAfetler.LOGGER.info(ON + metin, arg);
     }
 
     /** Bir meteorun uçuş döngüsü: meteoru izler, kazanç mesafeyle karesel, perde Doppler. */

@@ -40,6 +40,7 @@ import net.minecraftforge.client.event.ClientPlayerNetworkEvent;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
 import net.minecraftforge.client.event.ViewportEvent;
 import net.minecraftforge.event.TickEvent;
+import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
@@ -320,6 +321,13 @@ public final class IstemciMeteor {
                             (r.nextDouble() - 0.5) * 1.6);
                 }
             }
+        }
+    }
+
+    @SubscribeEvent
+    public static void varlikGirdi(EntityJoinLevelEvent olay) {
+        if (olay.getLevel().isClientSide() && olay.getEntity() instanceof MeteorVarligi meteor) {
+            MeteorSesi.ekle(meteor);
         }
     }
 
