@@ -17,6 +17,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraftforge.common.Tags;
 
 /**
@@ -61,10 +62,15 @@ final class TsunamiYikimi {
      * ({@code tsunami.yikimBolumTick} × kısma), {@code sutun} en çok farklı chunk sütunu, {@code efekt} kırılma efekti;
      * {@code esyaOrani} ahşap/taş bloğun eşya bırakma olasılığı; {@code sutunBirimi} birim chunk sütunu mu (yoksa 16³ bölüm).
      */
-    record Ayar(int blok, int birim, int sutun, int efekt, double esyaOrani, boolean sutunBirimi) {
+    /**
+     * {@code birimTavani} (Ts4-2): bir birimin tek tick'te kırılabilecek en çok bloğu; aşan birim kalanını sonraki tick'te sürdürür.
+     */
+    record Ayar(int blok, int birim, int sutun, int efekt, double esyaOrani, boolean sutunBirimi, int birimTavani) {
     }
 
     static final int KOLON_BUTCESI = 192;
+    /** Ts3: sütun taraması dalga tepesinden en çok bu kadar yukarı (çatı, ağaç tepesi) uzar; dalga üstü yapı havada kalmaz. */
+    static final int UST_PAYI = 16;
     /** İstemciye gönder, komşu şekillerini güncelleme (yaprak/çit zinciri yok), komşuya {@code neighborChanged} yok. */
     static final int BAYRAK = Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE;
     static final int DUSURME_TICK = 2;
@@ -86,6 +92,8 @@ final class TsunamiYikimi {
     private long toplamBolum;
     private long toplamKirli;
     private int enCokBirimTick;
+    private int enCokBlokTick;
+    private long enUzunTickNs;
     private int toplamDusen;
 
     /** Tick başına blok jetonu: {@code 8 + 8·seviye} × {@code yikimCarpani} × TPS kısması (en az 1). */
@@ -119,6 +127,16 @@ final class TsunamiYikimi {
         return enCokBirimTick;
     }
 
+    /** Ts4-2: bir tick'te kırılan en çok blok. */
+    int enCokBlokTick() {
+        return enCokBlokTick;
+    }
+
+    /** Ts4-2: en uzun yıkım tick'inin süresi (ms; tarama, kırma ve sanal su bildirimi). */
+    double enUzunTickMs() {
+        return enUzunTickNs / 1e6;
+    }
+
     int bekleyen() {
         return kolonlar.size() + isSayisi;
     }
@@ -141,11 +159,12 @@ final class TsunamiYikimi {
      * jeton ≥ 0 iken başlar, o an hazır bütün blokları aynı tick'te kırılır ve sayısı jetondan düşülür (negatife inebilir).
      * Ortalama hız blok bütçesine eşit kalır, TPS kısmasıyla yavaşlar; bir birim tick'lere bölünmez (TS-15): her değişen
      * bölüm istemcide yeniden derlenir, ışık değişimi sütun boyunca ve komşu bölümlere yayılıp onları da derletir (TS-12).
-     * Tick başına en çok {@code Ayar.birim} birim ve {@code Ayar.sutun} sütun. Sınıf gecikmeleri (cam önce, ahşap 0,3 sn
+     * Tick başına en çok {@code Ayar.birim} birim ve {@code Ayar.sutun} sütun; bir birim tick'te en çok {@code Ayar.birimTavani} blok. Sınıf gecikmeleri (cam önce, ahşap 0,3 sn
      * sonra) korunur. {@code magara} mağara ağzı adayını alır ve daha aday istiyorsa {@code true} döner. Kırılan blok sayısı.
      */
     int tick(ServerLevel l, long simdi, TsunamiSeviyesi sv, double taban, double kisma, Ayar a, boolean blokHasari,
             Predicate<BlockPos> magara) {
+        long basla = System.nanoTime();
         BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
         int alt = (int) Math.floor(taban) - 1;
         boolean magaraIstiyor = true;
@@ -157,7 +176,8 @@ final class TsunamiYikimi {
                 continue;
             }
             boolean ustDogal = false;
-            for (int y = Math.min(k.ust, l.getMaxBuildHeight() - 1); y >= Math.max(alt, l.getMinBuildHeight()); y--) {
+            int tepe = Math.max(k.ust, Math.min(k.ust + UST_PAYI, l.getHeight(Heightmap.Types.MOTION_BLOCKING, k.x, k.z) - 1));
+            for (int y = Math.min(tepe, l.getMaxBuildHeight() - 1); y >= Math.max(alt, l.getMinBuildHeight()); y--) {
                 BlockState s = l.getBlockState(m.set(k.x, y, k.z));
                 if (s.isAir()) {
                     if (ustDogal && magaraIstiyor && magaraAgzi(l, m)) {
@@ -189,7 +209,12 @@ final class TsunamiYikimi {
             }
             int once = kirilan;
             long enErken = Long.MAX_VALUE;
+            boolean kesildi = false;
             for (Iterator<Is> isIt = b.isler.iterator(); isIt.hasNext();) {
+                if (kirilan - once >= a.birimTavani()) {
+                    kesildi = true;
+                    break;
+                }
                 Is is = isIt.next();
                 if (is.hazir() > simdi) {
                     enErken = Math.min(enErken, is.hazir());
@@ -198,6 +223,9 @@ final class TsunamiYikimi {
                 isIt.remove();
                 isSayisi--;
                 m.set(is.konum());
+                if (!l.isLoaded(m)) {
+                    continue;
+                }
                 BlockState s = l.getBlockState(m);
                 Sinif c = blokHasari ? sinif(l, m, s, sv) : null;
                 if (c == null) {
@@ -216,7 +244,7 @@ final class TsunamiYikimi {
                 bolumler.add(SectionPos.asLong(m.getX() >> 4, m.getY() >> 4, m.getZ() >> 4));
                 kirilan++;
             }
-            b.enErken = enErken;
+            b.enErken = kesildi ? simdi : enErken;
             if (b.isler.isEmpty()) {
                 birimIt.remove();
             }
@@ -245,6 +273,8 @@ final class TsunamiYikimi {
         toplamBolum += bolumler.size();
         toplamKirli += kirli.size();
         enCokBirimTick = Math.max(enCokBirimTick, birimler.size());
+        enCokBlokTick = Math.max(enCokBlokTick, kirilan);
+        enUzunTickNs = Math.max(enUzunTickNs, System.nanoTime() - basla);
         return kirilan;
     }
 
@@ -302,7 +332,7 @@ final class TsunamiYikimi {
         }
         for (Direction d : Direction.Plane.HORIZONTAL) {
             BlockPos k = p.relative(d);
-            if (l.getBlockState(k).isAir() && l.canSeeSky(k)) {
+            if (l.isLoaded(k) && l.getBlockState(k).isAir() && l.canSeeSky(k)) {
                 return true;
             }
         }

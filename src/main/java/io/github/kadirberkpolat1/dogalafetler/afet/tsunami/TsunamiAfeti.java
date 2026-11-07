@@ -274,11 +274,20 @@ public final class TsunamiAfeti extends Afet {
         double kisma = TpsOlcer.kismaCarpani();
         int hacim = Math.min(a.magaraHacmi.get() * seviye(), SuAyarlari.sunucu().magaraMaksHacim.get());
         long kalis = SuAyarlari.sunucu().magaraKalisSn.get() * 20L;
-        TsunamiYikimi.Ayar ayar = new TsunamiYikimi.Ayar(TsunamiYikimi.blokButcesi(sv, a.yikimCarpani.get(), kisma),
-                Math.max(1, (int) Math.round(a.yikimBolumTick.get() * kisma)), a.yikimChunkTick.get(), a.yikimEfektTick.get(),
-                a.yikimEsyaOrani.get(), a.yikimSutunBirimi.get());
-        yikim.tick(level, simdi, sv, taban, kisma, ayar, Kurallar.blokHasariAcik(level.getGameRules()),
+        yikim.tick(level, simdi, sv, taban, kisma, yikimAyari(sv), Kurallar.blokHasariAcik(level.getGameRules()),
                 p -> magaraDene(level, sv, p, hacim, kalis));
+    }
+
+    /**
+     * Yıkım ayarı (TS-15b): jeton blok bütçesi ve tick başına birim {@link TpsOlcer} kısmasıyla çarpılır; birim tavanı
+     * kısmasız bütçenin 4 katıdır (Ts4-2: kısma ortalamayı yavaşlatır, birimi bölmez).
+     */
+    static TsunamiYikimi.Ayar yikimAyari(TsunamiSeviyesi sv) {
+        TsunamiAyarlari a = TsunamiAyarlari.al();
+        double kisma = TpsOlcer.kismaCarpani();
+        return new TsunamiYikimi.Ayar(TsunamiYikimi.blokButcesi(sv, a.yikimCarpani.get(), kisma),
+                Math.max(1, (int) Math.round(a.yikimBolumTick.get() * kisma)), a.yikimChunkTick.get(), a.yikimEfektTick.get(),
+                a.yikimEsyaOrani.get(), a.yikimSutunBirimi.get(), 4 * TsunamiYikimi.blokButcesi(sv, a.yikimCarpani.get(), 1));
     }
 
     /** Mağara ağzı adayı: öncekilere 12 bloktan yakın değilse doldurur. Daha aday isteniyorsa true. */
@@ -450,9 +459,10 @@ public final class TsunamiAfeti extends Afet {
         OrtamSesi.durdur(level.getServer(), KATMAN, temiz ? 20 : 60);
         var d = SanalSu.dunya(level);
         DogalAfetler.LOGGER.info("Tsunami: temizlendi (temiz={}, doğal={}): kırılan {} blok, değişen bölüm {} (tick başına en çok {} "
-                + "birim), kirletilen bölüm {}, taranan {} sütun, bekleyen yıkım {}, mağara {}; boyutta kalan dalga {}, çekilme {}, "
-                + "mağara {}", temiz, dogalBitti, yikim.toplamKirilan(), yikim.toplamBolum(), yikim.enCokBirimTick(),
-                yikim.toplamKirli(), yikim.toplamTaranan(), bekleyen, magaralar.size(), d == null ? 0 : d.dalgalar().size(),
+                + "birim), kirletilen bölüm {}, taranan {} sütun, bekleyen yıkım {}, tick başına en çok {} blok, en uzun yıkım "
+                + "tick'i {} ms, mağara {}; boyutta kalan dalga {}, çekilme {}, mağara {}", temiz, dogalBitti, yikim.toplamKirilan(),
+                yikim.toplamBolum(), yikim.enCokBirimTick(), yikim.toplamKirli(), yikim.toplamTaranan(), bekleyen, yikim.enCokBlokTick(),
+                sayi(yikim.enUzunTickMs()), magaralar.size(), d == null ? 0 : d.dalgalar().size(),
                 d == null ? 0 : d.cekilmeler().size(), d == null ? 0 : d.magaralar().size());
     }
 
@@ -568,6 +578,16 @@ public final class TsunamiAfeti extends Afet {
 
     long toplamBolum() {
         return yikim.toplamBolum();
+    }
+
+    /** Doğal bitiş (BITIS dalgalar sönüp kuyruk boşalınca) oldu mu. */
+    boolean dogalBitti() {
+        return dogalBitti;
+    }
+
+    /** Kuyrukta bekleyen yıkım (sütun + blok). */
+    int bekleyenYikim() {
+        return yikim.bekleyen();
     }
 
     /** Afet boyunca bir tick'te başlatılan en çok birim (bölüm ya da sütun). */

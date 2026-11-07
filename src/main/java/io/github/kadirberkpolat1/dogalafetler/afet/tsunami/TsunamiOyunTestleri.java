@@ -7,8 +7,9 @@ import io.github.kadirberkpolat1.dogalafetler.config.CekirdekAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetBaglami;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
-import io.github.kadirberkpolat1.dogalafetler.core.CekirdekOyunTestleri;
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
+import io.github.kadirberkpolat1.dogalafetler.core.OyunTestiTemizligi;
+import io.github.kadirberkpolat1.dogalafetler.core.TpsOlcer;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.AfetZamanlayicisi;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.BeklemeDurumu;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SonumTipi;
@@ -24,6 +25,7 @@ import java.util.function.Consumer;
 import java.util.random.RandomGenerator;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
+import net.minecraft.gametest.framework.AfterBatch;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
@@ -31,10 +33,10 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.animal.Pig;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
 
@@ -51,6 +53,77 @@ public final class TsunamiOyunTestleri {
     private static final TsunamiAfeti.Olcek OLCEK = new TsunamiAfeti.Olcek(6, 8, 12, 10, 0);
 
     private TsunamiOyunTestleri() {
+    }
+
+    @AfterBatch(batch = "tsunami_yer")
+    public static void yerSonrasi(ServerLevel level) {
+        temizlik(level);
+    }
+
+    @AfterBatch(batch = "tsunami_stop")
+    public static void stopSonrasi(ServerLevel level) {
+        temizlik(level);
+    }
+
+    @AfterBatch(batch = "tsunami_yikim")
+    public static void yikimSonrasi(ServerLevel level) {
+        temizlik(level);
+    }
+
+    @AfterBatch(batch = "tsunami_jeton")
+    public static void jetonSonrasi(ServerLevel level) {
+        temizlik(level);
+    }
+
+    @AfterBatch(batch = "tsunami_ipucu")
+    public static void ipucuSonrasi(ServerLevel level) {
+        temizlik(level);
+    }
+
+    @AfterBatch(batch = "tsunami_dogal")
+    public static void dogalSonrasi(ServerLevel level) {
+        temizlik(level);
+    }
+
+    @AfterBatch(batch = "tsunami_kayit")
+    public static void kayitSonrasi(ServerLevel level) {
+        temizlik(level);
+    }
+
+    @AfterBatch(batch = "tsunami_ay")
+    public static void aySonrasi(ServerLevel level) {
+        temizlik(level);
+    }
+
+    @AfterBatch(batch = "tsunami_jeton_sutun")
+    public static void jetonSutunSonrasi(ServerLevel level) {
+        temizlik(level);
+    }
+
+    @AfterBatch(batch = "tsunami_tps")
+    public static void tpsSonrasi(ServerLevel level) {
+        temizlik(level);
+    }
+
+    @AfterBatch(batch = "tsunami_dogal_yikim")
+    public static void dogalYikimSonrasi(ServerLevel level) {
+        temizlik(level);
+    }
+
+    /**
+     * Başarısız test de batch sonunda temizlenir (K-E15): testler afeti yöneticisiz sürdüğü için kalan dalga, çekilme ve mağara
+     * boyuttan silinir, sabitlenen TPS kısması ve sahte oyuncu/dinleyici geri alınır.
+     */
+    private static void temizlik(ServerLevel level) {
+        TpsOlcer.testKismasi(null);
+        SanalSuDunyasi d = SanalSu.dunya(level);
+        if (d != null) {
+            new ArrayList<>(d.dalgalar().keySet()).forEach(id -> SanalSu.dalgaBitir(level, id));
+            new ArrayList<>(d.cekilmeler().keySet()).forEach(id -> SanalSu.cekilmeBitir(level, id));
+            new ArrayList<>(d.magaralar().keySet()).forEach(id -> SanalSu.magaraBitir(level, id));
+        }
+        SanalSu.bolgeBirak(level);
+        OyunTestiTemizligi.batchSonu(level);
     }
 
     private static BlockPos m(GameTestHelper h, int x, int y, int z) {
@@ -245,23 +318,66 @@ public final class TsunamiOyunTestleri {
     @GameTest(template = "su_alani", batch = "tsunami_jeton", timeoutTicks = 100)
     public static void yikimJetonuKismadaYavaslarBolumBolunmez(GameTestHelper h) {
         TsunamiSeviyesi sv = TsunamiSeviyesi.al(5);
-        int tam = ikinciYiginGecikmesi(h, sv, 1.0);
-        int kisma = ikinciYiginGecikmesi(h, sv, 0.25);
+        int tam = ikinciYiginGecikmesi(h, sv, 1.0, false);
+        int kisma = ikinciYiginGecikmesi(h, sv, 0.25, false);
         h.assertTrue(kisma > tam, "TPS kısmasında yıkım yavaşlamadı: ikinci yığın tam hızda " + tam + ", kısmada " + kisma
                 + " tick sonra");
         DogalAfetler.LOGGER.info("Tsunami GameTest: jeton ikinci yığın gecikmesi tam {} tick, kısma (x0,25) {} tick", tam, kisma);
         h.succeed();
     }
 
-    /** İki cam yığınını sırayla tek yıkım kuyruğuyla yıkar, her tick'i denetler; ikinci yığının ilk kırıldığı tick (başından). */
-    private static int ikinciYiginGecikmesi(GameTestHelper h, TsunamiSeviyesi sv, double kisma) {
+    /**
+     * Ts4-3: aynı değişmezler varsayılan birimle (chunk sütunu, {@code tsunami.yikimSutunBirimi=true}): tick başına en çok bir
+     * sütun başlar, başlayan sütunun hazır bütün camı aynı tick'te kırılır, kısmada (×0,25) ikinci yığın geç başlar.
+     */
+    @GameTest(template = "su_alani", batch = "tsunami_jeton_sutun", timeoutTicks = 100)
+    public static void sutunKipindeJetonKismadaYavaslarSutunBolunmez(GameTestHelper h) {
+        TsunamiSeviyesi sv = TsunamiSeviyesi.al(5);
+        int tam = ikinciYiginGecikmesi(h, sv, 1.0, true);
+        int kisma = ikinciYiginGecikmesi(h, sv, 0.25, true);
+        h.assertTrue(kisma > tam, "sütun kipinde TPS kısmasında yıkım yavaşlamadı: tam " + tam + ", kısma " + kisma);
+        DogalAfetler.LOGGER.info("Tsunami GameTest: sütun kipi jeton ikinci yığın gecikmesi tam {} tick, kısma {} tick", tam, kisma);
+        h.succeed();
+    }
+
+    /**
+     * Ts4-3: afetin yıkım ayarı {@link TpsOlcer} kısmasını okur (jeton ve tick başına birim kısmayla çarpılır); birim tavanı
+     * kısmasız bütçenin 4 katı kalır (Ts4-2).
+     */
+    @GameTest(template = "su_alani", batch = "tsunami_tps")
+    public static void yikimAyariTpsKismasiniOkur(GameTestHelper h) {
+        TsunamiSeviyesi sv = TsunamiSeviyesi.al(5);
+        TsunamiAyarlari a = TsunamiAyarlari.al();
+        double carpan = a.yikimCarpani.get();
+        TsunamiYikimi.Ayar tam = TsunamiAfeti.yikimAyari(sv);
+        TpsOlcer.testKismasi(0.25);
+        TsunamiYikimi.Ayar kisma;
+        try {
+            kisma = TsunamiAfeti.yikimAyari(sv);
+        } finally {
+            TpsOlcer.testKismasi(null);
+        }
+        h.assertTrue(tam.blok() == TsunamiYikimi.blokButcesi(sv, carpan, 1.0)
+                && kisma.blok() == TsunamiYikimi.blokButcesi(sv, carpan, 0.25), "jeton kısmayı okumuyor: " + tam + " / " + kisma);
+        h.assertTrue(kisma.birim() == Math.max(1, (int) Math.round(a.yikimBolumTick.get() * 0.25)), "birim kısmayı okumuyor");
+        h.assertTrue(tam.birimTavani() == 4 * TsunamiYikimi.blokButcesi(sv, carpan, 1.0) && kisma.birimTavani() == tam.birimTavani(),
+                "birim tavanı kısmasız bütçenin 4 katı değil: " + tam.birimTavani() + " / " + kisma.birimTavani());
+        h.succeed();
+    }
+
+    /**
+     * İki cam yığınını sırayla tek yıkım kuyruğuyla yıkar, her tick'i denetler; ikinci yığının ilk kırıldığı tick (başından). Birim
+     * {@code sutun} ise chunk sütunu, değilse bölüm (16³).
+     */
+    private static int ikinciYiginGecikmesi(GameTestHelper h, TsunamiSeviyesi sv, double kisma, boolean sutun) {
         ServerLevel l = h.getLevel();
         sahne(h, 2);
         int ust = m(h, 0, 10, 0).getY();
         double taban = m(h, 0, 3, 0).getY();
         TsunamiGeometrisi g = geometri(h);
         TsunamiYikimi y = new TsunamiYikimi();
-        TsunamiYikimi.Ayar ayar = new TsunamiYikimi.Ayar(TsunamiYikimi.blokButcesi(sv, 1.0, kisma), 1, 1, 0, 0, false);
+        TsunamiYikimi.Ayar ayar = new TsunamiYikimi.Ayar(TsunamiYikimi.blokButcesi(sv, 1.0, kisma), 1, 1, 0, 0, sutun,
+                4 * TsunamiYikimi.blokButcesi(sv, 1.0, 1.0));
         long simdi = DunyaDonemi.al(l).saat();
         int tick = 0;
         int toplam = 0;
@@ -274,7 +390,7 @@ public final class TsunamiOyunTestleri {
             Long2IntOpenHashMap kalan = new Long2IntOpenHashMap();
             for (BlockPos p : BlockPos.betweenClosed(m(h, x0, 3, 5), m(h, x0 + 2, 10, 11))) {
                 camlar.add(p.immutable());
-                kalan.addTo(SectionPos.asLong(p.getX() >> 4, p.getY() >> 4, p.getZ() >> 4), 1);
+                kalan.addTo(birimAnahtari(p, sutun), 1);
             }
             enBuyuk = Math.max(enBuyuk, kalan.values().intStream().max().orElse(0));
             for (double b = x0 - 6 + 0.1; b < x0 - 6 + 3; b += 0.7) {
@@ -289,10 +405,10 @@ public final class TsunamiOyunTestleri {
                     if (!l.getBlockState(p).isAir()) {
                         return false;
                     }
-                    kirilan.addTo(SectionPos.asLong(p.getX() >> 4, p.getY() >> 4, p.getZ() >> 4), 1);
+                    kirilan.addTo(birimAnahtari(p, sutun), 1);
                     return true;
                 });
-                h.assertTrue(kirilan.size() <= 1, "bir tick'te " + kirilan.size() + " bölüm başladı");
+                h.assertTrue(kirilan.size() <= 1, "bir tick'te " + kirilan.size() + (sutun ? " sütun" : " bölüm") + " başladı");
                 for (var e : kirilan.long2IntEntrySet()) {
                     h.assertTrue(e.getIntValue() == kalan.get(e.getLongKey()), "bölüm bölündü: " + e.getIntValue() + " / "
                             + kalan.get(e.getLongKey()));
@@ -310,6 +426,10 @@ public final class TsunamiOyunTestleri {
         return ikinci;
     }
 
+    private static long birimAnahtari(BlockPos p, boolean sutun) {
+        return sutun ? ChunkPos.asLong(p.getX() >> 4, p.getZ() >> 4) : SectionPos.asLong(p.getX() >> 4, p.getY() >> 4, p.getZ() >> 4);
+    }
+
     /**
      * B.3/B.4 ve #2 Dalga Avcısı: karadaki sahte oyuncuyu dalga sürükleyince afet {@link Ipucu#SURUKLENDI} yayınlar (bir kez);
      * dalgadaki oyuncu ve domuz hasar alır.
@@ -319,7 +439,7 @@ public final class TsunamiOyunTestleri {
         ServerLevel l = h.getLevel();
         sahne(h, 2);
         BlockPos ayak = m(h, 10, 3, 8);
-        ServerPlayer oyuncu = CekirdekOyunTestleri.sahteOyuncu(h, ayak.getX() + 0.5, ayak.getY(), ayak.getZ() + 0.5);
+        ServerPlayer oyuncu = OyunTestiTemizligi.oyuncu(h, ayak.getX() + 0.5, ayak.getY(), ayak.getZ() + 0.5);
         oyuncu.setGameMode(GameType.SURVIVAL);
         // Hasar dalga ilerlerken verilir (menzilde duran su itmez): domuz kıyıya yakın, cephenin uzun süre geçtiği yerde;
         // yürüyüp dalga şeridinden çıkmasın diye yapay zekâsız. Yapay zekâsız mob travel etmediği için dalga onu sürüklemez:
@@ -335,14 +455,13 @@ public final class TsunamiOyunTestleri {
                 gelen.add(e.ipucu());
             }
         };
-        MinecraftForge.EVENT_BUS.addListener(dinleyici);
+        OyunTestiTemizligi.dinle(BasarimIpucuEvent.class, dinleyici);
         TsunamiAfeti a = baslat(h, 2);
         h.startSequence()
                 .thenWaitUntil(() -> h.assertTrue(!gelen.isEmpty(), "SURUKLENDI ipucu gelmedi"))
                 .thenWaitUntil(() -> h.assertTrue(oyuncu.getHealth() < oyuncuCan && domuz.getHealth() < domuzCan,
                         "dalga hasarı yok: oyuncu " + oyuncu.getHealth() + " domuz " + domuz.getHealth()))
                 .thenExecute(() -> {
-                    MinecraftForge.EVENT_BUS.unregister(dinleyici);
                     h.assertTrue(gelen.size() == 1 && gelen.get(0) == Ipucu.SURUKLENDI, "ipucu: " + gelen);
                     DogalAfetler.LOGGER.info("Tsunami GameTest: ipucu {} oyuncu can {} -> {} domuz can {} -> {}", gelen, oyuncuCan,
                             oyuncu.getHealth(), domuzCan, domuz.getHealth());
@@ -370,6 +489,36 @@ public final class TsunamiOyunTestleri {
                     h.assertTrue(!a.magaralar().isEmpty() && dunya(h).magaralar().containsKey(a.magaralar().get(0)),
                             "doğal bitişte mağara suyu kaldırıldı");
                     h.assertTrue(magaraHash(h) == hashOnce, "mağara kutusunun blokları değişti");
+                    a.magaralar().forEach(id -> SanalSu.magaraBitir(l, id));
+                })
+                .thenSucceed();
+    }
+
+    /**
+     * Ts3 + Ts4-3: S2 doğal bitişi yıkımlı sahnede, bekleyen yıkım boşalınca gelir ({@code doğal=true}, bekleyen 0). Dalga
+     * tepesini aşan ahşap sütun (y 3..18, şablonun üstüne taşar) boşluk bırakmadan tamamen yıkılır: üst kısmı havada kalmaz.
+     */
+    @GameTest(template = "su_alani", batch = "tsunami_dogal_yikim", timeoutTicks = 900)
+    public static void dogalBitisYikimBitinceGelirDalgaUstuKalmaz(GameTestHelper h) {
+        ServerLevel l = h.getLevel();
+        sahne(h, 2);
+        kutu(h, 10, 3, 8, 10, 18, 8, Blocks.OAK_PLANKS.defaultBlockState());
+        for (int z = 4; z <= 12; z += 2) {
+            h.setBlock(8, 3, z, Blocks.GLASS);
+        }
+        TsunamiAfeti a = baslat(h, 2);
+        h.startSequence()
+                .thenWaitUntil(() -> h.assertTrue(a.sonlandi(), "afet kendiliğinden bitmedi: " + a.asama()))
+                .thenExecute(() -> {
+                    h.assertTrue(a.dogalBitti(), "bitiş doğal sayılmadı");
+                    h.assertTrue(a.bekleyenYikim() == 0, "doğal bitişte bekleyen yıkım var: " + a.bekleyenYikim());
+                    h.assertTrue(a.kirilan() > 0, "yıkımlı sahnede blok kırılmadı");
+                    for (int y = 3; y <= 18; y++) {
+                        h.assertTrue(l.getBlockState(m(h, 10, y, 8)).isAir(), "ahşap sütun y=" + y + " kaldı (dalga üstü havada)");
+                    }
+                    DogalAfetler.LOGGER.info("Tsunami GameTest: doğal bitiş yıkımla kırılan={} bekleyen={} doğal={}", a.kirilan(),
+                            a.bekleyenYikim(), a.dogalBitti());
+                    a.durdur(l, true);
                     a.magaralar().forEach(id -> SanalSu.magaraBitir(l, id));
                 })
                 .thenSucceed();

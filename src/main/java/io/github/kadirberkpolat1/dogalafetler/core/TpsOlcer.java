@@ -17,6 +17,7 @@ public final class TpsOlcer {
     private static volatile double ortalamaMs;
     private static volatile double tps = TpsKismasi.EN_YUKSEK_TPS;
     private static volatile double kismaCarpani = 1.0;
+    private static volatile Double testCarpani;
     private static int sayac;
 
     private TpsOlcer() {
@@ -24,7 +25,13 @@ public final class TpsOlcer {
 
     /** Ağır işlerin bütçe çarpanı: 1, 0.5 ya da 0.25. */
     public static double kismaCarpani() {
-        return kismaCarpani;
+        Double test = testCarpani;
+        return test != null ? test : kismaCarpani;
+    }
+
+    /** Yalnız GameTest: kısma çarpanını sabitler, {@code null} ölçüme döner (TPS testte düşürülemez). */
+    public static void testKismasi(Double carpan) {
+        testCarpani = carpan;
     }
 
     public static double tps() {
