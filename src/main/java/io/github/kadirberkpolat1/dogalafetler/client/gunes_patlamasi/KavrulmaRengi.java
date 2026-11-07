@@ -21,7 +21,8 @@ import net.minecraftforge.fml.common.Mod;
  * Yaprak ve çimen kuruması (tasarım §2 "yapraklar kahverengiye döner", blok değişmez): BUYUYEN evrenin 2. gününden sonra
  * biyom rengi istemcide soluk samana (çimen) ve kahverengiye (yaprak) karışır. Renk işleyicileri vanilla'nın
  * {@code BlockColors.createDefault} kayıtlarının aynısını hesaplayıp karışımı ekler; kuruluk 0 iken vanilla rengiyle bire
- * bir aynıdır. Dünya dışında (eşya simgesi, {@code level == null}) dokunulmaz. Karışım 8 basamaklıdır; basamak
+ * bir aynıdır. Dünya dışında (eşya simgesi, {@code level == null}) dokunulmaz. Şeker kamışı ve nilüfer çimenle kurur; kavun ve
+ * balkabağı saplarının büyümeye bağlı rengi dışarıda kalır (GP13). Karışım 8 basamaklıdır; basamak
  * değişince chunk'lar bir kez yeniden örülür (5 günlük süreçte en çok 8 + dönüş).
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
@@ -36,7 +37,9 @@ public final class KavrulmaRengi {
     @SubscribeEvent
     public static void renkler(RegisterColorHandlersEvent.Block olay) {
         olay.register((s, l, p, i) -> cimen(l != null && p != null ? BiomeColors.getAverageGrassColor(l, p)
-                : GrassColor.get(0.5, 1.0), l), Blocks.GRASS_BLOCK, Blocks.FERN, Blocks.GRASS, Blocks.POTTED_FERN);
+                : GrassColor.get(0.5, 1.0), l), Blocks.GRASS_BLOCK, Blocks.FERN, Blocks.GRASS, Blocks.POTTED_FERN,
+                Blocks.SUGAR_CANE);
+        olay.register((s, l, p, i) -> cimen(l != null && p != null ? 0x208030 : 0x71C35C, l), Blocks.LILY_PAD);
         olay.register((s, l, p, i) -> cimen(l != null && p != null ? BiomeColors.getAverageGrassColor(l,
                 s.getValue(DoublePlantBlock.HALF) == DoubleBlockHalf.UPPER ? p.below() : p) : -1, l),
                 Blocks.LARGE_FERN, Blocks.TALL_GRASS);
