@@ -1090,6 +1090,19 @@ public final class SuRenderer {
         return i < 0 || j < 0 || i >= N || j >= N ? -1 : i * N + j;
     }
 
+    /**
+     * Otomasyon (yağmur halkası ölçütü): son yakın halkada {@code (x, z)} sütununun çizilen ham su üstü (dalgacıksız,
+     * {@link #UST}); sütun halkanın dışındaysa, kamera yapım sırasında kaydıysa ya da sütunda su üstü çizilmiyorsa (yalnız gerçek
+     * su, TUR 3) NaN.
+     */
+    public static double cizilenUst(int x, int z) {
+        int k = komsu(x - (yakinOx - YAKIN), z - (yakinOz - YAKIN));
+        if (yakinBos || yapOx != yakinOx || yapOz != yakinOz || k < 0 || TUR[k] == 0 || TUR[k] == 3) {
+            return Double.NaN;
+        }
+        return UST[k];
+    }
+
     private static void sutun(ClientLevel l, DenizAlani alan, int x, int z, int i, int j, double t, long tick) {
         int k = i * N + j;
         byte tur = TUR[k];

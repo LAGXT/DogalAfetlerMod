@@ -215,7 +215,7 @@ def main():
     cikis = re.search(r"cikis=(\d+)", metin)
     log(f"bitti: yoklama={yoklama} ALARM={alarm} girdi_satiri={girdi} kapanis_asili={'E' if asili else 'H'} "
         f"otomasyon_ozeti={bitti.groups() if bitti else None} gradle_{cikis.group(0) if cikis else 'cikis=?'}")
-    desen = (r".*(?:TSUNAMI-OTOMASYON (?:FPS|FOTO|KARE|KAMERA|DALGA|KALITE|AVCI|AYAR|KAPANIS|PROFIL)|OLCUM tsunami |"
+    desen = (r".*(?:TSUNAMI-OTOMASYON (?:FPS|FOTO|KARE|HALKA|KAMERA|DALGA|KALITE|AVCI|AYAR|KAPANIS|PROFIL)|OLCUM tsunami |"
              r"KARE-KAPISI tsunami |Tsunami: |\[CHAT\]|SU-TANI |Sanal su: kurulum|Tsunami köpüğü: |"
              r"has (?:made|reached|completed) the).*")
     for satir in re.findall(desen, metin):

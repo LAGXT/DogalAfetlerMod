@@ -34,8 +34,10 @@ class YagmurCarpmasiTest {
     }
 
     @Test
-    void yandanCarpmadaBlokSuAltindaysaSuYuzeyineDuser() {
-        assertEquals(67.0, YagmurCarpmasi.karar(64.3, 63.15, 65.0, 67.0));
-        assertEquals(YagmurCarpmasi.YAN, YagmurCarpmasi.karar(64.3, 63.15, 65.0, 64.0));
+    void sanalSuyunAltindakiDamlaHalkasizSoner() {
+        assertEquals(YagmurCarpmasi.YAN, YagmurCarpmasi.karar(64.3, 63.15, 65.0, 67.0), "bloka yandan, suyun altında");
+        assertEquals(YagmurCarpmasi.YAN, YagmurCarpmasi.karar(66.0, 64.85, YUZEYSIZ, 67.0), "yüzey damlanın üstüne yükseldi");
+        assertEquals(YagmurCarpmasi.YAN, YagmurCarpmasi.karar(64.3, 63.15, 65.0, 64.0), "yüzeyden geçti ama bloka yandan");
+        assertEquals(67.0, YagmurCarpmasi.karar(67.5, 66.35, 65.0, 67.0), "yüzeye üstten");
     }
 }
