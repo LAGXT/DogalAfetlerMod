@@ -4,6 +4,8 @@
 #   tools/senaryo/uzak.sh -g <log> tools/senaryo/gradle_kapisi.sh <log> test
 #   tools/senaryo/uzak.sh -g <kanıt>/ python3 tools/senaryo/deprem_sunucu.py --kanit <kanıt> --port 25651
 # Elle çağırmak gerekmez: ./gradlew (ekransız görevler), gradle_kapisi.sh ve *_sunucu.py kendileri buraya döner (K-E44).
+# Tek giriş (K-E60): kuyruk işinin dışındaki çağrı (SIRA_IS ve UZAK_ICINDE yok, SIRA_SERBEST=1 değil) kendini pc2 işi olarak
+# kuyruğa ekler ve bekler (`sira.py ekle --bekle`); --uzak-mi sorgusu kuyruğa girmez.
 #   uzak.sh --gradle <proje> <gradle argümanları>  ./gradlew kancası: görevlerin hepsi ekransızsa pc2'de, değilse yerelde
 #   uzak.sh --uzak-mi <gradle argümanları>         çıkış 0: görevlerin hepsi ekransız (pc2'ye gider)
 # pc2'ye ulaşılamıyorsa çıkış 4: iş yerelde başlatılmaz. pc2'de aynı anda UZAK_YUVA (vars. 2) iş ve aynı klasörden tek iş
@@ -13,8 +15,7 @@
 # klasördür. -g yolu klasörün dışında ya da .vibe/, build/, logs/, run*/ altında olmalı (eşitlenen kaynak geri ezilmez).
 # Geçen ortam: TEST_FILTRE, KAPI_PORT, KAPI_DK, VIBE_OTURUM, JAVA_HOME, LC_ALL, GRADLE_OPTS; KAPI_SURE vars. 4500 sn,
 # KAPI_RAM_MB vars. 2500 (pc2'de iki iş yan yana sığsın diye; K-E44). UZAK_MAKINE ssh adı (vars. pc2). UZAK_YUVA_TUTULU=1:
-# yuva kilitlerini çağıran tutuyor (kuyruğun istemci işi, K-E51), yuva beklenmez; klasör kilidi yine alınır. Bloklamadan sıra
-# için gradle_kapisi.sh / *_sunucu.py kapı doluysa işi kuyruğa atar (tools/senaryo/sira.py, K-E51).
+# yuva kilitlerini çağıran tutuyor (kuyruğun istemci işi, K-E51), yuva beklenmez; klasör kilidi yine alınır.
 set -u
 makine=${UZAK_MAKINE:-pc2}
 ssh_ac=(ssh -o BatchMode=yes -o ConnectTimeout=5 "$makine")
@@ -45,6 +46,13 @@ case ${1:-} in
         shift
         gradle_uzak_mi "$@"
         exit ;;
+esac
+
+if [ -z "${SIRA_IS-}${UZAK_ICINDE-}" ] && [ "${SIRA_SERBEST-}" != 1 ]; then
+    exec python3 "$(dirname -- "$0")/sira.py" ekle --bekle --makine oto -- "$0" "$@"
+fi
+
+case ${1:-} in
     --gradle)
         dizin=$2
         shift 2
