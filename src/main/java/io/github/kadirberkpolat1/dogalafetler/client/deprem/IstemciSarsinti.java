@@ -1,15 +1,21 @@
 package io.github.kadirberkpolat1.dogalafetler.client.deprem;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.afet.deprem.ArtciKuyrugu;
 import io.github.kadirberkpolat1.dogalafetler.afet.deprem.DepremIstemciAyarlari;
+import io.github.kadirberkpolat1.dogalafetler.afet.deprem.mantik.ArtciSarsintisi;
 import io.github.kadirberkpolat1.dogalafetler.afet.deprem.mantik.SarsintiZarfi;
 import io.github.kadirberkpolat1.dogalafetler.afet.sinkhole.mantik.SinkholeSeviyesi;
 import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciAfetDurumu;
 import io.github.kadirberkpolat1.dogalafetler.client.sinkhole.IstemciSinkhole;
+import io.github.kadirberkpolat1.dogalafetler.client.uyari.IstemciOrtam;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetAsamasi;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.network.AfetDurumPaketi;
+import io.github.kadirberkpolat1.dogalafetler.uyari.HacimEgrisi;
+import io.github.kadirberkpolat1.dogalafetler.uyari.UyariPaketleri.OrtamPaketi;
+import java.util.List;
 import java.util.Optional;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -32,8 +38,10 @@ import net.minecraftforge.fml.common.Mod;
  * Deprem ve sinkhole ekran sarsıntısı (madde 3: oyuncu başına; bölüm C "yakındakinde daha şiddetli"). Sunucudan ek paket
  * gelmez: {@code AfetDurumPaketi} (aşama/alt aşama değişiminde hemen, sonra 1 Hz) merkez, seviye ve afetin {@code ozel}
  * verisini (geçen süre, süre, genlik, yarıçap, yarık doğrultusu) taşır; aradaki tick'ler yerel saatle tahmin edilir.
- * Deprem: {@link SarsintiZarfi#deprem} zarfı × mesafe çarpanı, 8–14 Hz iki kanallı titreme + 1,2–2 Hz yuvarlanma, el ±2 piksel;
- * artçı sürerken ({@code altAsama} &gt; 0) ana genliğin {@code af} kesri kadar {@link SarsintiZarfi#artci} zarfı.
+ * Deprem: {@link SarsintiZarfi#deprem} zarfı × mesafe çarpanı, 8–14 Hz iki kanallı titreme + 1,2–2 Hz yuvarlanma, el ±2 piksel.
+ * Artçılar afet yuvası dışındadır (AF-D1): genlik ve yarıçap artçı gürleme katmanından ({@code deprem/artci},
+ * {@link IstemciOrtam#katman}) okunur, zarf {@link SarsintiZarfi#artci}, katman sönerken sarsıntı da söner
+ * ({@link ArtciSarsintisi}, AF-D7); sürerken oyuncunun çevresinde zemin sıçramaları.
  * Sinkhole: çatlama/sarkmada 0,2° titreme, çekirdek çöküşünde 32 blok içinde tek sert sarsma ve aşağı kısa bakış çekimi.
  * Yarığın açık bölümünden ve oyuncunun çevresindeki zeminden toz ve çakıl sıçramaları (efekt kalitesiyle, 96 blok ötesi yok).
  */
@@ -41,6 +49,10 @@ import net.minecraftforge.fml.common.Mod;
 public final class IstemciSarsinti {
     private static final double TOZ_MENZILI = 96;
     private static final int TAHMIN_TAVANI = 40;
+
+    /** Bu tick'te oyuncunun boyutunda süren artçı katmanı: merkez, menzil, eğri tepesi ve süresi, geçen tick, fade. */
+    private record Artci(double x, double z, double menzil, float tepe, int sure, long gecen, float fade) {
+    }
 
     private static long saat;
     private static int surum = -1;
@@ -50,6 +62,7 @@ public final class IstemciSarsinti {
     private static int paketGecen;
     private static long paketSaati;
     private static long darbeSaati = Long.MIN_VALUE / 2;
+    private static Artci artci;
 
     private IstemciSarsinti() {
     }
@@ -66,10 +79,43 @@ public final class IstemciSarsinti {
             surum = IstemciAfetDurumu.surum();
             durum.ifPresent(IstemciSarsinti::paketGeldi);
         }
-        if (mc.level != null && mc.player != null && durum.isPresent() && durum.get().tur() == AfetTuru.DEPREM
-                && durum.get().asama() == AfetAsamasi.AKTIF) {
-            toz(mc.level, mc.player, durum.get());
+        artci = mc.level == null ? null : artciOku(mc.level);
+        if (mc.level == null || mc.player == null) {
+            return;
         }
+        if (durum.isPresent() && durum.get().tur() == AfetTuru.DEPREM && durum.get().asama() == AfetAsamasi.AKTIF) {
+            toz(mc.level, mc.player, durum.get());
+        } else if (artci != null) {
+            sicrama(mc.level, mc.player);
+        }
+    }
+
+    private static Artci artciOku(ClientLevel level) {
+        Optional<IstemciOrtam.KatmanDurumu> durum = IstemciOrtam.katman(ArtciKuyrugu.KATMAN);
+        if (durum.isEmpty()) {
+            return null;
+        }
+        OrtamPaketi p = durum.get().paket();
+        if (p.boyut() == null || !p.boyut().equals(level.dimension().location())) {
+            return null;
+        }
+        List<HacimEgrisi.Nokta> noktalar = p.egri().noktalar();
+        float tepe = 0f;
+        for (HacimEgrisi.Nokta n : noktalar) {
+            tepe = Math.max(tepe, n.hacim());
+        }
+        return new Artci(p.x(), p.z(), p.menzil(), tepe, noktalar.get(noktalar.size() - 1).tick(), durum.get().gecen(),
+                durum.get().fade());
+    }
+
+    /** Süren artçının bu oyuncudaki genliği (derece, kullanıcı çarpanından önce); artçı yoksa 0. */
+    private static double artciGenligi(Player oyuncu, float kismi) {
+        Artci a = artci;
+        if (a == null) {
+            return 0;
+        }
+        double d = Math.hypot(oyuncu.getX() - a.x(), oyuncu.getZ() - a.z());
+        return ArtciSarsintisi.oyuncuGenligi(a.tepe(), a.gecen() + kismi, a.sure(), d, a.menzil()) * a.fade();
     }
 
     private static void paketGeldi(AfetDurumPaketi p) {
@@ -95,31 +141,32 @@ public final class IstemciSarsinti {
 
     /** Bu oyuncunun anlık sarsıntı genliği (derece) ve sinkhole bakış çekimi; {@code [genlik, cekim]}. */
     static double[] genlik(Player oyuncu, float kismi) {
-        Optional<AfetDurumPaketi> durum = IstemciAfetDurumu.aktif();
         double carpan = DepremIstemciAyarlari.sarsintiCarpani();
-        if (durum.isEmpty() || carpan <= 0 || durum.get().asama() != AfetAsamasi.AKTIF) {
+        if (carpan <= 0) {
             return new double[] {0, 0};
+        }
+        double artciGenlik = artciGenligi(oyuncu, kismi);
+        Optional<AfetDurumPaketi> durum = IstemciAfetDurumu.aktif();
+        if (durum.isEmpty() || durum.get().asama() != AfetAsamasi.AKTIF) {
+            return new double[] {artciGenlik * carpan, 0};
         }
         AfetDurumPaketi p = durum.get();
         double d = Math.hypot(oyuncu.getX() - p.merkez().getX() - 0.5, oyuncu.getZ() - p.merkez().getZ() - 0.5);
         if (p.tur() == AfetTuru.DEPREM) {
             double r = p.ozel().getFloat("r");
-            double g = gecen(kismi);
-            double z = SarsintiZarfi.deprem(g, p.ozel().getInt("s"));
-            if (p.altAsama() > 0 && p.ozel().contains("ab")) {
-                int ab = p.ozel().getInt("ab");
-                z = Math.max(z, p.ozel().getFloat("af") * SarsintiZarfi.artci(g - ab, p.ozel().getInt("ae") - ab));
-            }
-            return new double[] {p.ozel().getFloat("a") * z * SarsintiZarfi.mesafeCarpani(d, r, r + 64) * carpan, 0};
+            double z = SarsintiZarfi.deprem(gecen(kismi), p.ozel().getInt("s"));
+            double ana = p.ozel().getFloat("a") * z * SarsintiZarfi.mesafeCarpani(d, r, r + 64);
+            return new double[] {Math.max(ana, artciGenlik) * carpan, 0};
         }
         if (p.tur() == AfetTuru.SINKHOLE) {
             double r = p.ozel().getFloat("R");
             double taban = p.altAsama() <= SinkholeSeviyesi.SARKMA ? 0.2 * SarsintiZarfi.mesafeCarpani(d, r + 16, r + 48)
                     : 0;
             double darbe = d <= 32 ? SarsintiZarfi.darbe(saat - darbeSaati + kismi) : 0;
-            return new double[] {(taban + p.ozel().getFloat("a") * darbe) * carpan, 1.5 * darbe * carpan};
+            return new double[] {Math.max(taban + p.ozel().getFloat("a") * darbe, artciGenlik) * carpan,
+                    1.5 * darbe * carpan};
         }
-        return new double[] {0, 0};
+        return new double[] {artciGenlik * carpan, 0};
     }
 
     @SubscribeEvent
@@ -189,8 +236,14 @@ public final class IstemciSarsinti {
                         z, 0, 0, 0);
             }
         }
+        sicrama(level, oyuncu);
+    }
+
+    /** Oyuncunun çevresinde zeminden sıçrayan blok parçacıkları, anlık sarsıntı genliğiyle. */
+    private static void sicrama(ClientLevel level, Player oyuncu) {
+        RandomSource r = level.random;
         double[] g = genlik(oyuncu, 0);
-        int sicrama = adet(r, 3 * q * Math.min(1, g[0]));
+        int sicrama = adet(r, 3 * kaliteCarpani() * Math.min(1, g[0]));
         for (int i = 0; i < sicrama; i++) {
             double x = oyuncu.getX() + (r.nextDouble() - 0.5) * 16;
             double z = oyuncu.getZ() + (r.nextDouble() - 0.5) * 16;

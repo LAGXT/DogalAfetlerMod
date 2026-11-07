@@ -113,6 +113,20 @@ public final class BlokIsleri {
         return true;
     }
 
+    /**
+     * İç yıkım: kırılma parçacığı ve sesiyle kırar; {@code esya}: yağma tablosundan eşya düşer. Blok varlıklı dekor (tabela,
+     * bayrak) da kırılır; hangi bloğun kırılacağını çağıran seçer (envanterli blokları seçmez). Sıvılı ve kırılmaz blok korunur.
+     */
+    public boolean dok(BlockPos p, boolean esya) {
+        BlockState s = level.getBlockState(p);
+        if (s.isAir() || !s.getFluidState().isEmpty() || s.getDestroySpeed(level, p) < 0 || p.getY() < enAltY) {
+            return false;
+        }
+        level.destroyBlock(p, esya);
+        isaretle(p);
+        return true;
+    }
+
     public void koy(BlockPos p, BlockState s) {
         if (p.getY() >= enAltY && level.getBlockState(p).canBeReplaced()) {
             level.setBlock(p, s, Block.UPDATE_ALL);
@@ -198,6 +212,11 @@ public final class BlokIsleri {
 
     /** Parçacık: {@value #PARCACIK_MENZILI} blok içindeki oyunculara (vanilla 32 blok sınırı yerine). */
     public void parcacik(ParticleOptions tur, double x, double y, double z, int adet, double yayilma, double hiz) {
+        parcacik(level, tur, x, y, z, adet, yayilma, hiz);
+    }
+
+    static void parcacik(ServerLevel level, ParticleOptions tur, double x, double y, double z, int adet, double yayilma,
+            double hiz) {
         for (ServerPlayer o : level.players()) {
             if (o.distanceToSqr(x, y, z) < PARCACIK_MENZILI * PARCACIK_MENZILI) {
                 level.sendParticles(o, tur, true, x, y, z, adet, yayilma, yayilma, yayilma, hiz);

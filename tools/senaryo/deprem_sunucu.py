@@ -9,7 +9,9 @@ sinkhole'lar yarığın üstüne düşmesin diye `execute positioned` ile doğu�
 Koşu 1: `start deprem 2`, `asama ileri` x2 (AKTIF) → `[deprem] yarık tamam` (değişen blok > 0) ve doğal bitiş;
 `start sinkhole 3`, `asama ileri` x2 → `[sinkhole] çukur tamam` (değişen blok > 0) ve doğal bitiş; `gamerule afetBlokHasari
 false` + `start sinkhole 1`, `asama ileri` x2 → çukur tamam değişen blok 0, doğal bitiş, `gamerule afetBlokHasari true`
-(S5'ten önce: S5 yarığının dalları doğuş çaprazlarını kesebilir); `start deprem 5`, AKTIF, 15 sn sonra `stop` (neden KOMUT);
+(S5'ten önce: S5 yarığının dalları doğuş çaprazlarını kesebilir); istek 24 (afet-fizik AF-30): `start deprem 3`, AKTIF,
+yarık tamam, `Afet bitti: deprem seviye 3 neden DOGAL` artçı sarsıntı satırından önce gelir (artçılar afet yuvası dışında), hemen
+`start sinkhole 2` kabul edilir ve `stop` ile biter, artçı sarsıntı sonra yine gelir; `start deprem 5`, AKTIF, 15 sn sonra `stop` (neden KOMUT);
 `start deprem 3`, AKTIF'te sunucuya `stop` (afet sürerken
 kayıt). Koşu 2 (aynı dünya): `Aktif afet geri yüklendi: deprem seviye 3 aşama aktif`, yarık tamam, artçı sarsıntı
 (`[deprem] artçı sarsıntı 1/1`, DS-14) ve doğal bitiş, `stop`.
@@ -106,6 +108,8 @@ def kosu1(sunucu):
     sunucu.bekle(r"Afet bitti: sinkhole seviye 1 neden DOGAL", 0, 40, "sinkhole doğal bitiş")
     sunucu.komut("gamerule afetBlokHasari true", r"afetBlokHasari is now set to: true")
 
+    bitince_yeni_afet(sunucu)
+
     sunucu.komut("dogalafet start deprem 5", r"Afet başladı: deprem seviye 5")
     aktife(sunucu, "deprem")
     for saniye in (5, 10, 15):
@@ -115,6 +119,32 @@ def kosu1(sunucu):
 
     sunucu.komut("dogalafet start deprem 3", r"Afet başladı: deprem seviye 3")
     aktife(sunucu, "deprem")
+
+
+def bitince_yeni_afet(sunucu):
+    """İstek 24: deprem bitti satırı gelince yeni afet hemen kabul edilir; artçı sarsıntı afet yuvası dışında sonra gelir.
+
+    Eski kodda artçı AKTIF'in içindeydi: ana sarsıntı bitip yer durulduğu hâlde yuva artçı bitene kadar doluydu ve `start`
+    "Zaten aktif bir afet var" diyordu; o kodda bu adım bitti satırından önce artçı satırını görüp düşer.
+    """
+    isaret = sunucu.isaret()
+    sunucu.komut("dogalafet start deprem 3", r"Afet başladı: deprem seviye 3")
+    aktife(sunucu, "deprem")
+    sunucu.bekle(r"\[deprem\] yarık tamam: seviye 3", isaret, 90, "seviye 3 yarık (istek 24)")
+    bitis = sunucu.bekle(r"Afet bitti: deprem seviye 3 neden DOGAL", isaret, 150, "S3 deprem doğal bitiş (istek 24)")
+    with sunucu.kilit:
+        satirlar = list(sunucu.satirlar[isaret:])
+    once = satirlar[:satirlar.index(bitis)]
+    artci = [s for s in once if re.search(r"\[deprem\] artçı sarsıntı", s)]
+    if artci:
+        raise cs.SenaryoHatasi(f"deprem bitişi artçıdan sonra geldi (yuva artçı boyunca dolu): {artci[0].strip()}")
+    satir = sunucu.komut("execute positioned ~-48 ~ ~-48 run dogalafet start sinkhole 2",
+                         r"Afet başladı: sinkhole seviye 2|A disaster is already active|Zaten aktif bir afet var|No suitable place"
+                         r"|uygun yer bulunamadı")
+    if "Afet başladı" not in satir:
+        raise cs.SenaryoHatasi(f"deprem bittikten hemen sonra yeni afet kabul edilmedi: {satir.strip()}")
+    sunucu.komut("dogalafet stop", r"Afet bitti: sinkhole seviye 2 neden KOMUT")
+    sunucu.bekle(r"\[deprem\] artçı sarsıntı 1/1", isaret, 150, "S3 artçı afet yuvası dışında (istek 24)")
 
 
 def kosu2(sunucu):

@@ -15,6 +15,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.AbstractTickableSoundInstance;
@@ -28,14 +29,25 @@ import net.minecraft.world.phys.Vec3;
  * İstemcideki ortam katmanları ({@code uyari.OrtamSesi}'nin karşılığı). Her tick katmanın düzeyi = hacim eğrisi × mesafe
  * sönümü × {@code ortamTavan} × siren bastırması (-3 dB) × kapanış fade'i; en yüksek düzeyli katmanlar kalite tavanına
  * kadar çalar (ses.md §4, §5). Ses motorunun kestiği katman (boyut değişimi) aynı zaman çizelgesiyle yeniden çalar.
+ * Başka istemci paketleri katmanı yalnız {@link #katman} ile okur (ör. deprem artçı sarsıntısı, AF-D7).
  */
-final class IstemciOrtam {
+public final class IstemciOrtam {
     static final IstemciOrtam ORNEK = new IstemciOrtam();
 
     private final Map<String, Katman> katmanlar = new LinkedHashMap<>();
     private final Bastirma bastirma = new Bastirma();
 
+    /** Salt okuma: katmanın son paketi, başından beri geçen istemci tick'i ve kapanış fade'i (1 sürüyor, 0 söndü). */
+    public record KatmanDurumu(OrtamPaketi paket, long gecen, float fade) {
+    }
+
     private IstemciOrtam() {
+    }
+
+    /** Katman istemcide varsa (sönüyor olsa da) durumu; istemci ana thread'inde. */
+    public static Optional<KatmanDurumu> katman(String kimlik) {
+        Katman k = ORNEK.katmanlar.get(kimlik);
+        return k == null ? Optional.empty() : Optional.of(new KatmanDurumu(k.paket, k.gecen, k.fade()));
     }
 
     private static final class Katman {
