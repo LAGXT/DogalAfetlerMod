@@ -15,6 +15,11 @@ public record GunSaatiPenceresi(long bas, long son) {
     public static final GunSaatiPenceresi SABAH = new GunSaatiPenceresi(0L, 6_000L);
     /** Gece (vanilla 13000–23000, ayın gökte olduğu bölüm). */
     public static final GunSaatiPenceresi GECE = new GunSaatiPenceresi(13_000L, 23_000L);
+    /**
+     * Beklemenin üst sınırı (gerçek tick, bir MC günü): bu kadar beklendiği hâlde pencere gelmediyse (başka bir mod saati
+     * kilitlemiş) bekleme biter ve afet sürer.
+     */
+    public static final long EN_COK_BEKLEME = GUN_TICK;
 
     public GunSaatiPenceresi {
         if (bas < 0 || son > GUN_TICK || bas >= son) {
@@ -46,11 +51,13 @@ public record GunSaatiPenceresi(long bas, long son) {
     }
 
     /**
-     * ON_UYARI'nın sonunda SIREN'e geçiş beklemeli mi. Komutla başlayan afet ({@code elle}) ve gün döngüsü kapalı dünya
-     * ({@code doDaylightCycle=false}: pencere hiç gelmeyebilir, kızıl cüce G19 ile aynı) beklemez.
+     * ON_UYARI'nın sonunda SIREN'e geçiş beklemeli mi. Komutla başlayan afet ({@code elle}), gün döngüsü kapalı dünya
+     * ({@code doDaylightCycle=false}: pencere hiç gelmeyebilir, kızıl cüce G19 ile aynı) ve {@value #EN_COK_BEKLEME} gerçek
+     * tick beklemiş afet ({@code beklenenTick}) beklemez.
      */
     public static boolean bekle(Optional<GunSaatiPenceresi> pencere, boolean elle, boolean gunDongusu, long gunSaati,
-            long sirenGercekTick) {
-        return pencere.isPresent() && !elle && gunDongusu && pencere.get().bekleme(gunSaati, sirenGercekTick) > 0;
+            long sirenGercekTick, long beklenenTick) {
+        return pencere.isPresent() && !elle && gunDongusu && beklenenTick < EN_COK_BEKLEME
+                && pencere.get().bekleme(gunSaati, sirenGercekTick) > 0;
     }
 }

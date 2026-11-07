@@ -28,8 +28,12 @@ import net.minecraftforge.eventbus.api.EventPriority;
 final class GunSaatiSabitleyici {
     static final String KIMLIK = "gun_saati";
     static final String HEDEF = "sabit";
-    /** Sabit saatin log'a yazılma aralığı (sunucu tick'i). */
+    /**
+     * Sabit saatin periyodik log aralığı (sunucu tick'i); yalnız görsel otomasyonda ({@code GorselOtomasyon.AKTIF} ile aynı
+     * özellik): üretimde yalnız geçiş satırları (sabit, dışarıdan değişti, serbest) yazılır (K-E42).
+     */
     private static final int LOG_ARALIGI = 1_200;
+    private static final boolean OTOMASYON = !System.getProperty("dogalafetler.otomasyon", "").isEmpty();
 
     private GunSaatiSabitleyici() {
     }
@@ -92,7 +96,7 @@ final class GunSaatiSabitleyici {
         if (yeni || server.getTickCount() % 20 == 0) {
             gonder(server, ust, false);
         }
-        if (server.getTickCount() % LOG_ARALIGI == 0) {
+        if (OTOMASYON && server.getTickCount() % LOG_ARALIGI == 0) {
             DogalAfetler.LOGGER.info("Gün saati sabit: dayTime={} oyun günü {} (güneş patlaması AKTIF)", ust.getDayTime(),
                     yonetici.oyunGunu());
         }

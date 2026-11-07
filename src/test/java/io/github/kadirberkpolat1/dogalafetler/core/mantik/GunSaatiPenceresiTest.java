@@ -65,13 +65,34 @@ class GunSaatiPenceresiTest {
     @Test
     void dogalBaslangicBeklerKomutVeDonguKapaliBeklemez() {
         Optional<GunSaatiPenceresi> gunes = GunSaatiPenceresi.dogalPatlama(AfetTuru.GUNES_PATLAMASI);
-        assertTrue(GunSaatiPenceresi.bekle(gunes, false, true, 18_000, 1_200), "doğal, gece: bekler");
-        assertFalse(GunSaatiPenceresi.bekle(gunes, false, true, 1_000, 1_200), "doğal, sabah: başlar");
-        assertFalse(GunSaatiPenceresi.bekle(gunes, true, true, 18_000, 1_200), "komut pencereye bakmaz");
-        assertFalse(GunSaatiPenceresi.bekle(gunes, false, false, 18_000, 1_200), "gün döngüsü kapalı: beklenmez");
-        assertFalse(GunSaatiPenceresi.bekle(Optional.empty(), false, true, 18_000, 1_200), "pencere kuralı olmayan tür");
+        assertTrue(GunSaatiPenceresi.bekle(gunes, false, true, 18_000, 1_200, 0), "doğal, gece: bekler");
+        assertFalse(GunSaatiPenceresi.bekle(gunes, false, true, 1_000, 1_200, 0), "doğal, sabah: başlar");
+        assertFalse(GunSaatiPenceresi.bekle(gunes, true, true, 18_000, 1_200, 0), "komut pencereye bakmaz");
+        assertFalse(GunSaatiPenceresi.bekle(gunes, false, false, 18_000, 1_200, 0), "gün döngüsü kapalı: beklenmez");
+        assertFalse(GunSaatiPenceresi.bekle(Optional.empty(), false, true, 18_000, 1_200, 0), "pencere kuralı olmayan tür");
         Optional<GunSaatiPenceresi> ay = GunSaatiPenceresi.dogalPatlama(AfetTuru.AY_CARPMASI);
-        assertTrue(GunSaatiPenceresi.bekle(ay, false, true, 6_000, 1_200), "doğal ay, gündüz: bekler");
-        assertFalse(GunSaatiPenceresi.bekle(ay, false, true, 15_000, 2), "doğal ay, gece (hiz 1000 sireni 2 tick)");
+        assertTrue(GunSaatiPenceresi.bekle(ay, false, true, 6_000, 1_200, 0), "doğal ay, gündüz: bekler");
+        assertFalse(GunSaatiPenceresi.bekle(ay, false, true, 15_000, 2, 0), "doğal ay, gece (hiz 1000 sireni 2 tick)");
+    }
+
+    @Test
+    void beklemeBirGundenUzunSurmez() {
+        Optional<GunSaatiPenceresi> ay = GunSaatiPenceresi.dogalPatlama(AfetTuru.AY_CARPMASI);
+        long sinir = GunSaatiPenceresi.EN_COK_BEKLEME;
+        assertEquals(24_000L, sinir, "üst sınır bir MC günü");
+        assertTrue(GunSaatiPenceresi.bekle(ay, false, true, 6_000, 1_200, sinir - 1), "sınırdan bir tick önce bekler");
+        assertFalse(GunSaatiPenceresi.bekle(ay, false, true, 6_000, 1_200, sinir), "saat kilitli: sınırda bekleme biter");
+        assertFalse(GunSaatiPenceresi.bekle(ay, false, true, 6_000, 1_200, sinir + 5_000));
+        // Saati kilitli (6000'de duran) dünyayı tick tick sür: tam sınırda bitmeli.
+        long beklenen = 0;
+        while (GunSaatiPenceresi.bekle(ay, false, true, 6_000, 1_200, beklenen)) {
+            beklenen++;
+        }
+        assertEquals(sinir, beklenen, "kilitli saatte bekleme tam 24000 tick");
+        for (long g = 0; g < 24_000; g += 97) {
+            for (GunSaatiPenceresi p : new GunSaatiPenceresi[] {SABAH, GECE}) {
+                assertTrue(p.bekleme(g, 1_200) < sinir, "normal döngüde pencere sınırdan önce gelir: " + g);
+            }
+        }
     }
 }

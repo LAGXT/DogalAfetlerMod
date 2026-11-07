@@ -141,6 +141,7 @@ Bütün komutlar `/dogalafet` altındadır ve **yalnız OP** (yetki seviyesi 2) 
 | `/dogalafet donma bilgi` | Donma ilerlemesi, dönem, buharlaşma, işlenen chunk kuyruğu. |
 | `/dogalafet kizilcuce baslat` | Beklemeyi atlayıp kızıl cüce doğuşunu başlatır. |
 | `/dogalafet kizilcuce bilgi` | Gökyüzü dönemi, çözülme ilerlemesi, bulunduğunuz chunk kalıcı kış mı. |
+| `/dogalafet pulsar baslat` | Kızıl cüce yerine pulsarı hemen doğurur (olasılık, donma ve şafak beklenmez; zaten pulsarsa ya da güneş patlaması sürüyorsa reddeder). |
 | `/dogalafet gun <sayı>` | Oyun gününü ayarlar ve seviye olasılıklarını gösterir. |
 | `/dogalafet odul meteor [parca\|cekirdek\|hepsi] [adet] [oyuncu]` | Test için Meteorit Parçası / Kozmik Çekirdek verir. |
 | `/dogalafet asama ileri [süreç]` | Aktif afeti ya da bir dünya dönemi sürecini sonraki aşamaya geçirir. |
@@ -227,6 +228,10 @@ hücresi). Sunucu TPS'i düşünce bu bütçeler kendiliğinden kısılır.
 | `cekirdek.tekSeferlik.gunesPatlamasiTekrarlanabilir` | `false` | Güneş patlaması kızıl cücede tekrar gelebilsin mi. |
 | `su.aysonrasiBeklemeDk`, `su.denizHedefArtis` | `10`, `4` | Ay çarpmasından sonra deniz yükselmesinin beklemesi (gerçek dakika) ve hedefi (blok). |
 | `gokyuzu.kizilCuceGecikmeGun` | `7` | Donma %100'e ulaştıktan sonra kızıl cücenin doğmasına kadar gün. |
+| `gokyuzu.pulsarOlasiligi` | `0,15` | Süpernova sonrası doğal doğuşta kızıl cüce yerine pulsar doğma olasılığı (dünya tohumundan belirlenir). |
+| `gokyuzu.pulsarIsinmaGun` | `2` | Pulsarın dünya etkilerinin (sıcaklık, kavrulma, yangın, buharlaşma) tam güce çıkma süresi, MC günü. |
+| `gokyuzu.pulsarYanginDakikaBasina` | `20` | Tam güçte oyuncu başına dakikada yeni yangın odağı (`afetBlokHasari false` iken yok). |
+| `gokyuzu.pulsarKavrulmaOlasiligi` | `0,6` | Tam güçte güneşe açık çimenin kaba toprağa dönme denemesi olasılığı (tick başına, oyuncu başına). |
 | `sicaklik.sicaklikSistemiModu` | `OTOMATIK` | `OTOMATIK`: Cold Sweat yüklüyse kendi sıcaklık sistemi kapalı; `ACIK` / `KAPALI`. |
 | `basarim.etkiAlaniPayi` | `0` | "Sağ çıkma" için afet yarıçapına eklenen pay (blok). |
 

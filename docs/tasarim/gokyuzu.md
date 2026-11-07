@@ -48,7 +48,7 @@ Kaynak: `.vibe/kararlar/spike-gokyuzu.md` G1…G6, `docs/KARARLAR.md` K0-23, K0-
 2. Derin uzay katmanı (görünürlük `uzayAlfa`): Samanyolu bandı → galaksiler → nebulalar → yıldızlar (additive, derinlik yazımı kapalı), gökyüzü dönüşüyle (`getTimeOfDay`) birlikte döner.
 3. Güneş / süpernova / kızıl cüce (evreye göre).
 4. Ay (yalnız `ayVar`), ay çarpması sırasında yaklaşan ay ve parçaları, sonra enkaz halkası.
-5. Ufuk efektleri: ay çarpması mantar sütunu, kızıl cüce doğuş ışığı, aurora.
+5. Ufuk efektleri: ay çarpmasının havadaki 3B patlaması (7 sn; gökyüzü-2'de mantar sütununun yerine), kızıl cüce doğuş ışığı, aurora.
 6. Vanilla'nın ufuk altı koyu diski.
 
 **Yıldızlar.** Açılışta tek seferlik `VertexBuffer` (vanilla 1500 yıldız yerine Yüksek'te 6000). Yön: birim kürede düzgün rastgele, %35'i Samanyolu düzlemine ±12° içinde yoğunlaştırılmış. Parlaklık: `m = -ln(U)` ile üstel dağılım, boyut 0,08–0,45 (en parlak %1'i 4 kollu küçük ışın dokusu). Renk: %70 beyaz `#F4F6FF`, %12 mavi-beyaz `#AFC8FF`, %10 sarı `#FFE7B0`, %8 turuncu-kırmızı `#FFB08A`. Titreme: yıldızlar 4 gruba bölünür, her grubun alfası farklı fazlı 1,1–2,3 Hz sinüsle ±%15 değişir (VBO yeniden yazılmaz, grup başına tek uniform renk); ufka yakın 15°'de alfa yarıya iner.
