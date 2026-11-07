@@ -5939,7 +5939,11 @@ Meteor zinciri K-E56 rev.'de. Reddedilen: `ModConfigEvent.Loading`'de `set` (iki
 entegrasyon `158fbaf`):** yazım yedekli ve atomik: yeni içerik aynı klasörde geçici dosyaya yazılır, özgün dosya
 `<dosya>.bak-ayarSurumu<eski>`'ye kopyalanır (var olan yedek ezilmez: `-2`, `-3`, …), geçici dosya `ATOMIC_MOVE` ile yerine
 taşınır, özet satırı yedeğin adını taşır. Hata yolunda (okuma, yazma, atomik taşıma desteklenmiyor) tek WARN, dosyaya
-dokunulmaz, geçici dosya silinir, Forge eski değerlerle sürer. **Kapsam (Mt28):** yalnız SERVER config'i; CLIENT config
+dokunulmaz, geçici dosya silinir, Forge eski değerlerle sürer. **Bilinen sınırlar (inceleme-meteor-2-4 Ek, P2):** Mt33 göç
+edilen dosya geçici dosyanın izinlerini alır (0644 → 0600), sembolik bağ düz dosyayla değişir, Linux'ta salt okunur dosya da
+değişir (klasör yazılabilirse taşıma geçer); Mt34 atomik taşıma kalıcı başarısızsa her açılışta bir `.bak` daha birikir
+(`-2`, `-3`, …). `f73c1c1` (derlenmeyen ara commit, `001f10d` düzeltti) dal geçmişinde kalır; defterde `kaldi` satırı.
+**Kapsam (Mt28):** yalnız SERVER config'i; CLIENT config
 (`dogalafetler-client.toml`), gamerule varsayılanları (`level.dat`) ve paket yapımcısının `defaultconfigs/` dosyası (Forge ilk
 kopyada `ayarSurumu`'nu güncel sürümle doldurur, göç etmez; K-C38) K-E61 dışında. Kalıp başka SERVER bölümlerine kendi
 `<bölüm>.ayarSurumu` + `AyarKaydi.sunucuGocu` ile uygulanır; "varsayılanı değişen SERVER anahtarı göç tablosuna girer"
