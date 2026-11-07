@@ -330,13 +330,17 @@ TSUNAMI_SAHNESI = [
     "fill ~-29 201 ~-19 ~-1 203 ~19 water",
     "fill ~0 201 ~-20 ~20 203 ~20 dirt",
 ]
+ORMAN_SAHNESI = [
+    "fill ~-50 199 ~30 ~-38 199 ~42 oak_planks",
+    "fill ~-50 200 ~30 ~-38 200 ~42 oak_leaves[persistent=true]",
+]
 SEKIZ_AFET = [
     ("dogalafet start kasirga 3", "Tornado"),
     ("execute positioned ~10 204 ~ run dogalafet start tsunami 1", "Tsunami"),
     ("dogalafet start deprem 2", "Earthquake"),
     ("execute positioned ~48 ~ ~48 run dogalafet start sinkhole 1", "Sinkhole"),
     ("dogalafet start asit_yagmuru 2", "Acid Rain"),
-    ("dogalafet start orman_yangini 2", "Wildfire"),
+    ("execute positioned ~-44 201 ~36 run dogalafet start orman_yangini 2", "Wildfire"),
     ("dogalafet start gunes_patlamasi", "Solar Flare"),
     ("dogalafet start ay_carpmasi", "Moon Impact"),
 ]
@@ -347,7 +351,7 @@ def kosu3(sunucu):
     if any("Oyun testi afeti" in s for s in sunucu.satirlar):
         raise SenaryoHatasi("bayraksız açılışta oyun testi afeti kaydedildi (gerçek afetler bekleniyordu)")
     sunucu.komut("forceload add ~-64 ~-64 ~64 ~64", r"to be force loaded|already marked")
-    for komut in TSUNAMI_SAHNESI:
+    for komut in TSUNAMI_SAHNESI + ORMAN_SAHNESI:
         sunucu.komut(komut, r"Successfully filled \d+ block", komut)
     for komut, ad in SEKIZ_AFET:
         sunucu.komut(komut, rf"{ad} started", f"start {ad} (gerçek afet)")
