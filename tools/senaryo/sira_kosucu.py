@@ -165,8 +165,8 @@ class Kosucu:
 
     def ana_engeli(self, veri, kosan, simdi):
         """Ana makine bu işi şimdi neden alamaz (None: alır). İstemci işi: ana makinede tek istemci. oto işi: pc2 öncelikli,
-        ağır süreç ≤ 2 (kuyruk dışı Gradle da), boş RAM >= KAPI_RAM_MB, aynı klasörden koşan oto işi yok, son oto işi
-        SIRA_ANA_ARA_SN önce başladı."""
+        ağır süreç ≤ 2 (kuyruk dışı Gradle da), boş RAM >= KAPI_RAM_MB, aynı klasörden koşan oto işi yok (worktree'nin
+        build/ ve run-server/ klasörü tek)."""
         if veri.get("istemci"):
             if any(v.get("istemci") for v in kosan):
                 return "kuyruğun istemci işi koşuyor"
@@ -180,8 +180,6 @@ class Kosucu:
         oto_kosan = [v for v in kosan if v.get("kaynak") == "oto"]
         if veri["cwd"] in {v["cwd"] for v in oto_kosan}:
             return "aynı klasörden oto işi koşuyor"
-        if any(time.time() - v.get("baslangic", 0) < sira.ANA_ARA_SN for v in oto_kosan):
-            return "az önce oto işi başladı (RAM ölçümü otursun)"
         oturumlar = {v.get("kosturucu") for v in kosan}
         agir = sum(sira.gerek(v, "ana") for v in kosan) + sum(o not in oturumlar for o in sira.gradle_oturumlari())
         if agir + sira.gerek(veri, "ana") > sira.YUVA:

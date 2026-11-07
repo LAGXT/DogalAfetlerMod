@@ -12,7 +12,7 @@ JAVA_HOME, LC_ALL, GRADLE_OPTS; ana kuyrukta ekran değişkenleri de), yuva, ekl
        değişmez). pc2 öncelikli: ana koşucu oto işini pc2 alamıyorsa (pc2'nin koşan + bekleyen yükü işe yer bırakmıyor, iş
        pc2'de koşan bir işle aynı klasörden ya da pc2 koşucusu yok) ya da iş SIRA_OTO_BEKLE_SN (60) sn beklediyse alır. Ana
        makinede ekransız iş UZAK=0 ile yerelde koşar (ağır süreç ≤ 2: kuyruğun işleri + kuyruk dışı Gradle; boş RAM >=
-       KAPI_RAM_MB, vars. 4096, ölçüm otursun diye iki oto işi arasında SIRA_ANA_ARA_SN, vars. 60 sn); istemci işi betiğin kendisiyle, 1 yuva (ana makinede tek istemci: kuyruğun istemci işi ya da
+       KAPI_RAM_MB, vars. 4096; aynı klasörden tek oto işi); istemci işi betiğin kendisiyle, 1 yuva (ana makinede tek istemci: kuyruğun istemci işi ya da
        yaşayan runClient kilidi varken alınmaz). pc2 istemci işini `pc2_istemci.sh <kanıt/> <betik> …` ile iki yuvada koşar.
   ana  ekranlı iş (runClient, runData, UZAK=0, --olcum, kanıtı belirsiz istemci işi) ya da `--makine ana`.
   pc2  `--makine pc2`, pc2_istemci.sh ve uzak.sh işi: komutun kendisi pc2'ye gider (K-E44); kendiliğinden gitmeyen komut
@@ -53,7 +53,6 @@ YUVA = 2
 SURUM = 2
 OTO_BEKLE_SN = float(os.environ.get("SIRA_OTO_BEKLE_SN", "60"))
 ACLIK_SN = float(os.environ.get("SIRA_ACLIK_SN", "600"))
-ANA_ARA_SN = float(os.environ.get("SIRA_ANA_ARA_SN", "60"))
 ENV_ANAHTARI = re.compile(r"(TEST_FILTRE|KAPI_\w+|UZAK\w*|DEFTER_ZORLA|VIBE_OTURUM|JAVA_HOME|LC_ALL|GRADLE_OPTS)")
 EKRAN_ENV = ("DISPLAY", "WAYLAND_DISPLAY", "HYPRLAND_INSTANCE_SIGNATURE", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS")
 KENDILIGINDEN_UZAK = ("uzak.sh", "pc2_istemci.sh")

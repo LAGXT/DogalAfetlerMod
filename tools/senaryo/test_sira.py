@@ -15,7 +15,7 @@ import unittest
 from pathlib import Path
 
 GECICI = tempfile.mkdtemp(prefix="sira-sinama-")
-os.environ.update(SIRA_KOK=f"{GECICI}/spool", SIRA_PANO=f"{GECICI}/pano.md", SIRA_ACLIK_SN="2", SIRA_OTO_BEKLE_SN="60", SIRA_ANA_ARA_SN="0",
+os.environ.update(SIRA_KOK=f"{GECICI}/spool", SIRA_PANO=f"{GECICI}/pano.md", SIRA_ACLIK_SN="2", SIRA_OTO_BEKLE_SN="60",
                   UZAK_MAKINE=f"sinama-{secrets.token_hex(3)}", DOGALAFETLER_RUNCLIENT_KILIT=f"{GECICI}/runclient.lock",
                   KAPI_RAM_MB="0")
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -166,18 +166,18 @@ class SiraTest(unittest.TestCase):
             sira.ekle("pc2", ["python3", "tools/senaryo/x_gorsel.py", "k/"], istemci=True, olcum=True, cwd=w,
                       cikti=sessiz)
 
-    def test_ana_oto_islerini_aralikli_alir(self):
+    def test_ana_iki_yuvayi_beklemeden_doldurur_ayni_klasor_tek(self):
         self.kosucu_kilidi("pc2")
-        sira.ANA_ARA_SN = 60
-        try:
-            ana = sira_kosucu.Kosucu("ana", 2)
-            bir = is_yaz("oto", ["sleep", "0"], once_sn=sira.OTO_BEKLE_SN + 2)
-            iki = is_yaz("oto", ["sleep", "0"], once_sn=sira.OTO_BEKLE_SN + 1)
-            ana.baslat()
-            self.assertEqual([sira.bul(k)[:2] for k in (bir, iki)], [("ana", "kosan"), ("oto", "bekleyen")])
-        finally:
-            sira.ANA_ARA_SN = 0
-        surdur([ana], [bir, iki])
+        ana = sira_kosucu.Kosucu("ana", 2)
+        ortak = tempfile.mkdtemp(dir=GECICI)
+        bir = is_yaz("oto", ["sleep", "2"], cwd=ortak, once_sn=sira.OTO_BEKLE_SN + 3)
+        ayni = is_yaz("oto", ["sleep", "0"], cwd=ortak, once_sn=sira.OTO_BEKLE_SN + 2)
+        iki = is_yaz("oto", ["sleep", "2"], once_sn=sira.OTO_BEKLE_SN + 1)
+        ana.baslat()
+        self.assertEqual([sira.bul(k)[:2] for k in (bir, ayni, iki)],
+                         [("ana", "kosan"), ("oto", "bekleyen"), ("ana", "kosan")],
+                         "ana iki oto işini aynı turda almalı; aynı klasörün ikinci işi beklemeli")
+        surdur([ana], [bir, ayni, iki])
 
     def test_ana_tek_istemci(self):
         self.kosucu_kilidi("pc2")
