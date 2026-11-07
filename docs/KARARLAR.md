@@ -32,7 +32,8 @@ metnindeki "14" sayısı şartnameyle çelişiyor, şartname kazanır (GOREV gir
 olmadığı için `Kurallar` sınıfı `FMLCommonSetupEvent.enqueueWork` içinde ana thread'de yüklenir. Vanilla
 `IntegerValue` aralık denetlemediği için değerler okunurken sıkıştırılır: `afetMaksSiddet` [1, 5] (madde 11),
 `afetSikligi` [0, 1000] (üst sınır bu kararın: %1000 = on kat; daha yüksek değer bekleme kuralı nedeniyle zaten fark
-yaratmaz). Okuyucular `Kurallar.maksSiddet(...)`, `Kurallar.siklikCarpani(...)`, `Kurallar.afetSecilebilir(...)` kullanır.
+yaratmaz; **rev. K-E62:** beklemeler de sıklığa bölündüğü için %1000 gerçekten ~on kat afet verir, 1000 üstü 1000 sayılır ve OP'lere
+bildirilir). Okuyucular `Kurallar.maksSiddet(...)`, `Kurallar.siklikCarpani(...)`, `Kurallar.afetSecilebilir(...)` kullanır.
 
 **K0-06 `/dogalafet` kayıt kancası.** Kök `DogalAfetKomutu`'nda, `requires(hasPermission(2))`. Diğer paketler mod
 inşasında `KomutKaydi.ekle(LiteralArgumentBuilder)` ya da argümanları `CommandBuildContext` isteyen komutlar için
@@ -117,7 +118,10 @@ yazılırdı. Final metotlar sırayı korur (ör. `baslat` iki kez çağrılamaz
 **K-C2 Zamanlayıcı: tür başına bağımsız oran.** λ_t = `gunlukAfetOrani × afetSikligi × çarpan_t × ağırlık_t / Σağırlık`
 (afet/gün); kontrol aralığında olay olasılığı `1 − e^(−Λ·adım/24000)`, tür λ_t/Λ ile seçilir. Kapalı, beklemedeki ya da tek
 seferliği tükenmiş tür Λ'ya girmez (kalanlar sıklaşmaz). Oyuncu sayısı hiçbir yerde yok (madde 3). Kontrol saniyede bir;
-olasılık adıma göre ölçeklendiği için sıklığı değiştirmez.
+olasılık adıma göre ölçeklendiği için sıklığı değiştirmez. **Rev. (K-E62, AS-1…AS-5, 2026-11-08):** `afetSikligi` artık bütün
+takvimi ölçekler: oran × sıklık, başlangıç (`baslangicBeklemeTick`), genel (`genelBeklemeTick` × şiddet uzaması) ve tür
+(`beklemeTick`) beklemeleri ÷ sıklık (`AfetZamanlayicisi.beklemeOlcekle`); 11.4'ün "200 = iki katı" gerçekleşen afet sayısı olarak
+okunur. Sıklık 0'da seçim yok, süreler değişmez; N14 ertelemesi, afetin kendi süresi ve `/dogalafet start` ölçeklenmez.
 
 **K-C3 Art arda 4–5, katı okuma.** Madde 10 "Seviye 4-5 afetler ardışık gelmesin (aynı seviye art arda en fazla bir kez)".
 Önceki seviyeli afet 4 ya da 5 idiyse bu seçimde 4 ve 5'in ikisi de dıştadır; parantezdeki kural bunun özel hâlidir ve
@@ -5952,6 +5956,28 @@ JUnit `MeteorAyarGocuTest` (eski varsayılan → yeni, ara sürüm zinciri, elle
 türü), `AyarGocuTest` (yedek ve numara, bozuk toml değişmez, yazılamayan klasörde dosya değişmez), GameTest
 `eskiAyarDosyasiAcilistaGocEderElleDegerKorunur` (batch `meteor_goc`, yedeği de sınar); entegrasyon dalında tam kapı (K-E59).
 
+## Teslim sonrası — güncelleme turu 2
+
+**K-E62 Afet sıklığı beklemeleri de ölçekler, `/dogalafet siklik` (kullanıcı şikâyeti: "afetSikligi etkisiz"; şef kararı,
+2026-11-08; dal `is/afet-siklik` `1f51c8c`, entegrasyon `is/entegrasyon-7` `5dc7c91`).** Kök neden: K-C2 `afetSikligi`'nı yalnız
+Poisson oranına çarpıyordu; başlangıç beklemesi (24 000 tick), genel bekleme (12 000 × şiddet uzaması) ve tür beklemesi (48 000)
+sıklıktan bağımsızdı. Oturum ölçeğinde beklemeler baskın olduğu için %1000 de %100 gibi görünüyordu ve geri bildirim yoktu
+(kullanıcı log'u: oturumun tamamı ilk gün beklemesinde, 0 afet; 1000 üstü sessizce 1000). Kararlar (`.vibe/kararlar/afet-siklik.md`):
+AS-1 oran × sıklık, üç bekleme ÷ sıklık (K-C2 rev.); AS-2 sıklık değişince süren beklemelerin kalanı `eski/yeni` ile çarpılır
+(`BeklemeDurumu.siklikDegisti`), bitiş anlarının hangi sıklıkla hesaplandığı `DunyaDonemi.uygulananSiklik`'te (NBT, yoksa 1,0 = eski
+kayıt ölçeksiz; 0 kaydedilmez) kalıcı, yeniden açılışta çift ölçekleme yok; AS-3 vanilla `/gamerule` geri çağırması olmadığı için
+`AfetYoneticisi.tick` ham değeri her tick karşılaştırır, değişimde OP'lere ve konsola "Afet sıklığı artık %S" (+ sınır dışı uyarısı)
+ve sonraki afet satırı; oturumun ilk okuması sessiz; K-C46 döngü kimliği, dönem süreçleri ve `sifirla` (beklemeler 0,
+`uygulananSiklik` korunur) etkilenmez; AS-4 `core.mantik.SonrakiAfetTahmini` zamanlayıcının kurallarıyla kapalı biçimde sonraki afetin
+ortalamasını ve %90 aralığını verir (geçici çarpanlar bugünkü değerle, `hiz` hesaba katılır), `/dogalafet durum` ve `siklik` bu
+satırı yazar; AS-5 `/dogalafet siklik` okur, `/dogalafet siklik <0..1000>` aynı gamerule'ü yazar (çekirdek alt komutu,
+`CEKIRDEK_ALT_KOMUTLARI`); alt komutsuz `/dogalafet` kullanılabilir alt komutları listeler (önceden "Bilinmeyen veya eksik komut").
+Şartnamede ayrı sıklık komutu vaat edilmiyor (KOM.1–KOM.17); komut kolaylıktır. SARTNAME N8 ve N18'e ek, yeni N25; IZLEME 3.7,
+11.4, yeni KOM.18 ve N25. Kanıt: JUnit `AfetZamanlayicisiTest` (`beklemeOlcekleSikligaBoler`,
+`onKatSiklikBaslangicBeklemesiniOndaBireIndirir`, `gerceklesenAfetSayisiSikliklaOrantili`), `BeklemeDurumuTest` (`siklikBeklemeyiBoler`,
+`siklikDegisinceKalanOlceklenir`), `SonrakiAfetTahminiTest` (5 vaka); GameTest `siklikKomutuBeklemeyiOlcekleriKaliciTahminKisalir`
+(batch `cekirdek_siklik`; dalda `gametest:Komut|Cekirdek @be725cf0ad39` 20/20). Ağ protokolü değişmez (yeni paket yok).
+
 ## Açık noktalar (Faz 2b)
 
 Entegratöre bırakılan notlardan işlenenler: kancalar (K-E1), protokol (K-C47), `asama ileri [süreç]` (K-C48), sanal su §3a istisnası
@@ -6121,14 +6147,16 @@ P2-9 `5-matris` kabulünde. Kapanış eşlemesi (K-E50) her maddenin sonunda:
 |---|---|---|---|---|
 | çekirdek | `cekirdek.zamanlayici.gunlukAfetOrani` | 0,8 | afet / MC günü (bekleme dışı) | bekleme ve afet süresiyle gerçekleşen ~0,43/gün (simülasyon, 5 dk süren afetle) ≈ 46 dk'da bir; 2–3 saatlik oturumda 3–4 afet (madde 4 "hiç olmayacak kadar nadir değil, bunaltıcı değil"); JUnit 417 günlük simülasyonda 0,25–1,0 aralığını doğrular |
 | çekirdek | `cekirdek.zamanlayici.kontrolAraligiTick` | 20 | tick | saniyede bir zar; olasılık adıma göre ölçeklenir, sıklığı değiştirmez |
-| çekirdek | `cekirdek.zamanlayici.genelBeklemeTick` | 12 000 | tick (10 dk, yarım gün) | madde 4 en az bekleme: afetten sonra toparlanma payı |
+| çekirdek | `cekirdek.zamanlayici.genelBeklemeTick` | 12 000 | tick (10 dk, yarım gün) | madde 4 en az bekleme: afetten sonra toparlanma payı; K-E62: ÷ `afetSikligi` (%200 → yarısı) |
 | çekirdek | `cekirdek.zamanlayici.siddetBeklemeCarpani` | 0,25 | oran | madde 10 "biraz uzasın": S3 ×1,25, S4 ×1,5, S5 ve seviyesiz ×1,75 |
 | çekirdek | `cekirdek.zamanlayici.ertelemeTick` | 6 000 | tick (5 dk) | N14: uygun yer yoksa türün yeniden denenmesi; oyuncular bu sürede yer değiştirir |
-| çekirdek | `cekirdek.zamanlayici.baslangicBeklemeTick` | 24 000 | tick (1 gün) | yeni dünyada ilk gün afetsiz; barınak kurulabilsin |
+| çekirdek | `cekirdek.zamanlayici.baslangicBeklemeTick` | 24 000 | tick (1 gün) | yeni dünyada ilk gün afetsiz; barınak kurulabilsin; K-E62: ÷ `afetSikligi` |
+| çekirdek (NBT) | `DunyaDonemi.uygulananSiklik` (yeni) | 1,0 | çarpan (`afetSikligi`/100; 0 kaydedilmez) | K-E62 AS-2: süren beklemelerin hangi sıklıkla hesaplandığı; yoksa 1,0 = eski kayıt ölçeksiz, yeniden açılışta çift ölçekleme yok |
+| çekirdek (komut) | `/dogalafet siklik [yüzde]` (yeni) | — | yüzde (0–1000, Brigadier) | K-E62 AS-5: `afetSikligi` gamerule'ünü okur/yazar; sonraki afet tahmini (ortalama + %90 aralık, `SonrakiAfetTahmini`) |
 | çekirdek | `cekirdek.afetler.{kasirga,tsunami,deprem,asit_yagmuru,sinkhole,orman_yangini}.agirlik` | 100 | ağırlık | madde 4 "görece sık, birbirine yakın" |
 | çekirdek | `cekirdek.afetler.ay_carpmasi.agirlik` | 32 | ağırlık | nadir: uygun olduktan sonra λ ≈ 0,04/gün (~25 günde bir) |
 | çekirdek | `cekirdek.afetler.gunes_patlamasi.agirlik` | 20 | ağırlık | en nadir: uygun olduktan sonra λ ≈ 0,025/gün (~40 günde bir); oyun boyunca yaşanabilir |
-| çekirdek | `cekirdek.afetler.<altı sık afet>.beklemeTick` | 48 000 | tick (2 gün) | aynı tür art arda gelmesin |
+| çekirdek | `cekirdek.afetler.<altı sık afet>.beklemeTick` | 48 000 | tick (2 gün) | aynı tür art arda gelmesin; K-E62: ÷ `afetSikligi` |
 | çekirdek | `cekirdek.afetler.ay_carpmasi.beklemeTick` | 240 000 | tick (10 gün) | tek seferlik; yalnız ay geri gelirse (sifirla) anlamlı |
 | çekirdek | `cekirdek.afetler.gunes_patlamasi.beklemeTick` | 480 000 | tick (20 gün) | tekrarlanabilir açıkken iki güneş patlaması arası |
 | çekirdek | `cekirdek.onUyari.enAzTick` / `enCokTick` | 900 / 1 800 | tick (45 / 90 sn) | şartname madde 4 |
