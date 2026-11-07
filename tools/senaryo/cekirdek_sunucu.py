@@ -195,8 +195,9 @@ def argumanlar(aciklama=None, varsayilan_port=VARSAYILAN_PORT, varsayilan_kanit=
 def defterli_kos(ayristirici, a):
     """Dış çağrı (K-E44, K-E51); süreç senaryonun çıkış koduyla biter. Test defterinde aynı girdi hash'inde `gecti` varsa
     koşmadan 0. Dedicated senaryo (`--yalniz-istemci`siz, `UZAK=0`'sız) `uzak.sh -g <kanıt>/ python3 <betik> ...` ile pc2'de
-    koşar (kanıt klasörü geri çekilir; pc2 kapalıysa 4); pc2 kapısı doluysa beklemez: `sira.py ekle` ile kuyruğa, iş kimliği,
-    çıkış 0 (`KAPI_BLOKLA=1` ve kuyruğun koştuğu iş bekler). İstemci tarafı (`uyari_sunucu.py --yalniz-istemci`, K-E46) ve
+    koşar (kanıt klasörü geri çekilir; pc2 kapalıysa 4); pc2 kapısı doluysa beklemez: `sira.py ekle` ile ortak `oto` kuyruğuna
+    (pc2 öncelikli, taşanı ana makine UZAK=0 ile alır; K-E53), iş kimliği, çıkış 0 (`KAPI_BLOKLA=1` ve kuyruğun koştuğu iş
+    bekler). İstemci tarafı (`uyari_sunucu.py --yalniz-istemci`, K-E46) ve
     `UZAK=0` yerelde: aynı betik alt süreçte. Sonuç deftere yazılır. `DEFTER_ICINDE` (defterli bir çağrının içi): defter
     ve kuyruk yok, pc2'ye yönlendirme sürer."""
     import defter
@@ -219,7 +220,7 @@ def defterli_kos(ayristirici, a):
             sira_py = [sys.executable, str(KOK / "tools" / "senaryo" / "sira.py")]
             dolu = subprocess.run([*sira_py, "dolu-mu", "--makine", "pc2"], capture_output=True, text=True)
             if dolu.returncode == 0:
-                is_no = subprocess.run([*sira_py, "ekle", "--makine", "pc2", "--", "python3", betik, *sys.argv[1:]],
+                is_no = subprocess.run([*sira_py, "ekle", "--makine", "oto", "--", "python3", betik, *sys.argv[1:]],
                                        stdout=subprocess.PIPE, text=True, check=True).stdout.strip()
                 print(f"SIRA: kapı dolu ({dolu.stdout.strip()}); kuyrukta {is_no} — sonuç: tools/senaryo/sira.py bekle {is_no}")
                 sys.exit(0)
