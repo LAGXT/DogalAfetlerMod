@@ -260,14 +260,15 @@ class Kosucu:
         return spool, tuple(d["pid"] for m in sira.MAKINELER for d in sira.dis_surecler(m))
 
     def pc2_surec_topla(self):
-        """pc2'deki Gradle istemcilerini ve uzak.sh oturum dosyalarını ssh ile okuyup `pc2/surecler.json`'a yazar."""
+        """pc2'deki Gradle istemcilerini ve uzak.sh oturum dosyalarını ssh ile okuyup `pc2/surecler.json`'a yazar (pc2'nin
+        giriş kabuğu fish: betik `bash -s`'e stdin'den gider)."""
         betik = ('ps -eo pid=,ppid=,etimes=,args=; echo @@; '
                  'for f in /tmp/uzak-*.pid; do [ -f "$f" ] && echo "$f $(cat "$f")"; done; true')
         while not self.dur:
             try:
                 sonuc = subprocess.run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5",
-                                        os.environ.get("UZAK_MAKINE", "pc2"), betik], capture_output=True, text=True,
-                                       timeout=20)
+                                        os.environ.get("UZAK_MAKINE", "pc2"), "bash", "-s"], input=betik,
+                                       capture_output=True, text=True, timeout=20)
                 if sonuc.returncode != 0:
                     raise OSError(sonuc.stderr.strip()[:200] or f"ssh çıkış {sonuc.returncode}")
                 ps_metni, _, dosyalar = sonuc.stdout.partition("@@")
