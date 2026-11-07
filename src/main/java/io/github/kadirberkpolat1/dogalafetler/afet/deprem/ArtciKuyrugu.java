@@ -228,7 +228,7 @@ public final class ArtciKuyrugu implements DonemSureci {
             }
             v.putInt(SUREN, yeni);
             if (yeni > 0) {
-                artciBasladi(server, v, plan, yeni);
+                artciBasladi(server, v, plan, yeni, yeni != eski);
             }
             donem.ekVeriDegisti(KIMLIK);
         }
@@ -245,11 +245,15 @@ public final class ArtciKuyrugu implements DonemSureci {
         return false;
     }
 
-    private static void artciBasladi(MinecraftServer server, CompoundTag v, List<ArtciPlani.Artci> plan, int sira) {
+    /** {@code ilkKez} false: sunucu yeniden açılınca yalnız ses yeniden başlar, artçı satırı ikinci kez yazılmaz. */
+    private static void artciBasladi(MinecraftServer server, CompoundTag v, List<ArtciPlani.Artci> plan, int sira,
+            boolean ilkKez) {
         ArtciPlani.Artci a = plan.get(sira - 1);
         BlockPos merkez = BlockPos.of(v.getLong(MERKEZ));
-        DogalAfetler.LOGGER.info("[deprem] artçı sarsıntı {}/{}: şiddet %{}, süre {} tick, merkez {}", sira, plan.size(),
-                Math.round(a.kesir() * 100), a.sure(), merkez.toShortString());
+        if (ilkKez) {
+            DogalAfetler.LOGGER.info("[deprem] artçı sarsıntı {}/{}: şiddet %{}, süre {} tick, merkez {}", sira, plan.size(),
+                    Math.round(a.kesir() * 100), a.sure(), merkez.toShortString());
+        }
         ResourceLocation boyutAdi = ResourceLocation.tryParse(v.getString(BOYUT));
         if (boyutAdi == null) {
             return;

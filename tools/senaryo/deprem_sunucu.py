@@ -138,7 +138,9 @@ def bitince_yeni_afet(sunucu):
     artci = [s for s in once if re.search(r"\[deprem\] artçı sarsıntı", s)]
     if artci:
         raise cs.SenaryoHatasi(f"deprem bitişi artçıdan sonra geldi (yuva artçı boyunca dolu): {artci[0].strip()}")
-    satir = sunucu.komut("execute positioned ~-48 ~ ~-48 run dogalafet start sinkhole 2",
+    # Hasar kapalı S1 çukurunun yeri: bu tohumda uygun olduğu biliniyor ve blok değişmedi; S3 yarığı (yarım boy 48)
+    # bu çapraza ulaşmaz.
+    satir = sunucu.komut("execute positioned ~-48 ~ ~48 run dogalafet start sinkhole 2",
                          r"Afet başladı: sinkhole seviye 2|A disaster is already active|Zaten aktif bir afet var|No suitable place"
                          r"|uygun yer bulunamadı")
     if "Afet başladı" not in satir:

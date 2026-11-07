@@ -429,7 +429,8 @@ public final class DepremOyunTestleri {
             int suren = suruyor ? ArtciKuyrugu.suren(server) : 0;
             if (suruyor) {
                 kuyrukGoruldu[0] = true;
-                yuvaDolu[0] |= yonetici.aktifAfet().isPresent();
+                // Devir BITIS'e geçilen tick'te olur; yuva bir sonraki tick'te boşalır (afet tick başına bir aşama geçer).
+                yuvaDolu[0] |= yonetici.aktifAfet().filter(a -> a.asama() != AfetAsamasi.BITIS).isPresent();
             }
             if (suren > 0 && (surenler.isEmpty() || surenler.get(surenler.size() - 1) != suren)) {
                 surenler.add(suren);
