@@ -31,17 +31,17 @@ public final class TsunamiAyarlari {
                 .defineInRange("ayCekilmeCarpani", 1.5, 1.0, 3.0);
         yikimCarpani = k.comment("Tick başına yıkım bütçesi çarpanı (S1 16 … S5 48 blok; ayrıca TPS kısmasıyla çarpılır).")
                 .defineInRange("yikimCarpani", 1.0, 0.1, 4.0);
-        yikimBolumTick = k.comment("Tick başına yıkımın başlattığı en çok farklı 16x16x16 chunk bölümü (her biri istemcide yeniden "
-                + "derlenir; seçilen bölümün hazır blokları aynı tick'te kırılır; TPS kısmasıyla çarpılır; efekt kalitesinden "
-                + "bağımsız).").defineInRange("yikimBolumTick", 1, 1, 64);
+        yikimBolumTick = k.comment("Tick başına yıkımın başlattığı en çok birim (chunk sütunu ya da 16x16x16 bölüm; üst sınır, "
+                + "bağlayıcı olan yikimCarpani blok jetonudur; TPS kısmasıyla çarpılır; efekt kalitesinden bağımsız).")
+                .defineInRange("yikimBolumTick", 1, 1, 64);
         yikimChunkTick = k.comment("Tick başına yıkımın değiştirdiği en çok farklı chunk sütunu (ışık değişimi sütun boyunca "
                 + "bölümleri istemcide yeniden derletir).").defineInRange("yikimChunkTick", 1, 1, 64);
         yikimEfektTick = k.comment("Tick başına kırılma efekti (vanilla kırılma sesi + ~64 blok parçacığı); 0 kapalı.")
                 .defineInRange("yikimEfektTick", 1, 0, 6);
         yikimEsyaOrani = k.comment("Kırılan ahşap/taş bloğun eşya bırakma olasılığı (tick başına en çok 2, afet başına 16·seviye).")
                 .defineInRange("yikimEsyaOrani", 0.3, 0.0, 1.0);
-        yikimSutunBirimi = k.comment("Yıkım birimi: true ise chunk sütunu (aynı sütunun hazır blokları aynı tick'te), false ise "
-                + "16x16x16 bölüm.").define("yikimSutunBirimi", false);
+        yikimSutunBirimi = k.comment("Yıkım birimi: true ise chunk sütunu (aynı sütunun hazır blokları aynı tick'te; komşu bölüm "
+                + "kirlenmesi örtüşür), false ise 16x16x16 bölüm.").define("yikimSutunBirimi", true);
         magaraHacmi = k.comment("Seviye başına bir mağara cebine dolan en çok hücre (su.magaraMaksHacim ile sınırlı).")
                 .defineInRange("magaraHacmi", 400, 16, 4000);
     }

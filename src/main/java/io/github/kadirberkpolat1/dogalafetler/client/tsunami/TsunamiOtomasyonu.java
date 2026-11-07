@@ -244,15 +244,16 @@ public final class TsunamiOtomasyonu {
             }
         }
         if (BOLUM.contains("deney")) {
-            // Ts3-1 ve Karar 3 ayrıştırması: sahne 1 eşyasız (yıkım eşya düşürmez), sahne 2 ve 4 sütun birimi, sahne 3 bölüm birimi.
+            // Ts3-1 ve Karar 3 ayrıştırması (gorsel-15): sahne 1 bölüm birimi ve eşyasız (yıkım eşya düşürmez), sahne 2 ve 4
+            // sütun birimi (varsayılan), sahne 3 bölüm birimi.
             a.addAll(List.of("k:dogalafet su vitrin", "b:300", "k:dogalafet su vitrin kamera tepe", "b:600"));
-            a.addAll(olcum("tsunami-deney-1-esyasiz", EfektKalitesi.YUKSEK, List.of("c:tsunami.yikimEsyaOrani=0"),
-                    List.of("c:tsunami.yikimEsyaOrani=0.3")));
-            a.addAll(olcum("tsunami-deney-2-sutun", EfektKalitesi.YUKSEK, List.of("c:tsunami.yikimSutunBirimi=true"),
-                    List.of("c:tsunami.yikimSutunBirimi=false")));
-            a.addAll(olcum("tsunami-deney-3-bolum", EfektKalitesi.YUKSEK, List.of(), List.of()));
-            a.addAll(olcum("tsunami-deney-4-sutun", EfektKalitesi.YUKSEK, List.of("c:tsunami.yikimSutunBirimi=true"),
-                    List.of("c:tsunami.yikimSutunBirimi=false")));
+            a.addAll(olcum("tsunami-deney-1-esyasiz", EfektKalitesi.YUKSEK,
+                    List.of("c:tsunami.yikimEsyaOrani=0", "c:tsunami.yikimSutunBirimi=false"),
+                    List.of("c:tsunami.yikimEsyaOrani=0.3", "c:tsunami.yikimSutunBirimi=true")));
+            a.addAll(olcum("tsunami-deney-2-sutun", EfektKalitesi.YUKSEK, List.of(), List.of()));
+            a.addAll(olcum("tsunami-deney-3-bolum", EfektKalitesi.YUKSEK, List.of("c:tsunami.yikimSutunBirimi=false"),
+                    List.of("c:tsunami.yikimSutunBirimi=true")));
+            a.addAll(olcum("tsunami-deney-4-sutun", EfektKalitesi.YUKSEK, List.of(), List.of()));
         }
         if (hepsi || BOLUM.contains("avci")) {
             a.addAll(avci());

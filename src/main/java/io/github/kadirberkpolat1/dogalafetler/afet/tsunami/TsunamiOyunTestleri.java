@@ -178,7 +178,8 @@ public final class TsunamiOyunTestleri {
     /**
      * B.5 yıkım sırası (S2): aynı cephe satırındaki cam anında, ahşap 0,3 sn sonra kırılır; yaprak kırılır; kırıktaş (yalnız
      * S4–5) ve doğal arazi (toprak, taş taban) kalır. TS-15b: satır boyu cam şeridi (z 3..14) iki chunk'a taşabilir; tick
-     * başına değişen bölüm {@code tsunami.yikimBolumTick} (1) aşılmaz, şeridin her bölümü yine de kırılır.
+     * başına başlatılan birim (varsayılan chunk sütunu) {@code tsunami.yikimBolumTick} (1) aşılmaz, şeridin her bölümü yine
+     * de kırılır.
      */
     @GameTest(template = "su_alani", batch = "tsunami_yikim", timeoutTicks = 300)
     public static void dalgaOnceCamSonraAhsapYikarAraziKalir(GameTestHelper h) {
@@ -317,8 +318,10 @@ public final class TsunamiOyunTestleri {
         BlockPos ayak = m(h, 10, 3, 8);
         ServerPlayer oyuncu = CekirdekOyunTestleri.sahteOyuncu(h, ayak.getX() + 0.5, ayak.getY(), ayak.getZ() + 0.5);
         oyuncu.setGameMode(GameType.SURVIVAL);
-        // Hasar dalga ilerlerken verilir (menzilde duran su itmez): domuz kıyıya yakın, cephenin uzun süre geçtiği yerde.
+        // Hasar dalga ilerlerken verilir (menzilde duran su itmez): domuz kıyıya yakın, cephenin uzun süre geçtiği yerde;
+        // yürüyüp dalga şeridinden çıkmasın diye yapay zekâsız (dalga onu yine sürükler).
         Pig domuz = h.spawn(EntityType.PIG, 7, 3, 11);
+        domuz.setNoAi(true);
         h.onEachTick(oyuncu::doTick);
         float oyuncuCan = oyuncu.getHealth();
         float domuzCan = domuz.getHealth();
