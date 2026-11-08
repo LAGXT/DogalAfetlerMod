@@ -177,8 +177,8 @@ public final class DonmaIstemciEfektleri {
         }
     }
 
-    /** Pulsar yolundaki buzul kıyamette tipi: kar iki kat, kar tanesi rüzgârla yataya yakın (PL-27). */
-    static final double TIPI_KAR_KATI = 2.0;
+    /** Pulsar yolundaki buzul kıyamette tipi: kar dört kat (PL-27'de iki, PL-41 ×2), kar tanesi rüzgârla yataya yakın. */
+    static final double TIPI_KAR_KATI = 4.0;
     static final double TIPI_RUZGAR_KATI = 6.0;
 
     static boolean tipi() {

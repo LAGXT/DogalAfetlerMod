@@ -1,5 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik;
 
+import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
+
 /**
  * Gökyüzü evrelerinin boyut, parlaklık ve renk eğrileri (docs/tasarim/gokyuzu.md, spike G2). İstemci çizicisi bunları
  * evre ilerlemesi (0–1) ve evre başlangıcından beri geçen gerçek saniyeyle çağırır; eğriler zamana göre monotondur
@@ -74,6 +76,37 @@ public final class GokyuzuEgrileri {
     /** Kalıntı nebulasının yavaş genişlemesi (güneşsiz evre ilerlemesiyle, tavan %130). */
     public static float kalintiGenisleme(float p) {
         return 1f + 0.3f * kenetle(p, 0f, 1f);
+    }
+
+    /**
+     * Kalıntı nebulasının tek evredeki görünürlüğü: süpernovada belirir, güneşsiz dönemde tam, kızıl cüce ve pulsar göğünde
+     * %85, yutmada dağılır. Pulsar yolundaki ({@code yol}) güneşsiz dönem ve doğuşta yok.
+     */
+    public static float kalintiPayi(GunesEvresi evre, float p, float saniye, boolean yol) {
+        return switch (evre) {
+            case SUPERNOVA -> kalintiBelirme(p);
+            case GUNESSIZ -> yol ? 0f : 1f;
+            case KIZIL_CUCE -> yol ? 0f : 0.85f;
+            case PULSAR -> 0.85f;
+            case KARADELIK_YUTMA -> 0.85f * KaraDelikYutmaEgrileri.kalinti(saniye);
+            default -> 0f;
+        };
+    }
+
+    /**
+     * Evre geçişinde kalıntı nebulası: önceki evrenin (tamamlanmış) payından yenisine {@code gecis} ile. Pulsar yolundan
+     * eski güneşe dönüşte paketin dönüş yolu bayrağı kalkar; önceki kızıl cücenin yolunu {@code gunesDondu} bildirir
+     * ({@link #oncekiYol}), yoksa 20 sn kalıntı nebulası belirirdi (Ps4).
+     */
+    public static float kalintiGecisi(GunesEvresi evre, float p, float saniye, boolean yol, GunesEvresi onceki,
+            boolean oncekiYol, float gecis) {
+        float yeni = kalintiPayi(evre, p, saniye, yol);
+        return onceki == null || gecis >= 1f ? yeni : lerp(gecis, kalintiPayi(onceki, 1f, 1e6f, oncekiYol), yeni);
+    }
+
+    /** Önceki evre pulsar yolunda mıydı: dönüş yolu bayrağı ya da (NORMAL'e dönüldüyse) güneş döndü bayrağı. */
+    public static boolean oncekiYol(boolean donusYolu, boolean gunesDondu) {
+        return donusYolu || gunesDondu;
     }
 
     /** Kızıl cüce diskinin doğuşta belirmesi: önce ufukta yalnız soğuk-kızıl ışık, sonra disk. */

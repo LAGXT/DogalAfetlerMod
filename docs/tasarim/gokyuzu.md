@@ -224,11 +224,14 @@ tüm oyunculara konumsuz kütleçekim dalgası sesi (`karadelik_yutma.ogg`, 8 sn
 Einstein halkası); tam ekran örtüsü karışımlı, 0,3 sn %50, 1,2 sn'de %15'e iner. 60–90 sn kara delik yavaş uzaklaşır (72. sn
 8,2°, 90. sn 2°) ve söner; arkasında merceklenmiş yıldız yayları, mora dönen akresyon kalıntısı; gök simsiyah, uzay %100,
 kalıntı nebulası yok; ufukta külün kızıl korları, ekran kenarında ilk kırağı. Gök koyu mor `#1C0A2E` → siyah. Yutmada en çok 16
-kuad.
+kuad. Kural duraklatmasında (K-C46) ölçekli saat sürer ama koreografi donar: paket `BAYRAK_DURAKLATILDI` taşır, ilerleme
+durma anının saniyesindedir ve istemci saniyeyi ondan alır; açılınca sunucu evre başlangıcını ileri kaydırır, görüntü geri
+sarmaz (Pg3).
 
-**Buzul kıyamet ve doğuş (pulsar yolu, PL-27).** Gök koyu çelik mavisi `#1E2A38`, sis beyaz `#C4CCD6` ve yakın (tipi), kar
-tanesi iki kat ve rüzgârla yataya yakın, ekran kenarında donmayla büyüyen kırağı vinyeti (%45 → %90), tipi rüzgârı sesi. Kızıl
-cüce doğuşunda doğu ufkunun ±72°'sini (%40) saran kızıl ışık yayı ve karla buzun üstünden yükselen buhar.
+**Buzul kıyamet ve doğuş (pulsar yolu, PL-27, PL-41).** Gök koyu çelik mavisi `#0C141E`, sis gri-beyaz `#A4AEBC` ve yakın
+(tipi), kar tanesi dört kat ve rüzgârla yataya yakın, ekran kenarında donmayla büyüyen kırağı vinyeti (%45 → %100), tipi
+rüzgârı sesi. Kızıl cüce doğuşunda gök ve sis koyu kan-kızılı bir şafakta (`#2A0C0A`, ilerleme 0,15–0,9'da açılır), doğu
+ufkunun ±72°'sini (%40) saran kızıl ışık yayı ve karla buzun üstünden yükselen buhar.
 
 **Cehennem dünya (sunucu, `afetBlokHasari` kapısı arkasında, tek bütçe).** Çimen → kaba toprak → kül bloğu; yaprak yanar,
 altına kül katmanı düşer; kütük → kömürleşmiş kütük (siyah çatlaklı, içi kızıl parlayan, ışık 3); çiçek/ot/kaktüs/mantar yanar;
@@ -271,19 +274,24 @@ ve alan çizgilerine birlikte uygulanır (16 Hz kare dalga, her yarım periyot h
 **3B kara delik.** Boyutlar Schwarzschild yarıçapı rs ile: gölge 2,6 rs, foton halkası 2,65 rs, disk 3–10 rs; dış yarıçap = açısal
 çapın yarısı (PL-27 eğrisi korunur). Disk gökte sabit, ekranda yatay, görünen eğim yaklaştıkça 4° → 11° ve her karede
 kamera–nesne vektöründen. Arka yarı ince-lens sapma tablosuyla (sınıf yüklenirken bir kez, 2 048 adım) gölgenin üstünde ve
-altında iki yay; disk sıcak ve çok parlak (iç kenar beyaz, orta sıcak, dış turuncu; kazanç 3,5 ve doyma geçişiyle iç kenar
-ve yaklaşan yan beyaza doyar), disk ve yayların 2,5 kat kalın, soluk (alfa 0,3) parlama kopyası; Doppler yaklaşan yan ×1,0
-mavi-beyaz, uzaklaşan ×0,3 turuncu. Yutma göğü neredeyse siyah (`#0A0510`). Gölge tam siyah, arkadaki yıldız, nebula ve
-pulsarı siler. Gölge çevresinde 2,5 R içinde merceklenmiş yıldız alanı (Einstein yarıçapı 1,45 R). Spagetti: pulsardan
-diske 3B kıvrımlı tüp (16 kesit) ve diske akan kuyruk. Yutumdan sonra mor kalıntı sönüme kadar %95 parlaklıkta. Pulsar
-yolundaki doğuşta kızıl cüce küresi ×(1 + 0,8·(1 − p)) şişkin doğar.
+altında iki yay; disk beyaz-sıcak ve soluk (iç kenar beyaz, orta beyaz-sıcak, dış soluk turuncu; doygunluk ≤ 0,3), kazanç
+3,5 Doppler'den önce uygulanıp 1'e kırpılır: yaklaşan yan ×1,0 mavi-beyaz, uzaklaşan ×0,3 sönük (Pg2); disk ve yayların
+2,5 kat kalın, soluk (alfa 0,3) parlama kopyası. Yutma göğü neredeyse siyah (`#0A0510`). Gölge tam siyah, arkadaki
+yıldız, nebula ve pulsarı siler. Gölge çevresinde 2,5 R içinde merceklenmiş yıldız alanı (Einstein yarıçapı 1,45 R).
+Spagetti: pulsardan diske 3B kıvrımlı tüp (16 kesit) ve diske akan kuyruk. Yutumdan sonra mor kalıntı sönüme kadar %95
+parlaklıkta. Pulsar yolundaki doğuşta kızıl cüce küresi ×(1 + 1,5·(1 − p)) şişkin doğar (doğuşta ×2,5, PL-41).
+Parlamanın altındaki silüet neredeyse siyah ve tam opak; yutumdan sonra mor kalıntı ek kazançla (×1,8) parlar, ufuk
+korları %85 alfayla.
 
-| Kademe | Pulsar dörtgen (üst sınır) | Kara delik dörtgen (en kötü kare) | Disk dilimi | Mercek yıldızı | Plazma |
-|---|---|---|---|---|---|
-| Düşük | 455 | ~656 | 24 | 120 | 40 |
-| Orta | 1 372 | — | 72 | 300 | 120 |
-| Yüksek | 2 380 | — | 72 | 450 | 200 |
-| Ultra | 4 548 | ~3 794 | 96 | 600 | 300 |
+| Kademe | Pulsar dörtgen (üst sınır) | Kara delik dörtgen (en kötü kare) | Ölçülen (yutma, pulsar + kara delik) | Disk dilimi | Mercek yıldızı | Plazma |
+|---|---|---|---|---|---|---|
+| Düşük | 455 | ~656 | — | 24 | 120 | 40 |
+| Orta | 1 372 | — | — | 72 | 300 | 120 |
+| Yüksek | 2 380 | — | 1 465 + 1 810 (40. sn); PULSAR evresinde pulsar 1 986–1 996 | 72 | 450 | 200 |
+| Ultra | 4 548 | ~3 794 | 2 736 + 3 016 = 5 752 (55,6. sn, `karadelik_ultra`) | 96 | 600 | 300 |
+
+Görsel koşu 4–7'deki `dortgen=` sayıları Yüksek kademedeydi (kullanıcı ayarı); Ultra ölçümü görsel koşu 8'de ayrı karede
+(PL-42). Sınır pay başına ≤ 6 000 (Ultra) / ≤ 1 000 (Düşük).
 
 **Ses.** `pulsar_vurus.ogg`: 8 sn döngü, tam 87 vuruş (10,875 Hz), 256 Hz vızıltı + 40–80 Hz uğultu + seyrek çatırtı, −26 LUFS /
 −13,7 dBTP. Boğuk-yankılı varyantlar `pulsar_vurus_yankili.ogg`, `karadelik_yutma_yankili.ogg` (800 Hz alçak geçiren + 67–401 ms

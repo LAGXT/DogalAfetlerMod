@@ -4,11 +4,14 @@ import com.mojang.datafixers.util.Pair;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.client.core.GorselOtomasyon;
 import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciDonem;
+import io.github.kadirberkpolat1.dogalafetler.config.EfektKalitesi;
+import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.KavurmaKuyrugu;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.PulsarKayitlari;
+import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.KaraDelikYutmaEgrileri;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.PulsarZinciri;
 import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorAPI;
 import io.github.kadirberkpolat1.dogalafetler.network.DonemPaketi;
@@ -20,6 +23,7 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import net.minecraft.client.Camera;
+import net.minecraft.client.CloudStatus;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.server.IntegratedServer;
@@ -76,6 +80,8 @@ public final class PulsarOtomasyonu {
     private static final float GECE_PITCH = -5f;
     /** Doğuş kadrajının merkezi ufkun 10° üstü: ufuk alt üçte birde, doğuş yayı (−18°'ye) ve alçaktaki küre ortada. */
     private static final float DOGUS_PITCH = -10f;
+    /** Doğuş kamerasının zeminden yüksekliği (blok): karın üstündeki buhar kadraja girsin (PL-41). */
+    private static final int DOGUS_YUKSEKLIGI = 3;
     private static final int SERI_KARE = 6;
     /** Kavurma birikimi bu eşdeğer güne varınca cehennem karesi (Ps5). */
     private static final double CEHENNEM_GUN = 3.0;
@@ -89,10 +95,18 @@ public final class PulsarOtomasyonu {
     private static final float MERCEK_SN = 35f;
     private static final int MERCEK_FOV = 30;
     private static final float SPAGETTI_SN = 40f;
-    /** Parlama karesi örtünün inişinde (parlamanın 0,6. sn'si): kara deliğin koyu silüeti okunur. */
-    private static final float PARLAMA_SN = PulsarZinciri.YUTMA_PARLAMA_SN + 0.6f;
-    /** Yutumdan sonraki karanlık: kara delik ~8° (yavaş uzaklaşma), mercek yayları, ufukta kor, ilk kırağı. */
-    private static final float KARANLIK_SN = 72f;
+    /**
+     * Dörtgen ölçümü (Pg4) Ultra kademede, yutmanın en kalabalık anında: parlama başladı, pulsar ve spagetti tüpü henüz
+     * sönmedi, silüet çiziliyor.
+     */
+    private static final float ULTRA_SN = PulsarZinciri.YUTMA_PARLAMA_SN + 0.6f;
+    /**
+     * Parlama karesi örtünün tabanında ({@link KaraDelikYutmaEgrileri#ORTU_TABAN}) ama parlama henüz tamken (tepe sonu,
+     * {@link KaraDelikYutmaEgrileri#PARLAMA_TEPE_SN} sn): silüet tam opak, üstündeki örtü en ince (PL-41).
+     */
+    private static final float PARLAMA_SN = PulsarZinciri.YUTMA_PARLAMA_SN + KaraDelikYutmaEgrileri.PARLAMA_TEPE_SN;
+    /** Yutumdan sonraki karanlık: kara delik 16° (uzaklaşma başında), parlak mor kalıntı, ufukta kor, ilk kırağı. */
+    private static final float KARANLIK_SN = 65f;
     /**
      * Karanlık karesinin gün saati: kara delik ~25° yükseklikte, ufuk kadrajın altında (doğal yutma ~6840'ta, PL-5
      * penceresinin içinde başlamış gibi).
@@ -104,9 +118,12 @@ public final class PulsarOtomasyonu {
     private static final int YAN_BEKLEME = 60;
     /** Buzul karesinden önce donmanın göle ve kara yetişme süresi (tick). */
     private static final int BUZUL_TICK = 2400;
-    /** Donacak gölün zemin kamerasından uzaklığı, yarı genişliği ve üstünde temizlenen hava (blok). */
-    private static final int GOL_UZAKLIGI = 16;
-    private static final int GOL_YARI = 5;
+    /**
+     * Donacak gölün zemin kamerasından uzaklığı, yarı genişliği ve üstünde temizlenen hava (blok); göl ön planda,
+     * kadrajın alt yarısını doldurur (PL-41).
+     */
+    private static final int GOL_UZAKLIGI = 11;
+    private static final int GOL_YARI = 7;
     private static final int GOL_TEMIZLIK = 12;
     /**
      * Ses kuyusu: zemin kamerasının arkasında ve kadraj dışında (kuzeyde) 7×7, yüzeyden {@value #KUYU_TABAN}'ye; taban katı.
@@ -260,6 +277,10 @@ public final class PulsarOtomasyonu {
             Adim.yeni("spagettileşme", s -> {
             }, () -> evre(GunesEvresi.KARADELIK_YUTMA) && evreSaniyesi() >= SPAGETTI_SN, "karadelik_spagetti", 1000)
                     .kadrajli(Kadraj.YUTMA_ORTA).sabitSaniyede(SPAGETTI_SN),
+            Adim.yeni("dörtgen ölçümü Ultra (yutma " + ULTRA_SN + " sn)", s -> {
+            }, () -> evre(GunesEvresi.KARADELIK_YUTMA) && evreSaniyesi() >= ULTRA_SN, "karadelik_ultra", 1600)
+                    .kadrajli(Kadraj.YUTMA_ORTA).sabitSaniyede(ULTRA_SN)
+                    .istemcide(() -> kalite(EfektKalitesi.ULTRA)).bitince(() -> kalite(null)),
             Adim.yeni("yutma parlaması", s -> {
             }, () -> evre(GunesEvresi.KARADELIK_YUTMA) && evreSaniyesi() >= PARLAMA_SN, "karadelik_parlama", 1600)
                     .kadrajli(Kadraj.YUTMA_ORTA).sabitSaniyede(PARLAMA_SN),
@@ -275,11 +296,11 @@ public final class PulsarOtomasyonu {
             Adim.yeni("kızıl cüce doğuşu (şafak sonrası, hız 4; ufuk, doğuş yayı ve küre)", s -> {
                 // Küre ~17° yükseklikte kalmalı: ~6°'de kömürleşmiş ağaçlar ve tepeler örtüyor.
                 komut(s, "weather clear", "time set 300", "dogalafet asama ileri gunessiz", "dogalafet hiz 4");
-                gunesBak(s, DOGUS_PITCH);
+                gunesBak(s, alcakKonum(s), DOGUS_PITCH);
             }, () -> evre(GunesEvresi.KIZIL_CUCE) && donem().evreIlerlemesi() >= DOGUS_ILERLEME, "kizil_cuce_dogus", 900),
             Adim.yeni("eski güneş döndü", s -> {
                 komut(s, "dogalafet hiz 1", "dogalafet asama ileri kizilcuce", "time set 3000");
-                gunesBak(s, Float.NaN);
+                gunesBak(s, kameraKonumu, Float.NaN);
             }, () -> evre(GunesEvresi.NORMAL) && evreSaniyesi() >= DONUS_SN + 1f, "gunes_dondu", 900));
 
     private PulsarOtomasyonu() {
@@ -479,7 +500,7 @@ public final class PulsarOtomasyonu {
         DogalAfetler.LOGGER.info(ON + "kare {} (FPS {}, TPS {}, mspt {}, evre {}, ilerleme {}, evre sn {}, sabit sn {}, "
                         + "kül yağışı {}, uçan meteor {}, parçacık {}, dönüş yolu {}, blok hasarı {}, güneş döndü {}, "
                         + "dortgen={} (pulsar {} + kara delik {}), eşdeğer gün {}, ofset {} {}, çekirdek px {} {}, FOV {}, "
-                        + "kapı beklemesi {} sn)", k.dosya(), k.fps(),
+                        + "kalite {}, kapı beklemesi {} sn)", k.dosya(), k.fps(),
                 server == null ? "?" : String.format(Locale.ROOT, "%.1f", tps(server)),
                 server == null ? "?" : String.format(Locale.ROOT, "%.1f", server.getAverageTickTime()), d.gunesEvresi().kimlik(),
                 String.format(Locale.ROOT, "%.3f", d.evreIlerlemesi()), String.format(Locale.ROOT, "%.1f", evreSaniyesi()),
@@ -488,7 +509,8 @@ public final class PulsarOtomasyonu {
                 pulsarDortgen + karaDelikDortgen, pulsarDortgen, karaDelikDortgen,
                 String.format(Locale.ROOT, "%.2f", esdegerGun), ofset == null ? "-" : sayi(ofset[0], 3),
                 ofset == null ? "-" : sayi(ofset[1], 3), px == null ? "-" : sayi(px[0], 1), px == null ? "-" : sayi(px[1], 1),
-                mc.options.fov().get(), String.format(Locale.ROOT, "%.1f", k.beklemeSn()));
+                mc.options.fov().get(), IstemciAyarlari.efektKalitesi(),
+                String.format(Locale.ROOT, "%.1f", k.beklemeSn()));
     }
 
     private static void sonraki() {
@@ -537,14 +559,23 @@ public final class PulsarOtomasyonu {
     }
 
     /**
-     * Çalışma anında ({@code options.txt}'ye yazılmaz) FOV efekti 0 ve kamera sallanması kapalı: uçan yaratıcı oyuncunun
-     * FOV çarpanı ve sallanma, çekirdek pikselinin {@code fov} ayarından izdüşümünü bozmasın.
+     * Çalışma anında ({@code options.txt}'ye yazılmaz) FOV efekti 0, kamera sallanması ve bulutlar kapalı: uçan yaratıcı
+     * oyuncunun FOV çarpanı ve sallanma, çekirdek pikselinin {@code fov} ayarından izdüşümünü bozmasın; vanilla bulutları
+     * dünya tick'ine bağlı konumda güneşin önüne gelip gök karelerini değiştirmesin.
      */
     private static void kameraAyari(Minecraft mc) {
         eskiFov = mc.options.fov().get();
         mc.options.fovEffectScale().set(0.0);
         mc.options.bobView().set(false);
-        DogalAfetler.LOGGER.info(ON + "kamera ayarı: FOV {}, FOV efekti 0, sallanma kapalı", eskiFov);
+        mc.options.cloudStatus().set(CloudStatus.OFF);
+        DogalAfetler.LOGGER.info(ON + "kamera ayarı: FOV {}, FOV efekti 0, sallanma ve bulutlar kapalı", eskiFov);
+    }
+
+    /** Efekt kademesini yalnız çalışma anında zorlar ({@code null}: kullanıcının ayarı). */
+    private static void kalite(EfektKalitesi k) {
+        IstemciAyarlari.otomasyonKalitesi(k);
+        DogalAfetler.LOGGER.info(ON + "KALITE istenen={} etkin={}", k == null ? "kullanıcı" : k,
+                IstemciAyarlari.efektKalitesi());
     }
 
     private static void fov(int derece) {
@@ -553,18 +584,25 @@ public final class PulsarOtomasyonu {
     }
 
     /**
-     * Kamera güneşe (vanilla ya da kızıl cüce) döner. Gök çizicisi güneşi doğu-batı düzleminde tepeden
+     * Kamera {@code konum}'dan güneşe (vanilla ya da kızıl cüce) döner. Gök çizicisi güneşi doğu-batı düzleminde tepeden
      * {@code getTimeOfDay · 360°} döndürür; sin &lt; 0 doğu (yaw −90) yarısıdır. {@code pitch} NaN ise güneşin
      * yüksekliği.
      */
-    private static void gunesBak(IntegratedServer s, float pitch) {
+    private static void gunesBak(IntegratedServer s, Vec3 konum, float pitch) {
         double aci = Math.toRadians(s.overworld().getTimeOfDay(1f) * 360.0);
         float yukseklik = (float) Math.toDegrees(Math.asin(Math.cos(aci)));
         float yaw = Math.sin(aci) < 0 ? -90f : 90f;
         float p = Float.isNaN(pitch) ? -yukseklik : pitch;
-        kamera(s, yaw, p);
-        DogalAfetler.LOGGER.info(ON + "gök kamerası: yaw {}, pitch {}, güneş yüksekliği {}°", yaw,
+        kamera(s, new Kamera(konum, yaw, p));
+        DogalAfetler.LOGGER.info(ON + "gök kamerası: {} yaw {}, pitch {}, güneş yüksekliği {}°", konum, yaw,
                 String.format(Locale.ROOT, "%.1f", p), String.format(Locale.ROOT, "%.1f", yukseklik));
+    }
+
+    /** Zemin kamerasının sütununda, yapraksız zeminin {@value #DOGUS_YUKSEKLIGI} blok üstü (sunucu thread'i). */
+    private static Vec3 alcakKonum(IntegratedServer s) {
+        Vec3 k = zeminKamerasi.konum();
+        int zemin = s.overworld().getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, Mth.floor(k.x), Mth.floor(k.z));
+        return new Vec3(k.x, zemin + DOGUS_YUKSEKLIGI, k.z);
     }
 
     /** Kadrajın bu karedeki dünya yönü (kopya); nesne yoksa null. */

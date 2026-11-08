@@ -131,8 +131,8 @@ final class GokyuzuCizici {
     private static final float GALAKSI_DONUS_SN = 3600f;
     /** Pulsar yolundaki kızıl cüce doğuşunun ışık yayı: doğu ufkunda ±72° (ufkun %40'ı). */
     private static final float DOGUS_YAYI_YARI = 72f;
-    /** Pulsar yolundaki kızıl cücenin doğuştaki şişkinliği: küre yarıçapı ×(1 + bu·(1 − ilerleme)). */
-    private static final float DOGUS_SISKINLIK = 0.8f;
+    /** Pulsar yolundaki kızıl cücenin doğuştaki şişkinliği: küre yarıçapı ×(1 + bu·(1 − ilerleme)); PL-41: doğuşta ×2,5. */
+    private static final float DOGUS_SISKINLIK = 1.5f;
 
     /** Pulsar yolundaki 3B kızıl cücenin iç ve kenar rengi. */
     private static final float[] KIZIL_IC = GokyuzuEgrileri.rgb(0xFF6A3A);

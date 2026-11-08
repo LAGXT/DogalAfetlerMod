@@ -7,11 +7,11 @@ import net.minecraft.nbt.CompoundTag;
  * burada. Pulsar yolu evre değil bayraktır: kara delik yutmasından sonraki {@link GunesEvresi#GUNESSIZ} (buzul kıyamet) ve
  * {@link GunesEvresi#KIZIL_CUCE} doğuşu süpernova yolundakilerle aynı evrelerdir, {@link #donusYolu} ile ayrılır (doğuş
  * bitince eski güneş döner). {@link #gunesDondu} NORMAL'e bu yoldan dönüldüğünü ve donmanın 0'a çözüldüğünü söyler. İki
- * bayrak {@code DonemPaketi.bayraklar} ile istemciye gider: değişimleri acil senkron ister, evreyle birlikte yazılırsa
- * aynı pakette gider. Süreler K-C29 oyun tick'iyle ({@code oyun zamanı + uyku birikimi + gün ofseti × 24000}) tutulur.
- * Süreç durdurulunca durma anı yazılır, kural açılınca süreler o kadar ileri çekilir (K-C46). {@link #zincirTukendi}
- * kalıcıdır: yalnız {@code sifirla} siler (madde 4 tek seferlik). Yazanı {@code gokyuzu.PulsarSureci},
- * {@code GunesZinciriSureci} ve sıfırlamadır; diğerleri yalnız okur.
+ * bayrak ve durma anının varlığı {@code DonemPaketi.bayraklar} ile istemciye gider: değişimleri acil senkron ister,
+ * evreyle birlikte yazılırsa aynı pakette gider. Süreler K-C29 oyun tick'iyle ({@code oyun zamanı + uyku birikimi + gün
+ * ofseti × 24000}) tutulur. Süreç durdurulunca durma anı yazılır, kural açılınca süreler o kadar ileri çekilir
+ * (K-C46). {@link #zincirTukendi} kalıcıdır: yalnız {@code sifirla} siler (madde 4 tek seferlik). Yazanı
+ * {@code gokyuzu.PulsarSureci}, {@code GunesZinciriSureci} ve sıfırlamadır; diğerleri yalnız okur.
  */
 public final class PulsarYolu {
     public static final String ALT_SISTEM = "pulsar";
@@ -93,12 +93,17 @@ public final class PulsarYolu {
     /** Yeni pulsar döngüsü: döngü kimliği ve oyun tick'i başlangıcı birlikte yazılır, yutma bayrağı silinir. */
     public static void yeniDongu(DunyaDonemi donem, long dongu, long oyunTick) {
         CompoundTag veri = veri(donem);
+        boolean durma = veri.contains(DURMA_OYUN_TICK);
         veri.putLong(DONGU, dongu);
         veri.putLong(BASLANGIC, oyunTick);
         veri.remove(YUTMA_PATLAMASI);
         veri.remove(DURMA_OYUN_TICK);
         veri.remove(DURMA_SAATI);
-        donem.ekVeriDegisti(ALT_SISTEM);
+        if (durma) {
+            istemciyeBildir(donem);
+        } else {
+            donem.ekVeriDegisti(ALT_SISTEM);
+        }
     }
 
     /** Eski kayıtta (gökyüzü-2) yalnız döngü kimliği vardır: başlangıç ilk tick'te yazılır. */
@@ -141,7 +146,7 @@ public final class PulsarYolu {
         CompoundTag veri = veri(donem);
         veri.putLong(DURMA_OYUN_TICK, oyunTick);
         veri.putLong(DURMA_SAATI, saat);
-        donem.ekVeriDegisti(ALT_SISTEM);
+        istemciyeBildir(donem);
     }
 
     /**
@@ -163,7 +168,7 @@ public final class PulsarYolu {
         }
         veri.remove(DURMA_OYUN_TICK);
         veri.remove(DURMA_SAATI);
-        donem.ekVeriDegisti(ALT_SISTEM);
+        istemciyeBildir(donem);
     }
 
     /**
@@ -173,9 +178,8 @@ public final class PulsarYolu {
      */
     public static void temizle(DunyaDonemi donem) {
         CompoundTag veri = veri(donem);
-        boolean bayrak = veri.contains(DONUS_YOLU) || veri.contains(GUNES_DONDU);
-        boolean kayit = veri.contains(BASLANGIC) || veri.contains(GUNESSIZ_BASLANGIC) || veri.contains(YUTMA_PATLAMASI)
-                || veri.contains(DURMA_OYUN_TICK);
+        boolean bayrak = veri.contains(DONUS_YOLU) || veri.contains(GUNES_DONDU) || veri.contains(DURMA_OYUN_TICK);
+        boolean kayit = veri.contains(BASLANGIC) || veri.contains(GUNESSIZ_BASLANGIC) || veri.contains(YUTMA_PATLAMASI);
         veri.remove(DONUS_YOLU);
         veri.remove(GUNES_DONDU);
         veri.remove(BASLANGIC);

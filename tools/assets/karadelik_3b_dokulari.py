@@ -5,15 +5,14 @@
     KOK/.venv/bin/python tools/assets/karadelik_3b_dokulari.py
 
 Çıktı: src/main/resources/assets/dogalafetler/textures/environment/gokyuzu/karadelik_3b_{tup,halka,yildiz,
-disk_sicak,parilti}.png (+ .png.mcmeta). Tohum ayrı (20261109; tur 4 düzeltmesinin dokuları 20261110): eski dokuların
-baytları değişmez. RGB rengi, alfa yoğunluğu taşır; hepsi toplamalı çizilir (parlama silüetinde disk dokusu koyu
-renkle normal karışımla da kullanılır).
+disk_soluk,parilti_soluk}.png (+ .png.mcmeta). Tohum ayrı (20261109; Pg2 dokuları 20261112): eski dokuların baytları
+değişmez. RGB rengi, alfa yoğunluğu taşır; hepsi toplamalı çizilir (parlama silüetinde disk dokusu koyu renkle normal
+karışımla da kullanılır). Kullanılmayan `disk`, `disk_sicak` ve `parilti` entegrasyonda kalktı (N19).
 
-- disk_sicak: akresyon diski (oyunda çizilen; eski `karadelik_3b_disk` kullanılmadığı için entegrasyonda kalktı): u = azimut
-  (dikişsiz, UV kaydırılır: akış), v = 0 iç kenar → 1 dış kenar, sarmal iplikler; merceklenmiş arka yarının yayları aynı
-  dokuyu UV haritasıyla kullanır, iç kenar beyaz (1; 0,97; 0,9), orta sıcak
-  (1; 0,75; 0,45), dış turuncu (0,9; 0,4; 0,15); alfa içte 1 (toplamalı karışımda doyar), dışta ~0,55.
-- parilti: disk boyunca yumuşak parlama (bloom) şeridi; u azimut (dikişsiz), v enine yumuşak profil, kenarlarda 0.
+- disk_soluk: akresyon diski (Pg2): u = azimut (dikişsiz, UV kaydırılır: akış), v = 0 iç kenar → 1 dış kenar, sarmal
+  iplikler; merceklenmiş arka yarının yayları aynı dokuyu UV haritasıyla kullanır. Referans gibi düşük doygunluk (≤ 0,3):
+  iç kenar beyaz (1; 0,99; 0,96), orta beyaz-sıcak (1; 0,9; 0,78), dış soluk turuncu (0,95; 0,82; 0,7).
+- parilti_soluk: disk boyunca yumuşak parlama (bloom) şeridi; u azimut (dikişsiz), v enine yumuşak profil, kenarlarda 0.
 - tup: spagetti tüpü; u boyuna (dikişsiz, kayar), v çevre (dikişsiz).
 - halka: ince foton halkası ve Einstein halkası şeridi; v enine Gauss profili.
 - yildiz: merceklenen yıldız sprite'ı (yumuşak nokta).
@@ -76,10 +75,10 @@ def yildiz(boyut=32):
     kaydet("karadelik_3b_yildiz", np.ones((boyut, boyut, 3), np.float32), np.clip(a, 0, 1))
 
 
-def disk_sicak(rng, w=1024, h=128):
-    """Parlak sıcak akresyon diski (referans: parlak piksellerin ortalaması 248, 237, 222): iç kenar ve iplikler
-    alfa 1'e yakın, dışa doğru turuncuya döner ve seyrelir."""
-    x, y = izgara(w, h)
+def disk_soluk(rng, w=1024, h=128):
+    """Soluk beyaz-sıcak disk (referans doygunluğu 0,17): iç kenar ve iplikler alfa 1'e yakın, dışa doğru seyrelir;
+    doygunluk her yerde ≤ 0,3."""
+    _, y = izgara(w, h)
     v = (y + 1) * 0.5
     iplik = sirtli(w, h, 10, 40, 3, rng, periyodik_x=True)
     ince = sirtli(w, h, 24, 96, 2, rng, periyodik_x=True)
@@ -87,25 +86,25 @@ def disk_sicak(rng, w=1024, h=128):
     for j in range(h):
         iplik[j] = np.roll(iplik[j], kayma[j])
         ince[j] = np.roll(ince[j], 2 * kayma[j])
-    rgb = np.stack([np.interp(v, [0.0, 0.5, 1.0], [1.0, 1.0, 0.9]),
-                    np.interp(v, [0.0, 0.25, 0.5, 1.0], [0.97, 0.94, 0.75, 0.4]),
-                    np.interp(v, [0.0, 0.25, 0.5, 1.0], [0.9, 0.82, 0.45, 0.15])], axis=-1).astype(np.float32)
+    rgb = np.stack([np.interp(v, [0.0, 0.5, 1.0], [1.0, 1.0, 0.95]),
+                    np.interp(v, [0.0, 0.25, 0.5, 1.0], [0.99, 0.96, 0.9, 0.82]),
+                    np.interp(v, [0.0, 0.25, 0.5, 1.0], [0.96, 0.9, 0.78, 0.7])], axis=-1).astype(np.float32)
     profil = 0.55 + 0.45 * (1 - v) ** 1.2
     a = profil * (0.8 + 0.14 * yumusak_basamak(0.25, 0.85, iplik) + 0.06 * ince)
     a *= yumusak_basamak(0.0, 0.04, v) * yumusak_basamak(1.0, 0.85, v)
-    kaydet("karadelik_3b_disk_sicak", rgb, np.clip(a, 0, 1), clamp=False)
+    kaydet("karadelik_3b_disk_soluk", rgb, np.clip(a, 0, 1), clamp=False)
 
 
-def parilti(rng, w=256, h=64):
-    """Disk parlaması: v enine yumuşak tepe (iç yana yakın, v ≈ 0,4), kenarlarda 0; azimutta hafif dalgalanma."""
+def parilti_soluk(rng, w=256, h=64):
+    """Soluk disk parlaması: v enine yumuşak tepe (iç yana yakın, v ≈ 0,4), kenarlarda 0; azimutta hafif dalgalanma;
+    renk beyaz-sıcak → soluk turuncu."""
     _, y = izgara(w, h)
     v = (y + 1) * 0.5
     dalga = periyodik_gurultu(w, h, 8, 1, rng)
     a = np.exp(-((v - 0.4) / 0.26) ** 2) * (0.85 + 0.15 * dalga)
     a *= yumusak_basamak(0.0, 0.12, v) * yumusak_basamak(1.0, 0.8, v)
-    rgb = renk_rampasi(v, [(0.0, "#FFEFD6"), (0.5, "#FFC88A"), (1.0, "#FF8C45")])
-    kaydet("karadelik_3b_parilti", rgb, np.clip(a, 0, 1), clamp=False)
-
+    rgb = renk_rampasi(v, [(0.0, "#FFF8EE"), (0.5, "#FFE6C8"), (1.0, "#F2CFAE")])
+    kaydet("karadelik_3b_parilti_soluk", rgb, np.clip(a, 0, 1), clamp=False)
 
 
 def main() -> None:
@@ -117,9 +116,9 @@ def main() -> None:
     tup(rng)
     halka()
     yildiz()
-    rng = np.random.default_rng(20261110)
-    disk_sicak(rng)
-    parilti(rng)
+    rng = np.random.default_rng(20261112)
+    disk_soluk(rng)
+    parilti_soluk(rng)
 
 
 if __name__ == "__main__":
