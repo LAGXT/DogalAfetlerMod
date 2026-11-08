@@ -1,16 +1,27 @@
 package io.github.kadirberkpolat1.dogalafetler.client.core;
 
+import com.mojang.blaze3d.pipeline.RenderTarget;
+import com.mojang.blaze3d.platform.GlStateManager;
+import com.mojang.blaze3d.platform.NativeImage;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.config.EfektKalitesi;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.TpsKismasi;
+import java.io.File;
+import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.IntBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.function.Consumer;
+import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.MouseHandler;
 import net.minecraft.client.Screenshot;
@@ -20,6 +31,10 @@ import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.util.ObfuscationReflectionHelper;
+import org.lwjgl.opengl.GL11C;
+import org.lwjgl.opengl.GL15C;
+import org.lwjgl.opengl.GL21C;
+import org.lwjgl.opengl.GL30C;
 
 /**
  * Görsel otomasyonların ortak ölçüm satırı ve A-34 kare kapısı. Yalnız {@code -Potomasyon=<ad>} ile (sistem özelliği
@@ -36,10 +51,10 @@ import net.minecraftforge.fml.util.ObfuscationReflectionHelper;
  * sahnesinin adı ya da {@code -}. {@code tools/senaryo/olcum_tablosu.py} satırları tek TSV'ye toplar ve kuralı uygular.
  *
  * <p><b>Kare kapısı (A-34).</b> {@link #kareIste} isteği kaydeder; kare {@code RenderTickEvent} END'de, istekten sonra en az
- * {@code enAzKare} (≥ 2; ardışık seri karesinde 1) yeni kare çizilmiş ve FPS ≥ {@value #AKICI_FPS} iken alınır.
- * {@value #KAPI_SN} sn'de sağlanmazsa yine alınır, WARN yazılır ve kare geçersiz sayılır. Ekran açıkken iç imleç beklerken
- * her karenin başında sol üst köşeye alınır ({@link #imleciKenaraAl}). Otomasyon bekleyen kare varken ({@link #kareBekliyor})
- * adım ilerletmez.
+ * {@code enAzKare} (≥ 2) yeni kare çizilmiş ve FPS ≥ {@value #AKICI_FPS} iken alınır. {@value #KAPI_SN} sn'de sağlanmazsa
+ * yine alınır, WARN yazılır ve kare geçersiz sayılır. Ekran açıkken iç imleç beklerken her karenin başında sol üst köşeye
+ * alınır ({@link #imleciKenaraAl}). Otomasyon bekleyen kare varken ({@link #kareBekliyor}) adım ilerletmez. Ardışık seri
+ * kareleri {@link #seriKaresiIste} ile istenir.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class GorselOtomasyon {
@@ -75,6 +90,8 @@ public final class GorselOtomasyon {
     private static Consumer<Kare> kareSonra;
     private static int kareToplam;
     private static int kareGecersiz;
+    private static boolean kareSeri;
+    private static final List<SeriOkuma> SERI_OKUMA = new ArrayList<>();
     private static int eylemBekleme;
 
     /** Bir ölçüm penceresinin sonucu ({@code OLCUM} satırının alanları). */
@@ -87,6 +104,10 @@ public final class GorselOtomasyon {
 
     /** Alınan kare: kapı açıldığında FPS, istekten sonra çizilen kare, bekleme ve geçerlilik. */
     public record Kare(String dosya, int fps, long yeniKare, double beklemeSn, boolean gecerli) {
+    }
+
+    /** PBO'ya okunmuş, henüz dosyaya yazılmamış seri karesi. */
+    private record SeriOkuma(int pbo, int en, int boy, String dosya) {
     }
 
     private GorselOtomasyon() {
@@ -233,16 +254,31 @@ public final class GorselOtomasyon {
 
     /**
      * Kare isteği: {@code dosya} ({@code screenshots/} altında) kapı açılınca alınır, ardından {@code sonra} (otomasyonun kendi
-     * kare satırı) çağrılır. {@code enAzKare} 1'den küçükse 1 sayılır; 1 yalnız önceki karenin {@code sonra}'sından istenen
-     * ardışık seri karesi içindir (sahne zaten çizili, bir sonraki render karesi alınır).
+     * kare satırı) çağrılır. {@code enAzKare} 2'den küçükse 2 sayılır.
      */
     public static void kareIste(String otomasyon, String dosya, int enAzKare, Consumer<Kare> sonra) {
+        istek(otomasyon, dosya, Math.max(2, enAzKare), false, sonra);
+    }
+
+    /**
+     * Ardışık seri karesi (titreşim gibi zamansal etkiler): kapı {@link #kareIste} ile aynı, ama ana hedef bir PBO'ya okunur ve
+     * render thread GPU'yu beklemez; PNG'ler seri bitince (bekleyen seri isteği kalmayınca) yazılır. {@code Screenshot.grab}
+     * her karede GPU'yu bekliyordu ve PNG kodlaması aynı anda koşuyordu: pc2'de kare başına ~60 ms, 6 kare 800 ms'yi aştı.
+     * {@code enAzKare} 1 = bir sonraki render karesi; bu durumda FPS koşulu aranmaz (sahne serinin ilk karesinde kapıdan
+     * geçti; saniyede bir güncellenen FPS sayacını beklemek kareleri ardışık olmaktan çıkarır).
+     */
+    public static void seriKaresiIste(String otomasyon, String dosya, int enAzKare, Consumer<Kare> sonra) {
+        istek(otomasyon, dosya, Math.max(1, enAzKare), true, sonra);
+    }
+
+    private static void istek(String otomasyon, String dosya, int enAzKare, boolean seri, Consumer<Kare> sonra) {
         if (kareDosya != null) {
             DogalAfetler.LOGGER.warn("KARE-KAPISI {} {} alınmadan {} istendi; önceki istek düştü", kareOtomasyon, kareDosya,
                     dosya);
         }
         kareOtomasyon = belirtec(otomasyon);
-        kareEnAz = Math.max(1, enAzKare);
+        kareEnAz = enAzKare;
+        kareSeri = seri;
         kareIstekNs = System.nanoTime();
         kareIstekCizilen = cizilen;
         kareSonra = sonra;
@@ -296,6 +332,9 @@ public final class GorselOtomasyon {
         if (kareDosya != null) {
             kapi();
         }
+        if (!SERI_OKUMA.isEmpty() && (kareDosya == null || !kareSeri)) {
+            seriYaz();
+        }
     }
 
     private static void kareEkle(long duvarNs, long cpuNs) {
@@ -311,7 +350,7 @@ public final class GorselOtomasyon {
         Minecraft mc = Minecraft.getInstance();
         long yeni = cizilen - kareIstekCizilen;
         double sn = (System.nanoTime() - kareIstekNs) / 1e9;
-        boolean gecerli = yeni >= kareEnAz && mc.getFps() >= AKICI_FPS;
+        boolean gecerli = yeni >= kareEnAz && (kareEnAz == 1 || mc.getFps() >= AKICI_FPS);
         if (!gecerli && sn < KAPI_SN) {
             return;
         }
@@ -319,8 +358,12 @@ public final class GorselOtomasyon {
         Consumer<Kare> sonra = kareSonra;
         kareDosya = null;
         kareSonra = null;
-        Screenshot.grab(mc.gameDirectory, dosya, mc.getMainRenderTarget(), mesaj -> {
-        });
+        if (kareSeri) {
+            seriOku(mc.getMainRenderTarget(), dosya);
+        } else {
+            Screenshot.grab(mc.gameDirectory, dosya, mc.getMainRenderTarget(), mesaj -> {
+            });
+        }
         kareToplam++;
         Kare k = new Kare(dosya, mc.getFps(), yeni, sn, gecerli);
         String bekleme = String.format(Locale.ROOT, "%.1f", sn);
@@ -335,5 +378,56 @@ public final class GorselOtomasyon {
         if (sonra != null) {
             sonra.accept(k);
         }
+    }
+
+    private static void seriOku(RenderTarget hedef, String dosya) {
+        int okunan = GlStateManager._getInteger(GL30C.GL_READ_FRAMEBUFFER_BINDING);
+        int pbo = GlStateManager._glGenBuffers();
+        GlStateManager._glBindBuffer(GL21C.GL_PIXEL_PACK_BUFFER, pbo);
+        GlStateManager._glBufferData(GL21C.GL_PIXEL_PACK_BUFFER, (long) hedef.width * hedef.height * 4, GL15C.GL_STREAM_READ);
+        GlStateManager._glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, hedef.frameBufferId);
+        GlStateManager._pixelStore(GL11C.GL_PACK_ALIGNMENT, 4);
+        GL11C.glReadPixels(0, 0, hedef.width, hedef.height, GL11C.GL_RGBA, GL11C.GL_UNSIGNED_BYTE, 0L);
+        GlStateManager._glBindFramebuffer(GL30C.GL_READ_FRAMEBUFFER, okunan);
+        GlStateManager._glBindBuffer(GL21C.GL_PIXEL_PACK_BUFFER, 0);
+        SERI_OKUMA.add(new SeriOkuma(pbo, hedef.width, hedef.height, dosya));
+    }
+
+    /** Bekleyen seri okumalarını eşler, dikeyde çevirir (GL alt satırdan başlar) ve PNG'leri G/Ç havuzunda yazar. */
+    private static void seriYaz() {
+        File klasor = new File(Minecraft.getInstance().gameDirectory, "screenshots");
+        klasor.mkdir();
+        for (SeriOkuma o : SERI_OKUMA) {
+            GlStateManager._glBindBuffer(GL21C.GL_PIXEL_PACK_BUFFER, o.pbo());
+            ByteBuffer veri = GL15C.glMapBuffer(GL21C.GL_PIXEL_PACK_BUFFER, GL15C.GL_READ_ONLY);
+            NativeImage resim = null;
+            if (veri == null) {
+                DogalAfetler.LOGGER.warn("KARE-KAPISI {} {} PBO eşlenemedi; dosya yazılmadı", kareOtomasyon, o.dosya());
+            } else {
+                resim = new NativeImage(o.en(), o.boy(), false);
+                IntBuffer piksel = veri.order(ByteOrder.LITTLE_ENDIAN).asIntBuffer();
+                for (int y = 0; y < o.boy(); y++) {
+                    int satir = (o.boy() - 1 - y) * o.en();
+                    for (int x = 0; x < o.en(); x++) {
+                        resim.setPixelRGBA(x, y, piksel.get(satir + x) | 0xFF000000);
+                    }
+                }
+                GL15C.glUnmapBuffer(GL21C.GL_PIXEL_PACK_BUFFER);
+            }
+            GlStateManager._glBindBuffer(GL21C.GL_PIXEL_PACK_BUFFER, 0);
+            GlStateManager._glDeleteBuffers(o.pbo());
+            if (resim != null) {
+                NativeImage yazilacak = resim;
+                File dosya = new File(klasor, o.dosya());
+                Util.ioPool().execute(() -> {
+                    try (yazilacak) {
+                        yazilacak.writeToFile(dosya);
+                    } catch (IOException e) {
+                        DogalAfetler.LOGGER.warn("KARE-KAPISI seri karesi {} yazılamadı", dosya, e);
+                    }
+                });
+            }
+        }
+        SERI_OKUMA.clear();
     }
 }

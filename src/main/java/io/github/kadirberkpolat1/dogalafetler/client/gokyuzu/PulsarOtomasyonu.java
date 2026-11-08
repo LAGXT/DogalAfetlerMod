@@ -400,7 +400,12 @@ public final class PulsarOtomasyonu {
                 if (!Float.isNaN(a.sabitSn())) {
                     IstemciGokyuzu.sabitSaniye(a.sabitSn());
                 }
-                GorselOtomasyon.kareIste(OTOMASYON, DOSYA + a.kareler().get(0) + ".png", PulsarOtomasyonu::kareAlindi);
+                String ilk = DOSYA + a.kareler().get(0) + ".png";
+                if (a.kareler().size() > 1) {
+                    GorselOtomasyon.seriKaresiIste(OTOMASYON, ilk, 2, PulsarOtomasyonu::kareAlindi);
+                } else {
+                    GorselOtomasyon.kareIste(OTOMASYON, ilk, PulsarOtomasyonu::kareAlindi);
+                }
                 return;
             }
             a.sonunda().run();
@@ -431,7 +436,8 @@ public final class PulsarOtomasyonu {
         }
         kareSirasi++;
         if (kareSirasi < a.kareler().size()) {
-            GorselOtomasyon.kareIste(OTOMASYON, DOSYA + a.kareler().get(kareSirasi) + ".png", 1, PulsarOtomasyonu::kareAlindi);
+            GorselOtomasyon.seriKaresiIste(OTOMASYON, DOSYA + a.kareler().get(kareSirasi) + ".png", 1,
+                    PulsarOtomasyonu::kareAlindi);
             return;
         }
         if (a.kareler().size() > 1) {
