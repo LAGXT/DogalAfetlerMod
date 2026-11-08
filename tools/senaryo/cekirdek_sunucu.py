@@ -22,7 +22,8 @@ Koşu 2 (aynı dünya): açılışta dönem okundu (gün ofseti, son afetler, be
 (gün 42, aktif deprem seviye 3; uyku 0, durdurma kaydı 0), stop, sifirla, `stop`.
 Koşu 3 (aynı dünya, bayraksız: gerçek afetler; 5-entegrasyon, §6 #4): oyun testi afeti kaydedilmedi; doğuşun üstünde küçük
 deniz; kasırga, tsunami, deprem, sinkhole, asit yağmuru, orman yangını, güneş patlaması ve ay çarpmasının her biri için
-start, asama ileri (siren), stop, durum (aktif afet yok); sifirla.
+start, asama ileri (siren), stop, durum (aktif afet yok); AS-8: kasırga S5 ve tsunami S5 aynı anda AKTIF, 30 sn sonra
+`durum`'daki TPS `cokluafet-tps.txt`'ye yazılır (ölçüt > 18; pc2'de bilgi, başarısız saymaz), stop (ikisi birden); sifirla.
 Sonda üç log da denetlenir: `invalid dist` yok, istisna yok, bizim config dosyalarımız için Forge düzeltme WARN'ı yok,
 üç süreç de 0 ile çıktı.
 
@@ -372,7 +373,7 @@ def kosu1(sunucu):
                  "tamamlanan sürecin kaydı silindi")
     sunucu.komut("dogalafet durum", r"Stopped era processes: none", "durum (duran süreç yok)")
     sunucu.komut("dogalafet start deprem 2", r"Earthquake started \(Level 2 \(Moderate\)\)")
-    sunucu.komut("dogalafet start deprem 1", r"A disaster is already active: Earthquake", "ikinci afet reddedilir")
+    sunucu.komut("dogalafet start deprem 1", r"Earthquake is already running", "aynı türden ikinci afet reddedilir")
     sunucu.komut("dogalafet asama ileri", r"Earthquake phase: Siren")
     sunucu.komut("dogalafet asama ileri", r"Earthquake phase: Active")
     sunucu.komut("dogalafet durum", r"Active disaster: Earthquake, Level 2 \(Moderate\); phase: Active")
@@ -442,7 +443,34 @@ def kosu3(sunucu):
         sunucu.komut("dogalafet asama ileri", rf"{ad} phase: Siren", f"{ad} siren")
         sunucu.komut("dogalafet stop", rf"{ad} stopped", f"stop {ad}")
         sunucu.komut("dogalafet durum", r"No active disaster\.", f"durum ({ad} sonrası aktif afet yok)")
+    coklu_afet_tps(sunucu)
     sunucu.komut("dogalafet sifirla", r"disaster and era state was reset")
+
+
+def coklu_afet_tps(sunucu):
+    """AS-8: iki ağır afet aynı anda AKTIF; TPS kanıt klasörüne yazılır (ölçüt > 18, başarısız saymaz)."""
+    sunucu.komut("dogalafet start kasirga 5", r"Tornado started", "çoklu: kasırga S5")
+    seviye = None
+    for s in (5, 3, 1):
+        satir = sunucu.komut(f"execute positioned ~10 204 ~ run dogalafet start tsunami {s}",
+                             r"Tsunami started|No suitable place found for Tsunami", f"çoklu: tsunami S{s} kasırga sürerken")
+        if "started" in satir:
+            seviye = s
+            break
+    if seviye is None:
+        raise SenaryoHatasi("kasırga sürerken tsunami hiçbir seviyede başlamadı")
+    for ad, tur in (("Tornado", "kasirga"), ("Tsunami", "tsunami")):
+        sunucu.komut(f"dogalafet asama ileri {tur}", rf"{ad} phase: Siren", f"çoklu: {tur} siren")
+        sunucu.komut(f"dogalafet asama ileri {tur}", rf"{ad} phase: Active", f"çoklu: {tur} aktif")
+    time.sleep(30)
+    satir = sunucu.komut("dogalafet durum", r"TPS: [\d.]+", "çoklu: durum TPS")
+    tps = float(re.search(r"TPS: ([\d.]+)", satir).group(1))
+    ozet = (f"kasirga S5 + tsunami S{seviye} aynı anda AKTIF, 30 sn sonra TPS {tps:.2f} (ölçüt > 18: "
+            f"{'geçti' if tps > 18 else 'geçmedi'}), makine {os.uname().nodename}")
+    sunucu.yaz(f"[cekirdek] {ozet}")
+    (Path(sunucu.log.name).parent / "cokluafet-tps.txt").write_text(ozet + "\n", encoding="utf-8")
+    sunucu.komut("dogalafet stop", r"(Tornado|Tsunami) stopped", "çoklu: stop ikisini durdurur")
+    sunucu.komut("dogalafet durum", r"No active disaster\.", "çoklu: stop sonrası aktif afet yok")
 
 
 def log_denetimi(yol):

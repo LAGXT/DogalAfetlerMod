@@ -132,8 +132,8 @@ Bütün komutlar `/dogalafet` altındadır ve **yalnız OP** (yetki seviyesi 2) 
 
 | Komut | Ne yapar |
 |---|---|
-| `/dogalafet start <afet> [seviye] [oyuncu]` | Afeti hemen başlatır (beklemeyi, gamerule'ü ve gün saati penceresini atlar; aktif afet varken reddeder). Doğal güneş patlaması yalnız sabah (gün saati 0–6000), ay çarpması yalnız gece (13000–23000) patlar; komutla başlatma bu pencereye bakmaz. |
-| `/dogalafet stop` | Aktif afeti temizce durdurur; afet yoksa süren dünya dönemi süreçlerini durdurur. |
+| `/dogalafet start <afet> [seviye] [oyuncu]` | Afeti hemen başlatır (beklemeyi, gamerule'ü ve gün saati penceresini atlar). Farklı türden afetler aynı anda sürebilir; aynı türden ikincisi "zaten sürüyor" diye reddedilir. Doğal afet yalnız hiç afet yokken seçilir. Doğal güneş patlaması yalnız sabah (gün saati 0–6000), ay çarpması yalnız gece (13000–23000) patlar; komutla başlatma bu pencereye bakmaz. |
+| `/dogalafet stop [afet]` | Afet adı verilmezse süren bütün afetleri, verilirse yalnız o afeti temizce durdurur; afet yoksa süren dünya dönemi süreçlerini durdurur. Stop ile biten afette alandaki oyuncular sağ çıkmış sayılır (başarımlar gelir). |
 | `/dogalafet` | Kullanabildiğiniz alt komutların listesi. |
 | `/dogalafet durum` | Aktif afet, aşama, seviye, kalan süre, beklemeler, sonraki afet tahmini, çarpanlar, deniz seviyesi, ay/güneş, donma ve buharlaşma. |
 | `/dogalafet sicaklik set <oyuncu> <değer>` | Oyuncunun vücut sıcaklığını ayarlar. |
@@ -147,7 +147,7 @@ Bütün komutlar `/dogalafet` altındadır ve **yalnız OP** (yetki seviyesi 2) 
 | `/dogalafet pulsar baslat` | Kızıl cüce yerine pulsarı hemen doğurur (olasılık, donma ve şafak beklenmez; zaten pulsarsa ya da güneş patlaması sürüyorsa reddeder). |
 | `/dogalafet gun <sayı>` | Oyun gününü ayarlar ve seviye olasılıklarını gösterir. |
 | `/dogalafet odul meteor [parca\|cekirdek\|hepsi] [adet] [oyuncu]` | Test için Meteorit Parçası / Kozmik Çekirdek verir. |
-| `/dogalafet asama ileri [süreç]` | Aktif afeti ya da bir dünya dönemi sürecini sonraki aşamaya geçirir. |
+| `/dogalafet asama ileri [afet\|süreç]` | Ad verilmezse ilk başlayan afeti, süren bir afetin adı verilirse onu, süreç adı verilirse o dünya dönemi sürecini sonraki aşamaya geçirir. |
 | `/dogalafet siklik [yüzde]` | Afet sıklığını (`afetSikligi` gamerule'ü, 0–1000) gösterir ya da ayarlar; süren beklemeler hemen ölçeklenir ve "sonraki afet: ~N gün (aralık X–Y gün)" yazılır. Değer dünyada kalıcıdır. |
 | `/dogalafet hiz <çarpan>` | Afet ve dönem zamanlayıcılarını hızlandırır (1 = normal; yeniden başlatınca 1'e döner). |
 | `/dogalafet sifirla` | Dünyanın afet ve dönem durumunu ilk hâline döndürür (ay, güneş, deniz, donma). |
@@ -181,7 +181,11 @@ Hepsi `/gamerule <ad> [değer]` ile okunur/değiştirilir (tab tamamlamalı) ve 
 - Kapatılan afet bir daha seçilmez. Henüz duyurulmamış (ön-uyarıdaki) afet sessizce iptal olur; başlamış afet güvenle biter.
   Süren güneş patlaması ya da ay çarpması yumuşakça durur (tamamlanmamış güneş büyümesi geri alınır); güneş zinciri gibi dönem
   süreçleri duraklar ve kural açılınca kaldıkları yerden sürer. Ulaşılmış dönemler (aysız gök, donma, kızıl cüce) geri alınmaz.
-- `/dogalafet start` ile elle başlatılan afet gamerule'lerden etkilenmez.
+- `/dogalafet start` ile elle başlatılan afet gamerule'lerden etkilenmez; başarımları doğal afetinki gibi verir.
+- Yeni dünyada ilk afet en erken 5 dakika sonra (`cekirdek.zamanlayici.baslangicBeklemeTick` 6000), afetler arası en az
+  bekleme 5 dakika (`genelBeklemeTick` 6000), aynı afetin tekrarı 1 oyun günü (`beklemeTick` 24000). Dünyada henüz hiç afet
+  olmadıysa ilk oyun gününün sonunda (`ilkAfetGarantiTick` 24000) bir doğal afet garanti edilir. Eski varsayılanlarda kalan
+  config değerleri açılışta yenilerine çekilir (`cekirdek.ayarSurumu`, yedekli); elle değiştirilenlere dokunulmaz.
 - **Haritayı korumak için:** afet ateşi vanilla `doFireTick`'ten bağımsızdır; `doFireTick false` afet yangınlarını durdurmaz.
   Haritayı afetlerden korumanın tek yolu `afetBlokHasari false`'tur.
 

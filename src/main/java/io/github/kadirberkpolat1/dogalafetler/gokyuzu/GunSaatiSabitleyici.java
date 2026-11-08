@@ -45,7 +45,7 @@ final class GunSaatiSabitleyici {
 
     /** Gün saati şu an sabit tutulmalı mı: güneş patlaması AKTIF aşamasında. */
     static boolean sabitlenmeli(AfetYoneticisi yonetici) {
-        return yonetici.aktifAfet().filter(a -> a.tur() == AfetTuru.GUNES_PATLAMASI && a.asama() == AfetAsamasi.AKTIF)
+        return yonetici.aktifAfet(AfetTuru.GUNES_PATLAMASI).filter(a -> a.asama() == AfetAsamasi.AKTIF)
                 .isPresent();
     }
 

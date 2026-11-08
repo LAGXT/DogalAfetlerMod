@@ -336,7 +336,7 @@ public final class AsitOrmanOtomasyonu {
 
     /** Sıcak karelerden ({@code h}: x, z, yanan hücre üçlüleri) ağırlık merkezi; istemci tick'inde saniyede bir. */
     private static void yanikTopla() {
-        IstemciAfetDurumu.aktif().filter(p -> p.tur() == AfetTuru.ORMAN_YANGINI).ifPresent(p -> {
+        IstemciAfetDurumu.aktif(AfetTuru.ORMAN_YANGINI).ifPresent(p -> {
             int[] h = p.ozel().getIntArray("h");
             for (int i = 0; i + 2 < h.length; i += 3) {
                 yanikX += (double) h[i] * h[i + 2];
@@ -402,7 +402,7 @@ public final class AsitOrmanOtomasyonu {
     private static Adim yakinKamera() {
         return (mc, s, t) -> {
             if (t == 1) {
-                long[] asinan = IstemciAfetDurumu.aktif().filter(p -> p.tur() == AfetTuru.ASIT_YAGMURU)
+                long[] asinan = IstemciAfetDurumu.aktif(AfetTuru.ASIT_YAGMURU)
                         .map(p -> p.ozel().getLongArray("a")).orElse(new long[0]);
                 BlockPos enYakin = null;
                 double uzaklik = Double.MAX_VALUE;

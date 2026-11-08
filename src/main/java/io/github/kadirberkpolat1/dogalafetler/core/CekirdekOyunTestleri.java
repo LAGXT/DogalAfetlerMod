@@ -135,7 +135,7 @@ public final class CekirdekOyunTestleri {
         afet.asamaIleri(level);
         afet.etkilenenEkle(hedef);
         afet.tick(level, 40);
-        donem.aktifAfetAyarla(afet);
+        donem.afetEkle(afet);
         CompoundTag beklenenAfet = afet.durumYaz(new CompoundTag());
         CompoundTag ilkKayit = donem.save(new CompoundTag());
 
@@ -181,7 +181,9 @@ public final class CekirdekOyunTestleri {
         yardimci.assertTrue(geri.ekVeri("donma").getFloat("maskeOrani") == 0.25f, "ek veri");
         yardimci.assertTrue(geri.save(new CompoundTag()).equals(ilkKayit), "ikinci kayıt ilkinin aynısı değil");
 
-        CompoundTag okunanAfet = geri.bekleyenAfetiAl();
+        List<CompoundTag> okunanlar = geri.bekleyenAfetleriAl();
+        yardimci.assertTrue(okunanlar.size() == 1, "kayıtta bir afet olmalı: " + okunanlar.size());
+        CompoundTag okunanAfet = okunanlar.get(0);
         yardimci.assertTrue(beklenenAfet.equals(okunanAfet), "aktif afetin NBT'si korunmadı");
         OyunTestiAfeti geriAfet = new OyunTestiAfeti(AfetTuru.SINKHOLE, 16, 500);
         geriAfet.durumOku(okunanAfet);
@@ -305,6 +307,106 @@ public final class CekirdekOyunTestleri {
             kurallar.getRule(Kurallar.DOGAL_AFETLER_ACIK).set(oncekiGenel, server);
             yonetici.siklikDenetle(false);
             donem.beklemeleriSifirla();
+        }
+        yardimci.succeed();
+    }
+
+    /**
+     * AS-8 (kullanıcı isteği 2026-11-08): komutla iki farklı afet aynı anda AKTIF olur, aynı tür reddedilir, {@code stop <afet>}
+     * yalnız onu durdurur, doğal seçim liste boşken açılır ve dönem kaydı iki afeti birden taşır.
+     */
+    @GameTest(template = "bos", batch = "cekirdek_coklu")
+    public static void komutlaIkiFarkliAfetAyniAndaSurer(GameTestHelper yardimci) {
+        ServerLevel level = yardimci.getLevel();
+        MinecraftServer server = level.getServer();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(server);
+        yonetici.durdur();
+        GameRules kurallar = server.getGameRules();
+        boolean oncekiGenel = kurallar.getBoolean(Kurallar.DOGAL_AFETLER_ACIK);
+        BlockPos konum = yardimci.absolutePos(BlockPos.ZERO);
+        ServerPlayer oyuncu = sahteOyuncu(yardimci, konum.getX() + 0.5, konum.getY(), konum.getZ() + 0.5);
+        try (AfetKaydi.GeciciKayit deprem = AfetKaydi.geciciKaydet(AfetTuru.DEPREM,
+                () -> new OyunTestiAfeti(AfetTuru.DEPREM, 8, 100));
+                AfetKaydi.GeciciKayit kasirga = AfetKaydi.geciciKaydet(AfetTuru.KASIRGA,
+                        () -> new OyunTestiAfeti(AfetTuru.KASIRGA, 8, 100))) {
+            kurallar.getRule(Kurallar.DOGAL_AFETLER_ACIK).set(true, server);
+            yardimci.assertTrue(yonetici.elleBaslat(AfetTuru.DEPREM, 2, oyuncu, level, konum)
+                    == AfetYoneticisi.BaslatmaSonucu.BASLADI, "deprem başlamadı");
+            yardimci.assertTrue(yonetici.elleBaslat(AfetTuru.KASIRGA, 1, oyuncu, level, konum)
+                    == AfetYoneticisi.BaslatmaSonucu.BASLADI, "deprem sürerken kasırga başlamadı");
+            yardimci.assertTrue(yonetici.elleBaslat(AfetTuru.DEPREM, 1, oyuncu, level, konum)
+                    == AfetYoneticisi.BaslatmaSonucu.ZATEN_AKTIF, "aynı türden ikinci afet reddedilmedi");
+            yardimci.assertTrue(komut(server, "dogalafet start deprem 3") == 0, "komutla aynı tür reddedilmedi");
+            yardimci.assertTrue(yonetici.aktifAfetler().size() == 2, "iki afet sürmeli: " + yonetici.aktifAfetler().size());
+            for (int i = 0; i < 2; i++) {
+                yardimci.assertTrue(yonetici.asamaIleri(AfetTuru.KASIRGA) && yonetici.asamaIleri(AfetTuru.DEPREM),
+                        "hedefli aşama ilerlemedi");
+            }
+            Afet d = yonetici.aktifAfet(AfetTuru.DEPREM).orElseThrow();
+            Afet k = yonetici.aktifAfet(AfetTuru.KASIRGA).orElseThrow();
+            yardimci.assertTrue(d.asama() == AfetAsamasi.AKTIF && k.asama() == AfetAsamasi.AKTIF && d.seviye() == 2,
+                    "iki farklı afet aynı anda AKTIF olmalı: " + d.asama() + " / " + k.asama());
+            yardimci.assertTrue(yonetici.secimYap(true).isEmpty(), "afet sürerken doğal seçim yapılmamalı");
+
+            List<CompoundTag> kayit = DunyaDonemi.yukle(yonetici.donem().save(new CompoundTag())).bekleyenAfetleriAl();
+            yardimci.assertTrue(kayit.size() == 2 && Afet.turOku(kayit.get(0)).equals(Optional.of(AfetTuru.DEPREM))
+                    && Afet.turOku(kayit.get(1)).equals(Optional.of(AfetTuru.KASIRGA)), "dönem kaydı iki afeti taşımalı");
+            OyunTestiAfeti geri = new OyunTestiAfeti(AfetTuru.KASIRGA, 8, 100);
+            geri.durumOku(kayit.get(1));
+            yardimci.assertTrue(geri.asama() == AfetAsamasi.AKTIF && geri.baglam().equals(k.baglam()),
+                    "kayıttan dönen kasırga aynı olmalı");
+
+            yardimci.assertTrue(komut(server, "dogalafet durum") == 1, "durum başarısız");
+            yardimci.assertTrue(komut(server, "dogalafet stop deprem") == 1, "stop deprem başarısız");
+            yardimci.assertTrue(yonetici.aktifAfet(AfetTuru.DEPREM).isEmpty() && yonetici.aktifAfet(AfetTuru.KASIRGA)
+                    .orElse(null) == k, "stop deprem yalnız depremi durdurmalı");
+            yardimci.assertTrue(komut(server, "dogalafet stop deprem") == 0, "sürmeyen tür için stop 0 dönmeli");
+            yardimci.assertTrue(komut(server, "dogalafet asama ileri kasirga") == 1, "asama ileri kasirga başarısız");
+            yardimci.assertTrue(komut(server, "dogalafet stop") == 1 && yonetici.aktifAfetler().isEmpty(),
+                    "stop hepsini durdurmalı");
+            yardimci.assertTrue(yonetici.secimYap(true).isPresent(), "liste boşalinca doğal seçim açılmalı");
+        } finally {
+            yonetici.durdur();
+            kurallar.getRule(Kurallar.DOGAL_AFETLER_ACIK).set(oncekiGenel, server);
+            server.getPlayerList().remove(oyuncu);
+        }
+        yardimci.succeed();
+    }
+
+    /**
+     * AS-9: oyuncu bir afetin sirenini duyarken aynı ya da düşük öncelikli ikinci afetin sireni ona gitmez; ilk siren bitince
+     * de gitmez (susar, kuyruğa alınmaz).
+     */
+    @GameTest(template = "bos", batch = "cekirdek_coklu_siren")
+    public static void ayniAndaIkiSirendeOncelikliCalarOtekiSusar(GameTestHelper yardimci) {
+        ServerLevel level = yardimci.getLevel();
+        MinecraftServer server = level.getServer();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(server);
+        yonetici.durdur();
+        BlockPos konum = yardimci.absolutePos(BlockPos.ZERO);
+        ServerPlayer oyuncu = sahteOyuncu(yardimci, konum.getX() + 0.5, konum.getY(), konum.getZ() + 0.5);
+        List<SirenIstegiEvent> istekler = new ArrayList<>();
+        Consumer<SirenIstegiEvent> dinleyici = istekler::add;
+        MinecraftForge.EVENT_BUS.addListener(EventPriority.NORMAL, false, SirenIstegiEvent.class, dinleyici);
+        try (AfetKaydi.GeciciKayit deprem = AfetKaydi.geciciKaydet(AfetTuru.DEPREM,
+                () -> new OyunTestiAfeti(AfetTuru.DEPREM, 8, 100));
+                AfetKaydi.GeciciKayit kasirga = AfetKaydi.geciciKaydet(AfetTuru.KASIRGA,
+                        () -> new OyunTestiAfeti(AfetTuru.KASIRGA, 8, 100))) {
+            yonetici.elleBaslat(AfetTuru.DEPREM, 1, oyuncu, level, konum);
+            yonetici.elleBaslat(AfetTuru.KASIRGA, 1, oyuncu, level, konum);
+            yonetici.asamaIleri(AfetTuru.DEPREM);
+            yardimci.assertTrue(istekler.stream().anyMatch(e -> e.afetTuru() == AfetTuru.DEPREM
+                    && e.oyuncular().contains(oyuncu)), "deprem sireni oyuncuya gitmedi");
+            yonetici.asamaIleri(AfetTuru.KASIRGA);
+            yardimci.assertTrue(yonetici.aktifAfet(AfetTuru.KASIRGA).orElseThrow().asama() == AfetAsamasi.SIREN,
+                    "kasırga SIREN'de olmalı");
+            yonetici.asamaIleri(AfetTuru.DEPREM);
+            yardimci.assertTrue(istekler.stream().noneMatch(e -> e.afetTuru() == AfetTuru.KASIRGA),
+                    "eşit öncelikte sonra başlayan kasırganın sireni gitmemeli: " + istekler.size());
+        } finally {
+            MinecraftForge.EVENT_BUS.unregister(dinleyici);
+            yonetici.durdur();
+            server.getPlayerList().remove(oyuncu);
         }
         yardimci.succeed();
     }
@@ -754,9 +856,10 @@ public final class CekirdekOyunTestleri {
         }
     }
 
-    /** {@code AfetDurumPaketi.YOK}'un ağdaki vanilla paketi (kanal adı ve ham baytı; ilk bayt paket kimliği). */
+    /** Deprem için {@code AfetDurumPaketi.yok}'un ağdaki vanilla paketi (kanal adı ve ham baytı; ilk bayt paket kimliği). */
     private static ICustomPacket<?> yokPaketi() {
-        return (ICustomPacket<?>) AgKanali.KANAL.toVanillaPacket(AfetDurumPaketi.YOK, NetworkDirection.PLAY_TO_CLIENT);
+        return (ICustomPacket<?>) AgKanali.KANAL.toVanillaPacket(AfetDurumPaketi.yok(AfetTuru.DEPREM),
+                NetworkDirection.PLAY_TO_CLIENT);
     }
 
     private static byte[] yokBaytlari() {

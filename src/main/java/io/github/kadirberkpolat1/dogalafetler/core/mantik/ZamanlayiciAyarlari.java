@@ -11,17 +11,19 @@ import java.util.Map;
  * afet saati tick'idir. Varsayılanlar config'in de varsayılanıdır (tek kaynak).
  */
 public record ZamanlayiciAyarlari(double gunlukAfetOrani, long genelBeklemeTick, double siddetBeklemeCarpani,
-        long ertelemeTick, long baslangicBeklemeTick, Map<AfetTuru, Integer> agirliklar,
+        long ertelemeTick, long baslangicBeklemeTick, long ilkAfetGarantiTick, Map<AfetTuru, Integer> agirliklar,
         Map<AfetTuru, Long> turBeklemeleri) {
     public static final double VARSAYILAN_GUNLUK_ORAN = 0.8;
-    public static final long VARSAYILAN_GENEL_BEKLEME = 12_000L;
+    public static final long VARSAYILAN_GENEL_BEKLEME = 6_000L;
     public static final double VARSAYILAN_SIDDET_CARPANI = 0.25;
     public static final long VARSAYILAN_ERTELEME = 6_000L;
-    public static final long VARSAYILAN_BASLANGIC_BEKLEMESI = 24_000L;
+    public static final long VARSAYILAN_BASLANGIC_BEKLEMESI = 6_000L;
+    /** AS-12: dünyada henüz afet olmadıysa ilk günün sonunda doğal seçim garanti edilir (0: garanti yok). */
+    public static final long VARSAYILAN_ILK_AFET_GARANTISI = 24_000L;
 
     public static final ZamanlayiciAyarlari VARSAYILAN = new ZamanlayiciAyarlari(VARSAYILAN_GUNLUK_ORAN,
             VARSAYILAN_GENEL_BEKLEME, VARSAYILAN_SIDDET_CARPANI, VARSAYILAN_ERTELEME, VARSAYILAN_BASLANGIC_BEKLEMESI,
-            varsayilanAgirliklar(), varsayilanBeklemeler());
+            VARSAYILAN_ILK_AFET_GARANTISI, varsayilanAgirliklar(), varsayilanBeklemeler());
 
     public ZamanlayiciAyarlari {
         if (!(gunlukAfetOrani >= 0) || Double.isInfinite(gunlukAfetOrani)) {
@@ -33,6 +35,7 @@ public record ZamanlayiciAyarlari(double gunlukAfetOrani, long genelBeklemeTick,
         genelBeklemeTick = Math.max(0, genelBeklemeTick);
         ertelemeTick = Math.max(0, ertelemeTick);
         baslangicBeklemeTick = Math.max(0, baslangicBeklemeTick);
+        ilkAfetGarantiTick = Math.max(0, ilkAfetGarantiTick);
         EnumMap<AfetTuru, Integer> a = new EnumMap<>(AfetTuru.class);
         EnumMap<AfetTuru, Long> b = new EnumMap<>(AfetTuru.class);
         for (AfetTuru tur : AfetTuru.values()) {
@@ -57,7 +60,7 @@ public record ZamanlayiciAyarlari(double gunlukAfetOrani, long genelBeklemeTick,
         return switch (tur) {
             case AY_CARPMASI -> 240_000L;
             case GUNES_PATLAMASI -> 480_000L;
-            default -> 48_000L;
+            default -> 24_000L;
         };
     }
 
@@ -104,12 +107,12 @@ public record ZamanlayiciAyarlari(double gunlukAfetOrani, long genelBeklemeTick,
 
     public ZamanlayiciAyarlari gunlukOranIle(double oran) {
         return new ZamanlayiciAyarlari(oran, genelBeklemeTick, siddetBeklemeCarpani, ertelemeTick, baslangicBeklemeTick,
-                agirliklar, turBeklemeleri);
+                ilkAfetGarantiTick, agirliklar, turBeklemeleri);
     }
 
     public ZamanlayiciAyarlari genelBeklemeIle(long tick) {
         return new ZamanlayiciAyarlari(gunlukAfetOrani, tick, siddetBeklemeCarpani, ertelemeTick, baslangicBeklemeTick,
-                agirliklar, turBeklemeleri);
+                ilkAfetGarantiTick, agirliklar, turBeklemeleri);
     }
 
     /** Bütün türlerin kendi beklemesini aynı değere çeker. */
@@ -119,11 +122,16 @@ public record ZamanlayiciAyarlari(double gunlukAfetOrani, long genelBeklemeTick,
             harita.put(tur, tick);
         }
         return new ZamanlayiciAyarlari(gunlukAfetOrani, genelBeklemeTick, siddetBeklemeCarpani, ertelemeTick,
-                baslangicBeklemeTick, agirliklar, harita);
+                baslangicBeklemeTick, ilkAfetGarantiTick, agirliklar, harita);
     }
 
     public ZamanlayiciAyarlari baslangicBeklemeIle(long tick) {
         return new ZamanlayiciAyarlari(gunlukAfetOrani, genelBeklemeTick, siddetBeklemeCarpani, ertelemeTick, tick,
-                agirliklar, turBeklemeleri);
+                ilkAfetGarantiTick, agirliklar, turBeklemeleri);
+    }
+
+    public ZamanlayiciAyarlari ilkAfetGarantisiIle(long tick) {
+        return new ZamanlayiciAyarlari(gunlukAfetOrani, genelBeklemeTick, siddetBeklemeCarpani, ertelemeTick,
+                baslangicBeklemeTick, tick, agirliklar, turBeklemeleri);
     }
 }

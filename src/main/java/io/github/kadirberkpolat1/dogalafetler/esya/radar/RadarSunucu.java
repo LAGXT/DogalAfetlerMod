@@ -31,7 +31,7 @@ import net.minecraftforge.fml.common.Mod;
  * yan elinde tutan her oyuncu için durumu hesaplar ve önceki gönderilenden farklıysa yalnız o oyuncuya gönderir; radarı
  * bırakan oyuncuya tek {@link RadarPaketi#YOK} gider, radarı olmayana hiçbir şey gitmez.
  *
- * <p>Kaynak çekirdektir: {@code aktifAfet()} (ON_UYARI dahil), {@code normalOnUyariBasladi()}, korumalı {@code
+ * <p>Kaynak çekirdektir: {@code aktifAfetler()} (ON_UYARI dahil; birden çoksa oyuncunun gördüğü en yakını), {@code normalOnUyariBasladi()}, korumalı {@code
  * kalanOku}/{@code etkiAlani} (çekirdek §1: {@code asamaKalanTick()}/{@code etkiAlani()} doğrudan çağrılmaz) ve
  * {@code DunyaDonemi.sonAfetler()}. Hareketli afetin güncel merkezi her saniye etki alanından okunur; Gelişmiş radarın
  * hareket yönü bu izden çıkar.
@@ -39,7 +39,7 @@ import net.minecraftforge.fml.common.Mod;
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID)
 public final class RadarSunucu {
     private static final Map<UUID, RadarPaketi> SON = new HashMap<>();
-    /** Tek aktif afet yuvası: iz afet numarasıyla sıfırlanır. 6 örnek = son 5 saniye. */
+    /** Tek iz ({@link #izAfeti}): afet numarasıyla sıfırlanır. 6 örnek = son 5 saniye. */
     private static final HareketIzi IZ = new HareketIzi(6);
 
     private RadarSunucu() {
@@ -87,13 +87,28 @@ public final class RadarSunucu {
     }
 
     private static void izGuncelle(MinecraftServer server) {
-        Optional<Afet> afet = AfetYoneticisi.al(server).aktifAfet();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(server);
+        Optional<Afet> afet = izAfeti(yonetici);
         if (afet.isEmpty()) {
             IZ.sifirla();
             return;
         }
-        AfetYoneticisi.al(server).etkiAlani(afet.get()).filter(alan -> !alan.global())
-                .ifPresent(alan -> IZ.ekle(afet.get().baglam().baslangicSaati(), server.getTickCount(), alan.x(), alan.z()));
+        yonetici.etkiAlani(afet.get()).ifPresent(
+                alan -> IZ.ekle(afet.get().baglam().baslangicSaati(), server.getTickCount(), alan.x(), alan.z()));
+    }
+
+    /** Hareket izinin izlediği afet: sürenlerin ilk bölgesel olanı (tek iz; başka afet seçilirse yön gösterilmez). */
+    private static Optional<Afet> izAfeti(AfetYoneticisi yonetici) {
+        for (Afet afet : yonetici.aktifAfetler()) {
+            if (!afet.tur().sunucuGeneli() && yonetici.etkiAlani(afet).filter(alan -> !alan.global()).isPresent()) {
+                return Optional.of(afet);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /** Oyuncunun radarının gösterdiği afet: görünen afetlerin en yakını (AS-10; eşitlikte önce başlayan). */
+    private record Secim(Afet afet, EtkiAlani alan, boolean global, RadarGorunumu gorunum, double mesafe) {
     }
 
     /** Oyuncunun radarının göreceği durum (göndermez). */
@@ -106,30 +121,34 @@ public final class RadarSunucu {
         int menzil = RadarAyarlari.menzil(gelismis);
         AfetYoneticisi yonetici = AfetYoneticisi.al(oyuncu.server);
         List<RadarPaketi.Gecmis> gecmis = gelismis ? gecmis(yonetici) : List.of();
-        Optional<Afet> secili = yonetici.aktifAfet();
-        if (secili.isEmpty()) {
+        Secim secim = null;
+        for (Afet aday : yonetici.aktifAfetler()) {
+            Optional<EtkiAlani> okunan = yonetici.etkiAlani(aday);
+            if (okunan.isEmpty()) {
+                continue;
+            }
+            EtkiAlani a = okunan.get();
+            boolean g = a.global() || aday.tur().sunucuGeneli();
+            boolean ayniBoyut = oyuncu.level().dimension().equals(aday.baglam().boyut());
+            double m = g ? 0 : YonMesafe.mesafe(oyuncu.getX(), oyuncu.getZ(), a.x(), a.z());
+            RadarGorunumu gr = Gorunurluk.radar(aday.asama(), aday.normalOnUyariBasladi(), g, ayniBoyut, m, menzil);
+            if (gr != RadarGorunumu.GIZLI && (secim == null || m < secim.mesafe())) {
+                secim = new Secim(aday, a, g, gr, m);
+            }
+        }
+        if (secim == null) {
             return RadarPaketi.sakin(gelismis, menzil, gecmis);
         }
-        Afet afet = secili.get();
-        Optional<EtkiAlani> okunan = yonetici.etkiAlani(afet);
-        if (okunan.isEmpty()) {
-            return RadarPaketi.sakin(gelismis, menzil, gecmis);
-        }
-        EtkiAlani alan = okunan.get();
-        boolean global = alan.global() || afet.tur().sunucuGeneli();
-        boolean ayniBoyut = oyuncu.level().dimension().equals(afet.baglam().boyut());
-        double mesafe = global ? 0 : YonMesafe.mesafe(oyuncu.getX(), oyuncu.getZ(), alan.x(), alan.z());
-        RadarGorunumu gorunum = Gorunurluk.radar(afet.asama(), afet.normalOnUyariBasladi(), global, ayniBoyut, mesafe,
-                menzil);
-        if (gorunum == RadarGorunumu.GIZLI) {
-            return RadarPaketi.sakin(gelismis, menzil, gecmis);
-        }
+        Afet afet = secim.afet();
+        EtkiAlani alan = secim.alan();
+        boolean global = secim.global();
+        RadarGorunumu gorunum = secim.gorunum();
         long kalanSn = SureBicimi.saniye(yonetici.zamanOlcegi().gercekTick(yonetici.kalanOku(afet)));
         int x = global ? 0 : (int) Math.floor(alan.x());
         int z = global ? 0 : (int) Math.floor(alan.z());
         float yon = Float.NaN;
         float hiz = 0;
-        if (gelismis && !global && IZ.yon().isPresent()) {
+        if (gelismis && !global && IZ.yon().isPresent() && izAfeti(yonetici).orElse(null) == afet) {
             OptionalDouble iz = IZ.yon();
             yon = Math.round(iz.getAsDouble() / 5.0) * 5f % 360f;
             hiz = Math.round(IZ.hiz() * 2) / 2f;

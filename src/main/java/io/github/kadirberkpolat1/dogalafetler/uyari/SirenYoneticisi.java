@@ -80,7 +80,7 @@ public final class SirenYoneticisi {
     }
 
     private static long afetNo(AfetYoneticisi yonetici, AfetTuru tur) {
-        return yonetici.aktifAfet().filter(afet -> afet.tur() == tur).map(afet -> afet.baglam().baslangicSaati())
+        return yonetici.aktifAfet(tur).map(afet -> afet.baglam().baslangicSaati())
                 .orElse(sonAfetNo);
     }
 

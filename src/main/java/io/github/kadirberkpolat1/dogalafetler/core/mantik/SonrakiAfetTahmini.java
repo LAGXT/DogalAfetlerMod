@@ -12,8 +12,9 @@ import java.util.function.ToDoubleFunction;
  * Afet yokken bir sonraki doğal afet seçimine kalan süre ({@code /dogalafet durum}, sıklık bildirimi). Zamanlayıcının
  * kendi kuralları kullanılır: başlangıç ve genel bekleme bitene dek seçim yok; sonra her uygun tür kendi beklemesi
  * bittiğinde oranıyla ({@link AfetZamanlayicisi#turOrani}) Poisson sürecine katılır. Toplam oran parça parça sabit olduğu
- * için ortalama ve yüzdelik kapalı biçimde hesaplanır. Süreler ölçekli afet saati tick'idir; geçici çarpanlar bugünkü
- * değerleriyle sabit sayılır.
+ * için ortalama ve yüzdelik kapalı biçimde hesaplanır. İlk afet garantisi (AS-12) varsa seçim en geç garanti anında (ya da
+ * o anda hiçbir tür beklemeden çıkmamışsa ilk çıkanın anında) olur. Süreler ölçekli afet saati tick'idir; geçici çarpanlar
+ * bugünkü değerleriyle sabit sayılır.
  *
  * @param enErken  seçimin mümkün olduğu ilk an (bekleme bitişi)
  * @param ortalama beklenen seçim anı
@@ -26,9 +27,18 @@ public record SonrakiAfetTahmini(long enErken, long ortalama, long enGec) {
     private record Katilim(long an, double oranTick) {
     }
 
-    /** Uygun tür yoksa, sıklık 0 ise ya da bütün oranlar 0 ise boş (doğal afet seçilmez). */
+    /** Garantisiz tahmin. */
     public static Optional<SonrakiAfetTahmini> hesapla(ZamanlayiciAyarlari ayarlar, long saat, BeklemeDurumu bekleme,
             Set<AfetTuru> uygunTurler, ToDoubleFunction<AfetTuru> carpan, double siklik) {
+        return hesapla(ayarlar, saat, bekleme, uygunTurler, carpan, siklik, Long.MAX_VALUE);
+    }
+
+    /**
+     * Uygun tür yoksa, sıklık 0 ise ya da bütün oranlar 0 ise boş (doğal afet seçilmez). {@code garantiKalan}: şimdiden ilk
+     * afet garantisine kalan tick ({@link Long#MAX_VALUE}: garanti yok).
+     */
+    public static Optional<SonrakiAfetTahmini> hesapla(ZamanlayiciAyarlari ayarlar, long saat, BeklemeDurumu bekleme,
+            Set<AfetTuru> uygunTurler, ToDoubleFunction<AfetTuru> carpan, double siklik, long garantiKalan) {
         long baslangic = Math.max(0, AfetZamanlayicisi.beklemeOlcekle(ayarlar.baslangicBeklemeTick(), siklik) - saat);
         long kapali = Math.max(baslangic, bekleme.genelKalan(saat));
         List<Katilim> katilimlar = new ArrayList<>();
@@ -47,6 +57,8 @@ public record SonrakiAfetTahmini(long enErken, long ortalama, long enGec) {
             return Optional.empty();
         }
         katilimlar.sort(Comparator.comparingLong(Katilim::an));
+        double garanti = garantiKalan == Long.MAX_VALUE ? Double.POSITIVE_INFINITY
+                : Math.max(Math.max(0, garantiKalan), katilimlar.get(0).an());
         double hedef = -Math.log(1.0 - UST_YUZDELIK);
         double birikim = 0;
         double egim = 0;
@@ -55,7 +67,11 @@ public record SonrakiAfetTahmini(long enErken, long ortalama, long enGec) {
         for (int i = 0; i < katilimlar.size(); i++) {
             egim += katilimlar.get(i).oranTick();
             double bas = katilimlar.get(i).an();
-            double uzunluk = i + 1 < katilimlar.size() ? katilimlar.get(i + 1).an() - bas : Double.POSITIVE_INFINITY;
+            if (bas >= garanti) {
+                break;
+            }
+            double son = i + 1 < katilimlar.size() ? katilimlar.get(i + 1).an() : Double.POSITIVE_INFINITY;
+            double uzunluk = Math.min(son, garanti) - bas;
             if (uzunluk <= 0) {
                 continue;
             }
@@ -65,6 +81,9 @@ public record SonrakiAfetTahmini(long enErken, long ortalama, long enGec) {
                 enGec = bas + (hedef - birikim) / egim;
             }
             birikim += egim * uzunluk;
+        }
+        if (Double.isNaN(enGec) || enGec > garanti) {
+            enGec = garanti;
         }
         return Optional.of(new SonrakiAfetTahmini(katilimlar.get(0).an(), Math.round(ortalama), Math.round(enGec)));
     }

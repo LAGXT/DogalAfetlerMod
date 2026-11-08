@@ -141,7 +141,7 @@ def bitince_yeni_afet(sunucu):
     # Hasar kapalı S1 çukurunun yeri: bu tohumda uygun olduğu biliniyor ve blok değişmedi; S3 yarığı (yarım boy 48)
     # bu çapraza ulaşmaz.
     satir = sunucu.komut("execute positioned ~-48 ~ ~48 run dogalafet start sinkhole 2",
-                         r"Afet başladı: sinkhole seviye 2|A disaster is already active|Zaten aktif bir afet var|No suitable place"
+                         r"Afet başladı: sinkhole seviye 2|is already running|zaten sürüyor|No suitable place"
                          r"|uygun yer bulunamadı")
     if "Afet başladı" not in satir:
         raise cs.SenaryoHatasi(f"deprem bittikten hemen sonra yeni afet kabul edilmedi: {satir.strip()}")

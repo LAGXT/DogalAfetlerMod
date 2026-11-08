@@ -2,6 +2,7 @@ package io.github.kadirberkpolat1.dogalafetler.afet.kasirga;
 
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.KasirgaSeviyesi;
+import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
 import java.util.Locale;
 import net.minecraft.commands.CommandSourceStack;
@@ -35,7 +36,7 @@ final class KasirgaKomutlari {
         }
         int kv = kasirgaVarligi;
         int uv = ucanVarlik;
-        Kasirga k = AfetYoneticisi.al(server).aktifAfet().filter(Kasirga.class::isInstance).map(Kasirga.class::cast)
+        Kasirga k = AfetYoneticisi.al(server).aktifAfet(AfetTuru.KASIRGA).filter(Kasirga.class::isInstance).map(Kasirga.class::cast)
                 .orElse(null);
         if (k == null) {
             kaynak.sendSuccess(() -> Component.translatable(YOK, kv, uv), false);

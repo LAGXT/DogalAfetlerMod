@@ -58,7 +58,7 @@ public final class IstemciSinkhole {
     @SubscribeEvent
     public static void gorusAcisi(ComputeFovModifierEvent olay) {
         Player oyuncu = olay.getPlayer();
-        var durum = IstemciAfetDurumu.aktif();
+        var durum = IstemciAfetDurumu.aktif(AfetTuru.SINKHOLE);
         if (durum.isEmpty() || durum.get().tur() != AfetTuru.SINKHOLE || durum.get().asama() != AfetAsamasi.AKTIF
                 || durum.get().altAsama() < SinkholeSeviyesi.COKUS || oyuncu.fallDistance < 2) {
             return;

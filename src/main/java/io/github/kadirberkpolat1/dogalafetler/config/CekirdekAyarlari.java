@@ -1,6 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.config;
 
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.CekirdekAyarGocu;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.GelisimKriteri;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.GelisimOlcutu;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SiddetAyarlari;
@@ -30,6 +31,7 @@ public final class CekirdekAyarlari {
     private final ForgeConfigSpec.DoubleValue siddetBeklemeCarpani;
     private final ForgeConfigSpec.LongValue ertelemeTick;
     private final ForgeConfigSpec.LongValue baslangicBeklemeTick;
+    private final ForgeConfigSpec.LongValue ilkAfetGarantiTick;
     private final Map<AfetTuru, ForgeConfigSpec.IntValue> agirliklar = new EnumMap<>(AfetTuru.class);
     private final Map<AfetTuru, ForgeConfigSpec.LongValue> turBeklemeleri = new EnumMap<>(AfetTuru.class);
 
@@ -78,6 +80,9 @@ public final class CekirdekAyarlari {
 
     private CekirdekAyarlari(ForgeConfigSpec.Builder k) {
         ZamanlayiciAyarlari z = ZamanlayiciAyarlari.VARSAYILAN;
+        k.comment("Config göçünün sürümü (K-E61): dosya bundan eskiyse açılışta eski varsayılanında kalan bekleme değerleri yeni "
+                + "varsayılana çekilir, elle değiştirilenlere dokunulmaz. Elle değiştirmeyin.")
+                .defineInRange("ayarSurumu", CekirdekAyarGocu.GUNCEL, 0, Integer.MAX_VALUE);
         k.comment("Afet zamanlayıcısı (madde 4). Sabit takvim yoktur; her afet olasılıkla ve bekleme kurallarıyla seçilir.")
                 .push("zamanlayici");
         gunlukAfetOrani = k.comment("Bekleme dışındayken bir Minecraft gününde beklenen afet sayısı (sekiz türün hepsi",
@@ -95,6 +100,9 @@ public final class CekirdekAyarlari {
                 .defineInRange("ertelemeTick", z.ertelemeTick(), 0L, 100_000_000L);
         baslangicBeklemeTick = k.comment("Yeni dünyada ilk afetten önce geçmesi gereken süre (afetSikligi çarpanına bölünür).")
                 .defineInRange("baslangicBeklemeTick", z.baslangicBeklemeTick(), 0L, 100_000_000L);
+        ilkAfetGarantiTick = k.comment("Dünyada (ya da sifirla'dan sonra) henüz hiç afet olmadıysa bu süre dolunca doğal afet",
+                "seçimi garanti edilir; beklemeler ve uygunluk yine geçerlidir (afetSikligi çarpanına bölünür). 0 = garanti yok.")
+                .defineInRange("ilkAfetGarantiTick", z.ilkAfetGarantiTick(), 0L, 100_000_000L);
         k.pop();
 
         k.comment("Afet başına olasılık ağırlığı ve kendi beklemesi. Nadirlik sırası (madde 4): altı sık afet birbirine yakın,",
@@ -210,6 +218,7 @@ public final class CekirdekAyarlari {
     /** Bölümü config kayıt kancasına ekler; mod kurucusunda {@code AyarKaydi.kaydet}'ten önce çağrılır. */
     public static void kaydet() {
         bolum = AyarKaydi.sunucuBolumu("cekirdek", "Çekirdek: afet yöneticisi ve dünya dönemi", CekirdekAyarlari::new);
+        AyarKaydi.sunucuGocu(CekirdekAyarGocu.SURUM_YOLU, CekirdekAyarGocu.GUNCEL, CekirdekAyarGocu::plan);
     }
 
     public static CekirdekAyarlari al() {
@@ -227,7 +236,7 @@ public final class CekirdekAyarlari {
             b.put(tur, turBeklemeleri.get(tur).get());
         }
         return new ZamanlayiciAyarlari(gunlukAfetOrani.get(), genelBeklemeTick.get(), siddetBeklemeCarpani.get(),
-                ertelemeTick.get(), baslangicBeklemeTick.get(), a, b);
+                ertelemeTick.get(), baslangicBeklemeTick.get(), ilkAfetGarantiTick.get(), a, b);
     }
 
     public SiddetAyarlari siddet() {

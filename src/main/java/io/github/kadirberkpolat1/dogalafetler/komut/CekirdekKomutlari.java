@@ -76,6 +76,7 @@ public final class CekirdekKomutlari {
     public static final String STOP_DURDU = ON + "stop.durdu";
     public static final String STOP_AFET_YOK = ON + "stop.afet_yok";
     public static final String STOP_SURECLER = ON + "stop.surecler";
+    public static final String STOP_TUR_YOK = ON + "stop.tur_yok";
     public static final String STOP_SURECLER_SURUYOR = ON + "stop.surecler_suruyor";
     public static final String GUN_AYARLANDI = ON + "gun.ayarlandi";
     public static final String HIZ_AYARLANDI = ON + "hiz.ayarlandi";
@@ -106,9 +107,8 @@ public final class CekirdekKomutlari {
         long gun = yonetici.oyunGunu();
         List<Component> satirlar = new ArrayList<>();
         satirlar.add(Component.translatable(DURUM_BASLIK));
-        Optional<Afet> aktif = yonetici.aktifAfet();
-        if (aktif.isPresent()) {
-            Afet afet = aktif.get();
+        List<Afet> aktifler = yonetici.aktifAfetler();
+        for (Afet afet : aktifler) {
             AfetBaglami afetBaglami = afet.baglam();
             long pencere = afet.pencereBeklemesi();
             Component kalan = pencere >= 0 ? Component.translatable(DURUM_PENCERE, sure(pencere))
@@ -119,7 +119,8 @@ public final class CekirdekKomutlari {
                     .orElseGet(() -> Component.translatable(BILINMIYOR));
             satirlar.add(Component.translatable(DURUM_AFET_KONUM, afetBaglami.merkez().toShortString(),
                     afetBaglami.boyut().location().toString(), yaricap, oyuncuAdi(server, afetBaglami.hedefOyuncu())));
-        } else {
+        }
+        if (aktifler.isEmpty()) {
             satirlar.add(Component.translatable(DURUM_AFET_YOK));
         }
         satirlar.add(Component.translatable(DURUM_GUN, gun, donem.gunOfseti(), sayi(yonetici.zamanOlcegi().carpan()),
@@ -160,7 +161,7 @@ public final class CekirdekKomutlari {
                 BlockPos.containing(kaynak.getPosition()));
         switch (sonuc) {
             case BASLADI -> {
-                Afet afet = yonetici.aktifAfet().orElseThrow();
+                Afet afet = yonetici.aktifAfet(tur).orElseThrow();
                 AfetBaglami afetBaglami = afet.baglam();
                 Component mesaj = Component.translatable(START_BASLADI, afetAdi(tur), seviyeMetni(afet.seviye()),
                         afetBaglami.merkez().toShortString(), oyuncuAdi(kaynak.getServer(), afetBaglami.hedefOyuncu()),
@@ -170,8 +171,7 @@ public final class CekirdekKomutlari {
                         START_PENCERE, afetAdi(tur), p.bas(), p.son()), false));
                 return 1;
             }
-            case ZATEN_AKTIF -> kaynak.sendFailure(Component.translatable(START_ZATEN_AKTIF,
-                    afetAdi(yonetici.aktifAfet().map(Afet::tur).orElse(tur))));
+            case ZATEN_AKTIF -> kaynak.sendFailure(Component.translatable(START_ZATEN_AKTIF, afetAdi(tur)));
             case KAYITLI_DEGIL -> kaynak.sendFailure(Component.translatable(START_KAYITLI_DEGIL, afetAdi(tur)));
             case YER_UYGUN_DEGIL, HEDEF_YOK -> kaynak.sendFailure(Component.translatable(START_YER_UYGUN_DEGIL, afetAdi(tur)));
             case HATA -> kaynak.sendFailure(Component.translatable(START_HATA, afetAdi(tur)));
@@ -179,12 +179,31 @@ public final class CekirdekKomutlari {
         return 0;
     }
 
-    static int stop(CommandContext<CommandSourceStack> baglam) {
+    /**
+     * {@code stop}: süren bütün afetleri durdurur; afet yoksa dönem süreçlerini. {@code stop <afet>}: yalnız o türden süren afeti
+     * (AS-8).
+     */
+    static int stop(CommandContext<CommandSourceStack> baglam, Optional<String> ad) {
         CommandSourceStack kaynak = baglam.getSource();
         AfetYoneticisi yonetici = AfetYoneticisi.al(kaynak.getServer());
-        Optional<AfetTuru> tur = yonetici.aktifAfet().map(Afet::tur);
-        if (tur.isPresent() && yonetici.durdur()) {
-            kaynak.sendSuccess(() -> Component.translatable(STOP_DURDU, afetAdi(tur.get())), false);
+        if (ad.isPresent()) {
+            Optional<AfetTuru> secilen = AfetTuru.kimlikIle(ad.get());
+            if (secilen.isEmpty()) {
+                kaynak.sendFailure(Component.translatable(START_BILINMEYEN, ad.get()));
+                return 0;
+            }
+            if (!yonetici.durdur(secilen.get())) {
+                kaynak.sendFailure(Component.translatable(STOP_TUR_YOK, afetAdi(secilen.get())));
+                return 0;
+            }
+            kaynak.sendSuccess(() -> Component.translatable(STOP_DURDU, afetAdi(secilen.get())), false);
+            return 1;
+        }
+        List<Afet> afetler = yonetici.aktifAfetler();
+        if (yonetici.durdur()) {
+            for (Afet afet : afetler) {
+                kaynak.sendSuccess(() -> Component.translatable(STOP_DURDU, afetAdi(afet.tur())), false);
+            }
             List<DonemSureci> suren = yonetici.aktifDonemSurecleri();
             if (!suren.isEmpty()) {
                 Component adlar = surecAdlari(suren);
@@ -268,14 +287,18 @@ public final class CekirdekKomutlari {
         return 1;
     }
 
-    /** {@code asama ileri [süreç]}: süreç adı verilirse aktif afete dokunmadan yalnız o dönem süreci ilerler (K-C48). */
+    /**
+     * {@code asama ileri [afet|süreç]}: ad yoksa birincil afet, süren bir afetin adıysa o afet (AS-8), değilse yalnız o dönem
+     * süreci ilerler (K-C48).
+     */
     static int asamaIleri(CommandContext<CommandSourceStack> baglam, Optional<String> surec) {
         CommandSourceStack kaynak = baglam.getSource();
         MinecraftServer server = kaynak.getServer();
         AfetYoneticisi yonetici = AfetYoneticisi.al(server);
-        Optional<AfetTuru> tur = yonetici.aktifAfet().map(Afet::tur);
-        if (surec.isEmpty() && tur.isPresent() && yonetici.asamaIleri()) {
-            Optional<Afet> sonra = yonetici.aktifAfet();
+        Optional<AfetTuru> tur = surec.isEmpty() ? yonetici.aktifAfet().map(Afet::tur)
+                : AfetTuru.kimlikIle(surec.get()).filter(t -> yonetici.aktifAfet(t).isPresent());
+        if (tur.isPresent() && yonetici.asamaIleri(tur.get())) {
+            Optional<Afet> sonra = yonetici.aktifAfet(tur.get());
             Component mesaj = sonra.isPresent()
                     ? Component.translatable(ASAMA_AFET, afetAdi(tur.get()),
                             Component.translatable(sonra.get().asama().ceviriAnahtari()))
@@ -283,7 +306,7 @@ public final class CekirdekKomutlari {
             kaynak.sendSuccess(() -> mesaj, false);
             return 1;
         }
-        Optional<Component> donemMesaji = yonetici.donemAsamaIleri(surec);
+        Optional<Component> donemMesaji = tur.isPresent() ? Optional.empty() : yonetici.donemAsamaIleri(surec);
         if (donemMesaji.isPresent()) {
             Component mesaj = donemMesaji.get();
             kaynak.sendSuccess(() -> mesaj, false);
@@ -462,11 +485,12 @@ public final class CekirdekKomutlari {
                 + "arasında patlar).");
         y.ekle(START_BILINMEYEN, "Unknown disaster: %s", "Bilinmeyen afet: %s");
         y.ekle(START_KAYITLI_DEGIL, "%s is not registered yet.", "%s henüz kayıtlı değil.");
-        y.ekle(START_ZATEN_AKTIF, "A disaster is already active: %s. Use /dogalafet stop first.",
-                "Zaten aktif bir afet var: %s. Önce /dogalafet stop.");
+        y.ekle(START_ZATEN_AKTIF, "%s is already running; other disasters can be started alongside it.",
+                "%s zaten sürüyor; başka türden afetler yanında başlatılabilir.");
         y.ekle(START_YER_UYGUN_DEGIL, "No suitable place found for %s.", "%s için uygun yer bulunamadı.");
         y.ekle(START_HATA, "%s could not be started; see the server log.", "%s başlatılamadı; sunucu log'una bakın.");
         y.ekle(STOP_DURDU, "%s stopped.", "%s durduruldu.");
+        y.ekle(STOP_TUR_YOK, "No %s is running.", "Süren %s yok.");
         y.ekle(STOP_AFET_YOK, "There is no disaster or era process to stop.", "Durdurulacak afet ya da dönem süreci yok.");
         y.ekle(STOP_SURECLER, "Era processes stopped: %s", "Dönem süreçleri durduruldu: %s");
         y.ekle(STOP_SURECLER_SURUYOR, "Era processes still running: %s; run /dogalafet stop again to stop them.",
