@@ -220,8 +220,15 @@ halkası (göğün geri kalanının yıldızları sönmez). 20–60 sn pulsar ka
 kuyruk, mor-mavi-beyaz Doppler'li akresyon diski, titreşim zirvede); 55. sn'de aradaki yolun %80'i, 56,5. sn'de pulsar yok.
 55–60 sn kör edici mor-beyaz parlama (0,1 sn'de tepe, 1,5 sn tutar, τ 0,9 sn; ekran örtüsü %50, ışık haritası %85, gök ve sis %60) + sunucudan
 tüm oyunculara konumsuz kütleçekim dalgası sesi (`karadelik_yutma.ogg`, 8 sn düşen bas 90 → 25 Hz + çatırtı, −23 LUFS) ve 3°,
-100 tick ekran sarsıntısı (hızlı bileşeni `pulsarTitresim`'le). 60–90 sn kara delik küçülüp uzaklaşır (diski yutumdan sonra
-parlak) ve söner, gök simsiyah, uzay %100, kalıntı nebulası yok. Gök koyu mor `#1C0A2E` → siyah. Yutmada en çok 16 kuad.
+100 tick ekran sarsıntısı (hızlı bileşeni `pulsarTitresim`'le). Parlama boyunca kara delik koyu silüet (jetler, disk, foton ve
+Einstein halkası); tam ekran örtüsü karışımlı, 0,3 sn %50, 1,2 sn'de %15'e iner. 60–90 sn kara delik yavaş uzaklaşır (72. sn
+8,2°, 90. sn 2°) ve söner; arkasında merceklenmiş yıldız yayları, mora dönen akresyon kalıntısı; gök simsiyah, uzay %100,
+kalıntı nebulası yok; ufukta külün kızıl korları, ekran kenarında ilk kırağı. Gök koyu mor `#1C0A2E` → siyah. Yutmada en çok 16
+kuad.
+
+**Buzul kıyamet ve doğuş (pulsar yolu, PL-27).** Gök koyu çelik mavisi `#1E2A38`, sis beyaz `#C4CCD6` ve yakın (tipi), kar
+tanesi iki kat ve rüzgârla yataya yakın, ekran kenarında donmayla büyüyen kırağı vinyeti (%45 → %90), tipi rüzgârı sesi. Kızıl
+cüce doğuşunda doğu ufkunun ±72°'sini (%40) saran kızıl ışık yayı ve karla buzun üstünden yükselen buhar.
 
 **Cehennem dünya (sunucu, `afetBlokHasari` kapısı arkasında, tek bütçe).** Çimen → kaba toprak → kül bloğu; yaprak yanar,
 altına kül katmanı düşer; kütük → kömürleşmiş kütük (siyah çatlaklı, içi kızıl parlayan, ışık 3); çiçek/ot/kaktüs/mantar yanar;
@@ -233,5 +240,5 @@ toprak ve kül bloğu kalır.
 |---|---|---|
 | PULSAR | titreşen pulsar + mavimsi ay; gündüz uzay %55 | titreşen pulsar + kara delikli zengin uzay |
 | KARADELIK_YUTMA | yutma koreografisi + mor tonlu ay | yutma koreografisi |
-| GÜNEŞSİZ (pulsar yolu) | uzay, soluk gri ay, kalıntı yok | yalnız uzay, kalıntı yok |
+| GÜNEŞSİZ (pulsar yolu) | çelik mavisi gök, soluk gri ay, kalıntı yok, tipi | çelik mavisi gök, kalıntı yok, tipi |
 
