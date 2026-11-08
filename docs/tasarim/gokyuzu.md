@@ -275,16 +275,17 @@ ve alan çizgilerine birlikte uygulanır (16 Hz kare dalga, her yarım periyot h
 çapın yarısı (PL-27 eğrisi korunur). Disk gökte sabit, ekranda yatay, görünen eğim yaklaştıkça 4° → 11° ve her karede
 kamera–nesne vektöründen. Arka yarı ince-lens sapma tablosuyla (sınıf yüklenirken bir kez, 2 048 adım) gölgenin üstünde ve
 altında iki yay; disk beyaz-sıcak ve soluk (iç kenar beyaz, orta beyaz-sıcak, dış soluk turuncu; doygunluk ≤ 0,3). Köşe
-parlaklığı Doppler çarpanı × besleme eğrisi × mor kalıntı çarpanı (PL-43): Doppler çarpanı ≤ 1, ön yarıda yaklaşan yan
-×1,0 mavi-beyaz, uzaklaşan ×0,3 sönük (Pg2); merceklenmiş yaylarda Doppler yalnız yanal bantta (ağırlık cos²φ), yay
-tepesinde üst yay ×0,9, alt yay ×1,0 (referansta alt yay en parlak). Besleme eğrisi (yaklaşmada 0,8, spagettileşmeyle 1,0)
-ve yutumdan sonra mor kalıntı çarpanı (1 + 0,8·morluk, ×1,8) Doppler'den sonra gelir; 1'i aşan pay toplamalı kalıntı
-geçişinde çizilir. Disk ve yayların 2,5 kat kalın, soluk (alfa 0,3) parlama kopyası. Yutma göğü neredeyse siyah
-(`#0A0510`). Gölge tam siyah, arkadaki yıldız, nebula ve pulsarı siler. Gölge çevresinde 2,5 R içinde merceklenmiş yıldız
-alanı (Einstein yarıçapı 1,45 R). Spagetti: pulsardan diske 3B kıvrımlı tüp (16 kesit) ve diske akan kuyruk. Yutumdan
-sonra mor kalıntı sönüme kadar besleme %95 × 1,8 parlaklıkta. Pulsar yolundaki doğuşta kızıl cüce küresi
-×(1 + 1,5·(1 − p)) şişkin doğar (doğuşta ×2,5, PL-41). Parlamanın altındaki silüet neredeyse siyah ve tam opak; ufuk
-korları %85 alfayla.
+parlaklığı Doppler çarpanı × besleme eğrisi × mor kalıntı çarpanı (PL-43): Doppler çarpanı ≤ 1 ve yalnız gölgenin iki
+yanındaki yanal bantta (görüntü düzleminde |r·cos φ| ≥ 1 gölge yarıçapı): yaklaşan yan ×1,0 mavi-beyaz, uzaklaşan ×0,3
+sönük (Pg2). Gölgenin üstü ve altındaki orta sütunda (≤ 0,5 gölge yarıçapı) madde bakışa dik gider: üstteki
+merceklenmiş yay ×0,9, alttaki ön yarı ve ikinci görüntü ×1,0 (referansta alttaki en parlak). Besleme eğrisi
+(yaklaşmada 0,8, spagettileşmeyle 1,0) ve yutumdan sonra mor kalıntı çarpanı (1 + 0,8·morluk, ×1,8) Doppler'den sonra
+gelir; 1'i aşan pay toplamalı kalıntı geçişinde çizilir. Disk ve yayların 2,5 kat kalın, soluk (alfa 0,3) parlama kopyası.
+Yutma göğü neredeyse siyah (`#0A0510`). Gölge tam siyah, arkadaki yıldız, nebula ve pulsarı siler. Gölge çevresinde
+2,5 R içinde merceklenmiş yıldız alanı (Einstein yarıçapı 1,45 R). Spagetti: pulsardan diske 3B kıvrımlı tüp (16 kesit) ve
+diske akan kuyruk. Yutumdan sonra mor kalıntı sönüme kadar besleme %95 × 1,8 parlaklıkta. Pulsar yolundaki doğuşta
+kızıl cüce küresi ×(1 + 1,5·(1 − p)) şişkin doğar (doğuşta ×2,5, PL-41). Parlamanın altındaki silüet neredeyse siyah
+ve tam opak; ufuk korları %85 alfayla.
 
 | Kademe | Pulsar dörtgen (üst sınır) | Kara delik dörtgen (en kötü kare) | Ölçülen (yutma, pulsar + kara delik) | Disk dilimi | Mercek yıldızı | Plazma |
 |---|---|---|---|---|---|---|
