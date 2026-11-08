@@ -469,7 +469,12 @@ parçacık gitmez.** Alev (4 `FLAME`) ve kar (6 `SNOWFLAKE`) parçacıkları yal
 doğan 8×8 sprite birinci şahısta 32–75 px'lik bloklu turuncu/beyaz leke oluyordu (pulsar `karadelik_spagetti` karesinde koşu
 11'de 30 149 px; hayatta kalma oyuncusu pulsarda ve buzulda aynı lekeyi görürdü). Oyuncunun kendisi sıcaklığı HUD, vinyet ve
 hasarla okur (S-10, S-11). Kanıt: dal GameTest 144/144 (`.vibe/kanit/pulsar-2/gametest-8.log`), görsel koşu 13'te kara delik
-karelerinde leke 0 px; entegrasyonda filtresiz kapı (K-E66).
+karelerinde leke 0 px; entegrasyonda filtresiz kapı (K-E66). **PL-45 (`0d8e98d`, entegrasyon `002afc7`; inceleme tur 4 Pi1, Pi2):**
+oyuncunun kendisi için istemci parçacığı, durum paketindeki kademe hasarlıyken (`DONUYOR`/`YANIYOR`) ve kamera birinci şahıs
+değilken saniyede bir üretir (`IstemciSicaklik`; sunucuyla aynı: alev 4 / kar tanesi 6, saçılım 0,3 / 0,5 / 0,3, hız 0,01;
+duraklatılmış oyunda ve izleyicide yok): üçüncü şahısta kendi alevini/kar tanesini görür, birinci şahısta leke yok. Sunucu
+kodu değişmedi. GameTest `hasarParcacigiKendisineGitmezYanindakineGider` (batch `sicaklik_hasar`: vücut 95 oyuncunun kanalında
+`ClientboundLevelParticlesPacket` 0, 3 blok yanındaki nötr oyuncuda `FLAME` ≥ 1).
 
 **S-09 Yavaşlama hareket hızı değiştiricisi.** `MOVEMENT_SPEED` üzerinde sabit UUID'li geçici `MULTIPLY_TOTAL` değiştirici; soğuk
 eşiğinden (−30) ölçek ucuna %0→%50. Slowness efekti kullanılmadı (ikon/parçacık görünür, süt ile silinir, süre yönetimi ister).
@@ -6065,7 +6070,7 @@ işaretidir, tel biçimi aynı; tarif-2 paket değiştirmedi. Uyumsuz istemci el
 
 **K-E66 Pulsar zinciri: 15 gün pulsar, kara delik yutması, buzul kıyamet, eski güneşin dönüşü; 3B ve ses (kullanıcı isteği:
 "pulsar yetersiz"; şef kararları, 2026-11-08; dal `is/pulsar-2` `b0a8878`, entegrasyon `be5ec37`).** Ayrıntı `.vibe/kararlar/pulsar-2.md`
-PL-1…PL-41. **Zincir** (`gokyuzu.PulsarSureci`, süreç kimliği `pulsar`; saf kurallar `gokyuzu.mantik.PulsarZinciri`): PULSAR
+PL-1…PL-45. **Zincir** (`gokyuzu.PulsarSureci`, süreç kimliği `pulsar`; saf kurallar `gokyuzu.mantik.PulsarZinciri`): PULSAR
 (`gokyuzu.pulsarGun` 15 oyun günü, ilk `pulsarIsinmaGun` 1 gün ısınma) → tek yeni evre `KARADELIK_YUTMA` (90 sn, doğal geçişte gündüz
 penceresi [3000, 7200), en çok bir gün bekler; 55. sn'de tek seferlik patlama sesi ve sarsıntı) → GUNESSIZ buzul kıyamet
 (`pulsarSonrasiGunessizGun` 10 gün + ilk şafak) → KIZIL_CUCE doğuşu → NORMAL (eski güneş). Buzul ve doğuş mevcut evrelerdir,
@@ -6097,7 +6102,7 @@ karesi 65. sn ve mor kalıntı + ufuk korları, buzulda göl + tipi ×4 + koyu g
 PL-42 Pg2 disk kazancı Doppler'den önce ve kırpılmış (min(1, a · 3,5) · Doppler; yaklaşan 1, uzaklaşan ×0,3; doyma geçişi kalktı),
 soluk dokular (doygunluk ≤ 0,3); Pg3 KURAL duraklamasında yutma koreografisi donar (`DonemPaketi.BAYRAK_DURAKLATILDI` 8,
 `PulsarSureci.durdur` ilerlemeyi durma saniyesine yazar, istemci `PulsarZinciri.duraklamaSaniyesi`); Pg4 dörtgen ölçümü Ultra
-kademede ayrı karede (`karadelik_ultra`): 2 736 + 3 016 = 5 752 ≤ 6 000; Pg5 kalıntı nebulası kararı saf
+kademede ayrı karede (`karadelik_ultra`): pulsar 2 736 ≤ 6 000, kara delik 3 016 ≤ 6 000 (pay başına); Pg5 kalıntı nebulası kararı saf
 `GokyuzuEgrileri.kalintiGecisi`/`oncekiYol` (eski güneşe dönüşte kalıntı belirmez); otomasyon vanilla bulutları kapatır (yalnız
 `-Potomasyon`). Görsel koşu 8 (ana makine): `karadelik_mercek` Doppler oranı 2,24 (ölçüt ≥ 2,0), disk doygunluğu 0,156,
 benzerlik 3,00; `karadelik_spagetti` korku 3,00. **İnceleme 3, PL-43 (`0c36023`, entegrasyon `01fd1fe`; yalnız `KaraDelik3B` ve tasarım notu):** Ph1 disk köşesinin parlaklığı
@@ -6118,11 +6123,11 @@ görüntü 1,12 (`TEPE_ALT`; 1'i aşan pay kalıntı geçişinde, Doppler çarpa
 doygunluk 0,161, orta sütun tepesi 0,89 / 0,95, gölgenin üst yarısı L 0, karanlık kalıntı parlak pikseli 10 758 (≥ koşu 7'nin
 10 042); mercek okunurluk 3,00 / benzerlik 3,00, spagetti korku 3,00, kontrol `pulsar_buyuk` 3,00; bütün PL-44 ölçütleri tuttu.
 Spagetti karesindeki turuncu leke pulsar değil sıcaklık parçacığıydı: hasarlı sıcaklık kademesinde oyuncunun kendisine giden
-`FLAME`/`SNOWFLAKE` (S-08 rev.: kendi ekranına parçacık gitmez; `sicaklik/` değişti, kapı filtresiz). **Bilinen sınırlar:**
+`FLAME`/`SNOWFLAKE` (S-08 rev.: kendi ekranına parçacık gitmez; PL-45 `0d8e98d`: üçüncü şahısta istemci kendi parçacığını üretir; `sicaklik/` değişti, kapı filtresiz). **Bilinen sınırlar:**
 pc2 kare koşularında FPS 15–19 (K-E29 b, bilgi; ana makine koşu 6 en düşük 29); üç kare değerlendirici model ölçütünün (PL-39,
 ≥ 3) altında: `karadelik_karanlik` (korku 2,67, koşu 13), `gunessiz_buz` (2,00) ve `kizil_cuce_dogus` (2,00; koşu 7, 3 örnek);
 referansla çift karşılaştırma bilgi (koşu 13'e karşı koşu 7: mercek 0/6, spagetti 2/6, karanlık 4/6); yeni deneme yok, kullanıcı
-oyunda karar verir; yutma parlaması (1,5 sn tepe) `pulsarTitresim`'le ölçeklenmez. Kanıt: son kapı `6f1d35b` (pulsar-2 `931cdd0` birleşmesi; kuyruktan, ana makine, pc2 erişilemez): `runData` `1108-090907967-0c` fark yok (written 0), `compileJava` `1108-090908059-41` BUILD SUCCESSFUL (runData derlemişti, UP-TO-DATE), JUnit 722/0 `1108-090908147-ad` (`test @3a937c0661cd`), filtresiz GameTest 274/274 `1108-090908235-9d` (`FILTRE=yok`, `gametest @fa53fbfa8f77`, protokol 8, en büyük batch 7; iki `/ERROR]` kasıtlı deprem testleri), N19 245/245 fark 0; pano `pano-7.txt`.
+oyunda karar verir; yutma parlaması (1,5 sn tepe) `pulsarTitresim`'le ölçeklenmez. Kanıt: son kapı `002afc7` (pulsar-2 `0d8e98d` PL-45 birleşmesi; kuyruktan, ana makine, pc2 erişilemez): `runData` `1108-092158365-c9` fark yok (written 0), `compileJava` `1108-092158463-8b` BUILD SUCCESSFUL (UP-TO-DATE), JUnit 722/0 `1108-092158563-11` (`test @04189671f2ed`), filtresiz GameTest 275/275 `1108-092158681-a2` (`FILTRE=yok`, `gametest @9eba541c6d95`, protokol 8, en büyük batch 7; yeni `hasarParcacigiKendisineGitmezYanindakineGider` dahil), N19 245/245 fark 0; pano `pano-8.txt` (önceki `6f1d35b`: JUnit 722/0, filtresiz 274/274, `pano-7.txt`).
 
 ## Açık noktalar (Faz 2b)
 

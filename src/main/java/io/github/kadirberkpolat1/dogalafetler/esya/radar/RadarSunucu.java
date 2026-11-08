@@ -31,7 +31,8 @@ import net.minecraftforge.fml.common.Mod;
  * yan elinde tutan her oyuncu için durumu hesaplar ve önceki gönderilenden farklıysa yalnız o oyuncuya gönderir; radarı
  * bırakan oyuncuya tek {@link RadarPaketi#YOK} gider, radarı olmayana hiçbir şey gitmez.
  *
- * <p>Kaynak çekirdektir: {@code aktifAfetler()} (ON_UYARI dahil; birden çoksa oyuncunun gördüğü en yakını), {@code normalOnUyariBasladi()}, korumalı {@code
+ * <p>Kaynak çekirdektir: {@code aktifAfetler()} (ON_UYARI dahil; birden çoksa oyuncunun gördüğü bölgesel afet önce (en
+ * yakını), yoksa küresel afet (önce başlayanı); {@link #izAfeti}), {@code normalOnUyariBasladi()}, korumalı {@code
  * kalanOku}/{@code etkiAlani} (çekirdek §1: {@code asamaKalanTick()}/{@code etkiAlani()} doğrudan çağrılmaz) ve
  * {@code DunyaDonemi.sonAfetler()}. Hareketli afetin güncel merkezi her saniye etki alanından okunur; Gelişmiş radarın
  * hareket yönü bu izden çıkar.
