@@ -342,6 +342,7 @@ public final class PulsarSureci implements DonemSureci {
 
     /** Buzul kıyamet: süre dolunca kızıl cüce ilk şafakta (gün döngüsü kapalıysa hemen) doğar. */
     private static void buzulTick(ServerLevel ust, DunyaDonemi donem, long simdi, long oncekiGunSaati, long gunSaati) {
+        PulsarEtkileri.buzul(ust.getServer());
         long bas = PulsarYolu.gunessizBaslangic(donem);
         int gun = GokyuzuAyarlari.pulsarSonrasiGunessizGun();
         donem.evreIlerlemesiAyarla(PulsarZinciri.ilerleme(bas, simdi, gun));

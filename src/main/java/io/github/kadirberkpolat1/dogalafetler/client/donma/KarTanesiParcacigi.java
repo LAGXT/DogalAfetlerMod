@@ -69,7 +69,8 @@ final class KarTanesiParcacigi extends TextureSheetParticle {
             salinimHizi = 0.10F + random.nextFloat() * 0.15F;
             salinimGenligi = 0.02F + random.nextFloat() * 0.02F;
             donmeHizi = (random.nextFloat() - 0.5F) * 0.1F;
-            ruzgarPayi *= KAR_RUZGAR_KATI;
+            ruzgarPayi *= KAR_RUZGAR_KATI
+                    * (DonmaIstemciEfektleri.tipi() ? DonmaIstemciEfektleri.TIPI_RUZGAR_KATI : 1.0);
             tamAlfa = 0.85F + random.nextFloat() * 0.15F;
             int zemin = level.getHeight(Heightmap.Types.MOTION_BLOCKING, Mth.floor(x), Mth.floor(z));
             lifetime = Math.min(EN_UZUN_OMUR, (int) (Math.max(0.0, y - zemin) / ucHizi) + 40);

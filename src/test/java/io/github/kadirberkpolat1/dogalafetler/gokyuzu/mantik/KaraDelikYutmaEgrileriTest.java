@@ -43,7 +43,9 @@ class KaraDelikYutmaEgrileriTest {
             assertTrue(c <= onceki, "uzaklaşırken küçülür");
             onceki = c;
         }
-        assertTrue(KaraDelikYutmaEgrileri.karaDelikCapi(90f) < 2f);
+        assertEquals(2f, KaraDelikYutmaEgrileri.karaDelikCapi(90f), 1e-4f, "90 sn'de 2°");
+        assertTrue(KaraDelikYutmaEgrileri.karaDelikCapi(72f) >= 8f,
+                "72 sn'de hâlâ büyük: " + KaraDelikYutmaEgrileri.karaDelikCapi(72f));
         assertEquals(0f, KaraDelikYutmaEgrileri.karaDelikAlfa(0f), 1e-6f);
         assertEquals(1f, KaraDelikYutmaEgrileri.karaDelikAlfa(30f), 1e-6f);
         assertEquals(1f, KaraDelikYutmaEgrileri.karaDelikAlfa(70f), 1e-6f);
@@ -107,5 +109,36 @@ class KaraDelikYutmaEgrileriTest {
         assertTrue(KaraDelikYutmaEgrileri.diskParlakligi(50f) > KaraDelikYutmaEgrileri.diskParlakligi(10f),
                 "pulsar maddesiyle disk parlar");
         assertEquals(0f, KaraDelikYutmaEgrileri.diskParlakligi(90f), 1e-6f);
+    }
+
+    @Test
+    void ortuSiluetIcinIner() {
+        assertEquals(0f, KaraDelikYutmaEgrileri.ekranOrtusu(PARLAMA - 0.1f), 0f);
+        assertEquals(KaraDelikYutmaEgrileri.ORTU_TEPE, KaraDelikYutmaEgrileri.ekranOrtusu(PARLAMA + 0.2f), 1e-6f,
+                "0,3 sn tepe");
+        float kare = KaraDelikYutmaEgrileri.ekranOrtusu(PARLAMA + 0.6f);
+        assertTrue(kare > 0.4f && kare < KaraDelikYutmaEgrileri.ORTU_TEPE, "parlama karesinde örtü inişte: " + kare);
+        assertEquals(KaraDelikYutmaEgrileri.ORTU_TABAN, KaraDelikYutmaEgrileri.ekranOrtusu(PARLAMA + 1.5f), 1e-4f);
+        float onceki = KaraDelikYutmaEgrileri.ORTU_TEPE;
+        for (float x = 0.15f; x < 5f; x += 0.05f) {
+            float o = KaraDelikYutmaEgrileri.ekranOrtusu(PARLAMA + x);
+            assertTrue(o <= onceki + 1e-6f && o >= 0f, "örtü iner: " + x);
+            onceki = o;
+        }
+        assertEquals(0f, KaraDelikYutmaEgrileri.ekranOrtusu(60f), 0f);
+    }
+
+    @Test
+    void yutumSonrasiMercekKorVeKiragi() {
+        assertEquals(1f, KaraDelikYutmaEgrileri.merceklenme(72f), 1e-6f, "72 sn'de mercek tam");
+        assertEquals(0f, KaraDelikYutmaEgrileri.mercekYaylari(50f), 0f, "pulsar yutulmadan yay yok");
+        assertEquals(1f, KaraDelikYutmaEgrileri.mercekYaylari(72f), 1e-6f);
+        assertEquals(0f, KaraDelikYutmaEgrileri.korUfku(50f), 0f);
+        assertEquals(1f, KaraDelikYutmaEgrileri.korUfku(72f), 0f);
+        assertEquals(1f, KaraDelikYutmaEgrileri.kalintiMorlugu(72f), 0f);
+        assertEquals(0f, KaraDelikYutmaEgrileri.kiragi(PARLAMA), 0f);
+        float k = KaraDelikYutmaEgrileri.kiragi(72f);
+        assertTrue(k > 0.1f && k < KaraDelikYutmaEgrileri.KIRAGI_ILK, "ilk kırağı: " + k);
+        assertEquals(KaraDelikYutmaEgrileri.KIRAGI_ILK, KaraDelikYutmaEgrileri.kiragi(SON), 1e-6f);
     }
 }

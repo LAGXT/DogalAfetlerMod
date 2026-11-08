@@ -38,6 +38,9 @@ final class GokyuzuRenkleri {
     private static final int KD_SIYAH_SIS = 0x020104;
     private static final int KD_PARLAMA_GOK = 0xE8DAFF;
     private static final int KD_PARLAMA_SIS = 0xD8C8FF;
+    /** Pulsar yolundaki buzul kıyamet: koyu çelik mavisi gök, yakın beyaz tipi sisi (PL-27). */
+    private static final int BUZUL_GOK = 0x1E2A38;
+    private static final int BUZUL_SIS = 0xC4CCD6;
     private static final float[] PULSAR_ISIK_TAM = {1.1f, 1.3f, 0.72f, 0.5f};
     private static final float[] KD_ISIK_MOR = {0.6f, 0.9f, 0.7f, 1.2f};
     private static final float[] GUNESSIZ_ISIK = {0.35f, 0.75f, 0.85f, 1.15f};
@@ -61,7 +64,8 @@ final class GokyuzuRenkleri {
                 + 0.25f * GokyuzuEgrileri.supernovaFlas(saniye), 0f, 1f);
     }
 
-    private static float[] tekGok(GunesEvresi evre, float p, float saniye, boolean ay, float[] v, float gun, float kc) {
+    private static float[] tekGok(GunesEvresi evre, float p, float saniye, boolean ay, float[] v, float gun, float kc,
+            boolean yol) {
         return switch (evre) {
             case NORMAL -> ay ? v : GokyuzuEgrileri.karistir(v, GokyuzuEgrileri.rgb(GECE_AYSIZ), (1f - gun) * 0.8f);
             case BUYUYEN -> {
@@ -71,7 +75,7 @@ final class GokyuzuRenkleri {
                 yield ay ? r : GokyuzuEgrileri.karistir(r, GokyuzuEgrileri.rgb(GECE_AYSIZ), (1f - gun) * 0.8f);
             }
             case SUPERNOVA -> GokyuzuEgrileri.karistir(SN_KARANLIK_GOK, SN_PARLAK_GOK, supernovaAydinlatma(p, saniye, gun));
-            case GUNESSIZ -> GokyuzuEgrileri.rgb(GUNESSIZ_GOK);
+            case GUNESSIZ -> GokyuzuEgrileri.rgb(yol ? BUZUL_GOK : GUNESSIZ_GOK);
             case KIZIL_CUCE -> GokyuzuEgrileri.karistir(v, GokyuzuEgrileri.karistir(KC_GECE_GOK, KC_GUNDUZ_GOK, gun), kc);
             case PULSAR -> pulsarRengi(PULSAR_GECE_GOK, PULSAR_GUNDUZ_GOK, GUNESSIZ_GOK, p, gun);
             case KARADELIK_YUTMA -> yutmaRengi(pulsarRengi(PULSAR_GECE_GOK, PULSAR_GUNDUZ_GOK, GUNESSIZ_GOK, 1f, gun),
@@ -92,7 +96,8 @@ final class GokyuzuRenkleri {
         return GokyuzuEgrileri.karistir(r, GokyuzuEgrileri.rgb(parlama), 0.6f * KaraDelikYutmaEgrileri.parlama(s));
     }
 
-    private static float[] tekSis(GunesEvresi evre, float p, float saniye, boolean ay, float[] v, float gun, float kc) {
+    private static float[] tekSis(GunesEvresi evre, float p, float saniye, boolean ay, float[] v, float gun, float kc,
+            boolean yol) {
         return switch (evre) {
             case NORMAL -> ay ? v : GokyuzuEgrileri.karistir(v, GokyuzuEgrileri.rgb(GECE_AYSIZ), (1f - gun) * 0.6f);
             case BUYUYEN -> {
@@ -101,7 +106,7 @@ final class GokyuzuRenkleri {
                 yield GokyuzuEgrileri.karistir(v, new float[] {b[0] * k, b[1] * k, b[2] * k}, p * gun * 0.7f);
             }
             case SUPERNOVA -> GokyuzuEgrileri.karistir(SN_KARANLIK_SIS, SN_PARLAK_SIS, supernovaAydinlatma(p, saniye, gun));
-            case GUNESSIZ -> GokyuzuEgrileri.rgb(GUNESSIZ_SIS);
+            case GUNESSIZ -> GokyuzuEgrileri.rgb(yol ? BUZUL_SIS : GUNESSIZ_SIS);
             case KIZIL_CUCE -> GokyuzuEgrileri.karistir(v, GokyuzuEgrileri.karistir(KC_GECE_SIS, KC_GUNDUZ_SIS, gun), kc);
             case PULSAR -> pulsarRengi(PULSAR_GECE_SIS, PULSAR_GUNDUZ_SIS, GUNESSIZ_SIS, p, gun);
             case KARADELIK_YUTMA -> yutmaRengi(pulsarRengi(PULSAR_GECE_SIS, PULSAR_GUNDUZ_SIS, GUNESSIZ_SIS, 1f, gun),
@@ -110,20 +115,20 @@ final class GokyuzuRenkleri {
     }
 
     static float[] gokRengi(IstemciGokyuzu.Gorunum g, float[] vanilla, float gun) {
-        float[] yeni = tekGok(g.evre(), g.ilerleme(), g.saniye(), g.ayVar(), vanilla, gun, g.renkGucu());
+        float[] yeni = tekGok(g.evre(), g.ilerleme(), g.saniye(), g.ayVar(), vanilla, gun, g.renkGucu(), g.pulsarYolu());
         if (g.onceki() == null || g.gecis() >= 1f) {
             return yeni;
         }
-        float[] eski = tekGok(g.onceki(), 1f, 1e6f, g.ayVar(), vanilla, gun, g.renkGucu());
+        float[] eski = tekGok(g.onceki(), 1f, 1e6f, g.ayVar(), vanilla, gun, g.renkGucu(), g.pulsarYolu());
         return GokyuzuEgrileri.karistir(eski, yeni, g.gecis());
     }
 
     static float[] sisRengi(IstemciGokyuzu.Gorunum g, float[] vanilla, float gun) {
-        float[] yeni = tekSis(g.evre(), g.ilerleme(), g.saniye(), g.ayVar(), vanilla, gun, g.renkGucu());
+        float[] yeni = tekSis(g.evre(), g.ilerleme(), g.saniye(), g.ayVar(), vanilla, gun, g.renkGucu(), g.pulsarYolu());
         if (g.onceki() == null || g.gecis() >= 1f) {
             return yeni;
         }
-        float[] eski = tekSis(g.onceki(), 1f, 1e6f, g.ayVar(), vanilla, gun, g.renkGucu());
+        float[] eski = tekSis(g.onceki(), 1f, 1e6f, g.ayVar(), vanilla, gun, g.renkGucu(), g.pulsarYolu());
         return GokyuzuEgrileri.karistir(eski, yeni, g.gecis());
     }
 

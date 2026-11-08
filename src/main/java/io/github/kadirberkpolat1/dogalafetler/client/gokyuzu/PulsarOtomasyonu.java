@@ -7,6 +7,7 @@ import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciDonem;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
+import io.github.kadirberkpolat1.dogalafetler.gokyuzu.PulsarKayitlari;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.KaraDelikYutmaEgrileri;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.PulsarZinciri;
 import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorAPI;
@@ -27,6 +28,8 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.Biomes;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
@@ -62,9 +65,21 @@ public final class PulsarOtomasyonu {
     private static final float GECE_PITCH = -5f;
     private static final float YAKLASMA_SN = 12f;
     private static final float SPAGETTI_SN = 40f;
-    private static final float PARLAMA_SN = PulsarZinciri.YUTMA_PARLAMA_SN + KaraDelikYutmaEgrileri.PARLAMA_TEPE_SN;
-    /** Yutumdan sonraki karanlık: kara delik hâlâ büyük (~13°) ve diski parlıyor. */
-    private static final float KARANLIK_SN = 66f;
+    /** Parlama karesi örtünün inişinde (parlamanın 0,6. sn'si): kara deliğin koyu silüeti okunur. */
+    private static final float PARLAMA_SN = PulsarZinciri.YUTMA_PARLAMA_SN + 0.6f;
+    /** Yutumdan sonraki karanlık: kara delik ~8° (yavaş uzaklaşma), mercek yayları, ufukta kor, ilk kırağı. */
+    private static final float KARANLIK_SN = 72f;
+    /**
+     * Karanlık karesinin gün saati: kara delik ~25° yükseklikte, ufuk kadrajın altında (doğal yutma ~6840'ta, PL-5
+     * penceresinin içinde başlamış gibi).
+     */
+    private static final long KARANLIK_SAATI = 8280L;
+    /** Buzul karesinden önce donmanın göle ve kara yetişme süresi (tick). */
+    private static final int BUZUL_TICK = 2400;
+    /** Donacak gölün zemin kamerasından uzaklığı, yarı genişliği ve üstünde temizlenen hava (blok). */
+    private static final int GOL_UZAKLIGI = 16;
+    private static final int GOL_YARI = 5;
+    private static final int GOL_TEMIZLIK = 12;
     private static final float DOGUS_ILERLEME = 0.3f;
     private static final float DONUS_SN = 20f;
 
@@ -99,9 +114,13 @@ public final class PulsarOtomasyonu {
     private static volatile Kamera zeminKamerasi;
     private static volatile BlockPos ormanMerkezi;
     private static volatile int ucanMeteor;
-    /** Yutma kareleri boyunca kamera her istemci tick'inde pulsar ile kara deliğin ortasına çevrilir. */
+    /**
+     * Yutma kareleri boyunca kamera her istemci tick'inde güneş yolunda {@code kadrajAcisi} öteye çevrilir: pulsar ile kara
+     * deliğin ortası, karanlık karesinde kara deliğin kendisi.
+     */
     private static volatile boolean yutmaKadraji;
-    private static boolean kadrajYazildi;
+    private static volatile float kadrajAcisi = KaraDelikYutmaEgrileri.KARADELIK_ACI / 2f;
+    private static float yazilanKadraj = Float.NaN;
 
     private static final List<Adim> ADIMLAR = List.of(
             new Adim("pulsar doğuşu ve tam güç (gündüz)", s -> {
@@ -145,20 +164,23 @@ public final class PulsarOtomasyonu {
             new Adim("yutma parlaması", s -> {
             }, () -> evre(GunesEvresi.KARADELIK_YUTMA) && evreSaniyesi() >= PARLAMA_SN, "karadelik_parlama", 1600,
                     PARLAMA_SN, null),
-            new Adim("karanlık", s -> {
+            new Adim("karanlık (kamera kara deliğe)", s -> {
+                komut(s, "time set " + KARANLIK_SAATI);
+                kadrajAcisi = KaraDelikYutmaEgrileri.KARADELIK_ACI;
             }, () -> evre(GunesEvresi.KARADELIK_YUTMA) && evreSaniyesi() >= KARANLIK_SN, "karadelik_karanlik", 2200,
                     KARANLIK_SN, null),
             new Adim("yutma sonu (hız 50)", s -> {
                 yutmaKadraji = false;
                 komut(s, "dogalafet hiz 50");
             }, () -> evre(GunesEvresi.GUNESSIZ), null, 400),
-            new Adim("güneşsiz buzul (tipi)", s -> {
+            new Adim("güneşsiz buzul (tipi, donan göl, karda kül; 120 sn)", s -> {
+                buzulSahnesi(s);
                 komut(s, "dogalafet hiz 1", "time set 6000", "dogalafet donma 100", "weather rain");
                 kamera(s, zeminKamerasi);
-            }, () -> sayac >= 600 && evre(GunesEvresi.GUNESSIZ), "gunessiz_buz", 800),
+            }, () -> sayac >= BUZUL_TICK && evre(GunesEvresi.GUNESSIZ), "gunessiz_buz", BUZUL_TICK + 200),
             new Adim("kızıl cüce doğuşu (şafak, hız 4)", s -> {
                 komut(s, "weather clear", "time set 23600", "dogalafet asama ileri gunessiz", "dogalafet hiz 4");
-                kamera(s, -90f, -8f);
+                gunesBak(s);
             }, () -> evre(GunesEvresi.KIZIL_CUCE) && donem().evreIlerlemesi() >= DOGUS_ILERLEME, "kizil_cuce_dogus", 900),
             new Adim("eski güneş döndü", s -> {
                 komut(s, "dogalafet hiz 1", "dogalafet asama ileri kizilcuce", "time set 3000");
@@ -366,21 +388,22 @@ public final class PulsarOtomasyonu {
     }
 
     /**
-     * İstemci oyuncusunu (kamera) güneş yolunda pulsar ile yutan kara deliğin ortasına çevirir (yön çizimle aynı hesaptan,
+     * İstemci oyuncusunu (kamera) güneş yolunda pulsardan {@code kadrajAcisi} öteye çevirir (yön çizimle aynı hesaptan,
      * {@link IstemciGokyuzu#gunesYoluYonu}); ara kare yumuşatması olmasın diye önceki açı da.
      */
     private static void yutmayaCevir(Minecraft mc) {
-        org.joml.Vector3f y = IstemciGokyuzu.gunesYoluYonu(KaraDelikYutmaEgrileri.KARADELIK_ACI / 2f, mc.level, 1f);
+        float aci = kadrajAcisi;
+        org.joml.Vector3f y = IstemciGokyuzu.gunesYoluYonu(aci, mc.level, 1f);
         float yaw = (float) Math.toDegrees(Math.atan2(-y.x, y.z));
         float pitch = (float) -Math.toDegrees(Math.asin(Mth.clamp(y.y, -1f, 1f)));
         mc.player.setYRot(yaw);
         mc.player.setXRot(pitch);
         mc.player.yRotO = yaw;
         mc.player.xRotO = pitch;
-        if (!kadrajYazildi) {
-            kadrajYazildi = true;
-            DogalAfetler.LOGGER.info(ON + "yutma kadrajı: pulsar ile kara deliğin ortası ({}° öte), yaw {}, pitch {} (takip)",
-                    KaraDelikYutmaEgrileri.KARADELIK_ACI / 2f, String.format(Locale.ROOT, "%.1f", yaw),
+        if (aci != yazilanKadraj) {
+            yazilanKadraj = aci;
+            DogalAfetler.LOGGER.info(ON + "yutma kadrajı: güneş yolunda {}° öte (kara delik {}°), yaw {}, pitch {} (takip)",
+                    aci, KaraDelikYutmaEgrileri.KARADELIK_ACI, String.format(Locale.ROOT, "%.1f", yaw),
                     String.format(Locale.ROOT, "%.1f", pitch));
         }
     }
@@ -416,6 +439,45 @@ public final class PulsarOtomasyonu {
                         : bulunan.getSecond().unwrapKey().map(k -> k.location().toString()).orElse("?"),
                 kameraKonumu, zeminKamerasi);
         sunucuHazir = true;
+    }
+
+    /**
+     * Zemin kamerasının {@value #GOL_UZAKLIGI} blok önünde bir blok gömük sığ göl ve kül bloğundan kıyı: göl donar, kıyının
+     * karlı üstü ve kül yanları (kül → kar tablosu, PL-16) kareye girer. Komşu güncellemesiz yazılır (su akmaz).
+     */
+    private static void buzulSahnesi(IntegratedServer s) {
+        ServerLevel level = s.overworld();
+        int cx = Mth.floor(zeminKamerasi.konum().x) + GOL_UZAKLIGI;
+        int cz = Mth.floor(zeminKamerasi.konum().z);
+        int taban = Integer.MAX_VALUE;
+        for (int dx = -GOL_YARI - 1; dx <= GOL_YARI + 1; dx++) {
+            for (int dz = -GOL_YARI - 1; dz <= GOL_YARI + 1; dz++) {
+                taban = Math.min(taban, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, cx + dx, cz + dz));
+            }
+        }
+        int su = taban - 2;
+        BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
+        for (int dx = -GOL_YARI - 1; dx <= GOL_YARI + 1; dx++) {
+            for (int dz = -GOL_YARI - 1; dz <= GOL_YARI + 1; dz++) {
+                int x = cx + dx;
+                int z = cz + dz;
+                if (Math.abs(dx) > GOL_YARI || Math.abs(dz) > GOL_YARI) {
+                    int ust = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1;
+                    level.setBlock(p.set(x, ust, z), PulsarKayitlari.KUL_BLOGU.get().defaultBlockState(),
+                            Block.UPDATE_CLIENTS);
+                    continue;
+                }
+                for (int y = su + 1; y <= su + GOL_TEMIZLIK; y++) {
+                    level.setBlock(p.set(x, y, z), Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
+                }
+                if (level.getBlockState(p.set(x, su - 1, z)).isAir() || !level.getFluidState(p).isEmpty()) {
+                    level.setBlock(p, Blocks.STONE.defaultBlockState(), Block.UPDATE_CLIENTS);
+                }
+                level.setBlock(p.set(x, su, z), Blocks.WATER.defaultBlockState(), Block.UPDATE_CLIENTS);
+            }
+        }
+        DogalAfetler.LOGGER.info(ON + "buzul sahnesi: göl merkezi {} {} {}, {}x{}, kül bloğu kıyı", cx, su, cz,
+                2 * GOL_YARI + 1, 2 * GOL_YARI + 1);
     }
 
     /** Büyük meteor ormanın ortasına (kameranın {@value #UZAKLIK} blok önüne) düşer: izi kareye girer. */

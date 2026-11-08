@@ -3,6 +3,7 @@ package io.github.kadirberkpolat1.dogalafetler.gokyuzu;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.afet.gunes_patlamasi.GunesPatlamasiAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.afet.gunes_patlamasi.GunesPatlamasiSesleri;
+import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.KasirgaKayitlari;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import io.github.kadirberkpolat1.dogalafetler.core.PulsarYolu;
@@ -35,6 +36,9 @@ import net.minecraftforge.event.server.ServerStoppedEvent;
  */
 public final class PulsarEtkileri {
     static final String RUZGAR_KATMANI = "gokyuzu/pulsar";
+    /** Pulsar yolundaki buzul kıyametin tipi rüzgârı (kasırga rüzgârı döngüsü; donmanın kendi ortam katmanı yok). */
+    static final String BUZUL_KATMANI = "gokyuzu/buzul";
+    private static final float BUZUL_RUZGAR_DUZEYI = 0.55f;
     /** Yangın odağının merkezden uzaklığı (blok). */
     private static final int YANGIN_EN_YAKIN = 16;
     private static final int YANGIN_EN_UZAK = 96;
@@ -77,11 +81,22 @@ public final class PulsarEtkileri {
         }
     }
 
+    /** Pulsar yolundaki buzul kıyamet: tipi rüzgârı çalar (evre değişince, {@code sifirla} ve durdurmada {@link #bitir}). */
+    public static void buzul(MinecraftServer server) {
+        if (!OrtamSesi.aktifMi(BUZUL_KATMANI)) {
+            OrtamSesi.baslat(server, BUZUL_KATMANI, OrtamSesi.AFETSIZ, KasirgaKayitlari.RUZGAR, SoundSource.WEATHER,
+                    OrtamSesi.Yer.global(), HacimEgrisi.giris(200, BUZUL_RUZGAR_DUZEYI));
+        }
+    }
+
     /** Rüzgâr söner; pulsarın ateşleri yayılmadan yanıp biter, meteor yağmuru durur (uçanlar düşmeyi tamamlar). */
     public static void bitir(MinecraftServer server, DunyaDonemi donem, String neden) {
         boolean ruzgar = OrtamSesi.aktifMi(RUZGAR_KATMANI);
         if (ruzgar) {
             OrtamSesi.durdur(server, RUZGAR_KATMANI, 80);
+        }
+        if (OrtamSesi.aktifMi(BUZUL_KATMANI)) {
+            OrtamSesi.durdur(server, BUZUL_KATMANI, 80);
         }
         YanginKaynagi kaynak = kaynak(donem);
         int durdu = durdur(server, kaynak);

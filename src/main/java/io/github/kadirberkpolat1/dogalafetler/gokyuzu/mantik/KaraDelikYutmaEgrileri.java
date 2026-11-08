@@ -17,6 +17,17 @@ public final class KaraDelikYutmaEgrileri {
     static final float PARLAMA_TAU_SN = 0.9f;
     public static final float BASLANGIC_CAPI = 1.5f;
     public static final float EN_BUYUK_CAP = 20f;
+    /** Yutumdan sonra kara delik yavaş uzaklaşır: 90. sn'deki çap (72. sn'de hâlâ ~8°). */
+    public static final float SON_CAP = 2f;
+    /** Merceklenmenin tam güce çıktığı çap. */
+    static final float MERCEK_TAM_CAP = 8f;
+    /** Parlamanın tam ekran örtüsü (karışımlı): tepe, tepede kalış, iniş ve inişin sonu; altında silüet okunur. */
+    public static final float ORTU_TEPE = 0.5f;
+    static final float ORTU_TEPE_SN = 0.3f;
+    static final float ORTU_INIS_SN = 1.2f;
+    public static final float ORTU_TABAN = 0.15f;
+    /** Yutumdan sonra ekran kenarında ilk kırağının en çok gücü. */
+    public static final float KIRAGI_ILK = 0.45f;
     /** Kara deliğin güneş yolu boyunca pulsardan açısı (derece): ikisi aynı kadraja sığar. */
     public static final float KARADELIK_ACI = 40f;
     /** Pulsarın tamamen yutulduğu ve parlamanın bittiği saniye. */
@@ -41,7 +52,7 @@ public final class KaraDelikYutmaEgrileri {
             return EN_BUYUK_CAP;
         }
         float t = kenetle((s - YUTUM_SN) / (PulsarZinciri.YUTMA_SN - YUTUM_SN));
-        return EN_BUYUK_CAP / (1f + 12f * t * t);
+        return EN_BUYUK_CAP / (1f + (EN_BUYUK_CAP / SON_CAP - 1f) * t * t);
     }
 
     /** Kara deliğin örtücülüğü: ilk 1,5 sn'de belirir, uzaklaşmanın son üçte birinde söner. */
@@ -103,9 +114,31 @@ public final class KaraDelikYutmaEgrileri {
         return (float) ((Math.exp(-(x - PARLAMA_TEPE_SN) / PARLAMA_TAU_SN) - taban) / (1.0 - taban));
     }
 
+    /**
+     * Parlamanın tam ekran örtüsü 0–{@value #ORTU_TEPE}: {@value #PARLAMA_YUKSELIS_SN} sn'de tepe,
+     * {@value #ORTU_TEPE_SN} sn'ye dek tutar, sonraki {@value #ORTU_INIS_SN} sn'de {@value #ORTU_TABAN}'e iner, sonra parlamayla söner.
+     */
+    public static float ekranOrtusu(float s) {
+        float x = s - PulsarZinciri.YUTMA_PARLAMA_SN;
+        if (x < 0f || x >= PARLAMA_SURE_SN) {
+            return 0f;
+        }
+        if (x < PARLAMA_YUKSELIS_SN) {
+            return ORTU_TEPE * x / PARLAMA_YUKSELIS_SN;
+        }
+        if (x < ORTU_TEPE_SN) {
+            return ORTU_TEPE;
+        }
+        float inisSonu = ORTU_TEPE_SN + ORTU_INIS_SN;
+        if (x < inisSonu) {
+            return ORTU_TEPE + (ORTU_TABAN - ORTU_TEPE) * yumusak(ORTU_TEPE_SN, inisSonu, x);
+        }
+        return ORTU_TABAN * parlama(s);
+    }
+
     /** Kütleçekim merceği gücü 0–1: çevre yıldız sönümü ve mercek halkası kara deliğin açısal çapıyla büyür. */
     public static float merceklenme(float s) {
-        return kenetle((karaDelikCapi(s) - BASLANGIC_CAPI) / (EN_BUYUK_CAP - BASLANGIC_CAPI)) * karaDelikAlfa(s);
+        return kenetle((karaDelikCapi(s) - BASLANGIC_CAPI) / (MERCEK_TAM_CAP - BASLANGIC_CAPI)) * karaDelikAlfa(s);
     }
 
     /** Foton halkasının ek parlaklığı: mercekle artar, parlamada tavan. */
@@ -142,6 +175,26 @@ public final class KaraDelikYutmaEgrileri {
     /** Kalıntı nebulasının kalan payı: çekim boyunca dağılır, yutumdan önce yok olur. */
     public static float kalinti(float s) {
         return 1f - yumusak(YAKLASMA_SN, YUTUM_SN - 2f, s);
+    }
+
+    /** Akresyon kalıntısının mora dönüşü: pulsarın maddesi bitince disk mor söner. */
+    public static float kalintiMorlugu(float s) {
+        return yumusak(YUTUM_SN - 2f, YUTUM_SN + 2f, s);
+    }
+
+    /** Kara deliğin arkasındaki yıldızların merceklenmiş yayları: pulsar yutulunca belirir, mercekle güçlenir. */
+    public static float mercekYaylari(float s) {
+        return yumusak(YUTUM_SN - 3f, YUTUM_SN, s) * merceklenme(s);
+    }
+
+    /** Ufukta külün kızıl korları: parlamadan sonra kararan gökte belirir. */
+    public static float korUfku(float s) {
+        return yumusak(PulsarZinciri.YUTMA_PARLAMA_SN + 1f, YUTUM_SN + 2f, s);
+    }
+
+    /** İlk kırağı vinyeti 0–{@value #KIRAGI_ILK}: soğuk yutumdan sonra ekran kenarından başlar. */
+    public static float kiragi(float s) {
+        return KIRAGI_ILK * yumusak(YUTUM_SN, PulsarZinciri.YUTMA_SN - 6f, s);
     }
 
     private static float kenetle(float x) {

@@ -15,6 +15,7 @@ import io.github.kadirberkpolat1.dogalafetler.config.EfektKalitesi;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.PulsarKayitlari;
+import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.GokyuzuEgrileri;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.KaraDelikYutmaEgrileri;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.PulsarEgrileri;
 import io.github.kadirberkpolat1.dogalafetler.network.DonemPaketi;
@@ -42,7 +43,8 @@ import org.joml.Vector3f;
 /**
  * Pulsar döneminin istemci efektleri (pulsar-2, PL-2/PL-4): kamera çevresinde göğe açık yerlere kül yağışı (yalnız
  * PULSAR ve blok hasarı açıkken), ufukta titreyen ısı dalgası şeridi (gök aşaması: arazi önüne geçer), güçle kısalan
- * görüş mesafesi ve kara delik parlamasının ekran örtüsü ile ışık haritası (sis rengi {@link GokyuzuRenkleri}'nde).
+ * görüş mesafesi, kara delik parlamasının ekran örtüsü ile ışık haritası, yutumdan sonra ufukta kor ve kenarlarda kırağı
+ * vinyeti, pulsar yolundaki buzulda yakın tipi sisi (sis rengi {@link GokyuzuRenkleri}'nde).
  * Durum yalnız {@link IstemciDonem} ve {@link IstemciGokyuzu}'nden; yeni paket yok, ekrana yazı yok (N6).
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
@@ -56,8 +58,16 @@ public final class PulsarIstemciEfektleri {
     private static float kulBirikimi;
     /** Işık haritasında parlamanın çektiği mor-beyaz. */
     private static final float[] PARLAMA_RENGI = {0.95f, 0.9f, 1f};
-    /** Parlamanın tam ekran örtüsü: tepede bile parlayan kara delik ve arazi silueti okunur kalır. */
-    private static final float EKRAN_ORTUSU = 0.5f;
+    /** Kenarlardan içeri büyüyen buz kristalleri (sıcaklık ekran efektinin dokusu; yeni doku yok). */
+    private static final ResourceLocation KIRAGI = DogalAfetler.konum("textures/misc/sicaklik_buz.png");
+    /** Kırağı vinyetinin donma %100'deki gücü (pulsar yolundaki buzul). */
+    static final float KIRAGI_TAM = 0.9f;
+    /** Buzul tipisinde görüş mesafesi ve sis başlangıcı çarpanları (yakın, beyaz sis). */
+    private static final float BUZUL_SIS_UZAK = 0.45f;
+    private static final float BUZUL_SIS_YAKIN = 0.1f;
+    /** Ufuk şeridinin rengi: pulsarda sıcak serap, yutumdan sonra külün korları. */
+    private static final float[] ISI_RENGI = {1f, 0.5f, 0.25f};
+    private static final float[] KOR_RENGI = {1f, 0.2f, 0.06f};
 
     private PulsarIstemciEfektleri() {
     }
@@ -92,6 +102,12 @@ public final class PulsarIstemciEfektleri {
 
     private static boolean pulsarda(ClientLevel level, DonemPaketi d) {
         return level != null && level.dimension() == Level.OVERWORLD && d.gunesEvresi() == GunesEvresi.PULSAR;
+    }
+
+    /** Pulsar yolundaki buzul kıyamet (GÜNEŞSİZ, eski güneş dönecek). */
+    private static boolean buzulda(ClientLevel level, DonemPaketi d) {
+        return level != null && level.dimension() == Level.OVERWORLD && d.gunesEvresi() == GunesEvresi.GUNESSIZ
+                && d.donusYolu();
     }
 
     private static float guc(float pt) {
@@ -136,23 +152,34 @@ public final class PulsarIstemciEfektleri {
         if (olay.getStage() == RenderLevelStageEvent.Stage.AFTER_SKY) {
             isiSeridi(olay);
         } else if (olay.getStage() == RenderLevelStageEvent.Stage.AFTER_LEVEL) {
-            parlamaOrtusu(olay.getPartialTick());
+            ekranOrtuleri(olay.getPartialTick());
         }
     }
 
     /**
-     * Ufkun 0–6° bandında kamera çevresinde halka: yatayda kayan, üst kenarı titreyen sıcak şerit (şadersiz serap; tek çizim,
-     * kademeye göre 8/12/16/24 dilim).
+     * Ufkun 0–6° bandında kamera çevresinde halka: yatayda kayan, üst kenarı titreyen şerit; pulsarda sıcak serap, yutumdan
+     * sonra karanlık ufukta külün kızıl korları (şadersiz; tek çizim, kademeye göre 8/12/16/24 dilim).
      */
     private static void isiSeridi(RenderLevelStageEvent olay) {
         Minecraft mc = Minecraft.getInstance();
         ClientLevel level = mc.level;
         float pt = olay.getPartialTick();
-        if (!pulsarda(level, IstemciDonem.durum()) || olay.getCamera().getFluidInCamera() != FogType.NONE) {
+        if (level == null || level.dimension() != Level.OVERWORLD || olay.getCamera().getFluidInCamera() != FogType.NONE) {
             return;
         }
-        float gun = GokyuzuRenkleri.gunIsigi(level.getTimeOfDay(pt));
-        float alfa = 0.35f * guc(pt) * (0.6f + 0.4f * gun) * (1f - 0.6f * level.getRainLevel(pt));
+        GunesEvresi evre = IstemciDonem.durum().gunesEvresi();
+        float alfa;
+        float[] renk;
+        if (evre == GunesEvresi.PULSAR) {
+            float gun = GokyuzuRenkleri.gunIsigi(level.getTimeOfDay(pt));
+            alfa = 0.35f * guc(pt) * (0.6f + 0.4f * gun) * (1f - 0.6f * level.getRainLevel(pt));
+            renk = ISI_RENGI;
+        } else if (evre == GunesEvresi.KARADELIK_YUTMA) {
+            alfa = 0.5f * KaraDelikYutmaEgrileri.korUfku(IstemciGokyuzu.gorunum(pt).saniye());
+            renk = KOR_RENGI;
+        } else {
+            return;
+        }
         if (alfa <= 0.003f) {
             return;
         }
@@ -178,7 +205,7 @@ public final class PulsarIstemciEfektleri {
                 float er = el * Mth.DEG_TO_RAD;
                 float yatay = 100f * Mth.cos(er);
                 b.vertex(m, Mth.sin(az) * yatay, 100f * Mth.sin(er), -Mth.cos(az) * yatay)
-                        .uv((float) s / n * 4f + kayma, ust ? 0f : 1f).color(1f, 0.5f, 0.25f, alfa).endVertex();
+                        .uv((float) s / n * 4f + kayma, ust ? 0f : 1f).color(renk[0], renk[1], renk[2], alfa).endVertex();
             }
         }
         BufferUploader.drawWithShader(b.end());
@@ -188,16 +215,43 @@ public final class PulsarIstemciEfektleri {
         RenderSystem.disableBlend();
     }
 
-    /** Kara delik parlaması: dünya çizimi bitince tam ekran mor-beyaz örtü (G2-4 kalıbı; GUI katmanı değil). */
-    private static void parlamaOrtusu(float pt) {
+    /**
+     * Dünya çizimi bitince tam ekran örtüler (G2-4 kalıbı; GUI katmanı değil, GUI gizliyken de çizilir): önce kenarlardan
+     * kırağı vinyeti, sonra kara delik parlamasının karışımlı (toplamalı değil) mor-beyaz örtüsü.
+     */
+    private static void ekranOrtuleri(float pt) {
         ClientLevel level = Minecraft.getInstance().level;
         if (level == null || level.dimension() != Level.OVERWORLD) {
             return;
         }
-        float guc = EKRAN_ORTUSU * parlama(IstemciGokyuzu.gorunum(pt));
-        if (guc <= 0.004f) {
-            return;
+        IstemciGokyuzu.Gorunum g = IstemciGokyuzu.gorunum(pt);
+        float kiragi = kiragi(IstemciDonem.durum(), g);
+        float ortu = g.evre() == GunesEvresi.KARADELIK_YUTMA ? KaraDelikYutmaEgrileri.ekranOrtusu(g.saniye()) : 0f;
+        if (kiragi > 0.004f) {
+            tamEkran(KIRAGI, 1f, 1f, 1f, kiragi);
         }
+        if (ortu > 0.004f) {
+            tamEkran(null, 0.93f, 0.86f, 1f, ortu);
+        }
+    }
+
+    /**
+     * Kırağı vinyeti 0–{@value #KIRAGI_TAM}: yutumdan sonra ilk soğuk, pulsar yolundaki buzulda donmayla tam, kızıl cüce
+     * doğuşunun ilk %15'inde söner. Normal süpernova yolunda yok.
+     */
+    static float kiragi(DonemPaketi d, IstemciGokyuzu.Gorunum g) {
+        float donma = Mth.clamp(d.donmaIlerlemesi() / 100f, 0f, 1f);
+        return switch (g.evre()) {
+            case KARADELIK_YUTMA -> KaraDelikYutmaEgrileri.kiragi(g.saniye());
+            case GUNESSIZ -> g.pulsarYolu() ? Mth.lerp(donma, KaraDelikYutmaEgrileri.KIRAGI_ILK, KIRAGI_TAM) : 0f;
+            case KIZIL_CUCE -> g.pulsarYolu()
+                    ? KIRAGI_TAM * donma * (1f - GokyuzuEgrileri.yumusak(0f, 0.15f, g.ilerleme())) : 0f;
+            default -> 0f;
+        };
+    }
+
+    /** Tam ekran kare, normal karışım: {@code doku} null ise düz renk, değilse doku ekranı kaplar. */
+    private static void tamEkran(ResourceLocation doku, float r, float g, float b, float a) {
         RenderSystem.backupProjectionMatrix();
         RenderSystem.setProjectionMatrix(new Matrix4f(), VertexSorting.ORTHOGRAPHIC_Z);
         PoseStack gorus = RenderSystem.getModelViewStack();
@@ -209,13 +263,23 @@ public final class PulsarIstemciEfektleri {
         RenderSystem.disableCull();
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
-        RenderSystem.setShader(GameRenderer::getPositionColorShader);
         BufferBuilder tampon = Tesselator.getInstance().getBuilder();
-        tampon.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
-        tampon.vertex(-1, -1, 0).color(0.93f, 0.86f, 1f, guc).endVertex();
-        tampon.vertex(1, -1, 0).color(0.93f, 0.86f, 1f, guc).endVertex();
-        tampon.vertex(1, 1, 0).color(0.93f, 0.86f, 1f, guc).endVertex();
-        tampon.vertex(-1, 1, 0).color(0.93f, 0.86f, 1f, guc).endVertex();
+        if (doku == null) {
+            RenderSystem.setShader(GameRenderer::getPositionColorShader);
+            tampon.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+            tampon.vertex(-1, -1, 0).color(r, g, b, a).endVertex();
+            tampon.vertex(1, -1, 0).color(r, g, b, a).endVertex();
+            tampon.vertex(1, 1, 0).color(r, g, b, a).endVertex();
+            tampon.vertex(-1, 1, 0).color(r, g, b, a).endVertex();
+        } else {
+            RenderSystem.setShader(GameRenderer::getPositionTexColorShader);
+            RenderSystem.setShaderTexture(0, doku);
+            tampon.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
+            tampon.vertex(-1, -1, 0).uv(0f, 1f).color(r, g, b, a).endVertex();
+            tampon.vertex(1, -1, 0).uv(1f, 1f).color(r, g, b, a).endVertex();
+            tampon.vertex(1, 1, 0).uv(1f, 0f).color(r, g, b, a).endVertex();
+            tampon.vertex(-1, 1, 0).uv(0f, 0f).color(r, g, b, a).endVertex();
+        }
         BufferUploader.drawWithShader(tampon.end());
         RenderSystem.disableBlend();
         RenderSystem.enableCull();
@@ -226,19 +290,30 @@ public final class PulsarIstemciEfektleri {
         RenderSystem.restoreProjectionMatrix();
     }
 
-    /** Pulsar döneminde görüş mesafesi güçle yarıya, sis başlangıcı yakına çekilir (Forge yalnız iptal edilen olayı uygular). */
+    /**
+     * Pulsar döneminde görüş mesafesi güçle yarıya, sis başlangıcı yakına çekilir; pulsar yolundaki buzulda tipi sisi yakın
+     * (Forge yalnız iptal edilen olayı uygular).
+     */
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void sis(ViewportEvent.RenderFog olay) {
-        if (olay.getMode() != FogRenderer.FogMode.FOG_TERRAIN || olay.getCamera().getFluidInCamera() != FogType.NONE
-                || !pulsarda(Minecraft.getInstance().level, IstemciDonem.durum())) {
+        if (olay.getMode() != FogRenderer.FogMode.FOG_TERRAIN || olay.getCamera().getFluidInCamera() != FogType.NONE) {
             return;
         }
-        float g = guc((float) olay.getPartialTick());
-        if (g <= 0f) {
+        ClientLevel level = Minecraft.getInstance().level;
+        DonemPaketi d = IstemciDonem.durum();
+        if (pulsarda(level, d)) {
+            float g = guc((float) olay.getPartialTick());
+            if (g <= 0f) {
+                return;
+            }
+            olay.scaleFarPlaneDistance(1f - 0.5f * g);
+            olay.scaleNearPlaneDistance(1f - 0.8f * g);
+        } else if (buzulda(level, d)) {
+            olay.scaleFarPlaneDistance(BUZUL_SIS_UZAK);
+            olay.scaleNearPlaneDistance(BUZUL_SIS_YAKIN);
+        } else {
             return;
         }
-        olay.scaleFarPlaneDistance(1f - 0.5f * g);
-        olay.scaleNearPlaneDistance(1f - 0.8f * g);
         olay.setCanceled(true);
     }
 

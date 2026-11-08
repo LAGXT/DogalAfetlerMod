@@ -157,6 +157,11 @@ final class GokyuzuCizici {
     private static final float FOTON_DOKU_R = 0.84f;
     /** Akresyon diskinin gök düzlemindeki eğimi (derece). */
     private static final float KD_EGIM = -16f;
+    /** Parlamada kara delik silüetinin rengi; Einstein halkasının disk dokusu yarıçapına oranı. */
+    private static final float[] SILUET = {0.07f, 0.03f, 0.12f};
+    private static final float EINSTEIN_HALKASI = 1.45f;
+    /** Pulsar yolundaki kızıl cüce doğuşunun ışık yayı: doğu ufkunda ±72° (ufkun %40'ı). */
+    private static final float DOGUS_YAYI_YARI = 72f;
     /** Titreşim ofsetleri; yalnız render thread'i yazar. */
     private static final float[] HIZLI = new float[2];
     private static final float[] YAVAS = new float[2];
@@ -452,6 +457,7 @@ final class GokyuzuCizici {
 
         RenderSystem.blendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE,
                 GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ZERO);
+        dogusYayi(poz, d, yagmursuz);
         poz.pushPose();
         poz.mulPose(Axis.YP.rotationDegrees(-90f));
         poz.mulPose(Axis.XP.rotationDegrees(zaman * 360f));
@@ -674,6 +680,39 @@ final class GokyuzuCizici {
         kuad(m, HALE, TEPE, disk * 1.8f, 0f, 1f, 0.5f, 0.28f, 0.5f * dogus * da);
     }
 
+    /**
+     * Pulsar yolundaki kızıl cüce doğuşu: doğu ufkunda ufkun %40'ını (±{@value #DOGUS_YAYI_YARI}°) saran kızıl-turuncu
+     * ışık yayı; dünya çerçevesinde, toplamalı, tek çizim. Normal süpernova yolunun doğuşu değişmez.
+     */
+    private static void dogusYayi(PoseStack poz, IstemciGokyuzu.Gorunum d, float yagmursuz) {
+        if (d.evre() != GunesEvresi.KIZIL_CUCE || !d.pulsarYolu() || d.ilerleme() >= 1f) {
+            return;
+        }
+        float a = 0.85f * (float) Math.pow(1f - d.ilerleme(), 0.6) * yagmursuz;
+        if (a <= 0.003f) {
+            return;
+        }
+        int n = 24;
+        Matrix4f m = poz.last().pose();
+        RenderSystem.setShader(GameRenderer::getPositionColorShader);
+        BufferBuilder bb = Tesselator.getInstance().getBuilder();
+        bb.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+        for (int i = 0; i < n; i++) {
+            for (int k = 0; k < 4; k++) {
+                int j = k == 1 || k == 2 ? i + 1 : i;
+                boolean ust = k >= 2;
+                float f = (float) j / n * 2f - 1f;
+                float w = 1f - f * f;
+                float az = f * DOGUS_YAYI_YARI * Mth.DEG_TO_RAD;
+                float el = (ust ? 3f + 15f * w : -3f) * Mth.DEG_TO_RAD;
+                float yatay = 100f * Mth.cos(el);
+                bb.vertex(m, Mth.cos(az) * yatay, 100f * Mth.sin(el), Mth.sin(az) * yatay)
+                        .color(1f, 0.45f, 0.2f, ust ? 0f : a * (0.25f + 0.75f * w)).endVertex();
+            }
+        }
+        BufferUploader.drawWithShader(bb.end());
+    }
+
     /** Şişen güneş: disk normal karışım + %12 toplamalı (parlak gökte sarı-beyaza doymasın), etrafında turuncu hale. */
     private static void buyuyen(Matrix4f m, float olcek, float[] c, float haleP, float a, float sn) {
         float disk = GUNES_DISK * olcek;
@@ -861,11 +900,13 @@ final class GokyuzuCizici {
         RenderSystem.blendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE,
                 GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ZERO);
         if (!sade) {
+            float mor = KaraDelikYutmaEgrileri.kalintiMorlugu(s);
             kuadUv(m, KARADELIK_DISK_AKIS, delik, yari, yari * KD_BASIKLIK, KD_EGIM,
-                    sn * KaraDelikYutmaEgrileri.diskDonusHizi(s), 0.85f, 0.8f, 1f,
-                    0.8f * KaraDelikYutmaEgrileri.diskParlakligi(s) * yagmursuz);
+                    sn * KaraDelikYutmaEgrileri.diskDonusHizi(s), Mth.lerp(mor, 0.85f, 0.72f),
+                    Mth.lerp(mor, 0.8f, 0.42f), 1f, 0.8f * KaraDelikYutmaEgrileri.diskParlakligi(s) * yagmursuz);
             kuad(m, KARADELIK_FOTON, delik, yari * KD_FOTON / FOTON_DOKU_R, KD_EGIM, 0.92f, 0.88f, 1f,
                     KaraDelikYutmaEgrileri.fotonHalkasi(s) * yagmursuz);
+            mercekYaylari(m, delik, yari, s, sn, yagmursuz);
         }
         float pa = KaraDelikYutmaEgrileri.pulsarAlfa(s) * yagmursuz;
         if (pa > 0.002f) {
@@ -882,6 +923,42 @@ final class GokyuzuCizici {
         float parlama = KaraDelikYutmaEgrileri.parlama(s);
         if (parlama > 0.003f) {
             kuad(m, HALE, delik, 85f, 0f, 0.92f, 0.84f, 1f, parlama);
+            siluet(m, delik, yari, parlama * kd);
+        }
+    }
+
+    /**
+     * Parlamanın altında kara deliğin koyu silüeti (normal karışım, parlak halenin üstünde): iki kutup jeti,
+     * akresyon diski ve gölge, foton halkası ve dıştaki Einstein halkası okunur kalır.
+     */
+    private static void siluet(Matrix4f m, Vector3f delik, float yari, float a) {
+        float r = SILUET[0];
+        float g = SILUET[1];
+        float b = SILUET[2];
+        RenderSystem.defaultBlendFunc();
+        kuadDik(m, KARA_DELIK_JET, delik, yari * 0.2f, yari * 3.4f, KD_EGIM, r, g, b, 0.85f * a);
+        kuad(m, karadelikBuyuk, delik, yari, KD_EGIM, r, g, b, 0.95f * a);
+        kuad(m, KARADELIK_FOTON, delik, yari * KD_FOTON / FOTON_DOKU_R, KD_EGIM, r, g, b, 0.9f * a);
+        kuad(m, KARADELIK_FOTON, delik, yari * EINSTEIN_HALKASI / FOTON_DOKU_R, KD_EGIM, r, g, b, 0.8f * a);
+        RenderSystem.blendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE,
+                GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ZERO);
+    }
+
+    /** Kara deliğin arkasındaki yıldızların merceklenmiş yayları: diskin dışında teğet soluk şeritler (toplamalı). */
+    private static void mercekYaylari(Matrix4f m, Vector3f delik, float yari, float s, float sn, float yagmursuz) {
+        float a = KaraDelikYutmaEgrileri.mercekYaylari(s) * yagmursuz;
+        if (a <= 0.003f) {
+            return;
+        }
+        int n = kurulanKalite == EfektKalitesi.ORTA ? 4 : kurulanKalite == EfektKalitesi.ULTRA ? 8 : 6;
+        float disk = yari * KD_DISK_DIS;
+        for (int i = 0; i < n; i++) {
+            float aci = i * 360f / n + (i % 2) * 11f + sn * 3f;
+            float uzak = disk * (1.25f + 0.09f * (i * 7 % 5));
+            float ar = aci * Mth.DEG_TO_RAD;
+            Vector3f yon = kaydir(delik, Mth.cos(ar) * uzak / DERECE_BIRIM, Mth.sin(ar) * uzak / DERECE_BIRIM);
+            kuadDik(m, HALE, yon, uzak * 0.42f, uzak * 0.035f, aci + 90f, 0.82f, 0.88f, 1f,
+                    a * (0.55f + 0.15f * (i * 3 % 4)));
         }
     }
 
