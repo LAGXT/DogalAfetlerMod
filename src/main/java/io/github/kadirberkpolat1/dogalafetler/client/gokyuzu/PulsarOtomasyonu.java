@@ -256,13 +256,7 @@ public final class PulsarOtomasyonu {
                 komut(s, "time set 18000");
                 kamera(s, new Kamera(zeminKamerasi.konum(), zeminKamerasi.yaw(), GECE_PITCH));
             }, () -> sayac >= 60, "pulsar_gece", 200),
-            Adim.yeni("3B paralaks hazırlığı (gündüz, gök kamerası)", s -> {
-                komut(s, "time set 3000");
-                kamera(s, -90f, -35f);
-            }, () -> sayac >= 40, null, 40).kadrajli(Kadraj.PULSAR),
-            Adim.yeni("3B pulsar yandan (kamera pulsar yönüne dik ~" + YAN_ACI + "°)", s -> yanaKay(s),
-                    () -> sayac >= YAN_BEKLEME, "pulsar_3b_yan", YAN_BEKLEME).kadrajli(Kadraj.PULSAR)
-                    .istemcide(PulsarOtomasyonu::yanHazirla).bitince(PulsarOtomasyonu::paralaksSatiri),
+            // Ufuk ve öğlen kareleri paralaks kaymasından önce: çapa kamerayla aynı yerde, pulsar tam doğuda.
             Adim.yeni("pulsar ufukta (~12°, iki yatay hüzme)", s -> {
                 komut(s, "time set 0");
                 kamera(s, -90f, -12f);
@@ -271,6 +265,13 @@ public final class PulsarOtomasyonu {
                 komut(s, "time set 6000");
                 kamera(s, -90f, OGLEN_PITCH);
             }, () -> sayac >= 60, "pulsar_oglen", 200),
+            Adim.yeni("3B paralaks hazırlığı (gündüz, gök kamerası)", s -> {
+                komut(s, "time set 3000");
+                kamera(s, -90f, -35f);
+            }, () -> sayac >= 40, null, 40).kadrajli(Kadraj.PULSAR),
+            Adim.yeni("3B pulsar yandan (kamera pulsar yönüne dik ~" + YAN_ACI + "°)", s -> yanaKay(s),
+                    () -> sayac >= YAN_BEKLEME, "pulsar_3b_yan", YAN_BEKLEME).kadrajli(Kadraj.PULSAR)
+                    .istemcide(PulsarOtomasyonu::yanHazirla).bitince(PulsarOtomasyonu::paralaksSatiri),
             Adim.yeni("kara delik yaklaşması (hız 0.25)", s -> {
                 AfetYoneticisi y = AfetYoneticisi.al(s);
                 for (int i = 0; i < 3 && y.donem().gunesEvresi() == GunesEvresi.PULSAR; i++) {
