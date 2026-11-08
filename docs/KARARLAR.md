@@ -6037,7 +6037,7 @@ yazılır ve `yok(tur)` paketinde de taşınır (istemci yalnız o türü siler)
 alan VarInt `bayraklar` (`BAYRAK_DONUS_YOLU` 1, `BAYRAK_BLOK_HASARI` 2, `BAYRAK_GUNES_DONDU` 4); (3) yeni `gokyuzu/yutma` paketi
 (`PulsarSesleri`, alansız): ada göre sıralı kimlikler kayar (`meteor/sarsinti` 4 → 5 …). `RadarPaketi.HER_YER` (afet-fizik-2) merkez
 işaretidir, tel biçimi aynı; tarif-2 paket değiştirmedi. Uyumsuz istemci el sıkışmada reddedilir. Tek dokunulan yer
-`network.AgKanali.PROTOKOL_SURUMU`; README, SARTNAME ve TEST-RAPORU'nda protokol numarası geçmez.
+`network.AgKanali.PROTOKOL_SURUMU`; README, SARTNAME ve TEST-RAPORU'nda protokol numarası geçmez. Kanıt (`8c8c497`, kuyruktan, ana makine; pc2 06:00'dan beri erişilemez): `runData` `1108-060053791-1c` BUILD SUCCESSFUL (`yeni_safak.json` ve dil satırları `3837d3c`), `compileJava` `1108-060538709-49` (runData derlemişti, UP-TO-DATE), JUnit 720/0 `1108-060538824-4a` (`test @a9525110bf20`), GameTest `TEST_FILTRE='Pulsar|Gokyuzu|Cekirdek|Komut|Basarim|Meteor'` 101/101 `1108-060538937-39` (`@4575c27178fe`; "13 ağ paketi kaydedildi (protokol 8)", `gokyuzu/yutma` 4, `meteor/sarsinti` 5; göç GameTest'i üç bölümü tek geçişte göç ettirir; en büyük batch 5), N19 245/245 fark 0. Filtresiz kapı pulsar-2 tur 5 HEAD'iyle.
 
 **K-E66 Pulsar zinciri: 15 gün pulsar, kara delik yutması, buzul kıyamet, eski güneşin dönüşü; 3B ve ses (kullanıcı isteği:
 "pulsar yetersiz"; şef kararları, 2026-11-08; dal `is/pulsar-2` `b0a8878`, entegrasyon `be5ec37`).** Ayrıntı `.vibe/kararlar/pulsar-2.md`
@@ -6069,7 +6069,7 @@ başarımı (`e01ed41`, N29). Protokol "8" K-E65 (`b9db98b`). Config göçü tek
 kalktı; `karadelik_3b_dokulari.py` tüpün tohum sırasını korur, N19). SARTNAME N29 (Yeni Şafak), N30 (güneşin dönüşü yalnız pulsar
 yolu, fotosensitivite). **Bilinen sınırlar:** pc2 kare koşularında FPS 15–19 (K-E29 b, bilgi; ana makine koşu 6 en düşük 29);
 değerlendirici model puanı 3'ün altında kalan kareler (yutma sonu, buzul, doğuş; PL-39, PL-41) için yeni deneme yok, tur 5 görsel
-sonucu gelince buraya yazılır ve kullanıcı oyunda karar verir; yutma parlaması (1,5 sn tepe) `pulsarTitresim`'le ölçeklenmez.
+sonucu gelince buraya yazılır ve kullanıcı oyunda karar verir; yutma parlaması (1,5 sn tepe) `pulsarTitresim`'le ölçeklenmez. Kanıt K-E65'teki kapı.
 
 ## Açık noktalar (Faz 2b)
 
