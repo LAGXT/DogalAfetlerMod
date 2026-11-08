@@ -26,12 +26,14 @@ import org.joml.Vector3f;
  * kameranın dönüşünü taşıyan dünya pozunda çizilen 3B nesne. Akresyon diski gerçek eğik halkadır (disk düzlemi gökte
  * sabit; oyuncu uçunca bakış vektörüyle görünen eğim değişir). Arka yarısı Schwarzschild ince-merceğiyle
  * ({@link KaraDelikMercek}) gölgenin üstünde ve altında iki yay olarak görünür; ön yarı gölgenin önünden geçer. Disk
- * referanstaki gibi beyaz-sıcak ve soluk (doygunluk düşük): kazanç Doppler'den önce uygulanıp 1'e kırpılır, böylece
- * yaklaşan yan parlak, uzaklaşan yan ×0,3 sönük kalır; üstüne aynı geometrinin {@value #PARILTI_KALINLIK} kat kalın
- * soluk kopyası parlama verir. Sıra: mercek sönümü (normal) → bükülen yıldızlar → pulsar → spagetti tüpü → arka
- * yarının yayları → tam siyah gölge (normal karışım: arkadaki yıldız, nebula, kalıntı ve pulsar silinir) → ön yarı →
- * foton halkası → parlama ve silüet. Konumlar Schwarzschild yarıçapı (rs) biriminde hesaplanır; disk dış yarıçapı yutma
- * eğrisindeki açısal çapın yarısıdır. Yalnız render thread'i.
+ * referanstaki gibi beyaz-sıcak ve soluk (doygunluk düşük). Köşe parlaklığı Doppler çarpanı (≤ 1; Doppler yalnız
+ * gölgenin iki yanındaki yanal bantta: yaklaşan yan 1, uzaklaşan ×0,3; gölgenin üstü ve altındaki orta sütunda yay ve
+ * ön yarı tepesi ≥ 0,9) × besleme eğrisi × mor kalıntı çarpanıdır; 1'i aşan pay toplamalı ek geçişte çizilir. Üstüne
+ * aynı geometrinin {@value #PARILTI_KALINLIK} kat kalın soluk kopyası parlama verir. Sıra: mercek sönümü (normal) →
+ * bükülen yıldızlar → pulsar → spagetti tüpü → arka yarının yayları → tam siyah gölge (normal karışım: arkadaki
+ * yıldız, nebula, kalıntı ve pulsar silinir) → ön yarı → foton halkası → parlama ve silüet. Konumlar Schwarzschild
+ * yarıçapı (rs) biriminde hesaplanır; disk dış yarıçapı yutma eğrisindeki açısal çapın yarısıdır. Yalnız render
+ * thread'i.
  */
 public final class KaraDelik3B {
     private static final ResourceLocation DISK = doku("karadelik_3b_disk_soluk");
@@ -49,15 +51,22 @@ public final class KaraDelik3B {
     private static final float[] UZAKLASAN = {1f, 0.92f, 0.84f};
     private static final float[] YAKLASAN = {0.94f, 0.97f, 1f};
     private static final float[] MOR = {0.88f, 0.62f, 1f};
-    /**
-     * Disk parlaklığı kazancı, Doppler'den önce: min(1, parlaklık × bu) × Doppler. Yaklaşan yan en çok 1, uzaklaşan
-     * yan ×0,3'te kalır: görünen oran Doppler oranıdır, doyma iki yanı eşitlemez.
-     */
-    private static final float KAZANC = 3.5f;
-    /** Yutumdan sonraki mor kalıntının ek kazancı: parlaklık × (1 + bu × morluk). */
+    /** Yutumdan sonraki mor kalıntının çarpanı (1 + bu × morluk): besleme eğrisiyle birlikte Doppler çarpanından sonra. */
     private static final float KALINTI_EK = 0.8f;
-    /** Merceklenmiş ikinci yayın (gölgenin altında) ana görüntüye göre parlaklığı. */
-    private static final float IKINCI_YAY = 0.85f;
+    /**
+     * Gölgenin üstündeki ve altındaki orta sütunun Doppler çarpanı: üstte merceklenmiş arka yarı, altta ön yarı ve ikinci
+     * görüntü (referansta alttaki en parlak, üstteki ~0,9'u). Orada madde bakışa dik gider; doğrusal Doppler ×0,65
+     * verirdi.
+     */
+    private static final float TEPE_UST = 0.9f;
+    private static final float TEPE_ALT = 1f;
+    /**
+     * Doppler'in yanal bandı: köşenin merceklenmiş görüntüsünün gölge merkezinden yatay uzaklığı gölge yarıçapının bu
+     * katları arasında orta sütunun çarpanından diskin Doppler'ine geçer. Bandın dışı (gölgenin iki yanı) tam Doppler.
+     * Disk düzlemindeki |r·cos φ| yetmez: mercek yayların yan uçlarını ekranda dışa iter, oranı ölçen yanlara taşır.
+     */
+    private static final float YANAL_IC = 0.5f;
+    private static final float YANAL_DIS = 1f;
     /** Parlama kopyası: dikey kalınlık katı, alfası, radyal genişleme (iç ve dış yarıçap çarpanı). */
     private static final float PARILTI_KALINLIK = 2.5f;
     private static final float PARILTI_ALFA = 0.3f;
@@ -84,6 +93,7 @@ public final class KaraDelik3B {
     private static final int TUMU = 3;
     private static final int GECIS_ANA = 0;
     private static final int GECIS_PARILTI = 1;
+    private static final int GECIS_KALINTI = 2;
 
     /** Kademe: disk dilimi, radyal bant, yıldız, tüp kesiti ve çevresi, disk kuyruğu dilimi. */
     private record Kademe(int dilim, int bant, int yildiz, int kesit, int cevre, int kuyruk) {
@@ -500,18 +510,24 @@ public final class KaraDelik3B {
 
     /**
      * Akresyon diski: {@code parca} ARKA merceklenmiş arka yarı (gölgenin üstünde yay), IKINCI arka yarının ikinci
-     * görüntüsü (altında), ON gölgenin önünden geçen yarı. Parlama kopyası ve ana geçiş.
+     * görüntüsü (altında), ON gölgenin önünden geçen yarı. Parlama kopyası, ana geçiş ve (parlaklık 1'i aşabiliyorsa)
+     * kalıntı geçişi.
      */
     private static void disk(Matrix4f m, int parca, float a, float akis, float mor) {
         diskGecisi(m, parca, a, akis, mor, null, GECIS_PARILTI);
         diskGecisi(m, parca, a, akis, mor, null, GECIS_ANA);
+        if (a * (1f + KALINTI_EK * mor) > 1f) {
+            diskGecisi(m, parca, a, akis, mor, null, GECIS_KALINTI);
+        }
     }
 
     /**
-     * Diskin bir geçişi. Köşe parlaklığı min(1, {@code a} × {@value #KAZANC}) × Doppler (yaklaşan yan ×1,0 mavi-beyaz,
-     * uzaklaşan ×0,3 soluk turuncu). Parlama geçişi tek radyal bant: yarıçap aralığı genişler, köşeler görüntü
-     * düzleminde orta çizgiden dikeyde {@value #PARILTI_KALINLIK} kat uzaklaşır, alfa {@value #PARILTI_ALFA}.
-     * {@code siluet} verilirse yalnız ana geçiş, düz renk ve Doppler'siz (TUMU: iki yarının ana görüntüsü).
+     * Diskin bir geçişi. Köşe parlaklığı {@link #dopplerCarpani} × {@code a} (besleme eğrisi) × (1 +
+     * {@value #KALINTI_EK} × {@code mor}): ana geçiş 1'e kadarını, kalıntı geçişi aşanı toplamalı çizer (köşe alfası
+     * baytta).
+     * Parlama geçişi tek radyal bant: yarıçap aralığı genişler, köşeler görüntü düzleminde orta çizgiden dikeyde
+     * {@value #PARILTI_KALINLIK} kat uzaklaşır, alfa {@value #PARILTI_ALFA}. {@code siluet} verilirse yalnız ana geçiş, düz
+     * renk ve Doppler'siz (TUMU: iki yarının ana görüntüsü).
      */
     private static void diskGecisi(Matrix4f m, int parca, float a, float akis, float mor, @Nullable float[] siluet,
             int gecis) {
@@ -524,7 +540,7 @@ public final class KaraDelik3B {
         boolean ikincil = parca == IKINCI;
         float ic = KaraDelikMercek.DISK_IC_RS * (parilti ? PARILTI_IC : 1f);
         float dis = KaraDelikMercek.DISK_DIS_RS * (parilti ? PARILTI_DIS : 1f);
-        float yay = ikincil ? IKINCI_YAY : 1f;
+        float tepe = parca == ARKA ? TEPE_UST : TEPE_ALT;
         RenderSystem.setShader(GameRenderer::getPositionTexColorShader);
         RenderSystem.setShaderTexture(0, parilti ? PARILTI : DISK);
         BufferBuilder bb = Tesselator.getInstance().getBuilder();
@@ -547,9 +563,12 @@ public final class KaraDelik3B {
                     tamam = parilti ? pariltiKosesi(r, (ic + dis) * 0.5f, fi, ikincil, KOSE[q])
                             : diskKosesi(r, fi, ikincil, KOSE[q]);
                     float parlak = siluet != null ? a
-                            : Math.min(1f, a * yay * KAZANC * (1f + KALINTI_EK * mor))
-                                    * KaraDelikMercek.doppler(KaraDelikMercek.yaklasmaCos(fi, egim));
-                    KOSE_ALFA[q] = parilti ? PARILTI_ALFA * parlak : parlak;
+                            : dopplerCarpani(fi, GOR[0], tepe) * a * (1f + KALINTI_EK * mor);
+                    KOSE_ALFA[q] = switch (gecis) {
+                        case GECIS_PARILTI -> PARILTI_ALFA * parlak;
+                        case GECIS_KALINTI -> Math.max(0f, parlak - 1f);
+                        default -> Math.min(1f, parlak);
+                    };
                     enBuyuk = Math.max(enBuyuk, KOSE_ALFA[q]);
                 }
                 if (!tamam || enBuyuk <= 0.002f) {
@@ -572,6 +591,18 @@ public final class KaraDelik3B {
             }
         }
         BufferUploader.drawWithShader(bb.end());
+    }
+
+    /**
+     * Köşenin Doppler çarpanı (≤ 1); {@code x} köşenin merceklenmiş görüntüsünün yatay konumu (rs). Gölgenin iki
+     * yanında (|x| ≥ {@value #YANAL_DIS} gölge yarıçapı) diskin Doppler'i: yaklaşan yan 1, uzaklaşan ×0,3. Gölgenin
+     * üstü ve altındaki orta sütunda (≤ {@value #YANAL_IC}) madde bakışa dik gider ve çarpan {@code tepe}; arada
+     * yumuşak geçiş. Sol/sağ oranı bandın dışında kalır, yaylar ve ön yarı ortada sönmez.
+     */
+    private static float dopplerCarpani(float fi, float x, float tepe) {
+        float d = KaraDelikMercek.doppler(KaraDelikMercek.yaklasmaCos(fi, egim));
+        float t = Mth.clamp((Math.abs(x) / KaraDelikMercek.GOLGE_RS - YANAL_IC) / (YANAL_DIS - YANAL_IC), 0f, 1f);
+        return tepe + (d - tepe) * t * t * (3f - 2f * t);
     }
 
     /**
