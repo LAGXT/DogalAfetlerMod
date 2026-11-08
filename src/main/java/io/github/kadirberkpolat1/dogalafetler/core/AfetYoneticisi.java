@@ -10,6 +10,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.mantik.OyunGunu;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SecimTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SiddetAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SiddetSecici;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.TekSeferlikAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.TekSeferlikKurallar;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.ZamanOlcegi;
 import io.github.kadirberkpolat1.dogalafetler.core.olay.AfetAsamaDegistiEvent;
@@ -632,17 +633,25 @@ public final class AfetYoneticisi {
 
     /** Kayıtlı, gamerule'ü açık ve tek seferlik kuralları geçen türler. */
     private Set<AfetTuru> uygunTurler(GameRules kurallar, CekirdekAyarlari ayar) {
-        DunyaDonemi donem = donem();
         double gun = oyunGunu();
         double puan = gelisimPuani();
         Set<AfetTuru> uygun = EnumSet.noneOf(AfetTuru.class);
         for (AfetTuru tur : AfetKaydi.kayitliTurler()) {
-            if (Kurallar.afetSecilebilir(kurallar, tur) && TekSeferlikKurallar.uygunMu(tur, donem.ayVar(),
-                    donem.gunesEvresi(), gun, puan, ayar.tekSeferlik())) {
+            if (Kurallar.afetSecilebilir(kurallar, tur) && tekSeferlikUygun(tur, gun, puan, ayar.tekSeferlik())) {
                 uygun.add(tur);
             }
         }
         return uygun;
+    }
+
+    /**
+     * Seçim turunun tek seferlik süzgeci (madde 4) bu dönemde türü geçiriyor mu: ay, güneş evresi ve pulsar zincirinin
+     * geçmişi ({@link PulsarYolu#donusYolu}, {@link PulsarYolu#zincirTukendi}) dönemden okunur.
+     */
+    public boolean tekSeferlikUygun(AfetTuru tur, double gun, double puan, TekSeferlikAyarlari ayarlar) {
+        DunyaDonemi donem = donem();
+        return TekSeferlikKurallar.uygunMu(tur, donem.ayVar(), donem.gunesEvresi(), PulsarYolu.donusYolu(donem),
+                PulsarYolu.zincirTukendi(donem), gun, puan, ayarlar);
     }
 
     private int seviyeSec(AfetTuru tur) {

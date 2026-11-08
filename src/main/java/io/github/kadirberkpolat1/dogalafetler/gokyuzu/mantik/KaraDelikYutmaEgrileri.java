@@ -34,6 +34,9 @@ public final class KaraDelikYutmaEgrileri {
     public static final float YUTUM_SN = PulsarZinciri.YUTMA_PARLAMA_SN + PARLAMA_SURE_SN;
     /** Pulsarın parlama tepesinde ilerlediği ayrım payı: kuyruk diske değer, çekirdek gölgenin kenarındadır. */
     static final float PARLAMADA_CEKIM = 0.8f;
+    /** Diskin görünen eğimi (bakışın disk düzlemiyle açısı, derece): uzakta neredeyse yandan, en yakında açık. */
+    public static final float EGIM_UZAK = 4f;
+    public static final float EGIM_YAKIN = 11f;
 
     private KaraDelikYutmaEgrileri() {
     }
@@ -155,6 +158,15 @@ public final class KaraDelikYutmaEgrileri {
     /** Akresyon akış dokusunun dönüşü (derece/sn). */
     public static float diskDonusHizi(float s) {
         return 25f + 35f * spagetti(s);
+    }
+
+    /**
+     * Diskin görünen eğimi (derece): çapla birlikte {@value #EGIM_UZAK}° → {@value #EGIM_YAKIN}° açılır, yutumdan sonra
+     * uzaklaştıkça geri kapanır (yaklaşma ve uzaklaşma tek eğriden).
+     */
+    public static float gorunenEgim(float s) {
+        float yakinlik = kenetle((karaDelikCapi(s) - BASLANGIC_CAPI) / (EN_BUYUK_CAP - BASLANGIC_CAPI));
+        return EGIM_UZAK + (EGIM_YAKIN - EGIM_UZAK) * yakinlik;
     }
 
     /** Derin uzay katmanının alt sınırı: yutuma doğru 1'e çıkar, sonra %100 kalır. */

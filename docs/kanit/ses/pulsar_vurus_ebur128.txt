@@ -1,0 +1,27 @@
+Dosya: src/main/resources/assets/dogalafetler/sounds/pulsar_vurus.ogg (81624 bayt, 8.0 sn, mono, 48000 Hz, Vorbis q5)
+Hedef (docs/tasarim/ses.md §4): -26.0 LUFS ±1, gerçek tepe <= -12.0 dBTP, baskın frekans 250–500 Hz, 2500 Hz üstü <= -20 dB
+Ölçülen (ogg): I = -26.0 LUFS, gerçek tepe = -13.7 dBTP
+Baskın frekanslar (20 Hz kümeleri, güçlüden zayıfa): 260 Hz, 240 Hz, 520 Hz
+Perde izi (0,5 sn pencerelerde en güçlü frekans, ilk 20): 250, 250, 260, 260, 250, 260, 250, 260, 250, 250, 250, 262, 260, 262, 250, 260 Hz
+Bant enerjisi / toplam: 250–500 Hz -2.9 dB; 300–3400 Hz (konuşma) -5.3 dB; >2500 Hz -24.4 dB; >8000 Hz -32.8 dB
+Döngü dikişi: |ilk - son| / en büyük iç adım = 0.005 (<= 1 ise süreksizlik yok); ilk örnek = +0.00046
+Vuruş (olcum.md yöntemi; referans 10.87 Hz, 4 ms ince yapı): zarf spektrumu tepesi 10.875 Hz (hedef 10.875 Hz, çözünürlük 0.125 Hz); otokorelasyon ince yapısı 3.90 ms (257 Hz)
+Vuruş fazı: i. vuruşun zarfı dosyada i/10.875 sn'den 1 ms sonra en dik yükselir, 6 ms sonra tepededir (4 ms ortalanmış zarf, 1 ms kutular)
+Bant payı % (ölçülen / video): 20–60 Hz 5.7 / 0.9; 60–120 Hz 3.1 / 3.9; 120–250 Hz 15.7 / 17.9; 250–500 Hz 50.7 / 46.4; 500–1000 Hz 16.0 / 15.1; 1000–2000 Hz 7.3 / 12.8; 2000–4000 Hz 1.1 / 1.4; 4000–8000 Hz 0.1 / 1.2; 8000–16000 Hz 0.0 / 0.5
+Hedefle karşılaştırma: UYGUN
+
+ffmpeg -i pulsar_vurus.ogg -af ebur128=peak=true -f null -
+Summary:
+
+  Integrated loudness:
+    I:         -26.0 LUFS
+    Threshold: -36.0 LUFS
+
+  Loudness range:
+    LRA:         0.3 LU
+    Threshold: -46.0 LUFS
+    LRA low:   -26.2 LUFS
+    LRA high:  -25.9 LUFS
+
+  True peak:
+    Peak:      -13.7 dBFS

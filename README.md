@@ -105,7 +105,9 @@ Güneş patlaması ve ay çarpması yalnız dünya yeterince yaşlanınca seçil
   (var/yok) birbirinden bağımsızdır ve dünyaya kaydedilir; sonradan giren oyuncu aynı gökyüzünü görür. Güneşsiz dönemde dünya
   birkaç günde donar (çimenin üstüne kar katmanı, buz, kırağı rengi; donma uzaktaki chunk'lara oyuncu geldikçe yetişir). Kızıl
   cüce doğunca dünya kısmen çözülür, kalıcı kış bölgeleri donuk kalır. **Pulsar** (düşük olasılık) güneşten kat kat büyük, sağa
-  sola hızla titreşen mor-beyaz bir nötron yıldızıdır: 15 oyun günü boyunca dünya cehenneme döner (çimen kavrulur ve küle döner,
+  sola hızla titreşen 3B bir nötron yıldızıdır (mavi-beyaz çekirdek, manyetik alan çizgileri, saniyede ~11 kez nabızlanan iki
+  ışın konisi ve aynı vuruşta tıklayan bir ses; ses yer altında ve üstü kapalı yerlerde azalır, boğuk ve yankılı duyulur):
+  15 oyun günü boyunca dünya cehenneme döner (çimen kavrulur ve küle döner,
   ağaçlar yanıp kömürleşir, kül yağar, seyrek lav gözeleri açılır, dakikada 12 meteor düşer, sıcaklık çok yükselir). Sonra uzak
   bir kara delik pulsarı 90 saniyede yutar (gündüz başlar); dünya 10 gün buzul kıyamete sürüklenir (küller kar altında kalır),
   ardından kızıl cüce doğar ve doğuş bitince eski güneş geri gelir.
@@ -204,7 +206,7 @@ Dosya ilk açılışta bütün anahtarlar ve açıklamalarıyla yazılır. Her s
 | `yangin.parcacikYogunlugu`, `su.parcacikYogunlugu`, `donma.parcacikYogunlugu`, `meteor.izYogunlugu`, `gokyuzu.yildizYogunlugu` | `1,0` | Efekt kalitesinin üstüne parçacık ince ayarı (0 = kapalı). |
 | `deprem.sarsintiCarpani` | `100` | Deprem ekran sarsıntısı (% 0–200). |
 | `ay_carpmasi.ekranSarsintisi`, `ay_carpmasi.parlama` | `1,0` | Ay çarpmasının ekran sarsıntısı ve parlaması (0 = kapalı; harekete/ışığa duyarlı oyuncular için). |
-| `gokyuzu.pulsarTitresim` | `1,0` | Pulsarın hızlı titreşimi ve kısa beyaz parlamaları (0 = kapalı, yalnız yavaş sarsıntı kalır). **Fotosensitivite:** pulsar dönemi saniyede ~16 kez titreşen ışık ve saniyede ~2 kısa parlama içerir; ışığa duyarlı oyuncular 0 yapmalı. Kara delik yutmasının 55. saniyesindeki parlama ve sarsıntı `ay_carpmasi.parlama` gibi kapatılamaz, 1,5 sn sürer. |
+| `gokyuzu.pulsarTitresim` | `1,0` | Pulsarın hızlı titreşimi, ışın konilerinin strobu ve kısa beyaz parlamaları (0 = kapalı: koniler sabit yanar, yalnız yavaş sarsıntı kalır). **Fotosensitivite:** pulsar dönemi saniyede ~16 kez titreşen ışık, saniyede ~11 kez nabızlanan büyük ışın konileri (parlaklık %45 ile %100 arasında; tam kararmaz) ve saniyede ~2 kısa parlama içerir; ışığa duyarlı oyuncular 0 yapmalı. Kara delik yutmasının 55. saniyesindeki parlama ve sarsıntı `ay_carpmasi.parlama` gibi kapatılamaz, 1,5 sn sürer. |
 
 ### Sunucu: yıkım hızı ve afet başına çarpanlar
 
@@ -238,7 +240,7 @@ hücresi). Sunucu TPS'i düşünce bu bütçeler kendiliğinden kısılır.
 | `gokyuzu.pulsarGun` | `15` | Pulsar döneminin süresi (oyun günü; uyku ilerletir, `/time set` ilerletmez). Bitince kara delik yutması gündüz penceresinde (gün saati 3000–7200) başlar. |
 | `gokyuzu.pulsarIsinmaGun` | `1` | Pulsarın dünya etkilerinin tam güce çıkma süresi, MC günü (eski varsayılan 2 göçle 1'e çekilir). |
 | `gokyuzu.pulsarYanginDakikaBasina` | `24` | Tam güçte oyuncu başına (gerçek) dakikada yeni yangın odağı (`afetBlokHasari false` iken yok; eski 20 göçle 24'e çekilir). |
-| `gokyuzu.pulsarKavrulmaOlasiligi` | `0,6` | Tam güçte oyuncu başına tick'te kavurma denemesi olasılığı (çimen → kaba toprak → kül, yaprak → kül katmanı, kütük → kömürleşmiş kütük). |
+| `gokyuzu.pulsarKavrulmaOlasiligi` | `0,6` | Tam güçte bir kavurma denemesinin isabet olasılığı. Deneme sayısı alanla orantılı: varsayılanla 3 oyun gününde 96 blok yarıçapta çimen kalmaz, ağaçlar kömür ve kül olur (çimen → kaba toprak → kül bloğu, yaprak → kül katmanı, kütük → kömürleşmiş kütük). |
 | `gokyuzu.pulsarMeteorDakikaBasina` | `12` | Pulsar boyunca oyuncu başına dakikada meteor (güneş patlaması ve ay çarpması 180). |
 | `gokyuzu.pulsarBlokButcesi` | `256` | Pulsarın tick başına en çok blok değişimi (kavurma, kül, lav; TPS düşünce kısılır). |
 | `gokyuzu.pulsarLav` | `true` | Kavrulan yüzeyde seyrek tek bloklu lav gözeleri. |

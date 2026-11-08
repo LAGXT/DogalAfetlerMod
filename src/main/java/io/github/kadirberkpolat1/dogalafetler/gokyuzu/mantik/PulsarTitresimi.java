@@ -1,11 +1,15 @@
 package io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik;
 
 /**
- * Pulsarın yanal titreşimi (pulsar-2, PL-2): dönme yok; çekirdek ve ışınlar iki eksende sağa sola savrulur. İki bileşen:
- * hızlı kare/testere titreşimi ({@value #HIZLI_HZ} Hz, Düşük kalitede {@value #DUSUK_HZ} Hz; erişilebilirlik ayarıyla
- * ölçeklenir, 0'da yok) ve büyük genlikli yavaş sarsıntı (1–2 Hz; ayardan bağımsız). Düzensiz "çatırtı" parlamaları
- * saniyede ortalama {@value #CATIRTI_HZ}, her biri 0,10–0,15 sn. Girdi gerçek zaman saniyesidir: değerler kare süresinden
- * bağımsızdır. Açılar derece. Minecraft sınıfı kullanmaz.
+ * Pulsarın yanal titreşimi (pulsar-2, PL-2, PL-28): dönme yok; çekirdek, koniler ve alan çizgileri iki eksende birlikte
+ * savrulur. İki bileşen: hızlı kare/testere titreşimi ({@value #HIZLI_HZ} Hz, Düşük kalitede {@value #DUSUK_HZ} Hz;
+ * erişilebilirlik ayarıyla ölçeklenir, 0'da yok) ve büyük genlikli yavaş sarsıntı (1–2 Hz; ayardan bağımsız). Düzensiz
+ * "çatırtı" parlamaları saniyede ortalama {@value #CATIRTI_HZ}, her biri 0,10–0,15 sn. Girdi gerçek zaman saniyesidir:
+ * değerler kare süresinden bağımsızdır. Açılar derece. Minecraft sınıfı kullanmaz.
+ *
+ * <p>Hızlı bileşenin genliği referans videodaki yanal çırpınmaya bağlıdır: en parlak nokta ardışık karelerde pulsar
+ * görüntüsünün ({@value #KADRAJ_DERECE}° hale çapı) {@code 3/90}–{@code 4/90}'ı kadar sıçrar. Tam güç ve ayar 1'de her
+ * yarım periyodun sapması bu banttadır; 29,97 kare/sn örneklemede ardışık karelerin çoğu karşı tarafa düşer.
  */
 public final class PulsarTitresimi {
     public static final float HIZLI_HZ = 16f;
@@ -14,10 +18,17 @@ public final class PulsarTitresimi {
     public static final float CATIRTI_HZ = 2f;
     public static final float CATIRTI_EN_KISA_SN = 0.10f;
     public static final float CATIRTI_EN_UZUN_SN = 0.15f;
+    /** Çırpınmanın ölçüldüğü kadraj: pulsar halesinin görünür açısal çapı (derece). */
+    public static final float KADRAJ_DERECE = 34f;
+    /** Videoda ardışık karelerde yanal sıçramanın kadraja oranı: ±3–4 px / 90 px. */
+    public static final float CIRPINMA_EN_AZ = 3f / 90f;
+    public static final float CIRPINMA_EN_COK = 4f / 90f;
+    /** Tam güç ve ayar 1'de hızlı bileşenin tepe genliği (derece). */
+    public static final float HIZLI_TEPE_DERECE = CIRPINMA_EN_COK * KADRAJ_DERECE;
     /** Testere (dikey) ekseninin kare eksenine oranı: titreşim bir çizgi boyunca değil, düzlemde savrulur. */
     static final float TESTERE_ORANI = 0.45f;
-    /** Her yarım periyodun genliği 0,6–1 arası karmayla değişir (makine gibi düzgün görünmesin). */
-    static final float EN_AZ_ADIM = 0.6f;
+    /** Her yarım periyodun genliği karmayla {@code EN_AZ_ADIM}–1 arası değişir (makine gibi düzgün görünmesin). */
+    static final float EN_AZ_ADIM = CIRPINMA_EN_AZ / CIRPINMA_EN_COK;
     /** Çatırtı yuvası: her yuvada en çok bir parlama, olasılık {@code CATIRTI_HZ × YUVA_SN}. */
     private static final double YUVA_SN = 0.25;
     private static final double[] YAVAS_HZ_X = {1.3, 1.9};
@@ -26,9 +37,17 @@ public final class PulsarTitresimi {
     private PulsarTitresimi() {
     }
 
-    /** Hızlı bileşenin tepe genliği (derece): {@code (0,6 + 0,4·güç) × ayar}; ayar 0–1'e kenetlenir. */
+    /**
+     * Hızlı bileşenin tepe genliği (derece): {@code (0,6 + 0,4·güç) × ayar × HIZLI_TEPE_DERECE}; güç ve ayar 0–1'e
+     * kenetlenir.
+     */
     public static float hizliGenlik(float guc, float ayar) {
-        return (0.6f + 0.4f * kenetle(guc)) * kenetle(ayar);
+        return (0.6f + 0.4f * kenetle(guc)) * kenetle(ayar) * HIZLI_TEPE_DERECE;
+    }
+
+    /** Hızlı bileşenin tepe genliğinin kadraja oranı (çırpınma; tam güç ve ayar 1'de {@link #CIRPINMA_EN_COK}). */
+    public static float cirpinmaOrani(float guc, float ayar) {
+        return hizliGenlik(guc, ayar) / KADRAJ_DERECE;
     }
 
     /** Yavaş sarsıntının tepe genliği (derece): güçle 1,5°'den 2,5°'ye. */

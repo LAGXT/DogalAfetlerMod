@@ -21,25 +21,39 @@ import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.RegistryObject;
 
 /**
- * Kara delik yutmasının sesi ve sarsıntısı (pulsar-2 PL-4): {@code KARADELIK_YUTMA} evresinin parlama anında
- * ({@code PulsarSureci}, kalıcı bayrakla bir kez) {@link #yutmaPatlamasi} bütün çevrim içi oyunculara {@code gokyuzu/yutma}
- * paketini yollar; istemci kütleçekim dalgası sesini konumsuz çalar ve tek seferlik ekran sarsıntısını başlatır
- * ({@code client.gokyuzu.PulsarSarsintisi}). Oyuncu nerede olursa olsun duyar (gök aşaması herkeste aynıdır). Dosya
- * {@code tools/assets/ses_uret.py} ile üretilir; {@code sounds.json} ve altyazı datagen'dir.
+ * Pulsar ve kara delik sesleri (pulsar-2 PL-4, tur 4 D). Pulsar vuruşu ({@link #PULSAR_VURUS}, 8 sn'de 87 vuruş) evre
+ * PULSAR'da ve yutmada pulsar yutulana dek istemcide döngülü çalar ({@code client.gokyuzu.PulsarSesi}); paket gerekmez.
+ * Kara delik yutması: {@code KARADELIK_YUTMA} evresinin parlama anında ({@code PulsarSureci}, kalıcı bayrakla bir kez)
+ * {@link #yutmaPatlamasi} bütün çevrim içi oyunculara {@code gokyuzu/yutma} paketini yollar; istemci kütleçekim dalgası
+ * sesini konumsuz çalar ve tek seferlik ekran sarsıntısını başlatır ({@code client.gokyuzu.PulsarSarsintisi}). Her sesin kuru
+ * ve boğuk-yankılı iki dosyası aynı anda başlar; kazançları derinlik/örtü sönümünden ({@code mantik.SesSonumu}). Kategori
+ * WEATHER (Sirenler kaydırıcısına bağlı değil). Dosyalar {@code tools/assets/ses_uret.py} ile üretilir; {@code sounds.json}
+ * ve altyazı datagen'dir. Dosyalar önceden yüklenir: kuru ve yankılı örnek aynı tick'te başlatıldığında ikisi de hazır
+ * tampondan aynı anda çalar (faz aynı).
  */
 public final class PulsarSesleri {
     public static final ResourceLocation KARADELIK_YUTMA_KIMLIGI = DogalAfetler.konum("karadelik_yutma");
+    public static final ResourceLocation KARADELIK_YUTMA_YANKILI_KIMLIGI = DogalAfetler.konum("karadelik_yutma_yankili");
+    public static final ResourceLocation PULSAR_VURUS_KIMLIGI = DogalAfetler.konum("pulsar_vurus");
+    public static final ResourceLocation PULSAR_VURUS_YANKILI_KIMLIGI = DogalAfetler.konum("pulsar_vurus_yankili");
     static final String ALTYAZI = "subtitles.dogalafetler.karadelik_yutma";
+    static final String VURUS_ALTYAZI = "subtitles.dogalafetler.pulsar_vurus";
     /** Sarsıntının tepe genliği (derece; ay çarpması 2,5) ve süresi (gerçek tick; ses 8 sn, parlama 55–60 sn). */
     static final float SARSINTI_DERECE = 3f;
     static final int SARSINTI_TICK = 100;
 
     private static final DeferredRegister<SoundEvent> KAYIT = DeferredRegister.create(Registries.SOUND_EVENT,
             DogalAfetler.MOD_ID);
-    public static final RegistryObject<SoundEvent> KARADELIK_YUTMA = KAYIT.register(KARADELIK_YUTMA_KIMLIGI.getPath(),
-            () -> SoundEvent.createVariableRangeEvent(KARADELIK_YUTMA_KIMLIGI));
+    public static final RegistryObject<SoundEvent> KARADELIK_YUTMA = olay(KARADELIK_YUTMA_KIMLIGI);
+    public static final RegistryObject<SoundEvent> KARADELIK_YUTMA_YANKILI = olay(KARADELIK_YUTMA_YANKILI_KIMLIGI);
+    public static final RegistryObject<SoundEvent> PULSAR_VURUS = olay(PULSAR_VURUS_KIMLIGI);
+    public static final RegistryObject<SoundEvent> PULSAR_VURUS_YANKILI = olay(PULSAR_VURUS_YANKILI_KIMLIGI);
 
     private PulsarSesleri() {
+    }
+
+    private static RegistryObject<SoundEvent> olay(ResourceLocation ad) {
+        return KAYIT.register(ad.getPath(), () -> SoundEvent.createVariableRangeEvent(ad));
     }
 
     static void kaydet(IEventBus modBus) {
@@ -59,12 +73,21 @@ public final class PulsarSesleri {
     }
 
     private static void tanimla(SesSaglayici saglayici) {
-        saglayici.tanimla(KARADELIK_YUTMA_KIMLIGI.getPath(), SoundDefinition.definition().subtitle(ALTYAZI)
-                .with(SoundDefinition.Sound.sound(KARADELIK_YUTMA_KIMLIGI, SoundDefinition.SoundType.SOUND)));
+        tanimla(saglayici, KARADELIK_YUTMA_KIMLIGI, ALTYAZI);
+        tanimla(saglayici, KARADELIK_YUTMA_YANKILI_KIMLIGI, ALTYAZI);
+        tanimla(saglayici, PULSAR_VURUS_KIMLIGI, VURUS_ALTYAZI);
+        tanimla(saglayici, PULSAR_VURUS_YANKILI_KIMLIGI, VURUS_ALTYAZI);
+    }
+
+    /** Kuru ve yankılı varyant aynı altyazıyı taşır: ikisi birlikte çalınca tek satır görünür. */
+    private static void tanimla(SesSaglayici saglayici, ResourceLocation ad, String altyazi) {
+        saglayici.tanimla(ad.getPath(), SoundDefinition.definition().subtitle(altyazi)
+                .with(SoundDefinition.Sound.sound(ad, SoundDefinition.SoundType.SOUND).preload(true)));
     }
 
     private static void cevirileriYaz(CeviriYazici yazici) {
         yazici.ekle(ALTYAZI, "Black hole swallows the pulsar", "Kara delik pulsarı yutuyor");
+        yazici.ekle(VURUS_ALTYAZI, "Pulsar pulses", "Pulsar atıyor");
     }
 
     /**

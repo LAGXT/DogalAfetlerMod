@@ -242,3 +242,47 @@ toprak ve kül bloğu kalır.
 | KARADELIK_YUTMA | yutma koreografisi + mor tonlu ay | yutma koreografisi |
 | GÜNEŞSİZ (pulsar yolu) | çelik mavisi gök, soluk gri ay, kalıntı yok, tipi | çelik mavisi gök, kalıntı yok, tipi |
 
+### Pulsar-2 tur 4: 3B pulsar ve kara delik, referansa göre ses (2026-11-08)
+
+Kaynak: `.vibe/kararlar/pulsar-2.md` PL-28…, referans ölçümü `.vibe/gorev/pulsar-2-referans/olcum.md`. Kullanıcı: "her şey
+2D; videoya ve kara delik görseline göre gerçekçi yap, titreşim ve ses de aynı olsun; ses aşağı indikçe azalsın ve yankılansın".
+
+**Gerçek olay (referanslar).** Pulsar videosu (https://youtube.com/shorts/13FgOZU48Lg): buz mavisi-beyaz çekirdek, iki kutuptan
+ışın konisi, ses 10,87 Hz vuruş (her vuruşta 250 Hz vızıltı darbesi, enerji %46 250–500 Hz), görüntü 4,46 Hz şişip iner,
+çekirdek ardışık karelerde yana sıçrar. Kara delik görseli Gargantua tipi: kenardan görülen ince sıcak disk, diskin arka yarısı
+kütleçekim merceğiyle gölgenin üstünde ve altında iki yay, ince foton halkası, tam siyah gölge, Doppler'le bir yan parlak.
+
+**Çizim sırası eki.** … → güneş evresi → ay → **3B nesneler** (`Pulsar3B`, `KaraDelik3B`, pulsar yolundaki kızıl cüce küresi;
+güneş yolu dönüşünden önceki dünya pozunda, konum `GokCapasi`'ndan) → ay çarpması → ufuk altı karanlık disk.
+
+**Gök çapası (paralaks).** Nesne güneş yolundaki yönünde, kök noktadan 800 blok ötede; kök kamerayı gecikmeyle izler (pulsar
+τ 60 sn, kara delik 120 sn; 1 600 bloktan büyük sıçramada sıfırlanır). Oyuncu uçunca nesne yandan görülür (koniler ve disk
+başka açıdan); uzun yolculukta gökte kaybolmaz.
+
+**3B pulsar.** Çekirdek 10° küre (Fresnel: merkez buz mavisi-beyaz, ısınmayla mor-beyaz, kenar parlak), kesişen üç düzlem +
+derinlik katmanlı hale (~34°) ve korona (~56°), dipol alan çizgileri r = L·sin²θ (L = 1,9 / 2,6 / 3,4 R), manyetik eksende iki koni
+(iç dar 1,8°, dış 5°; ortası parlak kenarı saydam; gök kubbesini aşar) ve uçlardan saçılan plazma. Manyetik eksen gökte
+sabit (dönme yok). Koni strobu ses döngüsüyle aynı fazda: her vuruşta 4 ms yükseliş, ~30 ms sönüm, 4,5 Hz yavaş şişme;
+`pulsarTitresim` 1'de parlaklık %45'in altına inmez, 0'da sabit. Yanal titreşim çekirdek, koniler ve alan çizgilerine birlikte
+uygulanır (16 Hz kare dalga, her yarım periyot hale çapının 3–4/90'ı kadar; Düşük 8 Hz).
+
+**3B kara delik.** Boyutlar Schwarzschild yarıçapı rs ile: gölge 2,6 rs, foton halkası 2,65 rs, disk 3–10 rs; dış yarıçap = açısal
+çapın yarısı (PL-27 eğrisi korunur). Disk gökte sabit, ekranda yatay, görünen eğim yaklaştıkça 4° → 11° ve her karede
+kamera–nesne vektöründen. Arka yarı ince-lens sapma tablosuyla (sınıf yüklenirken bir kez, 2 048 adım) gölgenin üstünde ve
+altında iki yay; Doppler yaklaşan yan ×1,0 mavi-beyaz, uzaklaşan ×0,3 turuncu. Gölge tam siyah, arkadaki yıldız, nebula ve
+pulsarı siler. Gölge çevresinde 2,5 R içinde merceklenmiş yıldız alanı (Einstein yarıçapı 1,45 R). Spagetti: pulsardan
+diske 3B kıvrımlı tüp (16 kesit) ve diske akan kuyruk.
+
+| Kademe | Pulsar dörtgen (üst sınır) | Kara delik dörtgen (en kötü kare) | Disk dilimi | Mercek yıldızı | Plazma |
+|---|---|---|---|---|---|
+| Düşük | 432 | 548 | 24 | 120 | 40 |
+| Orta | 1 337 | 1 776 | 72 | 300 | 120 |
+| Yüksek | 2 333 | 2 322 | 72 | 450 | 200 |
+| Ultra | 4 485 | 3 074 | 96 | 600 | 300 |
+
+**Ses.** `pulsar_vurus.ogg`: 8 sn döngü, tam 87 vuruş (10,875 Hz), 256 Hz vızıltı + 40–80 Hz uğultu + seyrek çatırtı, −26 LUFS /
+−13,7 dBTP. Boğuk-yankılı varyantlar `pulsar_vurus_yankili.ogg`, `karadelik_yutma_yankili.ogg` (800 Hz alçak geçiren + 67–401 ms
+aralıklı altı yankı). Konumsuz, WEATHER kategorisi. Sönüm `k = gökOranı × derinlik` (gökOranı: başın bir üstündeki 5×5
+hücrede gök ışığı 15 olan payı; derinlik: y 63'ün altına her 16 blokta −%25, y ≤ −1'de 0): kuru kazanç k, yankılı
+0,35·(1 − k). OpenAL EFX kullanılmadı (kaynak kimliğine mixin'siz erişim yok); varyant çapraz geçişi.
+

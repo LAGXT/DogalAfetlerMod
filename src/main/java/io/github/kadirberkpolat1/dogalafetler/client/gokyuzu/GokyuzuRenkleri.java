@@ -1,5 +1,6 @@
 package io.github.kadirberkpolat1.dogalafetler.client.gokyuzu;
 
+import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciDonem;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.GokyuzuEgrileri;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.KaraDelikYutmaEgrileri;
@@ -10,7 +11,8 @@ import org.joml.Vector3f;
 /**
  * Evreye göre gök kubbesi, sis, uzay katmanı ve ışık haritası tonu (docs/tasarim/gokyuzu.md renk tablosu, spike G2/G5).
  * Evre değişiminde önceki evrenin son rengiyle 20 sn karıştırılır. Hepsi yalnız görseldir: ışık değerleri, gün/gece
- * döngüsü ve spawn kuralları değişmez (madde 16). Pulsar yolunda ({@code yol}) GUNESSIZ ve KIZIL_CUCE kalıntı nebulasız.
+ * döngüsü ve spawn kuralları değişmez (madde 16). Pulsar yolunda ({@code yol}) GUNESSIZ ve KIZIL_CUCE kalıntı nebulasız;
+ * eski güneşin dönüş geçişinde önceki KIZIL_CUCE de (Ps4).
  */
 final class GokyuzuRenkleri {
     private static final int GECE_AYSIZ = 0x05070F;
@@ -119,7 +121,7 @@ final class GokyuzuRenkleri {
         if (g.onceki() == null || g.gecis() >= 1f) {
             return yeni;
         }
-        float[] eski = tekGok(g.onceki(), 1f, 1e6f, g.ayVar(), vanilla, gun, g.renkGucu(), g.pulsarYolu());
+        float[] eski = tekGok(g.onceki(), 1f, 1e6f, g.ayVar(), vanilla, gun, g.renkGucu(), oncekiYol(g));
         return GokyuzuEgrileri.karistir(eski, yeni, g.gecis());
     }
 
@@ -128,7 +130,7 @@ final class GokyuzuRenkleri {
         if (g.onceki() == null || g.gecis() >= 1f) {
             return yeni;
         }
-        float[] eski = tekSis(g.onceki(), 1f, 1e6f, g.ayVar(), vanilla, gun, g.renkGucu(), g.pulsarYolu());
+        float[] eski = tekSis(g.onceki(), 1f, 1e6f, g.ayVar(), vanilla, gun, g.renkGucu(), oncekiYol(g));
         return GokyuzuEgrileri.karistir(eski, yeni, g.gecis());
     }
 
@@ -174,7 +176,15 @@ final class GokyuzuRenkleri {
     static float kalintiAlfa(IstemciGokyuzu.Gorunum g) {
         float yeni = tekKalinti(g.evre(), g.ilerleme(), g.saniye(), g.pulsarYolu());
         return g.onceki() == null || g.gecis() >= 1f ? yeni
-                : Mth.lerp(g.gecis(), tekKalinti(g.onceki(), 1f, 1e6f, g.pulsarYolu()), yeni);
+                : Mth.lerp(g.gecis(), tekKalinti(g.onceki(), 1f, 1e6f, oncekiYol(g)), yeni);
+    }
+
+    /**
+     * Önceki evre pulsar yolunda mıydı: paketin dönüş yolu bayrağı NORMAL'e dönünce kalkar, o geçişte önceki KIZIL_CUCE'yi
+     * {@code gunesDondu} bildirir (yoksa 20 sn kalıntı nebulası ve sönük pulsar noktası belirirdi).
+     */
+    private static boolean oncekiYol(IstemciGokyuzu.Gorunum g) {
+        return g.pulsarYolu() || IstemciDonem.durum().gunesDondu();
     }
 
     private static float[] tekIsik(GunesEvresi evre, float p, float saniye) {

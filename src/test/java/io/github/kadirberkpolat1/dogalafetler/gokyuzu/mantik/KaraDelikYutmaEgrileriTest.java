@@ -141,4 +141,19 @@ class KaraDelikYutmaEgrileriTest {
         assertTrue(k > 0.1f && k < KaraDelikYutmaEgrileri.KIRAGI_ILK, "ilk kırağı: " + k);
         assertEquals(KaraDelikYutmaEgrileri.KIRAGI_ILK, KaraDelikYutmaEgrileri.kiragi(SON), 1e-6f);
     }
+
+    @Test
+    void gorunenEgimCaplaBirlikteAcilirVeKapanir() {
+        assertEquals(KaraDelikYutmaEgrileri.EGIM_UZAK, KaraDelikYutmaEgrileri.gorunenEgim(0f), 1e-5f);
+        assertEquals(KaraDelikYutmaEgrileri.EGIM_YAKIN, KaraDelikYutmaEgrileri.gorunenEgim(30f), 1e-5f);
+        float onceki = 0f;
+        for (float s = 0f; s <= KaraDelikYutmaEgrileri.YAKLASMA_SN; s += 0.5f) {
+            float e = KaraDelikYutmaEgrileri.gorunenEgim(s);
+            assertTrue(e >= onceki - 1e-5f, "yaklaşırken açılır: " + s);
+            onceki = e;
+        }
+        assertTrue(KaraDelikYutmaEgrileri.gorunenEgim(72f) > KaraDelikYutmaEgrileri.gorunenEgim(90f),
+                "uzaklaşırken kapanır");
+        assertTrue(KaraDelikYutmaEgrileri.gorunenEgim(90f) < KaraDelikYutmaEgrileri.EGIM_UZAK + 0.5f);
+    }
 }

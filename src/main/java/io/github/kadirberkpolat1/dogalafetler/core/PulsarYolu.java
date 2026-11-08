@@ -9,7 +9,9 @@ import net.minecraft.nbt.CompoundTag;
  * bitince eski güneş döner). {@link #gunesDondu} NORMAL'e bu yoldan dönüldüğünü ve donmanın 0'a çözüldüğünü söyler. İki
  * bayrak {@code DonemPaketi.bayraklar} ile istemciye gider: değişimleri acil senkron ister, evreyle birlikte yazılırsa
  * aynı pakette gider. Süreler K-C29 oyun tick'iyle ({@code oyun zamanı + uyku birikimi + gün ofseti × 24000}) tutulur.
- * Yazanı {@code gokyuzu.PulsarSureci}, {@code GunesZinciriSureci} ve sıfırlamadır; diğerleri yalnız okur.
+ * Süreç durdurulunca durma anı yazılır, kural açılınca süreler o kadar ileri çekilir (K-C46). {@link #zincirTukendi}
+ * kalıcıdır: yalnız {@code sifirla} siler (madde 4 tek seferlik). Yazanı {@code gokyuzu.PulsarSureci},
+ * {@code GunesZinciriSureci} ve sıfırlamadır; diğerleri yalnız okur.
  */
 public final class PulsarYolu {
     public static final String ALT_SISTEM = "pulsar";
@@ -23,6 +25,11 @@ public final class PulsarYolu {
     public static final String YUTMA_PATLAMASI = "yutmaPatlamasi";
     public static final String DONUS_YOLU = "donusYolu";
     public static final String GUNES_DONDU = "gunesDondu";
+    /** Eski güneş pulsar yolundan döndü: güneş patlaması yalnız {@code tekrarlanabilir} açıkken yeniden seçilir. */
+    public static final String ZINCIR_TUKENDI = "zincirTukendi";
+    /** Süreç durdurulduğu andaki K-C29 oyun tick'i ve ölçekli afet saati (K-C46). */
+    public static final String DURMA_OYUN_TICK = "durmaOyunTick";
+    public static final String DURMA_SAATI = "durmaSaati";
 
     private PulsarYolu() {
     }
@@ -66,12 +73,31 @@ public final class PulsarYolu {
         return veri(donem).getBoolean(YUTMA_PATLAMASI);
     }
 
+    /** Eski güneş bu dünyada pulsar yolundan döndü (kalıcı; {@code sifirla} siler). */
+    public static boolean zincirTukendi(DunyaDonemi donem) {
+        return veri(donem).getBoolean(ZINCIR_TUKENDI);
+    }
+
+    public static boolean durmaVar(DunyaDonemi donem) {
+        return veri(donem).contains(DURMA_OYUN_TICK);
+    }
+
+    public static long durmaOyunTick(DunyaDonemi donem) {
+        return veri(donem).getLong(DURMA_OYUN_TICK);
+    }
+
+    public static long durmaSaati(DunyaDonemi donem) {
+        return veri(donem).getLong(DURMA_SAATI);
+    }
+
     /** Yeni pulsar döngüsü: döngü kimliği ve oyun tick'i başlangıcı birlikte yazılır, yutma bayrağı silinir. */
     public static void yeniDongu(DunyaDonemi donem, long dongu, long oyunTick) {
         CompoundTag veri = veri(donem);
         veri.putLong(DONGU, dongu);
         veri.putLong(BASLANGIC, oyunTick);
         veri.remove(YUTMA_PATLAMASI);
+        veri.remove(DURMA_OYUN_TICK);
+        veri.remove(DURMA_SAATI);
         donem.ekVeriDegisti(ALT_SISTEM);
     }
 
@@ -104,19 +130,59 @@ public final class PulsarYolu {
         }
     }
 
+    public static void zincirTukendiAyarla(DunyaDonemi donem, boolean tukendi) {
+        if (bayrakYaz(donem, ZINCIR_TUKENDI, tukendi)) {
+            donem.ekVeriDegisti(ALT_SISTEM);
+        }
+    }
+
+    /** Durma anını yazar (durdurmada ve durmuşken evre değişince: yeni evrenin süresi o andan sayılır). */
+    public static void durmaAyarla(DunyaDonemi donem, long oyunTick, long saat) {
+        CompoundTag veri = veri(donem);
+        veri.putLong(DURMA_OYUN_TICK, oyunTick);
+        veri.putLong(DURMA_SAATI, saat);
+        donem.ekVeriDegisti(ALT_SISTEM);
+    }
+
     /**
-     * {@code kizilcuce baslat}, {@code pulsar baslat} ve zincirin doğal doğuşu: yol bayrakları ve aşama kayıtları silinir;
-     * döngü kimliği kalır (biten döngünün yangın/meteor kaynağı ona bakar, yeni PULSAR üstüne yazar).
+     * Kural açıldı (K-C46): durma anı silinir, evrenin oyun günü süresi (PULSAR'da {@link #BASLANGIC}, güneşsiz dönemde
+     * {@link #GUNESSIZ_BASLANGIC}) durduğu süre kadar ileri çekilir. Yutma saniyesi ölçekli saatle evre başlangıcından
+     * sayıldığı için onu sahibi {@code DunyaDonemi.evreBaslangiciniKaydir} ile kaydırır.
+     *
+     * @param ileriOyunTick durduğu süre (K-C29 oyun tick'i, ≥ 0)
+     */
+    public static void durmaBitti(DunyaDonemi donem, long ileriOyunTick) {
+        CompoundTag veri = veri(donem);
+        String sure = switch (donem.gunesEvresi()) {
+            case PULSAR -> BASLANGIC;
+            case GUNESSIZ -> GUNESSIZ_BASLANGIC;
+            default -> null;
+        };
+        if (sure != null && veri.contains(sure)) {
+            veri.putLong(sure, veri.getLong(sure) + ileriOyunTick);
+        }
+        veri.remove(DURMA_OYUN_TICK);
+        veri.remove(DURMA_SAATI);
+        donem.ekVeriDegisti(ALT_SISTEM);
+    }
+
+    /**
+     * {@code kizilcuce baslat}, {@code pulsar baslat} ve zincirin doğal doğuşu: yol bayrakları, aşama kayıtları ve durma
+     * anı silinir; döngü kimliği (biten döngünün yangın/meteor kaynağı ona bakar, yeni PULSAR üstüne yazar) ve
+     * {@link #zincirTukendi} kalır.
      */
     public static void temizle(DunyaDonemi donem) {
         CompoundTag veri = veri(donem);
         boolean bayrak = veri.contains(DONUS_YOLU) || veri.contains(GUNES_DONDU);
-        boolean kayit = veri.contains(BASLANGIC) || veri.contains(GUNESSIZ_BASLANGIC) || veri.contains(YUTMA_PATLAMASI);
+        boolean kayit = veri.contains(BASLANGIC) || veri.contains(GUNESSIZ_BASLANGIC) || veri.contains(YUTMA_PATLAMASI)
+                || veri.contains(DURMA_OYUN_TICK);
         veri.remove(DONUS_YOLU);
         veri.remove(GUNES_DONDU);
         veri.remove(BASLANGIC);
         veri.remove(GUNESSIZ_BASLANGIC);
         veri.remove(YUTMA_PATLAMASI);
+        veri.remove(DURMA_OYUN_TICK);
+        veri.remove(DURMA_SAATI);
         if (bayrak) {
             istemciyeBildir(donem);
         } else if (kayit) {

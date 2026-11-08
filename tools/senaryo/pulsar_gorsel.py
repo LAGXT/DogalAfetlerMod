@@ -3,15 +3,20 @@
 
 Kullanım (worktree kökünden): python3 tools/senaryo/pulsar_gorsel.py [<kanıt klasörü>]
   pc2'de görünür istemciyle: tools/senaryo/pc2_istemci.sh <kanıt klasörü>/ pulsar_gorsel.py <kanıt klasörü>
-Kanıt klasörü verilmezse KOK/.vibe/kanit/pulsar-2/gorsel.
+Kanıt klasörü verilmezse KOK/.vibe/kanit/pulsar-2/gorsel-4 (tur 4).
 
 Tek oyunculu Quick Play dünyası `run/saves/pulsar` her koşuda KOK/run/saves/test'ten (seed 20261105, allowCommands=1) taze
 kopyalanır; istemci `-Potomasyon=pulsar` ile açılır ve `client.gokyuzu.PulsarOtomasyonu` adımlarını yürütür (büyük
-pulsar, aynı saniyede iki titreşim karesi, blok hasarı açık cehennem + meteor izi, pulsar gecesi, kara delik yutmasının
-dört anı tam evre saniyesinde, güneşsiz buzul, kızıl cüce doğuşu, eski güneşin dönüşü). Her kare satırı FPS, TPS, mspt,
-evre, evre saniyesi, kül yağışı sayacı ve uçan meteoru taşır; betik bunları `kareler-<no>.tsv`'ye yazar ve her karenin
-evresini (kara delik kareleri `karadelik_yutma`, kızıl cüce ilerlemesi >= 0,3, cehennemde kül yağışı > 0 ve uçan meteor
->= 1) denetler. K-E29: ana makinede her kare FPS >= 20; pc2'de FPS geçersizdir, yalnız bilgi olarak yazılır.
+pulsar, iki ardışık titreşim karesi, 0,5 sn içinde 6 karelik titreşim serisi, blok hasarı açık 3 eşdeğer günlük kavurma
+sonrası cehennem + meteor izi, 5x5 hava kuyusunda ses derinliği ölçümü, pulsar gecesi, ~30° yandan 3B paralaks karesi,
+kara delik yutmasının beş anı tam evre saniyesinde (mercek karesi FOV 30), güneşsiz buzul, kızıl cüce doğuşu, eski
+güneşin dönüşü). Her kare satırı FPS, TPS, mspt, evre, evre saniyesi, kül yağışı, uçan meteor, 3B dörtgen sayısı
+(Pulsar3B + KaraDelik3B), kavurmanın eşdeğer günü, titreşim ofseti, çekirdek merkez pikseli ve FOV'u taşır; betik
+bunları `kareler-<no>.tsv`'ye, `PULSAR_SES` satırlarını `ses.tsv`'ye, `PULSAR_TITRESIM` satırlarını `titresim.tsv`'ye
+yazar ve denetler: her karenin evresi (kara delik kareleri `karadelik_yutma`, kızıl cüce ilerlemesi >= 0,3, cehennemde
+kül yağışı > 0, uçan meteor >= 1 ve eşdeğer gün >= 3, mercek FOV 30), ses ölçümleri (açık gök kuyusunda y 64 ya da
+yüzey+1 / 48 / 16 / -20 ve üstü kapalı tünel), titreşim serisi (6 kare, 500 ms içinde, her karede çekirdek pikseli).
+K-E29: ana makinede her kare FPS >= 20; pc2'de FPS geçersizdir, yalnız bilgi olarak yazılır.
 
 Protokol (runclient_kilit.py ortak yolu): (a) açılış yalnız Hyprland exec kuralıyla ([workspace 93 silent;
 no_initial_focus; no_focus on; focus_on_activate off]); (b) JVM'de HL_EXEC_RULE_TOKEN yoksa öldürülür; (c) pencere
@@ -41,25 +46,44 @@ import runclient_kilit  # noqa: E402
 WS = 93
 W = Path(__file__).resolve().parents[2]
 KOK = W.parents[1] if W.parent.name == ".worktrees" else W
-KANIT = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else KOK / ".vibe/kanit/pulsar-2/gorsel"
+KANIT = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else KOK / ".vibe/kanit/pulsar-2/gorsel-4"
 KARELER = KANIT / "kareler"
 JAVA_HOME = "/home/lagxt/.jdks/jdk-17.0.21+9"
 ISARET = "PULSAR_OTOMASYON"
 ONEK = "pulsar2_"
 FPS_ESIGI = 20
-BEKLENEN = ["pulsar_buyuk", "pulsar_titresim_a", "pulsar_titresim_b", "pulsar_cehennem", "pulsar_gece",
-            "karadelik_yaklasma", "karadelik_spagetti", "karadelik_parlama", "karadelik_karanlik", "gunessiz_buz",
-            "kizil_cuce_dogus", "gunes_dondu"]
+SERI = "titresim_seri"
+SERI_KARE = 6
+SERI_MS = 500
+CEHENNEM_GUN = 3.0
+MERCEK_FOV = 30
+SES_Y = [48, 16, -20]
+BEKLENEN = ["pulsar_buyuk", "pulsar_titresim_a", "pulsar_titresim_b", *(f"{SERI}_{i}" for i in range(SERI_KARE)),
+            "pulsar_cehennem", "pulsar_gece", "pulsar_3b_yan", "karadelik_yaklasma", "karadelik_mercek",
+            "karadelik_spagetti", "karadelik_parlama", "karadelik_karanlik", "gunessiz_buz", "kizil_cuce_dogus",
+            "gunes_dondu"]
 EVRE = {"pulsar_buyuk": "pulsar", "pulsar_titresim_a": "pulsar", "pulsar_titresim_b": "pulsar",
-        "pulsar_cehennem": "pulsar", "pulsar_gece": "pulsar", "karadelik_yaklasma": "karadelik_yutma",
+        **{f"{SERI}_{i}": "pulsar" for i in range(SERI_KARE)}, "pulsar_cehennem": "pulsar", "pulsar_gece": "pulsar",
+        "pulsar_3b_yan": "pulsar", "karadelik_yaklasma": "karadelik_yutma", "karadelik_mercek": "karadelik_yutma",
         "karadelik_spagetti": "karadelik_yutma", "karadelik_parlama": "karadelik_yutma",
         "karadelik_karanlik": "karadelik_yutma", "gunessiz_buz": "gunessiz", "kizil_cuce_dogus": "kizil_cuce",
         "gunes_dondu": "normal"}
 KARE_SATIRI = re.compile(rf"{ISARET} kare {ONEK}(\w+)\.png \(FPS (\d+), TPS ([\d.?]+), mspt ([\d.?]+), evre (\w+), "
                          r"ilerleme ([\d.]+), evre sn ([\d.]+), sabit sn ([\d.-]+), kül yağışı (\d+), uçan meteor (\d+), "
-                         r"parçacık (\d+), dönüş yolu (\w+), blok hasarı (\w+), güneş döndü (\w+)")
+                         r"parçacık (\d+), dönüş yolu (\w+), blok hasarı (\w+), güneş döndü (\w+), "
+                         r"dortgen=(\d+) \(pulsar (\d+) \+ kara delik (\d+)\), eşdeğer gün ([^,]+), "
+                         r"ofset ([-\d.]+) ([-\d.]+), çekirdek px ([-\d.]+) ([-\d.]+), FOV (\d+)")
 SUTUNLAR = ["kare", "FPS", "TPS", "mspt", "evre", "ilerleme", "evre_sn", "sabit_sn", "kul_yagisi", "ucan_meteor",
-            "parcacik", "donus_yolu", "blok_hasari", "gunes_dondu"]
+            "parcacik", "donus_yolu", "blok_hasari", "gunes_dondu", "dortgen", "dortgen_pulsar", "dortgen_karadelik",
+            "esdeger_gun", "ofset_x", "ofset_y", "px_x", "px_y", "FOV"]
+SES_SATIRI = re.compile(r"PULSAR_SES (kapali )?y=([-\d.]+) k=([\d.]+) kuru=([\d.]+) yankı=([\d.]+) gök=([\d.]+) "
+                        r"hedef=(-?\d+)")
+SES_SUTUNLARI = ["olcum", "y", "k", "kuru", "yanki", "gok", "hedef"]
+TITRESIM_KARESI = re.compile(r"PULSAR_TITRESIM kare=(\w+) t_ms=([\d.]+) ofset_x=([-\d.]+) ofset_y=([-\d.]+) "
+                             r"px_x=([-\d.]+) px_y=([-\d.]+)")
+TITRESIM_SERISI = re.compile(r"PULSAR_TITRESIM seri ad=(\w+) n=(\d+) ofset_x=(\S+) ofset_y=(\S+) px_x=(\S+) "
+                             r"px_y=(\S+) aralik_ms=(\S*) toplam_ms=([\d.]+)")
+TITRESIM_SUTUNLARI = ["satir", "ad", "t_ms", "ofset_x", "ofset_y", "px_x", "px_y", "aralik_ms"]
 KANIT.mkdir(parents=True, exist_ok=True)
 KARELER.mkdir(exist_ok=True)
 GUNLUK = open(KANIT / "protokol.log", "a", encoding="utf-8")
@@ -147,11 +171,52 @@ def kare_denetimi(satirlar):
             yanlis.append(f"{kare}: doğuş ilerlemesi {s['ilerleme']} < 0,3")
         if kare == "pulsar_cehennem" and (int(s["kul_yagisi"]) == 0 or int(s["ucan_meteor"]) == 0):
             yanlis.append(f"{kare}: kül yağışı {s['kul_yagisi']}, uçan meteor {s['ucan_meteor']} (ikisi de > 0 olmalı)")
+        if kare == "pulsar_cehennem" and not sayi(s["esdeger_gun"]) >= CEHENNEM_GUN:
+            yanlis.append(f"{kare}: eşdeğer gün {s['esdeger_gun']} < {CEHENNEM_GUN:g}")
+        if kare == "karadelik_mercek" and int(s["FOV"]) != MERCEK_FOV:
+            yanlis.append(f"{kare}: FOV {s['FOV']} (beklenen {MERCEK_FOV})")
         if kare in ("gunessiz_buz", "kizil_cuce_dogus") and s["donus_yolu"] != "true":
             yanlis.append(f"{kare}: dönüş yolu {s['donus_yolu']} (pulsar yolu bekleniyordu)")
         if int(s["FPS"]) < FPS_ESIGI:
             dusuk.append(f"{kare} {s['FPS']}")
     return yanlis, dusuk
+
+
+def sayi(metin):
+    try:
+        return float(metin)
+    except ValueError:
+        return float("nan")
+
+
+def ses_denetimi(sesler):
+    """Açık gök kuyusunda 4 ölçüm (y 64 ya da yüzey+1, sonra 48 / 16 / -20) ve bir üstü kapalı tünel ölçümü."""
+    acik = [s for s in sesler if s["olcum"] == "acik"]
+    kapali = [s for s in sesler if s["olcum"] == "kapali"]
+    yanlis = []
+    hedefler = [int(s["hedef"]) for s in acik]
+    if len(acik) != 4 or hedefler[1:] != SES_Y or hedefler[0] > 64:
+        yanlis.append(f"ses: açık gök ölçümleri hedef {hedefler} (beklenen [64 ya da yüzey+1] + {SES_Y})")
+    if len(kapali) != 1:
+        yanlis.append(f"ses: üstü kapalı ölçüm {len(kapali)} (beklenen 1)")
+    return yanlis
+
+
+def titresim_denetimi(seriler, kareler):
+    """Ps6: titresim_seri 6 kare, ilk ile son kare arası <= 500 ms, her karede ofset ve çekirdek pikseli."""
+    seri = [s for s in seriler if s["ad"] == SERI]
+    if not seri:
+        return [f"titreşim: {SERI} seri satırı yok"]
+    s = seri[-1]
+    yanlis = []
+    if int(s["n"]) != SERI_KARE:
+        yanlis.append(f"titreşim: seri {s['n']} kare (beklenen {SERI_KARE})")
+    if not sayi(s["t_ms"]) <= SERI_MS:
+        yanlis.append(f"titreşim: seri {s['t_ms']} ms (beklenen <= {SERI_MS})")
+    eksik = [k["ad"] for k in kareler if k["ad"].startswith(SERI) and "-" in (k["ofset_x"], k["px_x"])]
+    if eksik:
+        yanlis.append(f"titreşim: ofset ya da çekirdek pikseli yok {eksik}")
+    return yanlis
 
 
 def kosu(no):
@@ -210,12 +275,30 @@ def kosu(no):
     (KANIT / f"kareler-{no}.tsv").write_text("\n".join(tablo) + "\n", encoding="utf-8")
     for satir in tablo:
         log("tablo:", satir)
+    sesler = [dict(zip(SES_SUTUNLARI, ("kapali" if m.group(1) else "acik",) + m.groups()[1:]))
+              for m in SES_SATIRI.finditer(metin)]
+    ses_tablo = ["\t".join(["kosu"] + SES_SUTUNLARI)] + ["\t".join([str(no)] + [s[k] for k in SES_SUTUNLARI])
+                                                      for s in sesler]
+    (KANIT / "ses.tsv").write_text("\n".join(ses_tablo) + "\n", encoding="utf-8")
+    titresim_kareleri = [dict(zip(TITRESIM_SUTUNLARI, ("kare",) + m.groups() + ("",)))
+                         for m in TITRESIM_KARESI.finditer(metin)]
+    seriler = [dict(zip(["ad", "n", "ofset_x", "ofset_y", "px_x", "px_y", "aralik_ms", "t_ms"], m.groups()))
+               for m in TITRESIM_SERISI.finditer(metin)]
+    titresim_tablo = ["\t".join(["kosu"] + TITRESIM_SUTUNLARI)]
+    titresim_tablo += ["\t".join([str(no)] + [k[c] for c in TITRESIM_SUTUNLARI]) for k in titresim_kareleri]
+    titresim_tablo += ["\t".join([str(no), "seri"] + [s[c] for c in TITRESIM_SUTUNLARI[1:]]) for s in seriler]
+    (KANIT / "titresim.tsv").write_text("\n".join(titresim_tablo) + "\n", encoding="utf-8")
+    for satir in ses_tablo[1:] + titresim_tablo[1:]:
+        log("ölçüm:", satir)
     for satir in metin.splitlines():
-        if f"{ISARET} " in satir and any(k in satir for k in ("zaman aşımı", "cehennem:", "ardışık kare", "en düşük TPS",
-                                                            "meteor kameranın", "yutma kadrajı")):
+        if f"{ISARET} " in satir and any(k in satir for k in ("zaman aşımı", "cehennem:", "en düşük TPS", "meteor kameranın",
+                                                            "kadraj ", "3B yan:", "ses kuyusu:", "kavurma birikimi:",
+                                                            "kamera ayarı:", "gök kamerası:")):
             log("otomasyon:", satir.split(f"{ISARET} ", 1)[1])
         elif "kara delik yutma patlaması" in satir or "[pulsar] yutma sesi" in satir:
             log("yutma:", satir.strip())
+        elif "PULSAR_SES " in satir and "yok:" in satir:
+            log("ses:", satir.split("PULSAR_SES ", 1)[1])
     sayim = girdi_sayilari((latest, istemci_log))
     if sayim is None:
         log(f"koşu {no} GEÇERSİZ: girdi sayıları satırı yok")
@@ -226,6 +309,7 @@ def kosu(no):
     eksik = [k for k in BEKLENEN if k not in kareler]
     ayni = sorted({a for a in kareler for b in kareler if a < b and kareler[a] == kareler[b]})
     yanlis, dusuk = kare_denetimi(satirlar)
+    yanlis += ses_denetimi(sesler) + titresim_denetimi(seriler, titresim_kareleri)
     if eksik:
         log(f"koşu {no}: eksik kare {eksik}")
     if ayni:

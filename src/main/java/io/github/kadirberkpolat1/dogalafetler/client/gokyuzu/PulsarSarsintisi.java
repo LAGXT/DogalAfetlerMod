@@ -5,9 +5,6 @@ import io.github.kadirberkpolat1.dogalafetler.gokyuzu.GokyuzuAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.PulsarSesleri;
 import java.util.function.Consumer;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.resources.sounds.SimpleSoundInstance;
-import net.minecraft.client.resources.sounds.SoundInstance;
-import net.minecraft.sounds.SoundSource;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.ViewportEvent;
 import net.minecraftforge.event.TickEvent;
@@ -16,9 +13,9 @@ import net.minecraftforge.fml.common.Mod;
 
 /**
  * Kara delik yutmasının istemci tepkisi ({@code gokyuzu/yutma} paketi, yutma başına bir kez): kütleçekim dalgası sesi
- * konumsuz (dinleyicide, sönümsüz) çalar ve tek seferlik ekran sarsıntısı başlar; genlik sürenin karesiyle söner. Hızlı
- * titreme bileşeni {@code gokyuzu.pulsarTitresim} ile ölçeklenir (0'da yalnız yavaş yuvarlanma kalır, PL-2 erişilebilirlik).
- * Ekrana yazı yoktur (N6).
+ * {@link PulsarSesi#yutmaCal} ile konumsuz (dinleyicide) kuru + boğuk-yankılı çalar (derinlik/örtü sönümüyle) ve tek
+ * seferlik ekran sarsıntısı başlar; genlik sürenin karesiyle söner. Hızlı titreme bileşeni {@code gokyuzu.pulsarTitresim}
+ * ile ölçeklenir (0'da yalnız yavaş yuvarlanma kalır, PL-2 erişilebilirlik). Ekrana yazı yoktur (N6).
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class PulsarSarsintisi {
@@ -35,13 +32,11 @@ public final class PulsarSarsintisi {
     }
 
     private static void yutma(PulsarSesleri.YutmaPaketi p) {
-        Minecraft.getInstance().getSoundManager().play(new SimpleSoundInstance(PulsarSesleri.KARADELIK_YUTMA_KIMLIGI,
-                SoundSource.AMBIENT, 1f, 1f, SoundInstance.createUnseededRandom(), false, 0,
-                SoundInstance.Attenuation.NONE, 0, 0, 0, true));
+        PulsarSesi.yutmaCal();
         toplam = p.sureTick();
         kalan = toplam;
         genlik = p.siddet();
-        DogalAfetler.LOGGER.info("[pulsar] yutma sesi çalındı, sarsıntı {}° {} tick", genlik, toplam);
+        DogalAfetler.LOGGER.info("[pulsar] yutma sarsıntısı {}° {} tick", genlik, toplam);
     }
 
     @SubscribeEvent

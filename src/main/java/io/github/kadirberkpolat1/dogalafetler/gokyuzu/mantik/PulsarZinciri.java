@@ -7,8 +7,8 @@ import java.util.Optional;
  * Pulsar zincirinin saf kuralları (pulsar-2): PULSAR ({@code pulsarGun} oyun günü) → KARADELİK_YUTMA ({@value #YUTMA_SN}
  * sn, ölçekli afet saatiyle) → pulsar yolunda GÜNEŞSİZ ({@code pulsarSonrasiGunessizGun} oyun günü + ilk şafak) →
  * KIZIL CÜCE doğuşu → NORMAL (eski güneş). Gün süreleri K-C29 oyun tick'iyle ({@link #oyunTick}) sayılır: {@code /time
- * set} ve {@code /dogalafet hiz} onları değiştirmez, uyku ve {@code /dogalafet gun} ofseti ilerletir. Minecraft sınıfı
- * kullanmaz.
+ * set} ve {@code /dogalafet hiz} onları değiştirmez, uyku ve {@code /dogalafet gun} ofseti ilerletir. Kural duraklatması
+ * sayılmaz (K-C46): kural açılınca başlangıçlar {@link #duraklama} kadar ileri çekilir. Minecraft sınıfı kullanmaz.
  */
 public final class PulsarZinciri {
     public static final long GUN_TICK = GunesZinciri.GUN_TICK;
@@ -60,6 +60,14 @@ public final class PulsarZinciri {
 
     public static long sureTick(double gun) {
         return Math.max(1L, Math.round(gun * GUN_TICK));
+    }
+
+    /**
+     * K-C46: durma anından kuralın açıldığı ana geçen süre (oyun tick'i ya da ölçekli saat); geri alınan ofsette 0. Süre
+     * başlangıcı bu kadar ileri çekilince kalan süre ve yutma saniyesi durduğu andaki değerine döner.
+     */
+    public static long duraklama(long durma, long simdi) {
+        return Math.max(0L, simdi - durma);
     }
 
     /** Başlangıçtan beri geçen oyun tick'i; geri alınan ofsette 0. */

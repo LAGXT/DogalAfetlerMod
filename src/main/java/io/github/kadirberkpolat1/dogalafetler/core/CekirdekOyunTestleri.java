@@ -5,7 +5,6 @@ import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SonumTipi;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.ZamanlayiciAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.TekSeferlikAyarlari;
-import io.github.kadirberkpolat1.dogalafetler.core.mantik.TekSeferlikKurallar;
 import io.github.kadirberkpolat1.dogalafetler.core.olay.AfetBittiEvent;
 import io.github.kadirberkpolat1.dogalafetler.core.olay.SirenIstegiEvent;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
@@ -307,8 +306,8 @@ public final class CekirdekOyunTestleri {
             yardimci.assertTrue(yonetici.aktifAfet().isEmpty(), "afet durmadı");
             yardimci.assertTrue(donem.gunesEvresi() == GunesEvresi.NORMAL,
                     "tamamlanmamış büyüme durdurulunca güneş NORMAL olmalı: " + donem.gunesEvresi());
-            yardimci.assertTrue(TekSeferlikKurallar.uygunMu(AfetTuru.GUNES_PATLAMASI, donem.ayVar(), donem.gunesEvresi(),
-                    1000, 1000, TekSeferlikAyarlari.VARSAYILAN), "güneş patlaması yeniden seçilebilir kalmalı");
+            yardimci.assertTrue(yonetici.tekSeferlikUygun(AfetTuru.GUNES_PATLAMASI, 1000, 1000,
+                    TekSeferlikAyarlari.VARSAYILAN), "güneş patlaması yeniden seçilebilir kalmalı");
 
             yardimci.assertTrue(yonetici.elleBaslat(AfetTuru.GUNES_PATLAMASI, null, null, level, konum)
                     == AfetYoneticisi.BaslatmaSonucu.BASLADI, "ikinci güneş patlaması başlamadı");

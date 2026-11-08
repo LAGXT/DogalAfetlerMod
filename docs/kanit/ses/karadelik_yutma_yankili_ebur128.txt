@@ -1,0 +1,24 @@
+Dosya: src/main/resources/assets/dogalafetler/sounds/karadelik_yutma_yankili.ogg (46203 bayt, 8.0 sn, mono, 48000 Hz, Vorbis q5)
+Hedef (docs/tasarim/ses.md §4): -23.0 LUFS ±1, gerçek tepe <= -6.0 dBTP, baskın frekans 20–120 Hz, 2500 Hz üstü <= -25 dB
+Ölçülen (ogg): I = -23.0 LUFS, gerçek tepe = -10.0 dBTP
+Baskın frekanslar (20 Hz kümeleri, güçlüden zayıfa): 40 Hz, 60 Hz, 20 Hz
+Perde izi (0,5 sn pencerelerde en güçlü frekans, ilk 20): 86, 80, 72, 66, 60, 56, 50, 46, 42, 38, 34, 32, 28, 26, 24, 24 Hz
+Bant enerjisi / toplam: 20–120 Hz -0.1 dB; 300–3400 Hz (konuşma) -31.6 dB; >2500 Hz -77.2 dB; >8000 Hz -87.0 dB
+Tek seferlik: döngü dikişi ölçülmez (son 1 sn kosinüsle sıfıra iner).
+Hedefle karşılaştırma: UYGUN
+
+ffmpeg -i karadelik_yutma_yankili.ogg -af ebur128=peak=true -f null -
+Summary:
+
+  Integrated loudness:
+    I:         -23.0 LUFS
+    Threshold: -33.4 LUFS
+
+  Loudness range:
+    LRA:         6.4 LU
+    Threshold: -43.6 LUFS
+    LRA low:   -27.7 LUFS
+    LRA high:  -21.3 LUFS
+
+  True peak:
+    Peak:      -10.0 dBFS

@@ -3,9 +3,34 @@ package io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik;
 /**
  * Pulsar kavurmasının saf dönüşüm tablosu (PL-3 a): blok kategorisi × güç (0–1) × [0, 1) zar → hedef. Kategoriyi blok ve
  * etiketten sunucu tarafı ({@code gokyuzu.KavurmaKuyrugu}) çıkarır; tablo Minecraft sınıfı kullanmaz. Güç 0 iken hiçbir
- * şey değişmez. Kül birikimi (kül yağışının dünyadaki izi) ayrı bir zarla {@link #birikimKati} ile seçilir.
+ * şey değişmez. Kül birikimi (kül yağışının dünyadaki izi) ayrı bir zarla {@link #birikimKati} ile seçilir. Örnekleme
+ * (Ps5): deneme sayısı alanla orantılıdır ({@link #DENEME_YOGUNLUGU}, yarıçaptan bağımsız); bir isabet sütunu yanan
+ * örtüsüyle ({@link #altinaSurer}) zemine kadar kavurur.
  */
 public final class PulsarKavurma {
+    /** Varsayılan {@code pulsarKavrulmaOlasiligi}: tam güçte bir denemenin sütun seçme olasılığı. */
+    public static final double VARSAYILAN_OLASILIK = 0.6;
+    /** Üç oyun günü (oyun tick'i). */
+    public static final long UC_GUN_TICK = 3L * 24_000L;
+    /**
+     * Tam güçte, varsayılan olasılıkla üç oyun gününde bir yüzey sütununa düşen ortalama isabet (Poisson λ). Bir isabet
+     * sütunu zemine kadar kavurur (çimen kalmaz), ikincisi kaba toprağı kül bloğuna çevirir: 96 blok yarıçaptaki ~29 bin
+     * sütunda hiç isabet almayan sütun beklentisi 29 000 · e^−16 ≈ 0,003, iki isabetten az alan payı 17 · e^−16 ≈ 2·10⁻⁶.
+     */
+    public static final double UC_GUN_ISABET = 16.0;
+    /** Sütun ve oyun tick'i başına deneme: merkez başına tick'teki deneme {@code adım · yoğunluk · πr²}. */
+    public static final double DENEME_YOGUNLUGU = UC_GUN_ISABET / (VARSAYILAN_OLASILIK * UC_GUN_TICK);
+
+    /**
+     * Bir merkezin bu tick'teki deneme planı.
+     *
+     * @param sayi yapılacak deneme
+     * @param artan sonraki tick'e kalan kesirli deneme (0 ≤ artan < 1)
+     * @param etkinAdim gerçekten örneklenen oyun tick'i (tavan kırptıysa adımdan küçük; eşdeğer gün bununla birikir)
+     */
+    public record Denemeler(int sayi, double artan, double etkinAdim) {
+    }
+
     /** Kumun cama dönme olasılığı (dönüşüm denemesi başına). */
     public static final double CAM_OLASILIGI = 0.02;
     /** Tam güçte bir yüzey denemesinin kül katmanı biriktirme olasılığı. */
@@ -92,6 +117,37 @@ public final class PulsarKavurma {
             return 0;
         }
         return 1 + Math.min(BIRIKIM_TAVANI - 1, (int) (zar / p * BIRIKIM_TAVANI));
+    }
+
+    /** Yarıçap içindeki sütun sayısı (πr²). */
+    public static double alan(int yaricap) {
+        return Math.PI * yaricap * (double) yaricap;
+    }
+
+    /**
+     * Bu tick'in denemeleri: {@code istenen = artan + adım · DENEME_YOGUNLUGU · πr²}, {@code sayi = ⌊istenen⌋}. {@code tavan}
+     * aşılırsa (yüksek {@code /dogalafet hiz}) fazlası atılır, kesir birikmez ve etkin adım {@code adım · tavan / istenen}'e
+     * küçülür: eşdeğer gün yalnız gerçekten örneklenen süreyi sayar.
+     */
+    public static Denemeler denemeler(double artan, int adim, int yaricap, int tavan) {
+        if (adim <= 0) {
+            return new Denemeler(0, artan, 0);
+        }
+        double istenen = Math.max(0, artan) + adim * DENEME_YOGUNLUGU * alan(yaricap);
+        int sayi = (int) Math.floor(istenen);
+        if (sayi <= tavan) {
+            return new Denemeler(sayi, istenen - sayi, adim);
+        }
+        int t = Math.max(0, tavan);
+        return new Denemeler(t, 0, adim * (double) t / istenen);
+    }
+
+    /**
+     * Sonuçtan sonra sütun taraması aşağı sürer mi: yanan örtü (yaprak, bitki, kar, gövde) kalkınca altı da aynı isabette
+     * kavrulur; zemin ({@link Hedef#YOK} dahil), su ve cam taramayı bitirir.
+     */
+    public static boolean altinaSurer(Hedef hedef) {
+        return hedef == Hedef.HAVA || hedef == Hedef.HAVA_VE_KUL || hedef == Hedef.KOMURLESMIS_KUTUK;
     }
 
     /** Mevcut kül katına {@code ek} eklenince yeni kat; birikim {@link #BIRIKIM_TAVANI}'nı, yaprak külü 8'i geçmez. */

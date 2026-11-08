@@ -6,6 +6,7 @@ import com.electronwill.nightconfig.toml.TomlFormat;
 import com.mojang.authlib.GameProfile;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.config.AyarKaydi;
+import io.github.kadirberkpolat1.dogalafetler.config.SurumluGocPlani;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.CekirdekOyunTestleri;
 import io.github.kadirberkpolat1.dogalafetler.core.DonemAlani;
@@ -932,7 +933,7 @@ public final class MeteorOyunTestleri {
             beklenen.put("meteor.ucusSuresi", 180.0);
             beklenen.put("gunes_patlamasi.meteorYagmuruSaniye", 600.0);
             sayilarAyni(y, dosyada, beklenen, "Forge düzeltmesinden sonra");
-            for (MeteorAyarGocu.Adim a : MeteorAyarGocu.ADIMLAR) {
+            for (SurumluGocPlani.Adim a : MeteorAyarGocu.ADIMLAR) {
                 Object varsayilan = ((ForgeConfigSpec.ValueSpec) spec.getSpec().get(a.yol())).getDefault();
                 dogrula(y, varsayilan instanceof Number n && n.doubleValue() == a.yeni().doubleValue(),
                         a.yol() + " tablodaki yeni değer " + a.yeni() + ", spec varsayılanı " + varsayilan);

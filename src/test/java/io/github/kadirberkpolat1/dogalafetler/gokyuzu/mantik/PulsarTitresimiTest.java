@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
-/** Pulsar titreşimi (PL-2): frekans, genlik sınırları, erişilebilirlik ayarı, Düşük kalite, çatırtı sıklığı. */
+/** Pulsar titreşimi (PL-2, PL-28): frekans, genlik sınırları, video çırpınması, erişilebilirlik ayarı, Düşük, çatırtı. */
 class PulsarTitresimiTest {
     private static final double ADIM = 1e-4;
 
@@ -34,10 +34,11 @@ class PulsarTitresimiTest {
 
     @Test
     void hizliGenlikSinirlariGucVeAyarla() {
-        assertEquals(0.6f, PulsarTitresimi.hizliGenlik(0f, 1f), 1e-6f);
-        assertEquals(1.0f, PulsarTitresimi.hizliGenlik(1f, 1f), 1e-6f);
-        assertEquals(0.5f, PulsarTitresimi.hizliGenlik(1f, 0.5f), 1e-6f);
-        assertEquals(1.0f, PulsarTitresimi.hizliGenlik(5f, 3f), 1e-6f, "aralık dışı kenetlenir");
+        float tepe = PulsarTitresimi.HIZLI_TEPE_DERECE;
+        assertEquals(0.6f * tepe, PulsarTitresimi.hizliGenlik(0f, 1f), 1e-6f);
+        assertEquals(tepe, PulsarTitresimi.hizliGenlik(1f, 1f), 1e-6f);
+        assertEquals(0.5f * tepe, PulsarTitresimi.hizliGenlik(1f, 0.5f), 1e-6f);
+        assertEquals(tepe, PulsarTitresimi.hizliGenlik(5f, 3f), 1e-6f, "aralık dışı kenetlenir");
         float[] o = new float[2];
         for (float guc : new float[] {0f, 0.5f, 1f}) {
             float a = PulsarTitresimi.hizliGenlik(guc, 1f);
@@ -45,12 +46,46 @@ class PulsarTitresimiTest {
             for (double t = 7.0; t < 9.0; t += 0.0007) {
                 PulsarTitresimi.hizliOfset(t, guc, 1f, false, 1f, o);
                 assertTrue(Math.abs(o[0]) <= a + 1e-5f && Math.abs(o[0]) >= PulsarTitresimi.EN_AZ_ADIM * a - 1e-5f,
-                        "kare dalga yarım periyot genliği 0,6A–A: " + o[0]);
+                        "kare dalga yarım periyot genliği EN_AZ_ADIM·A–A: " + o[0]);
                 assertTrue(Math.abs(o[1]) <= PulsarTitresimi.TESTERE_ORANI * a + 1e-5f, "testere ekseni sınırlı");
                 enCok = Math.max(enCok, Math.abs(o[0]));
             }
             assertTrue(enCok > 0.95f * a, "tepe genliğe ulaşılır: " + enCok + " / " + a);
         }
+    }
+
+    /** Videoda ardışık karelerde en parlak nokta kadrajın ±3/90–4/90'ı kadar yana sıçrar (29,97 kare/sn). */
+    @Test
+    void videoCirpinmasiArdisikKarelerdeUcDortPiksel() {
+        assertEquals(4f / 90f, PulsarTitresimi.cirpinmaOrani(1f, 1f), 1e-6f);
+        assertEquals(PulsarTitresimi.CIRPINMA_EN_AZ, PulsarTitresimi.EN_AZ_ADIM * PulsarTitresimi.CIRPINMA_EN_COK, 1e-6f);
+        float[] o = new float[2];
+        double kare = 1.0 / 29.97;
+        int adet = 1800;
+        int karsiTaraf = 0;
+        float onceki = Float.NaN;
+        for (int i = 0; i < adet; i++) {
+            PulsarTitresimi.hizliOfset(100.0123 + i * kare, 1f, 1f, false, 1f, o);
+            float oran = Math.abs(o[0]) / PulsarTitresimi.KADRAJ_DERECE;
+            assertTrue(oran >= 3f / 90f - 1e-5f && oran <= 4f / 90f + 1e-5f,
+                    "kare " + i + " sıçrama " + oran * 90f + " px");
+            if (!Float.isNaN(onceki) && Math.signum(o[0]) != Math.signum(onceki)) {
+                karsiTaraf++;
+            }
+            onceki = o[0];
+        }
+        assertTrue(karsiTaraf > 0.85 * (adet - 1), "ardışık karelerin çoğu karşı tarafa sıçrar: " + karsiTaraf);
+        karsiTaraf = 0;
+        onceki = Float.NaN;
+        for (int i = 0; i < adet; i++) {
+            PulsarTitresimi.hizliOfset(100.0123 + i * kare, 1f, 1f, true, 1f, o);
+            if (!Float.isNaN(onceki) && Math.signum(o[0]) != Math.signum(onceki)) {
+                karsiTaraf++;
+            }
+            onceki = o[0];
+        }
+        assertTrue(karsiTaraf > 0.4 * (adet - 1) && karsiTaraf < 0.65 * (adet - 1),
+                "Düşük (8 Hz): kabaca her iki karede bir sıçrama: " + karsiTaraf);
     }
 
     @Test

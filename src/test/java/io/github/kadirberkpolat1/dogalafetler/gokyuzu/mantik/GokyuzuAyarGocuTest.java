@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.github.kadirberkpolat1.dogalafetler.config.SurumluGocPlani;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -64,7 +65,7 @@ class GokyuzuAyarGocuTest {
     void tabloSiraliYeniEskilerdeYok() {
         Set<String> gorulen = new HashSet<>();
         int onceki = 0;
-        for (GokyuzuAyarGocu.Adim a : GokyuzuAyarGocu.ADIMLAR) {
+        for (SurumluGocPlani.Adim a : GokyuzuAyarGocu.ADIMLAR) {
             assertTrue(a.surum() >= onceki && a.surum() >= 1 && a.surum() <= GokyuzuAyarGocu.GUNCEL, a.yol());
             onceki = a.surum();
             assertTrue(gorulen.add(a.surum() + "/" + a.yol()), "aynı sürümde iki adım: " + a.yol());

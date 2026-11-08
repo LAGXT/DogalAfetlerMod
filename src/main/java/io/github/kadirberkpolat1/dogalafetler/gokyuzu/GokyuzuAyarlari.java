@@ -65,7 +65,10 @@ public final class GokyuzuAyarlari {
         return sunucu.get().pulsarYanginDakikaBasina.get();
     }
 
-    /** Tam güçte oyuncu başına ölçekli tick'te kavrulma denemesi olasılığı (çimen → kaba toprak). */
+    /**
+     * Tam güçte bir kavurma denemesinin sütun seçme olasılığı; deneme sayısı alanla orantılı
+     * ({@code PulsarKavurma.DENEME_YOGUNLUGU}).
+     */
     public static double pulsarKavrulmaOlasiligi() {
         return sunucu.get().pulsarKavrulmaOlasiligi.get();
     }
@@ -153,8 +156,8 @@ public final class GokyuzuAyarlari {
             pulsarYanginDakikaBasina = k.comment("Tam güçte oyuncu başına dakikada yeni yangın odağı (ortak yangın sistemi; "
                     + "TPS kısması ve yangın tavanıyla sınırlı, afetBlokHasari=false iken yok).")
                     .defineInRange("pulsarYanginDakikaBasina", 24.0, 0.0, 120.0);
-            pulsarKavrulmaOlasiligi = k.comment("Tam güçte oyuncu başına ölçekli tick'te güneşe açık çimenin kaba toprağa "
-                    + "dönme denemesi olasılığı (güneş patlaması kavrulmasıyla aynı kural).")
+            pulsarKavrulmaOlasiligi = k.comment("Tam güçte bir kavurma denemesinin sütun seçme olasılığı (deneme sayısı alanla "
+                    + "orantılı; varsayılanla 3 oyun gününde 96 blok yarıçapta yüzey küle döner).")
                     .defineInRange("pulsarKavrulmaOlasiligi", 0.6, 0.0, 1.0);
             pulsarGun = k.comment("Pulsar döneminin süresi, Minecraft günü (oyun günü: uyku ve /dogalafet gun sayılır, "
                     + "/dogalafet hiz sayılmaz). Dolunca pulsarı uzak bir kara delik yutar.")

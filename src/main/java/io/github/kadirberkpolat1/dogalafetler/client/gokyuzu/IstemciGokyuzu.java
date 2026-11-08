@@ -6,10 +6,15 @@ import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciDonem;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.GokyuzuAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.GokyuzuEgrileri;
+import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.KaraDelikYutmaEgrileri;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.MonotonIlerleme;
 import io.github.kadirberkpolat1.dogalafetler.network.DonemPaketi;
 import java.util.Locale;
 import net.minecraft.Util;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.world.phys.Vec3;
+import org.joml.Vector3f;
 
 /**
  * İstemcinin karede gördüğü gökyüzü: {@link IstemciDonem}'deki ay/evre/ilerleme ve evre başlangıcından türetilir. Geçişler
@@ -83,6 +88,23 @@ public final class IstemciGokyuzu {
     public static org.joml.Vector3f gunesYoluYonu(float aciDerece, net.minecraft.client.multiplayer.ClientLevel level,
             float pt) {
         return GokyuzuCizici.gunesYoluYonu(aciDerece, level.getTimeOfDay(pt));
+    }
+
+    /**
+     * Bu karede kameradan pulsara dünya çerçevesinde birim yön: gecikmeli çapanın paralaksı ve yutmadaki çekim dahil
+     * (çizimle aynı; otomasyon kamerayı buna çevirir).
+     */
+    public static Vector3f pulsarGorunurYonu(ClientLevel level, float pt) {
+        Vec3 goz = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
+        Vector3f yon = GokyuzuCizici.gunesYoluYonu(GokyuzuCizici.pulsarAcisi(gorunum(pt)), level.getTimeOfDay(pt));
+        return GokCapasi.PULSAR.merkez(yon, goz).normalize();
+    }
+
+    /** Bu karede kameradan yutan kara deliğe dünya çerçevesinde birim yön (gecikmeli çapa dahil; çizimle aynı). */
+    public static Vector3f karaDelikGorunurYonu(ClientLevel level, float pt) {
+        Vec3 goz = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
+        Vector3f yon = GokyuzuCizici.gunesYoluYonu(KaraDelikYutmaEgrileri.KARADELIK_ACI, level.getTimeOfDay(pt));
+        return GokCapasi.KARADELIK.merkez(yon, goz).normalize();
     }
 
     /** {@code i}. kara deliğin bu karedeki dünya yönü (görsel otomasyonun yakın kadrajı; çizimle aynı dönüş). */

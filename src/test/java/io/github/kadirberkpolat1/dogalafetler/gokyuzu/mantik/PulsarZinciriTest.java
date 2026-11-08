@@ -124,4 +124,40 @@ class PulsarZinciriTest {
         assertTrue(PulsarZinciri.yutmaBaslar(0, sure + PulsarZinciri.YUTMA_EN_COK_BEKLEME, 15, 18_000, true),
                 "bir gün beklendi: pencere gelmese de başlar");
     }
+
+    /** K-C46: 3. günde 2 gün (ofset ya da zaman) duran PULSAR açılınca kalan günü değişmeden sürer. */
+    @Test
+    void kuralDuraklamasiKalanGunuDegistirmez() {
+        long bas = 5_000L;
+        long durma = bas + 3 * GUN + 700L;
+        double kalanDurmada = PulsarZinciri.kalanGun(bas, durma, 15);
+        long acilis = durma + 2 * GUN;
+        assertEquals(kalanDurmada - 2.0, PulsarZinciri.kalanGun(bas, acilis, 15), 1e-12, "öteleme olmasa iki gün eksilirdi");
+        long yeniBas = bas + PulsarZinciri.duraklama(durma, acilis);
+        assertEquals(kalanDurmada, PulsarZinciri.kalanGun(yeniBas, acilis, 15), 1e-12);
+        assertFalse(PulsarZinciri.doldu(yeniBas, acilis + 12 * GUN - 701L, 15), "kalan süre açılıştan sayılır");
+        assertTrue(PulsarZinciri.doldu(yeniBas, acilis + 12 * GUN - 700L, 15));
+        long uzun = durma + 20 * GUN;
+        assertFalse(PulsarZinciri.doldu(bas + PulsarZinciri.duraklama(durma, uzun), uzun, 15),
+                "20 gün kapalı kalan kural açılınca süre dolmuş sayılmaz");
+        assertEquals(0L, PulsarZinciri.duraklama(durma, durma - GUN), "geri alınan ofsette öteleme yok");
+    }
+
+    /** K-C46: yutmanın 30. sn'sinde duran saat açılınca 30. sn'den sürer; 55. sn parlaması ve 90. sn bitişi atlanmaz. */
+    @Test
+    void kuralDuraklamasiYutmaSaniyesiniKoruyor() {
+        long evreBas = 100_000L;
+        long durma = evreBas + 30 * PulsarZinciri.SANIYE_TICK;
+        long acilis = durma + 400 * PulsarZinciri.SANIYE_TICK;
+        assertTrue(PulsarZinciri.yutmaBitti(PulsarZinciri.yutmaSaniyesi(evreBas, acilis)), "ötelemesiz 90 sn atlanırdı");
+        long kaydirilmis = evreBas + PulsarZinciri.duraklama(durma, acilis);
+        float sn = PulsarZinciri.yutmaSaniyesi(kaydirilmis, acilis);
+        assertEquals(30f, sn, 1e-6);
+        assertFalse(PulsarZinciri.yutmaParlamasiGeldi(sn));
+        assertEquals(60f, PulsarZinciri.yutmaKalanSaniye(sn), 1e-6);
+        assertTrue(PulsarZinciri.yutmaParlamasiGeldi(PulsarZinciri.yutmaSaniyesi(kaydirilmis,
+                acilis + 25 * PulsarZinciri.SANIYE_TICK)));
+        assertFalse(PulsarZinciri.yutmaBitti(PulsarZinciri.yutmaSaniyesi(kaydirilmis,
+                acilis + 25 * PulsarZinciri.SANIYE_TICK)));
+    }
 }

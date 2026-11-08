@@ -31,10 +31,13 @@ import net.minecraftforge.server.ServerLifecycleHooks;
  * {@code pulsarIsinmaGun} boyunca evre ilerlemesi 0 → 1 ısınma; dünya etkileri {@link PulsarEtkileri}'nde) → KARADELİK_YUTMA
  * ({@value PulsarZinciri#YUTMA_SN} sn ölçekli afet saatiyle, 55. sn'de bir kez sarsıntı + ses) → pulsar yolunda GÜNEŞSİZ
  * (buzul kıyamet, {@code pulsarSonrasiGunessizGun} oyun günü + ilk şafak; donma her zamanki gibi) → KIZIL CÜCE doğuşu
- * → NORMAL: eski güneş döner, donma doğal çözülür. Gün süreleri K-C29 oyun tick'iyle, başlangıçları {@link PulsarYolu}'nda
- * kalıcıdır (yeniden başlatmada kaldığı yerden sürer); ısınma ve doğuş {@code zamanAdimi()} ile biriktiği için
- * {@link #devamEt} boştur. Güneşsiz dönem ve doğuş pulsar yolundayken {@link GunesZinciriSureci} devre dışıdır. Döngü
- * kimliği PULSAR'ın {@code evreBaslangicSaati} (K-C46), yangın/meteor kaynağı {@code PulsarEtkileri.kaynak}.
+ * → NORMAL: eski güneş döner, donma doğal çözülür; güneş patlaması bundan sonra yalnız {@code tekrarlanabilir} açıkken
+ * yeniden seçilir ({@link PulsarYolu#zincirTukendi}). Gün süreleri K-C29 oyun tick'iyle, başlangıçları {@link PulsarYolu}'nda
+ * kalıcıdır (yeniden başlatmada kaldığı yerden sürer). K-C46: {@link #durdur} durma anını (oyun tick'i ve ölçekli saat)
+ * yazar, {@link #devamEt} farkıyla hesaplanan süreleri (15 gün, 10 gün, yutmanın saniyesi) durduğu süre kadar ileri
+ * çeker; ısınma ve doğuş {@code zamanAdimi()} ile birikir. Durmuşken evre geçerse ({@code asama ileri}) yeni evrenin süresi
+ * o andan sayılır. Güneşsiz dönem ve doğuş pulsar yolundayken {@link GunesZinciriSureci} devre dışıdır. Döngü kimliği
+ * PULSAR'ın {@code evreBaslangicSaati} (K-C46), yangın/meteor kaynağı {@code PulsarEtkileri.kaynak}.
  */
 public final class PulsarSureci implements DonemSureci {
     public static final String KIMLIK = PulsarYolu.ALT_SISTEM;
@@ -141,10 +144,34 @@ public final class PulsarSureci implements DonemSureci {
                 Component.translatable(donem.gunesEvresi().ceviriAnahtari()), kalan));
     }
 
-    /** Etkiler durur (yangınlar yayılmadan yanıp biter); ulaşılmış evre ve süre kayıtları korunur. */
+    /**
+     * Etkiler durur (yangınlar yayılmadan yanıp biter); ulaşılmış evre ve süre kayıtları korunur, durma anı yazılır (kural
+     * kaydı komuta çevrilince ilk an kalır).
+     */
     @Override
     public void durdur(ServerLevel ustDunya, DurdurmaNedeni neden) {
-        PulsarEtkileri.bitir(ustDunya.getServer(), DunyaDonemi.al(ustDunya), "durduruldu (" + neden + ")");
+        DunyaDonemi donem = DunyaDonemi.al(ustDunya);
+        if (!PulsarYolu.durmaVar(donem)) {
+            PulsarYolu.durmaAyarla(donem, oyunTick(ustDunya, donem), donem.saat());
+        }
+        PulsarEtkileri.bitir(ustDunya.getServer(), donem, "durduruldu (" + neden + ")");
+    }
+
+    /** K-C46: kural açıldı; süreler durduğu süre kadar ileri çekilir, zincir kaldığı yerden sürer. */
+    @Override
+    public void devamEt(ServerLevel ustDunya) {
+        DunyaDonemi donem = DunyaDonemi.al(ustDunya);
+        if (!PulsarYolu.durmaVar(donem)) {
+            return;
+        }
+        long oyun = PulsarZinciri.duraklama(PulsarYolu.durmaOyunTick(donem), oyunTick(ustDunya, donem));
+        long olcekli = PulsarZinciri.duraklama(PulsarYolu.durmaSaati(donem), donem.saat());
+        if (donem.gunesEvresi() == GunesEvresi.KARADELIK_YUTMA) {
+            donem.evreBaslangiciniKaydir(olcekli);
+        }
+        PulsarYolu.durmaBitti(donem, oyun);
+        DogalAfetler.LOGGER.info("Pulsar süreci kaldığı yerden sürüyor: evre {}, {} oyun tick'i ({} ölçekli) durmuştu",
+                donem.gunesEvresi().kimlik(), oyun, olcekli);
     }
 
     /** K-C29 oyun tick'i (üst dünyanın oyun zamanı + uyku birikimi + gün ofseti). */
@@ -152,9 +179,18 @@ public final class PulsarSureci implements DonemSureci {
         return PulsarZinciri.oyunTick(ust.getGameTime(), donem.uykuBirikimi(), donem.gunOfseti());
     }
 
-    /** Zincirin bu aşamadaki kalan süresi ({@code durum} ve {@code kizilcuce bilgi}); pulsar zinciri dışında boş. */
+    /** Durmuşsa durma anı, yoksa şimdiki K-C29 oyun tick'i: duran sürenin kalanı azalmaz. */
+    private static long etkinOyunTick(ServerLevel ust, DunyaDonemi donem) {
+        return PulsarYolu.durmaVar(donem) ? PulsarYolu.durmaOyunTick(donem) : oyunTick(ust, donem);
+    }
+
+    /**
+     * Zincirin bu aşamadaki kalan süresi ({@code durum} ve {@code kizilcuce bilgi}); pulsar zinciri dışında boş. Durmuş
+     * sürecin kalanı durma anındaki değerdir.
+     */
     static Optional<Component> kalanMetni(ServerLevel ust, DunyaDonemi donem) {
-        long simdi = oyunTick(ust, donem);
+        long simdi = etkinOyunTick(ust, donem);
+        long saat = PulsarYolu.durmaVar(donem) ? PulsarYolu.durmaSaati(donem) : donem.saat();
         float p = donem.evreIlerlemesi();
         boolean yol = PulsarYolu.donusYolu(donem);
         return switch (donem.gunesEvresi()) {
@@ -166,7 +202,7 @@ public final class PulsarSureci implements DonemSureci {
             }
             case KARADELIK_YUTMA -> Optional.of(Component.translatable(GokyuzuKomutlari.KALAN_KARADELIK,
                     GokyuzuKomutlari.yuzde(PulsarZinciri.yutmaKalanSaniye(
-                            PulsarZinciri.yutmaSaniyesi(donem.evreBaslangicSaati(), donem.saat())))));
+                            PulsarZinciri.yutmaSaniyesi(donem.evreBaslangicSaati(), saat)))));
             case GUNESSIZ -> {
                 if (!yol) {
                     yield Optional.empty();
@@ -195,7 +231,8 @@ public final class PulsarSureci implements DonemSureci {
 
     /**
      * Zincirin bir sonraki evresi. Pulsar yolu bayrağı evreden önce yazılır: dönem olayını dinleyenler (donma) ve istemci
-     * paketi ikisini birlikte görür.
+     * paketi ikisini birlikte görür. Durmuş süreçte ({@code asama ileri}) durma anı şimdiye çekilir: yeni evrenin süresi
+     * kural açılınca başlar.
      */
     private static void evreGec(ServerLevel ust, DunyaDonemi donem, GunesEvresi yeni, String neden) {
         switch (yeni) {
@@ -209,12 +246,22 @@ public final class PulsarSureci implements DonemSureci {
         }
         GunesEvresi eski = donem.gunesEvresi();
         donem.gunesEvresiAyarla(yeni);
+        if (PulsarYolu.durmaVar(donem)) {
+            PulsarYolu.durmaAyarla(donem, oyunTick(ust, donem), donem.saat());
+        }
         DogalAfetler.LOGGER.info("Pulsar zinciri: {} -> {} ({}), saat={}, oyun tick={}, donma={}", eski.kimlik(),
                 yeni.kimlik(), neden, donem.saat(), oyunTick(ust, donem), donem.donmaIlerlemesi());
     }
 
-    /** Kızıl cüce doğuşu bitti: eski güneş döner, donma doğal çözülür, üst dünyadaki oyunculara "Yeni Şafak" ipucu. */
+    /**
+     * Kızıl cüce doğuşu bitti: eski güneş döner, donma doğal çözülür, üst dünyadaki oyunculara "Yeni Şafak" ipucu; zincir
+     * tükendi (madde 4: güneş patlaması yalnız {@code tekrarlanabilir} açıkken yeniden seçilir).
+     */
     private static void eskiGunesDoner(MinecraftServer server, DunyaDonemi donem, String neden) {
+        if (PulsarYolu.durmaVar(donem)) {
+            PulsarYolu.durmaBitti(donem, 0L);
+        }
+        PulsarYolu.zincirTukendiAyarla(donem, true);
         PulsarYolu.donusYoluAyarla(donem, false);
         PulsarYolu.gunesDonduAyarla(donem, true);
         donem.gunesEvresiAyarla(GunesEvresi.NORMAL);
@@ -225,7 +272,10 @@ public final class PulsarSureci implements DonemSureci {
         }
     }
 
-    /** Evre PULSAR'dan çıkınca ({@code asama ileri}, süre doldu, başka yıldız, {@code sifirla}) dünya etkileri biter. */
+    /**
+     * Evre PULSAR'dan çıkınca ({@code asama ileri}, süre doldu, başka yıldız, {@code sifirla}) dünya etkileri biter ve
+     * kavurmanın eşdeğer gün sayacı sıfırlanır.
+     */
     private static void donemDegisti(DonemDegistiEvent olay) {
         MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
         if (server == null || DunyaDonemi.al(server) != olay.donem()
@@ -234,6 +284,7 @@ public final class PulsarSureci implements DonemSureci {
             return;
         }
         PulsarEtkileri.bitir(server, olay.donem(), "evre " + olay.donem().gunesEvresi().kimlik());
+        KavurmaKuyrugu.esdegerGunuSifirla();
     }
 
     private void tick(TickEvent.ServerTickEvent olay) {
@@ -255,9 +306,9 @@ public final class PulsarSureci implements DonemSureci {
         long simdi = oyunTick(ust, donem);
         GunesEvresi evre = donem.gunesEvresi();
         if (evre == GunesEvresi.PULSAR) {
-            donguyuDenetle(yonetici, donem, simdi);
+            donguyuDenetle(yonetici, donem, simdi, etkinOyunTick(ust, donem));
         } else if (evre == GunesEvresi.GUNESSIZ && !PulsarYolu.gunessizBaslangicVar(donem)) {
-            PulsarYolu.gunessizBaslangicAyarla(donem, simdi);
+            PulsarYolu.gunessizBaslangicAyarla(donem, etkinOyunTick(ust, donem));
         }
         int adim = yonetici.zamanAdimi();
         if (yonetici.surecDurdu(this) || adim <= 0) {
@@ -294,16 +345,19 @@ public final class PulsarSureci implements DonemSureci {
         }
     }
 
-    /** Yeni pulsar döngüsü (K-C46: yalnız PULSAR başlangıcında) ya da eski kayıtta eksik başlangıç. */
-    private void donguyuDenetle(AfetYoneticisi yonetici, DunyaDonemi donem, long simdi) {
+    /**
+     * Yeni pulsar döngüsü (K-C46: yalnız PULSAR başlangıcında; durdurma kaydı ve durma anı silinir) ya da eski kayıtta
+     * eksik başlangıç ({@code etkin}: durmuşsa durma anı).
+     */
+    private void donguyuDenetle(AfetYoneticisi yonetici, DunyaDonemi donem, long simdi, long etkin) {
         if (!PulsarYolu.donguVar(donem) || PulsarYolu.dongu(donem) != donem.evreBaslangicSaati()) {
             PulsarYolu.yeniDongu(donem, donem.evreBaslangicSaati(), simdi);
             yonetici.donemSureciBasladi(this);
             DogalAfetler.LOGGER.info("Pulsar süreci yeni döngüde: pulsar saat {}, oyun tick {}, süre {} gün",
                     donem.evreBaslangicSaati(), simdi, GokyuzuAyarlari.pulsarGun());
         } else if (!PulsarYolu.baslangicVar(donem)) {
-            PulsarYolu.baslangicAyarla(donem, simdi);
-            DogalAfetler.LOGGER.info("Pulsar süreci: eski kayıtta başlangıç yoktu, oyun tick {} yazıldı", simdi);
+            PulsarYolu.baslangicAyarla(donem, etkin);
+            DogalAfetler.LOGGER.info("Pulsar süreci: eski kayıtta başlangıç yoktu, oyun tick {} yazıldı", etkin);
         }
     }
 

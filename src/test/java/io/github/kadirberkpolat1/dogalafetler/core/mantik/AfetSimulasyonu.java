@@ -178,7 +178,7 @@ final class AfetSimulasyonu {
             if (gunTam != uygunGunu || ay != uygunAy || gunes != uygunGunes) {
                 uygun = EnumSet.noneOf(AfetTuru.class);
                 for (AfetTuru tur : AfetTuru.values()) {
-                    if (TekSeferlikKurallar.uygunMu(tur, ay, gunes, gunTam, puan, tekSeferlik)) {
+                    if (TekSeferlikKurallar.uygunMu(tur, ay, gunes, false, false, gunTam, puan, tekSeferlik)) {
                         uygun.add(tur);
                     }
                 }

@@ -15,6 +15,7 @@ import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.OrtamSicakligi;
 import io.github.kadirberkpolat1.dogalafetler.yangin.YanginYoneticisi;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.BooleanSupplier;
 import java.util.function.DoubleSupplier;
 import java.util.function.Function;
@@ -26,6 +27,7 @@ import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -38,10 +40,11 @@ import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
 
 /**
- * Pulsar-2 dünya dilimi oyun testleri: kavurma bütçesi hiçbir tick'te aşılmaz ve TPS kısması uygulanır;
- * {@code afetBlokHasari} kapalıyken blok, ateş ve lav değişmez; dönüşüm tablosunun uç noktaları dünyada; kül katmanı
- * kar altında kalır ve çözülünce kül bloğu kalır; meteor yağmuru oyuncu başına dakikada
- * {@code pulsarMeteorDakikaBasina}; sıcaklığın PULSAR katkısı çarpan 2,0. Düz dünyada sahne testin içinde kurulur
+ * Pulsar-2 dünya dilimi oyun testleri: kavurma bütçesi hiçbir tick'te aşılmaz ve TPS kısması uygulanır; 3 eşdeğer
+ * oyun gününde çimen ve ağaç küle döner (Ps5); {@code afetBlokHasari} kapalıyken blok, ateş ve lav değişmez; dönüşüm
+ * tablosunun uç noktaları dünyada; lav gözesi yanıcı blok yakınında açılmaz (Ps8); kül katmanı kar altında kalır ve
+ * çözülünce kül bloğu kalır; meteor yağmuru oyuncu başına dakikada {@code pulsarMeteorDakikaBasina}; sıcaklığın
+ * PULSAR katkısı çarpan 2,0. Düz dünyada sahne testin içinde kurulur
  * ({@code donma_alan}, 9×6×9 hava). Kavurma kancaları ve gamerule değiştiren her test kendi batch'indedir; eski
  * değerleri batch sonu geri koyar. Config dosyasına yazılmaz (K-E28).
  */
@@ -54,6 +57,9 @@ public final class PulsarDunyaOyunTestleri {
     private static final String BUTCE = "pulsar_dunya_butce";
     private static final String KAPI = "pulsar_dunya_kapi";
     private static final String METEOR = "pulsar_dunya_meteor";
+    private static final String KAVURMA = "pulsar_dunya_kavurma";
+    /** Hızlandırılmış testlerde tick başına oyun tick'i (yarıçap 4'te ~37 deneme, tavanın altında: örnekleme kesilmez). */
+    private static final int HIZLI_ADIM = 2_000;
     private static final String DUNYA = "pulsar_dunya";
 
     private static boolean kancalarKurulu;
@@ -79,6 +85,11 @@ public final class PulsarDunyaOyunTestleri {
 
     @AfterBatch(batch = METEOR)
     public static void meteorSonrasi(ServerLevel level) {
+        geriKoy(level.getServer());
+    }
+
+    @AfterBatch(batch = KAVURMA)
+    public static void kavurmaSonrasi(ServerLevel level) {
         geriKoy(level.getServer());
     }
 
@@ -208,11 +219,37 @@ public final class PulsarDunyaOyunTestleri {
         y.setBlock(p(6, 2, 6), Blocks.SAND);
     }
 
+    /** Çimen + ağaç sahnesi: taş taban, toprak, çimen; ortada iki kütüklü ağaç ve 3×3 kalıcı yaprak tacı, dört bitki. */
+    private static void cimenAgacSahnesi(GameTestHelper y) {
+        BlockState yaprak = Blocks.OAK_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true);
+        for (int x = 0; x < EN; x++) {
+            for (int z = 0; z < EN; z++) {
+                y.setBlock(p(x, 0, z), Blocks.STONE);
+                y.setBlock(p(x, 1, z), Blocks.DIRT);
+                y.setBlock(p(x, 2, z), Blocks.GRASS_BLOCK);
+                for (int yy = 3; yy < BOY; yy++) {
+                    y.setBlock(p(x, yy, z), Blocks.AIR);
+                }
+            }
+        }
+        y.setBlock(p(4, 3, 4), Blocks.OAK_LOG);
+        y.setBlock(p(4, 4, 4), Blocks.OAK_LOG);
+        for (int x = 3; x <= 5; x++) {
+            for (int z = 3; z <= 5; z++) {
+                y.setBlock(p(x, 5, z), yaprak);
+            }
+        }
+        y.setBlock(p(2, 3, 4), Blocks.POPPY);
+        y.setBlock(p(6, 3, 4), Blocks.DANDELION);
+        y.setBlock(p(4, 3, 2), Blocks.GRASS);
+        y.setBlock(p(4, 3, 6), Blocks.FERN);
+    }
+
     // ---------------------------------------------------------------- bütçe ve kapı
 
     /**
-     * PL-3 f: bütçe 5 × kısma 0,75 → 4 yazma; her tick {@code sonIslem ≤ sonButce} ve en az bir tick'te bütçe dolar (19
-     * deneme, 81 aday). Sonra kısma 0: bütçe 0, hiç yazma yok.
+     * PL-3 f: bütçe 5 × kısma 0,75 → 4 yazma; her tick {@code sonIslem ≤ sonButce} ve en az bir tick'te bütçe dolar
+     * (tick başına tavan kadar deneme, 81 aday). Sonra kısma 0: bütçe 0, hiç yazma yok.
      */
     @GameTest(template = ALAN, batch = BUTCE, timeoutTicks = 200)
     public static void kavurmaButcesiHicbirTickteAsilmaz(GameTestHelper y) {
@@ -229,7 +266,7 @@ public final class PulsarDunyaOyunTestleri {
             if (tick[0] == 61) {
                 KavurmaKuyrugu.kismaKaynagiAyarla(() -> 0.0);
             }
-            KavurmaKuyrugu.tick(level, 1f, 32);
+            KavurmaKuyrugu.tick(level, 1f, 2 * HIZLI_ADIM);
             int islem = KavurmaKuyrugu.sonIslem(level);
             int butce = KavurmaKuyrugu.sonButce(level);
             asim[0] = Math.max(asim[0], islem - butce);
@@ -250,6 +287,78 @@ public final class PulsarDunyaOyunTestleri {
             DogalAfetler.LOGGER.info("Pulsar GameTest: 60 tick'te {} yazma, {} tick bütçe doldu, aşım {}", toplam[0],
                     doldu[0], asim[0]);
         });
+    }
+
+    /**
+     * Ps5: çimen + ağaç sahnesinde (yarıçap 4, üretimle aynı sütun yoğunluğu) tam güçte 3 eşdeğer oyun günü (Σadım 72 000,
+     * tick başına {@value #HIZLI_ADIM}) kavurmadan sonra iç dairedeki (3 blok) sütunların ≥ %90'ının yüzeyi kül, kaba toprak
+     * ya da kömürleşmiş kütük; çimen, yaprak ve kütük kalmamış; hiçbir tick'te bütçe aşılmamış.
+     */
+    @GameTest(template = ALAN, batch = KAVURMA, timeoutTicks = 200)
+    public static void ucGundeCimenVeAgacKuleDoner(GameTestHelper y) {
+        temizBasla(y);
+        cimenAgacSahnesi(y);
+        kancalar(y, 4, 256, 1.0);
+        blokHasari(y, true);
+        ServerLevel level = y.getLevel();
+        int[] asim = {Integer.MIN_VALUE};
+        int[] tick = {0};
+        y.onEachTick(() -> {
+            if (KavurmaKuyrugu.esdegerGun(level) < 3.0) {
+                tick[0]++;
+                KavurmaKuyrugu.tick(level, 1f, HIZLI_ADIM);
+                asim[0] = Math.max(asim[0], KavurmaKuyrugu.sonIslem(level) - KavurmaKuyrugu.sonButce(level));
+            }
+        });
+        y.succeedWhen(() -> {
+            double gun = KavurmaKuyrugu.esdegerGun(level);
+            y.assertTrue(gun >= 3.0, "3 eşdeğer gün bekleniyor: " + gun);
+            int sutun = 0;
+            int donusen = 0;
+            List<String> kalan = new ArrayList<>();
+            for (int x = 0; x < EN; x++) {
+                for (int z = 0; z < EN; z++) {
+                    int dx = x - EN / 2;
+                    int dz = z - EN / 2;
+                    for (int yy = 0; yy < BOY; yy++) {
+                        BlockState s = y.getBlockState(p(x, yy, z));
+                        boolean icDaire = dx * dx + dz * dz <= 9;
+                        if (s.is(BlockTags.LOGS) || icDaire && (s.is(Blocks.GRASS_BLOCK) || s.is(BlockTags.LEAVES))) {
+                            kalan.add("(" + x + "," + yy + "," + z + ") " + s);
+                        }
+                    }
+                    if (dx * dx + dz * dz <= 9) {
+                        sutun++;
+                        if (kavrulmus(yuzey(y, x, z))) {
+                            donusen++;
+                        }
+                    }
+                }
+            }
+            DogalAfetler.LOGGER.info("Pulsar GameTest: {} eşdeğer günde ({} tick) iç dairede {}/{} sütun kavruldu, kalan çimen/"
+                    + "yaprak/kütük {}, bütçe aşımı {}", String.format(Locale.ROOT, "%.2f", gun), tick[0],
+                    donusen, sutun, kalan.size(), asim[0]);
+            y.assertTrue(asim[0] <= 0, "bütçe aşımı " + asim[0]);
+            y.assertTrue(donusen * 10 >= sutun * 9, "yüzeyin ≥ %90'ı dönüşmeli: " + donusen + "/" + sutun);
+            y.assertTrue(kalan.isEmpty(), "çimen, yaprak ve kütük kalmamalı: " + kalan.size() + ", ilki "
+                    + (kalan.isEmpty() ? "" : kalan.get(0)));
+        });
+    }
+
+    /** Sütunun en üstteki hava olmayan bloğu. */
+    private static BlockState yuzey(GameTestHelper y, int x, int z) {
+        for (int yy = BOY - 1; yy >= 0; yy--) {
+            BlockState s = y.getBlockState(p(x, yy, z));
+            if (!s.isAir()) {
+                return s;
+            }
+        }
+        return Blocks.AIR.defaultBlockState();
+    }
+
+    private static boolean kavrulmus(BlockState s) {
+        return s.is(PulsarKayitlari.KUL_KATMANI.get()) || s.is(PulsarKayitlari.KUL_BLOGU.get())
+                || s.is(Blocks.COARSE_DIRT) || s.is(PulsarKayitlari.KOMURLESMIS_KUTUK.get());
     }
 
     /**
@@ -375,6 +484,38 @@ public final class PulsarDunyaOyunTestleri {
         y.assertTrue(donustur(y, 8, 1, 2, 0.01) == 1 && is(y, 8, 1, 2, Blocks.GLASS), "kum → cam %2");
         y.assertTrue(donustur(y, 0, 1, 4, 0.0) == 0 && is(y, 0, 1, 4, Blocks.STONE_BRICKS),
                 "tablo dışı blok değişmez");
+        y.succeed();
+    }
+
+    /**
+     * Ps8: lav gözesi yalnız {@value KavurmaKuyrugu#LAV_YANICI_ARALIGI} blok küpte yanıcı blok yokken açılır (vanilla ateşi
+     * ortak yangının dışında kalmasın): 3 blok yandaki tahta, küpün köşesindeki yün ve 3 blok üstteki yaprak engeller, 4 blok
+     * ötedeki tahta engellemez.
+     */
+    @GameTest(template = ALAN, batch = DUNYA)
+    public static void lavGozesiYaniciYakinindaAcilmaz(GameTestHelper y) {
+        for (int x = 0; x < EN; x++) {
+            for (int z = 0; z < EN; z++) {
+                y.setBlock(p(x, 0, z), Blocks.STONE);
+                y.setBlock(p(x, 1, z), Blocks.STONE);
+                for (int yy = 2; yy < BOY; yy++) {
+                    y.setBlock(p(x, yy, z), Blocks.AIR);
+                }
+            }
+        }
+        ServerLevel level = y.getLevel();
+        BlockPos goz = y.absolutePos(p(4, 1, 4));
+        y.assertTrue(KavurmaKuyrugu.yaniciYok(level, goz), "taş çevrede göze açılabilir");
+        y.setBlock(p(7, 2, 4), Blocks.OAK_PLANKS);
+        y.assertTrue(!KavurmaKuyrugu.yaniciYok(level, goz), "3 blok yandaki tahta engeller");
+        y.setBlock(p(7, 2, 4), Blocks.AIR);
+        y.setBlock(p(8, 2, 4), Blocks.OAK_PLANKS);
+        y.assertTrue(KavurmaKuyrugu.yaniciYok(level, goz), "4 blok ötedeki tahta engellemez");
+        y.setBlock(p(7, 4, 7), Blocks.WHITE_WOOL);
+        y.assertTrue(!KavurmaKuyrugu.yaniciYok(level, goz), "küpün köşesindeki yün engeller");
+        y.setBlock(p(7, 4, 7), Blocks.AIR);
+        y.setBlock(p(4, 4, 4), Blocks.OAK_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true));
+        y.assertTrue(!KavurmaKuyrugu.yaniciYok(level, goz), "3 blok üstteki yaprak engeller");
         y.succeed();
     }
 
