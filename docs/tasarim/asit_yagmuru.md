@@ -134,7 +134,7 @@ kullanıcıda yağsın, herkes görebilsin; asit yağmuru tüm dünyada yağsın
   ve kar biyomunda da asit yağar (kar yerine asit).
 - **Hasar her oyuncuya:** başı göğe açık her oyuncu (yaratıcı, izleyici, ölü ve chunk'ı yüklenmemiş olan hariç) saniyede
   `hasarSaniye`; `asitMinimumCan` (4) aynen. Hedefe 500 blok uzaktaki oyuncu da hasar alır (GameTest).
-- **Aşınma oyuncuların çevresinde:** her örnek rastgele bir oyuncu seçer (izleyici ve yaratıcı hariç; yarısı 24 blok, yarısı
+- **Aşınma oyuncuların çevresinde:** her örnek rastgele bir oyuncu seçer (izleyici hariç, yaratıcı dahil; yarısı 24 blok, yarısı
   seviye yarıçapı); hız oyuncu başına tablo değeri, tick örnekleme bütçesi `asit_yagmuru.blokButcesi` (32) × TPS kısması;
   yüklenmemiş chunk okunmaz.
 - **Bilinen sınır (AF2-07):** gerçek yağmur soğuk biyomda vanilla kar katmanı biriktirir ve kazanları doldurur (istemci orada
