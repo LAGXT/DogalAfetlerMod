@@ -248,12 +248,13 @@ public final class SicaklikOtomasyonu {
     }
 
     /**
-     * Parçacık yeni üretilmişken (ekranda görünürken) ve {@code yeterli} iken kare; 300 tick'te olmazsa uyarıp yine de
-     * çeker.
+     * Son çizilen kare parçacık yeni üretilmişken (ekranda opakken) çizildiyse ve {@code yeterli} iken kare; 300 tick'te
+     * olmazsa uyarıp yine de çeker. Gizli workspace'te istemci ~1 FPS çizer: ekran görüntüsü son çizilen kareyi alır,
+     * tazelik o karenin tick'ine ({@code SicaklikHud.sonTick}) göre ölçülür.
      */
     private static void ucuncuSahis(Minecraft mc, Sahne s, long sonParcacik, int gecikme, boolean yeterli) {
-        long simdi = IstemciSicaklik.tick();
-        boolean taze = sonParcacik > sahneTick && simdi - sonParcacik >= gecikme && simdi - sonParcacik <= gecikme + 3
+        long cizilen = SicaklikHud.sonTick;
+        boolean taze = sonParcacik > sahneTick && cizilen - sonParcacik >= gecikme && cizilen - sonParcacik <= gecikme + 8
                 && yeterli;
         if (sayac >= OTURMA && taze || sayac >= OTURMA + 300) {
             if (!taze) {
