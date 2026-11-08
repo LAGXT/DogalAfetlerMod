@@ -33,8 +33,9 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraftforge.common.MinecraftForge;
 
 /**
- * Asit yağmuru (bölüm E, madde 10, tasarım notu {@code docs/tasarim/asit_yagmuru.md}). AKTIF iken bütün dünyada normal
- * yağmur gibi yağar (AF2-01): etki alanı {@link EtkiAlani#herYer()} (siren, durum paketi ve "etkilenen" herkese), sunucu
+ * Asit yağmuru (bölüm E, madde 10, tasarım notu {@code docs/tasarim/asit_yagmuru.md}). AKTIF iken afetin boyutunun (üst
+ * dünya) her yerinde normal yağmur gibi yağar (AF2-01): etki alanı {@link EtkiAlani#herYer()}; siren, durum paketi ve
+ * "etkilenen" yalnız afetin boyutundaki oyunculara (her boyut yalnız sunucu geneli afette, güneş/ay; AF2-08). Sunucu
  * vanilla yağmurunu açıp tutar ve bitişte önceki havayı geri yükler ({@link AsitHavasi}). Yağmur 10 sn'de yoğunlaşır, son
  * 15 sn'de seyrelir; sürdükçe başı gökyüzüne açık her oyuncu saniyede {@code hasarSaniye} hasar alır (seviyeden bağımsız;
  * can {@code asitMinimumCan} altına inmez; çatı altı hiç hasar yok). Her oyuncunun çevresindeki yüklü chunk'larda gökyüzünü
@@ -239,12 +240,13 @@ public final class AsitYagmuru extends Afet {
     }
 
     /**
-     * Aşınma oyuncuların (izleyici ve yaratıcı hariç; AF2-05) çevresinden örneklenir: her örnek rastgele bir oyuncu seçer,
-     * yarısı onun 24 blok, yarısı seviyenin yarıçapı içinden; yüklü olmayan sütun atlanır (chunk yüklenmez). Tick bütçesi
-     * {@code blokButcesi} × TPS kısması; aşınabilir blok hız birikimi el verdikçe çatlak kuyruğuna girer.
+     * Aşınma oyuncuların (izleyici hariç; yaratıcı oyuncunun çevresi de aşınır, AF2-05) çevresinden örneklenir: her örnek
+     * rastgele bir oyuncu seçer, yarısı onun 24 blok, yarısı seviyenin yarıçapı içinden; yüklü olmayan sütun atlanır (chunk
+     * yüklenmez). Tick bütçesi {@code blokButcesi} × TPS kısması; aşınabilir blok hız birikimi el verdikçe çatlak kuyruğuna
+     * girer.
      */
     private void asindir(ServerLevel level, double yogunluk, int adim) {
-        List<ServerPlayer> oyuncular = level.players().stream().filter(o -> !o.isSpectator() && !o.isCreative()).toList();
+        List<ServerPlayer> oyuncular = level.players().stream().filter(o -> !o.isSpectator()).toList();
         if (oyuncular.isEmpty()) {
             return;
         }
