@@ -39,10 +39,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
+import net.minecraft.gametest.framework.GameTestAssertException;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -92,6 +94,34 @@ public final class MeteorOyunTestleri {
         if (!kosul) {
             y.fail(mesaj);
         }
+    }
+
+    /**
+     * Sahnenin zorlanmış chunk'ı ilk tick'te henüz varlık işlemeyebilir; o zaman {@link MeteorAPI#dusur} varlık açmadan doğrudan
+     * çarpar ve boş döner (ay çarpması AY-12 ile aynı yarış). {@code dusur} sahne merkezi varlık işleyince bir kez koşar, sonra
+     * {@code kosul} her tick denenir. {@code dusur}'daki başarısız doğrulama ya da istisna sonraki denemelerde de hata kalır.
+     */
+    private static void varlikIsleyinceDusur(GameTestHelper y, Runnable dusur, Runnable kosul) {
+        BlockPos merkez = y.absolutePos(MERKEZ);
+        boolean[] dustu = {false};
+        String[] hata = {null};
+        y.succeedWhen(() -> {
+            if (!dustu[0]) {
+                y.assertTrue(y.getLevel().isPositionEntityTicking(merkez), "sahne chunk'ı henüz varlık işlemiyor");
+                dustu[0] = true;
+                try {
+                    dusur.run();
+                } catch (GameTestAssertException e) {
+                    hata[0] = e.getMessage();
+                } catch (RuntimeException e) {
+                    hata[0] = e.toString();
+                }
+            }
+            if (hata[0] != null) {
+                y.fail(hata[0]);
+            }
+            kosul.run();
+        });
     }
 
     /**
@@ -170,12 +200,13 @@ public final class MeteorOyunTestleri {
         y.setBlock(sert, Blocks.OBSIDIAN);
         y.setBlock(MERKEZ.offset(0, -1, 1), Blocks.BEDROCK);
         ServerLevel level = y.getLevel();
-        Optional<MeteorVarligi> m = MeteorAPI.dusur(level, y.absolutePos(MERKEZ), MeteorBoyutu.BUYUK.tipikOlcek(),
-                MeteorGorunumu.GUNES,
-                YanginKaynagi.KOMUT, false, 90, 0, HIC);
-        dogrula(y, m.isPresent(), "meteor varlığı oluşmalı");
-        dogrula(y, m.get().getY() > y.absolutePos(MERKEZ).getY() + 100, "meteor yukarıdan başlamalı: " + m.get().getY());
-        y.succeedWhen(() -> {
+        AtomicReference<MeteorVarligi> m = new AtomicReference<>();
+        varlikIsleyinceDusur(y, () -> {
+            m.set(MeteorAPI.dusur(level, y.absolutePos(MERKEZ), MeteorBoyutu.BUYUK.tipikOlcek(), MeteorGorunumu.GUNES,
+                    YanginKaynagi.KOMUT, false, 90, 0, HIC).orElse(null));
+            dogrula(y, m.get() != null, "meteor varlığı oluşmalı");
+            dogrula(y, m.get().getY() > y.absolutePos(MERKEZ).getY() + 100, "meteor yukarıdan başlamalı: " + m.get().getY());
+        }, () -> {
             y.assertTrue(m.get().isRemoved(), "meteor henüz çarpmadı");
             y.assertTrue(bekleyenKrater(y) == 0, "krater işi sürüyor");
             y.assertBlockPresent(Blocks.AIR, MERKEZ);
@@ -381,11 +412,12 @@ public final class MeteorOyunTestleri {
         List<MeteorCarptiEvent> olaylar = new ArrayList<>();
         Consumer<MeteorCarptiEvent> dinleyici = olaylar::add;
         MinecraftForge.EVENT_BUS.addListener(EventPriority.NORMAL, false, MeteorCarptiEvent.class, dinleyici);
-        Optional<MeteorVarligi> m = MeteorAPI.dusur(level, y.absolutePos(MERKEZ), MeteorBoyutu.BUYUK.tipikOlcek(),
-                MeteorGorunumu.GUNES,
-                YanginKaynagi.KOMUT, false, 90, 0, HEP);
-        dogrula(y, m.isPresent(), "meteor varlığı oluşmalı");
-        y.succeedWhen(() -> {
+        AtomicReference<MeteorVarligi> m = new AtomicReference<>();
+        varlikIsleyinceDusur(y, () -> {
+            m.set(MeteorAPI.dusur(level, y.absolutePos(MERKEZ), MeteorBoyutu.BUYUK.tipikOlcek(), MeteorGorunumu.GUNES,
+                    YanginKaynagi.KOMUT, false, 90, 0, HEP).orElse(null));
+            dogrula(y, m.get() != null, "meteor varlığı oluşmalı");
+        }, () -> {
             y.assertTrue(m.get().isRemoved() && !olaylar.isEmpty(), "meteor henüz çarpmadı");
             MinecraftForge.EVENT_BUS.unregister(dinleyici);
             MeteorCarptiEvent olay = olaylar.get(0);
@@ -803,22 +835,22 @@ public final class MeteorOyunTestleri {
     public static void sifirlamaUcanMeteorVeSicakParcayiTemizler(GameTestHelper y) {
         zemin(y, Blocks.STONE);
         ServerLevel level = y.getLevel();
-        Optional<MeteorVarligi> m = MeteorAPI.dusur(level, y.absolutePos(MERKEZ), MeteorBoyutu.KUCUK.tipikOlcek(),
-                MeteorGorunumu.GUNES,
-                YanginKaynagi.KOMUT, false, 90, 0, HIC);
-        int yagmur = MeteorAPI.yagmur(level, List.of(), 2000, 1, 0, YanginKaynagi.KOMUT);
-        ItemEntity sicak = MeteorOdulleri.birak(level, Vec3.atBottomCenterOf(y.absolutePos(new BlockPos(3, 6, 3))),
-                new ItemStack(MeteorEsyaKayitlari.METEORIT_PARCASI.get()), 20);
-        dogrula(y, m.isPresent() && !m.get().isRemoved(), "meteor uçuyor olmalı");
-        dogrula(y, MeteorAPI.aktifYagmurSayisi(level) >= 1, "yağmur başlamalı: " + yagmur);
-        MeteorYoneticisi.donemDegisti(new DonemDegistiEvent(DunyaDonemi.al(level), DonemAlani.SIFIRLAMA));
-        dogrula(y, m.get().isRemoved(), "uçan meteor kalkmalı");
-        dogrula(y, MeteorAPI.aktifMeteorSayisi(level) == 0, "uçan meteor sayısı 0");
-        dogrula(y, MeteorAPI.aktifYagmurSayisi(level) == 0, "yağmur durmalı");
-        dogrula(y, MeteorOdulleri.sicakBitis(sicak.getItem()) == OdulZamani.SOGUK, "sıcak parça soğumalı");
-        dogrula(y, sicak.isAlive(), "yerdeki ödül kalır");
-        sahneyiTemizle(y);
-        y.succeed();
+        varlikIsleyinceDusur(y, () -> {
+            Optional<MeteorVarligi> m = MeteorAPI.dusur(level, y.absolutePos(MERKEZ), MeteorBoyutu.KUCUK.tipikOlcek(),
+                    MeteorGorunumu.GUNES, YanginKaynagi.KOMUT, false, 90, 0, HIC);
+            int yagmur = MeteorAPI.yagmur(level, List.of(), 2000, 1, 0, YanginKaynagi.KOMUT);
+            ItemEntity sicak = MeteorOdulleri.birak(level, Vec3.atBottomCenterOf(y.absolutePos(new BlockPos(3, 6, 3))),
+                    new ItemStack(MeteorEsyaKayitlari.METEORIT_PARCASI.get()), 20);
+            dogrula(y, m.isPresent() && !m.get().isRemoved(), "meteor uçuyor olmalı");
+            dogrula(y, MeteorAPI.aktifYagmurSayisi(level) >= 1, "yağmur başlamalı: " + yagmur);
+            MeteorYoneticisi.donemDegisti(new DonemDegistiEvent(DunyaDonemi.al(level), DonemAlani.SIFIRLAMA));
+            dogrula(y, m.get().isRemoved(), "uçan meteor kalkmalı");
+            dogrula(y, MeteorAPI.aktifMeteorSayisi(level) == 0, "uçan meteor sayısı 0");
+            dogrula(y, MeteorAPI.aktifYagmurSayisi(level) == 0, "yağmur durmalı");
+            dogrula(y, MeteorOdulleri.sicakBitis(sicak.getItem()) == OdulZamani.SOGUK, "sıcak parça soğumalı");
+            dogrula(y, sicak.isAlive(), "yerdeki ödül kalır");
+            sahneyiTemizle(y);
+        }, () -> { });
     }
 
     /** Tezgaha yığınları koyup tarifin sonucunu verir (eşleşme yoksa boş). */
