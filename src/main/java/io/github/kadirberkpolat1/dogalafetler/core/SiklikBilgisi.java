@@ -23,15 +23,26 @@ public final class SiklikBilgisi {
     public static final String SONRAKI = ON + "sonraki";
     public static final String SONRAKI_AKTIF = ON + "sonraki_aktif";
     public static final String SONRAKI_YOK = ON + "sonraki_yok";
+    public static final String SONRAKI_SIFIR = ON + "sonraki_sifir";
+    public static final String SONRAKI_SISTEM_KAPALI = ON + "sonraki_sistem_kapali";
     public static final String DEGISTI = ON + "degisti";
     public static final String SINIR = ON + "sinir";
 
     private SiklikBilgisi() {
     }
 
-    /** Sonraki afet satırı: aktif afet varsa bitimini, yoksa tahmini ({@link SonrakiAfetTahmini}) ya da "yok". */
+    /**
+     * Sonraki afet satırı. Doğal seçim hiç olamıyorsa (afet sistemi gamerule ile kapalı, sıklık %0) bunu söyler; aktif afet
+     * varsa bittikten sonraki bekleme, yoksa tahmin ({@link SonrakiAfetTahmini}) ya da "uygun afet yok".
+     */
     public static Component sonrakiSatiri(AfetYoneticisi yonetici) {
+        if (!yonetici.server().getGameRules().getBoolean(Kurallar.DOGAL_AFETLER_ACIK)) {
+            return Component.translatable(SONRAKI_SISTEM_KAPALI);
+        }
         int yuzde = yuzde(yonetici);
+        if (yuzde == 0) {
+            return Component.translatable(SONRAKI_SIFIR);
+        }
         String carpan = sayi(yuzde / 100.0);
         Optional<Afet> aktif = yonetici.aktifAfet();
         if (aktif.isPresent()) {
@@ -83,10 +94,14 @@ public final class SiklikBilgisi {
     public static void cevirileriYaz(CeviriYazici y) {
         y.ekle(SONRAKI, "Next disaster: ~%s days (range %s–%s days, 90%%); frequency %s%% (x%s)",
                 "Sonraki afet: ~%s gün (aralık %s–%s gün, %%90); sıklık %%%s (x%s)");
-        y.ekle(SONRAKI_AKTIF, "Next disaster: after the active one ends and a %s-day cooldown; frequency %s%% (x%s)",
-                "Sonraki afet: aktif afet bitip %s günlük bekleme dolunca; sıklık %%%s (x%s)");
-        y.ekle(SONRAKI_YOK, "Next disaster: none (frequency %s%%, dogalAfetlerAcik off or no eligible disaster)",
-                "Sonraki afet: yok (sıklık %%%s, dogalAfetlerAcik kapalı ya da uygun afet yok)");
+        y.ekle(SONRAKI_AKTIF, "Next disaster: when the active one ends: ~%s days; frequency %s%% (x%s)",
+                "Sonraki afet: aktif afet bitince: ~%s gün; sıklık %%%s (x%s)");
+        y.ekle(SONRAKI_YOK, "Next disaster: none (frequency %s%%, no eligible disaster)",
+                "Sonraki afet: yok (sıklık %%%s, uygun afet yok)");
+        y.ekle(SONRAKI_SIFIR, "Next disaster: disasters are off (frequency 0%%)",
+                "Sonraki afet: afetler kapalı (sıklık %%0)");
+        y.ekle(SONRAKI_SISTEM_KAPALI, "Next disaster: the disaster system is off (dogalAfetlerAcik)",
+                "Sonraki afet: afet sistemi kapalı (dogalAfetlerAcik)");
         y.ekle(DEGISTI, "Disaster frequency is now %s%% (x%s); new and running cooldowns scale with it.",
                 "Afet sıklığı artık %%%s (x%s); yeni ve süren beklemeler buna göre ölçeklenir.");
         y.ekle(SINIR, "afetSikligi %s is outside 0–1000; %s%% is used.",
