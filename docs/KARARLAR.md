@@ -5935,6 +5935,23 @@ Sınama `test_sira.py` 18/18 (`test_dagitim_bos_yuvasi_cok_olana_esitlikte_pc2`:
 pc2, ana, pc2, ana, `2/2 · 2/2`; `test_dagitim_dolu_makine_atlanir`: pc2 dolu → ana, ana dolu → pc2). Canlı kanıt
 `.vibe/kanit/sira-4/dagitim-2.md`.
 
+**K-E60 rev. 2 pc2 erişilemezken yuvaları kapalı (şef kararı, 2026-11-08; entegratör, `is/entegrasyon-7` `f1d8db4`).** Kullanıcı
+gözlemi: pc2 06:00'dan beri erişilemiyor (`No route to host`, büyük olasılıkla Windows açık) ama pano "pc2 çalışıyor" diyordu ve
+oto işleri pc2'ye düşüp `uzak.sh` çıkış 4 ile ölüyordu (afet-fizik-2 ve entegrasyon `compile-3`, `1108-060053626-56`): "koşucusu
+yaşıyor" makinenin erişilebilir olduğu anlamına gelmiyordu. Karar: pc2 koşucusunun zaten 5 sn'de bir yaptığı ssh okuması
+(`Kosucu.pc2_oku`, `ssh -o BatchMode=yes -o ConnectTimeout=5 pc2 bash -s`) başarısızsa ve okuma tazeyse (`PC2_SUREC_TAZE_SN` 60)
+pc2 yuvaları kapalıdır (`sira.pc2_erisim_hatasi`): `Kosucu.engel` "pc2 erişilemiyor" döner, oto işi ana'ya gider, `--makine pc2`
+(ve `pc2_istemci.sh`) işi ölmeden bekler; `sira.py ekle` pc2 işinde UYARI basar; pano koşucu satırında "pc2 erişilemiyor
+(<neden>)", `Yuva: pc2 0/0`, bekleyen pc2 işinde "bekliyor (n.; pc2 erişilemiyor)". ssh yeniden geçince bir sonraki okumada pc2
+kendiliğinden açılır. Okuma yoksa (koşucu yeni başladı) eski davranış sürer. Reddedilen: ayrı `ssh pc2 true` döngüsü (aynı bilgiyi
+ikinci ssh ile alır). Bilinen sınır: pc2 düştüğü an ile ilk başarısız okuma arasında (≤ ~10 sn: 5 sn aralık + 5 sn bağlantı
+zaman aşımı) pc2'ye verilen oto işi yine çıkış 4 ile biter (yeniden kuyruğa alma yok). Sınama `test_sira.py` 19/19
+(`test_pc2_erisilemezse_yuvalari_kapali_oto_ana_pc2_isi_bekler`: sahte ssh çıkış 255 → oto işi ana, pc2 işi bekler, pano "pc2
+erişilemiyor (No route to host)" ve `Yuva: ana 1/2 · pc2 0/0`; sahte ssh geçince pc2 işi pc2'de koşar). Canlı: KÖK'te `sira.py`/
+`sira_kosucu.py` dalın sürümüyle değiştirildi (K-E53 kalıbı; birleşmede `checkout --` ile geri alınır), koşucular 06:23:06'da
+yeniden başladı (kuyruk boştu, kesilen iş yok); deneme oto işi `1108-062327862-4f` ana'da koştu, pc2 işi `1108-062327776-b6`
+"pc2 erişilemiyor" ile bekledi ve iptal edildi. Kanıt `.vibe/kanit/entegrasyon-7/pano-pc2-kapali.txt`, `test_sira-1.log`.
+
 **K-E61 Sunucu config göçü: `ayarSurumu` ile eski varsayılan yeni varsayılana çekilir, elle değer korunur (şef kararı MT2-31,
 Mt22; 2026-11-08; uygulama meteor-2 `20fe851`, entegrasyon `7745c47`).** Forge `serverconfig` dünya klasöründe yaşar ve var
 olan dosyada aralık içindeki değere dokunmaz; varsayılan değişince var olan dünya eski değeri okur (meteor 90 → 180/dk, tavan
