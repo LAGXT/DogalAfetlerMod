@@ -22,6 +22,10 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.alchemy.PotionUtils;
+import net.minecraft.world.item.alchemy.Potions;
 import net.minecraftforge.common.MinecraftForge;
 
 /**
@@ -94,12 +98,20 @@ public final class YiyecekAPI {
         return YiyecekTanimi.cigBalik(tur, YiyecekAyarlari.balikCigSaniye());
     }
 
-    /** Vanilla (ya da config'e eklenmiş) pişmiş yiyeceğin tanımı; ısınma kapalıysa ya da listede yoksa boş. */
-    public static Optional<YiyecekTanimi> vanillaTanimi(Item esya) {
-        if (!YiyecekAyarlari.vanillaIsinma() || esya instanceof SicaklikYiyecegi) {
+    /**
+     * Vanilla (ya da config'e eklenmiş) yiyeceğin tanımı: önce ısınma, sonra serinlik listesi; listenin anahtarı kapalıysa ya
+     * da eşya listede yoksa boş. İksir şişesi yalnız su iksiriyse sayılır (bütün iksirler aynı eşya kimliğini taşır).
+     */
+    public static Optional<YiyecekTanimi> vanillaTanimi(ItemStack yigin) {
+        Item esya = yigin.getItem();
+        if (esya instanceof SicaklikYiyecegi || yigin.is(Items.POTION) && PotionUtils.getPotion(yigin) != Potions.WATER) {
             return Optional.empty();
         }
-        return Optional.ofNullable(YiyecekAyarlari.vanillaTanimlari().get(esya));
+        YiyecekTanimi tanim = YiyecekAyarlari.vanillaIsinma() ? YiyecekAyarlari.vanillaIsinmaTanimlari().get(esya) : null;
+        if (tanim == null && YiyecekAyarlari.vanillaSerinlik()) {
+            tanim = YiyecekAyarlari.vanillaSerinlikTanimlari().get(esya);
+        }
+        return Optional.ofNullable(tanim);
     }
 
     /** Türün azalan verim penceresinden kalan (tick); pencere dışındaysa 0. */

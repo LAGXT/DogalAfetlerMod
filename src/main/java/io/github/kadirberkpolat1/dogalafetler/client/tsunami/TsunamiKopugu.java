@@ -15,10 +15,12 @@ import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.su.Dalga;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSuDunyasi;
+import it.unimi.dsi.fastutil.longs.Long2DoubleOpenHashMap;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
 import java.util.Locale;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.resources.ResourceLocation;
@@ -34,10 +36,11 @@ import org.joml.Matrix4f;
 /**
  * Tsunami dalgasının köpük katmanı (tasarım notu §2 "Köpük"): ortak su renderer'ının üstüne, tsunami sürerken her dalganın
  * cephesi boyunca üç şerit çizilir: tepe boyunca şerit, ön yüzden aşağı akan kesik köpük çizgileri ve cephe tabanında yuvarlanan
- * bore; üçü de {@code su_kopuk} dokulu (Ts2-1), parlaklık ve alfa yanal öbeklerle değişir. Yükseklik dalganın analitik
- * yüzeyinden ({@link Dalga#yuzey}) alınır; parçacık değil geometri olduğu için maliyeti cephe uzunluğuyla doğrusaldır. Kalite
- * (N13): Düşük'te yalnız tepe şeridi, 2 blok adım; diğerlerinde üç şerit, 1 blok adım (kameradan 64 blok ötede 2). Renk gün
- * ışığıyla ölçeklenir.
+ * bore; üçü de {@code su_kopuk} dokulu (Ts2-1), parlaklık ve alfa yanal öbeklerle değişir. Cephenin yeri analitik dalgadan
+ * ({@link Dalga#cephe}), yüksekliği bu karede çizilen sudan alınır ({@link SerpintiNoktasi#dogusYuksekligi}: yakın ağ, onun
+ * kapsamadığı yerde uzak LOD karosu); su çizilmeyen, blok içinde ya da çatı altında kalan noktada köpük yok. Parçacık değil geometri
+ * olduğu için maliyeti cephe uzunluğuyla doğrusaldır (sütun başına karede bir sorgu). Kalite (N13): Düşük'te yalnız tepe
+ * şeridi, 2 blok adım; diğerlerinde üç şerit, 1 blok adım (kameradan 64 blok ötede 2). Renk gün ışığıyla ölçeklenir.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class TsunamiKopugu {
@@ -64,6 +67,13 @@ public final class TsunamiKopugu {
     private static int logKare;
     /** -200: ilk karede satır yazılır ({@code Long.MIN_VALUE} ile {@code tick - logTick} taşıp hiç 200'e ulaşmıyordu). */
     private static long logTick = -200;
+    /** Bu karede sorgulanan sütunların köpük yüksekliği (yükseklik yalnız sütuna bağlı; sınırı aşan örnekler tekrar sormaz). */
+    private static final Long2DoubleOpenHashMap SUTUN = new Long2DoubleOpenHashMap();
+    private static ClientLevel seviye;
+
+    static {
+        SUTUN.defaultReturnValue(Double.NEGATIVE_INFINITY);
+    }
 
     private TsunamiKopugu() {
     }
@@ -79,12 +89,15 @@ public final class TsunamiKopugu {
             return;
         }
         sonSegment = 0;
+        SerpintiNoktasi.kopukKaresi();
         SanalSuDunyasi d = SanalSu.istemci;
         Minecraft mc = Minecraft.getInstance();
         if (d == null || mc.level == null || d.dalgalar().isEmpty()
                 || IstemciAfetDurumu.aktif(AfetTuru.TSUNAMI).isEmpty()) {
             return;
         }
+        seviye = mc.level;
+        SUTUN.clear();
         long cpu0 = GorselOtomasyon.AKTIF ? IPLIK.getCurrentThreadCpuTime() : 0;
         float pt = e.getPartialTick();
         double t = IstemciDonem.saat(pt);
@@ -102,7 +115,9 @@ public final class TsunamiKopugu {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.enableDepthTest();
-        RenderSystem.depthMask(false);
+        // Fabulous'ta bu aşama (tripwire katmanı) derinliği boş başlayan hava hedefine çizer: derinlik yazılmazsa bileştirme
+        // köpüğü en uzağa koyar, suyun ve zeminin arkasında kalır. Diğerlerinde ana hedefte çizilen suyun derinliğine sınanır.
+        RenderSystem.depthMask(Minecraft.useShaderTransparency());
         RenderSystem.disableCull();
         BufferBuilder b = Tesselator.getInstance().getBuilder();
         b.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
@@ -168,8 +183,8 @@ public final class TsunamiKopugu {
     /** Yanal {@code [u0, u1]} aralığında üç şerit (doku {@code [ta, tb]}); yüzeyi olmayan (yan kenar) aralık atlanır. */
     private static int serit(BufferBuilder b, Matrix4f m, Dalga w, double t, double c, double u0, double u1, float ta, float tb,
             Vec3 kam, boolean dusuk, float isik) {
-        double h0 = yukseklik(w, t, c, TEPE_ORTA, u0);
-        double h1 = yukseklik(w, t, c, TEPE_ORTA, u1);
+        double h0 = yukseklik(w, c, TEPE_ORTA, u0);
+        double h1 = yukseklik(w, c, TEPE_ORTA, u1);
         if (Double.isNaN(h0) || Double.isNaN(h1)) {
             return 0;
         }
@@ -186,19 +201,24 @@ public final class TsunamiKopugu {
             onYuz(b, m, w, t, c, u0, u1, ta, tb, kam, k0, k1, a * (float) (0.5 + 0.5 * gurultu(u0, t, 8)),
                     a * (float) (0.5 + 0.5 * gurultu(u1, t, 8)));
         }
-        // Bore: cephe tabanında yuvarlanan basamak, yüksekliği dalganın %12'si (en çok 1,6 blok), titreşen üst kenar.
-        double bore = Math.min(1.6, 0.12 * w.yukseklik()) * (0.8 + 0.2 * Math.sin(t * 0.6 + u0 * 0.8));
-        double taban = w.taban() + 0.05;
+        // Bore: cephe tabanında, önündeki görünen suyun (sel, deniz) üstünde yuvarlanan basamak, yüksekliği dalganın %12'si
+        // (en çok 1,6 blok), titreşen üst kenar; önü kuru (arazi, çekilmenin açtığı dip) cephede bore yok.
         double s0 = c + 0.6;
         double s1 = c - 0.4;
-        kose(b, m, w, s0, u0, taban, kam, k0, 1f, ta, 1f);
-        kose(b, m, w, s0, u1, taban, kam, k1, 1f, tb, 1f);
-        kose(b, m, w, s0, u1, taban + bore, kam, k1, 0.55f, tb, 0.6f);
-        kose(b, m, w, s0, u0, taban + bore, kam, k0, 0.55f, ta, 0.6f);
-        kose(b, m, w, s0, u0, taban + bore, kam, k0, 0.55f, ta, 0.6f);
-        kose(b, m, w, s0, u1, taban + bore, kam, k1, 0.55f, tb, 0.6f);
-        kose(b, m, w, s1, u1, taban + bore, kam, k1, 0.9f, tb, 0f);
-        kose(b, m, w, s1, u0, taban + bore, kam, k0, 0.9f, ta, 0f);
+        double taban0 = boreTabani(w, s0, u0) + 0.05;
+        double taban1 = boreTabani(w, s0, u1) + 0.05;
+        if (Double.isNaN(taban0) || Double.isNaN(taban1)) {
+            return 1;
+        }
+        double bore = Math.min(1.6, 0.12 * w.yukseklik()) * (0.8 + 0.2 * Math.sin(t * 0.6 + u0 * 0.8));
+        kose(b, m, w, s0, u0, taban0, kam, k0, 1f, ta, 1f);
+        kose(b, m, w, s0, u1, taban1, kam, k1, 1f, tb, 1f);
+        kose(b, m, w, s0, u1, taban1 + bore, kam, k1, 0.55f, tb, 0.6f);
+        kose(b, m, w, s0, u0, taban0 + bore, kam, k0, 0.55f, ta, 0.6f);
+        kose(b, m, w, s0, u0, taban0 + bore, kam, k0, 0.55f, ta, 0.6f);
+        kose(b, m, w, s0, u1, taban1 + bore, kam, k1, 0.55f, tb, 0.6f);
+        kose(b, m, w, s1, u1, taban1 + bore, kam, k1, 0.9f, tb, 0f);
+        kose(b, m, w, s1, u0, taban0 + bore, kam, k0, 0.9f, ta, 0f);
         return 1;
     }
 
@@ -215,10 +235,10 @@ public final class TsunamiKopugu {
         float orta1 = (float) (0.5 + 0.5 * gurultu(u1, t, 2));
         double arka0 = TEPE_ARKA + 2 * (gurultu(u0, t, 4) - 0.5);
         double arka1 = TEPE_ARKA + 2 * (gurultu(u1, t, 4) - 0.5);
-        double yo0 = yukseklik(w, t, c, TEPE_ON, u0);
-        double yo1 = yukseklik(w, t, c, TEPE_ON, u1);
-        double ya0 = yukseklik(w, t, c, arka0, u0);
-        double ya1 = yukseklik(w, t, c, arka1, u1);
+        double yo0 = yukseklik(w, c, TEPE_ON, u0);
+        double yo1 = yukseklik(w, c, TEPE_ON, u1);
+        double ya0 = yukseklik(w, c, arka0, u0);
+        double ya1 = yukseklik(w, c, arka1, u1);
         boolean on = !Double.isNaN(yo0) && !Double.isNaN(yo1);
         boolean arka = !Double.isNaN(ya0) && !Double.isNaN(ya1);
         for (int katman = 0; katman < 2; katman++) {
@@ -245,10 +265,10 @@ public final class TsunamiKopugu {
     /** Ön yüz çizgisi: {@code s} {@link #CIZGI_ALT}–{@link #TEPE_ON}, yüzeyin 0,06 üstünde; alfa tepede tam, aşağıda %40. */
     private static void onYuz(BufferBuilder b, Matrix4f m, Dalga w, double t, double c, double u0, double u1, float ta, float tb,
             Vec3 kam, float k0, float k1, float a0, float a1) {
-        double y00 = yukseklik(w, t, c, CIZGI_ALT, u0);
-        double y01 = yukseklik(w, t, c, CIZGI_ALT, u1);
-        double y11 = yukseklik(w, t, c, TEPE_ON, u1);
-        double y10 = yukseklik(w, t, c, TEPE_ON, u0);
+        double y00 = yukseklik(w, c, CIZGI_ALT, u0);
+        double y01 = yukseklik(w, c, CIZGI_ALT, u1);
+        double y11 = yukseklik(w, c, TEPE_ON, u1);
+        double y10 = yukseklik(w, c, TEPE_ON, u0);
         if (Double.isNaN(y00) || Double.isNaN(y01) || Double.isNaN(y11) || Double.isNaN(y10)) {
             return;
         }
@@ -264,11 +284,31 @@ public final class TsunamiKopugu {
                 + 0.08 * Math.sin(u * 5.3 + t * 0.11 + 2.9 * faz);
     }
 
-    /** Cephenin {@code s} blok arkasında, yanal {@code u}'daki yüzey (mutlak Y); su yoksa NaN. */
-    private static double yukseklik(Dalga w, double t, double c, double s, double u) {
+    /**
+     * Cephenin {@code s} blok arkasında, yanal {@code u}'daki görünen su üstü (mutlak Y; {@link SerpintiNoktasi#dogusYuksekligi},
+     * sütun başına karede bir kez); su çizilmiyorsa, nokta blok içinde ya da çatı altındaysa ya da su dalga tabanından
+     * yükselmemişse (orada dalga çizilmiyor) NaN.
+     */
+    private static double yukseklik(Dalga w, double c, double s, double u) {
         double x = w.x0() + w.yonX() * (c - s) - w.yonZ() * u;
         double z = w.z0() + w.yonZ() * (c - s) + w.yonX() * u;
-        return w.yuzey(x, z, t);
+        long k = ((long) Mth.floor(x) << 32) | (Mth.floor(z) & 0xffffffffL);
+        double y = SUTUN.get(k);
+        if (y == Double.NEGATIVE_INFINITY) {
+            y = SerpintiNoktasi.dogusYuksekligi(seviye, x, z, 0);
+            SUTUN.put(k, y);
+        }
+        if (!(y > w.taban() + 0.05)) {
+            return Double.NaN;
+        }
+        SerpintiNoktasi.kopukNoktasi(x, y + 0.12, z);
+        return y;
+    }
+
+    /** Cephe ekseninde {@code boyuna}, yanal {@code u}'daki görünen su ({@link SerpintiNoktasi#gorunenSu}); yoksa NaN. */
+    private static double boreTabani(Dalga w, double boyuna, double u) {
+        return SerpintiNoktasi.gorunenSu(seviye, w.x0() + w.yonX() * boyuna - w.yonZ() * u,
+                w.z0() + w.yonZ() * boyuna + w.yonX() * u);
     }
 
     /** Dokulu köşe: cephe ekseninde {@code boyuna}, yanal {@code u}, mutlak {@code y}; {@code (tu, tv)} köpük sprite'ı içinde 0..1. */

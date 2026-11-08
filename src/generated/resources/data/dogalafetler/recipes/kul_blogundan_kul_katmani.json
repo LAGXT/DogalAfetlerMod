@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "building",
+  "ingredients": [
+    {
+      "item": "dogalafetler:kul_blogu"
+    }
+  ],
+  "result": {
+    "count": 8,
+    "item": "dogalafetler:kul_katmani"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_kul_katmani": {
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "dogalafetler:kul_katmani"
+            ]
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    },
+    "has_the_recipe": {
+      "conditions": {
+        "recipe": "dogalafetler:kul_katmanindan_kul_blogu"
+      },
+      "trigger": "minecraft:recipe_unlocked"
+    }
+  },
+  "requirements": [
+    [
+      "has_kul_katmani",
+      "has_the_recipe"
+    ]
+  ],
+  "rewards": {
+    "recipes": [
+      "dogalafetler:kul_katmanindan_kul_blogu"
+    ]
+  },
+  "sends_telemetry_event": false
+}

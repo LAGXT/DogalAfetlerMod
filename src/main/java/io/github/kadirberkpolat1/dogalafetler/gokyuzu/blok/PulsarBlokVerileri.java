@@ -5,6 +5,7 @@ import io.github.kadirberkpolat1.dogalafetler.gokyuzu.PulsarKayitlari;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 import net.minecraft.advancements.critereon.StatePropertiesPredicate;
 import net.minecraft.core.Direction;
 import net.minecraft.data.CachedOutput;
@@ -13,8 +14,13 @@ import net.minecraft.data.DataProvider;
 import net.minecraft.data.PackOutput;
 import net.minecraft.data.loot.BlockLootSubProvider;
 import net.minecraft.data.loot.LootTableProvider;
+import net.minecraft.data.recipes.FinishedRecipe;
+import net.minecraft.data.recipes.RecipeCategory;
+import net.minecraft.data.recipes.RecipeProvider;
+import net.minecraft.data.recipes.ShapelessRecipeBuilder;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.flag.FeatureFlags;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.RotatedPillarBlock;
 import net.minecraft.world.level.block.SnowLayerBlock;
@@ -33,9 +39,13 @@ import net.minecraftforge.common.data.ExistingFileHelper;
 import net.minecraftforge.data.event.GatherDataEvent;
 
 /**
- * Pulsar bloklarının datagen çıktıları: loot tabloları (kül katmanı kat sayısı kadar kendini, diğerleri kendini), blok
- * durumları ve modeller (kül katmanı vanilla kar katmanı gibi 2/4/…/14 piksel kutu, 8 kat kül bloğu modeli; kömürleşmiş
- * kütük eksenli sütun). Doku dosyalarını {@code tools/assets/pulsar_dokular.py} üretir.
+ * Pulsar bloklarının datagen çıktıları: loot tabloları (kül katmanı 1–7 katta kat sayısı kadar kendini, 8 katta — Kül
+ * Bloğu modeliyle çizilen tam blok — bir Kül Bloğu, ipek dokunuşta da aynısı; diğerleri kendini), blok durumları ve
+ * modeller (kül katmanı vanilla kar katmanı gibi 2/4/…/14 piksel kutu, 8 kat kül bloğu modeli; kömürleşmiş kütük
+ * eksenli sütun, tahta tek dokulu küp) ve şekilsiz tarifler (1 kömürleşmiş kütük → 4 kömürleşmiş tahta, grup
+ * {@code planks}; 8 Kül Katmanı ↔ 1 Kül Bloğu, 8 katlı külü kıran oyuncu blokla birlikte katmanlarını kaybetmesin); her
+ * tarifin kitap kilidi girdisi envantere girince açılır (K-E63). Doku dosyalarını {@code tools/assets/pulsar_dokular.py}
+ * üretir.
  */
 public final class PulsarBlokVerileri {
     private static final ResourceLocation KUL = DogalAfetler.konum("block/kul");
@@ -49,6 +59,7 @@ public final class PulsarBlokVerileri {
         ExistingFileHelper dosyalar = olay.getExistingFileHelper();
         uretici.addProvider(olay.includeServer(), new Adli("Pulsar blok loot tabloları", new LootTableProvider(cikti,
                 Set.of(), List.of(new LootTableProvider.SubProviderEntry(BlokLootu::new, LootContextParamSets.BLOCK)))));
+        uretici.addProvider(olay.includeServer(), new Adli("Pulsar blok tarifleri", new Tarifler(cikti)));
         uretici.addProvider(olay.includeClient(), new Modeller(cikti, dosyalar));
     }
 
@@ -74,22 +85,48 @@ public final class PulsarBlokVerileri {
         protected void generate() {
             Block kul = PulsarKayitlari.KUL_KATMANI.get();
             LootPool.Builder havuz = LootPool.lootPool().setRolls(ConstantValue.exactly(1.0F));
-            for (int kat = 1; kat <= 8; kat++) {
-                havuz.add(LootItem.lootTableItem(kul)
-                        .when(LootItemBlockStatePropertyCondition.hasBlockStateProperties(kul)
-                                .setProperties(StatePropertiesPredicate.Builder.properties()
-                                        .hasProperty(SnowLayerBlock.LAYERS, kat)))
+            for (int kat = 1; kat < SnowLayerBlock.MAX_HEIGHT; kat++) {
+                havuz.add(LootItem.lootTableItem(kul).when(katta(kul, kat))
                         .apply(SetItemCountFunction.setCount(ConstantValue.exactly(kat))));
             }
+            havuz.add(LootItem.lootTableItem(PulsarKayitlari.KUL_BLOGU.get()).when(katta(kul, SnowLayerBlock.MAX_HEIGHT)));
             add(kul, LootTable.lootTable().withPool(applyExplosionCondition(kul, havuz)));
             dropSelf(PulsarKayitlari.KUL_BLOGU.get());
             dropSelf(PulsarKayitlari.KOMURLESMIS_KUTUK.get());
+            dropSelf(PulsarKayitlari.KOMURLESMIS_TAHTA.get());
+        }
+
+        private static LootItemBlockStatePropertyCondition.Builder katta(Block kul, int kat) {
+            return LootItemBlockStatePropertyCondition.hasBlockStateProperties(kul).setProperties(
+                    StatePropertiesPredicate.Builder.properties().hasProperty(SnowLayerBlock.LAYERS, kat));
         }
 
         @Override
         protected Iterable<Block> getKnownBlocks() {
             return List.of(PulsarKayitlari.KUL_KATMANI.get(), PulsarKayitlari.KUL_BLOGU.get(),
-                    PulsarKayitlari.KOMURLESMIS_KUTUK.get());
+                    PulsarKayitlari.KOMURLESMIS_KUTUK.get(), PulsarKayitlari.KOMURLESMIS_TAHTA.get());
+        }
+    }
+
+    private static final class Tarifler extends RecipeProvider {
+        Tarifler(PackOutput cikti) {
+            super(cikti);
+        }
+
+        @Override
+        protected void buildRecipes(Consumer<FinishedRecipe> c) {
+            Item kutuk = PulsarKayitlari.KOMURLESMIS_KUTUK_ESYASI.get();
+            ShapelessRecipeBuilder.shapeless(RecipeCategory.BUILDING_BLOCKS, PulsarKayitlari.KOMURLESMIS_TAHTA_ESYASI.get(), 4)
+                    .requires(kutuk).group("planks").unlockedBy("has_komurlesmis_kutuk", has(kutuk))
+                    .save(c, DogalAfetler.konum("komurlesmis_tahta"));
+            Block katman = PulsarKayitlari.KUL_KATMANI.get();
+            Block blok = PulsarKayitlari.KUL_BLOGU.get();
+            ShapelessRecipeBuilder.shapeless(RecipeCategory.BUILDING_BLOCKS, blok)
+                    .requires(katman, SnowLayerBlock.MAX_HEIGHT).unlockedBy("has_kul_katmani", has(katman))
+                    .save(c, DogalAfetler.konum("kul_katmanindan_kul_blogu"));
+            ShapelessRecipeBuilder.shapeless(RecipeCategory.BUILDING_BLOCKS, katman, SnowLayerBlock.MAX_HEIGHT)
+                    .requires(blok).unlockedBy("has_kul_blogu", has(blok))
+                    .save(c, DogalAfetler.konum("kul_blogundan_kul_katmani"));
         }
     }
 
@@ -124,6 +161,10 @@ public final class PulsarBlokVerileri {
             ModelFile dik = models().cubeColumn("komurlesmis_kutuk", yan, tepe);
             axisBlock(kutuk, dik, models().cubeColumnHorizontal("komurlesmis_kutuk_horizontal", yan, tepe));
             simpleBlockItem(kutuk, dik);
+
+            ModelFile tahta = models().cubeAll("komurlesmis_tahta", DogalAfetler.konum("block/komurlesmis_tahta"));
+            simpleBlock(PulsarKayitlari.KOMURLESMIS_TAHTA.get(), tahta);
+            simpleBlockItem(PulsarKayitlari.KOMURLESMIS_TAHTA.get(), tahta);
         }
 
         /** Vanilla {@code snow_height<n>} gibi: tabanda {@code yukseklik} piksellik kutu, üst yüzü kesilmez. */

@@ -1,19 +1,21 @@
 package io.github.kadirberkpolat1.dogalafetler.gokyuzu;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.gokyuzu.blok.KomurlesmisKutukBlogu;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.blok.KulKatmaniBlogu;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.blok.PulsarBlokVerileri;
+import io.github.kadirberkpolat1.dogalafetler.gokyuzu.blok.YakitsizBlokEsyasi;
 import io.github.kadirberkpolat1.dogalafetler.veri.CeviriYazici;
 import io.github.kadirberkpolat1.dogalafetler.veri.DataGenerators;
 import java.util.function.Supplier;
 import net.minecraft.core.particles.ParticleType;
 import net.minecraft.core.particles.SimpleParticleType;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.tags.ItemTags;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.RotatedPillarBlock;
 import net.minecraft.world.level.block.SnowLayerBlock;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
@@ -28,11 +30,15 @@ import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
 
 /**
- * Pulsar cehenneminin blokları ve parçacıkları (PL-3): {@code kul_katmani} (kar katmanı gibi 1–8 kat, erimez),
- * {@code kul_blogu} (kum sesi, kürek), {@code komurlesmis_kutuk} (eksenli, ışık 3, balta, yanmaz: yanıcılık kaydı yok);
- * parçacıklar {@code kul_yagisi}, {@code kor}, {@code kul_tozu} (istemci sağlayıcıları
- * {@code client.gokyuzu.PulsarParcacikKaydi}). Dokular {@code tools/assets/pulsar_dokular.py}; blok durumu, model, loot
- * datagen'de ({@link PulsarBlokVerileri}), vanilla etiketler ortak sağlayıcıdan (K-E12).
+ * Pulsar cehenneminin blokları ve parçacıkları (PL-3): {@code kul_katmani} (kar katmanı gibi 1–8 kat, erimez; 8 kat Kül
+ * Bloğu verir), {@code kul_blogu} (kum sesi, kürek), {@code komurlesmis_kutuk} (eksenli, ışık 3, balta, yanmaz: yanıcılık
+ * kaydı yok; suya değince birkaç dakikada kömür bloğu, {@link KomurlesmisKutukBlogu}), {@code komurlesmis_tahta} (çalışma
+ * masasında 1 kütük → 4 tahta; {@code minecraft:planks}, tekne tarifleri belirli tahta istediğinden tekne olmaz). Kütük
+ * ve tahta Nether odunları gibi yakıt değildir ({@code minecraft:non_flammable_wood}, {@link YakitsizBlokEsyasi}); kütük
+ * {@code minecraft:logs}'ta değildir (afet sınıflamaları ve odun kömürü tarifi değişmesin). Parçacıklar {@code kul_yagisi},
+ * {@code kor}, {@code kul_tozu} (istemci sağlayıcıları {@code client.gokyuzu.PulsarParcacikKaydi}). Dokular
+ * {@code tools/assets/pulsar_dokular.py}; blok durumu, model, loot, tarif datagen'de ({@link PulsarBlokVerileri}), vanilla
+ * etiketler ortak sağlayıcıdan (K-E12).
  */
 public final class PulsarKayitlari {
     private static final DeferredRegister<Block> BLOKLAR = DeferredRegister.create(ForgeRegistries.BLOCKS,
@@ -50,8 +56,11 @@ public final class PulsarKayitlari {
             () -> new Block(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_GRAY).strength(0.5f)
                     .sound(SoundType.SAND)));
     public static final RegistryObject<Block> KOMURLESMIS_KUTUK = BLOKLAR.register("komurlesmis_kutuk",
-            () -> new RotatedPillarBlock(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK)
+            () -> new KomurlesmisKutukBlogu(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK)
                     .instrument(NoteBlockInstrument.BASS).strength(2.0f).sound(SoundType.WOOD).lightLevel(durum -> 3)));
+    public static final RegistryObject<Block> KOMURLESMIS_TAHTA = BLOKLAR.register("komurlesmis_tahta",
+            () -> new Block(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK)
+                    .instrument(NoteBlockInstrument.BASS).strength(2.0f, 3.0f).sound(SoundType.WOOD)));
 
     /** Gökten süzülen gri-siyah kül pulu (istemci kül yağışı). */
     public static final RegistryObject<SimpleParticleType> KUL_YAGISI = PARCACIKLAR.register("kul_yagisi",
@@ -72,8 +81,12 @@ public final class PulsarKayitlari {
     static {
         ESYALAR.register("kul_katmani", () -> new BlockItem(KUL_KATMANI.get(), new Item.Properties()));
         ESYALAR.register("kul_blogu", () -> new BlockItem(KUL_BLOGU.get(), new Item.Properties()));
-        ESYALAR.register("komurlesmis_kutuk", () -> new BlockItem(KOMURLESMIS_KUTUK.get(), new Item.Properties()));
     }
+
+    public static final RegistryObject<Item> KOMURLESMIS_KUTUK_ESYASI = ESYALAR.register("komurlesmis_kutuk",
+            () -> new YakitsizBlokEsyasi(KOMURLESMIS_KUTUK.get(), new Item.Properties()));
+    public static final RegistryObject<Item> KOMURLESMIS_TAHTA_ESYASI = ESYALAR.register("komurlesmis_tahta",
+            () -> new YakitsizBlokEsyasi(KOMURLESMIS_TAHTA.get(), new Item.Properties()));
 
     private PulsarKayitlari() {
     }
@@ -90,7 +103,11 @@ public final class PulsarKayitlari {
         DataGenerators.parcacikEkle(KUL_TOZU, "kul_tozu", 4);
         DataGenerators.ceviriEkle(PulsarKayitlari::cevirileriYaz);
         DataGenerators.vanillaBlokEtiketiEkle(BlockTags.MINEABLE_WITH_SHOVEL, KUL_KATMANI, KUL_BLOGU);
-        DataGenerators.vanillaBlokEtiketiEkle(BlockTags.MINEABLE_WITH_AXE, KOMURLESMIS_KUTUK);
+        DataGenerators.vanillaBlokEtiketiEkle(BlockTags.MINEABLE_WITH_AXE, KOMURLESMIS_KUTUK, KOMURLESMIS_TAHTA);
+        DataGenerators.vanillaBlokEtiketiEkle(BlockTags.PLANKS, KOMURLESMIS_TAHTA);
+        DataGenerators.vanillaEsyaEtiketiEkle(ItemTags.PLANKS, KOMURLESMIS_TAHTA_ESYASI);
+        DataGenerators.vanillaEsyaEtiketiEkle(ItemTags.NON_FLAMMABLE_WOOD, KOMURLESMIS_KUTUK_ESYASI,
+                KOMURLESMIS_TAHTA_ESYASI);
         // Lambda: sağlayıcı sınıfı (istemci model üreticilerine bağlı) yalnız datagen'de yüklenir.
         DataGenerators.saglayiciEkle(olay -> PulsarBlokVerileri.ekle(olay));
     }
@@ -100,6 +117,9 @@ public final class PulsarKayitlari {
             olay.accept(KUL_KATMANI);
             olay.accept(KUL_BLOGU);
             olay.accept(KOMURLESMIS_KUTUK);
+        } else if (olay.getTabKey() == CreativeModeTabs.BUILDING_BLOCKS) {
+            olay.accept(KOMURLESMIS_KUTUK);
+            olay.accept(KOMURLESMIS_TAHTA);
         }
     }
 
@@ -107,5 +127,6 @@ public final class PulsarKayitlari {
         y.ekle("block.dogalafetler.kul_katmani", "Ash Layer", "Kül Katmanı");
         y.ekle("block.dogalafetler.kul_blogu", "Block of Ash", "Kül Bloğu");
         y.ekle("block.dogalafetler.komurlesmis_kutuk", "Charred Log", "Kömürleşmiş Kütük");
+        y.ekle("block.dogalafetler.komurlesmis_tahta", "Charred Planks", "Kömürleşmiş Tahta");
     }
 }

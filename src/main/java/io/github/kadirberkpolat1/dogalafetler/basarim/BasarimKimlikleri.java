@@ -2,6 +2,8 @@ package io.github.kadirberkpolat1.dogalafetler.basarim;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.Basarimlar;
+import io.github.kadirberkpolat1.dogalafetler.yiyecek.mantik.YiyecekTablosu;
+import io.github.kadirberkpolat1.dogalafetler.yiyecek.mantik.Yon;
 import java.util.List;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.ItemTags;
@@ -26,11 +28,12 @@ public final class BasarimKimlikleri {
     public static final ResourceLocation SISMOGRAF = DogalAfetler.konum("sismograf");
     /** Madde 14 (yiyecek işçisi): "hedef" ödülünün sıcak yiyeceği. */
     public static final ResourceLocation SICAK_SALEP = DogalAfetler.konum("sicak_salep");
-    /** Madde 14'ün sıcak yiyecekleri (yiyecek işçisi); #19 için isteğe bağlı etiket girdileri. */
-    public static final List<ResourceLocation> SICAK_YIYECEKLER = List.of(SICAK_SALEP,
-            DogalAfetler.konum("sicak_cikolata"), DogalAfetler.konum("sicak_tavuk_corbasi"),
-            DogalAfetler.konum("atesli_guvec"), DogalAfetler.konum("isitici_cay"),
-            DogalAfetler.konum("kutup_baligi_corbasi"));
+    /**
+     * İçten ısıtan bütün mod yiyecek ve içecekleri (madde 14 ve sıcaklık-3, tablo sırasıyla); #19 için isteğe bağlı etiket
+     * girdileri. Tablodan türetilir: yeni sıcak yiyecek kendiliğinden tanınır.
+     */
+    public static final List<ResourceLocation> SICAK_YIYECEKLER = YiyecekTablosu.KAYITLAR.stream()
+            .filter(k -> k.tanim().yon() == Yon.ISINMA).map(k -> DogalAfetler.konum(k.ad())).toList();
     /** #19: tanınan sıcak yiyecekler (veri paketiyle genişler, N12). */
     public static final TagKey<Item> SICAK_YIYECEK = ItemTags.create(DogalAfetler.konum("basarim/sicak_yiyecek"));
     /** "Hedef" başarımlarının ödülü: 1–2 sıcak yiyecek (madde 12). */

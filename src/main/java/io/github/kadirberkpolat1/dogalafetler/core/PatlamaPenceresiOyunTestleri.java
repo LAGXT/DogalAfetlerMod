@@ -16,16 +16,17 @@ import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
 
 /**
- * Gökyüzü-2 istek 26 oyun içi testleri: doğal başlayan güneş patlaması AKTIF'e yalnız sabah, ay çarpması yalnız gece geçer
- * (ON_UYARI'da bekler); komutla başlayan beklemez. Doğal başlatma paket özel {@code secimleBaslat} ile yapıldığı için sınıf
- * {@code core} paketindedir. Her test kendi batch'inde; başta ve sonda {@code sifirla} (K-E15), değiştirilen gamerule ve gün
- * saati geri konur; config dosyasına yazılmaz (K-E28). {@code /dogalafet hiz 1000}: ON_UYARI ve siren birkaç tick sürer.
+ * Gökyüzü-2 istek 26 oyun içi testleri, K-E67 biçimiyle: doğal güneş patlaması yalnız sabah, ay çarpması yalnız gece
+ * seçilebilir (pencere seçimde, {@code AfetYoneticisi.secimCarpani}); seçilen afet ön-uyarıda beklemeden ~30 sn sonra
+ * pencerede patlar; komutla başlayan pencereye bakmaz. Doğal başlatma paket özel {@code secimleBaslat} ile yapıldığı için
+ * sınıf {@code core} paketindedir. Her test kendi batch'inde; başta ve sonda {@code sifirla} (K-E15), değiştirilen gamerule
+ * ve gün saati geri konur; config dosyasına yazılmaz (K-E28).
  */
 @GameTestHolder(DogalAfetler.MOD_ID)
 @PrefixGameTestTemplate(false)
 public final class PatlamaPenceresiOyunTestleri {
-    /** ON_UYARI süresi dolduktan sonra beklemenin sürdüğü gözlenen tick. */
-    private static final int BEKLEME_TICK = 20;
+    /** Seçimden AKTIF'e en çok süre (gerçek tick, hız 1): varsayılan ön-uyarı en çok 160 + siren 500, üstüne pay. */
+    private static final int GORUNME_TICK = 700;
     private static final List<Runnable> GERI_AL = new ArrayList<>();
 
     private PatlamaPenceresiOyunTestleri() {
@@ -38,6 +39,11 @@ public final class PatlamaPenceresiOyunTestleri {
 
     @AfterBatch(batch = "pencere_ay_dogal")
     public static void aySonrasi(ServerLevel level) {
+        temizle(level.getServer());
+    }
+
+    @AfterBatch(batch = "pencere_gunes_otuz")
+    public static void otuzSonrasi(ServerLevel level) {
         temizle(level.getServer());
     }
 
@@ -79,66 +85,67 @@ public final class PatlamaPenceresiOyunTestleri {
         return AfetYoneticisi.al(server);
     }
 
-    /**
-     * Doğal başlayan afet ON_UYARI süresi dolduktan sonra {@value #BEKLEME_TICK} tick ON_UYARI'da kalır; sonra gün saati
-     * pencere başının {@code 10} tick öncesine alınır ve AKTIF'e geçtiği andaki gün saati pencerede olmalı.
-     */
-    private static void pencereyeKadarBekler(GameTestHelper y, AfetTuru tur, long baslangicSaati) {
-        AfetYoneticisi yonetici = kur(y, baslangicSaati);
+    /** Seçilebilirlik: doğal seçim çarpanı pencere dışında 0, içinde > 0; gün döngüsü kapalıyken pencere yok. */
+    private static void yalnizPenceredeSecilir(GameTestHelper y, AfetTuru tur, long[] secilir, long[] secilmez) {
+        AfetYoneticisi yonetici = kur(y, secilir[0]);
         MinecraftServer server = y.getLevel().getServer();
         ServerLevel ust = server.overworld();
-        GunSaatiPenceresi pencere = GunSaatiPenceresi.dogalPatlama(tur).orElseThrow();
-        y.assertTrue(yonetici.secimleBaslat(tur) == AfetYoneticisi.BaslatmaSonucu.BASLADI, tur.kimlik() + " başlamadı");
+        for (long saat : secilir) {
+            ust.setDayTime(saat);
+            y.assertTrue(yonetici.secimCarpani(tur) > 0, tur.kimlik() + " gün saati " + saat + "'de seçilebilmeli");
+        }
+        for (long saat : secilmez) {
+            ust.setDayTime(saat);
+            y.assertTrue(yonetici.secimCarpani(tur) == 0, tur.kimlik() + " gün saati " + saat + "'de seçilmemeli");
+        }
+        kural(server, GameRules.RULE_DAYLIGHT, false);
+        y.assertTrue(yonetici.secimCarpani(tur) > 0, "gün döngüsü kapalı: pencere hiç gelmeyebilir, seçilebilir");
+        temizle(server);
+        y.succeed();
+    }
+
+    @GameTest(template = "bos", batch = "pencere_gunes_dogal")
+    public static void dogalGunesPatlamasiYalnizSabahSecilir(GameTestHelper y) {
+        yalnizPenceredeSecilir(y, AfetTuru.GUNES_PATLAMASI, new long[] {0L, 1_000L, 5_100L},
+                new long[] {5_300L, 6_000L, 18_000L, 23_900L});
+    }
+
+    @GameTest(template = "bos", batch = "pencere_ay_dogal")
+    public static void dogalAyCarpmasiYalnizGeceSecilir(GameTestHelper y) {
+        yalnizPenceredeSecilir(y, AfetTuru.AY_CARPMASI, new long[] {13_000L, 18_000L, 22_100L},
+                new long[] {22_300L, 6_000L, 12_900L});
+    }
+
+    /**
+     * Sabah seçilen doğal güneş patlaması ön-uyarıda beklemeden hız 1'de {@value #GORUNME_TICK} tick içinde AKTIF'e
+     * geçer ve patlama anı pencerededir.
+     */
+    @GameTest(template = "bos", batch = "pencere_gunes_otuz", timeoutTicks = 900)
+    public static void dogalGunesPatlamasiOtuzSaniyedePenceredePatlar(GameTestHelper y) {
+        AfetYoneticisi yonetici = kur(y, 1_000L);
+        MinecraftServer server = y.getLevel().getServer();
+        ServerLevel ust = server.overworld();
+        y.assertTrue(yonetici.secimCarpani(AfetTuru.GUNES_PATLAMASI) > 0, "sabah seçilebilmeli");
+        y.assertTrue(yonetici.secimleBaslat(AfetTuru.GUNES_PATLAMASI) == AfetYoneticisi.BaslatmaSonucu.BASLADI,
+                "güneş patlaması başlamadı");
         Afet afet = yonetici.aktifAfet().orElseThrow();
         y.assertTrue(!afet.baglam().elle(), "seçimle (doğal) başlamalı");
-        yonetici.hizAyarla(1000);
-        int[] bekleyen = {0};
-        long[] aktifSaat = {-1L};
+        long bas = ust.getGameTime();
+        long[] aktif = {-1L, -1L};
         y.onEachTick(() -> {
-            if (aktifSaat[0] < 0 && afet.asama() == AfetAsamasi.AKTIF) {
-                aktifSaat[0] = ust.getDayTime();
+            if (aktif[0] < 0 && afet.asama() == AfetAsamasi.AKTIF) {
+                aktif[0] = ust.getGameTime() - bas;
+                aktif[1] = ust.getDayTime();
             }
         });
-        int[] sonra = {0};
         y.succeedWhen(() -> {
-            if (bekleyen[0] < BEKLEME_TICK) {
-                y.assertTrue(afet.asama() == AfetAsamasi.ON_UYARI, "pencere dışında ON_UYARI'da beklemeliydi: "
-                        + afet.asama() + ", dayTime " + ust.getDayTime());
-                if (afet.asamaKalanTick() == 0 && ++bekleyen[0] == BEKLEME_TICK) {
-                    long gun = Math.floorDiv(ust.getDayTime(), GunSaatiPenceresi.GUN_TICK) * GunSaatiPenceresi.GUN_TICK;
-                    long hedef = gun + Math.floorMod(pencere.bas() - 10, GunSaatiPenceresi.GUN_TICK);
-                    DogalAfetler.LOGGER.info("Pencere GameTest ({}): {} tick beklendi, dayTime {} -> {}", tur.kimlik(),
-                            BEKLEME_TICK, ust.getDayTime(), hedef);
-                    ust.setDayTime(hedef);
-                }
-                y.fail("ON_UYARI'da pencere bekleniyor");
-            }
-            y.assertTrue(aktifSaat[0] >= 0, "pencere başında AKTIF bekleniyordu: " + afet.asama() + ", dayTime "
-                    + ust.getDayTime());
-            y.assertTrue(pencere.icinde(aktifSaat[0]), "AKTIF'e geçiş pencerede olmalı: dayTime " + aktifSaat[0]);
-            if (++sonra[0] < 3) {
-                y.fail("gün saati sabitleyicisi bekleniyor");
-            }
-            if (tur == AfetTuru.AY_CARPMASI) {
-                y.assertTrue(yonetici.donem().ayDurumu() == AyDurumu.YOK, "ay çarptı: " + yonetici.donem().ozet());
-            } else {
-                y.assertTrue(pencere.icinde(ust.getDayTime()), "doğal güneş patlamasında öğleye zıplama yok: "
-                        + ust.getDayTime());
-            }
-            DogalAfetler.LOGGER.info("Pencere GameTest ({}): AKTIF dayTime {} (pencere [{}, {}))", tur.kimlik(), aktifSaat[0],
-                    pencere.bas(), pencere.son());
+            y.assertTrue(aktif[0] >= 0, "AKTIF bekleniyor: " + afet.asama());
+            DogalAfetler.LOGGER.info("Pencere GameTest: doğal güneş patlaması seçimden {} tick sonra AKTIF, dayTime {}",
+                    aktif[0], aktif[1]);
+            y.assertTrue(aktif[0] <= GORUNME_TICK, "seçimden AKTIF'e " + aktif[0] + " tick");
+            y.assertTrue(GunSaatiPenceresi.SABAH.icinde(aktif[1]), "patlama sabah penceresinde: " + aktif[1]);
             temizle(server);
         });
-    }
-
-    @GameTest(template = "bos", batch = "pencere_gunes_dogal", timeoutTicks = 400)
-    public static void dogalGunesPatlamasiGeceBaslarSabahPatlar(GameTestHelper y) {
-        pencereyeKadarBekler(y, AfetTuru.GUNES_PATLAMASI, 18_000L);
-    }
-
-    @GameTest(template = "bos", batch = "pencere_ay_dogal", timeoutTicks = 400)
-    public static void dogalAyCarpmasiGunduzBaslarGecePatlar(GameTestHelper y) {
-        pencereyeKadarBekler(y, AfetTuru.AY_CARPMASI, 6_000L);
     }
 
     @GameTest(template = "bos", batch = "pencere_komut", timeoutTicks = 200)

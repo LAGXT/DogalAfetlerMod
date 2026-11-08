@@ -115,6 +115,17 @@ GameTest bu jar için yeniden koşmadı (kullanıcı kararı, K-E50): kabul kan�
 (`.vibe/rapor/dogrulama-entegrasyon-5-son-3.md`); `9d90fb7` yalnız `client/kasirga` değiştirdi, `TEST_FILTRE=Kasirga` 11/11 (K-E49).
 Kanıt `.vibe/kanit/teslimat-t32/` (`build.log`, `jar.txt`).
 
+## Güncelleme turu 3 notu (`is/entegrasyon-8`, 2026-11-08)
+
+Dört dal (afet-zaman-3 K-E67, blok-3 K-E68, sıcaklık-3 K-E69, afet-fizik-3 K-E70) ve protokol 9 (K-E71). Son kod HEAD `02bff06`,
+kuyruktan: #1 build `build @88d973b1fecd` BUILD SUCCESSFUL; #2 JUnit 854/0 `test @88d973b1fecd`; #3 filtresiz GameTest 313/313
+`gametest @19a78927fd26` (protokol 9, 15 paket; filtresiz koşuyu atlama kararı ilk koşu sürerken geldi, o koşu yeni bir test
+kusurunu yakaladı, düzeltmeden sonraki koşu geçti; kabul ona dayanmaz); `runData` üç kez written 0; N19 270/270 fark 0. Ara koşular:
+`5513a72` GameTest 181/181, `91b7a76` GameTest 80/80. #6/#10 görsel ve ölçüm koşuları kullanıcı kararıyla yapılmadı ya da durduruldu:
+sıcaklık, kasırga ve genel doğruluk kullanıcının oyun içi doğrulamasıyla kabul (KARARLAR K-E71 (f), "Bilinen sınırlar (güncelleme
+turu 3)"). Tsunami yağmuru kullanıcı kararıyla varsayılan kapalı. Kanıt `.vibe/kanit/entegrasyon-8/`, rapor
+`.vibe/rapor/entegrasyon-8.md`.
+
 ## Bilinen sınırlar
 
 - **FPS duvar saati (#10, karar 2):** istemci gizli workspace'te koşar; compositor kısması duvar saati FPS'ini anlamsızlaştırır (deprem

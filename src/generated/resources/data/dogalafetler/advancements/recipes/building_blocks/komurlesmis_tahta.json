@@ -1,0 +1,35 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_komurlesmis_kutuk": {
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "dogalafetler:komurlesmis_kutuk"
+            ]
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    },
+    "has_the_recipe": {
+      "conditions": {
+        "recipe": "dogalafetler:komurlesmis_tahta"
+      },
+      "trigger": "minecraft:recipe_unlocked"
+    }
+  },
+  "requirements": [
+    [
+      "has_komurlesmis_kutuk",
+      "has_the_recipe"
+    ]
+  ],
+  "rewards": {
+    "recipes": [
+      "dogalafetler:komurlesmis_tahta"
+    ]
+  },
+  "sends_telemetry_event": false
+}

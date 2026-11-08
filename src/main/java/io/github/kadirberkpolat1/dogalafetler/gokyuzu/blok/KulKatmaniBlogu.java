@@ -5,15 +5,18 @@ import java.util.function.Supplier;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.SnowLayerBlock;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * Pulsar külü (PL-3 a): kar katmanı gibi 1–8 kat, ama erimez (rastgele tick yok; özellikleri kaydı kurar). Üstünde
- * yürüyen varlık istemcide {@code kul_tozu} kaldırır; 1 katlı külün çarpışma şekli yok, bu yüzden adım değil
- * {@link #entityInside} kullanılır. Pulsar güçlüyken ({@link PulsarKayitlari#korGorunur} kancası, istemci kurulumu
- * doldurur) seyrek {@code kor} kıvılcımı yükselir.
+ * Pulsar külü (PL-3 a): kar katmanı gibi 1–8 kat, ama erimez (rastgele tick yok; özellikleri kaydı kurar). 8 kat tam
+ * bloktur ve Kül Bloğu modeliyle çizilir; bu yüzden kırılınca (loot) ve orta tıkla Kül Bloğu verir. Üstünde yürüyen
+ * varlık istemcide {@code kul_tozu} kaldırır; 1 katlı külün çarpışma şekli yok, bu yüzden adım değil {@link #entityInside}
+ * kullanılır. Pulsar güçlüyken ({@link PulsarKayitlari#korGorunur} kancası, istemci kurulumu doldurur) seyrek {@code kor}
+ * kıvılcımı yükselir.
  */
 public final class KulKatmaniBlogu extends SnowLayerBlock {
     /** {@code animateTick} başına kor olasılığının paydası. */
@@ -23,6 +26,12 @@ public final class KulKatmaniBlogu extends SnowLayerBlock {
 
     public KulKatmaniBlogu(Properties ozellikler) {
         super(ozellikler);
+    }
+
+    @Override
+    public ItemStack getCloneItemStack(BlockGetter level, BlockPos konum, BlockState durum) {
+        return durum.getValue(LAYERS) >= MAX_HEIGHT ? new ItemStack(PulsarKayitlari.KUL_BLOGU.get())
+                : super.getCloneItemStack(level, konum, durum);
     }
 
     @Override

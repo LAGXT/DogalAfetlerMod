@@ -3,6 +3,7 @@ package io.github.kadirberkpolat1.dogalafetler.client.su;
 import com.mojang.blaze3d.shaders.FogShape;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciDonem;
+import io.github.kadirberkpolat1.dogalafetler.client.tsunami.SerpintiNoktasi;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.su.Cekilme;
 import io.github.kadirberkpolat1.dogalafetler.su.Dalga;
@@ -115,7 +116,10 @@ public final class IstemciSu {
 
     /**
      * Dalga tepesi sıçrantısı (SU-28): tepe hattı boyunca beyaz serpinti bulutu (dalga yönünde savrulur), sıçrama damlaları
-     * ve kıvrılan dudağın ucundan düşen su; yalnız oyuncuya 96 blok yakın tepe noktaları, kalite çarpanıyla.
+     * ve cephenin ön yüzünden düşen su; yalnız oyuncuya 96 blok yakın tepe noktaları, kalite çarpanıyla. Her parçacık son
+     * konumunda (rastgele saçılma dahil) bu karede çizilen suyun üstünde doğar ({@link SerpintiNoktasi#dogusYuksekligi}: yakın
+     * ağ, onun kapsamadığı yerde uzak LOD karosu; blok içinde, çatı altında ve ağın henüz çizmediği dalgada doğmaz). Analitik dalga
+     * yalnız tepe hattının yerini verir, yüksekliği değil: yüzeyi düz zemin varsayar, bloğu ve çizilen ağı bilmez.
      */
     private static void serpinti(Minecraft mc, ClientLevel l, double t) {
         double carpan = parcacikCarpani();
@@ -138,19 +142,33 @@ public final class IstemciSu {
                 if (mc.player.distanceToSqr(px, mc.player.getY(), pz) > 96 * 96) {
                     continue;
                 }
-                double y = w.yuzey(px, pz, t);
-                if (Double.isNaN(y) || y - w.taban() < 1.5) {
+                double bx = px + r.nextGaussian() * 0.3;
+                double bz = pz + r.nextGaussian() * 0.3;
+                double y = SerpintiNoktasi.dogusYuksekligi(l, bx, bz, 0.1);
+                // Çizilen su dalga tabanından 1,5 blok yükselmemişse tepe yok (ağ dalgayı henüz çizmedi ya da sığ sel).
+                if (Double.isNaN(y) || y - 0.1 - w.taban() < 1.5) {
                     continue;
                 }
-                l.addParticle(ParticleTypes.CLOUD, px + r.nextGaussian() * 0.3, y + 0.1, pz + r.nextGaussian() * 0.3,
-                        w.yonX() * w.hiz() * 0.6 + r.nextGaussian() * 0.03, 0.05 + r.nextDouble() * 0.12,
-                        w.yonZ() * w.hiz() * 0.6 + r.nextGaussian() * 0.03);
+                l.addParticle(ParticleTypes.CLOUD, bx, y, bz, w.yonX() * w.hiz() * 0.6 + r.nextGaussian() * 0.03,
+                        0.05 + r.nextDouble() * 0.12, w.yonZ() * w.hiz() * 0.6 + r.nextGaussian() * 0.03);
+                SerpintiNoktasi.dogdu(l, bx, y, bz);
                 if (r.nextInt(2) == 0) {
-                    l.addParticle(ParticleTypes.SPLASH, px, y + 0.2, pz, w.yonX() * 0.3, 0.2, w.yonZ() * 0.3);
+                    double sy = SerpintiNoktasi.dogusYuksekligi(l, px, pz, 0.2);
+                    if (!Double.isNaN(sy) && sy - 0.2 - w.taban() >= 1.5) {
+                        l.addParticle(ParticleTypes.SPLASH, px, sy, pz, w.yonX() * 0.3, 0.2, w.yonZ() * 0.3);
+                        SerpintiNoktasi.dogdu(l, px, sy, pz);
+                    }
                 }
                 if (r.nextInt(3) == 0) {
-                    double boy = Math.min(3.0, 0.28 * (y - w.taban()));
-                    l.addParticle(ParticleTypes.FALLING_WATER, px + w.yonX() * boy, y - 0.3 * boy, pz + w.yonZ() * boy, 0, 0, 0);
+                    // Ön yüzün üstünden (tepeden en çok 2 blok önde, cephenin yarım blok gerisinde) aşağı akar.
+                    double boy = Math.min(2.0, 0.28 * (y - 0.1 - w.taban()));
+                    double fx = px + w.yonX() * boy;
+                    double fz = pz + w.yonZ() * boy;
+                    double fy = SerpintiNoktasi.dogusYuksekligi(l, fx, fz, 0.1);
+                    if (!Double.isNaN(fy)) {
+                        l.addParticle(ParticleTypes.FALLING_WATER, fx, fy, fz, 0, 0, 0);
+                        SerpintiNoktasi.dogdu(l, fx, fy, fz);
+                    }
                 }
             }
         }

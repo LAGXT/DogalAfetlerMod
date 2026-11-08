@@ -2,6 +2,7 @@ package io.github.kadirberkpolat1.dogalafetler.client.yiyecek;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.client.sicaklik.IstemciSicaklik;
+import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.VucutOlcegi;
 import io.github.kadirberkpolat1.dogalafetler.yiyecek.SicaklikYiyecegi;
 import java.util.ArrayList;
 import java.util.List;
@@ -147,7 +148,7 @@ public final class YiyecekOtomasyonu {
         for (String esya : HOTBAR) {
             komutlar.add("give @s " + DogalAfetler.MOD_ID + ":" + esya + " " + (esya.equals("sicak_salep") ? 3 : 2));
         }
-        komutlar.add("dogalafet sicaklik set " + ad + " -45");
+        komutlar.add("dogalafet sicaklik set " + ad + " " + VucutOlcegi.metin(VucutOlcegi.santigrat(-45)));
         for (String k : komutlar) {
             ADIMLAR.add(() -> {
                 mc.player.connection.sendCommand(k);
@@ -296,8 +297,8 @@ public final class YiyecekOtomasyonu {
     private static boolean kare(Minecraft mc, String ad) {
         String dosya = "yiyecek_" + ad + ".png";
         Screenshot.grab(mc.gameDirectory, dosya, mc.getMainRenderTarget(), mesaj -> { });
-        DogalAfetler.LOGGER.info(ON + "kare {} (vücut {} kademe {}, ortam {}, efektler [{}], FPS {})", dosya,
-                sayi(IstemciSicaklik.durum().vucut()), IstemciSicaklik.durum().kademe(), sayi(IstemciSicaklik.durum().ortam()),
+        DogalAfetler.LOGGER.info(ON + "kare {} (vücut {} kademe {}, mekan {} °C, efektler [{}], FPS {})", dosya,
+                sayi(IstemciSicaklik.durum().vucut()), IstemciSicaklik.durum().kademe(), sayi(IstemciSicaklik.durum().mekan()),
                 efektler(mc), mc.getFps());
         return true;
     }

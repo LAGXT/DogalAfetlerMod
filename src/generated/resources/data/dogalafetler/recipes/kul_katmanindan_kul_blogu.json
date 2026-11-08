@@ -1,0 +1,33 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "building",
+  "ingredients": [
+    {
+      "item": "dogalafetler:kul_katmani"
+    },
+    {
+      "item": "dogalafetler:kul_katmani"
+    },
+    {
+      "item": "dogalafetler:kul_katmani"
+    },
+    {
+      "item": "dogalafetler:kul_katmani"
+    },
+    {
+      "item": "dogalafetler:kul_katmani"
+    },
+    {
+      "item": "dogalafetler:kul_katmani"
+    },
+    {
+      "item": "dogalafetler:kul_katmani"
+    },
+    {
+      "item": "dogalafetler:kul_katmani"
+    }
+  ],
+  "result": {
+    "item": "dogalafetler:kul_blogu"
+  }
+}

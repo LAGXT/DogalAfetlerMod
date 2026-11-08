@@ -15,23 +15,36 @@ class AyEgrileriTest {
     @Test
     void yaklasmaSirenSuresiyleAyni() {
         assertEquals(SirenTuru.sureTick(AfetTuru.AY_CARPMASI), Math.round(AyEgrileri.YAKLASMA_SN * 20),
-                "istemci yaklaşmayı siren süresinden çizer (K0-19: 60 sn)");
+                "istemci yaklaşmayı siren süresinden çizer (K0-19 rev. K-E67: 25 sn)");
+    }
+
+    /** K-E67: kısa yaklaşmada da evreler okunur kalır ve sırası korunur. */
+    @Test
+    void evrelerSiraliVeOkunur() {
+        float son = AyEgrileri.YAKLASMA_SN - AyEgrileri.SON_YAKLASMA_SN;
+        assertTrue(son >= 3f, "son yaklaşma en az 3 sn: " + son);
+        float ucuncu = AyEgrileri.PARCALANMA_SN + 2 * AyEgrileri.CATLAK_ARALIGI_SN;
+        assertTrue(AyEgrileri.PARCALANMA_SN >= 5f, "parçalanmadan önce süzülen ay görünür");
+        assertTrue(ucuncu + AyEgrileri.CATLAK_BELIRME_SN <= AyEgrileri.SON_YAKLASMA_SN + 1f,
+                "üçüncü çatlak son yaklaşmayla tamamlanır");
+        assertTrue(AyEgrileri.CATLAK_BELIRME_SN < AyEgrileri.CATLAK_ARALIGI_SN, "çatlaklar tek tek belirir");
     }
 
     @Test
     void ayBirdenOnDortKataMonotonBuyurVeUfkaIner() {
+        float yaklasma = AyEgrileri.YAKLASMA_SN;
         assertEquals(1f, AyEgrileri.olcek(0f), EPS, "vanilla boyda başlar");
-        assertEquals(14f, AyEgrileri.olcek(60f), EPS, "tasarım: 14x");
-        assertEquals(1f + 13f * 0.125f, AyEgrileri.olcek(30f), EPS, "s = 1 + 13t³");
+        assertEquals(14f, AyEgrileri.olcek(yaklasma), EPS, "tasarım: 14x");
+        assertEquals(1f + 13f * 0.125f, AyEgrileri.olcek(yaklasma / 2), EPS, "s = 1 + 13t³");
         assertEquals(35f, AyEgrileri.egim(0f), EPS);
-        assertEquals(35f, AyEgrileri.egim(50f), EPS, "son yaklaşmaya kadar 35°");
-        assertEquals(AyEgrileri.SON_EGIM, AyEgrileri.egim(60f), EPS);
+        assertEquals(35f, AyEgrileri.egim(AyEgrileri.SON_YAKLASMA_SN), EPS, "son yaklaşmaya kadar 35°");
+        assertEquals(AyEgrileri.SON_EGIM, AyEgrileri.egim(yaklasma), EPS);
         float olcek = 0f;
         float egim = 90f;
         float yay = -1f;
         float kiz = -1f;
         float[] catlak = {-1f, -1f, -1f};
-        for (float s = 0f; s <= 60f; s += 0.05f) {
+        for (float s = 0f; s <= yaklasma; s += 0.05f) {
             assertTrue(AyEgrileri.olcek(s) >= olcek, "ölçek azalmamalı");
             assertTrue(AyEgrileri.egim(s) <= egim, "eğim artmamalı");
             assertTrue(AyEgrileri.parcaYayilmasi(s) >= yay, "parça yayı daralmamalı");
@@ -46,11 +59,11 @@ class AyEgrileriTest {
                 catlak[i] = c;
             }
         }
-        assertEquals(0f, AyEgrileri.parcaYayilmasi(19.9f), EPS, "parçalanma 20. sn'de başlar");
-        assertEquals(0f, AyEgrileri.catlak(1, 20f), EPS);
-        assertEquals(1f, AyEgrileri.catlak(3, 60f), EPS, "son aşama çarpmadan önce tam");
-        assertEquals(0f, AyEgrileri.kizarma(50f), EPS);
-        assertEquals(1f, AyEgrileri.kizarma(60f), EPS);
+        assertEquals(0f, AyEgrileri.parcaYayilmasi(AyEgrileri.PARCALANMA_SN - 0.1f), EPS, "parçalanma 8. sn'de başlar");
+        assertEquals(0f, AyEgrileri.catlak(1, AyEgrileri.PARCALANMA_SN), EPS);
+        assertEquals(1f, AyEgrileri.catlak(3, yaklasma), EPS, "son aşama çarpmadan önce tam");
+        assertEquals(0f, AyEgrileri.kizarma(AyEgrileri.SON_YAKLASMA_SN), EPS);
+        assertEquals(1f, AyEgrileri.kizarma(yaklasma), EPS);
     }
 
     @Test

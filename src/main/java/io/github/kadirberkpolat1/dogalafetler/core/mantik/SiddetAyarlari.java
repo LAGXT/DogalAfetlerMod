@@ -5,13 +5,14 @@ package io.github.kadirberkpolat1.dogalafetler.core.mantik;
  * {@code k^(L−1)}'dir; {@code k} (yüksek seviye nadirlik katsayısı, &lt; 1) gün ilerledikçe {@code nadirlikBaslangic}'tan
  * {@code nadirlikSon}'a {@code nadirlikGecisGunu} günde doğrusal yükselir, böylece ağırlık yavaşça yüksek seviyelere kayar
  * ama yüksek seviye her zaman daha nadirdir. Yeni açılan seviye ağırlığının {@code acilisBaslangicOrani} kadarıyla başlar
- * ve {@code acilisRampaGunu} günde tam ağırlığa ulaşır (hemen baskın olmaz).
+ * ve {@code acilisRampaGunu} günde tam ağırlığa ulaşır (hemen baskın olmaz). Varsayılanlar (K-E67, kullanıcı isteği "seviye 4-5
+ * gelmiyor"): S2 gün 1, S3 gün 4, S4 gün 9, S5 gün 16'da açılır; açılış payı %40'tan 3 günde tama çıkar; k 60 günde
+ * 0,5'ten 0,8'e yükselir (gün 20'de S4 ≈ %9, gün 40'ta S5 ≈ %9, gün 60+'da S4+S5 ≈ %27).
  */
 public record SiddetAyarlari(int seviye2Gunu, int seviye3Gunu, int seviye4Gunu, int seviye5Gunu,
         double nadirlikBaslangic, double nadirlikSon, double nadirlikGecisGunu, double acilisRampaGunu,
         double acilisBaslangicOrani, boolean gelisimDahil, double puanBasinaGun) {
-    public static final SiddetAyarlari VARSAYILAN = new SiddetAyarlari(10, 25, 50, 80, 0.35, 0.6, 120, 15, 0.2, false,
-            2.0);
+    public static final SiddetAyarlari VARSAYILAN = new SiddetAyarlari(1, 4, 9, 16, 0.5, 0.8, 60, 3, 0.4, false, 2.0);
 
     public SiddetAyarlari {
         seviye2Gunu = Math.max(0, seviye2Gunu);

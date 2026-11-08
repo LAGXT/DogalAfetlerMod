@@ -48,9 +48,9 @@
 - **Vitrin anı:** süpernova sonrası dondurucu soğukta işaretçi barın sol ucuna dayanır, bar 1 px titrer, işaretçi
   buz mavisi ile beyaz arasında yanıp söner; ekran kenarlarından buz kristalleri içeri doğru büyür, kenarlar
   kırağıyla kaplanır. Sıcakta aynı anda turuncu-kırmızı vinyet dalgalanır ve kamera hafifçe yalpalar.
-- Yazı yok (N6): sayı yalnız `/dogalafet sicaklik bilgi` çıktısında.
-- Konum ve görünürlük CLIENT config'te (`sicaklik.hudGorunur`, `hudXOfset`, `hudYOfset`, `ortamOkuGoster`,
-  `ekranEfektleri`).
+- **Yerini aldı (K-E69, N6 rev.):** vücut °C sayısı HUD'da varsayılan görünür (`sayiGoster`); bkz. "Güncelleme turu 3".
+- Konum ve görünürlük CLIENT config'te (`sicaklik.hudGorunur`, `hudXOfset`, `hudYOfset`, `ekranEfektleri`, `sayiGoster`,
+  `hissedilenGoster`, `durumIkonlari`, `animasyonlar`; `ortamOkuGoster` kalktı).
 
 ## Dokular
 
@@ -64,3 +64,23 @@ vinyeti, dikey dalga deseni).
   kalpleri 1 px aşağı titrettiği için boşluksuz düzende kalpler işaretçiye biniyordu.
 - Bar ve kaydırma yalnız sunucunun sıcaklık kapısı açıkken: Cold Sweat sunucuda yüklüyken (OTOMATIK) bar çizilmez ve vanilla
   barlar kaydırılmaz; sistem bizimse bar görünür. Cold Sweat'in vücut sıcaklığı göstergesinin konumu kendi işidir.
+
+## Güncelleme turu 3 (K-E69, `.vibe/kararlar/sicaklik-3.md` S3-01…S3-11)
+
+- **HUD:** yukarıdaki barın yerini band aldı (`textures/gui/sicaklik/hud.png` 256×64; `bar.png` kalktı): ortada vücut °C hapı (durum
+  rengi, değişimde parlama, sayı durum renginin %65 beyaza açılmışı + koyu kontur), merkezden dışa dolan soğuk/sıcak tüpler,
+  eşik çentikleri (hasar eşikleri kırmızı), hissedilen üçgeni, solda durum ikonları, sağda eğilim şevronları ve hissedilen °C.
+  Kalpler/açlık `leftHeight/rightHeight` 58. Her atlas parçası karışımı açarak çizilir (S3-10).
+- **Ölçek:** oyuncuya vücut °C (normal 37,0), `VucutOlcegi` °C = 37 + 0,05·B; iç saklama ±100 birim (eski kayıtlar aynı).
+- **Hissedilen:** mekan + ıslaklık (−5·W °C) + rüzgâr soğuğu (NWS, T ≤ 10 °C, V > 4,8 km/h) + sol el; vücut hissedilenle ısı
+  alışverişi yapar (iletkenlik `1 + 0,5·W`, suda 3).
+- **Islaklık:** %0–100; suda 4 sn'de dolar, açık havada yağmurda ~83 sn, fırtınada ~50 sn; çatı/cam altında kurur (10 °C ~150 sn,
+  sıcakta ve ateş yanında hızlı), yanan oyuncu anında kurur, ölümde sıfır; gösterge `dogalafetler:islak`.
+- **Dört durum:** Üşüme ≤ 36,0 °C (ağız buharı `nefes_buhari`, ~50 tick'te bir nefes, dünya donarken yok), Donma ≤ 35,0 (hasar
+  ≤ 33,5; buz kenarı), Bunalma ≥ 38,0 (ter damlası, kırmızı kenar `sicaklik_bunalma.png`, ek açlık), Yanma ≥ 39,5 (hasar ≥ 40,5).
+  Kendi parçacığı yalnız üçüncü şahısta istemcide (S-08 rev.).
+- **Termometre menüsü:** tuş K (kategori "Doğal Afetler"), 320×214 pano: en solda fareyi izleyen oyuncu modeli, vücut °C + eğilim +
+  durum + 32–42 °C ölçeği, hissedilen/mekan/rüzgâr, mekan termometresi (−30…+50 °C), katkı dökümü; veri `sicaklik/dokum`.
+- **Sol el:** Buz Kovası −12 °C (mekan > 25 °C'de `(T − 25)/10`/sn erir, 300'de su kovası), lav kovası +12 °C; ana elde etki yok.
+- **Kaynaklar:** kömürleşmiş kütük 2:2, kömürleşmiş tahta 1,5:2 (kısık ama sürekli; `sicaklik.ayarSurumu` 1 liste göçü).
+- **Görsel kabul:** kullanıcının oyun içi doğrulaması (2026-11-08).

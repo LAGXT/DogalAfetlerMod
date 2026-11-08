@@ -2,8 +2,11 @@ package io.github.kadirberkpolat1.dogalafetler.sicaklik;
 
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Boyut;
+import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Hissedilen;
+import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Islaklik;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.KaynakTanimi;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.OrtamSicakligi;
+import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.SolEl;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Yagis;
 import java.util.IdentityHashMap;
 import java.util.Map;
@@ -20,7 +23,11 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.registries.ForgeRegistries;
 
-/** Oyuncunun çevresinden {@link OrtamSicakligi.Girdi} kurar (yalnız sunucu). */
+/**
+ * Oyuncunun çevresinden {@link OrtamSicakligi.Girdi} kurar (yalnız sunucu). Aynı girdinin gökyüzü, yağış, Y ve kaynak
+ * bilgisi hissedilen sıcaklığın ({@link #hissedilenGirdisi}) ve ıslaklığın ({@link #islaklikKaynagi}) da girdisidir: çevre
+ * güncelleme başına bir kez ölçülür.
+ */
 public final class OrtamOlcer {
     private static SicaklikAyarlari.Ozet kaynakOzeti;
     private static Map<Block, KaynakTanimi> kaynakTablosu = Map.of();
@@ -49,6 +56,28 @@ public final class OrtamOlcer {
                 SicaklikKancalari.kisAgirligi(level, ayak));
     }
 
+    /**
+     * Islatma kaynağı (S3-03): suda ya da kabarcık sütununda SU; açık havada yağmur (RAIN yağışı, kar ıslatmaz) YAGMUR,
+     * fırtınada FIRTINA; diğer her yer (çatı altı dahil) KURU. Yağış {@code girdi}'den gelir (göz hizasında, gökyüzü açıkken).
+     */
+    public static Islaklik.Kaynak islaklikKaynagi(ServerPlayer oyuncu, OrtamSicakligi.Girdi girdi) {
+        if (oyuncu.isInWaterOrBubble()) {
+            return Islaklik.Kaynak.SU;
+        }
+        return switch (girdi.yagis()) {
+            case YAGMUR -> Islaklik.Kaynak.YAGMUR;
+            case FIRTINA -> Islaklik.Kaynak.FIRTINA;
+            case YOK, KAR -> Islaklik.Kaynak.KURU;
+        };
+    }
+
+    /** Hissedilen sıcaklığın girdisi: mekan °C, ıslaklık, gökyüzü/yağış/Y (rüzgâr), koşma ve sol el. */
+    public static Hissedilen.Girdi hissedilenGirdisi(ServerPlayer oyuncu, OrtamSicakligi.Girdi girdi, double mekanC,
+            double islaklik, SolEl solEl) {
+        return new Hissedilen.Girdi(mekanC, islaklik, girdi.gokyuzu() && !oyuncu.serverLevel().dimensionType().hasCeiling(),
+                girdi.y(), girdi.yagis(), oyuncu.isSprinting(), solEl);
+    }
+
     static Boyut boyut(ServerLevel level) {
         if (level.dimension() == Level.NETHER || level.dimensionType().ultraWarm()) {
             return Boyut.NETHER;
@@ -59,8 +88,13 @@ public final class OrtamOlcer {
         return Boyut.NORMAL;
     }
 
+    /**
+     * Göz hizasına düşen yağış. Gök ışığı camdan geçtiği için {@code gokyuzu} tek başına yetmez: vanilla
+     * {@code isRainingAt} gibi hareket engelleyen en üst blok da gözün üstünde olmamalı (cam çatı altı kuru kalır).
+     */
     private static Yagis yagis(ServerLevel level, Biome biyom, BlockPos goz, boolean gokyuzu) {
-        if (!level.isRaining() || !gokyuzu || level.dimensionType().hasCeiling()) {
+        if (!level.isRaining() || !gokyuzu || level.dimensionType().hasCeiling()
+                || level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING, goz).getY() > goz.getY()) {
             return Yagis.YOK;
         }
         return switch (biyom.getPrecipitationAt(goz)) {

@@ -1,10 +1,17 @@
 package io.github.kadirberkpolat1.dogalafetler.afet.gunes_patlamasi;
 
+import io.github.kadirberkpolat1.dogalafetler.afet.gunes_patlamasi.mantik.GunesPatlamasiAyarGocu;
 import io.github.kadirberkpolat1.dogalafetler.config.AyarKaydi;
 import net.minecraftforge.common.ForgeConfigSpec;
 
 /** {@code gunes_patlamasi} SERVER config bölümü (bölüm D, N17). Meteor sayısı oynanıştır, efekt kalitesinden bağımsızdır. */
 public final class GunesPatlamasiAyarlari {
+    /**
+     * Öncü meteor yağmurunun ön-uyarıdaki payı (sn; K-E67, eski 90): 25 sn'lik sirenle AKTIF'ten önceki son 30 sn. Ön-uyarı
+     * artık 5–8 sn olduğundan eski 90 sn penceresi ön-uyarının tamamını kaplıyordu.
+     */
+    public static final int VARSAYILAN_ONCU_SANIYE = 5;
+
     private static AyarKaydi.Bolum<GunesPatlamasiAyarlari> bolum;
 
     private final ForgeConfigSpec.DoubleValue aktifSureGun;
@@ -22,6 +29,9 @@ public final class GunesPatlamasiAyarlari {
     private final ForgeConfigSpec.IntValue kavrulmaYaricap;
 
     private GunesPatlamasiAyarlari(ForgeConfigSpec.Builder k) {
+        k.comment("Config göçünün sürümü (K-E61): dosya bundan eskiyse açılışta eski varsayılanında kalan güneş patlaması "
+                + "değerleri yeni varsayılana çekilir, elle değiştirilenlere dokunulmaz. Elle değiştirmeyin.")
+                .defineInRange("ayarSurumu", GunesPatlamasiAyarGocu.GUNCEL, 0, Integer.MAX_VALUE);
         aktifSureGun = k.comment("Meteor ve kavrulma sürecinin uzunluğu, Minecraft günü (bölüm D: 5 gün); sonunda süpernova.")
                 .defineInRange("aktifSureGun", 5.0, 1.0, 10.0);
         meteorBaslangic = k.comment("İlk gün oyuncu başına dakikadaki meteor (1,5 = 40 sn'de bir).")
@@ -30,9 +40,9 @@ public final class GunesPatlamasiAyarlari {
                 .defineInRange("meteorSonDakikaBasina", 5.0, 0.0, 30.0);
         buyukMeteorOrani = k.comment("Büyük bant (1,6–2,5×) olasılığı (Kozmik Çekirdek yalnız büyükte); orta bant meteor.ortaMeteorOrani.")
                 .defineInRange("buyukMeteorOrani", 0.10, 0.0, 1.0);
-        meteorYagmuruOncuSaniye = k.comment("Öncü meteor yağmuru ön-uyarının son bu kadar saniyesinde başlar ve siren (güneş büyürken) boyunca "
-                + "artar (0: yalnız sirende).")
-                .defineInRange("meteorYagmuruOncuSaniye", 90, 0, 600);
+        meteorYagmuruOncuSaniye = k.comment("Öncü meteor yağmuru ön-uyarının son bu kadar saniyesinde başlar ve siren (güneş "
+                + "büyürken, 25 sn) boyunca artar (varsayılan: AKTIF'ten önceki son 30 sn; 0: yalnız sirende).")
+                .defineInRange("meteorYagmuruOncuSaniye", VARSAYILAN_ONCU_SANIYE, 0, 600);
         meteorYagmuruOncuDakikaBasina = k.comment("Öncü yağmurun başında oyuncu başına dakikadaki meteor.")
                 .defineInRange("meteorYagmuruOncuDakikaBasina", 6.0, 0.0, 300.0);
         meteorYagmuruOncuSonDakikaBasina = k.comment("Öncü yağmurun siren sonundaki yoğunluğu (arası doğrusal); AKTIF'te "
@@ -56,6 +66,7 @@ public final class GunesPatlamasiAyarlari {
 
     public static void kaydet() {
         bolum = AyarKaydi.sunucuBolumu("gunes_patlamasi", "Güneş patlaması (bölüm D)", GunesPatlamasiAyarlari::new);
+        AyarKaydi.sunucuGocu(GunesPatlamasiAyarGocu.PLAN);
     }
 
     private static GunesPatlamasiAyarlari al() {

@@ -2,7 +2,6 @@ package io.github.kadirberkpolat1.dogalafetler.afet.kasirga;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.Carpanlar;
-import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.Cekim;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.KasirgaEvresi;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.KasirgaRotasi;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.KasirgaSeviyesi;
@@ -20,6 +19,7 @@ import io.github.kadirberkpolat1.dogalafetler.uyari.HacimEgrisi;
 import io.github.kadirberkpolat1.dogalafetler.uyari.OrtamSesi;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -30,6 +30,7 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -40,8 +41,6 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LightningBolt;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.decoration.HangingEntity;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -50,6 +49,7 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.fml.util.ObfuscationReflectionHelper;
 
 /**
  * Kasırga afeti (bölüm A, madde 10; tasarım notu {@code docs/tasarim/kasirga.md}). Durum (konum, yön, rota, AKTIF'te geçen
@@ -61,7 +61,8 @@ import net.minecraft.world.phys.Vec3;
  * <li>ON_UYARI: gizli; hiçbir şey görünmez (madde 4).</li>
  * <li>SIREN: {@link KasirgaEvresi#OLUSUM}: duvar bulutu alçalıp döner, uzak uğultu 10 sn'de açılır.</li>
  * <li>AKTIF: doğuş 8 sn → olgun (seviye süresi) → ip 10 sn → dağılma 2 sn; alt aşama = evre sırası. Hareket, blok
- * kaldırma, çekim ve hasar sunucuda; bütçeler {@link TpsOlcer#kismaCarpani()} ile çarpılır.</li>
+ * kaldırma, mob/eşya çekimi ve hasar sunucuda (oyuncu çekimi oyuncunun istemcisinde, {@link KasirgaCekimi}); bütçeler
+ * {@link TpsOlcer#kismaCarpani()} ile çarpılır.</li>
  * </ul>
  *
  * Kodla değişen her blok için chunk {@link SanalSu#chunkDegisti} ile bildirilir; {@code afetBlokHasari=false} iken hiçbir
@@ -79,6 +80,15 @@ public final class Kasirga extends Afet {
     private static final double TAM_TUR = Math.PI * 2;
     /** K-E42: ara hedef satırı yalnız görsel otomasyonda ({@code -Potomasyon}); üretimde ve GameTest'te yazılmaz. */
     private static final boolean OTOMASYON = !System.getProperty("dogalafetler.otomasyon", "").isEmpty();
+    /**
+     * Vanilla "uçma" denetiminin sayacı ({@code ServerGamePacketListenerImpl.aboveGroundTickCount}, SRG {@code f_9737_}) ve
+     * sürülen aracın eşi ({@code aboveGroundVehicleTickCount}, {@code f_9739_}): uçma izni kapalı sunucuda havada yüzen oyuncu
+     * 80 tick sonra atılır. Olay yok; Forge yansıması (projede {@code BuzBalikciligi} kalıbı), mixin ya da access transformer
+     * gerekmez (AF3-08).
+     */
+    private static final Field UCMA_SAYACI = ObfuscationReflectionHelper.findField(ServerGamePacketListenerImpl.class, "f_9737_");
+    private static final Field ARAC_UCMA_SAYACI = ObfuscationReflectionHelper.findField(ServerGamePacketListenerImpl.class,
+            "f_9739_");
 
     private Vec3 konum;
     private double yon;
@@ -536,7 +546,7 @@ public final class Kasirga extends Afet {
                 return;
             }
             yeni.moveTo(k.x, k.y, k.z, 0, 0);
-            yeni.bagla(this, seviye(), (float) carpanlar().boyut());
+            yeni.bagla(this, seviye(), (float) carpanlar().boyut(), (float) carpanlar().cekim(), (float) kaldirmaTavani());
             yeni.guncelle(durum, (float) yon);
             varlik = yeni;
             level.addFreshEntity(yeni);
@@ -862,60 +872,61 @@ public final class Kasirga extends Afet {
         }
     }
 
+    /** Kaldırma tavanı (blok): config'in S5 değeri bu kasırganın yüksekliğiyle orantılı ({@link KasirgaSeviyesi#kaldirmaTavani}). */
+    private double kaldirmaTavani() {
+        return seviyeBilgisi().kaldirmaTavani(KasirgaAyarlari.kaldirmaTavani());
+    }
+
     /**
-     * Çekim, kaldırma ve çekirdek hasarı ({@link Cekim}): çekim yarıçapındaki oyuncu, mob, eşya ve araçlar. Oyuncunun hızı
-     * istemcide işlediği için iki tick'te bir {@code hurtMarked} ile gönderilir. Hasar saniyede bir, huni tabanında.
+     * Çekim, kaldırma ve çekirdek hasarı ({@link KasirgaCekimi}): çekim yarıçapındaki mob, eşya ve sahipsiz araçların hızı burada
+     * değişir. Oyuncunun ve sürdüğü aracın hareketinin sahibi oyuncunun istemcisidir, çekim orada uygulanır (AF3-01): sunucu
+     * onların hızını ezmez (END tick'inde {@code getX() - xo} her zaman 0'dır, eski hız tahmini çekimi biriktirmiyordu). Kaldırma
+     * etkiliyken sunucu yalnız düşme mesafesini (düşme hasarı sunucuda) ve oyuncunun uçma sayacını sıfırlar (AF3-08: huni oyuncuyu
+     * tavanda asılı tutar; kaldırma bölgesinden çıkan oyuncuda vanilla denetimi aynen sürer). Hasar saniyede bir, huni tabanda.
      */
     private void varliklariCek(ServerLevel level) {
-        double guc = KasirgaEvresi.guc(durum) * carpanlar().cekim();
-        KasirgaSeviyesi s = seviyeBilgisi();
-        if (guc <= 0 && KasirgaEvresi.guc(durum) <= 0) {
+        if (KasirgaEvresi.guc(durum) <= 0) {
             return;
         }
-        Vec3 k = konum();
+        KasirgaSeviyesi s = seviyeBilgisi();
+        KasirgaCekimi.Kaynak kaynak = new KasirgaCekimi.Kaynak(konum(), s, KasirgaEvresi.guc(durum) * carpanlar().cekim(),
+                kaldirmaTavani());
+        Vec3 k = kaynak.merkez();
         double r = s.cekimYaricapi();
         AABB kutu = new AABB(k.x - r, k.y - 6, k.z - r, k.x + r, k.y + s.yukseklik(), k.z + r);
-        double tavan = KasirgaAyarlari.kaldirmaTavani();
         boolean hasarTiki = tick % 20 == 0;
         double hasar = s.cekirdekHasari() * KasirgaEvresi.guc(durum);
-        for (Entity e : level.getEntities((Entity) null, kutu, Kasirga::cekilebilir)) {
-            double dx = e.getX() - k.x;
-            double dz = e.getZ() - k.z;
-            double h = e.getY() - k.y;
-            double[] ivme = Cekim.ivme(dx, dz, h, s.tabanYaricapi(), r, s.seviye(), guc, tavan);
-            if (ivme[0] != 0 || ivme[1] != 0 || ivme[2] != 0) {
-                if (e instanceof ServerPlayer oyuncu) {
-                    // Oyuncunun hareketini istemci işler; sunucudaki hız güncel değildir. Son tick'in yer değiştirmesi hız
-                    // tahminidir; iki tick'lik ivme eklenip hız paketiyle gönderilir.
-                    if (tick % 2 == 0) {
-                        double[] yeni = Cekim.kirp(new double[] {e.getX() - e.xo + 2 * ivme[0], e.getY() - e.yo + 2 * ivme[1],
-                            e.getZ() - e.zo + 2 * ivme[2]});
-                        oyuncu.setDeltaMovement(yeni[0], yeni[1], yeni[2]);
-                        oyuncu.hurtMarked = true;
-                    }
-                } else {
-                    Vec3 v = e.getDeltaMovement();
-                    double[] yeni = Cekim.kirp(new double[] {v.x + ivme[0], v.y + ivme[1], v.z + ivme[2]});
-                    e.setDeltaMovement(yeni[0], yeni[1], yeni[2]);
-                    e.hasImpulse = true;
-                    if (yeni[1] > 0) {
-                        e.fallDistance = 0;
+        for (Entity e : level.getEntities((Entity) null, kutu, KasirgaCekimi::cekilebilir)) {
+            double[] ivme = KasirgaCekimi.ivme(e, kaynak);
+            if (KasirgaCekimi.istemciYonetir(e)) {
+                if (ivme[1] > 0) {
+                    e.resetFallDistance();
+                    if ((e instanceof ServerPlayer p ? p : e.getControllingPassenger()) instanceof ServerPlayer surucu) {
+                        ucmaDenetiminiSifirla(surucu);
                     }
                 }
+            } else if (KasirgaCekimi.uygula(e, ivme)) {
+                e.hasImpulse = true;
             }
-            if (hasarTiki && hasar > 0 && e instanceof LivingEntity canli && Math.hypot(dx, dz) < s.hasarYaricapi()
-                    && h < s.yukseklik() * 0.5) {
+            double h = e.getY() - k.y;
+            if (hasarTiki && hasar > 0 && e instanceof LivingEntity canli && Math.hypot(e.getX() - k.x, e.getZ() - k.z)
+                    < s.hasarYaricapi() && h < s.yukseklik() * 0.5) {
                 canli.hurt(KasirgaKayitlari.hasar(level), (float) Math.max(0.5, hasar));
             }
         }
     }
 
-    private static boolean cekilebilir(Entity e) {
-        if (e instanceof KasirgaVarligi || e instanceof UcanBlokVarligi || e instanceof HangingEntity || !e.isAlive()
-                || e.isSpectator() || e.isPassenger() || e.noPhysics) {
-            return false;
+    /** Kaldırma etkiliyken oyuncunun (ve sürdüğü aracın) uçma sayacı sıfırlanır; bağlantısı olmayan oyuncu (çıkış anı) atlanır. */
+    private static void ucmaDenetiminiSifirla(ServerPlayer oyuncu) {
+        if (oyuncu.connection == null) {
+            return;
         }
-        return !(e instanceof Player p) || !p.isCreative();
+        try {
+            UCMA_SAYACI.setInt(oyuncu.connection, 0);
+            ARAC_UCMA_SAYACI.setInt(oyuncu.connection, 0);
+        } catch (IllegalAccessException hata) {
+            throw new IllegalStateException("uçma sayacına erişilemedi", hata);
+        }
     }
 
     private void sesleriBaslat(ServerLevel level, boolean aktif) {

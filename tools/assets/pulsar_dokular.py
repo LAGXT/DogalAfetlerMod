@@ -7,6 +7,8 @@
   çatlaklar (iç ateş). Çatlak rengi kenardan içe koyu kızıldan turuncu-sarıya.
 - komurlesmis_kutuk_top.png (kesit): kömür halkaları, merkezde ve halkalar arasında kor gibi parlayan çekirdek, ışınsal
   çatlaklar.
+- komurlesmis_tahta.png: dört yatay kömür tahtası (her biri 4 piksel); yatay lif, tahta aralarında koyu derz, tahta
+  başına kaydırılmış dikey ek yeri ve seyrek sönük kor parıltısı (kütükten daha soluk: tahta soğumuş kömürdür).
 - Parçacıklar (textures/particle):
   - kul_yagisi_0..3: düzensiz kül pulları (küçük/büyük, kıvrık kenar); açık gri tonda, istemci rengi koyulaştırır.
   - kor_0..3: yaşla küçülen parlak kıvılcım (merkez beyaz-sarı, kenar turuncu-kızıl, yumuşak hale).
@@ -14,7 +16,8 @@
   Saydam piksellerin rengi parçacığın ortalama rengi kalır (süzmede koyu hale olmasın).
 
 Kullanım (worktree kökünden): KOK/.venv/bin/python tools/assets/pulsar_dokular.py
-Çıktı: src/main/resources/assets/dogalafetler/textures/block/{kul,komurlesmis_kutuk,komurlesmis_kutuk_top}.png,
+Çıktı: src/main/resources/assets/dogalafetler/textures/block/{kul,komurlesmis_kutuk,komurlesmis_kutuk_top,
+komurlesmis_tahta}.png,
 src/main/resources/assets/dogalafetler/textures/particle/{kul_yagisi,kor,kul_tozu}_{0..3}.png
 """
 import math
@@ -140,6 +143,32 @@ def komurlesmis_kutuk_top():
     return img
 
 
+def komurlesmis_tahta():
+    r = random.Random(0xC0A3)
+    img = Image.new("RGBA", (BOY, BOY))
+    px = img.load()
+    for tahta in range(4):
+        ust = tahta * 4
+        ton = r.randint(-4, 4)
+        lif = [r.randint(-4, 4) for _ in range(4)]
+        ek = (r.randrange(BOY), r.random() < 0.5)
+        for dy in range(4):
+            y = ust + dy
+            for x in range(BOY):
+                v = 34 + ton + lif[dy] + r.randint(-3, 3)
+                if dy == 3:
+                    v = 16 + r.randint(-2, 2)
+                elif dy == 0:
+                    v += 5
+                if x == ek[0] and dy < 3:
+                    v = 18 + r.randint(-2, 2)
+                px[x, y] = (_sinirla(v + 3), _sinirla(v), _sinirla(v - 1), 255)
+        if ek[1]:
+            x = (ek[0] + r.randint(4, 11)) % BOY
+            px[x, ust + r.randint(1, 2)] = (*_kor_rengi(0.15 + 0.2 * r.random()), 255)
+    return img
+
+
 def _kare(ortu, renk, kenar_alfa=1.0):
     """ortu(x, y) → 0..1 (merkez 0,0, piksel birimi); renk(x, y, a) → (r, g, b); 4x4 alt örnekli alfa."""
     img = Image.new("RGBA", (BOY, BOY))
@@ -229,7 +258,7 @@ def toz_kareleri():
 def main():
     BLOK_KLASORU.mkdir(parents=True, exist_ok=True)
     for ad, img in (("kul", kul()), ("komurlesmis_kutuk", komurlesmis_kutuk()),
-                    ("komurlesmis_kutuk_top", komurlesmis_kutuk_top())):
+                    ("komurlesmis_kutuk_top", komurlesmis_kutuk_top()), ("komurlesmis_tahta", komurlesmis_tahta())):
         yol = BLOK_KLASORU / f"{ad}.png"
         img.save(yol, optimize=True)
         print(yol)

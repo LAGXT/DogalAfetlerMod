@@ -31,9 +31,10 @@ import net.minecraftforge.data.event.GatherDataEvent;
 import net.minecraftforge.registries.ForgeRegistries;
 
 /**
- * Yiyecek datagen'i: madde 14'ün tarifleri birebir (şekilsiz; süt kovasının kovası vanilla kalanıyla geri döner), tarif
- * kitabı açma başarımları ve eşya modelleri. Vanilla {@code RecipeProvider}'ın adı sabit olduğu için ("Recipes", K-E5) kendi
- * adlı sağlayıcı {@code ShapelessRecipeBuilder} çıktısını kendisi yazar.
+ * Yiyecek datagen'i: madde 14'ün tarifleri birebir ve sıcaklık-3'ün yeni yiyecekleriyle Buz Kovası (şekilsiz; süt kovasının
+ * kovası ve bal şişesinin şişesi vanilla kalanıyla geri döner), tarif kitabı açma başarımları ve eşya modelleri. Vanilla
+ * {@code RecipeProvider}'ın adı sabit olduğu için ("Recipes", K-E5) kendi adlı sağlayıcı {@code ShapelessRecipeBuilder}
+ * çıktısını kendisi yazar.
  */
 public final class YiyecekVerileri {
     private YiyecekVerileri() {
@@ -45,7 +46,7 @@ public final class YiyecekVerileri {
         olay.getGenerator().addProvider(olay.includeClient(), new Modeller(cikti));
     }
 
-    /** Madde 14 tarifleri (sıra şartnamedeki gibi). */
+    /** Madde 14 tarifleri (sıra şartnamedeki gibi), ardından sıcaklık-3 yiyecekleri ve Buz Kovası. */
     static void tarifler(Consumer<FinishedRecipe> c) {
         sekilsiz("sicak_salep", 3).requires(Items.GLASS_BOTTLE, 3).requires(Items.MILK_BUCKET)
                 .requires(Items.HONEY_BOTTLE).unlockedBy("has_milk_bucket", sahip(Items.MILK_BUCKET))
@@ -80,6 +81,45 @@ public final class YiyecekVerileri {
         JsonArray etiketDolu = CraftingHelper.serialize(new ICondition[] {
                 new NotCondition(new TagEmptyCondition(YiyecekKayitlari.PISMIS_KUTUP_BALIGI.location()))});
         corba.forEach(t -> c.accept(new KosulluKayit(t, etiketDolu)));
+        yeniTarifler(c);
+        ShapelessRecipeBuilder.shapeless(RecipeCategory.TOOLS, YiyecekKayitlari.BUZ_KOVASI.get()).requires(Items.BUCKET)
+                .requires(Items.ICE).unlockedBy("has_ice", sahip(Items.ICE)).save(c, DogalAfetler.konum("buz_kovasi"));
+    }
+
+    /**
+     * Sıcaklık-3 yiyecekleri (S3-06): serinleticiler buz, kar ya da soğuk meyveyle, ısıtıcılar pişmiş et, tahıl ve sebzeyle.
+     * Kap sayısı adede eşittir (her porsiyon kendi kabında); malzeme kümeleri birbirinden ve madde 14'ten farklıdır.
+     */
+    private static void yeniTarifler(Consumer<FinishedRecipe> c) {
+        sekilsiz("maras_dondurmasi", 2).requires(Items.BOWL, 2).requires(Items.MILK_BUCKET).requires(Items.SUGAR)
+                .requires(Items.ICE).unlockedBy("has_ice", sahip(Items.ICE)).save(c, DogalAfetler.konum("maras_dondurmasi"));
+        sekilsiz("soguk_elma_suyu", 2).requires(Items.GLASS_BOTTLE, 2).requires(Items.APPLE, 2).requires(Items.SNOWBALL)
+                .unlockedBy("has_apple", sahip(Items.APPLE)).save(c, DogalAfetler.konum("soguk_elma_suyu"));
+        sekilsiz("kar_helvasi", 1).requires(Items.BOWL).requires(Items.SNOWBALL, 2).requires(Items.HONEY_BOTTLE)
+                .unlockedBy("has_snowball", sahip(Items.SNOWBALL)).save(c, DogalAfetler.konum("kar_helvasi"));
+        sekilsiz("soguk_komposto", 1).requires(Items.GLASS_BOTTLE).requires(Items.APPLE).requires(Items.SWEET_BERRIES)
+                .requires(Items.SUGAR).requires(Items.SNOWBALL).unlockedBy("has_sweet_berries", sahip(Items.SWEET_BERRIES))
+                .save(c, DogalAfetler.konum("soguk_komposto"));
+        sekilsiz("parlak_sorbe", 1).requires(Items.BOWL).requires(Items.GLOW_BERRIES, 2).requires(Items.PACKED_ICE)
+                .requires(Items.SUGAR).unlockedBy("has_glow_berries", sahip(Items.GLOW_BERRIES))
+                .save(c, DogalAfetler.konum("parlak_sorbe"));
+        sekilsiz("buzlu_kakao", 3).requires(Items.GLASS_BOTTLE, 3).requires(Items.MILK_BUCKET).requires(Items.COCOA_BEANS, 2)
+                .requires(Items.ICE).unlockedBy("has_cocoa_beans", sahip(Items.COCOA_BEANS))
+                .save(c, DogalAfetler.konum("buzlu_kakao"));
+        sekilsiz("tarhana_corbasi", 3).requires(Items.BOWL, 3).requires(Items.MILK_BUCKET).requires(Items.WHEAT, 2)
+                .requires(Items.BEETROOT).unlockedBy("has_beetroot", sahip(Items.BEETROOT))
+                .save(c, DogalAfetler.konum("tarhana_corbasi"));
+        sekilsiz("kuzu_haslama", 1).requires(Items.BOWL).requires(Items.COOKED_MUTTON).requires(Items.POTATO)
+                .requires(Items.CARROT).unlockedBy("has_cooked_mutton", sahip(Items.COOKED_MUTTON))
+                .save(c, DogalAfetler.konum("kuzu_haslama"));
+        sekilsiz("kabak_corbasi", 2).requires(Items.BOWL, 2).requires(Items.PUMPKIN).requires(Items.CARROT)
+                .unlockedBy("has_pumpkin", sahip(Items.PUMPKIN)).save(c, DogalAfetler.konum("kabak_corbasi"));
+        sekilsiz("sucuklu_yumurta", 1).requires(Items.BOWL).requires(Items.EGG, 2).requires(Items.COOKED_BEEF)
+                .unlockedBy("has_egg", sahip(Items.EGG)).save(c, DogalAfetler.konum("sucuklu_yumurta"));
+        sekilsiz("firinda_elma", 1).requires(Items.APPLE).requires(Items.SUGAR).requires(Items.HONEY_BOTTLE)
+                .unlockedBy("has_apple", sahip(Items.APPLE)).save(c, DogalAfetler.konum("firinda_elma"));
+        sekilsiz("elma_cayi", 2).requires(Items.GLASS_BOTTLE, 2).requires(Items.APPLE).requires(Items.SUGAR)
+                .unlockedBy("has_apple", sahip(Items.APPLE)).save(c, DogalAfetler.konum("elma_cayi"));
     }
 
     private static ShapelessRecipeBuilder sekilsiz(String ad, int adet) {
@@ -203,14 +243,19 @@ public final class YiyecekVerileri {
         public CompletableFuture<?> run(CachedOutput onbellek) {
             Path kaynak = cikti.getOutputFolder(PackOutput.Target.RESOURCE_PACK);
             List<CompletableFuture<?>> isler = new ArrayList<>();
+            List<String> adlar = new ArrayList<>();
             for (YiyecekTablosu.Kayit kayit : YiyecekTablosu.KAYITLAR) {
+                adlar.add(kayit.ad());
+            }
+            adlar.add("buz_kovasi");
+            for (String ad : adlar) {
                 JsonObject model = new JsonObject();
                 model.addProperty("parent", "minecraft:item/generated");
                 JsonObject dokular = new JsonObject();
-                dokular.addProperty("layer0", DogalAfetler.MOD_ID + ":item/" + kayit.ad());
+                dokular.addProperty("layer0", DogalAfetler.MOD_ID + ":item/" + ad);
                 model.add("textures", dokular);
                 isler.add(DataProvider.saveStable(onbellek, model,
-                        kaynak.resolve(DogalAfetler.MOD_ID + "/models/item/" + kayit.ad() + ".json")));
+                        kaynak.resolve(DogalAfetler.MOD_ID + "/models/item/" + ad + ".json")));
             }
             return CompletableFuture.allOf(isler.toArray(CompletableFuture[]::new));
         }

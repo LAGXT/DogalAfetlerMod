@@ -12,9 +12,10 @@
 # (3) Quick Play `test` dünyası pc2'de yoksa KÖK'ün run/saves/test'ini aynı yola kopyalar (`uzak.sh` run*/ eşitlemez);
 # (4) yuva-1 alındıktan sonra (bütün yuvalar bizde, başka iş yok) pc2'nin boştaki Gradle daemon'larını `./gradlew --stop` ile
 # durdurur: pc2'de daemon açık (~/.gradle/gradle.properties, boşta 15 dk), her biri ~0,5 GiB tutar, istemci koşusunda en az boş
-# ~1,3 GiB. Uzak ortam: DOGALAFETLER_EKRAN=pc2, DISPLAY=$PC2_DISPLAY (vars. :0). Çıkış: `uzak.sh`'ninki (4 pc2 kapalı, 3 bekleme
-# doldu), 2 kullanım hatası. Tek giriş (K-E60): kuyruk işinin dışındaki çağrı kendini pc2 istemci işi olarak kuyruğa ekler ve
-# bekler (`sira.py ekle --bekle`).
+# ~1,3 GiB. Uzak ortam: DOGALAFETLER_EKRAN=pc2, DISPLAY=$PC2_DISPLAY (vars. :0); betik pc2'de KÖK/.venv/bin/python3 ile koşar
+# (numpy/pillow/nbtlib; pc2'nin sistem python3'ünde yoklar, kurulum sudo ister), venv yoksa python3 ile. Çıkış: `uzak.sh`'ninki
+# (4 pc2 kapalı, 3 bekleme doldu), 2 kullanım hatası. Tek giriş (K-E60): kuyruk işinin dışındaki çağrı kendini pc2 istemci işi
+# olarak kuyruğa ekler ve bekler (`sira.py ekle --bekle`).
 set -u
 [ $# -ge 2 ] || { echo "kullanım: tools/senaryo/pc2_istemci.sh <kanıt/> <görsel betik> [argümanlar...]" >&2; exit 2; }
 if [ -z "${SIRA_IS-}${UZAK_ICINDE-}" ] && [ "${SIRA_SERBEST-}" != 1 ]; then
@@ -64,5 +65,6 @@ fi
 echo "PC2: $makine'nin $son yuvası bu istemci için (yuva-1 uzak.sh'de)"
 # JAVA_HOME sabit: yerel kabuğun JAVA_HOME'u (ör. mise Java 21) pc2'de yok; o zaman `--stop` sessizce düşer, daemon'lar RAM'i tutar.
 UZAK_YUVA=1 JAVA_HOME=/home/lagxt/.jdks/jdk-17.0.21+9 exec tools/senaryo/uzak.sh -g "$kanit" env DOGALAFETLER_EKRAN=pc2 \
-    DISPLAY="${PC2_DISPLAY:-:0}" JAVA_HOME=/home/lagxt/.jdks/jdk-17.0.21+9 \
-    sh -c './gradlew --stop -q </dev/null >/dev/null 2>&1; exec python3 "$@"' sh "tools/senaryo/$betik" "$@"
+    DISPLAY="${PC2_DISPLAY:-:0}" JAVA_HOME=/home/lagxt/.jdks/jdk-17.0.21+9 PC2_PY="$kok_ana/.venv/bin/python3" \
+    sh -c './gradlew --stop -q </dev/null >/dev/null 2>&1; py=python3; [ -x "$PC2_PY" ] && py=$PC2_PY; exec "$py" "$@"' \
+    sh "tools/senaryo/$betik" "$@"

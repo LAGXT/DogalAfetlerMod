@@ -17,6 +17,9 @@ public record TsunamiSeviyesi(int seviye, double yukseklik, double hizBlokSn, do
         new TsunamiSeviyesi(5, 20, 8, 220, 260, 40, 0.12, 3.0, 4.0f),
     };
 
+    /** Dalganın doğuştan kıyıya varışı (sn). */
+    public static final double KIYIYA_SN = 8;
+
     /** Sığlaşmanın açıkta başladığı yükseklik payı ({@code H·(1 - d/d0)^0,25} sıfıra inmesin: ufukta alçak, geniş çizgi). */
     static final double ACIK_PAY = 0.35;
 
@@ -29,9 +32,12 @@ public record TsunamiSeviyesi(int seviye, double yukseklik, double hizBlokSn, do
         return hizBlokSn / 20.0;
     }
 
-    /** Dalganın açıkta doğduğu uzaklık: kıyıya ~18 sn'de varır (tasarım notu zaman çizelgesi), 60–150 blok. */
+    /**
+     * Dalganın açıkta doğduğu uzaklık: kıyıya {@value #KIYIYA_SN} sn'de varır (K-E67: seçimden kıyıya vuruşa ~40 sn; eski
+     * 18 sn), 32–150 blok (S1 32 … S5 64).
+     */
     public double aciklik() {
-        return Math.max(60, Math.min(150, hizBlokSn * 18));
+        return Math.max(32, Math.min(150, hizBlokSn * KIYIYA_SN));
     }
 
     /** Yüzeyin cephe arkasındaki uzunluğu (önde duvar, arkada kuyruk). */

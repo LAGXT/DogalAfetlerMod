@@ -122,15 +122,19 @@ olasılık adıma göre ölçeklendiği için sıklığı değiştirmez. **Rev. 
 takvimi ölçekler: oran × sıklık, başlangıç (`baslangicBeklemeTick`), genel (`genelBeklemeTick` × şiddet uzaması) ve tür
 (`beklemeTick`) beklemeleri ÷ sıklık (`AfetZamanlayicisi.beklemeOlcekle`); 11.4'ün "200 = iki katı" gerçekleşen afet sayısı olarak
 okunur. Sıklık 0'da seçim yok, süreler değişmez; N14 ertelemesi, afetin kendi süresi ve `/dogalafet start` ölçeklenmez.
+**Rev. K-E67:** gün çarpanı (`siklikArtisCarpani`/`siklikArtisGunu`, `1 + 7·min(1, gün/45)`) bölgesel oranı çarpar,
+yeni beklemeleri böler; güneş/ay oranına dördüncü kökü.
 
 **K-C3 Art arda 4–5, katı okuma.** Madde 10 "Seviye 4-5 afetler ardışık gelmesin (aynı seviye art arda en fazla bir kez)".
 Önceki seviyeli afet 4 ya da 5 idiyse bu seçimde 4 ve 5'in ikisi de dıştadır; parantezdeki kural bunun özel hâlidir ve
-yüksek seviyeler daha da nadirleşir. Seviyesiz afetler (güneş, ay) geçmişi sıfırlamaz. Berk değiştirebilir.
+yüksek seviyeler daha da nadirleşir. Seviyesiz afetler (güneş, ay) geçmişi sıfırlamaz. Berk değiştirebilir. **Rev. K-E67 (AZ-1):**
+kural yalnız doğal afetler arasındadır; komutla başlatılan afet `sonSeviye` yazmaz (sürüm 1 kaydındaki `sonSeviye` bir kez 0).
 
 **K-C4 Şiddet ağırlığı.** Seviye L'nin ağırlığı `k^(L−1) × rampa`; `k` gün 0'da 0,35'ten gün 120'de 0,6'ya doğrusal (k &lt; 1 →
 yüksek seviye her zaman daha nadir); yeni açılan seviye ağırlığının %20'siyle başlar, 15 günde tama çıkar. Gün 90:
 S1 %48,9, S2 %26,3, S3 %14,1, S4 %7,6, S5 %3,0. Gün 120+: %43,4 / %26,0 / %15,6 / %9,4 / %5,6 (`.vibe/kanit/cekirdek/simulasyon.txt`). `afetMaksSiddet` üstü keser. İsteğe bağlı
-gelişim kriteri açıksa şiddet günü `min(gün, puan × 2)` olur.
+gelişim kriteri açıksa şiddet günü `min(gün, puan × 2)` olur. **Rev. K-E67 (AZ-2, AZ-6):** eşikler 1/4/9/16, k 0,5 → 0,8 (60
+gün), rampa 3 gün, açılış %40; son günde çok doğal afet gelmişse (yük > 1,5) seviye dağılımı aşağı kayar.
 
 **K-C5 Bekleme bitişten başlar.** Genel ve tür beklemesi afet bitince (her nedenle, ON_UYARI iptali hariç) kurulur;
 şiddetli afette `1 + 0,25 × max(0, seviye−2)` kat uzar; seviyesiz afet 5 sayılır. N14 ertelemesi yalnız tür beklemesidir;
@@ -230,7 +234,7 @@ yazım `flat`; Minecraft ikisini de `minecraft:flat`'e çözer).
 
 ### İnceleme düzeltmeleri (inceleme-cekirdek P1/P2, şef kararları)
 
-**K-C25 Dönem süreçleri `core.DonemSureci` (B1, madde 11).** **Rev. (K-E62 AS-8):** "afet yuvası" artık tek afet değil, başlama sıralı liste (`DunyaDonemi.aktifAfetler()`); komutla farklı türler aynı anda sürer, aynı tür iki kez başlamaz, doğal seçim yalnız liste boşken. Afet yuvası dışında süren süreçler arayüzle kaydolur
+**K-C25 Dönem süreçleri `core.DonemSureci` (B1, madde 11).** **Rev. (K-E62 AS-8):** "afet yuvası" artık tek afet değil, başlama sıralı liste (`DunyaDonemi.aktifAfetler()`); komutla farklı türler aynı anda sürer, aynı tür iki kez başlamaz, doğal seçim yalnız liste boşken. **Rev. K-E67 (AZ-5):** doğal seçim doğal yuva dolana dek sürer (gün < 15 → 1, 15–39 → 2, ≥ 40 → 3 doğal afet; farklı tür, etki alanları çakışmaz, güneş/ay tek başına); komutla başlatılan afet doğal yuvayı doldurmaz. Afet yuvası dışında süren süreçler arayüzle kaydolur
 (`AfetYoneticisi.donemSureciKaydet`, mod kurucusunda; kimlik benzersiz). `/dogalafet stop` aktif afet yokken süren
 bütün süreçleri durdurur ve hangilerini durdurduğunu yazar; `afetTuru`'nun gamerule'ü ya da `dogalAfetlerAcik` kapanınca
 aynı yol saniyede bir çalışır (`kurallariDenetle`); `durum` süren süreçleri listeler; `asama ileri` aktif afet yokken
@@ -857,7 +861,7 @@ Döngü kimliği kuralı (K-C46) değişmez: süreçler zaten AKTIF/BITIS sonras
 kalır); komut yanıtı ve README bunu söyler. `doDaylightCycle=false` iken pencere hiç gelmeyebileceğinden beklenmez (G19 ile
 aynı ruh). **İstek 25 ile birlikte, tek cümle:** doğal güneş patlaması sabah penceresinde patlar ve gün saati o anki sabah
 saatinde donar (öğleye zıplamaz); yalnız komutla (ya da gün döngüsü kapalıyken) pencere dışında patlayan güneş gelecek
-öğleye alınıp orada donar. Bilinen sınır: SIREN'in 60 sn'si içinde gün saati sıçrarsa (uyku, `/time set`) ya da
+öğleye alınıp orada donar. Bilinen sınır: SIREN'in 25 sn'si (K0-19 rev. K-E67) içinde gün saati sıçrarsa (uyku, `/time set`) ya da
 `/dogalafet hiz` değişirse AKTIF pencereden kaçabilir; siren uzatılmadı (K0-19 siren süresi). Bekleme sırasında afet yuvası
 dolu kalır (başka afet seçilmez). **İnceleme Gk1:** `/dogalafet durum` beklemede "sirene 0 sn" yerine "patlama penceresi
 bekleniyor: ~N" yazar (`Afet.pencereBeklemesi()`, gerçek tick; `asamaKalanTick` sözleşmesi değişmedi, 0 kalır). Bekleme
@@ -865,6 +869,9 @@ bekleniyor: ~N" yazar (`Afet.pencereBeklemesi()`, gerçek tick; `asamaKalanTick`
 biter, SIREN başlar, log tek satır (`Patlama penceresi (<tür>): gelmedi, 24000 tick beklendi; bekleme bitti`); sayac
 (`pencereBeklenen`) afet kaydında, yeniden başlatmada sürer. **Gk8:** `GunSaatiSabitleyici`'nin 1200 tick'lik satırı
 yalnız görsel otomasyonda (`dogalafetler.otomasyon`, `GorselOtomasyon.AKTIF` ile aynı özellik); üretimde geçiş satırları.
+**Rev. K-E67 (AZ-7, denetim Z2):** pencere seçimde uygulanır (`GunSaatiPenceresi.dogalSecimCarpani`): doğal güneş/ay yalnız
+seçim anı ve 800 tick sonrası pencerede iken seçilir, oranı pencere payıyla telafi edilir; ON_UYARI beklemesi, Gk1 "patlama
+penceresi bekleniyor" satırı ve `EN_COK_BEKLEME` kalktı (`Afet.patlamaPenceresiniBekle` silindi); gün döngüsü kapalıyken pencere yok.
 
 **G2-10 Ay görsel otomasyonu pc2'de.** Kanıt koşusu 1–2'de pc2 FPS'i 12–13 (< A-34 kapısının 15'i): her kare 60 sn
 bekledi ve `/dogalafet hiz` alt sınırı 0,1 (0,05 / 0,01 istekleri 0,1'e kenetlendi) yüzünden 60 sn = 6 patlama saniyesi:
@@ -3334,6 +3341,14 @@ değildir; iki tick'te bir son tick'in yer değiştirmesi + 2·ivme `hurtMarked`
 yalnız çekim yarıçapındakilere). Yaratıcı/izleyici, binekteki, asılı (tablo, çerçeve) varlık çekilmez. Çekirdek hasarı saniyede
 bir, huni taban yarıçapı + 1,5 blok içinde ve gövdenin alt yarısında: seviye tablosu (1–4 can/sn) × evre gücü ×
 `hasarCarpani`. Uçan blok çarptığı canlıya bir kez `2 + 0,5·seviye` hasar verir. Hasar tipi `dogalafetler:kasirga`.
+**Rev. K-E70 (AF3-01/02/03/08, 2026-11-08):** oyuncu çekimi oyuncunun istemcisinde (`PlayerTickEvent` START, `KasirgaCekimi`);
+sunucu oyuncunun hızını ezmez (END tick'inde `getX() − xo` = 0 olduğu için eski hız tahmini çekimi biriktirmiyordu).
+Çekim: içe hız `8/4,8 b/sn · güç · √(R/d)`, ivme `V·(1−sürtünme)`, teğet 0,5·içe, çekirdekte dışa net ivme yok;
+kaldırma etkiliyken düşme sayılmaz ve uçma sayacı (`aboveGroundTickCount`/`aboveGroundVehicleTickCount`) sıfırlanır:
+adanmış sunucu `allow-flight=false` iken kaldırılan oyuncu 80 tick sonra "Flying is not enabled" ile atılmaz (Forge yansıması,
+AT/mixin yok). Sürülen araç hareketinin sahibi sürücünün istemcisi olduğu için istemcide çekilir
+(`KasirgaOyuncuCekimi.hareketSahibi`). Hız kırpması önceki hızı azaltmaz (`Cekim.kirp(hiz, onceki)`; elytra). Kaldırma tavanı
+huni yüksekliğinin ¼'ü (S5 36 blok, `kasirga.kaldirmaTavani`).
 
 **K-07 Ses (tasarım notu §4, uyarı §3–§4).** İki döngülü katman `OrtamSesi` ile, WEATHER: `kasirga/ugultu` (uzak "yük treni",
 16 sn döngü, 40–120 Hz baskın, menzil 160, siren başında 10 sn'de açılır) ve `kasirga/ruzgar` (yakın kükreme + 2 Hz basınç pompası,
@@ -3373,7 +3388,9 @@ varlıkları atılır; log `[kasirga] temizlendi (temiz=…)`. `kapanirken`: uç
 **K-12 GameTest.** 7 test, her biri kendi batch'inde (tek afet yuvası, çekirdek §13; K-E16 ≤ 7): blok sınıfları, stop temizliği,
 `afetBlokHasari=false`, mob çekimi/hasarı, doğal bitişte İlk Rüzgâr, hareketli etki alanı, NBT devamı. Kasırga test sahnesinin
 ortasına taşınır (`konumAyarla`, paket içi): başka testin sahte oyuncusu çevrim içiyse `elleBaslat` onu hedef alıp uzakta
-doğururdu. Kural değiştiren test eski değeri geri koyar (K-E15). Uzak chunk gerekmez (K-E21).
+doğururdu. Kural değiştiren test eski değeri geri koyar (K-E15). Uzak chunk gerekmez (K-E21). **Rev. K-E70:** 8. test
+`kasirga_cekim_bolgesi` (sunucu oyuncu hızını yazmaz; NoAI olmayan domuz içe çekilir), 9. test `kasirga_ucma`
+(`kaldirilanOyuncuUcmaDenetimiyleAtilmaz`).
 
 **K-13 Görsel tur otomasyonu (tur 2).** `KasirgaOtomasyonu` kareleri A-34 kapısıyla alır: istekten sonra en az 20 kare çizilmiş
 ve `getFps() ≥ 15` olmalı, en çok 60 sn beklenir (log'da `kapı açık` ya da `60 sn doldu, UYARI`). S1 ve S5 vitrin kareleri aynı
@@ -3923,6 +3940,16 @@ sanal su sorgusu eskisi gibi 24 blok altında; damla başına ömründe 2–3 `g
 
 **AF-01 rev. 3 (t4 kareçiği, göz hizası).** Halka yatay çizilir, üst yüz yalnız göz ondan yüksekteyse görünür. Göz hizasının üstündeki yüzeyde (kum tepesi, çatı, korkuluk) halka blokların kenarında gökyüzünün önünde asılı durur (t4 karesinde kum tepesinde göz +0,38 halka, `goz_ustu=1`; o karede 147 halkanın 130'u gözün üstündeydi). Karar: halka yalnız göz hizasının altındaki üst yüze konur, göz altına inerse söner (`YagmurCarpmasi.ustYuzGorunur`, JUnit); üstüne sanal su yükselen blok ve gerçek su halkası söner (damla artık su yüzeyine çarpar; batık zemindeki halka su ağının içinden görünüyordu, t4 dalga karesinde `dalga_alti=123`). Sonuç: her halkanın her noktası ekranda ufuk çizgisinin altında kalır; gökyüzü kutusundaki piksel adayları (inceleme yöntemi) tanım gereği halka değildir. Maliyet: tick başına canlı blok halkası başına bir `SanalSu.suSeviyesi` (en çok 480; sanal su yokken hemen NaN). Bilinen sınır (entegratöre, sanal su): yakın su ağı kurulmadan (pc2'de ilk yapım ~150 tick) kamera çevresinde sanal su çizilmez; o sürede orada sanal su halkası da olmaz.
 
+**AF-01 rev. 5 (K-E70, AF3-10 rev. 1, AF3-11…14; güncelleme turu 3).** Serpinti ve köpük yalnız **çizilen** sudan doğar: yükseklik
+kaynağı yakın su tamponu ya da uzak LOD'un çizdiği karo (`SuRenderer.yakinSuUstu`/`uzakSuUstu`), yoksa doğmaz; analitik
+`Dalga.yuzey` ve `SanalSu.suSeviyesi` yedeği kalktı (`client/tsunami/SerpintiKarari`, `SerpintiNoktasi`). Blok içi, çatı altı ve
+çizimsiz su kuralları JUnit `SerpintiKarariTest` ile; KARE ölçütü `SerpintiNoktasi.olcut` bağımsız yoldan (`SuRenderer.cizilenUst`),
+kabul üçü 0 (`havada`, `blok`, `cizimsiz`). Halka açıkları (a)–(d) ve Fabulous derinliği (AF3-11/12) kodda kaldı ama **tsunami
+yağmuru kullanıcı kararıyla varsayılan kapalı** (AF3-14, 2026-11-08: "tsunami yağmurunu kapa sonraki aşamalara geç"): CLIENT
+`tsunami.yagmur` (false), kapı tek yerde (`TsunamiYagmuru.acik()`); kapalıyken damla, halka, yağmur sesi ve sisi üretilmez,
+dalga serpintisi ve köpük açık. Otomasyon varsayılan config'le koşar (`y:1`/`y:0` geçersiz kılar), kare anları senkron evreden
+(AF3-15, `TsunamiKareAnlari`), `tsunami_gorsel.py` kabul sonucu çıkış kodunda (AF3-16).
+
 #### Tsunami yıkımı (istek 3)
 
 **AF-10 Dekor her seviyede, sertliğe bakılmadan, anında.** `TsunamiYikimi.sinif` önce ortak rolü okur (`AfetBloklari.rol`); `DEKOR`
@@ -4397,7 +4424,8 @@ karesi 94 / 81. S5 çarpma/karada karelerinde kamera dalganın içinde (yüzeyin
 
 **K0-19 Ay çarpması siren süresi: 60 sn.** Madde 5 "Güneş Patlaması hariç 10 sn" der; bölüm H "siren çaldıktan 60 saniye
 sonra ay çarpsın (siren bu anda fade-out ile dursun)" der. Daha özel kural kazanır: ay çarpmasında standart siren dosyası
-60 sn döngüyle çalar ve çarpma anında fade-out olur; diğer altı afette 10 sn. Berk değiştirebilir.
+60 sn döngüyle çalar ve çarpma anında fade-out olur; diğer altı afette 10 sn. Berk değiştirebilir. **Rev. K-E67 (2026-11-08):**
+kullanıcı isteğiyle ay çarpması ve güneş patlaması sireni 25 sn (`SirenTuru.UZUN_SURE_TICK` 500); seçimden çarpmaya ~30 sn.
 
 **K0-20 Tasarım notları kabul edildi.** `docs/tasarim/*.md` (12 dosya) şef tarafından okundu ve Faz 2–4 işçileri için
 bağlayıcı başlangıç noktasıdır; notlardaki "doğrulanmadı" işaretli teknik riskler (sıvı render mixin'i, sanal suda
@@ -6129,6 +6157,126 @@ pc2 kare koşularında FPS 15–19 (K-E29 b, bilgi; ana makine koşu 6 en düş�
 referansla çift karşılaştırma bilgi (koşu 13'e karşı koşu 7: mercek 0/6, spagetti 2/6, karanlık 4/6); yeni deneme yok, kullanıcı
 oyunda karar verir; yutma parlaması (1,5 sn tepe) `pulsarTitresim`'le ölçeklenmez. Kanıt: son kapı `002afc7` (pulsar-2 `0d8e98d` PL-45 birleşmesi; kuyruktan, ana makine, pc2 erişilemez): `runData` `1108-092158365-c9` fark yok (written 0), `compileJava` `1108-092158463-8b` BUILD SUCCESSFUL (UP-TO-DATE), JUnit 722/0 `1108-092158563-11` (`test @04189671f2ed`), filtresiz GameTest 275/275 `1108-092158681-a2` (`FILTRE=yok`, `gametest @9eba541c6d95`, protokol 8, en büyük batch 7; yeni `hasarParcacigiKendisineGitmezYanindakineGider` dahil), N19 245/245 fark 0; pano `pano-8.txt` (önceki `6f1d35b`: JUnit 722/0, filtresiz 274/274, `pano-7.txt`).
 
+## Teslim sonrası — güncelleme turu 3
+
+**K-E67 Afet takvimi günle sıklaşır, S4/S5 erken, seçimden görünmeye ~30 sn (kullanıcı isteği, güncelleme turu 3;
+K-C2, K0-19, madde 4 ön-uyarı ve N17 değişikliği; dal `is/afet-zaman-3` `1b74c1a`, entegrasyon `is/entegrasyon-8` `4663deb`).**
+(a) Komutla başlatılan afet `sonSeviye` yazmaz; art arda 4/5 kuralı yalnız doğal afetler arasındadır. `/dogalafet gun`/`durum`
+doğal seçimin olasılıklarını yazar, %0 seviyenin nedenini (gün eşiği, `afetMaksSiddet`, gelişim, önceki doğal afet 4/5) ve
+yoğunluk zayıflatmasını belirtir; `start <afet> <seviye>` `afetMaksSiddet`'i aşabilir, çıktıda söylenir. (b) Şiddet eşikleri
+1/4/9/16, k 0,5→0,8 (60 gün), rampa 3 gün, açılış %40 (gün 20 S4 ≈ %9, S5 ≈ %6; gün 40 S5 ≈ %9; gün 60+ S4+S5 ≈ %27).
+(c) Takvim: günlük oran 5, genel bekleme 1 500, bölgesel tür beklemesi 18 000, şiddet uzaması 0,15, ilk afet 3 dk'dan önce değil
+(3 600) ve 8 dk'da garanti (9 600); gün çarpanı `1 + 7·min(1, gün/45)` bölgesel oranı çarpar ve yeni beklemeleri böler,
+güneş/ay oranına dördüncü kökü; `afetSikligi` (K-E62) üstüne çarpılır. Benzetim (%100): takvim temposu gün 1 ≈ 7,5 dk, gün 10
+≈ 4,4 dk, gün 30 ≈ 3,0 dk; eşzamanlılıkla tek oyuncuda gün 30 ≈ 2,2 dk, gün 60 ≈ 1,8 dk. (d) Eşzamanlı doğal afet gün < 15 → 1,
+15–39 → 2, ≥ 40 → 3; farklı tür, etki alanları çakışmaz, güneş/ay tek başına, TPS kısması (K-C37) ikinci/üçüncüyü erteler;
+yuvayı yalnız doğal afetler doldurur (komutla başlatılan afet doğal takvimi durdurmaz); komutla çoklu afet (AS-8) değişmez.
+K-C25/AS-8'in "doğal seçim yalnız hiç afet yokken" cümlesi bununla değişir. (e) Çok gelirse güçsüz: son bir gündeki doğal afet
+sayısı günün normalinin (8/5/3 dk aralık) 1,5 katını ya da `afetSikligi` %150'yi aşarsa seviye dağılımı aşağı kayar (S1 hariç
+ağırlık `z^(−(L−1)/2)`, `z ≤ 8`; hiçbir seviye sıfırlanmaz). (f) Madde 4 ön-uyarı varsayılanı 45–90 sn yerine 10–18 sn + 5 sn
+erken bildirim (Hassas Sismograf avantajı kalır); K0-19 rev.: ay çarpması ve güneş patlaması sireni 60 → 25 sn, ön-uyarıları
+sirenin fazlası kadar kısa, en az 1 sn normal ön-uyarı (6–8 sn); ay yaklaşma görseli 25 sn, güneş öncü meteor penceresi 5 sn,
+tsunami dalgası AKTIF'ten 2 sn sonra doğar, 10. sn'de kıyıya vurur (açıklık hız × 8, çekilme 8 sn). Seçimden (ya da komuttan)
+görünmeye bütün 8 türde ortalama 29–31,3 sn, en çok 35 sn. Doğal güneş/ayın gün saati penceresi (Gökyüzü-2 istek 26, G2-9) seçimde
+uygulanır: tür yalnız seçim anı ve 40 sn sonrası pencerede iken seçilir, oranı pencere payıyla telafi edilir; ön-uyarıda bekleme
+yok (Gk1 "patlama penceresi bekleniyor" satırı kalktı). (g) Göç: `cekirdek.ayarSurumu` 2, `tsunami.ayarSurumu` 1,
+`gunes_patlamasi.ayarSurumu` 1 (eski varsayılanda kalan değerler yeniye çekilir, elle değiştirilene dokunulmaz); dünya kaydı
+biçimi 2: sürüm 1 kaydındaki `sonSeviye` bir kez sıfırlanır. Kaynak `.vibe/kararlar/afet-zaman-3.md` (AZ-1…AZ-10). Ayrıntı ve
+benzetim tabloları `.vibe/rapor/afet-zaman-3.md`. Entegrasyonda: `TsunamiOtomasyonu` kare adımları bu zamanlamaya çekildi (K-E71 (c)).
+
+**K-E68 Mod sekmesi, 8 kat kül = Kül Bloğu, pulsar iki yatay hüzme, kömürleşmiş tahta (kullanıcı istekleri, güncelleme turu 3;
+dal `is/blok-3` `a92f579`, entegrasyon `9152937`).** Ayrıntı `.vibe/kararlar/blok-3.md` BK-1…BK-8. (a) BK-1: modun kendi yaratıcı
+sekmesi "Doğal Afetler" (`esya.ModSekmesi`, ikon Kül Bloğu); içerik `dogalafetler` ad alanındaki bütün kayıtlı eşyalardan, kayıt
+sırasıyla, sekme her kurulduğunda doldurulur (sonradan eklenen eşya ayrıca yazılmadan girer; entegrasyonda 47 eşya, Buz Kovası ve
+sıcaklık-3 yiyecekleri dahil); alt sistemlerin vanilla sekmelere ekledikleri yerinde. (b) BK-2: dünyada görülen "kül bloğu" 8 katlı
+Kül Katmanıydı: yaprak külü 8 kata varınca gerçek Kül Bloğu yerleşir, `layers=8` kırılınca (ipek dokunuşta da) ve orta tıkla
+Kül Bloğu verir; 8 Kül Katmanı ↔ 1 Kül Bloğu şekilsiz tarifleri. (c) BK-3: pulsarın manyetik ekseni tek, gökte sabit 90°/4° (gök
+dönüşü ekseni, dünyada kuzey–güney): yalnız iki hüzme, ekranda pulsarın sağında ve solunda; ikinci koni çifti kalktı (K-E66/PL-31
+"33°/8°, ikinci çift −58°/−9°" yerine; `.vibe/kararlar/pulsar-2.md`, `docs/tasarim/gokyuzu.md` güncel). Bilinen sınır: pulsar tam
+tepedeyken kuzeye/güneye bakıp yukarı bakılırsa eksen ekranda dikey görünür (eksen göğe sabit, PL-31 paralaks ilkesi). (d) BK-4…BK-7:
+`dogalafetler:komurlesmis_tahta` (cubeAll, tarif 1 kömürleşmiş kütük → 4 tahta, grup `planks`, kitap kilidi kütükle);
+`minecraft:planks` ve `minecraft:non_flammable_wood` etiketleri (yalnız ortak sağlayıcıdan, K-E12), yakıt değil (`getBurnTime` 0),
+yanmaz, tekne yapılmaz (vanilla tekne tarifleri belirli tahta eşyası ister); bilinçli kabul: asit, deprem, kasırga, tsunami ve
+donma tahtayı sıradan ahşap gibi işler. Kömürleşmiş kütük suya konunca ya da su ona gelince 2–4 dk'da (planlanmış tick) kömür
+bloğuna döner, bu sırada blok durumu `donusuyor`=true ve yalnız o sürede duman; pulsar kavurmasının su kıyısında yerinde
+kömürleştirdiği kütük kendiliğinden dönmez, duman çıkarmaz. (e) BK-8 ısı yayma sıcaklık tarafında (K-E69 (e)). Ağ protokolü
+değişmedi.
+
+**K-E69 Sıcaklık 3: vücut °C, hissedilen, ıslaklık, dört durum, yeni HUD, termometre menüsü, yiyecekler, Buz Kovası (kullanıcı
+istekleri, güncelleme turu 3; dal `is/sicaklik-3` `20a2a78`, entegrasyon `f2fc102`).** Ayrıntı `.vibe/kararlar/sicaklik-3.md`
+S3-01…S3-11. (a) S3-01: oyuncuya vücut °C (normal 37,0); iç saklama ±100 birim, tek dönüşüm `VucutOlcegi` (°C = 37 + 0,05·B);
+eski kayıtlar ve Cold Sweat köprüsü değişmeden çalışır. (b) S3-02: hissedilen = mekan + ıslaklık (−5·W °C) + rüzgâr soğuğu (NWS,
+T ≤ 10 °C, V > 4,8 km/h, sınırlarda yumuşatılmış) + sol el; vücut hissedilenle ısı alışverişi yapar (S-03 formülü; iletkenlik
+`1 + 0,5·W`, suda 3). (c) S3-03: ıslaklık %0–100 (suda 0,25/sn, yağmurda 0,012/sn, fırtınada 0,02/sn; çatı altında ve camla
+örtülü yerde kurur, yanan oyuncu anında kurur, ölümde sıfır; gösterge `dogalafetler:islak`). (d) S3-04: dört durum Üşüme ≤ 36,0 °C,
+Donma ≤ 35,0 (hasar ≤ 33,5), Bunalma ≥ 38,0, Yanma ≥ 39,5 (hasar ≥ 40,5); üşüme/bunalma hasarsız, bunalma 0,04/sn, yanma 0,08/sn
+ek açlık; `Kademe` sırası aynı. Üşümede ağız buharı (`dogalafetler:nefes_buhari`, ~50 tick'te bir nefes; dünya donarken üretilmez),
+bunalmada ter damlası ve kırmızı ekran kenarı (S3-10, S3-11; kendi ekranına parçacık yalnız 3. şahısta istemcide, S-08 rev.).
+(e) S3-05: sol elde Buz Kovası −12 °C (mekan > 25 °C'de erir, su kovasına döner), lav kovası +12 °C (ana elde etki yok);
+kömürleşmiş kütük 2:2 ve tahta 1,5:2 ısı kaynağı (varsayılan listede, `sicaklik.ayarSurumu` 1 liste göçü; tahta blok-3 ile
+etkinleşti, GameTest `komurlesmisKutukVeTahtaDusukIsiVerir`: tahta < kütük < yanan fırın). (f) S3-06: 12 yeni yiyecek/içecek (6 serin,
+6 sıcak), vanilla ısınma kademeli (`eşya=kademe:saniye`), yeni vanilla serinlik listesi; başarım #19 `SICAK_YIYECEKLER`
+`YiyecekTablosu`'ndaki bütün ısıtan kayıtlardan türetilir (12). (g) S3-07 (**N6 rev.**): HUD'da vücut °C sayısı varsayılan görünür,
+CLIENT `sicaklik.sayiGoster=false` ile kapanır; hissedilen °C (`hissedilenGoster`) ve durum ikonları (`durumIkonlari`) ayrı kapanır;
+ekran efektleri yazısız kalır; `ortamOkuGoster` kalktı, `leftHeight/rightHeight` 56 → 58. Eski "HUD'da yazı yok" kuralı kullanıcı
+isteğiyle değişti. (h) S3-08: termometre menüsü (tuş K, 320×214; en solda oyuncu modeli, vücut ve hissedilen, mekan
+termometresi −30…+50 °C, katkı dökümü); sunucu oyuncu başına en çok 10 tick'te bir yanıtlar. (i) S3-09: config liste göçü
+`SurumluGocPlani.listeAdimi` (eski varsayılana birebir eşit listeyi çeker, elle değiştirileni korur); `sicaklik.ayarSurumu` 1,
+`yiyecek.ayarSurumu` 1. **Paketler** (protokol 9, K-E71): `sicaklik/durum` 16 alan, yeni `sicaklik/dokum` (S2C) ve
+`sicaklik/dokum_iste` (C2S). **Görsel kabul:** kullanıcının oyun içi doğrulaması (şef kararı, 2026-11-08: "Sıcaklık sistemi de
+çalışıyor, ben gördüm"); `20a2a78` dokusu için görsel koşu yapılmadı.
+
+**K-E70 Kasırga oyuncuyu içine çeker, güç–boy orantılı S5; tsunami serpintisi çizilen sudan, yağmur varsayılan kapalı (kullanıcı
+istekleri, güncelleme turu 3; dal `is/afet-fizik-3` `2d6e169`, entegrasyon `b06f278`).** Ayrıntı `.vibe/kararlar/afet-fizik-3.md`
+AF3-01…AF3-18. (a) AF3-01/02/03/08: oyuncu çekimi istemcide, içe baskın (K-06 rev.); kaldırılan oyuncu uçma denetimiyle atılmaz;
+sürülen araç istemcide çekilir; K-12'ye 8. ve 9. test. (b) AF3-05/06: kasırga seviye tablosu tek güç katsayısıyla (1 / 1,6 / 2,4 /
+3,4 / 4,8) orantılı: taban 10·g, tepe 16·g, yükseklik 30·g, çekim yarıçapı 15·g; kaldırma tavanı ve uçan blok yüksekliği
+yükseklikten. S5: 48 / 76,8 / 144 / 72 blok, 32 blok/tick, sertlik 6, hasar 6 can/sn. `kasirga.kaldirmaTavani` boyut 1'deki S5 tavanı,
+25 → 36, göç `kasirga.ayarSurumu` 1. `KasirgaVarligi` iki yeni senkron alan `CEKIM`, `TAVAN` (protokol 9). Rota kuralı (AF2-21)
+değişmedi. (c) AF3-10…14: AF-01 rev. 5 (serpinti/köpük yalnız çizilen sudan; **tsunami yağmuru kullanıcı kararıyla varsayılan
+kapalı**, CLIENT `tsunami.yagmur`). (d) AF3-15/16: otomasyon kare anları senkron evreden, `tsunami_gorsel.py` kabulü çıkış kodunda.
+(e) AF3-17: S5 K-17 taban rengi kadrajı kararlı değil (1/2 koşu); kamerayı S5 boyutundan türetmek denendi, tutmadı, geri alındı.
+**Görsel kabul (kasırga):** kullanıcının oyun içi doğrulaması (şef kararı, 2026-11-08); kasırga FPS/K0-33 koşusu istenmedi.
+
+**K-E71 Protokol "9" ve güncelleme turu 3 entegrasyonu (K-C47 tek artış; entegratör `Entegrator8`, 2026-11-08; `is/entegrasyon-8`).**
+(a) Protokol "8" → "9" (`f55b042`, tek dokunulan yer `network.AgKanali.PROTOKOL_SURUMU`): `sicaklik/durum` 16 alan, yeni
+`sicaklik/dokum` (S2C) ve `sicaklik/dokum_iste` (C2S; ada göre sıralı kimlikler kayar: `sicaklik/dokum` 6, `sicaklik/dokum_iste` 7,
+`sicaklik/durum` 8 … `yangin/ates_durumu` 14), `KasirgaVarligi` senkron alanları `CEKIM`/`TAVAN` (varlık veri düzeni). GameTest
+log'u "15 ağ paketi kaydedildi (protokol 9)". (b) Birleşme sırası afet-zaman-3 (`4663deb`) → blok-3 (`9152937`) → afet-fizik-3
+(`b06f278`) → sıcaklık-3 (`f2fc102`); tek git çakışması üretilmiş dil dosyaları (sıcaklık-3 birleşmesinde), elle çözülmedi,
+`runData` ile kaynaktan yeniden üretildi. (c) Entegrasyon kusuru: `TsunamiOtomasyonu` adım listesinde ufuk ile vitrin arasındaki
+100 tick'lik ölçüm K-E67 zamanlamasında vitrin karesini kıyı sonrasına atıyordu; adım listesi saf
+`client.tsunami.TsunamiKareAnlari.tsunamiAdimlari`, ölçüm çarpma ile karada arasında (`-carpma`), JUnit
+`kisaZamanlamadaAdimListesiKareleriEvresindeAlir` (`91b7a76`). (d) Entegrasyon maddeleri: kömürleşmiş tahta ısı kaynağı GameTest
+`komurlesmisKutukVeTahtaDusukIsiVerir` (tahta < kütük < yanan fırın); mod sekmesi GameTest
+`modSekmesiTarifEsyalariniKendiligindenTasir` (Buz Kovası, sıcaklık-3 yiyecekleri, kül ve kömür eşyaları kendiliğinden);
+başarım tutarlılığı kod değişikliği gerektirmedi (afet no benzersiz, doğal eşzamanlı afetlerin alanları çakışmaz, iz tek afete
+bağlı). (e) Altyapı: `uzak.sh` her pc2 işinden önce pc2'nin son açılışından eski çökme artıklarını (sıfır kilit, 0 baytlık `jars-9`
+sınıfı) yanlarına `.bozuk-<zaman>` adıyla taşır, ortak önbellekte yalnız uyarır (`fdc8ee0`, `.vibe/rapor/altyapi-pc2-kilit.md`);
+pc2 görsel betikleri pc2'deki proje `.venv`'iyle (numpy/pillow/nbtlib; sistem Python'u `EXTERNALLY-MANAGED`, kurulum `sudo`'suz)
+koşar, venv yoksa `python3` (`4af5b42`). (f) **Kullanıcı kararları (2026-11-08):** tsunami yağmuru varsayılan kapalı (K-E70);
+sıcaklık ve kasırga görsel kabulü kullanıcının oyun içi doğrulaması; filtresiz GameTest'i atlama kararı ("gametest i atla gerek
+yok") ilk filtresiz koşu sürerken geldi; o koşunun yakaladığı test kusuru düzeltildikten sonra kapı zincirine giren ikinci
+koşu 313/313 geçti, kabul ona dayanmaz; görsel/ölçüm koşuları (`pulsar_gorsel.py`, `tsunami_gorsel.py kabul`) kullanıcı kararıyla
+durduruldu ("runu durdur ben onaylıyorum doğruluğunu"): görsel kabul ve doğruluk kullanıcının onayıyla. Kanıt (son kod HEAD
+`02bff06`, kuyruktan): JUnit 854/0 `test @88d973b1fecd`, build `build @88d973b1fecd`, filtresiz GameTest 313/313
+`gametest @19a78927fd26`, `runData` üç kez written 0, N19 270/270 fark 0. Rapor `.vibe/rapor/entegrasyon-8.md`.
+
+### Bilinen sınırlar (güncelleme turu 3)
+
+- **Görsel/ölçüm koşuları kullanıcı kararıyla yapılmadı:** TS-16 rev. 3 CPU bütçesi ve serpinti ölçütü (0/0/0) yeni kodda
+  oyun içinde ölçülmedi (`tsunami_gorsel.py kabul` başladıktan sonra durduruldu; denetmen `main`'de de 2/4 sahnenin kaldığını
+  ölçmüştü); tsunami kare adımlarının yeni sırası yalnız JUnit benzetimiyle kanıtlı. `pulsar_gorsel.py` koşu 1 (ana makine,
+  `02bff06`) 14 kareden sonra (iki yatay hüzme kareleri `pulsar_buyuk`, `pulsar_ufuk`, `pulsar_oglen` dahil) kara delik adımında
+  kapanış satırı olmadan bitti (geçersiz, defter `kaldi`); tekrar yapılmadı, FPS ≥ 20 satırı yok. Kasırga K0-33 FPS oranı ölçülmedi.
+- afet-zaman-3: tek oyuncuda eşzamanlılık tür çiftine bağlı (tsunami ve asit yağmuru hep çakışır).
+- blok-3 (BK-3): pulsar tam tepedeyken kuzeye/güneye bakıp yukarı bakılırsa eksen ekranda dikey görünür.
+- sıcaklık-3: düşük efekt kalitesindeki gözlemci dünya donması sürerken başkasının ağız buharını görmez.
+- afet-fizik-3: oyuncu çekimi istemcide olduğu için GameTest yalnız "sunucu oyuncu hızını yazmaz"ı sınar (çekim saf benzetimle,
+  `CekimBenzetimiTest`); S5 K-17 taban rengi kadrajı kararlı değil (AF3-17); yavaş makinede yakın su ağı gecikirse serpinti ve
+  köpük azalır (AF3-10).
+- pc2'nin 2026-11-08 18:42'deki sıfırlanma nedeni bilinmiyor (yama artıkları taşır; donanım/güç tarafı incelenmedi).
+
 ## Açık noktalar (Faz 2b)
 
 Entegratöre bırakılan notlardan işlenenler: kancalar (K-E1), protokol (K-C47), `asama ileri [süreç]` (K-C48), sanal su §3a istisnası
@@ -6296,30 +6444,38 @@ P2-9 `5-matris` kabulünde. Kapanış eşlemesi (K-E50) her maddenin sonunda:
 
 | Alt sistem | Config anahtarı | Varsayılan | Birim | Gerekçe |
 |---|---|---|---|---|
-| çekirdek | `cekirdek.zamanlayici.gunlukAfetOrani` | 0,8 | afet / MC günü (bekleme dışı) | bekleme ve afet süresiyle gerçekleşen ~0,43/gün (simülasyon, 5 dk süren afetle) ≈ 46 dk'da bir; 2–3 saatlik oturumda 3–4 afet (madde 4 "hiç olmayacak kadar nadir değil, bunaltıcı değil"); JUnit 417 günlük simülasyonda 0,25–1,0 aralığını doğrular |
+| çekirdek | `cekirdek.zamanlayici.gunlukAfetOrani` | 5,0 (eski 0,8) | afet / MC günü (bekleme dışı) | bekleme ve afet süresiyle gerçekleşen ~0,43/gün (simülasyon, 5 dk süren afetle) ≈ 46 dk'da bir; 2–3 saatlik oturumda 3–4 afet (madde 4 "hiç olmayacak kadar nadir değil, bunaltıcı değil"); JUnit 417 günlük simülasyonda 0,25–1,0 aralığını doğrular; K-E67: gün 1'de başlangıçlar arası ~8 dk (benzetim 7,6) |
 | çekirdek | `cekirdek.zamanlayici.kontrolAraligiTick` | 20 | tick | saniyede bir zar; olasılık adıma göre ölçeklenir, sıklığı değiştirmez |
-| çekirdek | `cekirdek.zamanlayici.genelBeklemeTick` | 12 000 | tick (10 dk, yarım gün) | madde 4 en az bekleme: afetten sonra toparlanma payı; K-E62: ÷ `afetSikligi` (%200 → yarısı) |
-| çekirdek | `cekirdek.zamanlayici.siddetBeklemeCarpani` | 0,25 | oran | madde 10 "biraz uzasın": S3 ×1,25, S4 ×1,5, S5 ve seviyesiz ×1,75 |
+| çekirdek | `cekirdek.zamanlayici.genelBeklemeTick` | 1 500 (eski 12 000) | tick (10 dk, yarım gün) | madde 4 en az bekleme: afetten sonra toparlanma payı; K-E62: ÷ `afetSikligi` (%200 → yarısı); K-E67: afet sonrası 75 sn toparlanma, ayrıca ÷ gün çarpanı |
+| çekirdek | `cekirdek.zamanlayici.siddetBeklemeCarpani` | 0,15 (eski 0,25) | oran | madde 10 "biraz uzasın": S3 ×1,25, S4 ×1,5, S5 ve seviyesiz ×1,75; K-E67: S5 ×1,45; günle artan sıklığı tersine çevirmez |
 | çekirdek | `cekirdek.zamanlayici.ertelemeTick` | 6 000 | tick (5 dk) | N14: uygun yer yoksa türün yeniden denenmesi; oyuncular bu sürede yer değiştirir |
-| çekirdek | `cekirdek.zamanlayici.baslangicBeklemeTick` | 24 000 | tick (1 gün) | yeni dünyada ilk gün afetsiz; barınak kurulabilsin; K-E62: ÷ `afetSikligi`; tur 2: varsayılan 6 000 (eski 24 000, `cekirdek.ayarSurumu` göçü) |
-| çekirdek | `cekirdek.zamanlayici.ilkAfetGarantiTick` (yeni) | 24 000 | tick (÷ sıklık; 0 kapalı) | K-E62 AS-12: ilk gün en az bir afet |
-| çekirdek | `cekirdek.ayarSurumu` (yeni) | 1 | sürüm | K-E61 göçü (AS-11) |
+| çekirdek | `cekirdek.zamanlayici.baslangicBeklemeTick` | 3 600 (eski 24 000) | tick (1 gün) | yeni dünyada ilk gün afetsiz; barınak kurulabilsin; K-E62: ÷ `afetSikligi`; tur 2: varsayılan 6 000 (eski 24 000, `cekirdek.ayarSurumu` göçü); K-E67: ilk afet 3 dk'dan önce değil |
+| çekirdek | `cekirdek.zamanlayici.ilkAfetGarantiTick` (yeni) | 9 600 (eski 24 000) | tick (÷ sıklık; 0 kapalı) | K-E62 AS-12: ilk gün en az bir afet; K-E67: ilk afet 8 dk'da garanti (benzetim ortanca 6 dk) |
+| çekirdek | `cekirdek.zamanlayici.siklikArtisCarpani` (yeni) | 8,0 | kat (1–100) | K-E67: gün 45'te bölgesel oran ×8, beklemeler ÷8 (aralık ~3 dk) |
+| çekirdek | `cekirdek.zamanlayici.siklikArtisGunu` (yeni) | 45 | oyun günü | K-E67: gün 10 ~5 dk, gün 30+ ~3 dk |
+| çekirdek | `cekirdek.zamanlayici.eszamanliIkiGunu` / `eszamanliUcGunu` (yeni) | 15 / 40 | oyun günü | K-E67: "gün geçtikçe sayıları artsın" |
+| çekirdek (sabit) | `SirenTuru.UZUN_SURE_TICK` | 500 (eski 1 200) | tick (25 sn) | K0-19 rev. K-E67 |
+| çekirdek (sabit) | `AfetYogunlugu.ESIK` / `EN_COK_ZAYIFLATMA` | 1,5 / 8 | oran | K-E67 "çok gelirse güçsüz" |
+| çekirdek (sabit) | `AfetZamanlayicisi.DONEM_GUN_USSU` | 0,25 | üs | K-E67: ilk güneş ortancası 60–120 gün, 400 günde ≥ %99 |
+| çekirdek (sabit) | `GunSaatiPenceresi.EMNIYET_TICK` | 140 | tick | K-E67: görünme payı 800 tick, pencerenin son ~40 sn'sinde güneş/ay seçilmez |
+| çekirdek (NBT) | `DunyaDonemi.dogalBaslangiclar` (yeni); biçim `surum` 2 | — | başlangıç saatleri (son 24 000 tick) | K-E67 yoğunluk, `sifirla` temizler; sürüm 1 kaydında `sonSeviye` bir kez 0 |
+| çekirdek | `cekirdek.ayarSurumu` (yeni) | 2 | sürüm | K-E61 göçü (AS-11); K-E67 göçü (eski varsayılanda kalan değerler yeniye) |
 | çekirdek (NBT) | `DunyaDonemi.uygulananSiklik` (yeni) | 1,0 | çarpan (`afetSikligi`/100; 0 kaydedilmez) | K-E62 AS-2: süren beklemelerin hangi sıklıkla hesaplandığı; yoksa 1,0 = eski kayıt ölçeksiz, yeniden açılışta çift ölçekleme yok |
 | çekirdek (komut) | `/dogalafet siklik [yüzde]` (yeni) | — | yüzde (0–1000, Brigadier) | K-E62 AS-5: `afetSikligi` gamerule'ünü okur/yazar; sonraki afet tahmini (ortalama + %90 aralık, `SonrakiAfetTahmini`) |
 | çekirdek | `cekirdek.afetler.{kasirga,tsunami,deprem,asit_yagmuru,sinkhole,orman_yangini}.agirlik` | 100 | ağırlık | madde 4 "görece sık, birbirine yakın" |
 | çekirdek | `cekirdek.afetler.ay_carpmasi.agirlik` | 32 | ağırlık | nadir: uygun olduktan sonra λ ≈ 0,04/gün (~25 günde bir) |
 | çekirdek | `cekirdek.afetler.gunes_patlamasi.agirlik` | 20 | ağırlık | en nadir: uygun olduktan sonra λ ≈ 0,025/gün (~40 günde bir); oyun boyunca yaşanabilir |
-| çekirdek | `cekirdek.afetler.<altı sık afet>.beklemeTick` | 48 000 | tick (2 gün) | aynı tür art arda gelmesin; K-E62: ÷ `afetSikligi` |
+| çekirdek | `cekirdek.afetler.<altı sık afet>.beklemeTick` | 18 000 (eski 48 000) | tick (2 gün) | aynı tür art arda gelmesin; K-E62: ÷ `afetSikligi`; K-E67: ÷ sıklık ÷ gün çarpanı; gün 45+ ~2 dk |
 | çekirdek | `cekirdek.afetler.ay_carpmasi.beklemeTick` | 240 000 | tick (10 gün) | tek seferlik; yalnız ay geri gelirse (sifirla) anlamlı |
 | çekirdek | `cekirdek.afetler.gunes_patlamasi.beklemeTick` | 480 000 | tick (20 gün) | tekrarlanabilir açıkken iki güneş patlaması arası |
-| çekirdek | `cekirdek.onUyari.enAzTick` / `enCokTick` | 900 / 1 800 | tick (45 / 90 sn) | şartname madde 4 |
-| çekirdek | `cekirdek.onUyari.erkenBildirimTick` | 600 | tick (30 sn) | Hassas Sismograf "daha erken": 75–120 sn uyarı (madde 13b) |
-| çekirdek | `cekirdek.siddet.seviye{2,3,4,5}Gunu` | 10 / 25 / 50 / 80 | oyun günü | şartname madde 10 |
-| çekirdek | `cekirdek.siddet.nadirlikBaslangic` | 0,35 | katsayı | gün 10'da S2 ≈ %7: açılan seviye hemen baskın değil |
-| çekirdek | `cekirdek.siddet.nadirlikSon` | 0,6 | katsayı | geç oyunda S5 ≈ %5,6, S1 ≈ %43: kayış var, yüksek seviye hâlâ nadir |
-| çekirdek | `cekirdek.siddet.nadirlikGecisGunu` | 120 | oyun günü | S5 açılışından (80) 40 gün sonra son dağılım |
-| çekirdek | `cekirdek.siddet.acilisRampaGunu` | 15 | oyun günü | açılan seviyenin tam ağırlığa çıkışı |
-| çekirdek | `cekirdek.siddet.acilisBaslangicOrani` | 0,2 | oran | açılış gününde ağırlığın %20'si |
+| çekirdek | `cekirdek.onUyari.enAzTick` / `enCokTick` | 200 / 360 (eski 900 / 1 800) | tick (45 / 90 sn) | şartname madde 4; K-E67: seçimden görünmeye ~30 sn (ön-uyarı + 10 sn siren); sunucu geneli afette sirenin fazlası (15 sn) kadar kısa, en az 1 sn |
+| çekirdek | `cekirdek.onUyari.erkenBildirimTick` | 100 (eski 600) | tick (30 sn) | Hassas Sismograf "daha erken": 75–120 sn uyarı (madde 13b); K-E67: Hassas Sismograf avantajı > 0 kalır (madde 13b) |
+| çekirdek | `cekirdek.siddet.seviye{2,3,4,5}Gunu` | 1 / 4 / 9 / 16 (eski 10 / 25 / 50 / 80) | oyun günü | şartname madde 10; K-E67: kullanıcı "S4/S5 gelmiyor" |
+| çekirdek | `cekirdek.siddet.nadirlikBaslangic` | 0,5 (eski 0,35) | katsayı | gün 10'da S2 ≈ %7: açılan seviye hemen baskın değil; K-E67 |
+| çekirdek | `cekirdek.siddet.nadirlikSon` | 0,8 (eski 0,6) | katsayı | geç oyunda S5 ≈ %5,6, S1 ≈ %43: kayış var, yüksek seviye hâlâ nadir; K-E67: gün 60+ S4+S5 ≈ %27, S1 ≈ %30 |
+| çekirdek | `cekirdek.siddet.nadirlikGecisGunu` | 60 (eski 120) | oyun günü | S5 açılışından (80) 40 gün sonra son dağılım; K-E67 |
+| çekirdek | `cekirdek.siddet.acilisRampaGunu` | 3 (eski 15) | oyun günü | açılan seviyenin tam ağırlığa çıkışı; K-E67 |
+| çekirdek | `cekirdek.siddet.acilisBaslangicOrani` | 0,4 (eski 0,2) | oran | açılış gününde ağırlığın %20'si; K-E67: açıldığı gün S4 ≈ %3, S5 ≈ %2 |
 | çekirdek | `cekirdek.siddet.gelisimDahil` | false | — | madde 10 "opsiyonel" |
 | çekirdek | `cekirdek.siddet.puanBasinaGun` | 2,0 | gün / puan | puan 40 (XP 20 + elmas zırh) → 80. gün = S5 eşiği |
 | çekirdek | `cekirdek.tekSeferlik.gelisimOlcutu` | ORTALAMA | — | arkadaş grubunda tek önde gideni cezalandırmaz (madde 3) |
@@ -6345,13 +6501,17 @@ P2-9 `5-matris` kabulünde. Kapanış eşlemesi (K-E50) her maddenin sonunda:
 | çekirdek | `sicaklik.sicaklikSistemiModu` | OTOMATIK | OTOMATIK / ACIK / KAPALI | N8, K0-08: Cold Sweat yüklüyse kendi sıcaklık sistemimiz kapalı (çift hasar yok); `sicaklikSistemi` gamerule'ü ayrıca |
 | çekirdek (sabit) | `GunSaatiPenceresi.SABAH` (güneş patlamasının AKTIF anı) | [0, 6000) | gün saati | istek 26 (G2-9, K-E55): gün doğumu–öğle; doğal başlangıç bekler, komut beklemez |
 | çekirdek (sabit) | `GunSaatiPenceresi.GECE` (ay çarpmasının AKTIF anı) | [13000, 23000) | gün saati | istek 26 (G2-9, K-E55): vanilla gece; doğal başlangıç bekler, komut beklemez |
-| çekirdek (sabit) | `GunSaatiPenceresi.EN_COK_BEKLEME` | 24 000 | gerçek tick | inceleme Gk1: pencere gelmezse (saati kilitleyen mod) bekleme biter, SIREN başlar |
+| çekirdek (sabit) | `GunSaatiPenceresi.EN_COK_BEKLEME` | kalktı | gerçek tick | inceleme Gk1: pencere gelmezse (saati kilitleyen mod) bekleme biter, SIREN başlar; K-E67 (AZ-7): pencere seçimde uygulanır, ON_UYARI beklemesi yok |
 | sıcaklık | `sicaklik.guncellemeAraligiTick` | 20 | tick | madde 3 "saniyede birkaç kez" sınırının altında; zaman sabiti dakikalar olduğu için 1 Hz algılanabilir fark yaratmaz |
 | sıcaklık | `sicaklik.paketTazelemeTick` | 200 | tick | değer değişmese de 10 sn'de bir; kayıp paket HUD'u en çok 10 sn eski tutar |
 | sıcaklık | `sicaklik.tuyUstSiniri` | 30 | upgrade/parça | N2 "20 veya 30" |
 | sıcaklık | `sicaklik.kaynakTaramaYaricapi` | 5 | blok | kamp ateşi/fırın etrafında oturma mesafesi; 11³ blok/sn/oyuncu ucuz |
 | sıcaklık | `sicaklik.hasarMiktari` | 1,0 | can (yarım kalp) | madde 7c "kademeli, okunaklı": aralıkla birlikte uçta 0,5 can/sn |
-| sıcaklık | `sicaklik.kaynaklar` | lav 40:6, ateş 25:4, ruh ateşi 20:4, kamp ateşi 22:5, ruh kamp ateşi 16:5, fırın 10:3, yüksek fırın 12:3, tütsüleyici 8:3, magma 12:3, meşale 4:2, duvar meşalesi 4:2, fener 3:2, balkabağı feneri 2:2, buz −4:3, paketlenmiş buz −6:3, mavi buz −10:4, kar bloğu −2:2, toz kar −5:2 | °C:blok | madde 7a listesi; kamp ateşi başında gece ovada (8 °C) ~25 °C → konforlu; lav yanında 48 °C+; mavi buz odası belirgin soğuk |
+| sıcaklık | `sicaklik.kaynaklar` | lav 40:6, ateş 25:4, ruh ateşi 20:4, kamp ateşi 22:5, ruh kamp ateşi 16:5, fırın 10:3, yüksek fırın 12:3, tütsüleyici 8:3, magma 12:3, meşale 4:2, duvar meşalesi 4:2, fener 3:2, balkabağı feneri 2:2, buz −4:3, paketlenmiş buz −6:3, mavi buz −10:4, kar bloğu −2:2, toz kar −5:2 | °C:blok | madde 7a listesi; kamp ateşi başında gece ovada (8 °C) ~25 °C → konforlu; lav yanında 48 °C+; mavi buz odası belirgin soğuk; K-E69 (S3-05): + kömürleşmiş kütük 2:2, kömürleşmiş tahta 1,5:2 (kısık ama sürekli; `sicaklik.ayarSurumu` 1 liste göçü) |
+| sıcaklık | `sicaklik.ayarSurumu` (yeni) | 1 | sürüm | K-E69 (S3-09): eşikler °C ölçeğine, kaynak listesine kömür satırları (eski varsayılan aynen duruyorsa) |
+| sıcaklık (sabit) | `VucutOlcegi` | °C = 37 + 0,05·B (−100 → 32, +100 → 42) | °C | K-E69 (S3-01): oyuncuya vücut °C |
+| sıcaklık (sabit) | dört durum eşikleri | Üşüme ≤ 36,0, Donma ≤ 35,0 (hasar ≤ 33,5), Bunalma ≥ 38,0, Yanma ≥ 39,5 (hasar ≥ 40,5) | °C | K-E69 (S3-04) |
+| sıcaklık (sabit) | sol el Buz Kovası / lav kovası | −12 / +12; erime eşiği 25 °C, 300 birimde su kovası | °C hissedilen | K-E69 (S3-05) |
 | sıcaklık | `isi.esitlenmeHizi` | 0,006 | 1/sn | zaman sabiti ~170 sn: çıplak oyuncu dondurucu soğukta ~2,5 dk'da hasar eşiğinde (tepki süresi var), sıcak ortamda yine dakikalar |
 | sıcaklık | `isi.konforSicakligi` | 18 | °C | hafif giyimli insanın nötr ortamı ~18–22 °C; ova öğleni 24 °C nötrde kalır |
 | sıcaklık | `isi.birimPerDerece` | 2,0 | birim/°C | −32 °C ortam fark → −100'ün yarısını aşan soğuk; Nether (52 °C) → +68 |
@@ -6387,8 +6547,8 @@ P2-9 `5-matris` kabulünde. Kapanış eşlemesi (K-E50) her maddenin sonunda:
 | sıcaklık | `ortam.donmaDususu` | 55 | °C | G=100'de ova −47 °C (aşırı soğuk); G=40 tabanı −22 °C katkı |
 | sıcaklık | `ortam.kizilCuceOfseti` / `kizilCuceGunesCarpani` | −8 / 0,6 | °C / oran | kızıl cücede ova öğleni ~−10 °C: eski dünyadan belirgin soğuk ama süpernovadan 35 °C sıcak |
 | sıcaklık | `ortam.kisBolgesiDususu` | 25 | °C | kalıcı kış bölgesi ~−35 °C (aşırı soğuk) |
-| sıcaklık (istemci) | `sicaklik.hudGorunur` / `hudXOfset` / `hudYOfset` / `ortamOkuGoster` / `ekranEfektleri` / `kameraTitremesi` | true / 0 / 0 / true / true / true | — | madde 7d "pozisyonu ve görünürlüğü config'den" |
-| sıcaklık (istemci sabiti) | `KALP_BOSLUGU` | 2 | GUI px | GC-4: düşük canda vanilla kalp titremesi işaretçiye binmesin (`leftHeight/rightHeight` 54 → 56) |
+| sıcaklık (istemci) | `sicaklik.hudGorunur` / `hudXOfset` / `hudYOfset` / `ortamOkuGoster` / `ekranEfektleri` / `kameraTitremesi` | true / 0 / 0 / true / true / true | — | madde 7d "pozisyonu ve görünürlüğü config'den"; K-E69 (S3-07): `ortamOkuGoster` kalktı; yeni `sayiGoster`, `hissedilenGoster`, `durumIkonlari`, `animasyonlar` (vars. true) |
+| sıcaklık (istemci sabiti) | `KALP_BOSLUGU` | 2 | GUI px | GC-4: düşük canda vanilla kalp titremesi işaretçiye binmesin (`leftHeight/rightHeight` 54 → 56); K-E69: `leftHeight/rightHeight` 56 → 58 |
 | sıcaklık (sabit) | `OrtamSicakligi.PULSAR_ARTIS_CARPANI` | 2,0 (eski 1,2; K-E66 PL-19: açık havada ~+76 °C) | × `gunesPatlamasiArtisi` | G2-8: pulsarda açık havada +45,6 °C (Nether'e yakın); ayrı config yok |
 | uyarı | `uyari.sirenSes` | 28 | — | madde 5 "%25–30"; aralığın ortası (S-01) |
 | uyarı | `uyari.ortamTavan` | 40 | — | örnek katman (−26 LUFS) %40'ta ≈ −34 LUFS, %28 siren (−20 LUFS) ≈ −31 LUFS: ortam sirenden ~3 dB, siren sırasında ~6 dB alçak; konuşma bandı ayrıca −6 dB çentikli |
@@ -6502,7 +6662,7 @@ P2-9 `5-matris` kabulünde. Kapanış eşlemesi (K-E50) her maddenin sonunda:
 | yiyecek | `yiyecek.yanEtkiCarpani` | 1,5 | çarpan | Ateşli Güveç sıcakta: 45 → 67,5 birim; vücut 50'de 30 sn'de yanma kademesine iter (GameTest), soğukta etkisiz (F-04) |
 | yiyecek | `yiyecek.yanEtkiEsigi` | 20 | vücut birimi | 28 °C ortam ya da ılık vücut: ılıman ova (~22 °C) tetiklemez; çöl öğleni, Nether, yangın ya da lav yakını tetikler |
 | yiyecek | `yiyecek.vanillaIsinma` | true | aç/kapa | madde 14 "opsiyonel, config'den kapatılabilir" |
-| yiyecek | `yiyecek.vanillaYiyecekler` | 8 pişmiş yiyecek =30, 3 çorba =45 | eşya=sn | "çok küçük ve kısa"; çorbalar sıcak servis edildiği için biraz uzun (F-11) |
+| yiyecek | `yiyecek.vanillaYiyecekler` | 8 pişmiş yiyecek =30, 3 çorba =45 | eşya=sn | "çok küçük ve kısa"; çorbalar sıcak servis edildiği için biraz uzun (F-11); K-E69 (S3-06): satır biçimi `eşya=kademe:saniye` (13 yiyecek, kademeli); yeni `vanillaSerinlik` + `vanillaSerinYiyecekler` (10); `yiyecek.ayarSurumu` 1 göçü |
 | yiyecek | `yiyecek.balik.pismisSaniye` | 90 | sn | pişmiş buz balığı orta ısınma: Salep/Çikolata/Ayran'la aynı orta süre (F-14) |
 | yiyecek | `yiyecek.balik.cigSaniye` | 60 | sn | çiğ buz balığı hafif serinlik: Buzlu Karpuz'la aynı hafif süre (F-14) |
 | yiyecek | (tablo, kod) besin/doygunluk | Salep 4/0,6, Çikolata 5/0,6, Tavuk Çorbası 10/0,9, Güveç 8/0,8, Çay 2/0,3, Ayran 4/0,5, Karpuz 3/0,4, Şerbet 4/0,4, Kutup Balığı Çorbası 9/0,9 | açlık / doygunluk çarpanı | içecekler bal şişesi/karpuz ölçeğinde; çorbalar vanilla tavşan yahnisi (10/0,6) çevresinde, Tavuk Çorbası "yüksek doyuruculuk" en yüksek |
@@ -6592,7 +6752,7 @@ P2-9 `5-matris` kabulünde. Kapanış eşlemesi (K-E50) her maddenin sonunda:
 | güneş patlaması | `gunes_patlamasi.meteorBaslangicDakikaBasina` | 1,5 | meteor/dk/oyuncu (0–30) | tasarım: oyuncu başına 1/40 sn |
 | güneş patlaması | `gunes_patlamasi.meteorSonDakikaBasina` | 5,0 | meteor/dk/oyuncu (0–30) | tasarım: 5. gün 1/12 sn; arası doğrusal |
 | güneş patlaması | `gunes_patlamasi.buyukMeteorOrani` | 0,10 (eski 0,05) | oran (0–1) | istek 27 (MT2-13, K-E56): %10 büyük bant 1,6–2,5× (Kozmik Çekirdek yalnız büyükte) |
-| güneş patlaması | `gunes_patlamasi.meteorYagmuruOncuSaniye` | 90 | sn (0–600) | MT2-1/2: öncü yağmur ön-uyarının son 90 sn'si; 0 eski gizli ön-uyarıyı verir |
+| güneş patlaması | `gunes_patlamasi.meteorYagmuruOncuSaniye` | 5 (eski 90) | sn (0–600) | MT2-1/2: öncü yağmur ön-uyarının son 90 sn'si; 0 eski gizli ön-uyarıyı verir; K-E67: 5 sn ön-uyarı + 25 sn siren = AKTIF'ten önceki son 30 sn; `gunes_patlamasi.ayarSurumu` 1 göçü |
 | güneş patlaması | `gunes_patlamasi.meteorYagmuruOncuDakikaBasina` | 6 | meteor/dk/oyuncu (0–300) | MT2-1: 10 sn'de bir; arka planın 4 katı, seyrek başlangıç |
 | güneş patlaması | `gunes_patlamasi.meteorYagmuruOncuSonDakikaBasina` | 24 | meteor/dk/oyuncu (0–300) | istek 27 (MT2-15): öncü 6 → 24 (AKTIF'ten ayrı) |
 | güneş patlaması | `gunes_patlamasi.meteorYagmuruSaniye` | 600 (ilk sürüm 180) | ölçekli sn (0–1200) | istek 27 (K-E56): AKTIF başı 10 dk |
@@ -6673,13 +6833,15 @@ P2-9 `5-matris` kabulünde. Kapanış eşlemesi (K-E50) her maddenin sonunda:
 | orman yangını | `orman_yangini.yanikIziButcesi` | 8 | sütun/tick | sıcak karelerden örnekleme; 8 okuma × 3 blok, TPS kısmasıyla |
 | orman yangını | `orman_yangini.erkenBitisSaniye` | 15 | sn | yangın söndüyse (yağmur, seyrek yakıt) afet boşta beklemez; başlangıç alan işi bitmeden saymaz |
 | kasırga | `kasirga.ucanBlokTavani` | 40 (0–40) | varlık / kasırga | K0-33 (spike SK-03: 40 varlıkta TPS 20, 6–10 KB/sn) |
-| kasırga | `kasirga.kaldirmaTavani` | 25 | blok | tasarım notu §6 "kaldırılan oyuncu en çok 25 blok"; düşme vanilla, öldürücü olabilir |
+| kasırga | `kasirga.kaldirmaTavani` | 36 (eski 25) | blok | tasarım notu §6 "kaldırılan oyuncu en çok 25 blok"; düşme vanilla, öldürücü olabilir; K-E70 (AF3-05/06): boyut 1'deki S5 tavanı = huni yüksekliğinin ¼'ü; diğer seviyeler yükseklikle orantılı; `kasirga.ayarSurumu` 1 göçü |
 | kasırga | `kasirga.boyutCarpani` | 1,0 (0,25–3) | oran | madde 10 "config'den ayarlanabilir": huni, etek, çekim yarıçapı |
 | kasırga | `kasirga.hizCarpani` | 1,0 (0–4) | oran | S1 2,0 → S5 4,4 blok/sn (gerçek kasırga 10–20 m/sn; oyunda kaçılabilir olsun) |
 | kasırga | `kasirga.sureCarpani` | 1,0 (0,1–10) | oran | olgun evre S1 60 → S5 180 sn |
-| kasırga | `kasirga.cekimCarpani` | 1,0 (0–4) | oran | içe ivme 0,012 blok/tick² × (0,6 + 0,4·seviye); S1 kaldırmaz, S2+ kaldırır (çekirdekte S2 0,098 > 0,08) |
-| kasırga | `kasirga.blokCarpani` | 1,0 (0–4) | oran | S1 2 → S5 20 deneme/tick × TPS kısması |
-| kasırga | `kasirga.hasarCarpani` | 1,0 (0–10) | oran | çekirdek S1 1 → S5 4 can/sn; enkaz çarpması 2 + 0,5·seviye |
+| kasırga | `kasirga.cekimCarpani` | 1,0 (0–4) | oran | içe ivme 0,012 blok/tick² × (0,6 + 0,4·seviye); S1 kaldırmaz, S2+ kaldırır (çekirdekte S2 0,098 > 0,08); K-E70: içe hız S5 kenarda 8 b/sn, istemcide (`KasirgaCekimi`) |
+| kasırga | `kasirga.blokCarpani` | 1,0 (0–4) | oran | S1 2 → S5 20 deneme/tick × TPS kısması; K-E70: S1 2 → S5 32 |
+| kasırga | `kasirga.hasarCarpani` | 1,0 (0–10) | oran | çekirdek S1 1 → S5 4 can/sn; enkaz çarpması 2 + 0,5·seviye; K-E70: S5 6 can/sn |
+| kasırga | `kasirga.ayarSurumu` (yeni) | 1 | sürüm | K-E70 (AF3-06): `kaldirmaTavani` 25 → 36 göçü |
+| kasırga (sabit) | `KasirgaSeviyesi` güç / taban / tepe / yükseklik / çekim yarıçapı | 1 / 1,6 / 2,4 / 3,4 / 4,8; 10·g / 16·g / 30·g / 15·g | blok | K-E70 (AF3-05): güç–boy orantısı; S5 48 / 76,8 / 144 / 72 |
 | kasırga (kod) | doğuş mesafesi | [0,5·(R+56), R+56] | blok | siren menzili (etki + 64) içinde (K-03) |
 | kasırga (kod) | yön sapması | ±35° / 2 sn, dönüş 1,5°/tick | — | tasarım notu §6 |
 | kasırga (kod) | evre süreleri | doğuş 160, ip 200, dağılma 40 | ölçekli tick | tasarım notu §6 (8 sn / 10 sn) |
@@ -6698,8 +6860,11 @@ P2-9 `5-matris` kabulünde. Kapanış eşlemesi (K-E50) her maddenin sonunda:
 | kasırga (istemci) | `kasirga.sisEtkisi` | true | — | 64 blok içinde #5E6B5A sis, görüş %60 |
 | tsunami (SERVER) | `tsunami.enAzDenizSutunu` | 400 | sütun | tasarım notu §6 (N14 "okyanus/geniş su"; ~20×20 blok körfez) |
 | tsunami | `tsunami.aramaYaricapi` | 96 | blok | tasarım notu; varsayılan görüş mesafesinin yarısı, yüklü chunk'larda |
-| tsunami | `tsunami.dalgaGecikmeSn` | 10 | sn | tasarım notu çizelgesi: çekilme başladıktan 10 sn sonra ufukta çizgi |
-| tsunami | `tsunami.cekilmeSn` | 18 | sn | tasarım notu: 0–18 sn çekilme |
+| tsunami | `tsunami.dalgaGecikmeSn` | 2 (eski 10) | sn | tasarım notu çizelgesi: çekilme başladıktan 10 sn sonra ufukta çizgi; K-E67: dalga AKTIF'ten 2 sn sonra açıkta görünür; `tsunami.ayarSurumu` 1 göçü |
+| tsunami | `tsunami.cekilmeSn` | 8 (eski 18) | sn | tasarım notu: 0–18 sn çekilme; K-E67: çekilme dalga vurmadan (AKTIF 10. sn) biter |
+| tsunami (sabit) | `TsunamiSeviyesi.aciklik()` | hız × 8, 32–150 (eski hız × 18, 60–150) | blok | K-E67: kıyıya doğuştan 8 sn, seçimden ~39 sn |
+| tsunami | `tsunami.ayarSurumu` (yeni) | 1 | sürüm | K-E67 göçü |
+| tsunami (istemci) | `tsunami.yagmur` (CLIENT, yeni) | false | — | K-E70 (AF3-14): tsunami yağmuru, halka, ses, yağmur sisi; kullanıcı kararı 2026-11-08 |
 | tsunami | `tsunami.ayCekilmeCarpani` | 1,5 | kat | bölüm H "çekilme biraz daha belirgin"; tasarım notu ×1,5 |
 | tsunami | `tsunami.yikimCarpani` | 1,0 | kat | tick başına S1 16 … S5 48 blok (tasarım notu §5 "en çok 48"); TS-15b: jeton, ortalama yıkım hızı (× TPS kısması) |
 | tsunami | `tsunami.yikimBolumTick` | 1 | birim/tick | TS-12/TS-15b: tick başına başlatılan en çok birim (üst sınır; bağlayıcı olan jeton); TPS kısmasıyla çarpılır; N13'ten bağımsız; ölçüm 7'de 1, 2'den iyi |

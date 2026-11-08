@@ -6,6 +6,7 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.CommandNode;
+import io.github.kadirberkpolat1.dogalafetler.config.CekirdekAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.Afet;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetBaglami;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetKaydi;
@@ -22,6 +23,8 @@ import io.github.kadirberkpolat1.dogalafetler.core.TpsOlcer;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.GeciciCarpan;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.GunSaatiPenceresi;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.OyunGunu;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.SeviyeDurumu;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.SiddetSecici;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import io.github.kadirberkpolat1.dogalafetler.veri.CeviriYazici;
 import java.util.ArrayList;
@@ -56,6 +59,12 @@ public final class CekirdekKomutlari {
     public static final String DURUM_BEKLEME = ON + "durum.bekleme";
     public static final String DURUM_CARPANLAR = ON + "durum.carpanlar";
     public static final String DURUM_SEVIYELER = ON + "durum.seviyeler";
+    /** K-E67: olasılığı 0 olan seviyenin nedeni ve yoğunluk notu. */
+    public static final String SEVIYE_NEDEN_MAKS = ON + "seviye_neden.maks";
+    public static final String SEVIYE_NEDEN_GUN = ON + "seviye_neden.gun";
+    public static final String SEVIYE_NEDEN_GELISIM = ON + "seviye_neden.gelisim";
+    public static final String SEVIYE_NEDEN_ART_ARDA = ON + "seviye_neden.art_arda";
+    public static final String SEVIYE_YOGUNLUK = ON + "seviye_yogunluk";
     public static final String DURUM_KAYITLI = ON + "durum.kayitli";
     public static final String DURUM_GOKYUZU = ON + "durum.gokyuzu";
     public static final String DURUM_DENIZ = ON + "durum.deniz";
@@ -71,10 +80,10 @@ public final class CekirdekKomutlari {
     public static final String START_ZATEN_AKTIF = ON + "start.zaten_aktif";
     public static final String START_YER_UYGUN_DEGIL = ON + "start.yer_uygun_degil";
     public static final String START_HATA = ON + "start.hata";
+    /** K-E67: komutla verilen seviye {@code afetMaksSiddet}'i aştı. */
+    public static final String START_MAKS_ASILDI = ON + "start.maks_asildi";
     /** Gökyüzü-2 istek 26: komutla başlatma gün saati penceresine bakmaz. */
     public static final String START_PENCERE = ON + "start.pencere";
-    /** Gökyüzü-2 Gk1: doğal patlama penceresi beklenirken kalan sürenin yerine. */
-    public static final String DURUM_PENCERE = ON + "durum.pencere";
     public static final String STOP_DURDU = ON + "stop.durdu";
     public static final String STOP_AFET_YOK = ON + "stop.afet_yok";
     public static final String STOP_SURECLER = ON + "stop.surecler";
@@ -112,9 +121,7 @@ public final class CekirdekKomutlari {
         List<Afet> aktifler = yonetici.aktifAfetler();
         for (Afet afet : aktifler) {
             AfetBaglami afetBaglami = afet.baglam();
-            long pencere = afet.pencereBeklemesi();
-            Component kalan = pencere >= 0 ? Component.translatable(DURUM_PENCERE, sure(pencere))
-                    : sure(yonetici.zamanOlcegi().gercekTick(yonetici.kalanOku(afet)));
+            Component kalan = sure(yonetici.zamanOlcegi().gercekTick(yonetici.kalanOku(afet)));
             satirlar.add(Component.translatable(DURUM_AFET, afetAdi(afet.tur()), seviyeMetni(afet.seviye()),
                     Component.translatable(afet.asama().ceviriAnahtari()), afet.altAsama(), kalan));
             Component yaricap = yonetici.etkiAlani(afet).map(CekirdekKomutlari::yaricap)
@@ -131,7 +138,7 @@ public final class CekirdekKomutlari {
         satirlar.add(SiklikBilgisi.sonrakiSatiri(yonetici));
         satirlar.add(Component.translatable(DURUM_CARPANLAR, carpanlar(donem)));
         satirlar.add(Component.translatable(DURUM_SEVIYELER, gun, Kurallar.maksSiddet(server.getGameRules()),
-                seviyeOlasiliklari(yonetici.seviyeOlasiliklari(gun))));
+                seviyeOlasiliklari(yonetici.seviyeDurumu(gun))));
         satirlar.add(Component.translatable(DURUM_KAYITLI, kayitliAfetler()));
         satirlar.add(Component.translatable(DURUM_GOKYUZU, Component.translatable(donem.ayVar() ? VAR : YOK),
                 Component.translatable(donem.gunesEvresi().ceviriAnahtari()), sayi(donem.evreIlerlemesi() * 100.0)));
@@ -177,13 +184,18 @@ public final class CekirdekKomutlari {
                         afetBaglami.merkez().toShortString(), oyuncuAdi(kaynak.getServer(), afetBaglami.hedefOyuncu()),
                         sure(yonetici.zamanOlcegi().gercekTick(yonetici.kalanOku(afet))));
                 kaynak.sendSuccess(() -> mesaj, false);
+                int maks = Kurallar.maksSiddet(kaynak.getServer().getGameRules());
+                if (tur.seviyeli() && seviye != null && afet.seviye() > maks) {
+                    kaynak.sendSuccess(() -> Component.translatable(START_MAKS_ASILDI, afet.seviye(), maks), false);
+                }
                 GunSaatiPenceresi.dogalPatlama(tur).ifPresent(p -> kaynak.sendSuccess(() -> Component.translatable(
                         START_PENCERE, afetAdi(tur), p.bas(), p.son()), false));
                 return 1;
             }
             case ZATEN_AKTIF -> kaynak.sendFailure(Component.translatable(START_ZATEN_AKTIF, afetAdi(tur)));
             case KAYITLI_DEGIL -> kaynak.sendFailure(Component.translatable(START_KAYITLI_DEGIL, afetAdi(tur)));
-            case YER_UYGUN_DEGIL, HEDEF_YOK -> kaynak.sendFailure(Component.translatable(START_YER_UYGUN_DEGIL, afetAdi(tur)));
+            case YER_UYGUN_DEGIL, CAKISIYOR, HEDEF_YOK ->
+                    kaynak.sendFailure(Component.translatable(START_YER_UYGUN_DEGIL, afetAdi(tur)));
             case HATA -> kaynak.sendFailure(Component.translatable(START_HATA, afetAdi(tur)));
         }
         return 0;
@@ -238,7 +250,7 @@ public final class CekirdekKomutlari {
         DunyaDonemi donem = yonetici.donem();
         donem.gunOfsetiAyarla(OyunGunu.ofset(istenen, kaynak.getServer().overworld().getGameTime(), donem.uykuBirikimi()));
         long gun = yonetici.oyunGunu();
-        Component olasiliklar = seviyeOlasiliklari(yonetici.seviyeOlasiliklari(gun));
+        Component olasiliklar = seviyeOlasiliklari(yonetici.seviyeDurumu(gun));
         kaynak.sendSuccess(() -> Component.translatable(GUN_AYARLANDI, gun, olasiliklar), false);
         return 1;
     }
@@ -399,15 +411,34 @@ public final class CekirdekKomutlari {
         return ilk ? Component.translatable(YOK) : sonuc;
     }
 
-    static Component seviyeOlasiliklari(double[] olasiliklar) {
-        StringBuilder metin = new StringBuilder();
-        for (int i = 0; i < olasiliklar.length; i++) {
-            if (i > 0) {
-                metin.append(", ");
+    /**
+     * {@code S1 54.3%, …, S5 0.0% (16. günde açılır)}: doğal seçimin olasılıkları; 0 olan seviyenin yanında nedeni, yoğunluk
+     * zayıflatması etkinse sonda notu (K-E67).
+     */
+    static Component seviyeOlasiliklari(SeviyeDurumu durum) {
+        MutableComponent sonuc = Component.empty();
+        for (int seviye = AfetTuru.EN_DUSUK_SEVIYE; seviye <= AfetTuru.EN_YUKSEK_SEVIYE; seviye++) {
+            if (seviye > AfetTuru.EN_DUSUK_SEVIYE) {
+                sonuc.append(", ");
             }
-            metin.append(String.format(Locale.ROOT, "S%d %.1f%%", i + 1, olasiliklar[i] * 100.0));
+            sonuc.append(String.format(Locale.ROOT, "S%d %.1f%%", seviye, durum.olasilik(seviye) * 100.0));
+            int s = seviye;
+            durum.neden(seviye).ifPresent(neden -> sonuc.append(" (").append(nedenMetni(neden, s, durum.maks()))
+                    .append(")"));
         }
-        return Component.literal(metin.toString());
+        if (durum.zayiflatildi()) {
+            sonuc.append("; ").append(Component.translatable(SEVIYE_YOGUNLUK, sayi(durum.yuk())));
+        }
+        return sonuc;
+    }
+
+    private static Component nedenMetni(SiddetSecici.KapaliNeden neden, int seviye, int maks) {
+        return switch (neden) {
+            case MAKS -> Component.translatable(SEVIYE_NEDEN_MAKS, maks);
+            case GUN -> Component.translatable(SEVIYE_NEDEN_GUN, CekirdekAyarlari.al().siddet().esik(seviye));
+            case GELISIM -> Component.translatable(SEVIYE_NEDEN_GELISIM);
+            case ART_ARDA -> Component.translatable(SEVIYE_NEDEN_ART_ARDA);
+        };
     }
 
     private static Component surecAdlari(List<DonemSureci> surecler) {
@@ -469,15 +500,20 @@ public final class CekirdekKomutlari {
         y.ekle(DURUM_AFET_YOK, "No active disaster.", "Aktif afet yok.");
         y.ekle(DURUM_AFET, "Active disaster: %s, %s; phase: %s (sub-phase %s), remaining: %s",
                 "Aktif afet: %s, %s; aşama: %s (alt aşama %s), kalan: %s");
-        y.ekle(DURUM_PENCERE, "time-of-day window awaited: ~%s", "patlama penceresi bekleniyor: ~%s");
         y.ekle(DURUM_AFET_KONUM, "Centre: %s (%s), impact radius: %s, target: %s",
                 "Merkez: %s (%s), etki yarıçapı: %s, hedef: %s");
         y.ekle(DURUM_GUN, "Game day: %s (offset %s), speed: x%s, TPS: %s (budget x%s)",
                 "Oyun günü: %s (ofset %s), hız: x%s, TPS: %s (bütçe x%s)");
         y.ekle(DURUM_BEKLEME, "Cooldown: general %s; per disaster: %s", "Bekleme: genel %s; afet başına: %s");
         y.ekle(DURUM_CARPANLAR, "Temporary multipliers: %s", "Geçici çarpanlar: %s");
-        y.ekle(DURUM_SEVIYELER, "Level weights (day %s, max level %s): %s",
-                "Seviye ağırlıkları (gün %s, en yüksek seviye %s): %s");
+        y.ekle(DURUM_SEVIYELER, "Level probabilities (day %s, max level %s): %s",
+                "Seviye olasılıkları (gün %s, en yüksek seviye %s): %s");
+        y.ekle(SEVIYE_NEDEN_MAKS, "above afetMaksSiddet %s", "afetMaksSiddet %s üstünde");
+        y.ekle(SEVIYE_NEDEN_GUN, "unlocks on day %s", "%s. günde açılır");
+        y.ekle(SEVIYE_NEDEN_GELISIM, "player progress too low (gelisimDahil)", "oyuncu gelişimi yetersiz (gelisimDahil)");
+        y.ekle(SEVIYE_NEDEN_ART_ARDA, "previous natural disaster was level 4/5", "önceki doğal afet seviye 4/5 idi");
+        y.ekle(SEVIYE_YOGUNLUK, "many recent disasters (load x%s): higher levels are rarer",
+                "son günde çok afet (yük x%s): yüksek seviyeler daha seyrek");
         y.ekle(DURUM_KAYITLI, "Registered disasters: %s", "Kayıtlı afetler: %s");
         y.ekle(DURUM_GOKYUZU, "Moon: %s; sun: %s (progress %s%%)", "Ay: %s; güneş: %s (ilerleme %%%s)");
         y.ekle(DURUM_DENIZ, "Sea level: +%s blocks (target +%s, %s)", "Deniz seviyesi: +%s blok (hedef +%s, %s)");
@@ -499,13 +535,16 @@ public final class CekirdekKomutlari {
                 "%s zaten sürüyor; başka türden afetler yanında başlatılabilir.");
         y.ekle(START_YER_UYGUN_DEGIL, "No suitable place found for %s.", "%s için uygun yer bulunamadı.");
         y.ekle(START_HATA, "%s could not be started; see the server log.", "%s başlatılamadı; sunucu log'una bakın.");
+        y.ekle(START_MAKS_ASILDI, "Level %s is above afetMaksSiddet (%s); applied because it was started by command.",
+                "Seviye %s, afetMaksSiddet (%s) üstünde; komutla başlatıldığı için uygulandı.");
         y.ekle(STOP_DURDU, "%s stopped.", "%s durduruldu.");
         y.ekle(STOP_TUR_YOK, "No %s is running.", "Süren %s yok.");
         y.ekle(STOP_AFET_YOK, "There is no disaster or era process to stop.", "Durdurulacak afet ya da dönem süreci yok.");
         y.ekle(STOP_SURECLER, "Era processes stopped: %s", "Dönem süreçleri durduruldu: %s");
         y.ekle(STOP_SURECLER_SURUYOR, "Era processes still running: %s; run /dogalafet stop again to stop them.",
                 "Süren dönem süreçleri: %s; durdurmak için yeniden /dogalafet stop.");
-        y.ekle(GUN_AYARLANDI, "Game day set to %s. Level weights: %s", "Oyun günü %s olarak ayarlandı. Seviye ağırlıkları: %s");
+        y.ekle(GUN_AYARLANDI, "Game day set to %s. Level probabilities: %s",
+                "Oyun günü %s olarak ayarlandı. Seviye olasılıkları: %s");
         y.ekle(HIZ_AYARLANDI, "Disaster and era timers run at x%s.", "Afet ve dönem zamanlayıcıları x%s hızında.");
         y.ekle(YARDIM_BASLIK, "Natural Disasters commands (OP):", "Doğal Afetler komutları (OP):");
         SiklikBilgisi.cevirileriYaz(y);

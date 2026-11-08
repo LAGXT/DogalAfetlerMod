@@ -78,14 +78,15 @@ class TsunamiSeviyesiTest {
         }
     }
 
-    /** Açıklık dalgayı ~18 sn'de kıyıya getirir (60–150 blok); ilk dalga açıkta alçak doğar. */
+    /** K-E67: açıklık dalgayı doğuştan 8 sn'de kıyıya getirir (32–64 blok); ilk dalga açıkta alçak doğar. */
     @Test
-    void dalgaKiyiyaOnSekizSaniyedeVarir() {
+    void dalgaKiyiyaSekizSaniyedeVarir() {
         for (int s = 1; s <= 5; s++) {
             TsunamiSeviyesi sv = TsunamiSeviyesi.al(s);
             double sure = sv.aciklik() / sv.hizTick() / 20;
-            assertTrue(sv.aciklik() >= 60 && sv.aciklik() <= 150, "S" + s);
-            assertTrue(sure >= 15 && sure <= 18.01, "S" + s + " " + sure);
+            assertTrue(sv.aciklik() >= 32 && sv.aciklik() <= 64, "S" + s + " " + sv.aciklik());
+            assertTrue(sure <= TsunamiSeviyesi.KIYIYA_SN + 1e-9, "S" + s + " " + sure);
+            assertTrue(sv.aciklik() > sv.cekilme(), "dalga çekilen şeridin dışında doğar: S" + s);
         }
     }
 

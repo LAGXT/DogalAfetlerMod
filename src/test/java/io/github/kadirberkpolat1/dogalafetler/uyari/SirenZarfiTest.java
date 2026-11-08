@@ -5,10 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.github.kadirberkpolat1.dogalafetler.core.SirenTuru;
 import org.junit.jupiter.api.Test;
 
 class SirenZarfiTest {
     private static final float TOLERANS = 1e-4f;
+    /** Güneş sireninin tam süresi (25 sn, K0-19 rev. K-E67). */
+    private static final int UZUN = SirenTuru.UZUN_SURE_TICK;
 
     private static SirenZarfi ilerlet(SirenZarfi zarf, int tick) {
         for (int i = 0; i < tick; i++) {
@@ -80,7 +83,7 @@ class SirenZarfiTest {
 
     @Test
     void erkenSondurmeOAnkiDuzeydenBaslarVeGunesProfiliDortSaniyedir() {
-        SirenZarfi zarf = ilerlet(tam(SirenProfili.GUNES, 1200), 300);
+        SirenZarfi zarf = ilerlet(tam(SirenProfili.GUNES, UZUN), 300);
         float sondurmeOncesi = zarf.duzey();
         zarf.sondur(SirenProfili.GUNES.sondurmeTick());
         assertEquals(sondurmeOncesi, zarf.duzey(), TOLERANS);
@@ -136,7 +139,7 @@ class SirenZarfiTest {
 
     @Test
     void gunesSireniSureBoyuncaUcDesibelYukselir() {
-        int sure = 1200;
+        int sure = UZUN;
         SirenZarfi zarf = tam(SirenProfili.GUNES, sure);
         assertEquals(1f, zarf.perde(), TOLERANS);
         ilerlet(zarf, sure / 2);
@@ -151,12 +154,14 @@ class SirenZarfiTest {
      */
     @Test
     void kalanToplamdanKisaysaSureKalandirYukselisKaldigiYerdenSurer() {
-        SirenZarfi zarf = new SirenZarfi(SirenProfili.GUNES, 1200, 300);
+        SirenZarfi zarf = new SirenZarfi(SirenProfili.GUNES, UZUN, 300);
         assertEquals(300, zarf.kalanTick());
-        assertEquals(1200, zarf.toplamTick());
+        assertEquals(UZUN, zarf.toplamTick());
         assertEquals(0f, zarf.duzey(), TOLERANS, "geç gelen de sessizden başlar");
         ilerlet(zarf, SirenProfili.GUNES.acilisTick());
-        assertEquals(desibel(-3f * 240 / 1200), zarf.duzey(), 1e-3f, "yükseliş 900. tick'ten sürer");
+        int kalanYukselis = 300 - SirenProfili.GUNES.acilisTick();
+        assertEquals(desibel(-3f * kalanYukselis / UZUN), zarf.duzey(), 1e-3f,
+                "yükseliş " + (UZUN - 300) + ". tick'ten sürer");
         ilerlet(zarf, 300 - SirenProfili.GUNES.acilisTick());
         assertEquals(0, zarf.kalanTick());
         ilerlet(zarf, SirenZarfi.GUVENLIK_PAYI_TICK);
@@ -166,7 +171,7 @@ class SirenZarfiTest {
     @Test
     void paketleGelenSurelerKirpilir() {
         assertEquals(1, SirenZarfi.toplamiKirp(0));
-        assertEquals(1200, SirenZarfi.toplamiKirp(1200));
+        assertEquals(UZUN, SirenZarfi.toplamiKirp(UZUN));
         assertEquals(SirenZarfi.EN_UZUN_TICK, SirenZarfi.toplamiKirp(Integer.MAX_VALUE));
         assertEquals(1, SirenZarfi.kalaniKirp(-5, 200));
         assertEquals(120, SirenZarfi.kalaniKirp(120, 200), "kalan < toplam korunur");
@@ -181,7 +186,7 @@ class SirenZarfiTest {
      */
     @Test
     void zarfKorunarakYenidenBaslatmaAcilisiTekrarlamaz() {
-        SirenZarfi zarf = ilerlet(tam(SirenProfili.GUNES, 1200), 30);
+        SirenZarfi zarf = ilerlet(tam(SirenProfili.GUNES, UZUN), 30);
         float kesilmeOncesi = zarf.duzey();
         assertTrue(kesilmeOncesi > 0.3f, "açılışın ortası");
         assertEquals(kesilmeOncesi, zarf.duzey(), TOLERANS, "okuma durumu değiştirmez");
