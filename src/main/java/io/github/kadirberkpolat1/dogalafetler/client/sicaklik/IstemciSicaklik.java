@@ -29,8 +29,8 @@ import net.minecraftforge.fml.common.Mod;
  * parlaması için saklanır. Çıkışta sıfırlanır.
  * <p>
  * Oyuncunun kendi parçacıkları (sunucu bunları oyuncunun kendisine göndermez, S-08 rev.) yalnız kamera birinci şahıs
- * değilken üretilir: üşüme ve donmada ~50 tick'te bir nefes (her tick bir bulutçuk, {@code NefesBuhari.bulutcuk} kadar;
- * dünya donması sürerken üretilmez, onun nefesi zaten çizilir), bunalma ve yanmada ter damlası, ıslakken düşen su
+ * değilken üretilir: üşüme ve donmada ~2,5 sn'de bir nefes bulutu ({@code NefesBuhari.Ritim}; dünya donması sürerken
+ * üretilmez, onun nefesi zaten çizilir), bunalma ve yanmada ter damlası, ıslakken düşen su
  * damlası, hasarlı kademede alev ya da kar tanesi.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
@@ -38,8 +38,6 @@ public final class IstemciSicaklik {
     private static final float YAKLASMA = 0.25f;
     /** Hasarlı kademe alev/kar tanesi aralığı (tick): sunucunun varsayılan güncelleme aralığı. */
     private static final int PARCACIK_ARALIGI = 20;
-    /** Nefes döngüsü (tick, ~2,5 sn); her nefeste tick başına bir bulutçuk. */
-    static final int NEFES_DONGUSU = 50;
 
     private static SicaklikDurumPaketi durum = SicaklikDurumPaketi.KAPALI;
     private static float oncekiVucut;
@@ -54,7 +52,7 @@ public final class IstemciSicaklik {
     private static long tick;
     private static SicaklikDurumu sonDurum = SicaklikDurumu.NORMAL;
     private static long degisimTick = -1;
-    private static int nefesKalan;
+    private static final NefesBuhari.Ritim NEFES = new NefesBuhari.Ritim();
     /** Görsel kanıt: kendi üretilen parçacık sayısı ve son nefes/ter tick'i (otomasyon log'a yazar). */
     private static int kendiParcacik;
     private static long sonNefes = -1;
@@ -174,25 +172,16 @@ public final class IstemciSicaklik {
     private static void kendiParcaciklari(Minecraft mc) {
         LocalPlayer o = mc.player;
         if (o == null || mc.level == null || mc.isPaused() || o.isSpectator() || !durum.acik()) {
-            nefesKalan = 0;
+            NEFES.sifirla();
             return;
         }
         // Birinci şahısta göğüsteki ya da ağızdaki sprite ekranda dev bir leke olur.
         boolean ucuncu = mc.options.getCameraType() != CameraType.FIRST_PERSON;
         SicaklikDurumu sd = durum.kademe().durum();
         RandomSource r = o.getRandom();
-        if ((sd == SicaklikDurumu.USUME || sd == SicaklikDurumu.DONMA) && !dunyaDonuyor(mc)) {
-            if (tick % NEFES_DONGUSU == 0) {
-                nefesKalan = NefesBuhari.bulutcuk(sd) + r.nextInt(2);
-            }
-        } else {
-            nefesKalan = 0;
-        }
-        if (nefesKalan > 0) {
-            nefesKalan--;
-            if (ucuncu) {
-                nefes(mc, o, r);
-            }
+        int bulutcuk = NEFES.tick(tick, sd, dunyaDonuyor(mc), r.nextInt(2));
+        for (int i = 0; i < bulutcuk && ucuncu; i++) {
+            nefes(mc, o, r);
         }
         if (!ucuncu) {
             return;
@@ -257,6 +246,6 @@ public final class IstemciSicaklik {
         hissedilen = oncekiHissedilen = islaklik = oncekiIslaklik = 0;
         sonDurum = SicaklikDurumu.NORMAL;
         degisimTick = -1;
-        nefesKalan = 0;
+        NEFES.sifirla();
     }
 }

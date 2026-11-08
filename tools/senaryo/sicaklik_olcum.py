@@ -17,7 +17,9 @@ Kullanım: python3 tools/senaryo/sicaklik_olcum.py <kanıt/>   (sicaklik_gorsel.
           α = (kare − kontrol) / (255 − kontrol), en az iki geçerli kanal (255 − kontrol > 30) ve kanallar arası fark
           < 0,15; sonuç açık renk (L* ≥ 40; modelin koyu piksellerindeki poz/ışık oynaması sayılmaz); ter damlasının
           lacivert kontürünün 4 piksel çevresi (beyaz parlaması) dışarıda. α ≥ 0,15 piksel sayısı ile bu piksellerde
-          α ortalama / p90 / en çok. Buharsız kare (`bunalma_*`) negatif kontroldur: ≈ 0 çıkmalı.
+          α ortalama / p90 / en çok. Beyaz zemin (kar; kontrol L* ≥ 85) beyazlaşmayı ölçmeye yer bırakmaz: orada buharı
+          gri kenarı seçtirir, bu yüzden ayrıca açık zeminde kontrole göre ΔE > 10 olan piksel sayısı ve ortalama ΔE.
+          Buharsız kare (`bunalma_*`) negatif kontroldur: ≈ 0 çıkmalı.
   hap     HUD hapının içinde sayı pikselleri (log'daki sayı rengine yakın) ile hap içi zemininin WCAG karşıtlığı ve
           zeminin ortanca rengi. Kare satırında hap konumu yoksa (S3-10 öncesi koşu) yerleşimden hesaplanır ve sayı
           durum rengindedir.
@@ -144,7 +146,8 @@ def agiz_penceresi(h, w):
 
 
 def buhar(kare, ref):
-    """Ağız penceresinde kontrole göre beyaza tek tip karışım: (piksel, α ort, α p90, α en çok)."""
+    """Ağız penceresinde kontrole göre beyaza tek tip karışım: (piksel, α ort, α p90, α en çok) ve açık zeminde (kontrol
+    L* ≥ 85) ΔE > 10 olan (piksel, ΔE ort)."""
     p = agiz_penceresi(*kare.shape[:2])
     k, r = kare[p], ref[p]
     pay = 255 - r
@@ -160,12 +163,16 @@ def buhar(kare, ref):
         t[:, 1:] |= ter_cevresi[:, :-1]
         t[:, :-1] |= ter_cevresi[:, 1:]
         ter_cevresi = t
-    acik = lab(k)[..., 0] >= 40
+    lk, lr = lab(k), lab(r)
+    acik = lk[..., 0] >= 40
     buharli = (gecerli.sum(axis=2) >= 2) & (fark < 0.15) & (ort >= 0.15) & acik & ~ter_cevresi
+    de = np.linalg.norm(lk - lr, axis=-1)
+    beyaz_zeminde = (lr[..., 0] >= 85) & (de > 10) & ~ter_cevresi
+    kar = (int(beyaz_zeminde.sum()), float(de[beyaz_zeminde].mean()) if beyaz_zeminde.any() else 0.0)
     if not buharli.any():
-        return 0, 0.0, 0.0, 0.0
+        return 0, 0.0, 0.0, 0.0, kar
     v = ort[buharli]
-    return int(buharli.sum()), float(v.mean()), float(np.percentile(v, 90)), float(v.max())
+    return int(buharli.sum()), float(v.mean()), float(np.percentile(v, 90)), float(v.max()), kar
 
 
 def kontrol_adi(ad, birinci, kareler):
@@ -228,9 +235,9 @@ def main():
             else:
                 parcalar.append("ter damlası 0")
             if karsilastir:
-                n, ort, p90, enc = buhar(kare, ref)
+                n, ort, p90, enc, kar = buhar(kare, ref)
                 parcalar.append(f"buhar (ağız penceresi, {kontrol} karşısı) {n} piksel α ort {ort:.2f} p90 {p90:.2f} "
-                                f"en çok {enc:.2f}")
+                                f"en çok {enc:.2f}; açık zeminde ΔE>10 {kar[0]} piksel ΔE ort {kar[1]:.1f}")
         if ad != "menu":
             sonuc = hap(kare, satir)
             parcalar.append("hap sayısı bulunamadı" if sonuc is None

@@ -10,9 +10,10 @@ import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
 
 /**
- * S3-11: üşümede ağızdan çıkan buhar her arka planda seçilir. Gerçek parçacık dokusu ({@code nefes_buhari_0..3}) ile
- * parçacığın opaklık eğrisi birlikte sınanır: bulutçuk ömrünün ilk yarısında yoğun, açık gri kenarlı (beyaz gökte
- * kaybolmaz), yumuşak söner; nefes birkaç bulutçuktan oluşur, donmada daha yoğun.
+ * S3-11: üşümede ağızdan çıkan buhar her arka planda (gök, çimen, kar) seçilir. Gerçek parçacık dokusu
+ * ({@code nefes_buhari_0..3}) ile parçacığın opaklık eğrisi birlikte sınanır: bulutçuk ömrünün ilk yarısında yoğun, gri
+ * kenarlı (beyaz gökte ve karda kaybolmaz), yumuşak söner. Nefes ritmi: ~2–3 sn'de bir birkaç bulutçuk, donmada daha
+ * yoğun ve sıkışık; dünya donması sürerken hiç (çift buhar yok).
  */
 class NefesBuhariTest {
     /** Ömrün ilk yarısında gösterilen kareler ({@code SpriteSet.get(yaş, ömür)}, 4 kare). */
@@ -58,7 +59,7 @@ class NefesBuhariTest {
     }
 
     @Test
-    void kenarAcikGriGokteKaybolmaz() throws IOException {
+    void kenarGriGokteVeKardaSecilir() throws IOException {
         BufferedImage k = kare(0);
         double kenarP = 0;
         double kenarA = 0;
@@ -83,9 +84,10 @@ class NefesBuhariTest {
             }
         }
         assertTrue(kenar > 0 && ic > 0, "bulutçuğun kenarı ve içi olmalı");
-        assertTrue(kenarP / kenar <= icP / ic - 25, "kenar içten koyu (açık gri): kenar " + kenarP / kenar + " iç "
-                + icP / ic);
-        assertTrue(kenarA / kenar >= 0.35, "kenar seçilecek kadar opak: " + kenarA / kenar);
+        assertTrue(kenarP / kenar <= icP / ic - 25, "kenar içten koyu: kenar " + kenarP / kenar + " iç " + icP / ic);
+        // Kar bloğu (~245) önünde beyaz iç kaybolur; bulutu gri kenar seçtirir.
+        assertTrue(kenarP / kenar <= 170, "kenar kar önünde seçilecek kadar gri: " + kenarP / kenar);
+        assertTrue(kenarA / kenar >= 0.5, "kenar seçilecek kadar opak: " + kenarA / kenar);
     }
 
     @Test
@@ -105,6 +107,74 @@ class NefesBuhariTest {
     void nefesBulutOlurDonmadaDahaYogun() {
         assertTrue(NefesBuhari.bulutcuk(SicaklikDurumu.USUME) >= 5, "üşüme nefesi küçük bir bulut");
         assertTrue(NefesBuhari.bulutcuk(SicaklikDurumu.DONMA) > NefesBuhari.bulutcuk(SicaklikDurumu.USUME),
-                "donmada daha yoğun");
+                "donmada daha çok bulutçuk");
+        int[] usume = nefes(SicaklikDurumu.USUME);
+        int[] donma = nefes(SicaklikDurumu.DONMA);
+        // Donmada bulutçuklar aynı tick'te üst üste çıkar: bulut küçük kalır ve opaklığı birikir (yayılıp pusa dönmez).
+        assertTrue(donma[1] >= 3, "donmada tick başına en az üç bulutçuk: " + donma[1]);
+        assertTrue(donma[2] < usume[2], "donma nefesi daha kısa sürede çıkar: " + donma[2] + " / " + usume[2]);
+    }
+
+    /** Bir nefes (tick 0'dan): {toplam bulutçuk, bir tick'teki en çok, bulutçuk çıkan tick sayısı}. */
+    private static int[] nefes(SicaklikDurumu durum) {
+        NefesBuhari.Ritim r = new NefesBuhari.Ritim();
+        int toplam = 0;
+        int enCok = 0;
+        int sure = 0;
+        for (long t = 0; t < NefesBuhari.DONGU; t++) {
+            int n = r.tick(t, durum, false, 0);
+            toplam += n;
+            enCok = Math.max(enCok, n);
+            sure += n > 0 ? 1 : 0;
+        }
+        assertEquals(NefesBuhari.bulutcuk(durum), toplam, durum + " nefesinin bütün bulutçukları çıkar");
+        return new int[] {toplam, enCok, sure};
+    }
+
+    @Test
+    void nefesIkiUcSaniyedeBirAlinir() {
+        for (SicaklikDurumu durum : new SicaklikDurumu[] {SicaklikDurumu.USUME, SicaklikDurumu.DONMA}) {
+            NefesBuhari.Ritim r = new NefesBuhari.Ritim();
+            long onceki = -1;
+            long sonBaslangic = -1;
+            int nefesSayisi = 0;
+            for (long t = 0; t < 20 * 30; t++) {
+                int n = r.tick(t, durum, false, (int) (t / 7 % 2));
+                if (n > 0 && (onceki < 0 || t - onceki > 1)) {
+                    if (sonBaslangic >= 0) {
+                        long ara = t - sonBaslangic;
+                        assertTrue(ara >= 40 && ara <= 60, durum + ": nefesler arası " + ara + " tick (2–3 sn olmalı)");
+                    }
+                    sonBaslangic = t;
+                    nefesSayisi++;
+                }
+                if (n > 0) {
+                    onceki = t;
+                }
+            }
+            assertTrue(nefesSayisi >= 10 && nefesSayisi <= 15, durum + ": 30 sn'de " + nefesSayisi + " nefes");
+        }
+    }
+
+    @Test
+    void dunyaDonarkenVeIlikkenNefesYok() {
+        assertTrue(!NefesBuhari.uretilir(SicaklikDurumu.USUME, true), "dünya donmasının nefesi varken çift buhar olmaz");
+        assertTrue(!NefesBuhari.uretilir(SicaklikDurumu.DONMA, true));
+        assertTrue(NefesBuhari.uretilir(SicaklikDurumu.USUME, false) && NefesBuhari.uretilir(SicaklikDurumu.DONMA, false));
+        for (SicaklikDurumu d : new SicaklikDurumu[] {SicaklikDurumu.NORMAL, SicaklikDurumu.BUNALMA, SicaklikDurumu.YANMA}) {
+            assertTrue(!NefesBuhari.uretilir(d, false), d + " durumunda nefes buharı yok");
+        }
+        NefesBuhari.Ritim donarken = new NefesBuhari.Ritim();
+        for (long t = 0; t < 200; t++) {
+            assertEquals(0, donarken.tick(t, SicaklikDurumu.DONMA, true, 1), "dünya donarken tick " + t);
+        }
+        // Nefesin ortasında dünya donmaya başlarsa kalan bulutçuklar da çıkmaz, sonradan birikmiş nefes gelmez.
+        NefesBuhari.Ritim r = new NefesBuhari.Ritim();
+        assertTrue(r.tick(0, SicaklikDurumu.USUME, false, 0) > 0);
+        assertEquals(0, r.tick(1, SicaklikDurumu.USUME, true, 0));
+        for (long t = 2; t < NefesBuhari.DONGU; t++) {
+            assertEquals(0, r.tick(t, SicaklikDurumu.USUME, false, 0), "donma bitince bir sonraki nefese dek sessiz: " + t);
+        }
+        assertTrue(r.tick(NefesBuhari.DONGU, SicaklikDurumu.USUME, false, 0) > 0, "sonraki nefes zamanında gelir");
     }
 }

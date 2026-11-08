@@ -23,7 +23,7 @@ import net.minecraftforge.fml.common.Mod;
  * sahneleri sırayla çeker: birinci şahısta HUD normal, ıslak, donma, bunalma, yanma (iki nabız fazı); üçüncü şahısta
  * aynı kameradan normal karşılaştırma karesi, üşümede ağız buharı, bunalmada ter ve kırmızı kenar; termometre
  * menüsü; terin gök, çimen ve kum önünde üç kare (zemin oyuncunun altına {@code fill} ile serilir, kamera açısı arka
- * planı seçer); ağız buharı için gök ve çimen açılarında buharsız kontrol kare ({@code normal_<zemin>}), üşüme ve
+ * planı seçer); ağız buharı için gök, çimen ve kar açılarında buharsız kontrol kare ({@code normal_<zemin>}), üşüme ve
  * donma buharı, buharsız bunalma (negatif kontrol) ve birinci şahıs üşüme. Birinci şahıs sahnelerinde oyuncunun kendi
  * parçacık sayısı log'a yazılır (0 olmalı); her kare satırı hapın ekran konumunu ve sayı rengini de yazar (piksel ölçümü
  * {@code tools/senaryo/sicaklik_olcum.py}). Sonra sunucu konsolunun komutları için bekler ve kapanır.
@@ -74,7 +74,11 @@ public final class SicaklikOtomasyonu {
             new Sahne("bunalma_gok", 38.6, 0, Kip.HUD_3P, 20f, null),
             new Sahne("normal_cimen", 37.0, 0, Kip.HUD_3P, -35f, "minecraft:grass_block"),
             new Sahne("usume_cimen", 35.6, 0, Kip.BUHAR, -35f, null),
-            new Sahne("usume_1p", 35.6, 0, Kip.HUD, 8f, null));
+            new Sahne("usume_1p", 35.6, 0, Kip.HUD, 8f, null),
+            new Sahne("normal_kar", 37.0, 0, Kip.HUD_3P, -35f, "minecraft:snow_block"),
+            new Sahne("usume_kar", 35.6, 0, Kip.BUHAR, -35f, null),
+            new Sahne("donma_kar", 34.4, 0, Kip.BUHAR, -35f, null),
+            new Sahne("bunalma_kar", 38.6, 0, Kip.HUD_3P, -35f, null));
 
     private static int tus;
     private static int fare;
@@ -176,7 +180,7 @@ public final class SicaklikOtomasyonu {
             mc.options.setCameraType(ucuncu ? CameraType.THIRD_PERSON_FRONT : CameraType.FIRST_PERSON);
             mc.player.setXRot(s.bakis());
             if (s.zemin() != null) {
-                komut(mc, "fill ~-8 ~-1 ~-8 ~8 ~-1 ~8 %s", s.zemin());
+                komut(mc, "fill ~-16 ~-1 ~-16 ~16 ~-1 ~16 %s", s.zemin());
             }
             komut(mc, "dogalafet sicaklik set %s %.1f", ad, s.santigrat());
             komut(mc, "dogalafet sicaklik islaklik %s %d", ad, s.islaklik());

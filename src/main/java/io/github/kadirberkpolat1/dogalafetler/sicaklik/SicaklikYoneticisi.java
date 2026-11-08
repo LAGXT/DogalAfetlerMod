@@ -260,7 +260,7 @@ public final class SicaklikYoneticisi {
         ServerLevel level = oyuncu.serverLevel();
         boolean buhar = false;
         boolean donmaNefesi = level.dimension() == Level.OVERWORLD && DunyaDonemi.al(level).donmaIlerlemesi() > 0;
-        if (durum.soguk() && !donmaNefesi) {
+        if (NefesBuhari.uretilir(durum, donmaNefesi)) {
             g.buharSayaci++;
             if (g.buharSayaci >= 2 + oyuncu.getRandom().nextInt(2)) {
                 g.buharSayaci = 0;
