@@ -60,10 +60,15 @@ public final class KaraDelik3B {
     private static final float TEPE_ALT = 1.12f;
     /**
      * Orta sütunun yanal bandı: köşenin merceklenmiş görüntüsünün gölge merkezinden yatay uzaklığı gölge yarıçapının bu
-     * katları arasında orta sütunun çarpanından yanların çarpanına geçer (ön yarıda diskin Doppler'i, yaylarda 1).
+     * katları arasında orta sütunun çarpanından yanların Doppler'ine geçer.
      */
     private static final float YANAL_IC = 0.5f;
     private static final float YANAL_DIS = 1f;
+    /**
+     * Merceklenmiş yaylarda (arka yarı ve ikinci görüntü) Doppler'in derinliği; ön yarıda 1. Tam Doppler yayların yan
+     * uçlarını karartıp sol/sağ oranını referansın (~1,6) üstüne çıkarır (2,0), Doppler'siz yaylar altına indirir (1,15).
+     */
+    private static final float YAY_DOPPLER = 0.7f;
     /** Parlama kopyası: dikey kalınlık katı, alfası, radyal genişleme (iç ve dış yarıçap çarpanı). */
     private static final float PARILTI_KALINLIK = 2.5f;
     private static final float PARILTI_ALFA = 0.3f;
@@ -560,7 +565,8 @@ public final class KaraDelik3B {
                     tamam = parilti ? pariltiKosesi(r, (ic + dis) * 0.5f, fi, ikincil, KOSE[q])
                             : diskKosesi(r, fi, ikincil, KOSE[q]);
                     float parlak = siluet != null ? a
-                            : koseCarpani(fi, GOR[0], tepe, parca == ON) * a * (1f + KALINTI_EK * mor);
+                            : koseCarpani(fi, GOR[0], tepe, parca == ON ? 1f : YAY_DOPPLER) * a
+                                    * (1f + KALINTI_EK * mor);
                     KOSE_ALFA[q] = switch (gecis) {
                         case GECIS_PARILTI -> PARILTI_ALFA * parlak;
                         case GECIS_KALINTI -> Math.max(0f, parlak - 1f);
@@ -592,12 +598,12 @@ public final class KaraDelik3B {
 
     /**
      * Köşenin parlaklık çarpanı; {@code x} köşenin merceklenmiş görüntüsünün yatay konumu (rs). Gölgenin iki yanında
-     * (|x| ≥ {@value #YANAL_DIS} gölge yarıçapı) ön yarıda diskin Doppler'i (yaklaşan yan 1, uzaklaşan ×0,3), yaylarda
-     * 1: Doppler yayların yan uçlarını karartınca yutumdan sonraki kalıntı da sönüyordu. Gölgenin üstü ve altındaki orta
-     * sütunda (≤ {@value #YANAL_IC}) madde bakışa dik gider ve çarpan {@code tepe}; arada yumuşak geçiş.
+     * (|x| ≥ {@value #YANAL_DIS} gölge yarıçapı) diskin Doppler'i (yaklaşan yan 1, uzaklaşan ×0,3) {@code derinlik}
+     * oranında. Gölgenin üstü ve altındaki orta sütunda (≤ {@value #YANAL_IC}) madde bakışa dik gider ve çarpan
+     * {@code tepe}; arada yumuşak geçiş.
      */
-    private static float koseCarpani(float fi, float x, float tepe, boolean doppler) {
-        float d = doppler ? KaraDelikMercek.doppler(KaraDelikMercek.yaklasmaCos(fi, egim)) : 1f;
+    private static float koseCarpani(float fi, float x, float tepe, float derinlik) {
+        float d = 1f + derinlik * (KaraDelikMercek.doppler(KaraDelikMercek.yaklasmaCos(fi, egim)) - 1f);
         float t = Mth.clamp((Math.abs(x) / KaraDelikMercek.GOLGE_RS - YANAL_IC) / (YANAL_DIS - YANAL_IC), 0f, 1f);
         return tepe + (d - tepe) * t * t * (3f - 2f * t);
     }
