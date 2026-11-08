@@ -26,6 +26,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.Function;
 import net.minecraft.advancements.Advancement;
 import net.minecraft.advancements.CriteriaTriggers;
@@ -40,6 +41,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.inventory.CraftingMenu;
 import net.minecraft.world.inventory.TransientCraftingContainer;
+import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -51,6 +53,7 @@ import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
 import net.minecraftforge.network.ICustomPacket;
 import net.minecraftforge.network.NetworkDirection;
+import net.minecraftforge.registries.ForgeRegistries;
 
 /**
  * Radar ve sismografın oyun içi testleri (madde 3, 4, 13a, 13b, N7): paketler yalnız eşyayı tutan sahte oyuncuya gider
@@ -616,6 +619,54 @@ public final class EsyaOyunTestleri {
             server.getPlayerList().remove(oyuncu);
         }
         DogalAfetler.LOGGER.info("Eşya GameTest: {} tarifin kitap kilidi var, özel (kitapsız) {}", sayi, ozel);
+        yardimci.succeed();
+    }
+
+    /**
+     * Mod sekmesi ("Doğal Afetler", {@link ModSekmesi}) eşyaları kayıttan kendiliğinden alır: yüklü her {@code dogalafetler}
+     * tarifinin ürünü ve girdisi olan mod eşyası (kül katmanı ↔ kül bloğu, kömürleşmiş kütük → tahta, meteor ve sonradan
+     * eklenen alt sistemlerin tarifleri) sekmede; sekmeye eşya adı yazılmaz. Özel tarifler (zırh ekleri) kitapsız, muaf.
+     */
+    @GameTest(template = "bos", batch = "esya_tarif")
+    public static void modSekmesiTarifEsyalariniKendiligindenTasir(GameTestHelper yardimci) {
+        ServerLevel level = yardimci.getLevel();
+        CreativeModeTab sekme = ModSekmesi.SEKME.get();
+        sekme.buildContents(new CreativeModeTab.ItemDisplayParameters(level.enabledFeatures(), false,
+                level.registryAccess()));
+        Set<Item> sekmede = new HashSet<>();
+        sekme.getDisplayItems().forEach(s -> sekmede.add(s.getItem()));
+        Set<Item> tarifEsyalari = new HashSet<>();
+        Set<String> eksik = new TreeSet<>();
+        int tarifSayisi = 0;
+        for (Recipe<?> tarif : level.getRecipeManager().getRecipes()) {
+            if (!DogalAfetler.MOD_ID.equals(tarif.getId().getNamespace()) || tarif.isSpecial()) {
+                continue;
+            }
+            tarifSayisi++;
+            List<Item> esyalar = new ArrayList<>();
+            esyalar.add(tarif.getResultItem(level.registryAccess()).getItem());
+            for (Ingredient girdi : tarif.getIngredients()) {
+                for (ItemStack secenek : girdi.getItems()) {
+                    esyalar.add(secenek.getItem());
+                }
+            }
+            for (Item esya : esyalar) {
+                ResourceLocation kimlik = ForgeRegistries.ITEMS.getKey(esya);
+                if (kimlik != null && DogalAfetler.MOD_ID.equals(kimlik.getNamespace())) {
+                    tarifEsyalari.add(esya);
+                    if (!sekmede.contains(esya)) {
+                        eksik.add(tarif.getId().getPath() + " → " + kimlik.getPath());
+                    }
+                }
+            }
+        }
+        yardimci.assertTrue(eksik.isEmpty(), "mod sekmesinde olmayan tarif eşyaları (tarif → eşya): " + eksik);
+        for (String ad : List.of("kul_katmani", "kul_blogu", "komurlesmis_kutuk", "komurlesmis_tahta")) {
+            Item esya = ForgeRegistries.ITEMS.getValue(DogalAfetler.konum(ad));
+            yardimci.assertTrue(tarifEsyalari.contains(esya), "tarif eşyası olarak bulunmadı: " + ad);
+        }
+        DogalAfetler.LOGGER.info("Eşya GameTest: {} tarifin {} mod eşyası mod sekmesinde ({} eşya)", tarifSayisi,
+                tarifEsyalari.size(), sekmede.size());
         yardimci.succeed();
     }
 
