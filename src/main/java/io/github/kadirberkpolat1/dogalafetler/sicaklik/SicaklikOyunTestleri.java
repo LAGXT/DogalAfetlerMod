@@ -4,14 +4,17 @@ import com.mojang.authlib.GameProfile;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.core.CekirdekOyunTestleri;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
+import io.netty.channel.embedded.EmbeddedChannel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.gametest.framework.GameTestServer;
+import net.minecraft.network.protocol.game.ClientboundLevelParticlesPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -336,6 +339,45 @@ public final class SicaklikOyunTestleri {
         } finally {
             cikar(y, List.of(donan, yanan, korunan));
         }
+    }
+
+    /**
+     * Hasarlı kademedeki oyuncunun alev parçacığı 32 blok içindeki diğer oyuncuya gider, kendisine gitmez (birinci şahısta
+     * göğüsteki sprite ekranı kaplar; üçüncü şahısta istemci kendisi üretir).
+     */
+    @GameTest(template = "bos", batch = "sicaklik_hasar")
+    public static void hasarParcacigiKendisineGitmezYanindakineGider(GameTestHelper y) {
+        kuraliAc(y.getLevel().getServer());
+        ServerPlayer yanan = oyuncu(y, "parcacik-yanan", 0);
+        ServerPlayer izleyen = oyuncu(y, "parcacik-izleyen", 3);
+        try {
+            VucutSicakligi.yaz(yanan, 95);
+            VucutSicakligi.yaz(izleyen, 0);
+            parcacikPaketleri(yanan);
+            parcacikPaketleri(izleyen);
+            SicaklikYoneticisi.guncelle(yanan, 20);
+            List<ClientboundLevelParticlesPacket> kendisine = parcacikPaketleri(yanan);
+            long yanindakine = parcacikPaketleri(izleyen).stream()
+                    .filter(p -> p.getParticle().getType() == ParticleTypes.FLAME).count();
+            dogrula(y, kendisine.isEmpty(), "hasarlı oyuncuya kendi parçacığı gitti: " + kendisine.size() + " paket");
+            dogrula(y, yanindakine >= 1, "yanındaki oyuncuya alev parçacığı gitmedi (vücut " + VucutSicakligi.al(yanan)
+                    + ")");
+            y.succeed();
+        } finally {
+            cikar(y, List.of(yanan, izleyen));
+        }
+    }
+
+    /** Sahte oyuncunun kanalına giden vanilla parçacık paketleri (eskiden yeniye); kanalın giden kuyruğu boşalır. */
+    private static List<ClientboundLevelParticlesPacket> parcacikPaketleri(ServerPlayer o) {
+        EmbeddedChannel kanal = (EmbeddedChannel) o.connection.connection.channel();
+        List<ClientboundLevelParticlesPacket> sonuc = new ArrayList<>();
+        for (Object mesaj = kanal.readOutbound(); mesaj != null; mesaj = kanal.readOutbound()) {
+            if (mesaj instanceof ClientboundLevelParticlesPacket paket) {
+                sonuc.add(paket);
+            }
+        }
+        return sonuc;
     }
 
     /** Madde 7c ve 3: yavaşlama değiştiricisi soğukta eklenir; respawn'da ve kapı kapanınca kaldırılır. */
