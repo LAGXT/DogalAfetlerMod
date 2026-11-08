@@ -30,6 +30,8 @@ public final class KasirgaRotasi {
     /** Ara hedefin herhangi bir oyuncuya en yakın uzaklığı. */
     public static final double OYUNCUYA_EN_AZ = 32;
     public static final double VARIS = 12;
+    /** Sınırda ya da yüklü alan kenarında istenen zorunlu seçimler, son seçimden en az bu kadar ölçekli tick sonra (AF2-25). */
+    public static final int ZORUNLU_ARALIK = ARALIK_EN_AZ;
     /** Bir türün aday denemesi; ikinci aşamada her yöne bunun iki katı aday denenir. */
     static final int DENEME = 12;
     private static final long KARISTIR = 0x9E3779B97F4A7C15L;
@@ -63,6 +65,8 @@ public final class KasirgaRotasi {
     private int kalanTick;
     private Tur sonTur;
     private boolean sonDonus;
+    /** Son seçimden beri ilerleyen ölçekli tick; kalıcı değil (yüklenen rota zorunlu seçime hemen izin verir). */
+    private int secimdenBeri = ZORUNLU_ARALIK;
 
     private KasirgaRotasi(Durum d) {
         baslangicX = d.baslangicX();
@@ -144,7 +148,16 @@ public final class KasirgaRotasi {
      */
     public boolean secimZamani(int adim, double x, double z) {
         kalanTick -= Math.max(0, adim);
+        secimdenBeri = (int) Math.min(Integer.MAX_VALUE, (long) secimdenBeri + Math.max(0, adim));
         return sayac == 0 || kalanTick <= 0 || Math.hypot(hedefX - x, hedefZ - z) <= VARIS;
+    }
+
+    /**
+     * Sınırda ya da yüklü alan kenarında zorunlu yeni ara hedefe izin var mı: son seçimden beri en az {@link #ZORUNLU_ARALIK}
+     * geçtiyse. Aradaki tick'lerde çağıran eldeki ara hedefe döner (tick başına seçim ve log seli olmasın).
+     */
+    public boolean zorunluSecimSerbest() {
+        return secimdenBeri >= ZORUNLU_ARALIK;
     }
 
     /**
@@ -155,6 +168,7 @@ public final class KasirgaRotasi {
      */
     public Secim yeniAraHedef(double x, double z, List<double[]> oyuncular, KonumKosulu yuklu) {
         sayac++;
+        secimdenBeri = 0;
         SplittableRandom r = new SplittableRandom(tohum ^ (sayac * KARISTIR));
         kalanTick = ARALIK_EN_AZ + r.nextInt(ARALIK_EN_COK - ARALIK_EN_AZ + 1);
         Arama a = new Arama(oyuncular, yuklu);

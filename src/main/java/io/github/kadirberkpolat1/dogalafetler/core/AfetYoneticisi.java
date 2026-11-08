@@ -299,15 +299,15 @@ public final class AfetYoneticisi {
 
     /**
      * Afetten etkilenebilecek oyuncular (N11): bölgesel afette afetin boyutunda, etki alanı +
-     * {@code cekirdek.hedef.sirenEkYaricap} içinde olanlar; sunucu geneli afette her boyuttaki bütün çevrim içi oyuncular.
-     * Siren ve afet durum paketi bunlara gider.
+     * {@code cekirdek.hedef.sirenEkYaricap} içinde olanlar (küresel alanlı bölgesel afette, ör. asit yağmuru, o boyuttaki
+     * herkes; AF2-08); sunucu geneli afette her boyuttaki bütün çevrim içi oyuncular. Siren ve afet durum paketi bunlara gider.
      */
     public List<ServerPlayer> etkilenebilecekOyuncular(Afet afet) {
         EtkiAlani alan = alanOku(afet);
         if (alan == null) {
             return List.of();
         }
-        if (afet.tur().sunucuGeneli() || alan.global()) {
+        if (afet.tur().sunucuGeneli()) {
             return List.copyOf(server.getPlayerList().getPlayers());
         }
         ServerLevel level = server.getLevel(afet.baglam().boyut());
@@ -983,7 +983,7 @@ public final class AfetYoneticisi {
         MinecraftForge.EVENT_BUS.post(new SirenDurdurEvent(afet.tur(), oyuncular));
     }
 
-    /** AKTIF aşamada etki alanındaki oyuncuları "etkilenen" olarak işaretler. */
+    /** AKTIF aşamada etki alanındaki oyuncuları "etkilenen" olarak işaretler (bölgesel afette yalnız afetin boyutunda). */
     private void takipGuncelle(Afet afet, ServerLevel level) {
         if (afet.asama() != AfetAsamasi.AKTIF) {
             return;
@@ -992,7 +992,7 @@ public final class AfetYoneticisi {
         if (alan == null) {
             return;
         }
-        boolean herkes = afet.tur().sunucuGeneli() || alan.global();
+        boolean herkes = afet.tur().sunucuGeneli();
         for (ServerPlayer oyuncu : herkes ? server.getPlayerList().getPlayers() : level.players()) {
             if (!oyuncu.isSpectator() && oyuncu.isAlive()
                     && (herkes || alan.iceriyor(oyuncu.getX(), oyuncu.getY(), oyuncu.getZ(), 0))) {
@@ -1013,7 +1013,7 @@ public final class AfetYoneticisi {
             if (alan == null) {
                 return;
             }
-            boolean alanda = afet.tur().sunucuGeneli() || alan.global()
+            boolean alanda = afet.tur().sunucuGeneli()
                     || (oyuncu.level().dimension().equals(afet.baglam().boyut())
                             && alan.iceriyor(oyuncu.getX(), oyuncu.getY(), oyuncu.getZ(), 0));
             if (alanda) {

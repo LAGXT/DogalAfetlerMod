@@ -118,9 +118,10 @@ Notun üzerinden değişenler:
 
 Kullanıcı isteği: "Asit yağmuru her yerde yağmıyor; bir kullanıcıya targetlandıysa o kullanıcının olduğu yerde yağıyor. Her
 kullanıcıda yağsın, herkes görebilsin; asit yağmuru tüm dünyada yağsın, normal yağmur gibi, herkese etki etsin." Kararlar
-`.vibe/kararlar/afet-fizik-2.md` (AF2-01…AF2-06). Notun üzerinden değişenler:
+`.vibe/kararlar/afet-fizik-2.md` (AF2-01…AF2-09). Notun üzerinden değişenler:
 
-- **Alan yok, her yer:** etki alanı `EtkiAlani.herYer()`; afet kaymaz (`kaymaHizi` kalktı), siren ve durum paketi herkese gider.
+- **Alan yok, her yer:** etki alanı `EtkiAlani.herYer()`; afet kaymaz (`kaymaHizi` kalktı). "Her yer" afetin boyutudur (üst
+  dünya): siren, durum paketi, hasar ve başarım sayımı o boyuttaki herkese; Nether/End'deki oyuncu asitten etkilenmez (AF2-08).
   §2'deki "merkezden 1,5R içinde sis", "alan kenarında 16 blokluk geçiş" ve §6'daki "alan hedef oyuncunun çevresinde doğar"
   uygulanmaz: sis, bulut tavanı, yağış, sıçrama ve buhar kameranın bulunduğu her yerde. Seviye tablosundaki yarıçap artık
   aşınmanın her oyuncunun çevresindeki örnekleme yarıçapıdır.
@@ -133,8 +134,11 @@ kullanıcıda yağsın, herkes görebilsin; asit yağmuru tüm dünyada yağsın
   ve kar biyomunda da asit yağar (kar yerine asit).
 - **Hasar her oyuncuya:** başı göğe açık her oyuncu (yaratıcı, izleyici, ölü ve chunk'ı yüklenmemiş olan hariç) saniyede
   `hasarSaniye`; `asitMinimumCan` (4) aynen. Hedefe 500 blok uzaktaki oyuncu da hasar alır (GameTest).
-- **Aşınma oyuncuların çevresinde:** her örnek rastgele bir oyuncu seçer (yarısı 24 blok, yarısı seviye yarıçapı); hız oyuncu
-  başına tablo değeri, tick örnekleme bütçesi `asit_yagmuru.blokButcesi` (32) × TPS kısması; yüklenmemiş chunk okunmaz.
+- **Aşınma oyuncuların çevresinde:** her örnek rastgele bir oyuncu seçer (izleyici ve yaratıcı hariç; yarısı 24 blok, yarısı
+  seviye yarıçapı); hız oyuncu başına tablo değeri, tick örnekleme bütçesi `asit_yagmuru.blokButcesi` (32) × TPS kısması;
+  yüklenmemiş chunk okunmaz.
+- **Bilinen sınır (AF2-07):** gerçek yağmur soğuk biyomda vanilla kar katmanı biriktirir ve kazanları doldurur (istemci orada
+  asit çizer); bu `afetBlokHasari=false` iken de olur, mixin'siz engellenemez.
 - **Radar:** asit "gökyüzü anomalisi" (N7, yalnız güneş ve ay) değildir: normal ön-uyarı penceresinden itibaren radar "Asit
   Yağmuru, her yer" ve geri sayım gösterir, yön oku yoktur.
 - **Vitrin anı (§3) çöl eki:** çölde, yağmur görmeyen bir yerde sarı-yeşil sağanak; görsel kanıt `asit_uzak` karesi.
