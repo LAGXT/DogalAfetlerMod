@@ -279,7 +279,7 @@ hücresi). Sunucu TPS'i düşünce bu bütçeler kendiliğinden kısılır.
 
 ## Başarımlar
 
-Modun kendi başarım sekmesi **Doğal Afetler**'dir; 27 başarım vardır. "Sağ çıkmak": afetin etki alanındayken afet bitene kadar
+Modun kendi başarım sekmesi **Doğal Afetler**'dir; 28 başarım vardır (kök dahil). "Sağ çıkmak": afetin etki alanındayken afet bitene kadar
 ölmemek. Çok oyunculuda her oyuncu kendi başarımını kazanır.
 
 **Ödüller:** görev 15 XP; hedef 40 XP ve 1–2 Sıcak Salep; meydan okuma 100 XP ve bir ünvan. Ünvanlar: Kozmik Kâşif, Kutup
@@ -317,6 +317,7 @@ hayatta kalmada üretimle, yaratıcı kipte eşya envantere girince. XP miktarla
 | 24 | Felaket Ustası | meydan okuma | Seviye 5 bir afetten sağ çık. |
 | 25 | Hepsini Atlattım | meydan okuma, gizli | Sekiz afetin hepsinden en az bir kez sağ çık. |
 | 26 | Birlikte Hayatta | hedef, gizli | En az 3 oyuncu aynı afeti aynı anda atlatsın. |
+| 27 | Yeni Şafak | görev | Pulsar zincirinin sonunda eski güneşin geri dönüşünü üst dünyada canlı yaşa. |
 
 ## Cold Sweat ile birlikte kullanmak
 

@@ -20,6 +20,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.DenizSeviyesi;
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
 import io.github.kadirberkpolat1.dogalafetler.core.OyunTestiAfeti;
+import io.github.kadirberkpolat1.dogalafetler.core.PulsarYolu;
 import io.github.kadirberkpolat1.dogalafetler.core.olay.AfetBittiEvent;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.Gokyuzu;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
@@ -71,7 +72,7 @@ import net.minecraftforge.gametest.PrefixGameTestTemplate;
 import net.minecraftforge.registries.ForgeRegistries;
 
 /**
- * Başarımların oyun içi testleri (GOREV §6 #16; 27 başarımın her biri en az bir testte kazanılır, tablo rapor §6 #16):
+ * Başarımların oyun içi testleri (GOREV §6 #16; 28 başarımın her biri en az bir testte kazanılır, tablo rapor §6 #16):
  * gerçek afet yaşam döngüsü ({@link OyunTestiAfeti}, geçici kayıt; sunucu geneli güneş ve ay dahil), sahte oyuncular ve
  * datagen'le üretilmiş advancement'lar. Faz 4 afetinin iç davranışına bağlı koşullar (#2, #4, #5, #6) afetin
  * yayınlayacağı {@link BasarimIpucuEvent} testten yayınlanarak sınanır. Her test kendi oyuncularını açar; tek afet
@@ -747,7 +748,7 @@ public final class BasarimOyunTestleri {
             String ad = a.getDisplayName().getString();
             dogrula(y, ad.equals("komut-a"), "ad öneksiz: " + ad);
             int bilgi = komut(server, "dogalafet basarim bilgi");
-            dogrula(y, bilgi == Basarimlar.values().length, "27 başarım yüklü: " + bilgi);
+            dogrula(y, bilgi == Basarimlar.values().length, "28 başarım yüklü: " + bilgi);
         } finally {
             cikar(y, List.of(a));
         }
@@ -818,6 +819,35 @@ public final class BasarimOyunTestleri {
             dogrula(y, !kazandi(y, b, Basarimlar.GUNESI_ATLATTIM) && !kazandi(y, b, Basarimlar.SUPERNOVA_TANIGI),
                     "süreçte ölen ikisini de almaz");
             dogrula(y, !kazandi(y, a, Basarimlar.FIRTINAYA_MEYDAN_OKU), "seviyesiz afet seviye başarımı vermez");
+        } finally {
+            yonetici.sifirla();
+            cikar(y, List.of(a, b));
+        }
+        y.succeed();
+    }
+
+    /**
+     * N29 "Yeni Şafak": eski güneş pulsar yolundan ({@code PulsarYolu.gunesDondu}) dönünce üst dünyadaki canlı oyuncular
+     * kazanır; bayraksız NORMAL'e dönüş (süpernova yolu, geri alma, sıfırlama) vermez, ölü oyuncu almaz.
+     */
+    @GameTest(template = "bos", batch = "basarim_yeni_safak")
+    public static void eskiGunesPulsarYolundanDonunceYeniSafak(GameTestHelper y) {
+        AfetYoneticisi yonetici = AfetYoneticisi.al(y.getLevel().getServer());
+        DunyaDonemi donem = yonetici.donem();
+        ServerPlayer a = oyuncu(y, "safak-a", 0);
+        ServerPlayer b = oyuncu(y, "safak-b", 2);
+        try {
+            yonetici.sifirla();
+            donem.gunesEvresiAyarla(GunesEvresi.KIZIL_CUCE);
+            donem.gunesEvresiAyarla(GunesEvresi.NORMAL);
+            dogrula(y, !kazandi(y, a, Basarimlar.YENI_SAFAK), "pulsar yolu olmadan NORMAL'e dönüş Yeni Şafak değil");
+            donem.gunesEvresiAyarla(GunesEvresi.KIZIL_CUCE);
+            b.kill();
+            PulsarYolu.gunesDonduAyarla(donem, true);
+            donem.gunesEvresiAyarla(GunesEvresi.NORMAL);
+            dogrula(y, kazandi(y, a, Basarimlar.YENI_SAFAK), "eski güneş pulsar yolundan dönünce Yeni Şafak");
+            dogrula(y, !kazandi(y, b, Basarimlar.YENI_SAFAK), "ölü oyuncu almaz");
+            dogrula(y, gorunur(y, a, Basarimlar.YENI_SAFAK), "güneş dalında görünür");
         } finally {
             yonetici.sifirla();
             cikar(y, List.of(a, b));

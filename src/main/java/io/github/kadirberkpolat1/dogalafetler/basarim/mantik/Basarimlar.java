@@ -3,8 +3,8 @@ package io.github.kadirberkpolat1.dogalafetler.basarim.mantik;
 import java.util.Optional;
 
 /**
- * "Doğal Afetler" başarım sekmesi: kök "Felaket Başlıyor" ve madde 12 listesindeki 26 başarım, şartnamedeki numara, tür
- * ve gizlilikle birebir. Advancement kimliği {@code dogalafetler:dogalafetler/<yol>}. Datagen (JSON, dil dosyaları) ve
+ * "Doğal Afetler" başarım sekmesi: kök "Felaket Başlıyor", madde 12 listesindeki 26 başarım ve N29'daki "Yeni Şafak" (27),
+ * şartnamedeki numara, tür ve gizlilikle birebir. Advancement kimliği {@code dogalafetler:dogalafetler/<yol>}. Datagen (JSON, dil dosyaları) ve
  * testler bu listeyi okur. Ebeveyn her zaman önce tanımlıdır; ağaç sekmenin yerleşimidir, ön koşul değildir
  * (vanilla: çocuk ebeveynden önce kazanılabilir). Mod eşyası ikonları ({@code dogalafetler:}) datagen anında kayıtlı
  * değilse vanilla yedeği kullanılır.
@@ -146,7 +146,12 @@ public enum Basarimlar {
             "minecraft:cake", null,
             "Surviving Together", "Birlikte Hayatta",
             "Survive the same disaster together with at least 3 players",
-            "En az 3 oyuncu aynı afetin etki alanında birlikte sağ çıksın");
+            "En az 3 oyuncu aynı afetin etki alanında birlikte sağ çıksın"),
+    YENI_SAFAK(27, "yeni_safak", BasarimTuru.GOREV, SUPERNOVA_TANIGI, false, null,
+            "minecraft:clock", null,
+            "New Dawn", "Yeni Şafak",
+            "Live to see the old sun return at the end of the pulsar chain",
+            "Pulsar zincirinin sonunda eski güneşin geri dönüşünü yaşa");
 
     private final int no;
     private final String yol;

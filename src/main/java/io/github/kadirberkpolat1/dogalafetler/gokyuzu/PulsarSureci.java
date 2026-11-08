@@ -1,8 +1,6 @@
 package io.github.kadirberkpolat1.dogalafetler.gokyuzu;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
-import io.github.kadirberkpolat1.dogalafetler.basarim.BasarimIpucuEvent;
-import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.Ipucu;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
 import io.github.kadirberkpolat1.dogalafetler.core.DonemAlani;
@@ -19,7 +17,6 @@ import java.util.Optional;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.GameRules;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.TickEvent;
@@ -60,7 +57,6 @@ public final class PulsarSureci implements DonemSureci {
     static void kaydet() {
         ornek = new PulsarSureci();
         AfetYoneticisi.donemSureciKaydet(ornek);
-        BasarimIpucuEvent.yayinciKaydet(AfetTuru.GUNES_PATLAMASI, Ipucu.YENI_SAFAK);
         MinecraftForge.EVENT_BUS.addListener(EventPriority.NORMAL, false, TickEvent.ServerTickEvent.class, ornek::tick);
         MinecraftForge.EVENT_BUS.addListener(EventPriority.NORMAL, false, DonemDegistiEvent.class, PulsarSureci::donemDegisti);
     }
@@ -254,7 +250,8 @@ public final class PulsarSureci implements DonemSureci {
     }
 
     /**
-     * Kızıl cüce doğuşu bitti: eski güneş döner, donma doğal çözülür, üst dünyadaki oyunculara "Yeni Şafak" ipucu; zincir
+     * Kızıl cüce doğuşu bitti: eski güneş döner, donma doğal çözülür ("Yeni Şafak" başarımını {@code gunesDondu} bayrağı evreden
+     * önce yazıldığı için başarım sistemi {@code DonemDegistiEvent}'ten verir, N29); zincir
      * tükendi (madde 4: güneş patlaması yalnız {@code tekrarlanabilir} açıkken yeniden seçilir).
      */
     private static void eskiGunesDoner(MinecraftServer server, DunyaDonemi donem, String neden) {
@@ -267,9 +264,6 @@ public final class PulsarSureci implements DonemSureci {
         donem.gunesEvresiAyarla(GunesEvresi.NORMAL);
         DogalAfetler.LOGGER.info("Güneş zinciri: kizil_cuce_dogus -> normal (eski güneş döndü)");
         DogalAfetler.LOGGER.info("Pulsar zinciri tamam ({}), saat={}, donma={}", neden, donem.saat(), donem.donmaIlerlemesi());
-        for (ServerPlayer oyuncu : server.overworld().players()) {
-            MinecraftForge.EVENT_BUS.post(new BasarimIpucuEvent(oyuncu, Ipucu.YENI_SAFAK));
-        }
     }
 
     /**
