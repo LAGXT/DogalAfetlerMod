@@ -1,5 +1,6 @@
 package io.github.kadirberkpolat1.dogalafetler.client.sicaklik;
 
+import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.NefesBuhari;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.Particle;
 import net.minecraft.client.particle.ParticleProvider;
@@ -9,8 +10,9 @@ import net.minecraft.client.particle.TextureSheetParticle;
 import net.minecraft.core.particles.SimpleParticleType;
 
 /**
- * Vücut durumu parçacıkları (§A8, S3-10). Nefes buharı: ağızdan çıkan yarı saydam bulutçuk; hızla yavaşlar, büyür,
- * hafifçe yükselir ve söner. Ter damlası: baş ve omuz hizasından düşen damla (lacivert kontür, parlak gövde, düşüş izi:
+ * Vücut durumu parçacıkları (§A8, S3-10, S3-11). Nefes buharı: ağızdan öne savrulan, açık gri kenarlı yoğun bulutçuk;
+ * hızla yavaşlar, ömrünün ilk yarısında opak kalır, sonra büyüyerek yumuşakça söner ({@code NefesBuhari}). Ter damlası:
+ * baş ve omuz hizasından düşen damla (lacivert kontür, parlak gövde, düşüş izi:
  * gökte, çimende ve kumda seçilir); yerçekimiyle hızlanır, zemine değince sıçrama karesine geçip kısa sürede kaybolur.
  */
 final class SicaklikParcacigi extends TextureSheetParticle {
@@ -36,14 +38,14 @@ final class SicaklikParcacigi extends TextureSheetParticle {
         this.zd = vz;
         switch (tur) {
             case BUHAR -> {
-                lifetime = 22 + random.nextInt(10);
-                quadSize = 0.10F + random.nextFloat() * 0.05F;
+                lifetime = 26 + random.nextInt(10);
+                quadSize = 0.16F + random.nextFloat() * 0.06F;
                 hasPhysics = false;
-                gravity = -0.012F;
-                friction = 0.86F;
-                float ton = 0.92F + random.nextFloat() * 0.08F;
-                setColor(ton, ton, Math.min(1F, ton + 0.04F));
-                alpha = 0.72F;
+                gravity = -0.01F;
+                friction = 0.88F;
+                float ton = 0.96F + random.nextFloat() * 0.04F;
+                setColor(ton, ton, 1F);
+                alpha = NefesBuhari.ALFA;
                 setSpriteFromAge(kareler);
             }
             case TER -> {
@@ -71,9 +73,8 @@ final class SicaklikParcacigi extends TextureSheetParticle {
         switch (tur) {
             case BUHAR -> {
                 setSpriteFromAge(kareler);
-                quadSize = ilkBoy * (1.0F + oran * 1.6F);
-                // İlk birkaç tick'te yoğun, sonra yumuşakça söner.
-                alpha = ilkAlfa * (oran < 0.15F ? 1.0F : (1.0F - oran) / 0.85F);
+                quadSize = ilkBoy * NefesBuhari.buyume(oran);
+                alpha = ilkAlfa * NefesBuhari.opaklik(oran);
             }
             case TER -> {
                 if (onGround && yereDegdi < 0) {

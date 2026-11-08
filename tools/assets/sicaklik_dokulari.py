@@ -12,7 +12,7 @@
   misc/sicaklik_bunalma.png   256x256 buz kenarının kırmızı karşılığı (aynı kenar maskesi): süzülen ter izleri + ısı lekeleri
   misc/sicaklik_sicak.png     256x256 sıcak hava vinyeti; dikey yönde kesintisiz (efekt onu yukarı kaydırır)
   mob_effect/islak.png        18x18   Islak gösterge efekti: su damlası
-  particle/nefes_buhari_0..3  8x8     nefes buharı bulutçuğu (yaşla dağılır)
+  particle/nefes_buhari_0..3  16x16   nefes buharı bulutçuğu: yoğun beyaz iç, açık gri kenar (yaşla yayılıp seyrelir)
   particle/ter_damlasi_0..3   8x8     ter damlası: lacivert kontür, parlak gövde, düşüş izi (0-2 düşen, 3 sıçrama)
 
 Çalıştırma: KÖK/.venv/bin/python tools/assets/sicaklik_dokulari.py (aynı tohum -> aynı bayt).
@@ -375,22 +375,32 @@ def islak_ikonu():
     return img
 
 
+BUHAR_KENAR = (182, 190, 204)
+BUHAR_IC = (250, 252, 255)
+
+
 def buhar_karesi(i):
-    """8x8 yumuşak buhar bulutçuğu; kare ilerledikçe yayılır ve seyrelir."""
+    """16x16 nefes bulutçuğu (S3-11): dört yumuşak topak; iç yoğun ve beyaz, kenar açık gri ve en az 0,45 opak (beyaz
+    gökte ve karda da seçilir). Kare ilerledikçe yayılır ve seyrelir (son iki kare ömrün sönüm yarısında görünür)."""
+    n = 16
     rng = np.random.default_rng(300 + i)
-    yy, xx = np.mgrid[0:8, 0:8].astype(np.float64) + 0.5
-    sigma = 1.5 + 0.35 * i
-    yogunluk = np.zeros((8, 8))
-    for _ in range(3):
-        cx, cy = 4 + rng.uniform(-0.9, 0.9), 4 + rng.uniform(-0.9, 0.9)
+    yy, xx = np.mgrid[0:n, 0:n].astype(np.float64) + 0.5
+    sigma = 3.0 + 0.4 * i
+    yogunluk = np.zeros((n, n))
+    for _ in range(4):
+        cx, cy = n / 2 + rng.uniform(-2.2, 2.2), n / 2 + rng.uniform(-1.8, 1.8)
         yogunluk += np.exp(-((xx - cx) ** 2 + (yy - cy) ** 2) / (2 * sigma ** 2))
     yogunluk /= yogunluk.max()
-    alfa = np.clip(yogunluk * (1.0 - 0.12 * i) * (0.85 + 0.15 * rng.random((8, 8))), 0, 1)
-    img = np.zeros((8, 8, 4), dtype=np.uint8)
-    img[..., 0] = 255
-    img[..., 1] = 255
-    img[..., 2] = 255
-    img[..., 3] = (alfa * 235).astype(np.uint8)
+    esik = 0.22 + 0.03 * i
+    ic = yogunluk > esik
+    derin = np.clip((yogunluk - esik) / (1 - esik), 0, 1)
+    alfa = np.where(ic, np.clip(0.5 + 0.5 * derin, 0, 1) * (1.0 - 0.12 * i), 0)
+    t = np.clip((yogunluk - esik) / 0.25, 0, 1)[..., None]
+    renk = np.array(BUHAR_KENAR) * (1 - t) + np.array(BUHAR_IC) * t
+    img = np.zeros((n, n, 4), dtype=np.uint8)
+    img[..., :3] = np.round(renk).astype(np.uint8)
+    img[..., 3] = np.round(alfa * 255).astype(np.uint8)
+    img[~ic] = 0
     return Image.fromarray(img, "RGBA")
 
 

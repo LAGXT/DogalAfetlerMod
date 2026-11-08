@@ -17,14 +17,16 @@ import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.common.Mod;
 
 /**
- * Görsel kanıt otomasyonu (K0-21 rev. 2, S3-07, S3-10). Yalnız {@code -Ddogalafetler.otomasyon=sicaklik|sicaklik_coldsweat}
- * ile çalışır; üretimde etkisizdir. {@code sicaklik}: oyuncu OP olunca vücut sıcaklığını (°C) ve ıslaklığı komutla ayarlayıp
+ * Görsel kanıt otomasyonu (K0-21 rev. 2, S3-07, S3-10, S3-11). Yalnız {@code -Ddogalafetler.otomasyon=sicaklik|
+ * sicaklik_coldsweat} ile çalışır; üretimde etkisizdir. {@code sicaklik}: oyuncu OP olunca vücut sıcaklığını (°C) ve
+ * ıslaklığı komutla ayarlayıp
  * sahneleri sırayla çeker: birinci şahısta HUD normal, ıslak, donma, bunalma, yanma (iki nabız fazı); üçüncü şahısta
  * aynı kameradan normal karşılaştırma karesi, üşümede ağız buharı, bunalmada ter ve kırmızı kenar; termometre
  * menüsü; terin gök, çimen ve kum önünde üç kare (zemin oyuncunun altına {@code fill} ile serilir, kamera açısı arka
- * planı seçer). Birinci şahıs sahnelerinde oyuncunun kendi parçacık sayısı log'a yazılır (0 olmalı); her kare satırı
- * hapın ekran konumunu ve sayı rengini de yazar (piksel ölçümü {@code tools/senaryo/sicaklik_olcum.py}). Sonra sunucu
- * konsolunun komutları için bekler ve kapanır.
+ * planı seçer); ağız buharı için gök ve çimen açılarında buharsız kontrol kare ({@code normal_<zemin>}), üşüme ve
+ * donma buharı, buharsız bunalma (negatif kontrol) ve birinci şahıs üşüme. Birinci şahıs sahnelerinde oyuncunun kendi
+ * parçacık sayısı log'a yazılır (0 olmalı); her kare satırı hapın ekran konumunu ve sayı rengini de yazar (piksel ölçümü
+ * {@code tools/senaryo/sicaklik_olcum.py}). Sonra sunucu konsolunun komutları için bekler ve kapanır.
  * {@code sicaklik_coldsweat}: Cold Sweat yüklü tek oyunculu dünyada kapı durumunu loglar ve bir görüntü alır. Klavye, fare
  * ve tekerlek girdileri kapanışa kadar sayılır (sıfırdan farklıysa koşu geçersizdir). Kendi açmadığı duraklatma ekranını
  * kapatır; adımlar durum koşuluyla ilerler.
@@ -65,7 +67,14 @@ public final class SicaklikOtomasyonu {
             new Sahne("menu", 35.6, 60, Kip.MENU, 8f, null),
             new Sahne("ter_gok", 38.8, 0, Kip.TER, 20f, null),
             new Sahne("ter_cimen", 38.8, 0, Kip.TER, -35f, "minecraft:grass_block"),
-            new Sahne("ter_kum", 38.8, 0, Kip.TER, -35f, "minecraft:sand"));
+            new Sahne("ter_kum", 38.8, 0, Kip.TER, -35f, "minecraft:sand"),
+            new Sahne("normal_gok", 37.0, 0, Kip.HUD_3P, 20f, null),
+            new Sahne("usume_gok", 35.6, 0, Kip.BUHAR, 20f, null),
+            new Sahne("donma_gok", 34.4, 0, Kip.BUHAR, 20f, null),
+            new Sahne("bunalma_gok", 38.6, 0, Kip.HUD_3P, 20f, null),
+            new Sahne("normal_cimen", 37.0, 0, Kip.HUD_3P, -35f, "minecraft:grass_block"),
+            new Sahne("usume_cimen", 35.6, 0, Kip.BUHAR, -35f, null),
+            new Sahne("usume_1p", 35.6, 0, Kip.HUD, 8f, null));
 
     private static int tus;
     private static int fare;

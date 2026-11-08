@@ -10,6 +10,7 @@ import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.IsiAlisverisi;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Islaklik;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Kademe;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Katki;
+import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.NefesBuhari;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.OrtamSicakligi;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.SicaklikDurumu;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.SolEl;
@@ -252,8 +253,8 @@ public final class SicaklikYoneticisi {
 
     /**
      * Diğer oyunculara durum parçacıkları (S-08 rev.: kendisine gitmez, üçüncü şahısta istemci kendisi üretir): üşüme ve
-     * donmada 2–3 güncellemede bir ağızdan nefes buharı (üst dünyada dünya donması sürerken onun nefesi zaten
-     * çizilir), bunalma ve yanmada baş/omuz çevresinde ter damlası, ıslakken damlayan su.
+     * donmada 2–3 güncellemede bir ağızdan öne savrulan nefes bulutu ({@link NefesBuhari#bulutcuk}; üst dünyada dünya
+     * donması sürerken onun nefesi zaten çizilir), bunalma ve yanmada baş/omuz çevresinde ter damlası, ıslakken damlayan su.
      */
     private static void parcaciklariGonder(ServerPlayer oyuncu, Gecici g, SicaklikDurumu durum, double islaklik) {
         ServerLevel level = oyuncu.serverLevel();
@@ -277,13 +278,18 @@ public final class SicaklikYoneticisi {
         Vec3 agiz = oyuncu.getEyePosition().add(bakis.scale(0.35)).add(0, -0.12, 0);
         int damlaSayisi = 1 + (int) (islaklik * 3);
         int terSayisi = durum == SicaklikDurumu.YANMA ? 8 : 4;
+        Vec3[] bulut = new Vec3[buhar ? NefesBuhari.bulutcuk(durum) + oyuncu.getRandom().nextInt(2) : 0];
+        for (int i = 0; i < bulut.length; i++) {
+            bulut[i] = bakis.add(oyuncu.getRandom().nextGaussian() * 0.18, 0.06 + oyuncu.getRandom().nextGaussian() * 0.08,
+                    oyuncu.getRandom().nextGaussian() * 0.18);
+        }
         for (ServerPlayer izleyen : level.players()) {
             if (izleyen == oyuncu) {
                 continue;
             }
-            if (buhar) {
+            for (Vec3 yon : bulut) {
                 level.sendParticles(izleyen, SicaklikParcaciklari.NEFES_BUHARI.get(), false, agiz.x, agiz.y, agiz.z, 0,
-                        bakis.x, bakis.y, bakis.z, 0.04);
+                        yon.x, yon.y, yon.z, 0.09);
             }
             if (ter) {
                 level.sendParticles(izleyen, SicaklikParcaciklari.TER_DAMLASI.get(), false, oyuncu.getX(),

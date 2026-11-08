@@ -1,17 +1,23 @@
-"""Sıcaklık görsel kanıt karelerinin piksel ölçümü (S3-10). Ağır iş değil: yalnız PNG ve log okur.
+"""Sıcaklık görsel kanıt karelerinin piksel ölçümü (S3-10, S3-11). Ağır iş değil: yalnız PNG ve log okur.
 
 Kullanım: python3 tools/senaryo/sicaklik_olcum.py <kanıt/>   (sicaklik_gorsel.py hud <kanıt/> koşusundan sonra)
 
 Çıktı <kanıt/>/olcum.txt ve ekrana. Ölçüler:
   kenar   ekran kenarı bandı (kısa kenarın %12'si; alttaki %25 HUD/sıcak çubuğu için dışarıda) aynı kameranın normal
           karesine göre: ortalama CIELAB ΔE (görünür renk farkı), ΔE > 10 olan piksel oranı, ortalama RGB farkı ve
-          kızıllık (R - (G+B)/2) ile beyazlık (en küçük kanal) değişimi. Birinci şahıs kareleri `normal`, aynı kamera
-          açısındaki üçüncü şahıs kareleri (`usume`, `bunalma`) `normal_3p` ile karşılaştırılır; farklı açılı `ter_*` dışında.
+          kızıllık (R - (G+B)/2) ile beyazlık (en küçük kanal) değişimi. Birinci şahıs kareleri `normal` ile, üçüncü
+          şahıs kareleri aynı kamera açısındaki buharsız kontrol kare ile karşılaştırılır: `<durum>_<zemin>` için
+          `normal_<zemin>` (ör. `usume_gok` → `normal_gok`); eski adlı `usume`, `bunalma` için `normal_3p`. Kontrolü
+          olmayan (`ter_*`) kare karşılaştırılmaz.
   ter     ter dokusunun tam paleti (lacivert kontür 10,30,84 ve buz beyazı gövde 196,240,255, ±12): ikisini de içeren
           bağlı bileşen (6–800 piksel) bir damla; sayı ve her damlanın çevresindeki zemine WCAG karşıtlığı (kontür ya
           da gövdeden yüksek olanı).
-  buhar   `usume` ve `bunalma` (karşılaştırma) için `normal_3p`'ye göre ekranın orta üst bölgesinde açılan (L* +8,
-          ΔE > 10) piksel sayısı ve ortalama ΔE.
+  buhar   yalnız ağız penceresinde (önden 3. şahıs kamerası gözü ekranın ortasında tutar; pencere ortanın
+          0,2·Y sağı/solu, 0,12·Y üstü ile 0,25·Y altı) kontrol kareye göre beyaza doğru tek tip karışım: her kanalda
+          α = (kare − kontrol) / (255 − kontrol), en az iki geçerli kanal (255 − kontrol > 30) ve kanallar arası fark
+          < 0,15; sonuç açık renk (L* ≥ 40; modelin koyu piksellerindeki poz/ışık oynaması sayılmaz); ter damlasının
+          lacivert kontürünün 4 piksel çevresi (beyaz parlaması) dışarıda. α ≥ 0,15 piksel sayısı ile bu piksellerde
+          α ortalama / p90 / en çok. Buharsız kare (`bunalma_*`) negatif kontroldur: ≈ 0 çıkmalı.
   hap     HUD hapının içinde sayı pikselleri (log'daki sayı rengine yakın) ile hap içi zemininin WCAG karşıtlığı ve
           zeminin ortanca rengi. Kare satırında hap konumu yoksa (S3-10 öncesi koşu) yerleşimden hesaplanır ve sayı
           durum rengindedir.
@@ -27,7 +33,7 @@ from PIL import Image
 KARE = re.compile(r"SICAKLIK_OTOMASYON kare (sicaklik_\w+)\.png \((.*)\)\s*$")
 KONTUR = (18, 14, 12)
 TER_KONTUR, TER_GOVDE = (10, 30, 84), (196, 240, 255)
-AYNI_KAMERA_3P = ("usume", "bunalma")
+ESKI_3P = ("usume", "bunalma")
 # S3-10 öncesi hap sayısı durum rengindeydi (HudCizimi.renk).
 ESKI_SAYI_RENGI = {"NORMAL": "e8e6de", "USUME": "a6ddf8", "DONMA": "5eaeff", "BUNALMA": "ffb54a", "YANMA": "ff5a36"}
 # HudCizimi: bant genişliği 182, hap sol kenarı 74, hap 34x11; bantın tepesi ekranın altından 47 GUI pikseli.
@@ -131,13 +137,42 @@ def ter(kare):
     return damlalar
 
 
+def agiz_penceresi(h, w):
+    return slice(int(h / 2 - 0.12 * h), int(h / 2 + 0.25 * h)), slice(int(w / 2 - 0.2 * h), int(w / 2 + 0.2 * h))
+
+
 def buhar(kare, ref):
-    h, w = kare.shape[:2]
-    bolge = (slice(int(h * 0.08), int(h * 0.6)), slice(int(w * 0.3), int(w * 0.7)))
-    lk, lr = lab(kare[bolge]), lab(ref[bolge])
-    de = np.linalg.norm(lk - lr, axis=-1)
-    acilan = (de > 10) & (lk[..., 0] - lr[..., 0] > 8)
-    return int(acilan.sum()), float(de[acilan].mean()) if acilan.any() else 0.0
+    """Ağız penceresinde kontrole göre beyaza tek tip karışım: (piksel, α ort, α p90, α en çok)."""
+    p = agiz_penceresi(*kare.shape[:2])
+    k, r = kare[p], ref[p]
+    pay = 255 - r
+    gecerli = pay > 30
+    a = np.where(gecerli, (k - r) / np.maximum(pay, 1), np.inf)
+    ort = np.where(gecerli, a, 0).sum(axis=2) / np.maximum(gecerli.sum(axis=2), 1)
+    fark = np.where(gecerli, a, -np.inf).max(axis=2) - a.min(axis=2)
+    ter_cevresi = np.abs(k - np.array(TER_KONTUR)).max(axis=2) <= 12
+    for _ in range(4):
+        t = ter_cevresi.copy()
+        t[1:] |= ter_cevresi[:-1]
+        t[:-1] |= ter_cevresi[1:]
+        t[:, 1:] |= ter_cevresi[:, :-1]
+        t[:, :-1] |= ter_cevresi[:, 1:]
+        ter_cevresi = t
+    acik = lab(k)[..., 0] >= 40
+    buharli = (gecerli.sum(axis=2) >= 2) & (fark < 0.15) & (ort >= 0.15) & acik & ~ter_cevresi
+    if not buharli.any():
+        return 0, 0.0, 0.0, 0.0
+    v = ort[buharli]
+    return int(buharli.sum()), float(v.mean()), float(np.percentile(v, 90)), float(v.max())
+
+
+def kontrol_adi(ad, birinci, kareler):
+    if birinci:
+        return "normal"
+    zemin = ad.rsplit("_", 1)[1] if "_" in ad else None
+    if zemin and f"normal_{zemin}" in kareler:
+        return f"normal_{zemin}"
+    return "normal_3p" if ad in ESKI_3P else None
 
 
 def hap(kare, satir):
@@ -177,9 +212,9 @@ def main():
         durum, vucut = alan(satir, r"durum (\w+)"), alan(satir, r"vücut ([\d.]+)")
         parcalar = [f"{ad}: durum {durum}, vücut {vucut} °C, kamera {kamera}, kendi parçacığı {parcacik}"]
         birinci = kamera == "FIRST_PERSON"
-        ref = kareler.get("normal" if birinci else "normal_3p")
-        karsilastir = ref is not None and ref.shape == kare.shape and ad not in ("normal", "normal_3p", "menu") and (
-            birinci or ad in AYNI_KAMERA_3P)
+        kontrol = kontrol_adi(ad, birinci, kareler)
+        ref = kareler.get(kontrol) if kontrol else None
+        karsilastir = ref is not None and ref.shape == kare.shape and ad != kontrol and ad != "menu"
         if karsilastir:
             parcalar.append("kenar " + " ".join(f"{k}={v:.1f}" for k, v in kenar(kare, ref).items()))
         if not birinci:
@@ -191,8 +226,9 @@ def main():
             else:
                 parcalar.append("ter damlası 0")
             if karsilastir:
-                n, de = buhar(kare, ref)
-                parcalar.append(f"buhar (orta üst, açılan) {n} piksel ΔE {de:.1f}")
+                n, ort, p90, enc = buhar(kare, ref)
+                parcalar.append(f"buhar (ağız penceresi, {kontrol} karşısı) {n} piksel α ort {ort:.2f} p90 {p90:.2f} "
+                                f"en çok {enc:.2f}")
         if ad != "menu":
             sonuc = hap(kare, satir)
             parcalar.append("hap sayısı bulunamadı" if sonuc is None

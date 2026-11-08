@@ -5,6 +5,7 @@ import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciDonem;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.SicaklikDurumPaketi;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.SicaklikParcaciklari;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Kademe;
+import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.NefesBuhari;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.SicaklikDurumu;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
@@ -28,15 +29,16 @@ import net.minecraftforge.fml.common.Mod;
  * parlaması için saklanır. Çıkışta sıfırlanır.
  * <p>
  * Oyuncunun kendi parçacıkları (sunucu bunları oyuncunun kendisine göndermez, S-08 rev.) yalnız kamera birinci şahıs
- * değilken üretilir: üşüme ve donmada ~50 tick'te bir nefes (4–6 buhar bulutçuğu; dünya donması sürerken üretilmez, onun
- * nefesi zaten çizilir), bunalma ve yanmada ter damlası, ıslakken düşen su damlası, hasarlı kademede alev ya da kar tanesi.
+ * değilken üretilir: üşüme ve donmada ~50 tick'te bir nefes (her tick bir bulutçuk, {@code NefesBuhari.bulutcuk} kadar;
+ * dünya donması sürerken üretilmez, onun nefesi zaten çizilir), bunalma ve yanmada ter damlası, ıslakken düşen su
+ * damlası, hasarlı kademede alev ya da kar tanesi.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class IstemciSicaklik {
     private static final float YAKLASMA = 0.25f;
     /** Hasarlı kademe alev/kar tanesi aralığı (tick): sunucunun varsayılan güncelleme aralığı. */
     private static final int PARCACIK_ARALIGI = 20;
-    /** Nefes döngüsü (tick); her nefeste 2 tick arayla 4–6 bulutçuk. */
+    /** Nefes döngüsü (tick, ~2,5 sn); her nefeste tick başına bir bulutçuk. */
     static final int NEFES_DONGUSU = 50;
 
     private static SicaklikDurumPaketi durum = SicaklikDurumPaketi.KAPALI;
@@ -181,12 +183,12 @@ public final class IstemciSicaklik {
         RandomSource r = o.getRandom();
         if ((sd == SicaklikDurumu.USUME || sd == SicaklikDurumu.DONMA) && !dunyaDonuyor(mc)) {
             if (tick % NEFES_DONGUSU == 0) {
-                nefesKalan = 4 + r.nextInt(3);
+                nefesKalan = NefesBuhari.bulutcuk(sd) + r.nextInt(2);
             }
         } else {
             nefesKalan = 0;
         }
-        if (nefesKalan > 0 && tick % 2 == 0) {
+        if (nefesKalan > 0) {
             nefesKalan--;
             if (ucuncu) {
                 nefes(mc, o, r);
@@ -212,12 +214,13 @@ public final class IstemciSicaklik {
         }
     }
 
+    /** Ağızdan öne doğru kısa savrulan bulutçuk; nefesin bulutçukları biraz dağınık çıkar. */
     private static void nefes(Minecraft mc, LocalPlayer o, RandomSource r) {
         Vec3 bak = o.getViewVector(1f);
         Vec3 agiz = o.getEyePosition().add(bak.scale(0.3)).add(0, -0.12, 0);
         mc.level.addParticle(SicaklikParcaciklari.NEFES_BUHARI.get(), agiz.x, agiz.y, agiz.z,
-                bak.x * 0.06 + (r.nextDouble() - 0.5) * 0.012, bak.y * 0.04 + 0.004,
-                bak.z * 0.06 + (r.nextDouble() - 0.5) * 0.012);
+                bak.x * 0.09 + (r.nextDouble() - 0.5) * 0.03, bak.y * 0.06 + 0.006 + (r.nextDouble() - 0.5) * 0.015,
+                bak.z * 0.09 + (r.nextDouble() - 0.5) * 0.03);
         kendiParcacik++;
         sonNefes = tick;
     }
