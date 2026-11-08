@@ -19,14 +19,19 @@ class SirenProfiliTest {
                 "10 sn'den uzun döngü akışla (ses.md §5)");
     }
 
-    /** Ay çarpması 60 sn = standart 10 sn dosyasının 6 turu (K0-19); güneş 60 sn = 20 sn dosyanın 3 turu. */
+    /**
+     * Ay çarpması 25 sn = standart 10 sn dosyasının 2,5 turu, yukarı 3 (K0-19 rev. K-E67); güneş 25 sn = 20 sn dosyanın
+     * 1,25 turu, yukarı 2.
+     */
     @Test
     void donguSayisiSureyiDosyaBoyunaBoler() {
         SirenProfili ay = SirenProfili.icin(SirenTuru.afetIcin(AfetTuru.AY_CARPMASI));
         assertEquals(SirenProfili.STANDART, ay);
-        assertEquals(6, ay.donguSayisi(SirenTuru.sureTick(AfetTuru.AY_CARPMASI)));
+        assertEquals(3, ay.donguSayisi(SirenTuru.sureTick(AfetTuru.AY_CARPMASI)));
         assertEquals(1, SirenProfili.STANDART.donguSayisi(SirenTuru.sureTick(AfetTuru.DEPREM)));
-        assertEquals(3, SirenProfili.GUNES.donguSayisi(SirenTuru.sureTick(AfetTuru.GUNES_PATLAMASI)));
+        assertEquals(2, SirenProfili.GUNES.donguSayisi(SirenTuru.sureTick(AfetTuru.GUNES_PATLAMASI)));
+        assertTrue(SirenProfili.GUNES.acilisTick() + SirenProfili.GUNES.sondurmeTick()
+                < SirenTuru.sureTick(AfetTuru.GUNES_PATLAMASI) / 2, "açılış ve söndürme kısa sirenin yarısından kısa");
         assertEquals(1, SirenProfili.STANDART.donguSayisi(1), "kısa kalan süre de bir tur");
         assertEquals(2, SirenProfili.STANDART.donguSayisi(201), "yarım tur yukarı yuvarlanır");
     }

@@ -95,19 +95,28 @@ class AfetZamanlayicisiTest {
 
     @Test
     void varsayilanAyarlarlaSiklikMakulVeHerAfetGorulur() {
-        AfetSimulasyonu.Sonuc sonuc = new AfetSimulasyonu().afetSuresi(6000).donemGecisleri(true).kos(10_000_000);
+        AfetSimulasyonu.Sonuc sonuc = new AfetSimulasyonu().afetSuresi(6000).cakisma(true).donemGecisleri(true)
+                .kos(10_000_000);
         double gunluk = sonuc.gunlukOlay();
-        assertTrue(gunluk > 0.25 && gunluk < 1.0, "günlük afet sayısı makul aralıkta değil: " + gunluk);
+        assertTrue(gunluk > 2.0 && gunluk < 4.0, "günlük afet sayısı makul aralıkta değil: " + gunluk);
         for (AfetTuru tur : AfetTuru.values()) {
             assertTrue(sonuc.sayi(tur) > 0, tur + " 417 günde hiç çıkmadı: " + sonuc.sayilar());
         }
         assertEquals(1, sonuc.sayi(AfetTuru.AY_CARPMASI));
         assertEquals(1, sonuc.sayi(AfetTuru.GUNES_PATLAMASI));
+        assertEquals(0, sonuc.ayniAnIhlali());
         List<AfetSimulasyonu.Olay> olaylar = sonuc.olaylar();
         for (int i = 1; i < olaylar.size(); i++) {
-            long ara = olaylar.get(i).baslangic() - olaylar.get(i - 1).bitis();
-            assertTrue(ara >= ZamanlayiciAyarlari.VARSAYILAN.genelBeklemeTick(), "bekleme bozuldu: " + ara);
+            AfetSimulasyonu.Olay onceki = olaylar.get(i - 1);
+            long ara = olaylar.get(i).baslangic() - onceki.bitis();
+            assertTrue(ara >= enAzGenelBekleme(onceki.bitis()), "bekleme bozuldu: " + ara);
         }
+    }
+
+    /** Bitiş anındaki güne göre genel beklemenin alt sınırı (şiddet uzaması ≥ 1; K-E67 gün çarpanına bölünür). */
+    private static long enAzGenelBekleme(long bitis) {
+        ZamanlayiciAyarlari a = ZamanlayiciAyarlari.VARSAYILAN;
+        return (long) Math.floor(a.genelBeklemeTick() / a.gunCarpani(bitis / (double) AfetZamanlayicisi.GUN_TICK));
     }
 
     @Test
@@ -118,7 +127,7 @@ class AfetZamanlayicisiTest {
         List<Double> ay = new ArrayList<>();
         int gunesli = 0;
         for (int i = 0; i < dunya; i++) {
-            AfetSimulasyonu.Sonuc sonuc = new AfetSimulasyonu().tohum(1000 + i).adim(100).afetSuresi(8000)
+            AfetSimulasyonu.Sonuc sonuc = new AfetSimulasyonu().tohum(1000 + i).adim(100).afetSuresi(8000).cakisma(true)
                     .donemGecisleri(true).ilkOlaylardaDur(EnumSet.of(AfetTuru.GUNES_PATLAMASI, AfetTuru.AY_CARPMASI))
                     .kos(sinir);
             OptionalDouble g = sonuc.ilkGun(AfetTuru.GUNES_PATLAMASI);
@@ -193,18 +202,21 @@ class AfetZamanlayicisiTest {
     void carpanSonumundeBeklemeVeTekAfetKuraliBozulmaz() {
         CarpanListesi carpanlar = new CarpanListesi();
         carpanlar.ekle(new GeciciCarpan(AfetTuru.TSUNAMI, GeciciCarpan.EN_COK, 0, 200_000, 200_000, SonumTipi.USTEL));
-        AfetSimulasyonu.Sonuc sonuc = new AfetSimulasyonu().carpanlar(carpanlar).afetSuresi(4000).kos(400_000);
+        AfetSimulasyonu.Sonuc sonuc = new AfetSimulasyonu().carpanlar(carpanlar).afetSuresi(4000).cakisma(true)
+                .kos(400_000);
         assertEquals(0, sonuc.ayniAnIhlali());
         assertTrue(sonuc.sayi(AfetTuru.TSUNAMI) > 0);
         List<AfetSimulasyonu.Olay> olaylar = sonuc.olaylar();
+        ZamanlayiciAyarlari a = ZamanlayiciAyarlari.VARSAYILAN;
         for (int i = 1; i < olaylar.size(); i++) {
             AfetSimulasyonu.Olay onceki = olaylar.get(i - 1);
             AfetSimulasyonu.Olay olay = olaylar.get(i);
-            assertTrue(olay.baslangic() >= onceki.bitis(), "iki afet üst üste bindi");
-            assertTrue(olay.baslangic() - onceki.bitis() >= ZamanlayiciAyarlari.VARSAYILAN.genelBeklemeTick(),
+            assertTrue(olay.baslangic() >= onceki.bitis(), "tek oyuncuda iki afet üst üste bindi");
+            assertTrue(olay.baslangic() - onceki.bitis() >= enAzGenelBekleme(onceki.bitis()),
                     "çarpan genel beklemeyi bozdu");
             if (olay.tur() == onceki.tur()) {
-                assertTrue(olay.baslangic() - onceki.bitis() >= ZamanlayiciAyarlari.VARSAYILAN.turBekleme(olay.tur()),
+                double gunCarpani = a.gunCarpani(onceki.bitis() / (double) AfetZamanlayicisi.GUN_TICK);
+                assertTrue(olay.baslangic() - onceki.bitis() >= Math.floor(a.turBekleme(olay.tur()) / gunCarpani),
                         "çarpan afet başına beklemeyi bozdu");
             }
         }
@@ -223,7 +235,7 @@ class AfetZamanlayicisiTest {
     }
 
     @Test
-    void ayniAndaIkiAfetSecilmez() {
+    void yuvaDoluykenSecimYokVeSinirAsilmaz() {
         ZamanlayiciAyarlari ayarlar = ZamanlayiciAyarlari.VARSAYILAN.gunlukOranIle(1_000_000).baslangicBeklemeIle(0);
         SplittableRandom rastgele = new SplittableRandom(3);
         Set<AfetTuru> hepsi = EnumSet.allOf(AfetTuru.class);
@@ -280,15 +292,15 @@ class AfetZamanlayicisiTest {
         assertEquals(0, sonuc.toplam());
     }
 
-    /** K-C2 rev. 2 (AS-11): kullanıcı ilk afeti ilk oyun gününde görsün. */
+    /** K-C2 rev. 2 (AS-11), K-E67: ilk afet 3. dakikadan önce değil, 8. dakikada garanti; beklemeler kısa. */
     @Test
     void varsayilanBeklemelerIlkGunIcinKisa() {
         ZamanlayiciAyarlari a = ZamanlayiciAyarlari.VARSAYILAN;
-        assertEquals(6_000, a.baslangicBeklemeTick());
-        assertEquals(6_000, a.genelBeklemeTick());
-        assertEquals(24_000, a.ilkAfetGarantiTick());
+        assertEquals(3_600, a.baslangicBeklemeTick());
+        assertEquals(1_500, a.genelBeklemeTick());
+        assertEquals(9_600, a.ilkAfetGarantiTick());
         for (AfetTuru tur : SIK_ALTI) {
-            assertEquals(24_000, a.turBekleme(tur), tur.kimlik());
+            assertEquals(18_000, a.turBekleme(tur), tur.kimlik());
         }
         assertEquals(240_000, a.turBekleme(AfetTuru.AY_CARPMASI));
         assertEquals(480_000, a.turBekleme(AfetTuru.GUNES_PATLAMASI));

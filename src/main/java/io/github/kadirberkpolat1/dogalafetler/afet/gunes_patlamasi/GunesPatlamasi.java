@@ -31,7 +31,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.levelgen.Heightmap;
 
 /**
- * Güneş patlaması (bölüm D): seviyesiz, sunucu geneli. Siren başlayınca güneş BÜYÜYEN olur ve 60 sn'de 1,6 kata
+ * Güneş patlaması (bölüm D): seviyesiz, sunucu geneli. Siren başlayınca güneş BÜYÜYEN olur ve sirenin 25 sn'sinde 1,6 kata
  * büyür; AKTIF {@code aktifSureGun} (5 gün) sürer: evre ilerlemesi doğrusal 1'e (gökyüzü 3,2 kat, sıcaklık artışı ve
  * buharlaşma bu evreden okur), her oyuncunun çevresine {@link MeteorAPI#yagmur} ile dengeli meteorlar, 3. günden sonra
  * çimenler kavrulur. Meteor yoğunluğu {@link MeteorYagmuruEgrisi}'dir: ön-uyarının sonunda başlayıp sirende artan öncü

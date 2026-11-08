@@ -7,7 +7,8 @@ import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
  * kavrulma olasılığı ve başlama kapısı. Zamanlar ölçekli afet saati tick'idir.
  *
  * <p>Evre ilerlemesi gökyüzünde güneş ölçeğini ({@code 1 + 2,2·p}) ve ortam sıcaklığını ({@code artış·p}) sürer. Siren
- * boyunca {@code p = SIREN_SONU·τ²} (tasarım: güneş 60 sn'de 1,0 → 1,6 kat, sona doğru hızlanarak), AKTIF'in 5 gününde
+ * boyunca {@code p = SIREN_SONU·τ²} (tasarım: güneş siren süresinde, 25 sn'de (K0-19 rev. K-E67) 1,0 → 1,6 kat, sona
+ * doğru hızlanarak; τ siren süresine oran olduğu için eğri süreden bağımsızdır), AKTIF'in 5 gününde
  * {@code SIREN_SONU → 1} doğrusal (güneş 1,6 → 3,2 kat).
  */
 public final class GunesPatlamasiEgrileri {

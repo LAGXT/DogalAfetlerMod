@@ -166,8 +166,9 @@ public final class UyariOyunTestleri {
     }
 
     /**
-     * Sunucu geneli sirenler (V7): güneş patlaması kendi sireni, ay çarpması standart siren; ikisi de 1200 tick (K0-19),
-     * AKTIF'te türün fade-out'uyla durdurma (güneş 80, standart 40).
+     * Sunucu geneli sirenler (V7): güneş patlaması kendi sireni, ay çarpması standart siren; ikisi de
+     * {@link SirenTuru#UZUN_SURE_TICK} tick (25 sn, K0-19 rev. K-E67), AKTIF'te türün fade-out'uyla durdurma (güneş 80,
+     * standart 40).
      */
     private static void uzunSiren(GameTestHelper yardimci, AfetTuru afetTuru, SirenTuru beklenen) {
         Sahne sahne = Sahne.kur(yardimci, afetTuru);
@@ -200,7 +201,7 @@ public final class UyariOyunTestleri {
     }
 
     @GameTest(template = "bos", batch = "uyari_ay", timeoutTicks = 100)
-    public static void ayCarpmasiStandartSireniAltmisSaniyeCalarIkiSaniyedeSoner(GameTestHelper yardimci) {
+    public static void ayCarpmasiStandartSireniYirmiBesSaniyeCalarIkiSaniyedeSoner(GameTestHelper yardimci) {
         uzunSiren(yardimci, AfetTuru.AY_CARPMASI, SirenTuru.STANDART);
     }
 

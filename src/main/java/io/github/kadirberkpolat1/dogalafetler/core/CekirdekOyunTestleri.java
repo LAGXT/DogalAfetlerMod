@@ -5,6 +5,7 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.config.CekirdekAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.AfetZamanlayicisi;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.OyunGunu;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SonrakiAfetTahmini;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SonumTipi;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.ZamanlayiciAyarlari;
@@ -313,7 +314,7 @@ public final class CekirdekOyunTestleri {
 
     /**
      * AS-8 (kullanıcı isteği 2026-11-08): komutla iki farklı afet aynı anda AKTIF olur, aynı tür reddedilir, {@code stop <afet>}
-     * yalnız onu durdurur, doğal seçim liste boşken açılır ve dönem kaydı iki afeti birden taşır.
+     * yalnız onu durdurur, doğal seçim yalnız boş yuvada açılır (K-E67) ve dönem kaydı iki afeti birden taşır.
      */
     @GameTest(template = "bos", batch = "cekirdek_coklu")
     public static void komutlaIkiFarkliAfetAyniAndaSurer(GameTestHelper yardimci) {
@@ -348,7 +349,10 @@ public final class CekirdekOyunTestleri {
                     "aynı tick'te başlayan iki afet farklı afetNo almalı (AS-16)");
             yardimci.assertTrue(d.asama() == AfetAsamasi.AKTIF && k.asama() == AfetAsamasi.AKTIF && d.seviye() == 2,
                     "iki farklı afet aynı anda AKTIF olmalı: " + d.asama() + " / " + k.asama());
-            yardimci.assertTrue(yonetici.secimYap(true).isEmpty(), "afet sürerken doğal seçim yapılmamalı");
+            Optional<AfetTuru> yanina = yonetici.secimYap(true);
+            yardimci.assertTrue(yonetici.dogalYuvaDolu() ? yanina.isEmpty()
+                    : yanina.map(t -> t != AfetTuru.DEPREM && t != AfetTuru.KASIRGA && !t.sunucuGeneli()).orElse(true),
+                    "afet sürerken doğal seçim yalnız boş yuvaya, sürmeyen bölgesel türden olmalı (K-E67): " + yanina);
 
             List<CompoundTag> kayit = DunyaDonemi.yukle(yonetici.donem().save(new CompoundTag())).bekleyenAfetleriAl();
             yardimci.assertTrue(kayit.size() == 2 && Afet.turOku(kayit.get(0)).equals(Optional.of(AfetTuru.DEPREM))
@@ -373,6 +377,78 @@ public final class CekirdekOyunTestleri {
             server.getPlayerList().remove(oyuncu);
         }
         yardimci.succeed();
+    }
+
+    /**
+     * K-E67 (kullanıcı isteği "gün geçtikçe sayıları artsın"): gün 15'ten önce tek, 15–39 arası iki, 40'tan sonra üç doğal
+     * afet aynı anda sürer; etki alanı süren afetinkiyle çakışan doğal afet başlamaz; TPS kısılıyken ikinci afet ertelenir;
+     * komutla başlatma bunlara bağlı değildir; yoğunluk yalnız doğal başlangıçları sayar.
+     */
+    @GameTest(template = "bos", batch = "cekirdek_eszamanli")
+    public static void dogalAfetlerGunleEszamanliCakismadanBaslar(GameTestHelper yardimci) {
+        ServerLevel level = yardimci.getLevel();
+        MinecraftServer server = level.getServer();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(server);
+        yonetici.durdur();
+        DunyaDonemi donem = yonetici.donem();
+        long oncekiOfset = donem.gunOfseti();
+        BlockPos konum = yardimci.absolutePos(BlockPos.ZERO);
+        ServerPlayer a = sahteOyuncu(yardimci, konum.getX() + 0.5, konum.getY(), konum.getZ() + 0.5);
+        ServerPlayer b = sahteOyuncu(yardimci, konum.getX() + 300.5, konum.getY(), konum.getZ() + 0.5);
+        ServerPlayer c = sahteOyuncu(yardimci, konum.getX() + 600.5, konum.getY(), konum.getZ() + 0.5);
+        try (AfetKaydi.GeciciKayit deprem = AfetKaydi.geciciKaydet(AfetTuru.DEPREM,
+                () -> new OyunTestiAfeti(AfetTuru.DEPREM, 8, 6000));
+                AfetKaydi.GeciciKayit kasirga = AfetKaydi.geciciKaydet(AfetTuru.KASIRGA,
+                        () -> new OyunTestiAfeti(AfetTuru.KASIRGA, 8, 6000));
+                AfetKaydi.GeciciKayit sinkhole = AfetKaydi.geciciKaydet(AfetTuru.SINKHOLE,
+                        () -> new OyunTestiAfeti(AfetTuru.SINKHOLE, 8, 6000))) {
+            gunAyarla(server, donem, 5);
+            int dogalOnce = donem.sonGunDogalAfetSayisi();
+            yardimci.assertTrue(yonetici.dogalBaslat(AfetTuru.DEPREM, 1, a) == AfetYoneticisi.BaslatmaSonucu.BASLADI,
+                    "ilk doğal afet başlamadı");
+            yardimci.assertTrue(donem.sonGunDogalAfetSayisi() == dogalOnce + 1, "doğal başlangıç sayılmadı");
+            yardimci.assertTrue(yonetici.dogalBaslat(AfetTuru.KASIRGA, 1, b) == AfetYoneticisi.BaslatmaSonucu.ZATEN_AKTIF,
+                    "gün 5'te ikinci doğal afet başlamamalı");
+
+            gunAyarla(server, donem, 20);
+            yardimci.assertTrue(yonetici.dogalBaslat(AfetTuru.KASIRGA, 1, a) == AfetYoneticisi.BaslatmaSonucu.CAKISIYOR,
+                    "süren depremle aynı yerde doğal kasırga çakışmalı");
+            yardimci.assertTrue(yonetici.aktifAfet(AfetTuru.KASIRGA).isEmpty(), "çakışan afet kalmamalı");
+            yardimci.assertTrue(yonetici.dogalBaslat(AfetTuru.DEPREM, 1, b) == AfetYoneticisi.BaslatmaSonucu.ZATEN_AKTIF,
+                    "aynı tür ikinci kez başlamamalı");
+            yardimci.assertTrue(yonetici.dogalBaslat(AfetTuru.KASIRGA, 1, b) == AfetYoneticisi.BaslatmaSonucu.BASLADI,
+                    "gün 20'de uzaktaki ikinci doğal afet başlamalı");
+            yardimci.assertTrue(yonetici.dogalBaslat(AfetTuru.SINKHOLE, 1, c) == AfetYoneticisi.BaslatmaSonucu.ZATEN_AKTIF,
+                    "gün 20'de üçüncü doğal afet başlamamalı");
+            yardimci.assertTrue(yonetici.secimYap(true).isEmpty(), "yuva doluyken seçim yapılmamalı");
+
+            gunAyarla(server, donem, 45);
+            TpsOlcer.testKismasi(0.5);
+            yardimci.assertTrue(yonetici.dogalBaslat(AfetTuru.SINKHOLE, 1, c) == AfetYoneticisi.BaslatmaSonucu.ZATEN_AKTIF,
+                    "TPS kısılıyken üçüncü afet ertelenmeli");
+            TpsOlcer.testKismasi(null);
+            yardimci.assertTrue(yonetici.dogalBaslat(AfetTuru.SINKHOLE, 1, c) == AfetYoneticisi.BaslatmaSonucu.BASLADI,
+                    "gün 45'te üçüncü doğal afet başlamalı");
+            yardimci.assertTrue(yonetici.aktifAfetler().size() == 3 && yonetici.dogalYuvaDolu(), "üç afet, yuva dolu");
+
+            yonetici.durdur(AfetTuru.KASIRGA);
+            int dogalSonra = donem.sonGunDogalAfetSayisi();
+            yardimci.assertTrue(yonetici.elleBaslat(AfetTuru.KASIRGA, 1, a, level, konum)
+                    == AfetYoneticisi.BaslatmaSonucu.BASLADI, "komutla başlatma çakışmaya bağlı olmamalı");
+            yardimci.assertTrue(donem.sonGunDogalAfetSayisi() == dogalSonra, "komutla başlayan yoğunluğa sayılmamalı");
+        } finally {
+            TpsOlcer.testKismasi(null);
+            yonetici.durdur();
+            donem.gunOfsetiAyarla(oncekiOfset);
+            server.getPlayerList().remove(a);
+            server.getPlayerList().remove(b);
+            server.getPlayerList().remove(c);
+        }
+        yardimci.succeed();
+    }
+
+    private static void gunAyarla(MinecraftServer server, DunyaDonemi donem, long gun) {
+        donem.gunOfsetiAyarla(OyunGunu.ofset(gun, server.overworld().getGameTime(), donem.uykuBirikimi()));
     }
 
     /**

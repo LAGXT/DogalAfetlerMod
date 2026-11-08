@@ -159,7 +159,7 @@ public final class AyCarpmasiGokyuzu {
         sisKur.run();
     }
 
-    // ------------------------------------------------------------------ yaklaşma (siren, 0–60 sn)
+    // ------------------------------------------------------------------ yaklaşma (siren, 0–AyEgrileri.YAKLASMA_SN)
 
     private static void yaklasma(Matrix4f m, float s, float a, float oyunSn) {
         Vector3f yon = yon(AyEgrileri.egim(s), 0f);

@@ -43,7 +43,7 @@ class SonrakiAfetTahminiTest {
         Set<AfetTuru> hepsi = EnumSet.allOf(AfetTuru.class);
         assertEquals(A.baslangicBeklemeTick(), tahmin(A, 0, new BeklemeDurumu(), hepsi, 1).enErken());
         assertEquals(A.baslangicBeklemeTick() / 10, tahmin(A, 0, new BeklemeDurumu(), hepsi, 10).enErken());
-        assertEquals(A.baslangicBeklemeTick() - 5_000, tahmin(A, 5_000, new BeklemeDurumu(), hepsi, 1).enErken());
+        assertEquals(A.baslangicBeklemeTick() - 1_000, tahmin(A, 1_000, new BeklemeDurumu(), hepsi, 1).enErken());
         BeklemeDurumu bekleme = new BeklemeDurumu();
         bekleme.afetBitti(AfetTuru.DEPREM, 1, 100_000, A, 10);
         assertEquals(A.genelBeklemeTick() / 10, tahmin(A, 100_000, bekleme, hepsi, 10).enErken());
@@ -72,10 +72,10 @@ class SonrakiAfetTahminiTest {
     void ilkAfetGarantisiEnGecSinirdir() {
         Set<AfetTuru> hepsi = EnumSet.allOf(AfetTuru.class);
         SonrakiAfetTahmini serbest = SonrakiAfetTahmini.hesapla(A, 0, new BeklemeDurumu(), hepsi, tur -> 1, 1).orElseThrow();
-        SonrakiAfetTahmini garantili = SonrakiAfetTahmini.hesapla(A, 0, new BeklemeDurumu(), hepsi, tur -> 1, 1, 24_000)
+        SonrakiAfetTahmini garantili = SonrakiAfetTahmini.hesapla(A, 0, new BeklemeDurumu(), hepsi, tur -> 1, 1, 6_000)
                 .orElseThrow();
-        assertTrue(serbest.enGec() > 24_000, "garantisiz %90 sınırı bir günden uzun: " + serbest);
-        assertEquals(24_000, garantili.enGec());
+        assertTrue(serbest.enGec() > 6_000, "garantisiz %90 sınırı garantiden uzun: " + serbest);
+        assertEquals(6_000, garantili.enGec());
         assertTrue(garantili.ortalama() < serbest.ortalama() && garantili.ortalama() > garantili.enErken(), garantili.toString());
         SonrakiAfetTahmini erken = SonrakiAfetTahmini.hesapla(A, 0, new BeklemeDurumu(), hepsi, tur -> 1, 1, 100)
                 .orElseThrow();
@@ -107,5 +107,20 @@ class SonrakiAfetTahminiTest {
         double ortalama = toplam / deneme;
         assertEquals(tahmin.ortalama(), ortalama, tahmin.ortalama() * 0.05,
                 "tahmin " + tahmin.ortalama() + ", sınanan " + ortalama);
+    }
+
+    /** K-E67: gün çarpanı bölgesel oranları çarpar, dönem olaylarını (sunucu geneli) yalnız dördüncü köküyle. */
+    @Test
+    void gunCarpaniBolgeselOranlariCarparDonemOlaylarinaAzEtkiler() {
+        SonrakiAfetTahmini normal = SonrakiAfetTahmini.hesapla(BEKLEMESIZ, 0, new BeklemeDurumu(),
+                EnumSet.of(AfetTuru.DEPREM), tur -> 1, 1, 1.0, Long.MAX_VALUE).orElseThrow();
+        SonrakiAfetTahmini dortKat = SonrakiAfetTahmini.hesapla(BEKLEMESIZ, 0, new BeklemeDurumu(),
+                EnumSet.of(AfetTuru.DEPREM), tur -> 1, 1, 4.0, Long.MAX_VALUE).orElseThrow();
+        assertEquals(normal.ortalama() / 4.0, dortKat.ortalama(), 1);
+        SonrakiAfetTahmini ay = SonrakiAfetTahmini.hesapla(BEKLEMESIZ, 0, new BeklemeDurumu(),
+                EnumSet.of(AfetTuru.AY_CARPMASI), tur -> 1, 1, 1.0, Long.MAX_VALUE).orElseThrow();
+        SonrakiAfetTahmini ayDortKat = SonrakiAfetTahmini.hesapla(BEKLEMESIZ, 0, new BeklemeDurumu(),
+                EnumSet.of(AfetTuru.AY_CARPMASI), tur -> 1, 1, 4.0, Long.MAX_VALUE).orElseThrow();
+        assertEquals(ay.ortalama() / Math.pow(4.0, AfetZamanlayicisi.DONEM_GUN_USSU), ayDortKat.ortalama(), 1);
     }
 }

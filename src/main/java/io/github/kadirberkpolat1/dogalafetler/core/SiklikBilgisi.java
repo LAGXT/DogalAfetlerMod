@@ -32,8 +32,9 @@ public final class SiklikBilgisi {
     }
 
     /**
-     * Sonraki afet satırı. Doğal seçim hiç olamıyorsa (afet sistemi gamerule ile kapalı, sıklık %0) bunu söyler; aktif
-     * afetler varsa hepsi bittikten sonraki en uzun genel bekleme (doğal seçim liste boşken açılır, AS-8), yoksa tahmin ({@link SonrakiAfetTahmini}) ya da "uygun afet yok".
+     * Sonraki afet satırı. Doğal seçim hiç olamıyorsa (afet sistemi gamerule ile kapalı, sıklık %0) bunu söyler; doğal afet
+     * yuvası doluysa (K-E67) aktif afetler bittikten sonraki en uzun genel bekleme, yoksa tahmin ({@link SonrakiAfetTahmini}) ya
+     * da "uygun afet yok". Beklemeler afetSikligi'na ve gün çarpanına bölünür.
      */
     public static Component sonrakiSatiri(AfetYoneticisi yonetici) {
         if (!yonetici.server().getGameRules().getBoolean(Kurallar.DOGAL_AFETLER_ACIK)) {
@@ -45,13 +46,14 @@ public final class SiklikBilgisi {
         }
         String carpan = sayi(yuzde / 100.0);
         List<Afet> aktifler = yonetici.aktifAfetler();
-        if (!aktifler.isEmpty()) {
+        if (!aktifler.isEmpty() && yonetici.dogalYuvaDolu()) {
             ZamanlayiciAyarlari ayar = CekirdekAyarlari.al().zamanlayici();
             double uzama = 0;
             for (Afet afet : aktifler) {
                 uzama = Math.max(uzama, ayar.siddetUzamasi(afet.tur(), afet.seviye()));
             }
-            long bekleme = AfetZamanlayicisi.beklemeOlcekle(Math.round(ayar.genelBeklemeTick() * uzama), yuzde / 100.0);
+            long genel = Math.round(ayar.genelBeklemeTick() * uzama / yonetici.gunCarpani());
+            long bekleme = AfetZamanlayicisi.beklemeOlcekle(genel, yuzde / 100.0);
             return Component.translatable(SONRAKI_AKTIF, gun(yonetici, bekleme), yuzde, carpan);
         }
         Optional<SonrakiAfetTahmini> tahmin = yonetici.sonrakiAfetTahmini();
@@ -96,8 +98,8 @@ public final class SiklikBilgisi {
     public static void cevirileriYaz(CeviriYazici y) {
         y.ekle(SONRAKI, "Next disaster: ~%s days (range %s–%s days, 90%%); frequency %s%% (x%s)",
                 "Sonraki afet: ~%s gün (aralık %s–%s gün, %%90); sıklık %%%s (x%s)");
-        y.ekle(SONRAKI_AKTIF, "Next disaster: ~%s days after all active disasters end; frequency %s%% (x%s)",
-                "Sonraki afet: bütün aktif afetler bitince ~%s gün; sıklık %%%s (x%s)");
+        y.ekle(SONRAKI_AKTIF, "Next disaster: ~%s days after a running disaster ends and frees a slot; frequency %s%% (x%s)",
+                "Sonraki afet: süren bir afet bitip yer açılınca ~%s gün; sıklık %%%s (x%s)");
         y.ekle(SONRAKI_YOK, "Next disaster: none (frequency %s%%, no eligible disaster)",
                 "Sonraki afet: yok (sıklık %%%s, uygun afet yok)");
         y.ekle(SONRAKI_SIFIR, "Next disaster: disasters are off (frequency 0%%)",

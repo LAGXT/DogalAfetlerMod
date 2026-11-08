@@ -4,8 +4,8 @@ import io.github.kadirberkpolat1.dogalafetler.core.SirenTuru;
 
 /**
  * Siren türünün ses dosyası ve zarf parametreleri (madde 5, docs/tasarim/ses.md §4, spike-siren S-02). Saf Java'dır.
- * Dosya döngülüdür; süre, açılış ve fade-out kodla yönetilir ({@link SirenZarfi}). Ay çarpması standart profili 60 sn
- * çalar (K0-19).
+ * Dosya döngülüdür; süre, açılış ve fade-out kodla yönetilir ({@link SirenZarfi}). Ay çarpması standart profili, güneş
+ * patlaması kendi profili 25 sn çalar (K0-19 rev. K-E67); açılış ve söndürme süreden bağımsız birkaç saniyedir.
  */
 public enum SirenProfili {
     /** 280↔420 Hz wail; açılışta perde 140 Hz'den kalkar (spin-up), varsayılan fade-out 2 sn. */

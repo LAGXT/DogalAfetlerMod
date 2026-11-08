@@ -1,0 +1,173 @@
+package io.github.kadirberkpolat1.dogalafetler.core.mantik;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import io.github.kadirberkpolat1.dogalafetler.afet.asit_yagmuru.mantik.AsitKurallari;
+import io.github.kadirberkpolat1.dogalafetler.afet.deprem.mantik.DepremSeviyesi;
+import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.KasirgaSeviyesi;
+import io.github.kadirberkpolat1.dogalafetler.afet.orman_yangini.mantik.OrmanKurallari;
+import io.github.kadirberkpolat1.dogalafetler.afet.sinkhole.mantik.SinkholeSeviyesi;
+import io.github.kadirberkpolat1.dogalafetler.afet.tsunami.TsunamiSeviyesi;
+import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
+import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
+import io.github.kadirberkpolat1.dogalafetler.core.SirenTuru;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
+import org.junit.jupiter.api.Test;
+
+/**
+ * K-E67 kullanıcı istekleri 3 ve 1–2'nin benzetimle kanıtı: afetSikligi %100'de doğal afet başlangıçları arası ortalama
+ * gerçek süre gün 1'de ~8 dk, gün 10'da ~5 dk, gün 30+'da ~3 dk; ilk afet 3. dakikadan önce değil, 8. dakikada garanti;
+ * seviye dağılımı günle yükselir; eşzamanlı afet sayısı günle artar; çok afet gelirse seviye aşağı kayar. Afet süreleri
+ * türlerin varsayılan seviye tablolarından (ortalama ön-uyarı + siren dahil) alınır; tablo satırları rapora yazılır. Güneş
+ * patlaması ve ay çarpması gerçekleşmiş sayılır (kalıcı bölgesel tempo ölçülür).
+ */
+class AfetSikligiBenzetimiTest {
+    private static final long GUN = AfetZamanlayicisi.GUN_TICK;
+    private static final double DAKIKA = 1200.0;
+    private static final int[] GUNLER = {1, 10, 30, 60};
+    private static final int[] ARTCI = {0, 0, 1, 2, 3};
+
+    /** Ön-uyarı + siren (ortalama) + AKTIF + yaklaşık bitiş evresi, tick. */
+    static long sure(AfetTuru tur, int seviye) {
+        long once = Math.round(OnUyariPenceresi.VARSAYILAN_ERKEN_BILDIRIM
+                + OnUyariPenceresi.ortalama(OnUyariPenceresi.VARSAYILAN_EN_AZ, OnUyariPenceresi.VARSAYILAN_EN_COK, 0))
+                + SirenTuru.STANDART_SURE_TICK;
+        long aktif = switch (tur) {
+            case KASIRGA -> KasirgaSeviyesi.icin(seviye).aktifSureSn() * 20L;
+            case TSUNAMI -> {
+                TsunamiSeviyesi s = TsunamiSeviyesi.al(seviye);
+                double dalga = (s.aciklik() + s.karaGiris()) / s.hizBlokSn() * 20;
+                // Doğuş gecikmesi ve ikinci dalga (S3+) ile suların çekilmesi için yaklaşık 20 sn bitiş.
+                yield Math.round(dalga * (s.ikinciDalga() ? 2 : 1)) + 400;
+            }
+            // Ana sarsıntı + varsayılan artçılar (S1…S5: 0, 0, 1, 2, 3; aralık 20–60 sn, ortalama ~44 sn).
+            case DEPREM -> DepremSeviyesi.varsayilan(seviye).sureTick() + ARTCI[seviye - 1] * 880L;
+            case ASIT_YAGMURU -> AsitKurallari.Tablo.VARSAYILAN.seviye(seviye).sureTick();
+            case SINKHOLE -> SinkholeSeviyesi.varsayilan(seviye).aktifTick();
+            case ORMAN_YANGINI -> OrmanKurallari.Tablo.VARSAYILAN.seviye(seviye).sureTick();
+            case GUNES_PATLAMASI, AY_CARPMASI -> throw new IllegalArgumentException("dönem olayı benzetime girmez");
+        };
+        return once + aktif;
+    }
+
+    private static AfetSimulasyonu kalici(double gun, boolean tekOyuncu, long tohum) {
+        return new AfetSimulasyonu().gunSabit(gun).ayVar(false).evre(GunesEvresi.GUNESSIZ).sureler(
+                AfetSikligiBenzetimiTest::sure).cakisma(tekOyuncu).tohum(tohum);
+    }
+
+    /** Başlangıçlar arası ortalama (dk). */
+    private static double aralik(AfetSimulasyonu.Sonuc sonuc) {
+        List<AfetSimulasyonu.Olay> o = sonuc.olaylar();
+        return (o.get(o.size() - 1).baslangic() - o.get(0).baslangic()) / (double) (o.size() - 1) / DAKIKA;
+    }
+
+    private static double[] seviyeDagilimi(AfetSimulasyonu.Sonuc sonuc) {
+        double[] pay = new double[5];
+        int adet = 0;
+        for (AfetSimulasyonu.Olay olay : sonuc.olaylar()) {
+            if (olay.seviye() > 0) {
+                pay[olay.seviye() - 1]++;
+                adet++;
+            }
+        }
+        for (int i = 0; i < 5; i++) {
+            pay[i] /= adet;
+        }
+        return pay;
+    }
+
+    private static int enCokEszamanli(AfetSimulasyonu.Sonuc sonuc) {
+        List<long[]> kenarlar = new ArrayList<>();
+        for (AfetSimulasyonu.Olay olay : sonuc.olaylar()) {
+            kenarlar.add(new long[] {olay.baslangic(), 1});
+            kenarlar.add(new long[] {olay.bitis(), -1});
+        }
+        kenarlar.sort((a, b) -> a[0] != b[0] ? Long.compare(a[0], b[0]) : Long.compare(a[1], b[1]));
+        int simdi = 0;
+        int enCok = 0;
+        for (long[] k : kenarlar) {
+            simdi += (int) k[1];
+            enCok = Math.max(enCok, simdi);
+        }
+        return enCok;
+    }
+
+    @Test
+    void tekOyuncudaAralikGunleKisalirHedefeYakin() {
+        double[] aralik = new double[GUNLER.length];
+        System.out.println("| Gün | Tek oyuncu aralık (dk) | Dağınık çok oyuncu aralık (dk) | En çok eşzamanlı | S1 | S2 | S3 | S4 | S5 |");
+        System.out.println("|---|---|---|---|---|---|---|---|---|");
+        for (int i = 0; i < GUNLER.length; i++) {
+            AfetSimulasyonu.Sonuc tek = kalici(GUNLER[i], true, 11 + i).kos(60 * GUN);
+            AfetSimulasyonu.Sonuc cok = kalici(GUNLER[i], false, 11 + i).kos(60 * GUN);
+            assertEquals(0, tek.ayniAnIhlali());
+            assertEquals(0, cok.ayniAnIhlali());
+            aralik[i] = aralik(tek);
+            double[] pay = seviyeDagilimi(tek);
+            System.out.printf(Locale.ROOT, "| %d | %.2f | %.2f | %d | %.1f | %.1f | %.1f | %.1f | %.1f |%n", GUNLER[i],
+                    aralik[i], aralik(cok), enCokEszamanli(cok), pay[0] * 100, pay[1] * 100, pay[2] * 100, pay[3] * 100,
+                    pay[4] * 100);
+            assertTrue(aralik(cok) <= aralik[i] + 0.05, "eşzamanlı afet sayıyı azaltmamalı: gün " + GUNLER[i]);
+            assertEquals(ZamanlayiciAyarlari.VARSAYILAN.eszamanliSinir(GUNLER[i]), enCokEszamanli(cok),
+                    "dağınık oyuncularda eşzamanlı sınıra ulaşılmalı: gün " + GUNLER[i]);
+            assertEquals(1, enCokEszamanli(tek), "tek oyuncuda afetler çakışır, üst üste binmez");
+        }
+        assertEquals(8.0, aralik[0], 1.3, "gün 1 ~8 dk");
+        assertEquals(5.0, aralik[1], 0.9, "gün 10 ~5 dk");
+        assertEquals(3.0, aralik[2], 0.6, "gün 30 ~3 dk");
+        assertEquals(3.0, aralik[3], 0.6, "gün 60 ~3 dk");
+        assertTrue(aralik[0] > aralik[1] && aralik[1] > aralik[2], "aralık günle kısalmalı");
+        assertTrue(aralik[3] <= aralik[2] * 1.1, "yüksek seviye beklemesi günle artan sıklığı tersine çevirmemeli");
+    }
+
+    @Test
+    void seviyeDagilimiGunleYukselir() {
+        double[][] pay = new double[GUNLER.length][];
+        for (int i = 0; i < GUNLER.length; i++) {
+            pay[i] = seviyeDagilimi(kalici(GUNLER[i], true, 31 + i).kos(120 * GUN));
+        }
+        assertTrue(pay[0][0] + pay[0][1] >= 0.99 && pay[0][2] == 0, "gün 1: yalnız S1–S2");
+        assertTrue(pay[1][3] > 0.02 && pay[1][4] == 0, "gün 10: S4 gelir, S5 henüz yok");
+        assertTrue(pay[2][4] > 0.03, "gün 30: S5 gelir");
+        // Taban olasılık %27 (SiddetSeciciTest); art arda 4-5 kuralı gerçekleşeni ~%21'e indirir.
+        assertTrue(pay[3][3] + pay[3][4] >= 0.15, "gün 60: S4+S5 ≥ %15");
+        for (int i = 1; i < GUNLER.length; i++) {
+            assertTrue(pay[i][0] < pay[i - 1][0], "S1 payı günle azalmalı");
+        }
+    }
+
+    @Test
+    void ilkAfetUcDakikadanOnceDegilSekizDakikadaGaranti() {
+        List<Double> ilkler = new ArrayList<>();
+        for (int i = 0; i < 300; i++) {
+            AfetSimulasyonu.Sonuc sonuc = new AfetSimulasyonu().gun(0).sureler(AfetSikligiBenzetimiTest::sure)
+                    .cakisma(true).tohum(500 + i).kos(GUN / 2);
+            assertTrue(sonuc.toplam() > 0, "yarım günde afet yok");
+            long ilk = sonuc.olaylar().get(0).baslangic();
+            assertTrue(ilk >= ZamanlayiciAyarlari.VARSAYILAN.baslangicBeklemeTick(), "3. dakikadan önce: " + ilk);
+            assertTrue(ilk <= ZamanlayiciAyarlari.VARSAYILAN.ilkAfetGarantiTick(), "8. dakikada garanti: " + ilk);
+            ilkler.add(ilk / DAKIKA);
+        }
+        Collections.sort(ilkler);
+        double ortanca = ilkler.get(ilkler.size() / 2);
+        System.out.printf(Locale.ROOT, "ilk afet (seçim) ortanca %.2f dk, en erken %.2f, en geç %.2f%n", ortanca,
+                ilkler.get(0), ilkler.get(ilkler.size() - 1));
+        assertTrue(ortanca > 3.0 && ortanca < 7.5, "ilk afet ortancası: " + ortanca);
+    }
+
+    /** "Çok gelirse güçsüz": afetSikligi %400'de aynı günde seviye dağılımı aşağı kayar (deterministik zayıflatma). */
+    @Test
+    void cokAfetGelinceSeviyeAsagiKayar() {
+        double[] normal = seviyeDagilimi(kalici(60, true, 71).kos(60 * GUN));
+        double[] yogun = seviyeDagilimi(kalici(60, true, 71).siklik(4).kos(60 * GUN));
+        System.out.printf(Locale.ROOT, "gün 60 S4+S5: %%100 %.1f%%, %%400 %.1f%%%n", (normal[3] + normal[4]) * 100,
+                (yogun[3] + yogun[4]) * 100);
+        assertTrue(yogun[3] + yogun[4] < (normal[3] + normal[4]) * 0.6, "yüksek seviyeler azalmalı");
+        assertTrue(yogun[4] > 0, "zayıflatma S5'i sıfırlamaz");
+        assertTrue(yogun[0] > normal[0], "S1 payı artmalı");
+    }
+}

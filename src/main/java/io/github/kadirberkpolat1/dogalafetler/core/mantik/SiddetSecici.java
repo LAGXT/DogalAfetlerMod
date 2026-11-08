@@ -1,15 +1,29 @@
 package io.github.kadirberkpolat1.dogalafetler.core.mantik;
 
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
+import java.util.Optional;
 import java.util.random.RandomGenerator;
 
 /**
- * Afet seviyesinin ağırlıklı rastgele seçimi (madde 10). Seviye 4 ve 5 art arda gelmez: önceki seviyeli afet 4 ya da
- * 5 idiyse bu seçimde ikisi de dıştadır ("aynı seviye art arda en fazla bir kez" bunun özel hâlidir).
- * {@code afetMaksSiddet} gamerule'ü üstü keser. Diziler sıfır tabanlıdır: indeks 0 = Seviye 1.
+ * Afet seviyesinin ağırlıklı rastgele seçimi (madde 10). Seviye 4 ve 5 art arda gelmez: önceki doğal seviyeli afet 4 ya da
+ * 5 idiyse bu seçimde ikisi de dıştadır ("aynı seviye art arda en fazla bir kez" bunun özel hâlidir; komutla başlatılan
+ * afet önceki seviye sayılmaz, K-E67). {@code afetMaksSiddet} gamerule'ü üstü keser. Afet yoğunluğu yüksekse
+ * ({@link AfetYogunlugu}) ağırlık düşük seviyelere kayar. Diziler sıfır tabanlıdır: indeks 0 = Seviye 1.
  */
 public final class SiddetSecici {
     private static final int SEVIYE_SAYISI = AfetTuru.EN_YUKSEK_SEVIYE;
+
+    /** Bir seviyenin olasılığının 0 olma nedeni ({@code /dogalafet gun} ve {@code durum} çıktısı). */
+    public enum KapaliNeden {
+        /** {@code afetMaksSiddet} gamerule'ünün üstünde. */
+        MAKS,
+        /** Oyun günü seviyenin açıldığı günün altında. */
+        GUN,
+        /** Oyun günü yetiyor ama gelişim kriteri açıkken etkin gün yetmiyor (madde 10). */
+        GELISIM,
+        /** Önceki doğal seviyeli afet 4 ya da 5 idi. */
+        ART_ARDA
+    }
 
     private SiddetSecici() {
     }
@@ -41,12 +55,19 @@ public final class SiddetSecici {
         return agirlik;
     }
 
-    /** Normalleştirilmiş olasılıklar (toplam 1). */
+    /** Normalleştirilmiş olasılıklar (toplam 1), yoğunluk zayıflatması olmadan. */
     public static double[] olasiliklar(SiddetAyarlari ayarlar, double gun, int maksSiddet, boolean oncekiYuksek) {
+        return olasiliklar(ayarlar, gun, maksSiddet, oncekiYuksek, 1.0);
+    }
+
+    /** Normalleştirilmiş olasılıklar (toplam 1); {@code yuk} afet yoğunluğudur ({@link AfetYogunlugu#yuk}). */
+    public static double[] olasiliklar(SiddetAyarlari ayarlar, double gun, int maksSiddet, boolean oncekiYuksek,
+            double yuk) {
         double[] agirlik = agirliklar(ayarlar, gun, maksSiddet, oncekiYuksek);
         double toplam = 0;
-        for (double deger : agirlik) {
-            toplam += deger;
+        for (int i = 0; i < SEVIYE_SAYISI; i++) {
+            agirlik[i] *= AfetYogunlugu.seviyeCarpani(i + 1, yuk);
+            toplam += agirlik[i];
         }
         double[] olasilik = new double[SEVIYE_SAYISI];
         if (toplam <= 0) {
@@ -59,10 +80,16 @@ public final class SiddetSecici {
         return olasilik;
     }
 
-    /** Seviye (1–5) seçer. */
+    /** Seviye (1–5) seçer, yoğunluk zayıflatması olmadan. */
     public static int sec(SiddetAyarlari ayarlar, double gun, int maksSiddet, boolean oncekiYuksek,
             RandomGenerator rastgele) {
-        double[] olasilik = olasiliklar(ayarlar, gun, maksSiddet, oncekiYuksek);
+        return sec(ayarlar, gun, maksSiddet, oncekiYuksek, 1.0, rastgele);
+    }
+
+    /** Seviye (1–5) seçer. */
+    public static int sec(SiddetAyarlari ayarlar, double gun, int maksSiddet, boolean oncekiYuksek, double yuk,
+            RandomGenerator rastgele) {
+        double[] olasilik = olasiliklar(ayarlar, gun, maksSiddet, oncekiYuksek, yuk);
         double secim = rastgele.nextDouble();
         int son = 1;
         for (int i = 0; i < SEVIYE_SAYISI; i++) {
@@ -76,6 +103,28 @@ public final class SiddetSecici {
             }
         }
         return son;
+    }
+
+    /**
+     * Seviyenin olasılığı neden 0; açıksa boş. {@code gercekGun} oyun günü, {@code etkinGun} gelişim kriterinden sonraki
+     * gün ({@link #etkinGun}). Sıra: gamerule üst sınırı, gün eşiği, gelişim kriteri, art arda 4-5 kuralı.
+     */
+    public static Optional<KapaliNeden> kapaliNedeni(SiddetAyarlari ayarlar, double gercekGun, double etkinGun,
+            int seviye, int maksSiddet, boolean oncekiYuksek) {
+        if (seviye > Math.max(AfetTuru.EN_DUSUK_SEVIYE, maksSiddet)) {
+            return Optional.of(KapaliNeden.MAKS);
+        }
+        int esik = ayarlar.esik(seviye);
+        if (gercekGun < esik) {
+            return Optional.of(KapaliNeden.GUN);
+        }
+        if (etkinGun < esik) {
+            return Optional.of(KapaliNeden.GELISIM);
+        }
+        if (oncekiYuksek && yuksek(seviye)) {
+            return Optional.of(KapaliNeden.ART_ARDA);
+        }
+        return Optional.empty();
     }
 
     /**

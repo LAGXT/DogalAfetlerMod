@@ -2,6 +2,7 @@ package io.github.kadirberkpolat1.dogalafetler.core;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.AfetNumarasi;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.AfetZamanlayicisi;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.BeklemeDurumu;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.CarpanListesi;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.GeciciCarpan;
@@ -58,6 +59,8 @@ public final class DunyaDonemi extends SavedData {
     private final Deque<GecmisKaydi> sonAfetler = new ArrayDeque<>();
     private UUID sonHedef;
     private int sonSeviye;
+    /** Son bir oyun gününde başlayan doğal afetlerin başlama saatleri, eskiden yeniye (K-E67 yoğunluk). */
+    private final Deque<Long> dogalBaslangiclar = new ArrayDeque<>();
     private long gunOfseti;
     private long uykuBirikimi;
     private long saat;
@@ -323,6 +326,25 @@ public final class DunyaDonemi extends SavedData {
         setDirty();
     }
 
+    /** Doğal bir afet şimdi başladı (komutla başlayan sayılmaz; K-E67 yoğunluk). */
+    void dogalBaslangicEkle() {
+        dogalBaslangiclar.addLast(saat);
+        eskiBaslangiclariAt();
+        setDirty();
+    }
+
+    /** Son bir oyun gününde (24 000 ölçekli tick) başlayan doğal afet sayısı. */
+    public int sonGunDogalAfetSayisi() {
+        eskiBaslangiclariAt();
+        return dogalBaslangiclar.size();
+    }
+
+    private void eskiBaslangiclariAt() {
+        while (!dogalBaslangiclar.isEmpty() && dogalBaslangiclar.peekFirst() <= saat - AfetZamanlayicisi.GUN_TICK) {
+            dogalBaslangiclar.removeFirst();
+        }
+    }
+
     // ---------------------------------------------------------------- gün ve saat
 
     /**
@@ -478,9 +500,9 @@ public final class DunyaDonemi extends SavedData {
     // ---------------------------------------------------------------- sıfırlama ve senkron
 
     /**
-     * {@code /dogalafet sifirla}: ay, güneş, donma, buharlaşma, deniz, çarpanlar, beklemeler, geçmiş, son hedef, gün ofseti,
-     * süreç durdurma kayıtları ve ek veri ilk hâline döner. Uyku birikimi korunur: yaşanmış gecelerin payıdır, dünya
-     * yaşının parçasıdır (K-C42 rev., K-C46). Afet saati monoton kalır; aktif afeti ve dönem süreçlerini önce yönetici
+     * {@code /dogalafet sifirla}: ay, güneş, donma, buharlaşma, deniz, çarpanlar, beklemeler, geçmiş, doğal afet yoğunluğu, son
+     * hedef, gün ofseti, süreç durdurma kayıtları ve ek veri ilk hâline döner. Uyku birikimi korunur: yaşanmış gecelerin
+     * payıdır, dünya yaşının parçasıdır (K-C42 rev., K-C46). Afet saati monoton kalır; aktif afeti ve dönem süreçlerini önce yönetici
      * durdurur.
      */
     public void sifirla() {
@@ -499,6 +521,7 @@ public final class DunyaDonemi extends SavedData {
         ilkAfetTabani = saat;
         sonHedef = null;
         sonSeviye = 0;
+        dogalBaslangiclar.clear();
         gunOfseti = 0;
         surecDurdurmalari.clear();
         for (String anahtar : List.copyOf(ekVeri.getAllKeys())) {
@@ -614,6 +637,7 @@ public final class DunyaDonemi extends SavedData {
             etiket.putUUID("sonHedef", sonHedef);
         }
         etiket.putInt("sonSeviye", sonSeviye);
+        etiket.putLongArray("dogalBaslangiclar", dogalBaslangiclar.stream().mapToLong(Long::longValue).toArray());
         etiket.putLong("gunOfseti", gunOfseti);
         etiket.putLong("uykuBirikimi", uykuBirikimi);
         CompoundTag durdurmalar = new CompoundTag();
@@ -682,6 +706,9 @@ public final class DunyaDonemi extends SavedData {
         }
         donem.sonHedef = etiket.hasUUID("sonHedef") ? etiket.getUUID("sonHedef") : null;
         donem.sonSeviye = etiket.getInt("sonSeviye");
+        for (long baslangic : etiket.getLongArray("dogalBaslangiclar")) {
+            donem.dogalBaslangiclar.addLast(baslangic);
+        }
         donem.gunOfseti = etiket.getLong("gunOfseti");
         donem.uykuBirikimi = Math.max(0, etiket.getLong("uykuBirikimi"));
         CompoundTag durdurmalar = etiket.getCompound("surecDurdurmalari");

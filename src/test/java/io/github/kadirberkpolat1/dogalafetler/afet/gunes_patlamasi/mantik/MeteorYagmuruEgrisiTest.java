@@ -4,46 +4,57 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.github.kadirberkpolat1.dogalafetler.core.SirenTuru;
 import org.junit.jupiter.api.Test;
 
 class MeteorYagmuruEgrisiTest {
     private static final double EPS = 1e-9;
-    private static final long SIREN = 1200;
+    /** Güneş sireni 25 sn (K0-19 rev. K-E67). */
+    private static final long SIREN = SirenTuru.UZUN_SURE_TICK;
+    /** Varsayılan öncü payı (5 sn) ve sunucu geneli afetin en uzun ön-uyarısı (erken bildirim 100 + pencere 60 tick). */
+    private static final long ONCU = 100;
+    private static final long ON_UYARI = 160;
     private static final long GUN = GunesPatlamasiEgrileri.GUN_TICK;
 
     @Test
     void oncuYagmurOnUyaridaBaslarSirendeKesintisizArtar() {
-        long onUyari = 1200;
-        assertEquals(6.0, MeteorYagmuruEgrisi.onUyari(1200, onUyari, SIREN, 1800, 6, 24), EPS, "kısa ön-uyarıda baştan");
-        assertEquals(15.0, MeteorYagmuruEgrisi.onUyari(0, onUyari, SIREN, 1800, 6, 24), EPS);
-        assertEquals(MeteorYagmuruEgrisi.onUyari(0, onUyari, SIREN, 1800, 6, 24),
-                MeteorYagmuruEgrisi.siren(0, onUyari, SIREN, 1800, 6, 24), EPS, "siren başında sıçrama yok");
-        assertEquals(24.0, MeteorYagmuruEgrisi.siren(SIREN, onUyari, SIREN, 1800, 6, 24), EPS);
-        assertEquals(24.0, MeteorYagmuruEgrisi.siren(5 * SIREN, onUyari, SIREN, 1800, 6, 24), EPS);
+        assertEquals(0.0, MeteorYagmuruEgrisi.onUyari(ONCU + 1, ON_UYARI, SIREN, ONCU, 6, 24), EPS, "pencereden önce yok");
+        assertEquals(6.0, MeteorYagmuruEgrisi.onUyari(ONCU, ON_UYARI, SIREN, ONCU, 6, 24), EPS, "pencerenin başında 6/dk");
+        assertEquals(9.0, MeteorYagmuruEgrisi.onUyari(0, ON_UYARI, SIREN, ONCU, 6, 24), EPS, "100 / 600 tick'te");
+        assertEquals(MeteorYagmuruEgrisi.onUyari(0, ON_UYARI, SIREN, ONCU, 6, 24),
+                MeteorYagmuruEgrisi.siren(0, ON_UYARI, SIREN, ONCU, 6, 24), EPS, "siren başında sıçrama yok");
+        assertEquals(24.0, MeteorYagmuruEgrisi.siren(SIREN, ON_UYARI, SIREN, ONCU, 6, 24), EPS);
+        assertEquals(24.0, MeteorYagmuruEgrisi.siren(5 * SIREN, ON_UYARI, SIREN, ONCU, 6, 24), EPS);
+        assertEquals(6.0, MeteorYagmuruEgrisi.onUyari(60, 60, SIREN, ONCU, 6, 24), EPS, "kısa ön-uyarıda baştan");
+        assertEquals(30 * 20, ONCU + SIREN, "öncü yağmur AKTIF'ten önceki son 30 sn (K-E67)");
         double onceki = -1;
-        for (long kalan = onUyari; kalan >= 0; kalan -= 50) {
-            double y = MeteorYagmuruEgrisi.onUyari(kalan, onUyari, SIREN, 1800, 6, 24);
+        for (long kalan = ON_UYARI; kalan >= 0; kalan -= 10) {
+            double y = MeteorYagmuruEgrisi.onUyari(kalan, ON_UYARI, SIREN, ONCU, 6, 24);
             assertTrue(y >= onceki, "azalmamalı: kalan " + kalan);
+            onceki = y;
+        }
+        for (long gecen = 0; gecen <= SIREN; gecen += 10) {
+            double y = MeteorYagmuruEgrisi.siren(gecen, ON_UYARI, SIREN, ONCU, 6, 24);
+            assertTrue(y >= onceki, "azalmamalı: siren " + gecen);
             onceki = y;
         }
     }
 
     @Test
     void oncuPenceresiOncesiYagmurYokSifirdaYalnizSiren() {
-        assertEquals(0.0, MeteorYagmuruEgrisi.onUyari(700, 1200, SIREN, 600, 6, 24), EPS);
-        assertEquals(6.0, MeteorYagmuruEgrisi.onUyari(600, 1200, SIREN, 600, 6, 24), EPS);
-        assertEquals(0.0, MeteorYagmuruEgrisi.onUyari(0, 1200, SIREN, 0, 6, 24), EPS);
-        assertEquals(6.0, MeteorYagmuruEgrisi.siren(0, 1200, SIREN, 0, 6, 24), EPS);
-        assertEquals(15.0, MeteorYagmuruEgrisi.siren(600, 1200, SIREN, 0, 6, 24), EPS);
+        assertEquals(0.0, MeteorYagmuruEgrisi.onUyari(61, ON_UYARI, SIREN, 60, 6, 24), EPS);
+        assertEquals(6.0, MeteorYagmuruEgrisi.onUyari(60, ON_UYARI, SIREN, 60, 6, 24), EPS);
+        assertEquals(0.0, MeteorYagmuruEgrisi.onUyari(0, ON_UYARI, SIREN, 0, 6, 24), EPS);
+        assertEquals(6.0, MeteorYagmuruEgrisi.siren(0, ON_UYARI, SIREN, 0, 6, 24), EPS);
+        assertEquals(15.0, MeteorYagmuruEgrisi.siren(SIREN / 2, ON_UYARI, SIREN, 0, 6, 24), EPS);
     }
 
     @Test
     void pencereBeklenirkenOncuBastaSabitKalir() {
-        long onUyari = 1800;
-        assertTrue(MeteorYagmuruEgrisi.onUyari(0, onUyari, SIREN, 1800, 6, 24) > 13, "bekleme olmadan uçta 16,8/dk");
-        assertEquals(6.0, MeteorYagmuruEgrisi.pencereBeklerken(onUyari, 1800, 6), EPS, "Mt11: beklemede 6/dk");
-        assertEquals(6.0, MeteorYagmuruEgrisi.pencereBeklerken(600, 1800, 6), EPS, "kısa ön-uyarıda da");
-        assertEquals(0.0, MeteorYagmuruEgrisi.pencereBeklerken(onUyari, 0, 6), EPS, "öncü kapalıysa yağmur yok");
+        assertEquals(9.0, MeteorYagmuruEgrisi.onUyari(0, ON_UYARI, SIREN, ONCU, 6, 24), EPS, "bekleme olmadan uçta 9/dk");
+        assertEquals(6.0, MeteorYagmuruEgrisi.pencereBeklerken(ON_UYARI, ONCU, 6), EPS, "Mt11: beklemede 6/dk");
+        assertEquals(6.0, MeteorYagmuruEgrisi.pencereBeklerken(60, ONCU, 6), EPS, "kısa ön-uyarıda da");
+        assertEquals(0.0, MeteorYagmuruEgrisi.pencereBeklerken(ON_UYARI, 0, 6), EPS, "öncü kapalıysa yağmur yok");
     }
 
     @Test

@@ -38,4 +38,24 @@ class GelisimVeOnUyariTest {
         long ters = OnUyariPenceresi.sure(1800, 900, rastgele);
         assertTrue(ters >= 900 && ters <= 1800, "ters verilen sınırlar düzeltilir");
     }
+
+    /** K-E67: sireni uzun sunucu geneli afette pencere sirenin fazlası kadar kısalır (en az 0); ortalama ve en çok tutarlı. */
+    @Test
+    void sirenFazlasiPencereyiKisaltirOrtalamaTutarli() {
+        SplittableRandom rastgele = new SplittableRandom(9);
+        double toplam = 0;
+        int adet = 200_000;
+        long enBuyuk = 0;
+        for (int i = 0; i < adet; i++) {
+            long sure = OnUyariPenceresi.sure(200, 360, 300, rastgele);
+            assertTrue(sure >= 0 && sure <= 60, "kısaltılmış pencere dışı: " + sure);
+            toplam += sure;
+            enBuyuk = Math.max(enBuyuk, sure);
+        }
+        assertEquals(OnUyariPenceresi.ortalama(200, 360, 300), toplam / adet, 0.5);
+        assertEquals(OnUyariPenceresi.enCok(200, 360, 300), enBuyuk);
+        assertEquals(280.0, OnUyariPenceresi.ortalama(200, 360, 0), 1e-9);
+        assertEquals(0.0, OnUyariPenceresi.ortalama(200, 360, 500), 1e-9);
+        assertEquals(0, OnUyariPenceresi.sure(200, 360, 1_000, rastgele));
+    }
 }
