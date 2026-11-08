@@ -32,7 +32,9 @@
   1 Hz; kademe değişiminde ve `set`'te anında).
 - **Etkiler:** soğukta önce yavaşlama (hareket hızı değiştiricisi), sonra buz kenarı, sonra `dogalafetler:donma`
   hasarı; sıcakta önce titreme (kamera yalpası + sıcak hava dalgası dokusu), sonra `dogalafetler:asiri_isinma`
-  hasarı ve küçük alev parçacıkları. Hasar aralığı uç değere doğru kısalır (okunaklı, kademeli).
+  hasarı ve küçük alev parçacıkları. Hasar aralığı uç değere doğru kısalır (okunaklı, kademeli). Alev ve kar parçacıkları
+  yalnız çevredeki diğer oyunculara gider: oyuncunun kendi göğsünde doğan 8×8 sprite birinci şahısta ekranı kaplayan
+  bloklu bir leke olurdu (pulsar-2 PL-44).
 
 ## HUD
 

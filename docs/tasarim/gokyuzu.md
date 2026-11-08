@@ -275,13 +275,15 @@ ve alan çizgilerine birlikte uygulanır (16 Hz kare dalga, her yarım periyot h
 çapın yarısı (PL-27 eğrisi korunur). Disk gökte sabit, ekranda yatay, görünen eğim yaklaştıkça 4° → 11° ve her karede
 kamera–nesne vektöründen. Arka yarı ince-lens sapma tablosuyla (sınıf yüklenirken bir kez, 2 048 adım) gölgenin üstünde ve
 altında iki yay; disk beyaz-sıcak ve soluk (iç kenar beyaz, orta beyaz-sıcak, dış soluk turuncu; doygunluk ≤ 0,3). Köşe
-parlaklığı Doppler çarpanı × besleme eğrisi × mor kalıntı çarpanı (PL-43): Doppler çarpanı ≤ 1 ve yalnız gölgenin iki
-yanındaki yanal bantta (köşenin merceklenmiş görüntüsü gölge merkezinden yatayda ≥ 1 gölge yarıçapı): yaklaşan yan
-×1,0 mavi-beyaz, uzaklaşan ×0,3 sönük (Pg2). Gölgenin üstü ve altındaki orta sütunda (≤ 0,5 gölge yarıçapı) madde
-bakışa dik gider: üstteki merceklenmiş yay ×0,9, alttaki ön yarı ve ikinci görüntü ×1,0 (referansta alttaki en
-parlak). Besleme eğrisi (yaklaşmada 0,8, spagettileşmeyle 1,0) ve yutumdan sonra mor kalıntı çarpanı (1 + 0,8·morluk,
-×1,8) Doppler'den sonra gelir; 1'i aşan pay toplamalı kalıntı geçişinde çizilir. Disk ve yayların 2,5 kat kalın, soluk
-(alfa 0,3) parlama kopyası.
+parlaklığı köşe çarpanı × besleme eğrisi × mor kalıntı çarpanı (PL-43, PL-44). Doppler (≤ 1) yalnız gölgenin iki
+yanındaki yanal bantta (köşenin görüntüsü gölge merkezinden yatayda ≥ 1 gölge yarıçapı): ön yarıda tam derinlikte
+(yaklaşan yan ×1,0 mavi-beyaz, uzaklaşan ×0,3 sönük, Pg2), merceklenmiş yaylarda (arka yarı ve ikinci görüntü) 0,7
+derinlikte (uzaklaşan uç ×0,51). Tam Doppler yayların yan uçlarını karartıp sol/sağ oranını 2,0'a çıkarıyor ve kalıntıyı
+söndürüyordu, Doppler'siz yaylar oranı 1,15'e indiriyordu; referansın oranı aynı ölçümle 1,61. Gölgenin üstü ve
+altındaki orta sütunda (≤ 0,5 gölge yarıçapı) madde bakışa dik gider: üstteki yay ×1,0, alttaki ön yarı ve ikinci
+görüntü ×1,12 (referansta alttaki en parlak). Besleme eğrisi (yaklaşmada 0,8, spagettileşmeyle 1,0) ve yutumdan sonra
+mor kalıntı çarpanı (1 + 0,8·morluk, ×1,8) köşe çarpanından sonra gelir; 1'i aşan pay toplamalı kalıntı geçişinde
+çizilir. Disk ve yayların 2,5 kat kalın, soluk (alfa 0,3) parlama kopyası.
 Yutma göğü neredeyse siyah (`#0A0510`). Gölge tam siyah, arkadaki yıldız, nebula ve pulsarı siler. Gölge çevresinde
 2,5 R içinde merceklenmiş yıldız alanı (Einstein yarıçapı 1,45 R). Spagetti: pulsardan diske 3B kıvrımlı tüp (16 kesit) ve
 diske akan kuyruk. Yutumdan sonra mor kalıntı sönüme kadar besleme %95 × 1,8 parlaklıkta. Pulsar yolundaki doğuşta

@@ -12,8 +12,10 @@ import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Yalitim;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
@@ -146,8 +148,15 @@ public final class SicaklikYoneticisi {
                     donma ? SicaklikKayitlari.DONMA : SicaklikKayitlari.ASIRI_ISINMA), SicaklikAyarlari.hasarMiktari());
         }
         VucutSicakligi.hasarSayaciAyarla(oyuncu, sayac);
-        oyuncu.serverLevel().sendParticles(donma ? ParticleTypes.SNOWFLAKE : ParticleTypes.FLAME, oyuncu.getX(),
-                oyuncu.getY() + 1.0, oyuncu.getZ(), donma ? 6 : 4, 0.3, 0.5, 0.3, 0.01);
+        // Kendisine gönderilmez: gözün 0,6 blok altındaki 8×8 sprite birinci şahısta ekranda dev bloklu leke olur.
+        ServerLevel level = oyuncu.serverLevel();
+        ParticleOptions tur = donma ? ParticleTypes.SNOWFLAKE : ParticleTypes.FLAME;
+        for (ServerPlayer izleyen : level.players()) {
+            if (izleyen != oyuncu) {
+                level.sendParticles(izleyen, tur, false, oyuncu.getX(), oyuncu.getY() + 1.0, oyuncu.getZ(), donma ? 6 : 4,
+                        0.3, 0.5, 0.3, 0.01);
+            }
+        }
     }
 
     private static void yavaslamaAyarla(ServerPlayer oyuncu, double oran) {
