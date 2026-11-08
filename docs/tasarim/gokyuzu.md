@@ -226,9 +226,10 @@ Einstein halkası); tam ekran örtüsü karışımlı, 0,3 sn %50, 1,2 sn'de %15
 kalıntı nebulası yok; ufukta külün kızıl korları, ekran kenarında ilk kırağı. Gök koyu mor `#1C0A2E` → siyah. Yutmada en çok 16
 kuad.
 
-**Buzul kıyamet ve doğuş (pulsar yolu, PL-27).** Gök koyu çelik mavisi `#1E2A38`, sis beyaz `#C4CCD6` ve yakın (tipi), kar
-tanesi iki kat ve rüzgârla yataya yakın, ekran kenarında donmayla büyüyen kırağı vinyeti (%45 → %90), tipi rüzgârı sesi. Kızıl
-cüce doğuşunda doğu ufkunun ±72°'sini (%40) saran kızıl ışık yayı ve karla buzun üstünden yükselen buhar.
+**Buzul kıyamet ve doğuş (pulsar yolu, PL-27, PL-41).** Gök koyu çelik mavisi `#0C141E`, sis gri-beyaz `#A4AEBC` ve yakın
+(tipi), kar tanesi dört kat ve rüzgârla yataya yakın, ekran kenarında donmayla büyüyen kırağı vinyeti (%45 → %100), tipi
+rüzgârı sesi. Kızıl cüce doğuşunda gök ve sis koyu kan-kızılı bir şafakta (`#2A0C0A`, ilerleme 0,15–0,9'da açılır), doğu
+ufkunun ±72°'sini (%40) saran kızıl ışık yayı ve karla buzun üstünden yükselen buhar.
 
 **Cehennem dünya (sunucu, `afetBlokHasari` kapısı arkasında, tek bütçe).** Çimen → kaba toprak → kül bloğu; yaprak yanar,
 altına kül katmanı düşer; kütük → kömürleşmiş kütük (siyah çatlaklı, içi kızıl parlayan, ışık 3); çiçek/ot/kaktüs/mantar yanar;
@@ -276,7 +277,8 @@ ve yaklaşan yan beyaza doyar), disk ve yayların 2,5 kat kalın, soluk (alfa 0,
 mavi-beyaz, uzaklaşan ×0,3 turuncu. Yutma göğü neredeyse siyah (`#0A0510`). Gölge tam siyah, arkadaki yıldız, nebula ve
 pulsarı siler. Gölge çevresinde 2,5 R içinde merceklenmiş yıldız alanı (Einstein yarıçapı 1,45 R). Spagetti: pulsardan
 diske 3B kıvrımlı tüp (16 kesit) ve diske akan kuyruk. Yutumdan sonra mor kalıntı sönüme kadar %95 parlaklıkta. Pulsar
-yolundaki doğuşta kızıl cüce küresi ×(1 + 0,8·(1 − p)) şişkin doğar.
+yolundaki doğuşta kızıl cüce küresi ×(1 + 1,5·(1 − p)) şişkin doğar (doğuşta ×2,5, PL-41). Parlamanın altındaki silüet
+neredeyse siyah ve tam opak; yutumdan sonra mor kalıntı ek kazançla (×1,8) parlar, ufuk korları %85 alfayla.
 
 | Kademe | Pulsar dörtgen (üst sınır) | Kara delik dörtgen (en kötü kare) | Disk dilimi | Mercek yıldızı | Plazma |
 |---|---|---|---|---|---|
