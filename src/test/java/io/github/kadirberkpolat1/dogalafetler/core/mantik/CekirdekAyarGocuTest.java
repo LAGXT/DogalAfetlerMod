@@ -3,6 +3,7 @@ package io.github.kadirberkpolat1.dogalafetler.core.mantik;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.github.kadirberkpolat1.dogalafetler.config.SurumluGocPlani;
 import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -34,7 +35,7 @@ class CekirdekAyarGocuTest {
     @Test
     void yeniVarsayilanlarTabloylaAyni() {
         ZamanlayiciAyarlari v = ZamanlayiciAyarlari.VARSAYILAN;
-        for (CekirdekAyarGocu.Adim a : CekirdekAyarGocu.ADIMLAR) {
+        for (SurumluGocPlani.Adim a : CekirdekAyarGocu.ADIMLAR) {
             long beklenen = a.yol().endsWith("baslangicBeklemeTick") ? v.baslangicBeklemeTick()
                     : a.yol().endsWith("genelBeklemeTick") ? v.genelBeklemeTick()
                     : v.turBekleme(io.github.kadirberkpolat1.dogalafetler.core.AfetTuru.KASIRGA);

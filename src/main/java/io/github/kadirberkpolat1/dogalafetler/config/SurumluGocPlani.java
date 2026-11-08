@@ -11,7 +11,7 @@ import java.util.function.Function;
  * varsayılanda kalan değer yeni varsayılana çekilir; hiçbir eski varsayılana eşit olmayan (elle değiştirilmiş) değere
  * dokunulmaz. Dosyanın sürümü {@link #surumYolu()}'ndadır, dosyada yoksa 0 sayılır. Sonraki bir varsayılan değişikliği yeni
  * sürümlü {@link Adim} olarak eklenir ve {@link #guncel()} artar; eski sürümden gelen dosya adımları sırayla geçer
- * (24 → 90 → 180). Bölümler yalnız tabloyu verir, {@link #plan} {@link AyarKaydi#sunucuGocu}'ya gider. Minecraft sınıfı
+ * (24 → 90 → 180). Bölümler yalnız tabloyu verir; plan nesnesi {@link AyarKaydi#sunucuGocu}'ya verilir, dosya işi {@code AyarGocu}'da. Minecraft sınıfı
  * kullanmaz.
  */
 public final class SurumluGocPlani {

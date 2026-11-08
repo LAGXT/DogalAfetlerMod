@@ -218,7 +218,7 @@ public final class CekirdekAyarlari {
     /** Bölümü config kayıt kancasına ekler; mod kurucusunda {@code AyarKaydi.kaydet}'ten önce çağrılır. */
     public static void kaydet() {
         bolum = AyarKaydi.sunucuBolumu("cekirdek", "Çekirdek: afet yöneticisi ve dünya dönemi", CekirdekAyarlari::new);
-        AyarKaydi.sunucuGocu(CekirdekAyarGocu.SURUM_YOLU, CekirdekAyarGocu.GUNCEL, CekirdekAyarGocu::plan);
+        AyarKaydi.sunucuGocu(CekirdekAyarGocu.PLAN);
     }
 
     public static CekirdekAyarlari al() {

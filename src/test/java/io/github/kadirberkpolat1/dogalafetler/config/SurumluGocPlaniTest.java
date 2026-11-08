@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.CekirdekAyarGocu;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.GokyuzuAyarGocu;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.MeteorAyarGocu;
 import java.util.LinkedHashMap;
@@ -78,5 +79,8 @@ class SurumluGocPlaniTest {
         assertEquals(GokyuzuAyarGocu.SURUM_YOLU, GokyuzuAyarGocu.PLAN.surumYolu());
         assertEquals(GokyuzuAyarGocu.GUNCEL, GokyuzuAyarGocu.PLAN.guncel());
         assertEquals(GokyuzuAyarGocu.ADIMLAR, GokyuzuAyarGocu.PLAN.adimlar());
+        assertEquals(CekirdekAyarGocu.SURUM_YOLU, CekirdekAyarGocu.PLAN.surumYolu());
+        assertEquals(CekirdekAyarGocu.GUNCEL, CekirdekAyarGocu.PLAN.guncel());
+        assertEquals(CekirdekAyarGocu.ADIMLAR, CekirdekAyarGocu.PLAN.adimlar());
     }
 }

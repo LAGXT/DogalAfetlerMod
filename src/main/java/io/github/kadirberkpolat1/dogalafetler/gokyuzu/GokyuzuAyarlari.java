@@ -23,7 +23,7 @@ public final class GokyuzuAyarlari {
     public static void kaydet() {
         sunucu = AyarKaydi.sunucuBolumu("gokyuzu", "Ortak gökyüzü ve güneş zinciri (madde 16, bölüm D ve H)", Sunucu::new);
         istemci = AyarKaydi.istemciBolumu("gokyuzu", "Gökyüzü görseli (madde 16, N13)", Istemci::new);
-        AyarKaydi.sunucuGocu(GokyuzuAyarGocu.SURUM_YOLU, GokyuzuAyarGocu.GUNCEL, GokyuzuAyarGocu::plan);
+        AyarKaydi.sunucuGocu(GokyuzuAyarGocu.PLAN);
     }
 
     /** Güneş zinciri ayarları; süreç her tick okur, değerler değişmedikçe aynı kayıt döner. */

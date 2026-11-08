@@ -69,16 +69,10 @@ public final class AyarKaydi {
     private record Katki(String bolum, String aciklama, Function<ForgeConfigSpec.Builder, ?> kurucu, Bolum<?> hedef) {
     }
 
-    /** SERVER config göçünün planı (MT2-31): dosyadaki sürümden (yoksa 0) güncele değişecek anahtarlar, yol → yeni değer. */
-    @FunctionalInterface
-    public interface GocPlani {
-        Map<String, ?> plan(int surum, Function<String, Object> oku);
-    }
-
     private static final List<Katki> SUNUCU = new ArrayList<>();
     private static final List<Katki> ISTEMCI = new ArrayList<>();
-    private static final List<AyarGocu.Kayit> SUNUCU_GOCLERI = new ArrayList<>();
-    private static volatile List<AyarGocu.Kayit> sunucuGocleri = List.of();
+    private static final List<SurumluGocPlani> SUNUCU_GOCLERI = new ArrayList<>();
+    private static volatile List<SurumluGocPlani> sunucuGocleri = List.of();
     private static boolean kuruldu;
 
     private AyarKaydi() {
@@ -97,16 +91,17 @@ public final class AyarKaydi {
     }
 
     /**
-     * SERVER config'e bir göç ekler: var olan dosyada {@code surumYolu} {@code guncel}'den küçükse (anahtar yoksa 0), Forge
-     * dosyayı okumadan önce {@code plan}'ın değerleri yazılır ve sürüm {@code guncel} olur. Sürüm anahtarı bölümün spec'inde
-     * varsayılanı {@code guncel} olarak tanımlanır: yeni dosya güncel sürümle yazılır, göç ettirilmez.
+     * SERVER config'e bir bölümün göç tablosunu ekler: var olan dosyada {@code plan.surumYolu()} {@code plan.guncel()}'den
+     * küçükse (anahtar yoksa 0), Forge dosyayı okumadan önce planın değerleri yazılır ve sürüm güncel olur. Sürüm anahtarı
+     * bölümün spec'inde varsayılanı {@code plan.guncel()} olarak tanımlanır: yeni dosya güncel sürümle yazılır, göç
+     * ettirilmez.
      */
-    public static synchronized void sunucuGocu(String surumYolu, int guncel, GocPlani plan) {
+    public static synchronized void sunucuGocu(SurumluGocPlani plan) {
+        Objects.requireNonNull(plan, "plan");
         if (kuruldu) {
-            throw new IllegalStateException("Config spec'leri kuruldu; göç mod kurucusunda eklenmeli: " + surumYolu);
+            throw new IllegalStateException("Config spec'leri kuruldu; göç mod kurucusunda eklenmeli: " + plan.surumYolu());
         }
-        SUNUCU_GOCLERI.add(new AyarGocu.Kayit(Objects.requireNonNull(surumYolu, "surumYolu"), guncel,
-                Objects.requireNonNull(plan, "plan")));
+        SUNUCU_GOCLERI.add(plan);
     }
 
     /**
