@@ -560,11 +560,14 @@ public final class YiyecekOyunTestleri {
             SicaklikKancalari.ortamKaynagiEkle(level, Vec3.atCenterOf(y.absolutePos(BlockPos.ZERO)).add(0.5, 0, 0), 45, 10, 2);
             double ortam = SicaklikYoneticisi.analiz(yiyen).ortamBirim();
             dogrula(y, ortam >= a.yanEtkiEsigi(), "sahne sıcak olmalı: ortam " + ortam);
-            VucutSicakligi.ayarla(kontrol, 50);
-            VucutSicakligi.ayarla(yiyen, 50);
-            Kademe once = e.kademe(50);
+            // Bunalma bandının üst ucu: anlık etki yanmaya taşır, kontrolün hasar eşiğine payı eski testteki gibi 25 birim.
+            double bas = e.cokSicak() - 5;
+            VucutSicakligi.ayarla(kontrol, bas);
+            VucutSicakligi.ayarla(yiyen, bas);
+            Kademe once = e.kademe(bas);
+            dogrula(y, once == Kademe.SICAK, "başlangıç bunalmada olmalı: " + once);
             ye(yiyen, "atesli_guvec", 1);
-            double anlik = VucutSicakligi.al(yiyen) - 50;
+            double anlik = VucutSicakligi.al(yiyen) - bas;
             dogrula(y, yakin(anlik, a.cokBuyuk() * a.yanEtkiCarpani() * a.anlikOran()),
                     "sıcakta yan etki çarpanı uygulanmalı: " + anlik);
             Kademe hemen = e.kademe(VucutSicakligi.al(yiyen));
