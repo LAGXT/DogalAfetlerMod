@@ -29,16 +29,20 @@ class KasirgaSafMantikTest {
     void tabloTasarimNotuylaAyni() {
         KasirgaSeviyesi s1 = KasirgaSeviyesi.icin(1);
         KasirgaSeviyesi s5 = KasirgaSeviyesi.icin(5);
-        assertEquals(6, s1.tabanCapi(), E);
-        assertEquals(50, s1.yukseklik(), E);
+        assertEquals(10, s1.tabanCapi(), E);
+        assertEquals(30, s1.yukseklik(), E);
+        assertEquals(15, s1.cekimYaricapi(), E);
         assertEquals(60, s1.aktifSureSn());
-        assertEquals(34, s5.tabanCapi(), E);
-        assertEquals(55, s5.tepeCapi(), E);
-        assertEquals(110, s5.yukseklik(), E);
+        assertEquals(48, s5.tabanCapi(), E);
+        assertEquals(76.8, s5.tepeCapi(), 1e-9);
+        assertEquals(144, s5.yukseklik(), 1e-9);
+        assertEquals(72, s5.cekimYaricapi(), 1e-9);
         assertEquals(4.4, s5.hiz(), E);
         assertEquals(180 * 20L, s5.aktifSureTick());
-        assertEquals(20, s5.blokKaldirmaTick());
-        assertEquals(30.6, s5.etekYaricapi(), 1e-6);
+        assertEquals(32, s5.blokKaldirmaTick());
+        assertEquals(6, s5.sertlikSiniri(), E);
+        assertEquals(6, s5.cekirdekHasari(), E);
+        assertEquals(43.2, s5.etekYaricapi(), 1e-9);
         assertTrue(s1.altBoslukOrani() > 0, "S1 yere tam değmeyen halat");
         assertEquals(0, s5.altBoslukOrani(), E);
         assertFalse(s1.zeminKazar());
@@ -47,21 +51,58 @@ class KasirgaSafMantikTest {
         assertThrows(IllegalArgumentException.class, () -> KasirgaSeviyesi.icin(6));
     }
 
+    /** Kullanıcı isteği (tur 3): gücüyle boyu doğru orantılı; S5 belirgin daha büyük ve yıkıcı. */
     @Test
-    void kamaYalnizS4VeS5() {
-        assertFalse(KasirgaSeviyesi.icin(3).kamaMi());
-        assertTrue(KasirgaSeviyesi.icin(4).kamaMi());
-        assertTrue(KasirgaSeviyesi.icin(5).kamaMi());
-        assertEquals(38.5, KasirgaSeviyesi.icin(4).ortaGenislik(), 0.1);
-        assertEquals(47.9, KasirgaSeviyesi.icin(5).ortaGenislik(), 0.1);
+    void butunBoyutlarGucleDogruOrantili() {
+        KasirgaSeviyesi s1 = KasirgaSeviyesi.icin(1);
+        for (int l = 1; l <= 5; l++) {
+            KasirgaSeviyesi s = KasirgaSeviyesi.icin(l);
+            double g = s.guc() / s1.guc();
+            String ad = "S" + l;
+            assertEquals(s1.tabanCapi() * g, s.tabanCapi(), 1e-9, ad);
+            assertEquals(s1.tepeCapi() * g, s.tepeCapi(), 1e-9, ad);
+            assertEquals(s1.yukseklik() * g, s.yukseklik(), 1e-9, ad);
+            assertEquals(s1.cekimYaricapi() * g, s.cekimYaricapi(), 1e-9, ad);
+            assertEquals(s1.enkazYuksekligi() * g, s.enkazYuksekligi(), 1e-9, ad);
+            assertEquals(s1.etekYaricapi() * g, s.etekYaricapi(), 1e-9, ad);
+            assertEquals(s1.duvarBulutuYaricapi() * g, s.duvarBulutuYaricapi(), 1e-9, ad);
+            assertEquals(KasirgaYikimi.yikimYaricapi(s1.cekimYaricapi()) * g, KasirgaYikimi.yikimYaricapi(s.cekimYaricapi()),
+                    1e-9, ad);
+            assertEquals(s1.kaldirmaTavani(36) * g, s.kaldirmaTavani(36), 1e-9, ad);
+            assertEquals(s1.ucusYuksekligi(0.5) * g, s.ucusYuksekligi(0.5), 1e-9, ad);
+        }
+        KasirgaSeviyesi s4 = KasirgaSeviyesi.icin(4);
+        KasirgaSeviyesi s5 = KasirgaSeviyesi.icin(5);
+        assertTrue(s5.guc() / s4.guc() > 1.4, "S5 S4'ten belirgin güçlü");
+        assertTrue(s5.blokKaldirmaTick() >= 1.5 * 20, "S5 eski 20 blok/tick'ten belirgin yıkıcı");
+        assertEquals(KasirgaSeviyesi.S5_KALDIRMA_TAVANI, s5.kaldirmaTavani(KasirgaSeviyesi.S5_KALDIRMA_TAVANI), 1e-9);
+        assertEquals(0.25 * s5.yukseklik(), s5.kaldirmaTavani(KasirgaSeviyesi.S5_KALDIRMA_TAVANI), 1e-9);
+        assertEquals(7.5, s1.kaldirmaTavani(KasirgaSeviyesi.S5_KALDIRMA_TAVANI), 1e-9);
+        KasirgaSeviyesi buyuk = KasirgaSeviyesi.icin(5, new Carpanlar(2, 1, 1, 1, 1, 1));
+        assertEquals(72, buyuk.kaldirmaTavani(KasirgaSeviyesi.S5_KALDIRMA_TAVANI), 1e-9, "boyut çarpanı tavanı da ölçekler");
+        assertEquals(0.2 * s5.yukseklik(), s5.ucusYuksekligi(0), 1e-9);
+        assertEquals(0.55 * s5.yukseklik(), s5.ucusYuksekligi(1), 1e-9);
+    }
+
+    /** Boyutlar tek katsayıyla ölçeklendiği için huni biçimi her seviyede aynı: eski S5 gibi kama (orta genişlik ≥ %40). */
+    @Test
+    void huniBicimiHerSeviyedeAyniKama() {
+        double oran = KasirgaSeviyesi.icin(1).ortaGenislik() / KasirgaSeviyesi.icin(1).yukseklik();
+        for (int l = 1; l <= 5; l++) {
+            KasirgaSeviyesi s = KasirgaSeviyesi.icin(l);
+            assertEquals(oran, s.ortaGenislik() / s.yukseklik(), 1e-9, "S" + l);
+            assertTrue(s.kamaMi(), "S" + l);
+        }
+        assertEquals(67.0, KasirgaSeviyesi.icin(5).ortaGenislik(), 0.1);
     }
 
     @Test
     void carpanlarBoyutVeHiziAyriOlcekler() {
         KasirgaSeviyesi s = KasirgaSeviyesi.icin(3, new Carpanlar(2, 1, 1, 1, 1, 1));
-        assertEquals(32, s.tabanCapi(), E);
-        assertEquals(48, s.cekimYaricapi(), E);
+        assertEquals(48, s.tabanCapi(), 1e-9);
+        assertEquals(72, s.cekimYaricapi(), 1e-9);
         assertEquals(3.2, s.hiz(), E);
+        assertEquals(KasirgaSeviyesi.icin(3).guc(), s.guc(), E, "boyut çarpanı gücü değiştirmez");
         KasirgaSeviyesi h = KasirgaSeviyesi.icin(3, new Carpanlar(1, 0.5, 2, 1, 0.5, 3));
         assertEquals(1.6, h.hiz(), E);
         assertEquals(240, h.aktifSureSn());
@@ -190,22 +231,70 @@ class KasirgaSafMantikTest {
         assertEquals(3.1 + Yonelim.DONUS_HIZI, Yonelim.don(3.1, -3.1), 1e-9);
     }
 
+    /** S3 (çekirdek 12, çekim yarıçapı 36, güç 2,4, tavan 18) yerde duran varlık için çekim. */
+    private static double[] s3(double dx, double dz, double h, double seviyeGucu, double carpan) {
+        return Cekim.ivme(dx, dz, h, 0, 0, 12, 36, seviyeGucu, carpan, 18, Cekim.YER_SURTUNMESI);
+    }
+
     @Test
-    void cekimIceSiklonikVeKaldirmaCekirdekte() {
-        double[] disari = Cekim.ivme(10, 0, 0, 3, 9, 3, 1, 25);
+    void cekimIceBaskinSiklonikVeKaldirmaCekirdekte() {
+        double[] disari = s3(36.5, 0, 0, 2.4, 1);
         assertEquals(0, disari[0] + disari[1] + disari[2], E);
-        double[] dogu = Cekim.ivme(5, 0, 0, 3, 9, 3, 1, 25);
+        double[] dogu = s3(20, 0, 0, 2.4, 1);
         assertTrue(dogu[0] < 0, "içe (batıya) çeker");
         assertTrue(dogu[2] < 0, "siklonik: doğudaki varlık kuzeye (-z) sürüklenir");
+        assertEquals(Cekim.TEGET_ORANI * -dogu[0], -dogu[2], 1e-12, "teğet içenin yarısı");
+        assertTrue(Cekim.TEGET_ORANI <= 0.5);
         assertEquals(0, dogu[1], E);
-        double[] cekirdek = Cekim.ivme(1, 0, 0, 3, 9, 3, 1, 25);
+        double[] cekirdek = s3(1, 0, 0, 2.4, 1);
         assertTrue(cekirdek[1] > 0.08, "S3 çekirdekte yerçekimini aşar");
-        assertEquals(0, Cekim.ivme(1, 0, 25, 3, 9, 3, 1, 25)[1], E);
-        assertTrue(Cekim.ivme(0, 0, 0, 3, 9, 1, 1, 25)[1] < 0.08, "S1 (F1) varlıkları havaya kaldırmaz");
-        assertTrue(Math.abs(Cekim.ivme(5, 0, 0, 3, 9, 5, 1, 25)[0]) > Math.abs(Cekim.ivme(5, 0, 0, 3, 9, 1, 1, 25)[0]));
-        assertEquals(0, Cekim.ivme(5, 0, 0, 3, 9, 5, 0, 25)[0], E);
+        assertEquals(0, s3(1, 0, 18, 2.4, 1)[1], E, "tavanda kaldırma durur");
+        assertTrue(s3(0, 0, 0, KasirgaSeviyesi.icin(1).guc(), 1)[1] < 0.08, "S1 (F1) varlıkları havaya kaldırmaz");
+        assertTrue(s3(0, 0, 0, KasirgaSeviyesi.icin(2).guc(), 1)[1] > 0.08, "S2 eksende kaldırır");
+        assertTrue(Math.abs(s3(20, 0, 0, 4.8, 1)[0]) > Math.abs(s3(20, 0, 0, 1, 1)[0]));
+        assertEquals(0, s3(20, 0, 0, 4.8, 0)[0], E);
+        double yerde = s3(20, 0, 0, 2.4, 1)[0];
+        double havada = Cekim.ivme(20, 0, 5, 0, 0, 12, 36, 2.4, 1, 18, Cekim.HAVA_SURTUNMESI)[0];
+        assertEquals((1 - Cekim.HAVA_SURTUNMESI) / (1 - Cekim.YER_SURTUNMESI), havada / yerde, 1e-9,
+                "ivme sürtünmeyle ölçekli: yerde ve havada aynı sürüklenme hızı");
         double[] hiz = Cekim.kirp(new double[] {3, 2, 4});
         assertEquals(Cekim.EN_COK_YATAY, Math.hypot(hiz[0], hiz[2]), 1e-9);
         assertEquals(Cekim.EN_COK_DIKEY, hiz[1], E);
+    }
+
+    /** Hız ne olursa olsun çekirdekte ve çekim bölgesinde radyal ivme dışa bakmaz (merkezkaçla savurma yok). */
+    @Test
+    void hicbirYerdeDisaNetIvmeYok() {
+        for (int l = 1; l <= 5; l++) {
+            KasirgaSeviyesi s = KasirgaSeviyesi.icin(l);
+            for (double d = 0.25; d < s.cekimYaricapi(); d += 0.5) {
+                for (double vt = -1.4; vt <= 1.4; vt += 0.35) {
+                    for (double vr = -1.0; vr <= 1.0; vr += 0.5) {
+                        for (double f : new double[] {Cekim.YER_SURTUNMESI, Cekim.HAVA_SURTUNMESI}) {
+                            // Varlık doğuda (+x): radyal hız x, teğet hız -z yönünde (siklonik).
+                            double[] a = Cekim.ivme(d, 0, 2, vr, -vt, s.tabanYaricapi(), s.cekimYaricapi(), s.guc(), 1,
+                                    s.kaldirmaTavani(36), f);
+                            assertTrue(a[0] <= 1e-12, "S" + l + " d " + d + " vt " + vt + " vr " + vr + ": dışa " + a[0]);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /** Denetim P2-3: tavan yalnız çekimin eklediğini sınırlar; elytra ya da havai fişekle zaten hızlı olan yavaşlatılmaz. */
+    @Test
+    void kirpmaOncekiHiziAzaltmaz() {
+        double[] elytra = Cekim.kirp(new double[] {2.1, 0.2, 0}, new double[] {2.0, 0.2, 0});
+        assertEquals(2.0, Math.hypot(elytra[0], elytra[2]), 1e-9, "çekim hızlı varlığı daha da hızlandırmaz ama yavaşlatmaz");
+        double[] roket = Cekim.kirp(new double[] {0, 1.6, 0}, new double[] {0, 1.5, 0});
+        assertEquals(1.5, roket[1], 1e-9);
+        double[] dusus = Cekim.kirp(new double[] {0, -4.5, 0}, new double[] {0, -4.2, 0});
+        assertEquals(-4.2, dusus[1], 1e-9);
+        double[] yavas = Cekim.kirp(new double[] {1.0, 0.95, 1.0}, new double[] {0.3, 0, 0.3});
+        assertEquals(Cekim.EN_COK_YATAY, Math.hypot(yavas[0], yavas[2]), 1e-9, "yavaş varlıkta tavan aynen");
+        assertEquals(Cekim.EN_COK_DIKEY, yavas[1], 1e-9);
+        double[] yavaslayan = Cekim.kirp(new double[] {1.5, 0, 0}, new double[] {2.0, 0, 0});
+        assertEquals(1.5, yavaslayan[0], 1e-9, "çekim hızlı varlığı frenleyebilir");
     }
 }

@@ -5,6 +5,7 @@ import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.Kasirga;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.KasirgaKayitlari;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.UcanBlokVarligi;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.KasirgaEvresi;
+import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.KasirgaSeviyesi;
 import io.github.kadirberkpolat1.dogalafetler.client.core.GorselOtomasyon;
 import io.github.kadirberkpolat1.dogalafetler.config.EfektKalitesi;
 import io.github.kadirberkpolat1.dogalafetler.core.Afet;
@@ -90,7 +91,18 @@ public final class KasirgaOtomasyonu {
 
     /** Kasırganın hareket yönünde {@code mesafe} blok önünde, zemin + {@code yukseklik}, {@code egim} derece. */
     private record Kamera(double mesafe, double yukseklik, float egim) {
+        /** Aynı açıdan, uzaklığı ve yüksekliği {@code k} katı: orantılı büyüyen huni karede aynı yeri kaplar. */
+        Kamera olcekli(double k) {
+            return new Kamera(mesafe * k, yukseklik * k, egim);
+        }
     }
+
+    /**
+     * S5 kare kameralarının ölçeği (AF3-05): K-13/K-17 kameraları taban yarıçapı 17 olan eski S5'e göre kuruldu; boyutlar
+     * güçle orantılı büyüdüğü için kare kameraları da aynı oranda uzaklaşır (55 blok → 77,6). Sabit 55 blokta 48 çaplı huni
+     * alt üçte biri kaplıyor, K-17 toz ölçüsü huninin gövdesini ölçüyordu. FPS ölçüm kameraları (K0-33) mutlak kalır.
+     */
+    private static final double S5_KARE_OLCEGI = KasirgaSeviyesi.icin(5).tabanYaricapi() / 17;
 
     private static final Kamera VITRIN = new Kamera(55, 10, -8);
     private static final Kamera YAKIN = new Kamera(22, 4, -20);
@@ -98,6 +110,8 @@ public final class KasirgaOtomasyonu {
     private static final Kamera IC = new Kamera(5, 3, -25);
     /** Huni kenarı 64 bloktan uzakta (kasırga sisi yok); taban rengi ölçümü (K-17). */
     private static final Kamera UZAK = new Kamera(90, 10, -6);
+    /** S5 hunisinin tamamı (144 blok, AF3-05 güç–boy orantısı): 70° dikey görüşte zeminden tepeye. */
+    private static final Kamera TAM_BOY = new Kamera(150, 24, -10);
 
     /** {@code bekle} tick sonra (ve istenen kare alınmışsa) {@code kosul} doğruysa {@code is} çalışır; {@code enCok} tick sonra zorla. */
     private record Adim(String ad, int bekle, BooleanSupplier kosul, int enCok, Runnable is) {
@@ -416,20 +430,22 @@ public final class KasirgaOtomasyonu {
             });
             mc.options.hideGui = true;
         });
-        adim("siren kamerası", 20, () -> kamera(server, new Kamera(70, 12, -12)));
+        adim("siren kamerası", 20, () -> kamera(server, new Kamera(70, 12, -12).olcekli(S5_KARE_OLCEGI)));
         adim("siren karesi", 140, () -> kare("siren"));
         akiciBekle("aktif");
         adim("aktif", 30, () -> ilerletEger(server, k -> k.asama() == AfetAsamasi.SIREN));
-        adim("aktif kamerası", 60, () -> kamera(server, new Kamera(60, 10, -10)));
+        adim("aktif kamerası", 60, () -> kamera(server, new Kamera(60, 10, -10).olcekli(S5_KARE_OLCEGI)));
         adim("aktif doğuş karesi", 40, () -> kare("aktif_dogus"));
         adim("olgun", 20, () -> ilerletEger(server, k -> k.durum().evre() == KasirgaEvresi.DOGUS));
-        adim("vitrin kamerası", 100, () -> kamera(server, VITRIN));
+        adim("vitrin kamerası", 100, () -> kamera(server, VITRIN.olcekli(S5_KARE_OLCEGI)));
         adim("vitrin karesi", 30, () -> kare("s5_vitrin"));
         adim("kontrol", 5, () -> yalnizTozGizle(true));
         adim("kontrol karesi", 10, () -> kare("s5_vitrin_kontrol"));
         adim("kontrol bitti", 5, () -> yalnizTozGizle(false));
         adim("vitrin karesi b", 60, () -> kare("s5_vitrin_b"));
-        adim("uzak taban kamerası", 10, () -> kamera(server, UZAK));
+        adim("tam boy kamerası", 10, () -> kamera(server, TAM_BOY));
+        adim("tam boy karesi", 30, () -> kare("s5_tam_boy"));
+        adim("uzak taban kamerası", 10, () -> kamera(server, UZAK.olcekli(S5_KARE_OLCEGI)));
         adim("uzak taban karesi", 30, () -> kare("s5_taban_uzak"));
         adim("uzak kontrol", 5, () -> yalnizTozGizle(true));
         adim("uzak kontrol karesi", 10, () -> kare("s5_taban_uzak_kontrol"));

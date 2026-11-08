@@ -1,15 +1,30 @@
 package io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik;
 
 /**
- * Kasırganın varlıklara uyguladığı hız değişimi (tick başına, blok/tick): içe doğru çekim, siklonik teğet sürükleme ve
- * huni çekirdeğinde yukarı kaldırma (madde 10 "çekim gücü", bölüm A "nesneleri havaya çeksin"). Siklonik: yukarıdan
- * bakınca saat yönünün tersi; x doğu, z güney iken açı azalır, teğet birim vektör {@code (sin θ, -cos θ)}.
+ * Kasırganın varlıklara uyguladığı hız değişimi (tick başına, blok/tick; madde 10 "çekim gücü", bölüm A "nesneleri havaya
+ * çeksin"; tur 3 AF3-02). Siklonik: yukarıdan bakınca saat yönünün tersi; x doğu, z güney iken teğet birim vektör
+ * {@code (sin θ, -cos θ)}.
+ *
+ * <p>Çekim bölgesinde ({@code çekirdek ≤ d < R}) hedef bir içe sürüklenme hızı vardır: {@code V = KENAR_HIZI · güç ·
+ * √(R/d)} (kütle korunumundaki 1/r içe akışın yumuşatılmışı; R'nin son %10'unda sıfırdan açılır). İvme {@code V · (1 -
+ * sürtünme)}'dir: sabit ivmede vanilla sürtünmesi hızı {@code ivme / (1 - sürtünme)}'de dengeler, yani varlık yerde de havada
+ * da aynı {@code V} ile sürüklenir ve oyuncunun koşu girdisiyle (yerde 0,13 / 0,454 = 0,286 blok/tick, havada 0,026 / 0,09)
+ * doğrudan karşılaştırılabilir. Teğet bileşen içe bileşenin yarısıdır. Çekirdekte ({@code d < çekirdek}) dışa net ivme
+ * yoktur: içe yay {@code çekirdek/2}'ye kadar sürer, varlığın kendi teğet hızı için {@code vₜ²/d} merkezcil ivme ve dışa
+ * radyal hızın yarısı kadar sönüm eklenir; varlık çekirdekte döner, kaldırılır ve merkezkaçla fırlatılmaz.
  */
 public final class Cekim {
-    /** Çekim yarıçapının kenarında içe ivme (blok/tick²), seviye 1'de; seviyeyle doğrusal artar. */
-    public static final double TABAN_ICE = 0.012;
-    /** Çekirdek yarıçapında kaldırma ivmesi (blok/tick²); yerçekimini (0,08) seviyeyle aşar. */
-    public static final double TABAN_KALDIRMA = 0.07;
+    /** Güç 1'de çekim yarıçapının kenarındaki içe sürüklenme hızı (blok/tick): S5 (güç 4,8) kenarda 8 blok/sn. */
+    public static final double KENAR_HIZI = 8.0 / 4.8 / 20;
+    /** Güç 1'de kaldırma ivmesi (blok/tick²): S1 0,06 yerçekiminin (0,08) altında kalır, S2 eksende 0,096 aşar. */
+    public static final double TABAN_KALDIRMA = 0.06;
+    /** Teğet / içe oranı (çekim bölgesinde). */
+    public static final double TEGET_ORANI = 0.5;
+    /** Çekim yarıçapının bu payında çekim sıfırdan tam değerine açılır (kenarda ani sıçrama olmasın). */
+    public static final double KENAR_SOLMA = 0.1;
+    /** Vanilla yatay sürtünmeleri: yerde (blok sürtünmesi 0,6 × 0,91), havada canlı. */
+    public static final double YER_SURTUNMESI = 0.6 * 0.91;
+    public static final double HAVA_SURTUNMESI = 0.91;
     /** Yatay hız tavanı (blok/tick). */
     public static final double EN_COK_YATAY = 1.4;
     /** Dikey hız tavanı (blok/tick). */
@@ -19,49 +34,89 @@ public final class Cekim {
     }
 
     /**
-     * @param dx          varlığın kasırga eksenine göre doğu ofseti
-     * @param dz          varlığın kasırga eksenine göre güney ofseti
-     * @param yukseklik    varlığın kasırga zemininden yüksekliği
-     * @param cekirdek     kaldırmanın işlediği yarıçap (huni tabanı)
+     * @param dx            varlığın kasırga eksenine göre doğu ofseti
+     * @param dz            varlığın kasırga eksenine göre güney ofseti
+     * @param yukseklik     varlığın kasırga zemininden yüksekliği
+     * @param vx            varlığın şu anki doğu hızı (merkezcil terim ve dışa hız sönümü için)
+     * @param vz            varlığın şu anki güney hızı
+     * @param cekirdek      huni taban yarıçapı (kaldırma ve dönme bölgesi)
      * @param cekimYaricapi çekimin söndüğü yarıçap
-     * @param seviye       1-5
-     * @param guc          evre ve config çarpanı (0 = etkisiz)
-     * @param tavan        kaldırmanın durduğu yükseklik (oyuncu en çok 25 blok yükselir)
+     * @param seviyeGucu    {@link KasirgaSeviyesi#guc()}
+     * @param carpan        evre gücü × {@code cekimCarpani} (0 = etkisiz)
+     * @param tavan         kaldırmanın durduğu yükseklik ({@link KasirgaSeviyesi#kaldirmaTavani})
+     * @param surtunme      varlığın bu tick'teki yatay sürtünme çarpanı (yerde {@link #YER_SURTUNMESI}, havada
+     *                      {@link #HAVA_SURTUNMESI})
      * @return {vx, vy, vz} eklenecek hız; çekim yarıçapı dışında sıfır
      */
-    public static double[] ivme(double dx, double dz, double yukseklik, double cekirdek, double cekimYaricapi, int seviye,
-            double guc, double tavan) {
+    public static double[] ivme(double dx, double dz, double yukseklik, double vx, double vz, double cekirdek,
+            double cekimYaricapi, double seviyeGucu, double carpan, double tavan, double surtunme) {
         double d = Math.sqrt(dx * dx + dz * dz);
-        if (d >= cekimYaricapi || guc <= 0) {
+        if (d >= cekimYaricapi || carpan <= 0) {
             return new double[3];
         }
-        double kenar = 1 - d / cekimYaricapi;
-        double olcek = guc * (0.6 + 0.4 * seviye);
-        double ice = TABAN_ICE * olcek * (0.35 + 0.65 * kenar);
-        double teget = ice * 1.3;
         double ux = d > 1e-6 ? dx / d : 0;
         double uz = d > 1e-6 ? dz / d : 0;
-        // Çekirdeğin içinde içe çekim söner (varlık eksene yığılmasın, çevresinde döner).
-        double iceCarpan = d < cekirdek * 0.5 ? d / (cekirdek * 0.5) : 1;
-        double vx = -ux * ice * iceCarpan + uz * teget;
-        double vz = -uz * ice * iceCarpan - ux * teget;
-        double vy = 0;
+        double k = 1 - Math.max(0, Math.min(1, surtunme));
+        double cekirdekHizi = iceHiz(Math.min(d, cekirdek), cekirdek, cekimYaricapi, seviyeGucu, carpan);
+        double ice;
+        double teget;
+        if (d >= cekirdek) {
+            ice = iceHiz(d, cekirdek, cekimYaricapi, seviyeGucu, carpan) * k;
+            teget = TEGET_ORANI * ice;
+        } else {
+            double yay = cekirdek * 0.5;
+            ice = cekirdekHizi * k * Math.max(0, (d - yay) / (cekirdek - yay));
+            teget = TEGET_ORANI * cekirdekHizi * k * Math.min(1, d / yay);
+        }
+        if (d < cekirdek * 1.15 && d > 1e-6) {
+            double vr = vx * ux + vz * uz;
+            double vt = vx * uz - vz * ux;
+            ice += vt * vt / Math.max(d, 0.5);
+            if (vr > 0) {
+                ice += 0.5 * vr;
+            }
+        }
+        double ax = -ux * ice + uz * teget;
+        double az = -uz * ice - ux * teget;
+        double ay = 0;
         if (d < cekirdek * 1.15 && yukseklik < tavan) {
             double cekirdekPayi = 1 - Math.min(1, d / (cekirdek * 1.15));
             double tavanPayi = 1 - Math.max(0, yukseklik) / tavan;
-            vy = TABAN_KALDIRMA * olcek * (0.4 + 0.6 * cekirdekPayi) * Math.sqrt(Math.max(0, tavanPayi));
+            ay = TABAN_KALDIRMA * seviyeGucu * carpan * (0.4 + 0.6 * cekirdekPayi) * Math.sqrt(Math.max(0, tavanPayi));
         }
-        return new double[] {vx, vy, vz};
+        return new double[] {ax, ay, az};
+    }
+
+    /**
+     * Çekim bölgesinde {@code d} uzaklığındaki hedef içe sürüklenme hızı (blok/tick): sabit ivmede sürtünmeyle dengelenen
+     * hız. Çekirdek sınırında en büyük, kenarda {@code KENAR_HIZI · güç · çarpan}, dışında 0.
+     */
+    public static double iceHiz(double d, double cekirdek, double cekimYaricapi, double seviyeGucu, double carpan) {
+        if (d >= cekimYaricapi || carpan <= 0) {
+            return 0;
+        }
+        double solma = Math.min(1, (cekimYaricapi - d) / (KENAR_SOLMA * cekimYaricapi));
+        return KENAR_HIZI * seviyeGucu * carpan * Math.sqrt(cekimYaricapi / Math.max(d, cekirdek)) * solma;
     }
 
     /** Hızı tavanlara kırpar (yerinde). */
     public static double[] kirp(double[] hiz) {
+        return kirp(hiz, new double[3]);
+    }
+
+    /**
+     * Çekim eklenmiş hızı tavanlara kırpar (yerinde), ama çekimden önceki hızın ({@code onceki}) büyüklüğünden aşağı değil:
+     * tavanın üstünde süzülen (elytra, havai fişek) ya da itilen varlık çekim yarıçapına girince yavaşlatılmaz, çekim yalnız onu
+     * daha da hızlandıramaz (denetim P2-3).
+     */
+    public static double[] kirp(double[] hiz, double[] onceki) {
+        double tavan = Math.max(EN_COK_YATAY, Math.sqrt(onceki[0] * onceki[0] + onceki[2] * onceki[2]));
         double yatay = Math.sqrt(hiz[0] * hiz[0] + hiz[2] * hiz[2]);
-        if (yatay > EN_COK_YATAY) {
-            hiz[0] *= EN_COK_YATAY / yatay;
-            hiz[2] *= EN_COK_YATAY / yatay;
+        if (yatay > tavan) {
+            hiz[0] *= tavan / yatay;
+            hiz[2] *= tavan / yatay;
         }
-        hiz[1] = Math.max(-3.9, Math.min(EN_COK_DIKEY, hiz[1]));
+        hiz[1] = Math.max(Math.min(-3.9, onceki[1]), Math.min(Math.max(EN_COK_DIKEY, onceki[1]), hiz[1]));
         return hiz;
     }
 }

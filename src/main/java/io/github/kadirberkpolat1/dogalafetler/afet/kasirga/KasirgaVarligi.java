@@ -20,8 +20,9 @@ import net.minecraft.world.phys.AABB;
 /**
  * Kasırganın görüntü taşıyıcısı (tasarım notu §2 "Sunucu", spike SK-04): görünmez, fiziksiz, kaydedilmez. Konumunu ve
  * evresini sahibi {@link Kasirga} afeti her tick yazar; vanilla izleyici konumu {@link #SENKRON_ARALIGI} tick'te bir (4 Hz)
- * gönderir, seviye, evre, evre ilerlemesi, yön ve boyut çarpanı {@link SynchedEntityData}'dadır (evre ilerlemesi 4 Hz).
- * İstemci konumu {@link #lerpTo} ile 5 tick'e yayar. Sahibi yoksa ya da bittiyse kendini atar.
+ * gönderir, seviye, evre, evre ilerlemesi, yön, boyut çarpanı, çekim çarpanı ve kaldırma tavanı {@link SynchedEntityData}'dadır
+ * (evre ilerlemesi 4 Hz). İstemci konumu {@link #lerpTo} ile 5 tick'e yayar; oyuncunun istemcisi çekimi bu veriden
+ * hesaplar ({@link #cekimKaynagi}, AF3-01). Sahibi yoksa ya da bittiyse kendini atar.
  */
 public class KasirgaVarligi extends Entity {
     private static final EntityDataAccessor<Integer> SEVIYE = SynchedEntityData.defineId(KasirgaVarligi.class,
@@ -33,6 +34,10 @@ public class KasirgaVarligi extends Entity {
     private static final EntityDataAccessor<Float> YON = SynchedEntityData.defineId(KasirgaVarligi.class,
             EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Float> OLCEK = SynchedEntityData.defineId(KasirgaVarligi.class,
+            EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<Float> CEKIM = SynchedEntityData.defineId(KasirgaVarligi.class,
+            EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<Float> TAVAN = SynchedEntityData.defineId(KasirgaVarligi.class,
             EntityDataSerializers.FLOAT);
 
     public static final int SENKRON_ARALIGI = 5;
@@ -50,10 +55,12 @@ public class KasirgaVarligi extends Entity {
         noCulling = true;
     }
 
-    void bagla(Kasirga kasirga, int seviye, float olcek) {
+    void bagla(Kasirga kasirga, int seviye, float olcek, float cekim, float tavan) {
         sahip = kasirga;
         entityData.set(SEVIYE, Mth.clamp(seviye, 1, 5));
         entityData.set(OLCEK, olcek);
+        entityData.set(CEKIM, cekim);
+        entityData.set(TAVAN, tavan);
     }
 
     /** Sahibin her tick'teki yazımı; evre ilerlemesi yalnız evre değişince ve 4 Hz'de kirlenir (ağ). */
@@ -73,6 +80,8 @@ public class KasirgaVarligi extends Entity {
         entityData.define(EVRE_ILERLEME, 0f);
         entityData.define(YON, 0f);
         entityData.define(OLCEK, 1f);
+        entityData.define(CEKIM, 1f);
+        entityData.define(TAVAN, 0f);
     }
 
     public int seviye() {
@@ -101,6 +110,12 @@ public class KasirgaVarligi extends Entity {
     /** Hareket yönü (radyan; x doğu, z güney). */
     public float yon() {
         return entityData.get(YON);
+    }
+
+    /** Çekim girdisi: konum, boyutlar, evre gücü × sunucunun {@code cekimCarpani} ve kaldırma tavanı. */
+    public KasirgaCekimi.Kaynak cekimKaynagi() {
+        double carpan = KasirgaEvresi.guc(new KasirgaEvresi.Durum(evre(), evreIlerleme())) * entityData.get(CEKIM);
+        return new KasirgaCekimi.Kaynak(position(), seviyeBilgisi(), carpan, entityData.get(TAVAN));
     }
 
     @Override

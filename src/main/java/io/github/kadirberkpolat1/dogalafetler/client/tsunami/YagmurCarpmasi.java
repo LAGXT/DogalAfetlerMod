@@ -16,6 +16,11 @@ final class YagmurCarpmasi {
      * olduğu için yüzü yok). Orada görünen yüzey yalnız sanal sudur: damla bu tick onu geçtiyse ona iner, yoksa halkasız söner.
      */
     static final double GIZLI = Double.POSITIVE_INFINITY;
+    /**
+     * {@link #yandanGirdi} payı: {@code MOTION_BLOCKING} haritası en üst hareket engelleyen bloğun hücresinin üstüdür; görünen
+     * yüzeyi (yarım blok, kar katmanı, toprak yol, gerçek suyun 8/9'u) bir bloka kadar alçakta olabilir.
+     */
+    static final double YAN_GIRIS_PAYI = 1;
 
     private YagmurCarpmasi() {
     }
@@ -58,5 +63,35 @@ final class YagmurCarpmasi {
      */
     static boolean sanalUcDestekli(double uc, double yuzey, double pay) {
         return uc >= yuzey - pay;
+    }
+
+    /**
+     * Damla halkasız silinir: ömrü doldu, {@code altSinir}'ın (dünya tabanı ya da kameranın yeterince altı) altına indi ya da
+     * sütununun chunk'ı yüklü değil (orada hiç çarpmaz; sınırsız düşüp damla yuvasını tutardı).
+     */
+    static boolean damlaBitti(int yas, int omur, double y, double altSinir, boolean yuklu) {
+        return !yuklu || yas >= omur || y < altSinir;
+    }
+
+    /**
+     * Damla bu tick girdiği sütuna yandan girdi: sütunun {@code MOTION_BLOCKING} tepesi ({@code tepe}) damlanın tick başındaki
+     * yüksekliğinin ({@code once}) {@link #YAN_GIRIS_PAYI}'ndan fazla üstünde. Eğik düşen damla saçak, pencere, köprü ya da ağaç
+     * altına böyle girer; içerideki zemine halka bırakmadan söner.
+     */
+    static boolean yandanGirdi(int tepe, double once) {
+        return tepe > once + YAN_GIRIS_PAYI;
+    }
+
+    /**
+     * Halka ucunun altındaki yüzey ({@code nokta}) halkanın {@code yuzey}'iyle {@code pay} içinde aynı mı. Yüzey yoksa (NaN: blok
+     * yıkıldı) ya da üst yüzü çizilmeyen suysa ({@link #GIZLI}) hayır: kurulu halka da her tick sorulur, zemini gidince söner.
+     */
+    static boolean zeminAyni(double nokta, double yuzey, double pay) {
+        return Math.abs(nokta - yuzey) <= pay;
+    }
+
+    /** Blok hücresi halka yüzeyi olabilir mi: çarpışma şekli var ve çiziliyor (bariyer gibi görünmez blok havada halka bırakırdı). */
+    static boolean blokYuzeyi(boolean cizilir, boolean carpisir) {
+        return cizilir && carpisir;
     }
 }

@@ -115,7 +115,7 @@ public final class IstemciKasirga {
             float uzunluk = (float) Math.sqrt(ex * ex + ey * ey + ez * ez) + 1e-4f;
             liste.add(new GorselEnkaz(blok.blok(), simdi - RASTGELE.nextDouble() * 1.5,
                     s.tabanYaricapi() * (0.5 + RASTGELE.nextDouble() * 0.9), RASTGELE.nextDouble() * Math.PI * 2,
-                    3 + RASTGELE.nextDouble() * 4, Math.min(25 + RASTGELE.nextDouble() * 35, s.yukseklik() * 0.6),
+                    3 + RASTGELE.nextDouble() * 4, s.ucusYuksekligi(RASTGELE.nextDouble()),
                     0.25f + RASTGELE.nextFloat() * 0.25f, ex / uzunluk, ey / uzunluk, ez / uzunluk,
                     90 + RASTGELE.nextFloat() * 360, 2 + RASTGELE.nextDouble() * 4, 2 + RASTGELE.nextDouble() * 5));
         }

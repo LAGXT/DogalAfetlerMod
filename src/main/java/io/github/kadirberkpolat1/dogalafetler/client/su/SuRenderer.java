@@ -142,7 +142,7 @@ public final class SuRenderer {
     private static int uzakOx;
     private static int uzakOy;
     private static int uzakOz;
-    /** Yalnız otomasyon: kurulan ve çizilen uzak LOD karolarının su üstü (karo anahtarı {@link #karo}; {@link #cizilenUst}). */
+    /** Kurulan ve çizilen uzak LOD karolarının su üstü (karo anahtarı {@link #karo}; {@link #uzakSuUstu}, {@link #cizilenUst}). */
     private static Long2FloatOpenHashMap uzakYapUst = new Long2FloatOpenHashMap();
     private static Long2FloatOpenHashMap uzakCizilenUst = new Long2FloatOpenHashMap();
     /** Kurulmakta olan tamponun Y kökeni; köşe Y'si buna göre göreli yazılır. */
@@ -979,9 +979,7 @@ public final class SuRenderer {
                 continue;
             }
             float y = (float) A.ust(A.adet() - 1) - 0.16f;
-            if (GorselOtomasyon.AKTIF) {
-                uzakYapUst.put(karo(gx, gz), (float) A.ust(A.adet() - 1));
-            }
+            uzakYapUst.put(karo(gx, gz), (float) A.ust(A.adet() - 1));
             double mx = gx + LOD / 2.0;
             double mz = gz + LOD / 2.0;
             if (A.sakin(A.adet() - 1)) {
@@ -1121,10 +1119,9 @@ public final class SuRenderer {
 
     /**
      * {@code (x, z)} sütununda bu karede herhangi bir sanal su ağının çizdiği ham su üstü (dalgacıksız): önce çizilen yakın
-     * tampon ({@link #CIZ_UST}; TUR 3 yalnız gerçek suyun yan yüzü, su üstü değil), sonra çizilen uzak LOD karosu (karo
-     * ortasının yüksekliği; yalnız {@link GorselOtomasyon#AKTIF} iken kaydedilir: üretimde yalnız yakın tampon, tsunami
-     * yağmurunun halka koyduğu alan). Uzak LOD kendi yakın bölgesini çizmez: yakın tampon yokken (yavaş makinede ilk yapım
-     * ~150 tick) kameranın {@link #YAKIN} blok çevresinde sanal su çizilmez, NaN.
+     * tampon ({@link #CIZ_UST}; TUR 3 yalnız gerçek suyun yan yüzü, su üstü değil), sonra çizilen uzak LOD karosu
+     * ({@link #uzakSuUstu}). Uzak LOD kendi yakın bölgesini çizmez: yakın tampon yokken (yavaş makinede ilk yapım ~150
+     * tick) kameranın {@link #YAKIN} blok çevresinde sanal su çizilmez, NaN.
      */
     public static double cizilenUst(int x, int z) {
         if (!yakinBos) {
@@ -1133,8 +1130,33 @@ public final class SuRenderer {
                 return CIZ_UST[k];
             }
         }
+        return uzakSuUstu(x, z);
+    }
+
+    /**
+     * Yalnız çizilen uzak LOD'un {@code (x, z)}'yi içeren karosunun su üstü (karo ortasının yüksekliği); uzak LOD orada su
+     * çizmiyorsa (yakın kare, kuru karo, menzil dışı) NaN.
+     */
+    public static double uzakSuUstu(int x, int z) {
         long a = karo(Math.floorDiv(x, LOD) * LOD, Math.floorDiv(z, LOD) * LOD);
         return !uzakBos && uzakCizilenUst.containsKey(a) ? uzakCizilenUst.get(a) : Double.NaN;
+    }
+
+    /** {@code (x, z)} sütunu bu karede çizilen yakın tamponun içinde mi (su çizilsin çizilmesin); yakın tampon yoksa hayır. */
+    public static boolean yakinKapsar(int x, int z) {
+        return !yakinBos && komsu(x - (cizOx - YAKIN), z - (cizOz - YAKIN)) >= 0;
+    }
+
+    /**
+     * Yalnız çizilen yakın tamponun {@code (x, z)}'deki sanal su üstü (dalgacıksız; TUR 1 ve 2): kapsamıyorsa, sütun kuruysa,
+     * yalnız gerçek suyun yan yüzü ya da çekilmede açığa çıkan dip çiziliyorsa NaN. Uzak LOD'a düşmez ({@link #cizilenUst}).
+     */
+    public static double yakinSuUstu(int x, int z) {
+        if (yakinBos) {
+            return Double.NaN;
+        }
+        int k = komsu(x - (cizOx - YAKIN), z - (cizOz - YAKIN));
+        return k >= 0 && (CIZ_TUR[k] == 1 || CIZ_TUR[k] == 2) ? CIZ_UST[k] : Double.NaN;
     }
 
     /**
