@@ -10,6 +10,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
 import io.github.kadirberkpolat1.dogalafetler.core.EtkiAlani;
 import io.github.kadirberkpolat1.dogalafetler.core.OyunTestiTemizligi;
+import io.github.kadirberkpolat1.dogalafetler.core.olay.SirenIstegiEvent;
 import io.github.kadirberkpolat1.dogalafetler.esya.EsyaKayitlari;
 import io.github.kadirberkpolat1.dogalafetler.esya.mantik.RadarGorunumu;
 import io.github.kadirberkpolat1.dogalafetler.esya.radar.RadarPaketi;
@@ -17,6 +18,8 @@ import io.github.kadirberkpolat1.dogalafetler.esya.radar.RadarSunucu;
 import io.github.kadirberkpolat1.dogalafetler.yangin.YanginEtiketleri;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import net.minecraft.core.BlockPos;
@@ -30,6 +33,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LeavesBlock;
@@ -98,6 +102,11 @@ public final class AsitOyunTestleri {
         batchSonu(level);
     }
 
+    @AfterBatch(batch = "asit_boyut")
+    public static void boyutSonrasi(ServerLevel level) {
+        batchSonu(level);
+    }
+
     /**
      * Batch sonu: afet durur (önceki hava geri yüklenir), kural, dinleyici ve sahte oyuncular döner, zorla yüklenen uzak
      * chunk'lar bırakılır. Hava yağmıyorsa yağmur düzeyi de sıfırlanır: AF2-02 vanilla yağmuru 0,01/tick ile söner, sıradaki
@@ -150,6 +159,69 @@ public final class AsitOyunTestleri {
         });
         y.runAfterDelay(120, () -> {
             y.assertTrue(!level.isRaining(), "bitişten sonra yağmur sönmeli (düzey " + level.getRainLevel(1f) + ")");
+            y.succeed();
+        });
+    }
+
+    /**
+     * AF2-08 (inceleme Af1): küresel alanlı bölgesel afet yalnız kendi boyutunu etkiler. Asit sürerken Nether'daki oyuncu siren
+     * isteği ve durum paketi almaz, etkilenenlere girmez, doğal bitişte Çatı Altı almaz; üst dünyada cam çatı altındaki oyuncu
+     * üçünü de alır.
+     */
+    @GameTest(template = SAHNE, batch = "asit_boyut", timeoutTicks = 260)
+    public static void baskaBoyuttakiOyuncuAsittenEtkilenmez(GameTestHelper y) {
+        ServerLevel level = y.getLevel();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(level.getServer());
+        yonetici.durdur();
+        ServerLevel nether = level.getServer().getLevel(Level.NETHER);
+        y.assertTrue(nether != null, "Nether boyutu yok");
+        zemin(y);
+        for (int x = 5; x <= 7; x++) {
+            for (int z = 5; z <= 7; z++) {
+                y.setBlock(new BlockPos(x, 4, z), Blocks.GLASS);
+            }
+        }
+        BlockPos catiP = y.absolutePos(new BlockPos(6, 1, 6));
+        ServerPlayer ust = OyunTestiTemizligi.oyuncu(y, catiP.getX() + 0.5, catiP.getY(), catiP.getZ() + 0.5);
+        ServerPlayer alt = OyunTestiTemizligi.oyuncu(y, catiP.getX() + 0.5, catiP.getY(), catiP.getZ() + 0.5);
+        alt.teleportTo(nether, 0.5, 70, 0.5, 0f, 0f);
+        y.assertTrue(alt.level() == nether, "oyuncu Nether'e geçmedi");
+        List<ServerPlayer> hepsi = List.of(ust, alt);
+        for (ServerPlayer o : hepsi) {
+            o.setGameMode(GameType.SURVIVAL);
+            o.setHealth(20f);
+        }
+        List<ServerPlayer> sirenAlan = new ArrayList<>();
+        OyunTestiTemizligi.dinle(SirenIstegiEvent.class, olay -> {
+            if (olay.afetTuru() == AfetTuru.ASIT_YAGMURU) {
+                sirenAlan.addAll(olay.oyuncular());
+            }
+        });
+        AsitYagmuru afet = baslat(y, 5, catiP);
+        y.assertTrue(sirenAlan.contains(ust) && !sirenAlan.contains(alt),
+                "siren yalnız üst dünyadakine gitmeli: üst " + sirenAlan.contains(ust) + ", Nether " + sirenAlan.contains(alt));
+        List<ServerPlayer> paket = yonetici.etkilenebilecekOyuncular(afet);
+        y.assertTrue(paket.contains(ust) && !paket.contains(alt),
+                "durum paketi yalnız üst dünyadakine gitmeli: üst " + paket.contains(ust) + ", Nether " + paket.contains(alt));
+        y.onEachTick(() -> hepsi.forEach(AsitOyunTestleri::hasarAlabilir));
+        y.runAfterDelay(40, () -> {
+            Set<UUID> etkilenen = Set.copyOf(afet.etkilenenler());
+            for (int i = 0; i < 6 && yonetici.aktifAfet().isPresent(); i++) {
+                yonetici.asamaIleri();
+            }
+            Advancement catiAlti = level.getServer().getAdvancements()
+                    .getAdvancement(BasarimKimlikleri.basarim(Basarimlar.CATI_ALTI));
+            y.assertTrue(catiAlti != null, "advancement yüklü değil (runData?)");
+            boolean ustAldi = ust.getAdvancements().getOrStartProgress(catiAlti).isDone();
+            boolean altAldi = alt.getAdvancements().getOrStartProgress(catiAlti).isDone();
+            boolean bitti = yonetici.aktifAfet().isEmpty() && afet.sonlandi();
+            yonetici.durdur();
+            cikar(level, hepsi);
+            y.assertTrue(etkilenen.contains(ust.getUUID()), "üst dünyadaki oyuncu etkilenen olmalı");
+            y.assertTrue(!etkilenen.contains(alt.getUUID()), "Nether'daki oyuncu etkilenen olmamalı");
+            y.assertTrue(bitti, "asit doğal bitmeli: " + afet.asama());
+            y.assertTrue(ustAldi, "çatı altındaki üst dünya oyuncusu Çatı Altı almalı");
+            y.assertTrue(!altAldi, "Nether'daki oyuncu asitten Çatı Altı almamalı");
             y.succeed();
         });
     }
@@ -388,6 +460,7 @@ public final class AsitOyunTestleri {
         int ilk = ozet(y);
         BlockPos ortaP = y.absolutePos(new BlockPos(4, 2, 4));
         ServerPlayer goren = OyunTestiTemizligi.oyuncu(y, ortaP.getX() + 0.5, ortaP.getY(), ortaP.getZ() + 0.5);
+        goren.setGameMode(GameType.SURVIVAL);
         AsitYagmuru afet = baslat(y, 5, y.absolutePos(new BlockPos(4, 1, 4)));
         BlockPos tahta = y.absolutePos(new BlockPos(2, 1, 2));
         boolean kuyruk = afet.kuyrugaAl(level, tahta);
