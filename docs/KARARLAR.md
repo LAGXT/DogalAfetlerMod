@@ -5983,7 +5983,7 @@ dal `is/tarif-2` `7dbe2a8`, entegrasyon `is/entegrasyon-7`).** Kök neden: Hava 
 Meteorit Külçesi ve Termostat Plakası tarifleri için `unlockedBy` kilit başarımı (`advancements/recipes/...`) üretilmiyordu;
 tarif çalışıyor ama kitapta hiç açılmıyordu. Kural: her `recipes/*.json` için datagen'de `unlockedBy` kilit başarımı zorunlu
 (`RadarSismografVerileri`, `MeteorVerileri`); bekçi GameTest `herTarifinKitapKilidiVarMeteorTarifleriGirdiyleAcilir`
-(`EsyaOyunTestleri`; kilidi olmayan tarif testi kırar). Ağ protokolü etkilenmez. Kanıt: defter `gametest:Esya|Meteor
+(`EsyaOyunTestleri`; kilidi olmayan tarif testi kırar; bekçi her tarifi kilit başarımının `rewards.recipes` alanıyla eşler, Tr1 `ca15ab5`). Ağ protokolü etkilenmez. Kanıt: defter `gametest:Esya|Meteor
 @59b0622ceb16` (`7dbe2a8`, `.vibe/kanit/tarif-2/gametest-2.log`); filtresiz kapı güncelleme turu 2 sonunda.
 
 ## Açık noktalar (Faz 2b)
