@@ -116,6 +116,8 @@ public final class PulsarOtomasyonu {
     private static final float YAN_ACI = 30f;
     /** Paralaks karesi çapa ({@link GokCapasi#PULSAR}, tau 60 sn) kameraya yetişmeden alınır (tick). */
     private static final int YAN_BEKLEME = 60;
+    /** Öğlen karesinde doğuya bakışın eğimi: tepedeki pulsar kadrajın üst yarısında, ekran sağı güney (hüzme ekseni). */
+    private static final float OGLEN_PITCH = -70f;
     /** Buzul karesinden önce donmanın göle ve kara yetişme süresi (tick). */
     private static final int BUZUL_TICK = 2400;
     /**
@@ -261,6 +263,14 @@ public final class PulsarOtomasyonu {
             Adim.yeni("3B pulsar yandan (kamera pulsar yönüne dik ~" + YAN_ACI + "°)", s -> yanaKay(s),
                     () -> sayac >= YAN_BEKLEME, "pulsar_3b_yan", YAN_BEKLEME).kadrajli(Kadraj.PULSAR)
                     .istemcide(PulsarOtomasyonu::yanHazirla).bitince(PulsarOtomasyonu::paralaksSatiri),
+            Adim.yeni("pulsar ufukta (~12°, iki yatay hüzme)", s -> {
+                komut(s, "time set 0");
+                kamera(s, -90f, -12f);
+            }, () -> sayac >= 60, "pulsar_ufuk", 200).kadrajli(Kadraj.PULSAR),
+            Adim.yeni("pulsar öğlen (tepede, doğuya bakış, iki yatay hüzme)", s -> {
+                komut(s, "time set 6000");
+                kamera(s, -90f, OGLEN_PITCH);
+            }, () -> sayac >= 60, "pulsar_oglen", 200),
             Adim.yeni("kara delik yaklaşması (hız 0.25)", s -> {
                 AfetYoneticisi y = AfetYoneticisi.al(s);
                 for (int i = 0; i < 3 && y.donem().gunesEvresi() == GunesEvresi.PULSAR; i++) {

@@ -660,7 +660,7 @@ final class GokyuzuCizici {
         KaraDelik3B.bosKare();
         switch (d.evre()) {
             case PULSAR -> Pulsar3B.ciz(dunya, GokCapasi.PULSAR.merkez(gunesYoluYonu(0f, zaman), goz),
-                    PulsarEgrileri.yogunluk(d.ilerleme()), yagmursuz, 1f, null, 0f, 1f);
+                    PulsarEgrileri.yogunluk(d.ilerleme()), yagmursuz, 1f, null, 0f);
             case KARADELIK_YUTMA -> karaDelikYutma(dunya, d.saniye(), zaman, goz, yagmursuz, sn);
             case KIZIL_CUCE -> {
                 if (d.pulsarYolu()) {
@@ -727,10 +727,8 @@ final class GokyuzuCizici {
                 gunesYoluYonu(KaraDelikYutmaEgrileri.KARADELIK_ACI * KaraDelikYutmaEgrileri.cekim(s), zaman), goz);
         float spagetti = KaraDelikYutmaEgrileri.spagetti(s);
         float titresim = KaraDelikYutmaEgrileri.titresimCarpani(s);
-        float ikinci = 1f - GokyuzuEgrileri.yumusak(KaraDelikYutmaEgrileri.YAKLASMA_SN - 3f,
-                KaraDelikYutmaEgrileri.YAKLASMA_SN, s);
         KaraDelik3B.ciz(dunya, delik, birim, s, yagmursuz, sn, yon, pulsar, pa,
-                () -> Pulsar3B.ciz(dunya, pulsar, 1f, pa, titresim, delik, spagetti, ikinci));
+                () -> Pulsar3B.ciz(dunya, pulsar, 1f, pa, titresim, delik, spagetti));
     }
 
     /**
