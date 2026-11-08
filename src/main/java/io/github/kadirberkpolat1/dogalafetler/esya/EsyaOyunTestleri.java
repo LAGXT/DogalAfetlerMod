@@ -624,8 +624,9 @@ public final class EsyaOyunTestleri {
 
     /**
      * Mod sekmesi ("Doğal Afetler", {@link ModSekmesi}) eşyaları kayıttan kendiliğinden alır: yüklü her {@code dogalafetler}
-     * tarifinin ürünü ve girdisi olan mod eşyası (kül katmanı ↔ kül bloğu, kömürleşmiş kütük → tahta, meteor ve sonradan
-     * eklenen alt sistemlerin tarifleri) sekmede; sekmeye eşya adı yazılmaz. Özel tarifler (zırh ekleri) kitapsız, muaf.
+     * tarifinin ürünü ve girdisi olan mod eşyası (kül katmanı ↔ kül bloğu, kömürleşmiş kütük → tahta, Buz Kovası, sıcaklık-3
+     * yiyecekleri, meteor ve sonradan eklenen alt sistemlerin tarifleri) sekmede; sekmeye eşya adı yazılmaz. Özel tarifler (zırh
+     * ekleri) kitapsız, muaf.
      */
     @GameTest(template = "bos", batch = "esya_tarif")
     public static void modSekmesiTarifEsyalariniKendiligindenTasir(GameTestHelper yardimci) {
@@ -661,7 +662,8 @@ public final class EsyaOyunTestleri {
             }
         }
         yardimci.assertTrue(eksik.isEmpty(), "mod sekmesinde olmayan tarif eşyaları (tarif → eşya): " + eksik);
-        for (String ad : List.of("kul_katmani", "kul_blogu", "komurlesmis_kutuk", "komurlesmis_tahta")) {
+        for (String ad : List.of("kul_katmani", "kul_blogu", "komurlesmis_kutuk", "komurlesmis_tahta", "buz_kovasi",
+                "tarhana_corbasi", "maras_dondurmasi")) {
             Item esya = ForgeRegistries.ITEMS.getValue(DogalAfetler.konum(ad));
             yardimci.assertTrue(tarifEsyalari.contains(esya), "tarif eşyası olarak bulunmadı: " + ad);
         }
