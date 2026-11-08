@@ -61,8 +61,9 @@ public final class KaraDelik3B {
     private static final float TEPE_UST = 0.9f;
     private static final float TEPE_ALT = 1f;
     /**
-     * Doppler'in yanal bandı: köşenin görüntü düzlemindeki yanal uzaklığı (|r·cos φ|) gölge yarıçapının bu katları
-     * arasında orta sütunun çarpanından diskin Doppler'ine geçer. Bandın dışı (gölgenin iki yanı) tam Doppler.
+     * Doppler'in yanal bandı: köşenin merceklenmiş görüntüsünün gölge merkezinden yatay uzaklığı gölge yarıçapının bu
+     * katları arasında orta sütunun çarpanından diskin Doppler'ine geçer. Bandın dışı (gölgenin iki yanı) tam Doppler.
+     * Disk düzlemindeki |r·cos φ| yetmez: mercek yayların yan uçlarını ekranda dışa iter, oranı ölçen yanlara taşır.
      */
     private static final float YANAL_IC = 0.5f;
     private static final float YANAL_DIS = 1f;
@@ -562,7 +563,7 @@ public final class KaraDelik3B {
                     tamam = parilti ? pariltiKosesi(r, (ic + dis) * 0.5f, fi, ikincil, KOSE[q])
                             : diskKosesi(r, fi, ikincil, KOSE[q]);
                     float parlak = siluet != null ? a
-                            : dopplerCarpani(fi, r, tepe) * a * (1f + KALINTI_EK * mor);
+                            : dopplerCarpani(fi, GOR[0], tepe) * a * (1f + KALINTI_EK * mor);
                     KOSE_ALFA[q] = switch (gecis) {
                         case GECIS_PARILTI -> PARILTI_ALFA * parlak;
                         case GECIS_KALINTI -> Math.max(0f, parlak - 1f);
@@ -593,15 +594,14 @@ public final class KaraDelik3B {
     }
 
     /**
-     * Köşenin Doppler çarpanı (≤ 1). Gölgenin iki yanında (yanal uzaklık ≥ {@value #YANAL_DIS} gölge yarıçapı) diskin
-     * Doppler'i: yaklaşan yan 1, uzaklaşan ×0,3. Gölgenin üstü ve altındaki orta sütunda (≤ {@value #YANAL_IC}) madde
-     * bakışa dik gider ve çarpan {@code tepe}; arada yumuşak geçiş. Sol/sağ oranı bandın dışında kalır, yaylar ve ön
-     * yarı ortada sönmez.
+     * Köşenin Doppler çarpanı (≤ 1); {@code x} köşenin merceklenmiş görüntüsünün yatay konumu (rs). Gölgenin iki
+     * yanında (|x| ≥ {@value #YANAL_DIS} gölge yarıçapı) diskin Doppler'i: yaklaşan yan 1, uzaklaşan ×0,3. Gölgenin
+     * üstü ve altındaki orta sütunda (≤ {@value #YANAL_IC}) madde bakışa dik gider ve çarpan {@code tepe}; arada
+     * yumuşak geçiş. Sol/sağ oranı bandın dışında kalır, yaylar ve ön yarı ortada sönmez.
      */
-    private static float dopplerCarpani(float fi, float r, float tepe) {
+    private static float dopplerCarpani(float fi, float x, float tepe) {
         float d = KaraDelikMercek.doppler(KaraDelikMercek.yaklasmaCos(fi, egim));
-        float yanal = Math.abs(r * Mth.cos(fi * Mth.DEG_TO_RAD)) / KaraDelikMercek.GOLGE_RS;
-        float t = Mth.clamp((yanal - YANAL_IC) / (YANAL_DIS - YANAL_IC), 0f, 1f);
+        float t = Mth.clamp((Math.abs(x) / KaraDelikMercek.GOLGE_RS - YANAL_IC) / (YANAL_DIS - YANAL_IC), 0f, 1f);
         return tepe + (d - tepe) * t * t * (3f - 2f * t);
     }
 
