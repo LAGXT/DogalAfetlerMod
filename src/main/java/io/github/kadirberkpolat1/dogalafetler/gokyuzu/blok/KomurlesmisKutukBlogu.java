@@ -6,6 +6,7 @@ import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.BlockGetter;
@@ -16,11 +17,14 @@ import net.minecraft.world.level.block.RotatedPillarBlock;
 import net.minecraft.world.level.block.state.BlockState;
 
 /**
- * Kömürleşmiş kütük: eksenli sütun (pulsar kavurması ekseni taşır), yanmaz (yanıcılık kaydı yok). Altı yüzünden birine
- * gerçek su ({@link FluidTags#WATER}) değince {@value #EN_AZ_TICK}–{@value #EN_COK_TICK} tick sonrasına planlanmış tick
- * kurulur (dünya kaydıyla saklanır, {@code randomTickSpeed}'e bağlı değildir); beklerken istemcide duman ve buhar tüter.
- * Tick geldiğinde su hâlâ bitişikse kömür bloğuna döner (duman patlaması ve sönme sesi), su kaldırıldıysa dönmez.
- * Oyuncu eylemidir: {@code afetBlokHasari} kuralına bağlı değildir.
+ * Kömürleşmiş kütük: eksenli sütun (pulsar kavurması ekseni taşır), yanmaz (yanıcılık kaydı yok). "Suya konulunca"
+ * kömür bloğuna döner: kütük suya bitişik bir yere konunca ({@link #onPlace}, eski blok kütük değilse) ya da su kütüğün
+ * yanına gelince ya da akınca ({@link #neighborChanged}, değişen komşu suysa) {@value #EN_AZ_TICK}–{@value #EN_COK_TICK}
+ * tick sonrasına planlanmış tick kurulur (dünya kaydıyla saklanır, {@code randomTickSpeed}'e bağlı değildir). Pulsar
+ * kavurmasının bir kütüğü yerinde kömürleştirmesi (eski blok {@code minecraft:logs}) ve suyun dışındaki komşu
+ * değişimleri dönüşümü başlatmaz: göl kıyısındaki kavrulmuş orman kendiliğinden kömür bloğuna dönmez. Beklerken istemcide
+ * duman tüter. Tick geldiğinde su hâlâ bitişikse kömür bloğuna döner (duman patlaması ve sönme sesi), su kaldırıldıysa
+ * dönmez. Oyuncu eylemidir: {@code afetBlokHasari} kuralına bağlı değildir.
  */
 public final class KomurlesmisKutukBlogu extends RotatedPillarBlock {
     /** Suya değdikten sonra kömür bloğuna dönüşe kadar en az ve en çok bekleme (tick; 2–4 dakika). */
@@ -45,14 +49,18 @@ public final class KomurlesmisKutukBlogu extends RotatedPillarBlock {
     @Override
     public void onPlace(BlockState durum, Level level, BlockPos konum, BlockState eski, boolean hareketli) {
         super.onPlace(durum, level, konum, eski, hareketli);
-        planla(level, konum);
+        if (!eski.is(BlockTags.LOGS)) {
+            planla(level, konum);
+        }
     }
 
     @Override
     public void neighborChanged(BlockState durum, Level level, BlockPos konum, Block komsu, BlockPos komsuKonum,
             boolean hareketli) {
         super.neighborChanged(durum, level, konum, komsu, komsuKonum, hareketli);
-        planla(level, konum);
+        if (level.getFluidState(komsuKonum).is(FluidTags.WATER)) {
+            planla(level, konum);
+        }
     }
 
     private void planla(Level level, BlockPos konum) {

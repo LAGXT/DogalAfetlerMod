@@ -43,11 +43,13 @@ import net.minecraftforge.registries.ForgeRegistries;
 
 /**
  * Tur 3 blok dilimi oyun testleri. Kül Bloğu: modun "Doğal Afetler" sekmesinde (sekme bütün {@code dogalafetler} eşyalarını
- * taşır) ve Doğal Bloklar sekmesinde; 8 katlı Kül Katmanı kırılınca (ipçek dokunuşta da) ve orta tıkla Kül Bloğu
- * verir; yaprak külü 8 kata varınca gerçek Kül Bloğu yerleşir. Kömürleşmiş kütük ve tahta: çalışma masasında 1 kütük →
- * 4 tahta (tarif kitabında kütükle açılır), tahta çubuk ve çalışma masası yapar ama tekne yapmaz, ikisi de yakıt değil ve
- * bitişik ateş ya da lavla tutuşmaz, kütük suya değince planlanmış tick'te kömür bloğuna döner (su kaldırıldıysa
- * dönmez). Düz dünyada sahne testin içinde kurulur ({@code donma_alan}, 9×6×9 hava); config dosyasına yazılmaz (K-E28).
+ * taşır) ve Doğal Bloklar sekmesinde; 8 katlı Kül Katmanı kırılınca (ipek dokunuşta da) ve orta tıkla Kül Bloğu
+ * verir; yaprak külü 8 kata varınca gerçek Kül Bloğu yerleşir; çalışma masasında 8 katman ↔ 1 blok. Kömürleşmiş kütük
+ * ve tahta: çalışma masasında 1 kütük → 4 tahta (tarif kitabında kütükle açılır), tahta çubuk ve çalışma masası yapar
+ * ama tekne yapmaz, ikisi de yakıt değil ve bitişik ateş ya da lavla tutuşmaz, kütük suya konunca ya da su ona gelince
+ * planlanmış tick'te kömür bloğuna döner (su kaldırıldıysa dönmez), pulsar kavurmasının su kıyısında yerinde
+ * kömürleştirdiği kütük kendiliğinden dönmez. Düz dünyada sahne testin içinde kurulur ({@code donma_alan}, 9×6×9
+ * hava); config dosyasına yazılmaz (K-E28).
  */
 @GameTestHolder(DogalAfetler.MOD_ID)
 @PrefixGameTestTemplate(false)
@@ -161,6 +163,23 @@ public final class PulsarBlokOyunTestleri {
         BlockState ust = y.getBlockState(p(4, 2, 4));
         y.assertTrue(ust.is(PulsarKayitlari.KUL_KATMANI.get()) && ust.getValue(SnowLayerBlock.LAYERS) == 1,
                 "kül bloğunun üstüne bir kat kül: " + ust);
+        y.succeed();
+    }
+
+    /** Çalışma masası: 8 Kül Katmanı → 1 Kül Bloğu, 1 Kül Bloğu → 8 Kül Katmanı (8 katlı külü kıran kat kaybetmez). */
+    @GameTest(template = "bos", batch = KUL)
+    public static void kulKatmaniVeKulBloguBirbirineDoner(GameTestHelper y) {
+        ServerLevel level = y.getLevel();
+        Item katman = PulsarKayitlari.KUL_KATMANI.get().asItem();
+        Item blok = PulsarKayitlari.KUL_BLOGU.get().asItem();
+        Optional<ItemStack> bloga = uret(level, katman, katman, katman, katman, katman, katman, katman, katman);
+        y.assertTrue(bloga.isPresent() && bloga.get().is(blok) && bloga.get().getCount() == 1,
+                "8 katman → 1 Kül Bloğu bekleniyordu: " + bloga);
+        Optional<ItemStack> katmana = uret(level, blok);
+        y.assertTrue(katmana.isPresent() && katmana.get().is(katman)
+                && katmana.get().getCount() == SnowLayerBlock.MAX_HEIGHT, "1 Kül Bloğu → 8 katman bekleniyordu: " + katmana);
+        Optional<ItemStack> yedi = uret(level, katman, katman, katman, katman, katman, katman, katman);
+        y.assertTrue(yedi.isEmpty(), "7 katman bir şey üretmemeli: " + yedi);
         y.succeed();
     }
 
@@ -319,6 +338,34 @@ public final class PulsarBlokOyunTestleri {
         y.assertTrue(!KomurlesmisKutukBlogu.suyaDegiyor(level, y.absolutePos(b)), "su kaldırıldı");
         y.getBlockState(b).tick(level, y.absolutePos(b), level.random);
         y.assertTrue(y.getBlockState(b).equals(yatay), "su kalktıysa kütük kalmalı (eksen korunur): " + y.getBlockState(b));
+        y.succeed();
+    }
+
+    /**
+     * Pulsar kavurması su kıyısındaki meşe kütüğü yerinde kömürleştirir: tick planlanmaz, yanındaki su dışı komşu
+     * değişimi de planlamaz; su kaldırılıp yeniden konunca (su kütüğe gelince) planlanır.
+     */
+    @GameTest(template = ALAN, batch = ODUN)
+    public static void kavurmaKutuguSuKiyisindaKendiligindenDonmez(GameTestHelper y) {
+        zemin(y);
+        ServerLevel level = y.getLevel();
+        Block kutuk = PulsarKayitlari.KOMURLESMIS_KUTUK.get();
+        y.setBlock(p(4, 1, 4), Blocks.STONE);
+        y.setBlock(p(3, 1, 3), Blocks.STONE);
+        y.setBlock(p(3, 1, 5), Blocks.STONE);
+        y.setBlock(p(3, 1, 4), Blocks.WATER);
+        BlockPos k = p(2, 1, 4);
+        y.setBlock(k, Blocks.OAK_LOG.defaultBlockState().setValue(RotatedPillarBlock.AXIS, Direction.Axis.X));
+        BlockPos m = y.absolutePos(k);
+        y.assertTrue(KavurmaKuyrugu.donustur(level, m, 1f, 0.5) == 1, "kavurma kütüğü dönüştürmedi");
+        y.assertTrue(y.getBlockState(k).is(kutuk) && KomurlesmisKutukBlogu.suyaDegiyor(level, m),
+                "su kıyısında kömürleşmiş kütük bekleniyordu: " + y.getBlockState(k));
+        y.assertTrue(!level.getBlockTicks().hasScheduledTick(m, kutuk), "kavurma dönüşümü tick planladı");
+        y.setBlock(p(2, 1, 5), Blocks.COARSE_DIRT);
+        y.assertTrue(!level.getBlockTicks().hasScheduledTick(m, kutuk), "su dışı komşu değişimi tick planladı");
+        y.setBlock(p(3, 1, 4), Blocks.STONE);
+        y.setBlock(p(3, 1, 4), Blocks.WATER);
+        y.assertTrue(level.getBlockTicks().hasScheduledTick(m, kutuk), "su yeniden gelince tick planlanmadı");
         y.succeed();
     }
 }

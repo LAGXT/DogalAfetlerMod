@@ -40,10 +40,12 @@ import net.minecraftforge.data.event.GatherDataEvent;
 
 /**
  * Pulsar bloklarının datagen çıktıları: loot tabloları (kül katmanı 1–7 katta kat sayısı kadar kendini, 8 katta — Kül
- * Bloğu modeliyle çizilen tam blok — bir Kül Bloğu, ipçek dokunuşta da aynısı; diğerleri kendini), blok durumları ve
+ * Bloğu modeliyle çizilen tam blok — bir Kül Bloğu, ipek dokunuşta da aynısı; diğerleri kendini), blok durumları ve
  * modeller (kül katmanı vanilla kar katmanı gibi 2/4/…/14 piksel kutu, 8 kat kül bloğu modeli; kömürleşmiş kütük
- * eksenli sütun, tahta tek dokulu küp) ve tarif (şekilsiz 1 kömürleşmiş kütük → 4 kömürleşmiş tahta, grup {@code planks},
- * tarif kitabı kilidi kütük envantere girince; K-E63). Doku dosyalarını {@code tools/assets/pulsar_dokular.py} üretir.
+ * eksenli sütun, tahta tek dokulu küp) ve şekilsiz tarifler (1 kömürleşmiş kütük → 4 kömürleşmiş tahta, grup
+ * {@code planks}; 8 Kül Katmanı ↔ 1 Kül Bloğu, 8 katlı külü kıran oyuncu blokla birlikte katmanlarını kaybetmesin); her
+ * tarifin kitap kilidi girdisi envantere girince açılır (K-E63). Doku dosyalarını {@code tools/assets/pulsar_dokular.py}
+ * üretir.
  */
 public final class PulsarBlokVerileri {
     private static final ResourceLocation KUL = DogalAfetler.konum("block/kul");
@@ -117,6 +119,14 @@ public final class PulsarBlokVerileri {
             ShapelessRecipeBuilder.shapeless(RecipeCategory.BUILDING_BLOCKS, PulsarKayitlari.KOMURLESMIS_TAHTA_ESYASI.get(), 4)
                     .requires(kutuk).group("planks").unlockedBy("has_komurlesmis_kutuk", has(kutuk))
                     .save(c, DogalAfetler.konum("komurlesmis_tahta"));
+            Block katman = PulsarKayitlari.KUL_KATMANI.get();
+            Block blok = PulsarKayitlari.KUL_BLOGU.get();
+            ShapelessRecipeBuilder.shapeless(RecipeCategory.BUILDING_BLOCKS, blok)
+                    .requires(katman, SnowLayerBlock.MAX_HEIGHT).unlockedBy("has_kul_katmani", has(katman))
+                    .save(c, DogalAfetler.konum("kul_katmanindan_kul_blogu"));
+            ShapelessRecipeBuilder.shapeless(RecipeCategory.BUILDING_BLOCKS, katman, SnowLayerBlock.MAX_HEIGHT)
+                    .requires(blok).unlockedBy("has_kul_blogu", has(blok))
+                    .save(c, DogalAfetler.konum("kul_blogundan_kul_katmani"));
         }
     }
 
