@@ -5978,6 +5978,14 @@ satırı yazar; AS-5 `/dogalafet siklik` okur, `/dogalafet siklik <0..1000>` ayn
 `siklikDegisinceKalanOlceklenir`), `SonrakiAfetTahminiTest` (5 vaka); GameTest `siklikKomutuBeklemeyiOlcekleriKaliciTahminKisalir`
 (batch `cekirdek_siklik`; dalda `gametest:Komut|Cekirdek @be725cf0ad39` 20/20). Ağ protokolü değişmez (yeni paket yok). **Bilinen sınır (AS-6, `fe0b99e`):** %1000 gerçekleşen afet sayısında ≈ ×5 verir, ×10 değil: afetin kendi süresi sıklıkla kısalmaz ve yuvayı tutar.
 
+**K-E63 Her tarifin tarif kitabı kilidi var (kullanıcı şikâyeti: "tarif kitabında radar/sismograf yok"; şef kararı, 2026-11-08;
+dal `is/tarif-2` `7dbe2a8`, entegrasyon `is/entegrasyon-7`).** Kök neden: Hava Radarı, Sismograf, Gelişmiş/Hassas sürümleri,
+Meteorit Külçesi ve Termostat Plakası tarifleri için `unlockedBy` kilit başarımı (`advancements/recipes/...`) üretilmiyordu;
+tarif çalışıyor ama kitapta hiç açılmıyordu. Kural: her `recipes/*.json` için datagen'de `unlockedBy` kilit başarımı zorunlu
+(`RadarSismografVerileri`, `MeteorVerileri`); bekçi GameTest `herTarifinKitapKilidiVarMeteorTarifleriGirdiyleAcilir`
+(`EsyaOyunTestleri`; kilidi olmayan tarif testi kırar). Ağ protokolü etkilenmez. Kanıt: defter `gametest:Esya|Meteor
+@59b0622ceb16` (`7dbe2a8`, `.vibe/kanit/tarif-2/gametest-2.log`); filtresiz kapı güncelleme turu 2 sonunda.
+
 ## Açık noktalar (Faz 2b)
 
 Entegratöre bırakılan notlardan işlenenler: kancalar (K-E1), protokol (K-C47), `asama ileri [süreç]` (K-C48), sanal su §3a istisnası
