@@ -233,7 +233,8 @@ def hazirla(hedef):
     if hedef_dunya.exists():
         shutil.rmtree(hedef_dunya)
     shutil.copytree(KOK / "run/saves/test", hedef_dunya, ignore=shutil.ignore_patterns("session.lock"))
-    dogus_yaz(hedef_dunya / "level.dat", hedef[0], hedef[2], hedef[1])
+    if hedef is not None:
+        dogus_yaz(hedef_dunya / "level.dat", hedef[0], hedef[2], hedef[1])
     yol = run / "options.txt"
     satirlar = yol.read_text().splitlines() if yol.exists() else []
     satirlar = [s for s in satirlar if not s.startswith(("tutorialStep:", "pauseOnLostFocus:", "renderDistance:",
@@ -406,6 +407,9 @@ def rota_sonucu(no, istemci_log, alarm):
 
 
 def main():
+    if KIP == "rota":
+        # Rota kipi dünyanın kendi doğuş noktasını kullanır; S5 merkez seçimi (numpy, arazi haritası) gerekmez.
+        return kosu(None, None)
     harita = arazi(KOK / "run/saves/test")
     x, z, y, pay = hedef_sec(harita)
     log(f"K-E45: doğuş noktası ({x}, {y}, {z}); halkada uygun merkez payı %{100 * pay:.0f}, en çok {DENEME} deneme, kip {KIP}")

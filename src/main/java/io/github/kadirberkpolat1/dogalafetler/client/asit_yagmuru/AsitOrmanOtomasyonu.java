@@ -591,12 +591,27 @@ public final class AsitOrmanOtomasyonu {
                 bulunan == null ? "bulunamadı" : "minecraft:desert", ust, uzakMerkez.toShortString());
     }
 
-    /** Uzak kip: S5 asit oyuncudan {@value #UZAK_MESAFE} blok ötede, hedefsiz (konuma) başlar. */
+    /**
+     * Uzak kip: S5 asidin hedefi oyuncudur, ama başladığı an oyuncu çölden {@value #UZAK_MESAFE} blok doğudadır (merkez orada;
+     * hedefsiz başlatma çevrim içi oyuncuyu hedef seçerdi), sonra hemen çöle döner. Asit her yerde yağdığından merkez
+     * davranışı etkilemez (AF2-01); kare satırı merkeze gerçek uzaklığı yazar.
+     */
     private static void uzakBaslat(IntegratedServer s) {
         AfetYoneticisi y = AfetYoneticisi.al(s);
         y.durdur();
-        AfetYoneticisi.BaslatmaSonucu sonuc = y.elleBaslat(AfetTuru.ASIT_YAGMURU, 5, null, s.overworld(), uzakMerkez);
-        DogalAfetler.LOGGER.info(ON + "uzak: asit_yagmuru S5 başlatma {} merkez {}", sonuc,
+        ServerLevel level = s.overworld();
+        ServerPlayer o = oyuncu(s);
+        double cx = o.getX();
+        double cy = o.getY();
+        double cz = o.getZ();
+        float yaw = o.getYRot();
+        float pitch = o.getXRot();
+        level.getChunk(uzakMerkez.getX() >> 4, uzakMerkez.getZ() >> 4);
+        o.teleportTo(level, uzakMerkez.getX() + 0.5, uzakMerkez.getY(), uzakMerkez.getZ() + 0.5, yaw, pitch);
+        AfetYoneticisi.BaslatmaSonucu sonuc = y.elleBaslat(AfetTuru.ASIT_YAGMURU, 5, o, level, o.blockPosition());
+        o.teleportTo(level, cx, cy, cz, yaw, pitch);
+        y.aktifAfet().ifPresent(a -> uzakMerkez = a.baglam().merkez());
+        DogalAfetler.LOGGER.info(ON + "uzak: asit_yagmuru S5 başlatma {} merkez {} (hedef oyuncu, sonra çöle döndü)", sonuc,
                 y.aktifAfet().map(a -> a.baglam().merkez().toShortString()).orElse("-"));
     }
 
