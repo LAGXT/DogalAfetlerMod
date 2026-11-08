@@ -26,16 +26,16 @@ import org.joml.Vector3f;
  * kameranın dönüşünü taşıyan dünya pozunda çizilen 3B nesne. Akresyon diski gerçek eğik halkadır (disk düzlemi gökte
  * sabit; oyuncu uçunca bakış vektörüyle görünen eğim değişir). Arka yarısı Schwarzschild ince-merceğiyle
  * ({@link KaraDelikMercek}) gölgenin üstünde ve altında iki yay olarak görünür; ön yarı gölgenin önünden geçer. Disk
- * referanstaki gibi sıcak beyaz ve aşırı pozlanmış: toplamalı karışımda 1'i aşan pay ikinci geçişle eklenir (iç kenar ve
- * yaklaşan yan doyar), üstüne aynı geometrinin {@value #PARILTI_KALINLIK} kat kalın soluk kopyası parlama verir. Sıra:
- * mercek sönümü (normal) → bükülen yıldızlar → pulsar → spagetti tüpü → arka yarının yayları → tam siyah gölge (normal
- * karışım: arkadaki yıldız, nebula, kalıntı ve pulsar silinir) → ön yarı → foton halkası → parlama ve silüet. Konumlar
- * Schwarzschild yarıçapı (rs) biriminde hesaplanır; disk dış yarıçapı yutma eğrisindeki açısal çapın yarısıdır.
- * Yalnız render thread'i.
+ * referanstaki gibi beyaz-sıcak ve soluk (doygunluk düşük): kazanç Doppler'den önce uygulanıp 1'e kırpılır, böylece
+ * yaklaşan yan parlak, uzaklaşan yan ×0,3 sönük kalır; üstüne aynı geometrinin {@value #PARILTI_KALINLIK} kat kalın
+ * soluk kopyası parlama verir. Sıra: mercek sönümü (normal) → bükülen yıldızlar → pulsar → spagetti tüpü → arka
+ * yarının yayları → tam siyah gölge (normal karışım: arkadaki yıldız, nebula, kalıntı ve pulsar silinir) → ön yarı →
+ * foton halkası → parlama ve silüet. Konumlar Schwarzschild yarıçapı (rs) biriminde hesaplanır; disk dış yarıçapı yutma
+ * eğrisindeki açısal çapın yarısıdır. Yalnız render thread'i.
  */
 public final class KaraDelik3B {
-    private static final ResourceLocation DISK = doku("karadelik_3b_disk_sicak");
-    private static final ResourceLocation PARILTI = doku("karadelik_3b_parilti");
+    private static final ResourceLocation DISK = doku("karadelik_3b_disk_soluk");
+    private static final ResourceLocation PARILTI = doku("karadelik_3b_parilti_soluk");
     private static final ResourceLocation TUP = doku("karadelik_3b_tup");
     private static final ResourceLocation HALKA = doku("karadelik_3b_halka");
     private static final ResourceLocation YILDIZ = doku("karadelik_3b_yildiz");
@@ -45,13 +45,13 @@ public final class KaraDelik3B {
     private static final Vector3f GUNES_YOLU_EKSENI = new Vector3f(0f, 0f, 1f);
     /** Disk dokusunun azimutta tekrarı. */
     private static final float DISK_TEKRAR = 2f;
-    /** Uzaklaşan ve yaklaşan yanın tonu (Doppler: kırmızıya / maviye kayma); yutum sonrası mor kalıntı. */
-    private static final float[] UZAKLASAN = {1f, 0.8f, 0.62f};
-    private static final float[] YAKLASAN = {0.9f, 0.95f, 1f};
+    /** Uzaklaşan ve yaklaşan yanın tonu (Doppler: kırmızıya / maviye kayma, soluk); yutum sonrası mor kalıntı. */
+    private static final float[] UZAKLASAN = {1f, 0.92f, 0.84f};
+    private static final float[] YAKLASAN = {0.94f, 0.97f, 1f};
     private static final float[] MOR = {0.88f, 0.62f, 1f};
     /**
-     * Disk parlaklığı kazancı: Doppler'li parlaklık × bu; 1'i aşan pay doyma geçişinde eklenir (köşe alfası bayttadır:
-     * toplam en çok 2). 1280×720 / FOV 30 mercek karesinde merkez kırpıntının ~%5'i doyar, uzaklaşan yan turuncu kalır.
+     * Disk parlaklığı kazancı, Doppler'den önce: min(1, parlaklık × bu) × Doppler. Yaklaşan yan en çok 1, uzaklaşan
+     * yan ×0,3'te kalır: görünen oran Doppler oranıdır, doyma iki yanı eşitlemez.
      */
     private static final float KAZANC = 3.5f;
     /** Yutumdan sonraki mor kalıntının ek kazancı: parlaklık × (1 + bu × morluk). */
@@ -83,8 +83,7 @@ public final class KaraDelik3B {
     private static final int ON = 2;
     private static final int TUMU = 3;
     private static final int GECIS_ANA = 0;
-    private static final int GECIS_DOYMA = 1;
-    private static final int GECIS_PARILTI = 2;
+    private static final int GECIS_PARILTI = 1;
 
     /** Kademe: disk dilimi, radyal bant, yıldız, tüp kesiti ve çevresi, disk kuyruğu dilimi. */
     private record Kademe(int dilim, int bant, int yildiz, int kesit, int cevre, int kuyruk) {
@@ -501,20 +500,18 @@ public final class KaraDelik3B {
 
     /**
      * Akresyon diski: {@code parca} ARKA merceklenmiş arka yarı (gölgenin üstünde yay), IKINCI arka yarının ikinci
-     * görüntüsü (altında), ON gölgenin önünden geçen yarı. Ana geçiş, doyma geçişi ve parlama kopyası.
+     * görüntüsü (altında), ON gölgenin önünden geçen yarı. Parlama kopyası ve ana geçiş.
      */
     private static void disk(Matrix4f m, int parca, float a, float akis, float mor) {
         diskGecisi(m, parca, a, akis, mor, null, GECIS_PARILTI);
         diskGecisi(m, parca, a, akis, mor, null, GECIS_ANA);
-        diskGecisi(m, parca, a, akis, mor, null, GECIS_DOYMA);
     }
 
     /**
-     * Diskin bir geçişi. Köşe parlaklığı {@code a} × Doppler (yaklaşan yan ×1,0 mavi-beyaz, uzaklaşan ×0,3 turuncu) ×
-     * {@value #KAZANC}: ana geçiş 1'e kadarını, doyma geçişi aşanı çizer (doyma geçişinde payı olmayan dörtgen atlanır).
-     * Parlama geçişi tek radyal bant: yarıçap aralığı genişler, köşeler görüntü düzleminde orta çizgiden dikeyde
-     * {@value #PARILTI_KALINLIK} kat uzaklaşır, alfa {@value #PARILTI_ALFA}. {@code siluet} verilirse yalnız ana geçiş, düz renk
-     * ve Doppler'siz (TUMU: iki yarının ana görüntüsü).
+     * Diskin bir geçişi. Köşe parlaklığı min(1, {@code a} × {@value #KAZANC}) × Doppler (yaklaşan yan ×1,0 mavi-beyaz,
+     * uzaklaşan ×0,3 soluk turuncu). Parlama geçişi tek radyal bant: yarıçap aralığı genişler, köşeler görüntü
+     * düzleminde orta çizgiden dikeyde {@value #PARILTI_KALINLIK} kat uzaklaşır, alfa {@value #PARILTI_ALFA}.
+     * {@code siluet} verilirse yalnız ana geçiş, düz renk ve Doppler'siz (TUMU: iki yarının ana görüntüsü).
      */
     private static void diskGecisi(Matrix4f m, int parca, float a, float akis, float mor, @Nullable float[] siluet,
             int gecis) {
@@ -550,13 +547,9 @@ public final class KaraDelik3B {
                     tamam = parilti ? pariltiKosesi(r, (ic + dis) * 0.5f, fi, ikincil, KOSE[q])
                             : diskKosesi(r, fi, ikincil, KOSE[q]);
                     float parlak = siluet != null ? a
-                            : a * yay * KAZANC * (1f + KALINTI_EK * mor)
+                            : Math.min(1f, a * yay * KAZANC * (1f + KALINTI_EK * mor))
                                     * KaraDelikMercek.doppler(KaraDelikMercek.yaklasmaCos(fi, egim));
-                    KOSE_ALFA[q] = switch (gecis) {
-                        case GECIS_DOYMA -> Math.max(0f, parlak - 1f);
-                        case GECIS_PARILTI -> PARILTI_ALFA * Math.min(1f, parlak);
-                        default -> Math.min(1f, parlak);
-                    };
+                    KOSE_ALFA[q] = parilti ? PARILTI_ALFA * parlak : parlak;
                     enBuyuk = Math.max(enBuyuk, KOSE_ALFA[q]);
                 }
                 if (!tamam || enBuyuk <= 0.002f) {
