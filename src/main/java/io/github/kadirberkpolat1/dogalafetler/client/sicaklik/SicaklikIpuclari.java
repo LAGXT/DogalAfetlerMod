@@ -4,13 +4,17 @@ import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.ZirhEkleri;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.tags.ItemTags;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.entity.player.ItemTooltipEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
-/** Zırh tooltip satırları (N1): "Tüy Upgrade'i: N" ve kayıtlı ekler ("Yünlü", Faz 3 "Termostatlı"); modlu zırhta da. */
+/**
+ * Zırh tooltip satırları (N1): "Tüy Upgrade'i: N" ve kayıtlı ekler ("Yünlü", Faz 3 "Termostatlı"); modlu zırhta da. Yünde
+ * yünlü zırh tarifinin ipucu: zırh eki özel tariftir, tarif kitabında görünmez.
+ */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class SicaklikIpuclari {
     private SicaklikIpuclari() {
@@ -19,6 +23,10 @@ public final class SicaklikIpuclari {
     @SubscribeEvent
     public static void ipucu(ItemTooltipEvent olay) {
         ItemStack yigin = olay.getItemStack();
+        if (yigin.is(ItemTags.WOOL)) {
+            olay.getToolTip().add(Component.translatable("tooltip.dogalafetler.yun.tarif").withStyle(ChatFormatting.GRAY));
+            return;
+        }
         if (!ZirhEkleri.zirhMi(yigin)) {
             return;
         }

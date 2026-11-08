@@ -145,7 +145,7 @@ Kozmik Çekirdek envantere girince açılır. Kozmik Çekirdek meteor kraterleri
 
 "Demir" demir külçesi, "Bakır" bakır külçesi, "Taş" düz taştır (kırık taş olmaz). Meteorit Külçesi kitapta Meteorit
 Parçası, Termostat Plakası Meteorit Külçesi envantere girince açılır. Zırh ekleri vanilla deri zırh boyası gibi özel tariftir:
-çalışma masasında çalışır ama tarif kitabında görünmez. Gelişmiş tarifler Kozmik Çekirdek etiketi
+çalışma masasında çalışır ama tarif kitabında görünmez; yünün ve Termostat Plakası'nın açıklaması birleştirmeyi anlatır. Gelişmiş tarifler Kozmik Çekirdek etiketi
 (`#dogalafetler:kozmik_cekirdek`) boşken yüklenmez; etiketi boşaltan bir veri paketi yoksa her zaman yüklüdür.
 
 ## Komutlar
