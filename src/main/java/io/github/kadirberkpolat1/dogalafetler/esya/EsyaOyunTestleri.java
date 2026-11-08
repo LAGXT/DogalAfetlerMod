@@ -21,8 +21,10 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import net.minecraft.advancements.Advancement;
 import net.minecraft.advancements.CriteriaTriggers;
@@ -477,6 +479,55 @@ public final class EsyaOyunTestleri {
             server.getPlayerList().remove(demirli);
         }
         DogalAfetler.LOGGER.info("Eşya GameTest: temel tarifler ilk tick'te, gelişmişler temel eşyayla tarif kitabında");
+        yardimci.succeed();
+    }
+
+    /**
+     * Yüklü her {@code dogalafetler} tarifinin tarif kitabı başarımı ({@code dogalafetler:recipes/<sekme>/<tarif>}) var; yoksa tarif
+     * kitabında hiç görünmez. Özel tarifler ({@code isSpecial}, zırh ekleri) vanilla kitapta zaten görünmez, muaf. Meteor tarifleri
+     * girdi meteor eşyası envantere girince açılır.
+     */
+    @GameTest(template = "bos", batch = "esya_tarif")
+    public static void herTarifinKitapKilidiVarMeteorTarifleriGirdiyleAcilir(GameTestHelper yardimci) {
+        MinecraftServer server = yardimci.getLevel().getServer();
+        Set<String> kilitler = new HashSet<>();
+        for (Advancement a : server.getAdvancements().getAllAdvancements()) {
+            if (DogalAfetler.MOD_ID.equals(a.getId().getNamespace()) && a.getId().getPath().startsWith("recipes/")) {
+                String yol = a.getId().getPath();
+                kilitler.add(yol.substring(yol.lastIndexOf('/') + 1));
+            }
+        }
+        List<String> kilitsiz = new ArrayList<>();
+        List<String> ozel = new ArrayList<>();
+        int sayi = 0;
+        for (Recipe<?> tarif : server.getRecipeManager().getRecipes()) {
+            if (!DogalAfetler.MOD_ID.equals(tarif.getId().getNamespace())) {
+                continue;
+            }
+            if (tarif.isSpecial()) {
+                ozel.add(tarif.getId().getPath());
+            } else if (!kilitler.contains(tarif.getId().getPath())) {
+                kilitsiz.add(tarif.getId().getPath());
+            } else {
+                sayi++;
+            }
+        }
+        yardimci.assertTrue(kilitsiz.isEmpty(), "tarif kitabı başarımı olmayan tarifler: " + kilitsiz);
+        yardimci.assertTrue(sayi > 0, "hiç dogalafetler tarifi yüklenmedi");
+        ServerPlayer oyuncu = CekirdekOyunTestleri.sahteOyuncu(yardimci, 0.5, 2, 0.5);
+        try {
+            ResourceLocation kulce = DogalAfetler.konum("meteorit_kulcesi");
+            ResourceLocation plaka = DogalAfetler.konum("termostat_plakasi");
+            yardimci.assertTrue(!oyuncu.getRecipeBook().contains(kulce) && !oyuncu.getRecipeBook().contains(plaka),
+                    "meteor tarifleri girdisiz kitapta");
+            envantereKoy(oyuncu, MeteorEsyaKayitlari.METEORIT_PARCASI.get());
+            yardimci.assertTrue(oyuncu.getRecipeBook().contains(kulce), "Meteorit Parçasıyla kitapta değil: " + kulce);
+            envantereKoy(oyuncu, MeteorEsyaKayitlari.METEORIT_KULCESI.get());
+            yardimci.assertTrue(oyuncu.getRecipeBook().contains(plaka), "Meteorit Külçesiyle kitapta değil: " + plaka);
+        } finally {
+            server.getPlayerList().remove(oyuncu);
+        }
+        DogalAfetler.LOGGER.info("Eşya GameTest: {} tarifin kitap kilidi var, özel (kitapsız) {}", sayi, ozel);
         yardimci.succeed();
     }
 

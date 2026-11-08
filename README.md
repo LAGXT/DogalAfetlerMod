@@ -138,8 +138,14 @@ Kozmik Çekirdek envantere girince açılır. Kozmik Çekirdek meteor kraterleri
 | Sismograf | Demir · Kağıt · Demir / Çubuk · Kızıltaş · Çubuk / Taş · Bakır · Taş | 2 demir külçesi, 1 kağıt, 2 çubuk, 1 kızıltaş, 2 taş, 1 bakır külçesi |
 | Gelişmiş Hava Radarı | şekilsiz | 1 Hava Radarı + 1 Kozmik Çekirdek |
 | Hassas Sismograf | şekilsiz | 1 Sismograf + 1 Kozmik Çekirdek |
+| Meteorit Külçesi | şekilsiz | 3 Meteorit Parçası + 1 demir külçesi |
+| Termostat Plakası | şekilsiz | 1 Meteorit Külçesi + 1 altın külçesi + 1 kızıltaş + 1 demir külçesi |
+| Yünlü zırh | şekilsiz, zırh eki | 1 zırh parçası + 1 yün (herhangi bir renk) |
+| Termostatlı zırh | şekilsiz, zırh eki | 1 zırh parçası + 1 Termostat Plakası |
 
-"Demir" demir külçesi, "Bakır" bakır külçesi, "Taş" düz taştır (kırık taş olmaz). Gelişmiş tarifler Kozmik Çekirdek etiketi
+"Demir" demir külçesi, "Bakır" bakır külçesi, "Taş" düz taştır (kırık taş olmaz). Meteorit Külçesi kitapta Meteorit
+Parçası, Termostat Plakası Meteorit Külçesi envantere girince açılır. Zırh ekleri vanilla deri zırh boyası gibi özel tariftir:
+çalışma masasında çalışır ama tarif kitabında görünmez. Gelişmiş tarifler Kozmik Çekirdek etiketi
 (`#dogalafetler:kozmik_cekirdek`) boşken yüklenmez; etiketi boşaltan bir veri paketi yoksa her zaman yüklüdür.
 
 ## Komutlar
