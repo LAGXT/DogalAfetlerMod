@@ -58,5 +58,8 @@ public final class Sismograf extends Item {
     @Override
     public void appendHoverText(ItemStack yigin, @Nullable Level level, List<Component> satirlar, TooltipFlag bayrak) {
         satirlar.add(Component.translatable(getDescriptionId() + ".ipucu").withStyle(ChatFormatting.GRAY));
+        if (hassas) {
+            satirlar.add(Component.translatable(getDescriptionId() + ".tarif").withStyle(ChatFormatting.DARK_PURPLE));
+        }
     }
 }

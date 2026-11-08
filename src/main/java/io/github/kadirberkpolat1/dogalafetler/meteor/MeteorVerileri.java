@@ -3,20 +3,28 @@ package io.github.kadirberkpolat1.dogalafetler.meteor;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.esya.MeteorEsyaKayitlari;
 import io.github.kadirberkpolat1.dogalafetler.esya.termostat.Termostat;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import net.minecraft.advancements.critereon.InventoryChangeTrigger;
 import net.minecraft.data.CachedOutput;
 import net.minecraft.data.DataProvider;
 import net.minecraft.data.PackOutput;
+import net.minecraft.data.recipes.FinishedRecipe;
+import net.minecraft.data.recipes.RecipeCategory;
+import net.minecraft.data.recipes.ShapelessRecipeBuilder;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraftforge.common.Tags;
 import net.minecraftforge.data.event.GatherDataEvent;
 
 /**
- * Meteor ve termostat veri dosyaları (datagen): şekilsiz Meteorit Külçesi ve Termostat Plakası tarifleri, Termostatlı
- * zırh ({@code dogalafetler:zirh_eki}, sıcaklık §A3), eşya etiketi {@code #dogalafetler:kozmik_cekirdek} ve dört eşya
- * modeli. İki sağlayıcının adları ayrıdır (K-E5).
+ * Meteor ve termostat veri dosyaları (datagen): şekilsiz Meteorit Külçesi ve Termostat Plakası tarifleri ve tarif kitabı
+ * açma başarımları (girdi meteor eşyası envantere girince), Termostatlı zırh ({@code dogalafetler:zirh_eki}, sıcaklık §A3;
+ * özel tarif, tarif kitabında görünmez), eşya etiketi {@code #dogalafetler:kozmik_cekirdek} ve dört eşya modeli. İki
+ * sağlayıcının adları ayrıdır (K-E5).
  */
 public final class MeteorVerileri implements DataProvider {
     private static final String[] ESYALAR = {"meteorit_parcasi", "kozmik_cekirdek", "meteorit_kulcesi",
@@ -50,14 +58,16 @@ public final class MeteorVerileri implements DataProvider {
                 isler.add(DataProvider.saveStable(onbellek, model, kaynak.resolve("models/item/" + ad + ".json")));
             }
         } else {
-            Path veri = cikti.getOutputFolder(PackOutput.Target.DATA_PACK).resolve(DogalAfetler.MOD_ID);
-            isler.add(DataProvider.saveStable(onbellek, sekilsiz("meteorit_kulcesi", malzeme("item", "dogalafetler:meteorit_parcasi"),
-                    malzeme("item", "dogalafetler:meteorit_parcasi"), malzeme("item", "dogalafetler:meteorit_parcasi"),
-                    malzeme("tag", "forge:ingots/iron")), veri.resolve("recipes/meteorit_kulcesi.json")));
-            isler.add(DataProvider.saveStable(onbellek, sekilsiz("termostat_plakasi",
-                    malzeme("item", "dogalafetler:meteorit_kulcesi"), malzeme("tag", "forge:ingots/gold"),
-                    malzeme("tag", "forge:dusts/redstone"), malzeme("tag", "forge:ingots/iron")),
-                    veri.resolve("recipes/termostat_plakasi.json")));
+            Path kok = cikti.getOutputFolder(PackOutput.Target.DATA_PACK);
+            Path veri = kok.resolve(DogalAfetler.MOD_ID);
+            for (FinishedRecipe tarif : tarifler()) {
+                ResourceLocation id = tarif.getId();
+                ResourceLocation basarimId = tarif.getAdvancementId();
+                isler.add(DataProvider.saveStable(onbellek, tarif.serializeRecipe(),
+                        kok.resolve(id.getNamespace() + "/recipes/" + id.getPath() + ".json")));
+                isler.add(DataProvider.saveStable(onbellek, tarif.serializeAdvancement(),
+                        kok.resolve(basarimId.getNamespace() + "/advancements/" + basarimId.getPath() + ".json")));
+            }
             JsonObject zirh = new JsonObject();
             zirh.addProperty("type", DogalAfetler.MOD_ID + ":zirh_eki");
             zirh.addProperty("category", "equipment");
@@ -74,26 +84,27 @@ public final class MeteorVerileri implements DataProvider {
         return CompletableFuture.allOf(isler.toArray(CompletableFuture[]::new));
     }
 
+    /** Madde 13c tarifleri; kitapta girdi meteor eşyası envantere girince açılır (tarif-2). */
+    private static List<FinishedRecipe> tarifler() {
+        List<FinishedRecipe> liste = new ArrayList<>();
+        ShapelessRecipeBuilder.shapeless(RecipeCategory.MISC, MeteorEsyaKayitlari.METEORIT_KULCESI.get())
+                .requires(MeteorEsyaKayitlari.METEORIT_PARCASI.get(), 3).requires(Tags.Items.INGOTS_IRON)
+                .unlockedBy("has_meteorit_parcasi",
+                        InventoryChangeTrigger.TriggerInstance.hasItems(MeteorEsyaKayitlari.METEORIT_PARCASI.get()))
+                .save(liste::add, DogalAfetler.konum("meteorit_kulcesi"));
+        ShapelessRecipeBuilder.shapeless(RecipeCategory.MISC, MeteorEsyaKayitlari.TERMOSTAT_PLAKASI.get())
+                .requires(MeteorEsyaKayitlari.METEORIT_KULCESI.get()).requires(Tags.Items.INGOTS_GOLD)
+                .requires(Tags.Items.DUSTS_REDSTONE).requires(Tags.Items.INGOTS_IRON)
+                .unlockedBy("has_meteorit_kulcesi",
+                        InventoryChangeTrigger.TriggerInstance.hasItems(MeteorEsyaKayitlari.METEORIT_KULCESI.get()))
+                .save(liste::add, DogalAfetler.konum("termostat_plakasi"));
+        return liste;
+    }
+
     private static JsonObject malzeme(String tur, String kimlik) {
         JsonObject j = new JsonObject();
         j.addProperty(tur, kimlik);
         return j;
-    }
-
-    private static JsonObject sekilsiz(String sonuc, JsonObject... malzemeler) {
-        JsonObject tarif = new JsonObject();
-        tarif.addProperty("type", "minecraft:crafting_shapeless");
-        tarif.addProperty("category", "misc");
-        JsonArray liste = new JsonArray();
-        for (JsonObject m : malzemeler) {
-            liste.add(m);
-        }
-        tarif.add("ingredients", liste);
-        JsonObject cikti = new JsonObject();
-        cikti.addProperty("item", DogalAfetler.MOD_ID + ":" + sonuc);
-        cikti.addProperty("count", 1);
-        tarif.add("result", cikti);
-        return tarif;
     }
 
     @Override
