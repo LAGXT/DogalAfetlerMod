@@ -70,7 +70,19 @@
   },
   "karadelik_yutma": {
     "sounds": [
-      "dogalafetler:karadelik_yutma"
+      {
+        "name": "dogalafetler:karadelik_yutma",
+        "preload": true
+      }
+    ],
+    "subtitle": "subtitles.dogalafetler.karadelik_yutma"
+  },
+  "karadelik_yutma_yankili": {
+    "sounds": [
+      {
+        "name": "dogalafetler:karadelik_yutma_yankili",
+        "preload": true
+      }
     ],
     "subtitle": "subtitles.dogalafetler.karadelik_yutma"
   },
@@ -112,6 +124,24 @@
       }
     ],
     "subtitle": "subtitles.dogalafetler.ortam_test"
+  },
+  "pulsar_vurus": {
+    "sounds": [
+      {
+        "name": "dogalafetler:pulsar_vurus",
+        "preload": true
+      }
+    ],
+    "subtitle": "subtitles.dogalafetler.pulsar_vurus"
+  },
+  "pulsar_vurus_yankili": {
+    "sounds": [
+      {
+        "name": "dogalafetler:pulsar_vurus_yankili",
+        "preload": true
+      }
+    ],
+    "subtitle": "subtitles.dogalafetler.pulsar_vurus"
   },
   "sinkhole.cokus": {
     "sounds": [
