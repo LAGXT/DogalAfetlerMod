@@ -8,8 +8,8 @@ import io.github.kadirberkpolat1.dogalafetler.veri.DataGenerators;
 import net.minecraftforge.eventbus.api.IEventBus;
 
 /**
- * Tsunaminin mod kurucusundaki tek kayıt satırı: config bölümü, sesler (+ {@code sounds.json} ve alt yazı çevirileri), afet
- * fabrikası ve #2 Dalga Avcısı ipucu yayıncısı.
+ * Tsunaminin mod kurucusundaki tek kayıt satırı: config bölümleri (SERVER, CLIENT), sesler (+ {@code sounds.json} ve alt yazı
+ * çevirileri), afet fabrikası ve #2 Dalga Avcısı ipucu yayıncısı.
  */
 public final class Tsunami {
     private Tsunami() {
@@ -17,6 +17,7 @@ public final class Tsunami {
 
     public static void kaydet(IEventBus modBus) {
         TsunamiAyarlari.kaydet();
+        TsunamiIstemciAyarlari.kaydet();
         TsunamiSesleri.kaydet(modBus);
         DataGenerators.sesEkle(TsunamiSesleri::tanimla);
         DataGenerators.ceviriEkle(TsunamiSesleri::cevirileriYaz);

@@ -6,6 +6,7 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.afet.tsunami.TsunamiIstemciAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciAfetDurumu;
 import io.github.kadirberkpolat1.dogalafetler.client.su.SuGizleme;
 import io.github.kadirberkpolat1.dogalafetler.client.su.SuRenderer;
@@ -50,8 +51,10 @@ import org.joml.Matrix4f;
  * 1,5 kat uzun ince çizgiler iki katmanda (yakın hızlı ve parlak, uzak yavaş ve soluk) düşer; gerçek bir yüzeye (katı bloğun
  * görünen şekli, görünen gerçek sıvı, bu karede çizilen sanal su; hangisi yüksekse) üstten değen yakın damla, halkanın
  * sığdığı düz yüzeyde büyüyen bir halka bırakır; sanal sudaki halka çizilen su ağıyla iner kalkar. Gri-mavi sis görüşü %70'e
- * indirir. Cephe 24 blok içindeyken yerden gelen titreme (±0,3°·seviye), dalganın içinde ±8° yuvarlanma. Damla sayısı
- * kaliteye bağlı (N13: Düşük 400 … Ultra 2600 /sn); yağmur AKTIF ve BITIS boyunca, 3 sn'de girer ve çıkar.
+ * indirir. Damla sayısı kaliteye bağlı (N13: Düşük 400 … Ultra 2600 /sn); yağmur AKTIF ve BITIS boyunca, 3 sn'de girer ve
+ * çıkar. Yağmur, halka, ses ve sis yalnız CLIENT {@code tsunami.yagmur} açıkken vardır (varsayılan kapalı, AF3-14): kapalıyken
+ * tick ilk satırlarda döner, hiçbir damla doğmaz, taranmaz, çizilmez. Cephe 24 blok içindeyken yerden gelen titreme
+ * (±0,3°·seviye) ve dalganın içinde ±8° yuvarlanma yağmur değildir, her zaman çalışır.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class TsunamiYagmuru {
@@ -89,25 +92,26 @@ public final class TsunamiYagmuru {
     private static float yonX = 1;
     private static float yonZ;
     private static final BlockPos.MutableBlockPos P = new BlockPos.MutableBlockPos();
-    private static int seviye = 1;
     private static ClientLevel sonLevel;
     /** Son {@link #carpma} sonucu sanal su yüzeyi mi. */
     private static boolean sonSanal;
-    /** Yalnız otomasyonun kök neden ölçümü için: yağmuru kapatır. */
-    static volatile boolean kapali;
+    /** Görsel otomasyon için config'in yerine geçer ({@code y:1} açık, {@code y:0} kapalı, {@code y:-} config); üretimde null. */
+    static volatile Boolean otomasyonYagmuru;
     private static final RandomSource RASTGELE = RandomSource.create();
 
     private TsunamiYagmuru() {
     }
 
     /**
-     * Otomasyon ölçümü: canlı damla ve halka sayısı, kabul ölçütü ({@link #olcut}), şimdiki yoğunluk, çizilen yakın su
+     * Otomasyon ölçümü: yağmur ayarı ({@code yagmur_ayari=acik|kapali}, {@link #acik}), canlı damla ve halka sayısı, kabul ölçütü
+     * ({@link #olcut}; yalnız ayar açıkken anlamlı, kapalıyken damla ve halka 0 olmalı), şimdiki yoğunluk, çizilen yakın su
      * ağının yaşı ({@link SuRenderer#agYasi}).
      */
     static String ozet() {
         ClientLevel l = Minecraft.getInstance().level;
-        return "damla=" + damla + " halka=" + halka + " " + olcut() + " yogunluk="
-                + String.format(Locale.ROOT, "%.2f", yogunluk) + (l == null ? "" : " " + SuRenderer.agYasi(l.getGameTime()));
+        return "yagmur_ayari=" + (acik() ? "acik" : "kapali") + " damla=" + damla + " halka=" + halka + " " + olcut()
+                + " yogunluk=" + String.format(Locale.ROOT, "%.2f", yogunluk)
+                + (l == null ? "" : " " + SuRenderer.agYasi(l.getGameTime()));
     }
 
     /** Bir halkanın ölçüt durumu (yalnız otomasyon). */
@@ -271,10 +275,13 @@ public final class TsunamiYagmuru {
         };
     }
 
+    /** {@code tsunami.yagmur} (ya da otomasyonun geçersiz kılması) açık mı. */
+    static boolean acik() {
+        Boolean o = otomasyonYagmuru;
+        return o != null ? o : TsunamiIstemciAyarlari.yagmur();
+    }
+
     private static boolean aktif() {
-        if (kapali) {
-            return false;
-        }
         return IstemciAfetDurumu.aktif(AfetTuru.TSUNAMI).filter(p -> (p.asama() == AfetAsamasi.AKTIF || p.asama() == AfetAsamasi.BITIS) && p.ozel().getBoolean("yagmur"))
                 .map(TsunamiYagmuru::oku).isPresent();
     }
@@ -282,7 +289,6 @@ public final class TsunamiYagmuru {
     private static AfetDurumPaketi oku(AfetDurumPaketi p) {
         yonX = p.ozel().getFloat("yx");
         yonZ = p.ozel().getFloat("yz");
-        seviye = p.seviye();
         return p;
     }
 
@@ -298,6 +304,14 @@ public final class TsunamiYagmuru {
             damla = 0;
             halka = 0;
             yogunluk = 0;
+        }
+        if (!acik()) {
+            // Kapalı yağmur hiç üretilmez, taranmaz, çizilmez; sonradan kapatılan yağmurun damla, halka ve sisi hemen söner.
+            damla = 0;
+            halka = 0;
+            yogunluk = 0;
+            birikim = 0;
+            return;
         }
         if (l == null || mc.isPaused()) {
             return;
@@ -685,7 +699,8 @@ public final class TsunamiYagmuru {
     public static void kamera(ViewportEvent.ComputeCameraAngles e) {
         SanalSuDunyasi d = SanalSu.istemci;
         Minecraft mc = Minecraft.getInstance();
-        if (d == null || d.dalgalar().isEmpty() || mc.player == null || IstemciAfetDurumu.aktif(AfetTuru.TSUNAMI).isEmpty()) {
+        AfetDurumPaketi p = IstemciAfetDurumu.aktif(AfetTuru.TSUNAMI).orElse(null);
+        if (d == null || d.dalgalar().isEmpty() || mc.player == null || p == null) {
             return;
         }
         double t = SanalSu.istemciSaati.getAsDouble() + e.getPartialTick();
@@ -695,7 +710,7 @@ public final class TsunamiYagmuru {
             double s = w.cepheyeUzaklik(k.x, k.z, t);
             double yan = Math.abs(-(k.x - w.x0()) * w.yonZ() + (k.z - w.z0()) * w.yonX());
             if (s > -24 && s < 0 && yan < w.genislik() / 2) {
-                titreme = Math.max(titreme, 0.3 * seviye * (1 + s / 24));
+                titreme = Math.max(titreme, 0.3 * p.seviye() * (1 + s / 24));
             }
         }
         float roll = (float) (titreme * Math.sin(t * 1.7) + titreme * 0.5 * Math.sin(t * 3.1));

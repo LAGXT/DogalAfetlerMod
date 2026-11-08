@@ -17,8 +17,11 @@
 Kullanım (worktree kökünden): python3 tools/senaryo/tsunami_gorsel.py <kanıt klasörü> [bölüm: hepsi|s5|s1|kopuk|magara|kabul|...]
 `kopuk` (hepsi'de de): Ts2-1 kabul karesi, ayrı S5 koşusunda köpük yakından ve alçaktan (göz tepenin 1,5 blok üstünde, 10° aşağı, cepheye 8–12 blok;
 `tsunami-s5-kopuk-yakin.png` Yüksek, `-yakin-dusuk.png` Düşük; `KAMERA kopuk` ve `DALGA` satırları özette). Ts7 kameraları değişmez.
-Çıkış: 0 geçerli koşu, 1 protokol ihlali/iptal, 2 istemci hatası. FPS pencereleri varsa sonda `TABLO` satırları (Ts1 kabulü, tur 4).
-`KARE` satırlarındaki serpinti/köpük konum sayıları sonda `SERPINTI` satırlarında (kabul: havada, blok içinde, çizimsiz su üstü 0).
+Çıkış: 0 geçerli koşu ve ölçütler geçti, 1 protokol ihlali/iptal, 2 istemci hatası, 3 geçerli koşu ama bir kabul ölçütü kaldı
+(`KABUL KALDI` satırı; defter `kaldi` yazar). Ölçütler: FPS pencereleri varsa sonda `TABLO` satırları (Ts1 kabulü, TS-16 rev. 3:
+geçerli ölçüm ve her sahne geçti, CPU bütçesi dahil); `KARE` satırlarındaki serpinti/köpük konum sayıları `SERPINTI`
+satırlarında (havada, blok içinde, çizimsiz su üstü 0); tsunami yağmuru `YAGMUR` satırlarında (ayar kapalıyken 0 damla, 0
+halka; açıkken halka ölçütü).
 """
 import os
 import re
@@ -93,7 +96,8 @@ def fps_tablosu(metin, log):
     ancak karada ve sonra pencerelerinde sunucu mspt < 50, yabancı GradleWrapperMain (kendi runClient'ımız dışında) ≤ 1 ve
     sonra tabanı temiz (parçacık ≤ önce + 100) ise. Kırılan blok ve tick başına en
     çok bölüm karada penceresinden sonraki ilk `Tsunami: temizlendi` satırından. K26-1: karada `sicrama_varlik_sn` > 1 ise
-    sahne "K-E26b bekliyor" (kabulde bekleyen sahne dışındakiler sayılır). Sonuç (geçerli, hepsi geçti)."""
+    sahne "K-E26b bekliyor" (bilgi; çıkış kodu geçerli ölçüm ve bütün sahnelerin geçmesini ister). Sonuç: geçerli ve hepsi geçti
+    (bool) ya da FPS penceresi yoksa None."""
     sahne = {}
     temiz = [(m.start(), m.group(1), m.group(2), m.group(3), m.group(4), m.group(5)) for m in re.finditer(
         r"Tsunami: temizlendi \(temiz=\w+, doğal=\w+\): kırılan (\d+) blok, değişen bölüm (\d+) "
@@ -150,7 +154,7 @@ def fps_tablosu(metin, log):
     if sahne:
         log(f"TABLO ozet: gecerli={'E' if hepsi_gecerli else 'H'} hepsi_gecti={'E' if hepsi_gecti else 'H'} "
             f"K-E26b_disi_gecti={'E' if bekleyen_disi else 'H'}")
-    return hepsi_gecerli, hepsi_gecti
+    return hepsi_gecerli and hepsi_gecti if sahne else None
 
 
 def serpinti_ozeti(metin, log):
@@ -179,6 +183,36 @@ def serpinti_ozeti(metin, log):
     gecti = not any(toplam.values())
     log(f"SERPINTI ozet: kare={kare} serpinti_dogan={dogan} kopuk_nokta={kopuk} "
         + " ".join(f"{k}={v}" for k, v in toplam.items()) + f" kabul={'GECTI' if gecti else 'KALDI'}")
+    return gecti
+
+
+def yagmur_ozeti(metin, log):
+    """Tsunami yağmuru (AF3-14): her `KARE` satırının `yagmur_ayari` (CLIENT `tsunami.yagmur`, otomasyonun `y:` adımı).
+    Ayar kapalıyken (varsayılan) kabul her karede `damla=0 halka=0`; açıkken AF-01 halka ölçütü: `goz_ustu`, `cizimsiz`,
+    `kenarsiz` toplamı 0 (`TsunamiYagmuru.olcut`). Sonuç: geçti (bool) ya da satır yoksa None."""
+    sayi = {"kapali": 0, "acik": 0}
+    kapali = dict.fromkeys(("damla", "halka"), 0)
+    acik = dict.fromkeys(("goz_ustu", "cizimsiz", "kenarsiz"), 0)
+    for m in re.finditer(r"TSUNAMI-OTOMASYON KARE (\S+) yagmur_ayari=(acik|kapali) damla=(\d+) halka=(\d+) .*?"
+                         r"goz_ustu=(\d+) cizimsiz=(\d+) kenarsiz=(\d+)", metin):
+        sayi[m.group(2)] += 1
+        if m.group(2) == "kapali":
+            d = dict(zip(kapali, (int(m.group(3)), int(m.group(4)))))
+            hedef = kapali
+        else:
+            d = dict(zip(acik, (int(m.group(i)) for i in (5, 6, 7))))
+            hedef = acik
+        for k, v in d.items():
+            hedef[k] += v
+        if any(d.values()):
+            log(f"YAGMUR {m.group(1)} {m.group(2)} " + " ".join(f"{k}={v}" for k, v in d.items()))
+    if not sum(sayi.values()):
+        log("YAGMUR ozet: KARE satırlarında yağmur ayarı yok")
+        return None
+    gecti = not any(kapali.values()) and not any(acik.values())
+    log(f"YAGMUR ozet: kapali_kare={sayi['kapali']} " + " ".join(f"{k}={v}" for k, v in kapali.items())
+        + f" acik_kare={sayi['acik']} " + " ".join(f"{k}={v}" for k, v in acik.items())
+        + f" kabul={'GECTI' if gecti else 'KALDI'}")
     return gecti
 
 
@@ -245,13 +279,13 @@ def main():
     cikis = re.search(r"cikis=(\d+)", metin)
     log(f"bitti: yoklama={yoklama} ALARM={alarm} girdi_satiri={girdi} kapanis_asili={'E' if asili else 'H'} "
         f"otomasyon_ozeti={bitti.groups() if bitti else None} gradle_{cikis.group(0) if cikis else 'cikis=?'}")
-    desen = (r".*(?:TSUNAMI-OTOMASYON (?:FPS|FOTO|KARE|HALKA|KAMERA|DALGA|KALITE|AVCI|AYAR|KAPANIS|PROFIL)|OLCUM tsunami |"
+    desen = (r".*(?:TSUNAMI-OTOMASYON (?:FPS|FOTO|KARE|HALKA|KAMERA|DALGA|EVRE|KALITE|AVCI|AYAR|KAPANIS|PROFIL)|OLCUM tsunami |"
              r"KARE-KAPISI tsunami |Tsunami: |\[CHAT\]|SU-TANI |Sanal su: kurulum|Tsunami köpüğü: |"
              r"has (?:made|reached|completed) the).*")
     for satir in re.findall(desen, metin):
         log("  " + re.split(r"TSUNAMI-OTOMASYON |DogalAfetler/\]: |\]: ", satir, maxsplit=1)[-1])
-    fps_tablosu(metin, log)
-    serpinti_ozeti(metin, log)
+    kabul = {"TABLO": fps_tablosu(metin, log), "SERPINTI": serpinti_ozeti(metin, log), "YAGMUR": yagmur_ozeti(metin, log)}
+    kalan = [ad for ad, sonuc in kabul.items() if sonuc is False]
     for png in (RUN / "screenshots").glob("tsunami-*.png"):
         if png.stat().st_mtime > duvar_baslangic:
             shutil.copy2(png, kanit / png.name)
@@ -263,7 +297,12 @@ def main():
     if alarm or not girdi_temiz or avci_hata:
         return 1
     # Kapanışı asılı kalan istemcinin ölçümleri BITTI'den önce tamamdır; koşu geçerli, asılı kapanış log'da kalır.
-    return 0 if bitti and cikis and (cikis.group(1) == "0" or asili) else 2
+    if not (bitti and cikis and (cikis.group(1) == "0" or asili)):
+        return 2
+    if kalan:
+        log(f"KABUL KALDI: {', '.join(kalan)} (çıkış 3)")
+        return 3
+    return 0
 
 
 if __name__ == "__main__":
