@@ -131,6 +131,8 @@ final class GokyuzuCizici {
     private static final float GALAKSI_DONUS_SN = 3600f;
     /** Pulsar yolundaki kızıl cüce doğuşunun ışık yayı: doğu ufkunda ±72° (ufkun %40'ı). */
     private static final float DOGUS_YAYI_YARI = 72f;
+    /** Pulsar yolundaki kızıl cücenin doğuştaki şişkinliği: küre yarıçapı ×(1 + bu·(1 − ilerleme)). */
+    private static final float DOGUS_SISKINLIK = 0.8f;
 
     /** Pulsar yolundaki 3B kızıl cücenin iç ve kenar rengi. */
     private static final float[] KIZIL_IC = GokyuzuEgrileri.rgb(0xFF6A3A);
@@ -654,6 +656,8 @@ final class GokyuzuCizici {
     private static void nesneler3B(Matrix4f dunya, ClientLevel level, IstemciGokyuzu.Gorunum d, float zaman, Vec3 goz,
             float yagmursuz, float sn) {
         capalariGuncelle(level, d.evre(), goz);
+        Pulsar3B.bosKare();
+        KaraDelik3B.bosKare();
         switch (d.evre()) {
             case PULSAR -> Pulsar3B.ciz(dunya, GokCapasi.PULSAR.merkez(gunesYoluYonu(0f, zaman), goz),
                     PulsarEgrileri.yogunluk(d.ilerleme()), yagmursuz, 1f, null, 0f, 1f);
@@ -670,9 +674,6 @@ final class GokyuzuCizici {
             }
             default -> {
             }
-        }
-        if (d.evre() != GunesEvresi.KARADELIK_YUTMA) {
-            KaraDelik3B.bosKare();
         }
         RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
         RenderSystem.blendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE,
@@ -734,14 +735,16 @@ final class GokyuzuCizici {
 
     /**
      * Pulsar yolundaki kızıl cüce: 3B Fresnel küre (iç {@code #FF6A3A}, kenar koyu kızıl) ve çevresinde doğuşla sönen
-     * toplamalı hale; boyut normal yoldaki diskle aynı açı ({@link #GUNES_DISK} × boyut oranı).
+     * toplamalı hale; boyut normal yoldaki diskle aynı açı ({@link #GUNES_DISK} × boyut oranı). Doğan yıldız şişkindir:
+     * yarıçap ×(1 + {@value #DOGUS_SISKINLIK}·(1 − p)), p = 1'de (eski güneşe dönüşte) normal boy.
      */
     private static void kizilCuce3B(Matrix4f dunya, IstemciGokyuzu.Gorunum d, float p, float a, float zaman, Vec3 goz) {
         Vector3f yon = gunesYoluYonu(0f, zaman);
         Vector3f merkez = GokCapasi.PULSAR.merkez(yon, goz);
         float disk = GUNES_DISK * d.boyutOrani();
-        float yari = GokCapasi.PULSAR.birim(yon, goz) * GokCapasi.PULSAR.uzaklik() * disk / 100f;
         float dogus = 1f - p;
+        float yari = GokCapasi.PULSAR.birim(yon, goz) * GokCapasi.PULSAR.uzaklik() * disk / 100f
+                * (1f + DOGUS_SISKINLIK * dogus);
         float da = GokyuzuEgrileri.kizilCuceDiskAlfa(p) * a;
         Vector3f bakis = new Vector3f(merkez).normalize();
         kuad(dunya, HALE, bakis, disk * (5f + 3f * dogus), 0f, 1f, 0.3f, 0.15f, (0.4f + 0.3f * dogus) * a);

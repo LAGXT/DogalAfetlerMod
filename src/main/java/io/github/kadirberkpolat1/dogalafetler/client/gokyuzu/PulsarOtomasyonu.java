@@ -49,7 +49,7 @@ import org.joml.Vector3f;
  * yürütülür: pulsar doğuşu ve tam güç (büyük pulsar, iki ardışık titreşim karesi, 0,5 sn içinde
  * {@value #SERI_KARE} karelik titreşim serisi ve çekirdek merkezinin ekran pikseli) → blok hasarı açık kavurma birikimi
  * ({@code hiz 6}, kavurmanın eşdeğer günü ≥ {@value #CEHENNEM_GUN}) ve cehennem karesi → ses derinliği ölçümü
- * (5×5 hava kuyusunda y 64 / 48 / 16 / −20 ve üstü kapalı tünel, {@code PULSAR_SES}) → pulsar gecesi → 3B paralaks
+ * (7×7 hava kuyusunda y 64 / 48 / 16 / −20 ve üstü kapalı tünel, {@code PULSAR_SES}) → pulsar gecesi → 3B paralaks
  * karesi (kamera pulsar yönüne dik ~{@value #YAN_ACI}°'lik kayma) → kara delik yutmasının beş anı ({@code hiz 0.25};
  * her kare {@link IstemciGokyuzu#sabitSaniye} ile tam saniyede, G2-10; mercek karesi FOV {@value #MERCEK_FOV}) → güneşsiz
  * buzul (donma %100) → kızıl cüce doğuşu (ilerleme ≥ {@value #DOGUS_ILERLEME}) → eski güneş ({@code NORMAL},
@@ -109,12 +109,13 @@ public final class PulsarOtomasyonu {
     private static final int GOL_YARI = 5;
     private static final int GOL_TEMIZLIK = 12;
     /**
-     * Ses kuyusu: zemin kamerasının arkasında ve kadraj dışında (kuzeyde) 5×5, yüzeyden {@value #KUYU_TABAN}'ye; taban katı.
-     * Tünel kuyu kenarından doğuya {@value #TUNEL_BOY} blok, ucunun 5×5 sütunu en az {@value #TUNEL_ORTU} blok örtülü.
+     * Ses kuyusu: zemin kamerasının arkasında ve kadraj dışında (kuzeyde) 7×7, yüzeyden {@value #KUYU_TABAN}'ye; taban katı.
+     * Ölçülen 5×5 sütun duvara değmemeli: duvara bitişik hava hücresi derinde gök ışığı 15 almaz. Tünel kuyu kenarından
+     * doğuya {@value #TUNEL_BOY} blok, ucunun 5×5 sütunu en az {@value #TUNEL_ORTU} blok örtülü.
      */
     private static final int KUYU_DX = -4;
     private static final int KUYU_DZ = -10;
-    private static final int KUYU_YARI = 2;
+    private static final int KUYU_YARI = 3;
     private static final int KUYU_TABAN = -22;
     private static final int TUNEL_BOY = 8;
     private static final int TUNEL_ORTU = 6;
@@ -271,8 +272,9 @@ public final class PulsarOtomasyonu {
                 komut(s, "dogalafet hiz 1", "time set 6000", "dogalafet donma 100", "weather rain");
                 kamera(s, zeminKamerasi);
             }, () -> sayac >= BUZUL_TICK && evre(GunesEvresi.GUNESSIZ), "gunessiz_buz", BUZUL_TICK + 200),
-            Adim.yeni("kızıl cüce doğuşu (şafak, hız 4; ufuk, doğuş yayı ve küre)", s -> {
-                komut(s, "weather clear", "time set 23600", "dogalafet asama ileri gunessiz", "dogalafet hiz 4");
+            Adim.yeni("kızıl cüce doğuşu (şafak sonrası, hız 4; ufuk, doğuş yayı ve küre)", s -> {
+                // Küre ~17° yükseklikte kalmalı: ~6°'de kömürleşmiş ağaçlar ve tepeler örtüyor.
+                komut(s, "weather clear", "time set 300", "dogalafet asama ileri gunessiz", "dogalafet hiz 4");
                 gunesBak(s, DOGUS_PITCH);
             }, () -> evre(GunesEvresi.KIZIL_CUCE) && donem().evreIlerlemesi() >= DOGUS_ILERLEME, "kizil_cuce_dogus", 900),
             Adim.yeni("eski güneş döndü", s -> {
@@ -429,7 +431,7 @@ public final class PulsarOtomasyonu {
         }
         kareSirasi++;
         if (kareSirasi < a.kareler().size()) {
-            GorselOtomasyon.kareIste(OTOMASYON, DOSYA + a.kareler().get(kareSirasi) + ".png", PulsarOtomasyonu::kareAlindi);
+            GorselOtomasyon.kareIste(OTOMASYON, DOSYA + a.kareler().get(kareSirasi) + ".png", 1, PulsarOtomasyonu::kareAlindi);
             return;
         }
         if (a.kareler().size() > 1) {
@@ -748,7 +750,7 @@ public final class PulsarOtomasyonu {
     }
 
     /**
-     * Ses kuyusu (sunucu thread'i): zemin kamerasının arkasında 5×5 sütun en üst bloktan (yaprak dahil)
+     * Ses kuyusu (sunucu thread'i): zemin kamerasının arkasında 7×7 sütun en üst bloktan (yaprak dahil)
      * {@value #KUYU_TABAN}'nin üstüne kadar hava, taban taş; kuyu kenarından doğuya 1×2 tünel, ucunun 5×5 sütunu en az
      * {@value #TUNEL_ORTU} blok örtülü. Komşu güncellemesiz yazılır (sıvı ve kum akmaz).
      */

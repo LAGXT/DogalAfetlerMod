@@ -36,9 +36,10 @@ import net.minecraftforge.fml.util.ObfuscationReflectionHelper;
  * sahnesinin adı ya da {@code -}. {@code tools/senaryo/olcum_tablosu.py} satırları tek TSV'ye toplar ve kuralı uygular.
  *
  * <p><b>Kare kapısı (A-34).</b> {@link #kareIste} isteği kaydeder; kare {@code RenderTickEvent} END'de, istekten sonra en az
- * {@code enAzKare} (≥ 2) yeni kare çizilmiş ve FPS ≥ {@value #AKICI_FPS} iken alınır. {@value #KAPI_SN} sn'de sağlanmazsa yine
- * alınır, WARN yazılır ve kare geçersiz sayılır. Ekran açıkken iç imleç beklerken her karenin başında sol üst köşeye alınır
- * ({@link #imleciKenaraAl}). Otomasyon bekleyen kare varken ({@link #kareBekliyor}) adım ilerletmez.
+ * {@code enAzKare} (≥ 2; ardışık seri karesinde 1) yeni kare çizilmiş ve FPS ≥ {@value #AKICI_FPS} iken alınır.
+ * {@value #KAPI_SN} sn'de sağlanmazsa yine alınır, WARN yazılır ve kare geçersiz sayılır. Ekran açıkken iç imleç beklerken
+ * her karenin başında sol üst köşeye alınır ({@link #imleciKenaraAl}). Otomasyon bekleyen kare varken ({@link #kareBekliyor})
+ * adım ilerletmez.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class GorselOtomasyon {
@@ -232,7 +233,8 @@ public final class GorselOtomasyon {
 
     /**
      * Kare isteği: {@code dosya} ({@code screenshots/} altında) kapı açılınca alınır, ardından {@code sonra} (otomasyonun kendi
-     * kare satırı) çağrılır. {@code enAzKare} 2'den küçükse 2 sayılır.
+     * kare satırı) çağrılır. {@code enAzKare} 1'den küçükse 1 sayılır; 1 yalnız önceki karenin {@code sonra}'sından istenen
+     * ardışık seri karesi içindir (sahne zaten çizili, bir sonraki render karesi alınır).
      */
     public static void kareIste(String otomasyon, String dosya, int enAzKare, Consumer<Kare> sonra) {
         if (kareDosya != null) {
@@ -240,7 +242,7 @@ public final class GorselOtomasyon {
                     dosya);
         }
         kareOtomasyon = belirtec(otomasyon);
-        kareEnAz = Math.max(2, enAzKare);
+        kareEnAz = Math.max(1, enAzKare);
         kareIstekNs = System.nanoTime();
         kareIstekCizilen = cizilen;
         kareSonra = sonra;

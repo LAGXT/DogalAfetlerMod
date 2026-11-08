@@ -34,8 +34,8 @@ final class GokyuzuRenkleri {
     private static final int PULSAR_GUNDUZ_GOK = 0xC0401A;
     private static final int PULSAR_GUNDUZ_SIS = 0xA83A1A;
     /** Kara delik yutması (PL-4): koyu mor → simsiyah, parlamada mor-beyaz. */
-    private static final int KD_MOR_GOK = 0x1C0A2E;
-    private static final int KD_MOR_SIS = 0x160822;
+    private static final int KD_MOR_GOK = 0x0A0510;
+    private static final int KD_MOR_SIS = 0x08040C;
     private static final int KD_SIYAH_GOK = 0x000000;
     private static final int KD_SIYAH_SIS = 0x020104;
     private static final int KD_PARLAMA_GOK = 0xE8DAFF;

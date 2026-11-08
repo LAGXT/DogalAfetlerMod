@@ -109,6 +109,13 @@ class KaraDelikYutmaEgrileriTest {
         assertTrue(KaraDelikYutmaEgrileri.diskParlakligi(50f) > KaraDelikYutmaEgrileri.diskParlakligi(10f),
                 "pulsar maddesiyle disk parlar");
         assertEquals(0f, KaraDelikYutmaEgrileri.diskParlakligi(90f), 1e-6f);
+        assertTrue(KaraDelikYutmaEgrileri.diskParlakligi(30f) >= KaraDelikYutmaEgrileri.DISK_TABAN,
+                "mercek karesinde disk parlak");
+        float onceki = KaraDelikYutmaEgrileri.diskParlakligi(KaraDelikYutmaEgrileri.YUTUM_SN - 0.5f);
+        for (float s = KaraDelikYutmaEgrileri.YUTUM_SN; s <= 76f; s += 0.5f) {
+            assertTrue(KaraDelikYutmaEgrileri.diskParlakligi(s) >= 0.6f * onceki,
+                    "mor kalıntı sönüme kadar yutum öncesinin en az %60'ı: " + s);
+        }
     }
 
     @Test

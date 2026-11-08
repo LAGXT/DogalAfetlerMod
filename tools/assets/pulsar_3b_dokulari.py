@@ -7,7 +7,8 @@
 Çıktı: src/main/resources/assets/dogalafetler/textures/environment/gokyuzu/pulsar3b_*.png (+ .png.mcmeta). Yardımcılar
 gokyuzu_dokulari.py'den gelir; tohum ayrı (20261110): eski dokuların baytları değişmez, yalnız yeni dosyalar yazılır.
 Renk referans videodan: parlak piksellerin ortalaması buz mavisi-beyaz (219, 239, 247); ısınma (mor-beyaz) Java'da köşe
-rengiyle verilir. RGB rengi, alfa yoğunluğu taşır; hepsi toplamalı çizilir.
+rengiyle verilir. RGB rengi, alfa yoğunluğu taşır; yüzey dokusu dışındakiler toplamalı çizilir. Yüzey dokusu ayrı
+tohumla (20261111) üretilir: sonradan eklendi, öteki dokuların baytları değişmez.
 """
 from __future__ import annotations
 
@@ -70,6 +71,29 @@ def pulsar3b_alan(rng, w=256, h=32):
     kaydet("pulsar3b_alan", gecis(BEYAZ, renk("#C4D4FF"), np.abs(y) / 0.6), np.clip(a, 0, 1), clamp=False)
 
 
+def periyodik_bant(boyut, merkez, genislik, rng):
+    """İki eksende dikişsiz bant geçiren gürültü (beyaz gürültünün FFT süzgeci), standart sapması 1."""
+    f = np.fft.fft2(rng.standard_normal((boyut, boyut)))
+    fy = np.fft.fftfreq(boyut)[:, None] * boyut
+    fx = np.fft.fftfreq(boyut)[None, :] * boyut
+    n = np.real(np.fft.ifft2(f * np.exp(-((np.hypot(fx, fy) - merkez) / genislik) ** 2)))
+    return n / n.std()
+
+
+def pulsar3b_yuzey(rng, boyut=256):
+    """Çekirdek yüzeyi (normal karışım, opak): iki eksende döşenebilir granülasyon/plazma kaynaması, gri. Java bunu
+    köşe rengiyle çarpar; parlaklık 0,6–1 (ortalama ~0,8): ortalamaya göre ±%25. Koyu granül arası damarlar."""
+    granul = periyodik_bant(boyut, 14, 4.5, rng)
+    buyuk = periyodik_bant(boyut, 4, 1.5, rng)
+    ince = periyodik_bant(boyut, 38, 10, rng)
+    damar = np.exp(-(granul / 0.35) ** 2) * yumusak_basamak(0.4, -0.6, buyuk) * 0.5
+    n = 0.6 * np.tanh(0.8 * granul) + 0.25 * np.tanh(0.7 * buyuk) + 0.15 * np.tanh(ince) - damar
+    alt, ust = np.percentile(n, [1, 99])
+    n = np.clip((n - alt) / (ust - alt), 0, 1)
+    g = 0.6 + 0.4 * n
+    kaydet("pulsar3b_yuzey", np.repeat(g[..., None], 3, axis=2), np.ones_like(g), clamp=False)
+
+
 def main() -> None:
     print(f"Hedef: {HEDEF}")
     rng = np.random.default_rng(20261110)
@@ -77,6 +101,7 @@ def main() -> None:
     pulsar3b_parcacik()
     pulsar3b_hale_katman(rng)
     pulsar3b_alan(rng)
+    pulsar3b_yuzey(np.random.default_rng(20261111))
 
 
 if __name__ == "__main__":

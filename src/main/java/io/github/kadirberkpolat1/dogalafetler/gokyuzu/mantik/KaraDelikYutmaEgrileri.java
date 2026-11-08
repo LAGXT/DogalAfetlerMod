@@ -37,6 +37,9 @@ public final class KaraDelikYutmaEgrileri {
     /** Diskin görünen eğimi (bakışın disk düzlemiyle açısı, derece): uzakta neredeyse yandan, en yakında açık. */
     public static final float EGIM_UZAK = 4f;
     public static final float EGIM_YAKIN = 11f;
+    /** Akresyon diskinin beslenmeden önceki parlaklığı ve yutumdan sonraki mor kalıntının parlaklığı (tepe 1). */
+    public static final float DISK_TABAN = 0.8f;
+    public static final float KALINTI_PARLAKLIK = 0.95f;
 
     private KaraDelikYutmaEgrileri() {
     }
@@ -149,9 +152,12 @@ public final class KaraDelikYutmaEgrileri {
         return Math.max((0.35f + 0.65f * merceklenme(s)) * karaDelikAlfa(s), parlama(s));
     }
 
-    /** Akresyon diskinin parlaklığı: pulsarın maddesiyle beslendikçe artar, yutumdan sonra o parlaklıkta söner. */
+    /**
+     * Akresyon diskinin parlaklığı: baştan parlak ({@value #DISK_TABAN}), pulsarın maddesiyle beslendikçe 1'e çıkar; yutumdan
+     * sonra mor kalıntı {@value #KALINTI_PARLAKLIK}'te kalır ve kara delikle birlikte söner.
+     */
     public static float diskParlakligi(float s) {
-        float besleme = s < YUTUM_SN ? 0.55f + 0.45f * spagetti(s) : 0.95f;
+        float besleme = s < YUTUM_SN ? DISK_TABAN + (1f - DISK_TABAN) * spagetti(s) : KALINTI_PARLAKLIK;
         return besleme * karaDelikAlfa(s);
     }
 
