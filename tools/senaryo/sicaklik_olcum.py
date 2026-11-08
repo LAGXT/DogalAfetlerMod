@@ -13,7 +13,7 @@ Kullanım: python3 tools/senaryo/sicaklik_olcum.py <kanıt/>   (sicaklik_gorsel.
           bağlı bileşen (6–800 piksel) bir damla; sayı ve her damlanın çevresindeki zemine WCAG karşıtlığı (kontür ya
           da gövdeden yüksek olanı).
   buhar   yalnız ağız penceresinde (önden 3. şahıs kamerası gözü ekranın ortasında tutar; pencere ortanın
-          0,2·Y sağı/solu, 0,12·Y üstü ile 0,25·Y altı) kontrol kareye göre beyaza doğru tek tip karışım: her kanalda
+          0,1·Y sağı/solu, 0,08·Y üstü ile 0,12·Y altı) kontrol kareye göre beyaza doğru tek tip karışım: her kanalda
           α = (kare − kontrol) / (255 − kontrol), en az iki geçerli kanal (255 − kontrol > 30) ve kanallar arası fark
           < 0,15; sonuç açık renk (L* ≥ 40; modelin koyu piksellerindeki poz/ışık oynaması sayılmaz); ter damlasının
           lacivert kontürünün 4 piksel çevresi (beyaz parlaması) dışarıda. α ≥ 0,15 piksel sayısı ile bu piksellerde
@@ -138,7 +138,9 @@ def ter(kare):
 
 
 def agiz_penceresi(h, w):
-    return slice(int(h / 2 - 0.12 * h), int(h / 2 + 0.25 * h)), slice(int(w / 2 - 0.2 * h), int(w / 2 + 0.2 * h))
+    """Yüz önü: önden 3. şahıs kamerası gözü ekranın ortasında tutar, ağız ~0,12 blok altında; buhar kameraya doğru
+    savrulur. Kollar ve omuzlar (pozu kareden kareye oynar) pencerenin dışında kalır."""
+    return slice(int(h / 2 - 0.08 * h), int(h / 2 + 0.12 * h)), slice(int(w / 2 - 0.1 * h), int(w / 2 + 0.1 * h))
 
 
 def buhar(kare, ref):
