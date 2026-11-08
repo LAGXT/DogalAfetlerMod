@@ -11,7 +11,10 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 
-/** {@code /dogalafet kasirga bilgi} (OP): aktif kasırganın durumu ve dünyadaki kasırga/uçan blok varlık sayıları (temiz bitiş kanıtı). */
+/**
+ * {@code /dogalafet kasirga bilgi} (OP): aktif kasırganın durumu, dünyadaki kasırga/uçan blok varlık sayıları (temiz bitiş
+ * kanıtı), güncel konum ve ara hedef (rota senaryosu).
+ */
 final class KasirgaKomutlari {
     static final String BILGI = "commands.dogalafetler.kasirga.bilgi";
     static final String YOK = "commands.dogalafetler.kasirga.yok";
@@ -44,9 +47,15 @@ final class KasirgaKomutlari {
         KasirgaSeviyesi s = k.seviyeBilgisi();
         String merkez = BlockPos.containing(k.konum()).toShortString();
         long yon = Math.round(Math.toDegrees(k.yon()));
+        long px = Math.round(k.konum().x);
+        long pz = Math.round(k.konum().z);
+        double[] ara = k.araHedef();
+        String ax = ara == null ? "-" : Long.toString(Math.round(ara[0]));
+        String az = ara == null ? "-" : Long.toString(Math.round(ara[1]));
         kaynak.sendSuccess(() -> Component.translatable(BILGI, k.asama().name(), k.durum().evre().name(),
                 String.format(Locale.ROOT, "%.2f", k.durum().ilerleme()), s.seviye(), merkez, yon,
-                k.ucanBlokSayisi(), KasirgaAyarlari.ucanBlokTavani(), k.toplamKaldirilan(), kv, uv), false);
+                k.ucanBlokSayisi(), KasirgaAyarlari.ucanBlokTavani(), k.toplamKaldirilan(), kv, uv, px, pz, ax, az,
+                k.araHedefNo()), false);
         return 1;
     }
 }

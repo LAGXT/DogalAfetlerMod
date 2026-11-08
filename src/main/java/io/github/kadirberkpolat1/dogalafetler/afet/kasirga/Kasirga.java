@@ -4,6 +4,7 @@ import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.Carpanlar;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.Cekim;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.KasirgaEvresi;
+import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.KasirgaRotasi;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.KasirgaSeviyesi;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.KasirgaYikimi;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.Yonelim;
@@ -25,6 +26,7 @@ import java.util.Locale;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -50,9 +52,10 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
 /**
- * Kasırga afeti (bölüm A, madde 10; tasarım notu {@code docs/tasarim/kasirga.md}). Durum (konum, yön, hedef, AKTIF'te geçen
+ * Kasırga afeti (bölüm A, madde 10; tasarım notu {@code docs/tasarim/kasirga.md}). Durum (konum, yön, rota, AKTIF'te geçen
  * süre) bu afetin NBT'sindedir; {@link KasirgaVarligi} yalnız görüntü taşıyıcısıdır ve konumu entity-ticking olduğunda var
- * olur (spike B8: yüklü alan dışında kasırga soyut ilerler).
+ * olur. Kasırga kimseyi izlemez: hedef oyuncu yalnız doğuş noktasını verir, yürüyüş {@link KasirgaRotasi}'nın ara
+ * hedeflerinedir ve yalnız entity-ticking chunk'lara ilerler (K-01: görüntü ve çekim yalnız oralarda çalışır).
  *
  * <ul>
  * <li>ON_UYARI: gizli; hiçbir şey görünmez (madde 4).</li>
@@ -74,15 +77,16 @@ public final class Kasirga extends Afet {
     private static final SoundEvent[] ENKAZ_SESLERI = {SoundEvents.WOOD_BREAK, SoundEvents.GRAVEL_BREAK,
         SoundEvents.GLASS_BREAK, SoundEvents.GRASS_BREAK, SoundEvents.WOOD_BREAK};
     private static final double TAM_TUR = Math.PI * 2;
+    private static final int YENIDEN_SECIM_TICK = 20;
 
     private Vec3 konum;
     private double yon;
-    private double anaYon;
     private double hedefYon;
-    private double hedefX;
-    private double hedefZ;
-    private boolean hedefVar;
-    private boolean hedefGecildi;
+    /** Doğuşta hedeften kasırgaya yön (ilk bacağın yönü); hedefsiz başlatılan kasırgada NaN. */
+    private double ilkYon = Double.NaN;
+    private KasirgaRotasi rota;
+    /** Yüklü olmayan adımda son zorunlu ara hedef seçiminin tick'i (en çok {@link #YENIDEN_SECIM_TICK}'te bir). */
+    private int sonZorunluSecim = Integer.MIN_VALUE / 2;
     private long aktifGecen;
     private long toplamKaldirilan;
     private boolean hareketli = true;
@@ -133,6 +137,20 @@ public final class Kasirga extends Afet {
         return yon;
     }
 
+    /** Şu anki ara hedef {x, z}; rota henüz yoksa {@code null}. */
+    public double[] araHedef() {
+        return rota == null ? null : new double[] {rota.hedefX(), rota.hedefZ()};
+    }
+
+    /** Şu anki ara hedefin numarası (seçim sayacı; 0 = henüz seçilmedi). */
+    public int araHedefNo() {
+        return rota == null ? 0 : rota.sayac();
+    }
+
+    KasirgaRotasi rota() {
+        return rota;
+    }
+
     public KasirgaVarligi varlik() {
         return varlik;
     }
@@ -159,9 +177,12 @@ public final class Kasirga extends Afet {
         hareketli = false;
     }
 
-    /** GameTest: kasırgayı sahnenin ortasına taşır. */
+    /** GameTest: kasırgayı sahnenin ortasına taşır; rota yeni konumdan yeniden başlar (ilk hareket tick'inde ara hedef seçer). */
     void konumAyarla(Vec3 yeni) {
         konum = yeni;
+        if (rota != null) {
+            rota = KasirgaRotasi.yeni(yeni.x, yeni.z, yon, rota.tohum());
+        }
     }
 
     // ---------------------------------------------------------------- yaşam döngüsü
@@ -173,18 +194,18 @@ public final class Kasirga extends Afet {
     }
 
     /**
-     * Hedefin {@link Yonelim#dogusMesafesi} kadar uzağında doğar; hedef oyuncunun konumu yürüyüşün hedefidir. Doğuş chunk'ı
-     * yüklü değilse yükseklik hedefin Y'sinden alınır: yükseklik okuması chunk'ı eşzamanlı üretmesin (inceleme Kn3).
+     * Hedefin {@link Yonelim#dogusMesafesi} kadar uzağında doğar (K-03); hedef yürüyüşte izlenmez, ilk bacağın yönü hedeften
+     * uzaklaşır. Doğuş chunk'ı yüklü değilse yükseklik hedefin Y'sinden alınır: yükseklik okuması chunk'ı eşzamanlı
+     * üretmesin (inceleme Kn3).
      */
     @Override
     public BlockPos merkezSec(ServerLevel level, ServerPlayer hedef, int seviye, RandomSource r) {
         KasirgaSeviyesi s = KasirgaSeviyesi.icin(seviye, KasirgaAyarlari.carpanlar());
-        hedefX = hedef.getX();
-        hedefZ = hedef.getZ();
-        hedefVar = true;
-        double[] ofset = Yonelim.dogusOfseti(s.cekimYaricapi(), r.nextDouble(), r.nextDouble() * TAM_TUR);
-        int x = Mth.floor(hedefX + ofset[0]);
-        int z = Mth.floor(hedefZ + ofset[1]);
+        double aci = r.nextDouble() * TAM_TUR;
+        double[] ofset = Yonelim.dogusOfseti(s.cekimYaricapi(), r.nextDouble(), aci);
+        ilkYon = aci;
+        int x = Mth.floor(hedef.getX() + ofset[0]);
+        int z = Mth.floor(hedef.getZ() + ofset[1]);
         int yukseklik = level.hasChunk(x >> 4, z >> 4) ? level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z)
                 : Mth.floor(hedef.getY());
         return new BlockPos(x, yukseklik, z);
@@ -193,20 +214,14 @@ public final class Kasirga extends Afet {
     @Override
     protected void baslarken(ServerLevel level) {
         konum = Vec3.atBottomCenterOf(baglam().merkez());
-        if (!hedefVar) {
-            // Konuma başlatılan kasırga (hedef oyuncu yok): rastgele bir yöne yürür.
-            double aci = rastgele.nextDouble() * TAM_TUR;
-            hedefX = konum.x + Math.cos(aci) * 96;
-            hedefZ = konum.z + Math.sin(aci) * 96;
-            hedefVar = true;
-        }
-        anaYon = Yonelim.yon(konum.x, konum.z, hedefX, hedefZ);
-        yon = anaYon;
-        hedefYon = anaYon;
+        // Konuma başlatılan kasırga (hedef oyuncu yok) ilk bacağı rastgele bir yöne yürür.
+        yon = Double.isNaN(ilkYon) ? rastgele.nextDouble() * TAM_TUR : ilkYon;
+        hedefYon = yon;
+        rota = KasirgaRotasi.yeni(konum.x, konum.z, yon, rastgele.nextLong());
         KasirgaSeviyesi s = seviyeBilgisi();
-        DogalAfetler.LOGGER.info("[kasirga] başladı: seviye {} merkez {} hedef ({}, {}), taban çapı {}, çekim yarıçapı {}",
-                seviye(), baglam().merkez().toShortString(), Math.round(hedefX), Math.round(hedefZ), s.tabanCapi(),
-                s.cekimYaricapi());
+        DogalAfetler.LOGGER.info("[kasirga] başladı: seviye {} merkez {} rota tohumu {}, taban çapı {}, çekim yarıçapı {}",
+                seviye(), baglam().merkez().toShortString(), rota.tohum(), s.tabanCapi(), s.cekimYaricapi());
+        araHedefSec(level, konum);
     }
 
     @Override
@@ -224,7 +239,7 @@ public final class Kasirga extends Afet {
             case AKTIF -> {
                 aktifGecen += Math.max(0, adim);
                 durumAyarla(level, KasirgaEvresi.aktifte(aktifGecen, seviyeBilgisi().aktifSureTick()));
-                hareketEt(level);
+                hareketEt(level, adim);
                 varlikGuncelle(level);
                 sesleriBaslat(level, true);
                 sesleriTasi(level);
@@ -323,12 +338,22 @@ public final class Kasirga extends Afet {
         t.putDouble("y", k.y);
         t.putDouble("z", k.z);
         t.putDouble("yon", yon);
-        t.putDouble("anaYon", anaYon);
         t.putDouble("hedefYon", hedefYon);
-        t.putDouble("hedefX", hedefX);
-        t.putDouble("hedefZ", hedefZ);
-        t.putBoolean("hedefVar", hedefVar);
-        t.putBoolean("hedefGecildi", hedefGecildi);
+        if (rota != null) {
+            KasirgaRotasi.Durum d = rota.yaz();
+            CompoundTag r = new CompoundTag();
+            r.putDouble("bx", d.baslangicX());
+            r.putDouble("bz", d.baslangicZ());
+            r.putLong("tohum", d.tohum());
+            r.putInt("sayac", d.sayac());
+            r.putDouble("hx", d.hedefX());
+            r.putDouble("hz", d.hedefZ());
+            r.putDouble("sonYon", d.sonYon());
+            r.putInt("kalan", d.kalanTick());
+            r.putString("tur", d.sonTur().name());
+            r.putBoolean("donus", d.sonDonus());
+            t.put("rota", r);
+        }
         t.putLong("aktifGecen", aktifGecen);
         t.putLong("kaldirilan", toplamKaldirilan);
     }
@@ -339,12 +364,23 @@ public final class Kasirga extends Afet {
             konum = new Vec3(t.getDouble("x"), t.getDouble("y"), t.getDouble("z"));
         }
         yon = t.getDouble("yon");
-        anaYon = t.getDouble("anaYon");
         hedefYon = t.getDouble("hedefYon");
-        hedefX = t.getDouble("hedefX");
-        hedefZ = t.getDouble("hedefZ");
-        hedefVar = t.getBoolean("hedefVar");
-        hedefGecildi = t.getBoolean("hedefGecildi");
+        if (t.contains("rota", Tag.TAG_COMPOUND)) {
+            CompoundTag r = t.getCompound("rota");
+            KasirgaRotasi.Tur tur = KasirgaRotasi.Tur.RASTGELE;
+            for (KasirgaRotasi.Tur aday : KasirgaRotasi.Tur.values()) {
+                if (aday.name().equals(r.getString("tur"))) {
+                    tur = aday;
+                }
+            }
+            rota = KasirgaRotasi.oku(new KasirgaRotasi.Durum(r.getDouble("bx"), r.getDouble("bz"), r.getLong("tohum"),
+                    r.getInt("sayac"), r.getDouble("hx"), r.getDouble("hz"), r.getDouble("sonYon"), r.getInt("kalan"), tur,
+                    r.getBoolean("donus")));
+        } else {
+            // Rotasız eski kayıt: rota bulunduğu konumdan yeniden başlar.
+            Vec3 k = konum();
+            rota = KasirgaRotasi.yeni(k.x, k.z, yon, rastgele.nextLong());
+        }
         aktifGecen = Math.max(0, t.getLong("aktifGecen"));
         toplamKaldirilan = Math.max(0, t.getLong("kaldirilan"));
     }
@@ -361,6 +397,11 @@ public final class Kasirga extends Afet {
         altAsamaAyarla(durum.evre().ordinal());
         if (asama() == AfetAsamasi.SIREN || asama() == AfetAsamasi.AKTIF) {
             varlikGuncelle(level);
+        }
+        if (rota.sayac() == 0) {
+            araHedefSec(level, konum());
+        } else {
+            yolHedefiAyarla(rota.hedefX(), rota.hedefZ());
         }
         DogalAfetler.LOGGER.info("[kasirga] kayıttan dönüş: evre {} ({}), konum {}, kaldırılan {}", durum.evre(),
                 String.format(Locale.ROOT, "%.2f", durum.ilerleme()), BlockPos.containing(konum()).toShortString(),
@@ -383,31 +424,69 @@ public final class Kasirga extends Afet {
         }
     }
 
-    private void hareketEt(ServerLevel level) {
-        if (!hareketli) {
+    /**
+     * Ara hedefe yürür: zamanı gelince ({@link KasirgaRotasi#secimZamani}) yeni ara hedef, her {@link Yonelim#SAPMA_ARALIGI_TICK}
+     * tick'te ara hedefin yönü çevresinde sapmalı yön. Entity-ticking alandan çıkacak adımda kasırga bu tick yerinde kalır ve en
+     * çok {@link #YENIDEN_SECIM_TICK} tick'te bir yeni ara hedef ister (yüklü adaylar önce gelir, kasırga içeri döner). Zaten
+     * yüklü alanın dışındaysa (düşük simülasyon mesafesinde doğuş, kayıttan dönüş) K-01'deki gibi soyut ilerler; yükseklik
+     * yalnız yüklü sütundan okunur. Rota başlangıcından {@link KasirgaRotasi#EN_COK_UZAKLIK} bloktan uzağa çıkan adım sınıra
+     * kırpılır ve yeni ara hedef seçilir.
+     */
+    private void hareketEt(ServerLevel level, int adim) {
+        if (!hareketli || rota == null) {
             return;
         }
         Vec3 k = konum();
-        if (tick % Yonelim.SAPMA_ARALIGI_TICK == 0) {
-            if (!hedefGecildi) {
-                if (Math.hypot(hedefX - k.x, hedefZ - k.z) < Yonelim.GECIS_YARICAPI) {
-                    hedefGecildi = true;
-                } else {
-                    anaYon = Yonelim.yon(k.x, k.z, hedefX, hedefZ);
-                }
-            }
-            hedefYon = Yonelim.sapmaliYon(anaYon, rastgele.nextDouble());
+        boolean yeniHedef = rota.secimZamani(adim, k.x, k.z);
+        if (yeniHedef) {
+            araHedefSec(level, k);
+        }
+        if (yeniHedef || tick % Yonelim.SAPMA_ARALIGI_TICK == 0) {
+            hedefYon = Yonelim.sapmaliYon(Yonelim.yon(k.x, k.z, rota.hedefX(), rota.hedefZ()), rastgele.nextDouble());
         }
         yon = Yonelim.don(yon, hedefYon);
-        double adim = seviyeBilgisi().hiz() / 20 * KasirgaEvresi.hizPayi(durum.evre());
-        double nx = k.x + Math.cos(yon) * adim;
-        double nz = k.z + Math.sin(yon) * adim;
+        double hiz = seviyeBilgisi().hiz() / 20 * KasirgaEvresi.hizPayi(durum.evre());
+        double nx = k.x + Math.cos(yon) * hiz;
+        double nz = k.z + Math.sin(yon) * hiz;
+        double uzaklik = rota.baslangicaUzaklik(nx, nz);
+        boolean sinirda = uzaklik > KasirgaRotasi.EN_COK_UZAKLIK;
+        if (sinirda) {
+            double oran = KasirgaRotasi.EN_COK_UZAKLIK / uzaklik;
+            nx = rota.baslangicX() + (nx - rota.baslangicX()) * oran;
+            nz = rota.baslangicZ() + (nz - rota.baslangicZ()) * oran;
+        }
         double y = k.y;
-        if (level.isLoaded(BlockPos.containing(nx, y, nz))) {
-            int zemin = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, Mth.floor(nx), Mth.floor(nz));
+        BlockPos sonraki = BlockPos.containing(nx, y, nz);
+        if (!level.isPositionEntityTicking(sonraki) && level.isPositionEntityTicking(BlockPos.containing(k))) {
+            if (tick - sonZorunluSecim >= YENIDEN_SECIM_TICK) {
+                sonZorunluSecim = tick;
+                araHedefSec(level, k);
+            }
+            return;
+        }
+        if (level.isLoaded(sonraki)) {
+            int zemin = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, sonraki.getX(), sonraki.getZ());
             y += (zemin - y) * 0.2;
         }
         konum = new Vec3(nx, y, nz);
+        if (sinirda) {
+            araHedefSec(level, konum);
+        }
+    }
+
+    /** Yeni ara hedef: oyuncular (izleyici olmayan, canlı) ve entity-ticking yüklülük rotaya verilir; radar ve log'a bildirilir. */
+    private void araHedefSec(ServerLevel level, Vec3 k) {
+        List<double[]> oyuncular = new ArrayList<>();
+        for (ServerPlayer p : level.players()) {
+            if (!p.isSpectator() && p.isAlive()) {
+                oyuncular.add(new double[] {p.getX(), p.getZ()});
+            }
+        }
+        KasirgaRotasi.Secim s = rota.yeniAraHedef(k.x, k.z, oyuncular,
+                (x, z) -> level.isPositionEntityTicking(BlockPos.containing(x, k.y, z)));
+        yolHedefiAyarla(s.x(), s.z());
+        DogalAfetler.LOGGER.info("[kasirga] ara hedef {}: ({}, {}) tür {}{}, uzaklık {}, başlangıca {}", s.no(), Math.round(s.x()),
+                Math.round(s.z()), s.tur(), s.donus() ? " dönüş" : "", Math.round(s.uzaklik()), Math.round(s.baslangicaUzaklik()));
     }
 
     /**
