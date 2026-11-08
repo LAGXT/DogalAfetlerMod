@@ -239,12 +239,12 @@ public final class AsitYagmuru extends Afet {
     }
 
     /**
-     * Aşınma oyuncuların (gözlemci dahil) çevresinden örneklenir (AF2-05): her örnek rastgele bir oyuncu seçer, yarısı onun 24
-     * blok, yarısı seviyenin yarıçapı içinden; yüklü olmayan sütun atlanır (chunk yüklenmez). Tick bütçesi
+     * Aşınma oyuncuların (izleyici ve yaratıcı hariç; AF2-05) çevresinden örneklenir: her örnek rastgele bir oyuncu seçer,
+     * yarısı onun 24 blok, yarısı seviyenin yarıçapı içinden; yüklü olmayan sütun atlanır (chunk yüklenmez). Tick bütçesi
      * {@code blokButcesi} × TPS kısması; aşınabilir blok hız birikimi el verdikçe çatlak kuyruğuna girer.
      */
     private void asindir(ServerLevel level, double yogunluk, int adim) {
-        List<ServerPlayer> oyuncular = level.players();
+        List<ServerPlayer> oyuncular = level.players().stream().filter(o -> !o.isSpectator() && !o.isCreative()).toList();
         if (oyuncular.isEmpty()) {
             return;
         }
