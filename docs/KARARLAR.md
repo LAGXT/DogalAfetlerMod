@@ -5976,7 +5976,7 @@ satırı yazar; AS-5 `/dogalafet siklik` okur, `/dogalafet siklik <0..1000>` ayn
 11.4, yeni KOM.18 ve N25. Kanıt: JUnit `AfetZamanlayicisiTest` (`beklemeOlcekleSikligaBoler`,
 `onKatSiklikBaslangicBeklemesiniOndaBireIndirir`, `gerceklesenAfetSayisiSikliklaOrantili`), `BeklemeDurumuTest` (`siklikBeklemeyiBoler`,
 `siklikDegisinceKalanOlceklenir`), `SonrakiAfetTahminiTest` (5 vaka); GameTest `siklikKomutuBeklemeyiOlcekleriKaliciTahminKisalir`
-(batch `cekirdek_siklik`; dalda `gametest:Komut|Cekirdek @be725cf0ad39` 20/20). Ağ protokolü değişmez (yeni paket yok).
+(batch `cekirdek_siklik`; dalda `gametest:Komut|Cekirdek @be725cf0ad39` 20/20). Ağ protokolü değişmez (yeni paket yok). **Bilinen sınır (AS-6, `fe0b99e`):** %1000 gerçekleşen afet sayısında ≈ ×5 verir, ×10 değil: afetin kendi süresi sıklıkla kısalmaz ve yuvayı tutar.
 
 ## Açık noktalar (Faz 2b)
 
