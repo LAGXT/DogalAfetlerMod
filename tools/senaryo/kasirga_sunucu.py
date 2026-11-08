@@ -9,8 +9,9 @@ Adımlar: doğuş çevresi forceload; `kasirga bilgi` (aktif yok, varlık 0); `s
 ucan_blok=0 (KOM.3 temiz bitiş). Doğal bitiş: `start kasirga 1`, `asama ileri` ×2, `hiz 100` → log'da
 `Afet bitti: kasirga seviye 1 neden DOGAL`, `hiz 1`, varlık 0. Rota (AF2-20, kasırga kimseyi izlemez): (0, 0) çevresi ±160 blok
 forceload (iki çağrı, çağrı başına ≤ 256 chunk), `execute positioned 96 ~ 0 run dogalafet start kasirga 3`, `asama ileri` ×2; 120 sn
-boyunca 5 sn'de bir `kasirga bilgi` konumu, (0, 0) referansına (oyuncusuz sunucuda varsayılan hedef) ortalama uzaklık, adım
-imlecinden beri `[kasirga] ara hedef N:` satırı sayısı ve sonda `forge tps`: `### rota: ...` satırı; ortalama ≥ 48 blok, değişim
+boyunca 5 sn'de bir `kasirga bilgi` konumu, (0, 0) referansına (oyuncusuz sunucuda varsayılan hedef) ortalama uzaklık, ara hedef
+değişimi (`bilgi` satırındaki `#N`: son numara − 1; ara hedef log satırı yalnız otomasyonda, K-E42) ve sonda `forge tps`:
+`### rota: ...` satırı; ortalama ≥ 48 blok, değişim
 ≥ 4, TPS > 18 değilse hata; `stop`, büyük kare forceload'dan çıkarılır (doğuş çevresi ±64 yeniden eklenir). Sonda log denetimi: `invalid dist` yok, istisna yok,
 `[basarim] ... yayıncı olarak kayıtlı değil` satırı 0, `kasirga` config düzeltme WARN'ı yok, süreç 0 ile çıktı.
 Kayıttan dönüş (inceleme Kn5): `start kasirga 3`, `asama ileri` ×2, 12 sn (olgun evre) → sunucu `stop`; ikinci açılışta
@@ -90,12 +91,12 @@ def rota(sunucu):
     """AF2-20: S3 kasırga (96, 0)'dan başlar, oyuncusuz sunucuda (0, 0)'ı izlemeden ara hedeflere yürür."""
     for kare in ROTA_KARE:
         sunucu.komut(f"forceload add {kare}", r"to be force loaded|already marked")
-    isaret = sunucu.isaret()
     sunucu.yaz("### rota adımı başlıyor")
     sunucu.komut("execute positioned 96 ~ 0 run dogalafet start kasirga 3", r"Tornado started")
     sunucu.komut("dogalafet asama ileri", r"Tornado phase:", "rota siren")
     sunucu.komut("dogalafet asama ileri", r"Tornado phase:", "rota aktif")
     uzakliklar = []
+    numaralar = []
     son = time.monotonic() + ROTA_SURE
     while time.monotonic() < son:
         time.sleep(ROTA_ARALIK)
@@ -103,16 +104,16 @@ def rota(sunucu):
         konum = re.search(r"pos \((-?\d+), (-?\d+)\), waypoint \(([-\d]+), ([-\d]+)\) #(\d+)", satir)
         x, z = int(konum.group(1)), int(konum.group(2))
         uzakliklar.append((x * x + z * z) ** 0.5)
+        numaralar.append(int(konum.group(5)))
         sunucu.yaz(f"### rota konum ({x}, {z}), ara hedef ({konum.group(3)}, {konum.group(4)}) #{konum.group(5)}, "
                    f"(0, 0)'a {uzakliklar[-1]:.0f} blok")
     tps_satir = sunucu.komut("forge tps", r"Overall\s*:.*Mean TPS: [0-9.,]+", "rota TPS")
     olcum = re.search(r"Mean TPS: ([0-9.,]+)", tps_satir)
     tps = float(olcum.group(1).replace(",", "."))
-    with sunucu.kilit:
-        satirlar = list(sunucu.satirlar[isaret:])
-    degisim = sum(1 for s in satirlar if re.search(r"\[kasirga\] ara hedef \d+:", s))
+    degisim = max(numaralar) - 1
     ortalama = sum(uzakliklar) / len(uzakliklar)
-    sunucu.yaz(f"### rota: ortalama uzaklık {ortalama:.0f} blok, ara hedef değişimi {degisim}, TPS {tps:.2f}")
+    sunucu.yaz(f"### rota: ortalama uzaklık {ortalama:.0f} blok, ara hedef değişimi {degisim} (#1 → #{max(numaralar)}), "
+               f"TPS {tps:.2f}")
     sunucu.komut("dogalafet stop", r"Tornado stopped\.")
     time.sleep(1)
     sunucu.komut("dogalafet kasirga bilgi", r"No active tornado; " + SIFIR, "rota stop sonrası varlık 0")

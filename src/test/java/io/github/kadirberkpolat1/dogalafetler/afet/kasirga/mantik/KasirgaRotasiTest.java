@@ -43,17 +43,23 @@ class KasirgaRotasiTest {
         }
     }
 
-    /** Tick tick yürüyüş: Kasirga.hareketEt'in eşi (dönüş hızı 1,5°/tick, 40 tick'te bir ±35° sapma, 512 kırpma). */
+    /**
+     * Tick tick yürüyüş: Kasirga.hareketEt'in eşi (dönüş hızı 1,5°/tick, 40 tick'te bir ±35° sapma, yeni ara hedefte yön hemen
+     * ona, 512 kırpma, sınırda zorunlu seçim {@link KasirgaRotasi#zorunluSecimSerbest} ile).
+     */
     private static final class Yuruyus {
         final KasirgaRotasi rota;
         final Random r;
         final List<KasirgaRotasi.Secim> secimler = new ArrayList<>();
+        final List<Integer> secimTick = new ArrayList<>();
+        final List<Integer> zorunluTick = new ArrayList<>();
         double x;
         double z;
         double yon;
         double hedefYon;
         double enUzak;
         int oyuncuUstu;
+        int sinirTick;
 
         Yuruyus(long tohum) {
             r = new Random(tohum);
@@ -62,9 +68,11 @@ class KasirgaRotasiTest {
             rota = KasirgaRotasi.yeni(0, 0, yon, tohum);
         }
 
-        void sec(List<double[]> oyuncular) {
+        void sec(int t, List<double[]> oyuncular) {
             KasirgaRotasi.Secim s = rota.yeniAraHedef(x, z, oyuncular, HEPSI);
             secimler.add(s);
+            secimTick.add(t);
+            hedefYon = Yonelim.sapmaliYon(Yonelim.yon(x, z, s.x(), s.z()), r.nextDouble());
             for (double[] o : oyuncular) {
                 if (Math.hypot(s.x() - o[0], s.z() - o[1]) < KasirgaRotasi.OYUNCUYA_EN_AZ) {
                     oyuncuUstu++;
@@ -73,11 +81,9 @@ class KasirgaRotasiTest {
         }
 
         void tick(int t, List<double[]> oyuncular) {
-            boolean yeni = rota.secimZamani(1, x, z);
-            if (yeni) {
-                sec(oyuncular);
-            }
-            if (yeni || t % Yonelim.SAPMA_ARALIGI_TICK == 0) {
+            if (rota.secimZamani(1, x, z)) {
+                sec(t, oyuncular);
+            } else if (t % Yonelim.SAPMA_ARALIGI_TICK == 0) {
                 hedefYon = Yonelim.sapmaliYon(Yonelim.yon(x, z, rota.hedefX(), rota.hedefZ()), r.nextDouble());
             }
             yon = Yonelim.don(yon, hedefYon);
@@ -93,7 +99,13 @@ class KasirgaRotasiTest {
             z = nz;
             enUzak = Math.max(enUzak, rota.baslangicaUzaklik(x, z));
             if (sinirda) {
-                sec(oyuncular);
+                sinirTick++;
+                if (rota.zorunluSecimSerbest()) {
+                    zorunluTick.add(t);
+                    sec(t, oyuncular);
+                } else {
+                    hedefYon = Yonelim.yon(x, z, rota.hedefX(), rota.hedefZ());
+                }
             }
         }
     }
@@ -133,6 +145,40 @@ class KasirgaRotasiTest {
             toplamSecim += y.secimler.size();
         }
         assertTrue(toplamSecim > 300, "toplam seçim " + toplamSecim);
+    }
+
+    /**
+     * AF2-25 (inceleme Af3): başlangıçtan 512 blokta dışarı bakan kasırga tick başına ara hedef seçmez. İlk 200 tick'te zorunlu
+     * seçim yok (rotanın ilki ve en çok bir varış seçimi), kasırga sınırdan ayrılır (yön eldeki ara hedefe döner); uzun
+     * yürüyüşte iki seçim arası en az 40 tick ve her zorunlu seçim öncekinden en az {@link KasirgaRotasi#ZORUNLU_ARALIK} sonra.
+     */
+    @Test
+    void sinirdaDisariBakanKasirgaTickBasinaSecmezVeIceriDoner() {
+        for (long tohum = 1; tohum <= 6; tohum++) {
+            Yuruyus y = new Yuruyus(tohum);
+            y.x = KasirgaRotasi.EN_COK_UZAKLIK - 0.1;
+            y.yon = 0;
+            y.hedefYon = 0;
+            List<double[]> yok = List.of();
+            for (int t = 0; t < 200; t++) {
+                y.tick(t, yok);
+            }
+            assertTrue(y.sinirTick > 0, "kasırga sınıra hiç değmedi, tohum " + tohum);
+            assertTrue(y.zorunluTick.isEmpty() && y.secimler.size() <= 2,
+                    "ilk 200 tick'te zorunlu seçim olmamalı, tohum " + tohum + ": seçim " + y.secimTick + " zorunlu " + y.zorunluTick);
+            assertTrue(y.sinirTick < 200, "kasırga sınırda takılı kaldı: sınır tick'i " + y.sinirTick + ", tohum " + tohum);
+            for (int t = 200; t < 20 * 60 * 10; t++) {
+                y.tick(t, yok);
+            }
+            for (int i = 1; i < y.secimTick.size(); i++) {
+                int fark = y.secimTick.get(i) - y.secimTick.get(i - 1);
+                assertTrue(fark >= Yonelim.SAPMA_ARALIGI_TICK, "iki seçim arası " + fark + " tick, tohum " + tohum);
+                if (y.zorunluTick.contains(y.secimTick.get(i))) {
+                    assertTrue(fark >= KasirgaRotasi.ZORUNLU_ARALIK, "zorunlu seçim öncekinden " + fark + " tick sonra");
+                }
+            }
+            assertTrue(y.enUzak <= KasirgaRotasi.EN_COK_UZAKLIK + 1e-9, "512 aşıldı: " + y.enUzak);
+        }
     }
 
     @Test

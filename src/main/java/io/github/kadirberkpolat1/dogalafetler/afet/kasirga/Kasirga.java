@@ -77,7 +77,8 @@ public final class Kasirga extends Afet {
     private static final SoundEvent[] ENKAZ_SESLERI = {SoundEvents.WOOD_BREAK, SoundEvents.GRAVEL_BREAK,
         SoundEvents.GLASS_BREAK, SoundEvents.GRASS_BREAK, SoundEvents.WOOD_BREAK};
     private static final double TAM_TUR = Math.PI * 2;
-    private static final int YENIDEN_SECIM_TICK = 20;
+    /** K-E42: ara hedef satırı yalnız görsel otomasyonda ({@code -Potomasyon}); üretimde ve GameTest'te yazılmaz. */
+    private static final boolean OTOMASYON = !System.getProperty("dogalafetler.otomasyon", "").isEmpty();
 
     private Vec3 konum;
     private double yon;
@@ -85,8 +86,6 @@ public final class Kasirga extends Afet {
     /** Doğuşta hedeften kasırgaya yön (ilk bacağın yönü); hedefsiz başlatılan kasırgada NaN. */
     private double ilkYon = Double.NaN;
     private KasirgaRotasi rota;
-    /** Yüklü olmayan adımda son zorunlu ara hedef seçiminin tick'i (en çok {@link #YENIDEN_SECIM_TICK}'te bir). */
-    private int sonZorunluSecim = Integer.MIN_VALUE / 2;
     private long aktifGecen;
     private long toplamKaldirilan;
     private boolean hareketli = true;
@@ -426,22 +425,20 @@ public final class Kasirga extends Afet {
 
     /**
      * Ara hedefe yürür: zamanı gelince ({@link KasirgaRotasi#secimZamani}) yeni ara hedef, her {@link Yonelim#SAPMA_ARALIGI_TICK}
-     * tick'te ara hedefin yönü çevresinde sapmalı yön. Entity-ticking alandan çıkacak adımda kasırga bu tick yerinde kalır ve en
-     * çok {@link #YENIDEN_SECIM_TICK} tick'te bir yeni ara hedef ister (yüklü adaylar önce gelir, kasırga içeri döner). Zaten
-     * yüklü alanın dışındaysa (düşük simülasyon mesafesinde doğuş, kayıttan dönüş) K-01'deki gibi soyut ilerler; yükseklik
-     * yalnız yüklü sütundan okunur. Rota başlangıcından {@link KasirgaRotasi#EN_COK_UZAKLIK} bloktan uzağa çıkan adım sınıra
-     * kırpılır ve yeni ara hedef seçilir.
+     * tick'te ara hedefin yönü çevresinde sapmalı yön. Entity-ticking alandan çıkacak adımda kasırga bu tick yerinde kalır ve
+     * zorunlu yeni ara hedef ister ({@link #zorunluSecim}; yüklü adaylar önce gelir, kasırga içeri döner). Zaten yüklü alanın
+     * dışındaysa (düşük simülasyon mesafesinde doğuş, kayıttan dönüş) K-01'deki gibi soyut ilerler; yükseklik yalnız yüklü
+     * sütundan okunur. Rota başlangıcından {@link KasirgaRotasi#EN_COK_UZAKLIK} bloktan uzağa çıkan adım sınıra kırpılır ve
+     * zorunlu yeni ara hedef istenir.
      */
     private void hareketEt(ServerLevel level, int adim) {
         if (!hareketli || rota == null) {
             return;
         }
         Vec3 k = konum();
-        boolean yeniHedef = rota.secimZamani(adim, k.x, k.z);
-        if (yeniHedef) {
+        if (rota.secimZamani(adim, k.x, k.z)) {
             araHedefSec(level, k);
-        }
-        if (yeniHedef || tick % Yonelim.SAPMA_ARALIGI_TICK == 0) {
+        } else if (tick % Yonelim.SAPMA_ARALIGI_TICK == 0) {
             hedefYon = Yonelim.sapmaliYon(Yonelim.yon(k.x, k.z, rota.hedefX(), rota.hedefZ()), rastgele.nextDouble());
         }
         yon = Yonelim.don(yon, hedefYon);
@@ -458,10 +455,7 @@ public final class Kasirga extends Afet {
         double y = k.y;
         BlockPos sonraki = BlockPos.containing(nx, y, nz);
         if (!level.isPositionEntityTicking(sonraki) && level.isPositionEntityTicking(BlockPos.containing(k))) {
-            if (tick - sonZorunluSecim >= YENIDEN_SECIM_TICK) {
-                sonZorunluSecim = tick;
-                araHedefSec(level, k);
-            }
+            zorunluSecim(level, k);
             return;
         }
         if (level.isLoaded(sonraki)) {
@@ -470,11 +464,26 @@ public final class Kasirga extends Afet {
         }
         konum = new Vec3(nx, y, nz);
         if (sinirda) {
-            araHedefSec(level, konum);
+            zorunluSecim(level, konum);
         }
     }
 
-    /** Yeni ara hedef: oyuncular (izleyici olmayan, canlı) ve entity-ticking yüklülük rotaya verilir; radar ve log'a bildirilir. */
+    /**
+     * Sınırda ya da yüklü alan kenarında (AF2-25): son seçimden {@link KasirgaRotasi#ZORUNLU_ARALIK} geçtiyse yeni ara hedef;
+     * geçmediyse sapmasız eldeki ara hedefe döner (yön dışarıyı göstermeye devam etmesin, tick başına seçim olmasın).
+     */
+    private void zorunluSecim(ServerLevel level, Vec3 k) {
+        if (rota.zorunluSecimSerbest()) {
+            araHedefSec(level, k);
+        } else {
+            hedefYon = Yonelim.yon(k.x, k.z, rota.hedefX(), rota.hedefZ());
+        }
+    }
+
+    /**
+     * Yeni ara hedef: oyuncular (izleyici olmayan, canlı) ve entity-ticking yüklülük rotaya verilir; yön hemen yeni ara hedefe
+     * çevrilir (sapmalı), radara bildirilir.
+     */
     private void araHedefSec(ServerLevel level, Vec3 k) {
         List<double[]> oyuncular = new ArrayList<>();
         for (ServerPlayer p : level.players()) {
@@ -484,9 +493,13 @@ public final class Kasirga extends Afet {
         }
         KasirgaRotasi.Secim s = rota.yeniAraHedef(k.x, k.z, oyuncular,
                 (x, z) -> level.isPositionEntityTicking(BlockPos.containing(x, k.y, z)));
+        hedefYon = Yonelim.sapmaliYon(Yonelim.yon(k.x, k.z, s.x(), s.z()), rastgele.nextDouble());
         yolHedefiAyarla(s.x(), s.z());
-        DogalAfetler.LOGGER.info("[kasirga] ara hedef {}: ({}, {}) tür {}{}, uzaklık {}, başlangıca {}", s.no(), Math.round(s.x()),
-                Math.round(s.z()), s.tur(), s.donus() ? " dönüş" : "", Math.round(s.uzaklik()), Math.round(s.baslangicaUzaklik()));
+        if (OTOMASYON) {
+            DogalAfetler.LOGGER.info("[kasirga] ara hedef {}: ({}, {}) tür {}{}, uzaklık {}, başlangıca {}", s.no(),
+                    Math.round(s.x()), Math.round(s.z()), s.tur(), s.donus() ? " dönüş" : "", Math.round(s.uzaklik()),
+                    Math.round(s.baslangicaUzaklik()));
+        }
     }
 
     /**
