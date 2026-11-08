@@ -3,9 +3,11 @@ package io.github.kadirberkpolat1.dogalafetler.sicaklik;
 import com.mojang.authlib.GameProfile;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.core.CekirdekOyunTestleri;
+import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.PulsarKayitlari;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Esikler;
+import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Islaklik;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Katki;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.SicaklikDurumu;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.SolEl;
@@ -17,6 +19,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.particles.ParticleType;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -45,6 +48,7 @@ import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.common.ForgeHooks;
 import net.minecraftforge.event.server.ServerStartedEvent;
@@ -678,5 +682,101 @@ public final class SicaklikOyunTestleri {
         } finally {
             cikar(y, hepsi);
         }
+    }
+
+    /**
+     * S3-03: açık havada yağmur ıslatır ve yağış kalemini verir; cam çatı altında gök ışığı geçse de oyuncu ıslanmaz,
+     * kurur ve yağış soğuması yoktur (çatı altı "su almayan yer").
+     */
+    @GameTest(template = "bos", batch = "sicaklik_yagmur")
+    public static void yagmurAcikHavadaIslatirCamCatiAltindaKurur(GameTestHelper y) {
+        ServerLevel level = y.getLevel();
+        kuraliAc(level.getServer());
+        ServerPlayer acik = oyuncu(y, "yagmur-acik", 0);
+        ServerPlayer catili = oyuncu(y, "yagmur-catili", 4);
+        BlockPos cam = BlockPos.containing(catili.getEyePosition()).above(2);
+        try {
+            level.setWeatherParameters(0, 6000, true, false);
+            level.setRainLevel(1f);
+            level.setThunderLevel(0f);
+            level.setBlockAndUpdate(cam, Blocks.GLASS.defaultBlockState());
+            dogrula(y, level.isRainingAt(BlockPos.containing(acik.getEyePosition())),
+                    "sahne: açık oyuncunun başına yağmur yağmalı");
+            dogrula(y, level.canSeeSky(BlockPos.containing(catili.getEyePosition())),
+                    "sahne: cam gök ışığını geçirmeli");
+            SicaklikAyarlari.Ozet ozet = SicaklikAyarlari.al();
+            dogrula(y, OrtamOlcer.islaklikKaynagi(acik, OrtamOlcer.girdi(acik, ozet)) == Islaklik.Kaynak.YAGMUR,
+                    "açık havada ıslatma kaynağı yağmur olmalı");
+            dogrula(y, OrtamOlcer.islaklikKaynagi(catili, OrtamOlcer.girdi(catili, ozet)) == Islaklik.Kaynak.KURU,
+                    "cam çatı altında ıslatma olmamalı");
+            VucutSicakligi.islaklikAyarla(catili, 0.5);
+            SicaklikYoneticisi.guncelle(acik, 20);
+            SicaklikYoneticisi.guncelle(catili, 20);
+            dogrula(y, VucutSicakligi.islaklik(acik) > 0, "açık havada yağmurda ıslanmalı");
+            dogrula(y, VucutSicakligi.islaklik(catili) < 0.5, "cam çatı altında kurumalı: " + VucutSicakligi.islaklik(catili));
+            double acikYagis = SicaklikYoneticisi.analiz(acik).mekan().katki(Katki.YAGIS);
+            double catiliYagis = SicaklikYoneticisi.analiz(catili).mekan().katki(Katki.YAGIS);
+            dogrula(y, acikYagis < 0, "açık havada yağmur soğutmalı: " + acikYagis);
+            dogrula(y, catiliYagis == 0, "cam çatı altında yağmur soğutmamalı: " + catiliYagis);
+            y.succeed();
+        } finally {
+            level.setBlockAndUpdate(cam, Blocks.AIR.defaultBlockState());
+            level.setWeatherParameters(6000, 0, false, false);
+            level.setRainLevel(0f);
+            cikar(y, List.of(acik, catili));
+        }
+    }
+
+    /**
+     * S3-04, S-08 rev.: üşüyenin ağız buharı ve bunalanın teri yanındakine gider, kendisine gitmez; üst dünyada dünya
+     * donması sürerken buhar gönderilmez (donmanın nefesiyle çift buhar olmasın).
+     */
+    @GameTest(template = "bos", batch = "sicaklik_parcacik")
+    public static void nefesVeTerYanindakineGiderKendisineGitmez(GameTestHelper y) {
+        ServerLevel level = y.getLevel();
+        kuraliAc(level.getServer());
+        DunyaDonemi d = DunyaDonemi.al(level);
+        float donma = d.donmaIlerlemesi();
+        ServerPlayer usuyen = oyuncu(y, "parcacik-usuyen", 0);
+        ServerPlayer bunalan = oyuncu(y, "parcacik-bunalan", 1);
+        ServerPlayer izleyen = oyuncu(y, "parcacik-gozcu", 3);
+        List<ServerPlayer> hepsi = List.of(usuyen, bunalan, izleyen);
+        try {
+            level.setWeatherParameters(6000, 0, false, false);
+            level.setRainLevel(0f);
+            d.donmaIlerlemesiAyarla(0f);
+            VucutSicakligi.yaz(usuyen, VucutOlcegi.birim(35.4));
+            VucutSicakligi.yaz(bunalan, VucutOlcegi.birim(38.8));
+            VucutSicakligi.yaz(izleyen, 0);
+            for (ServerPlayer o : hepsi) {
+                parcacikPaketleri(o);
+            }
+            for (int i = 0; i < 3; i++) {
+                SicaklikYoneticisi.guncelle(usuyen, 20);
+                SicaklikYoneticisi.guncelle(bunalan, 20);
+            }
+            long kendiBuhari = parcacikSayisi(parcacikPaketleri(usuyen), SicaklikParcaciklari.NEFES_BUHARI.get());
+            long kendiTeri = parcacikSayisi(parcacikPaketleri(bunalan), SicaklikParcaciklari.TER_DAMLASI.get());
+            List<ClientboundLevelParticlesPacket> gorulen = parcacikPaketleri(izleyen);
+            dogrula(y, kendiBuhari == 0 && kendiTeri == 0, "kendi buhar/ter paketi gitti: " + kendiBuhari + "/" + kendiTeri);
+            dogrula(y, parcacikSayisi(gorulen, SicaklikParcaciklari.NEFES_BUHARI.get()) >= 1,
+                    "yanındakine üşüme buharı gitmedi (vücut " + VucutSicakligi.al(usuyen) + ")");
+            dogrula(y, parcacikSayisi(gorulen, SicaklikParcaciklari.TER_DAMLASI.get()) >= 1,
+                    "yanındakine bunalma teri gitmedi (vücut " + VucutSicakligi.al(bunalan) + ")");
+            d.donmaIlerlemesiAyarla(20f);
+            for (int i = 0; i < 3; i++) {
+                SicaklikYoneticisi.guncelle(usuyen, 20);
+            }
+            long donmadaBuhar = parcacikSayisi(parcacikPaketleri(izleyen), SicaklikParcaciklari.NEFES_BUHARI.get());
+            dogrula(y, donmadaBuhar == 0, "dünya donması sürerken buhar gönderildi: " + donmadaBuhar);
+            y.succeed();
+        } finally {
+            d.donmaIlerlemesiAyarla(donma);
+            cikar(y, hepsi);
+        }
+    }
+
+    private static long parcacikSayisi(List<ClientboundLevelParticlesPacket> paketler, ParticleType<?> tur) {
+        return paketler.stream().filter(p -> p.getParticle().getType() == tur).count();
     }
 }

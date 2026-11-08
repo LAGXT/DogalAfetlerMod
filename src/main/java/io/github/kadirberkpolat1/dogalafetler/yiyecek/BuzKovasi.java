@@ -33,6 +33,12 @@ public final class BuzKovasi extends Item {
         return Math.max(0, Math.min(1, etiket.getDouble(SicaklikYoneticisi.ERIME_ETIKETI) / Hissedilen.ERIME_SINIRI));
     }
 
+    /** Erime NBT'si saniyede bir yazılır; sol eldeki kova her seferinde aşağı inip kalkmasın. */
+    @Override
+    public boolean shouldCauseReequipAnimation(ItemStack eski, ItemStack yeni, boolean yuvaDegisti) {
+        return yuvaDegisti || !yeni.is(eski.getItem());
+    }
+
     @Override
     public void appendHoverText(ItemStack yigin, @Nullable Level level, List<Component> satirlar, TooltipFlag bayrak) {
         satirlar.add(Component.translatable("tooltip.dogalafetler.buz_kovasi").withStyle(ChatFormatting.AQUA));

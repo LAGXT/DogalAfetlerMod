@@ -113,20 +113,30 @@ public final class SicaklikAyarlari {
             for (String satir : a.kaynaklar.get()) {
                 liste.add(KaynakTanimi.coz(satir));
             }
-            try {
-                o = new Ozet(kur(IsiAlisverisi.Ayarlar.class, a.isi), kur(Yalitim.Ayarlar.class, a.yalitim),
-                        kur(Esikler.class, a.esikler), kur(OrtamSicakligi.Ayarlar.class, a.ortam),
-                        kur(Islaklik.Ayarlar.class, a.islaklik), kur(Hissedilen.Ayarlar.class, a.hissedilen),
-                        List.copyOf(liste));
-            } catch (IllegalStateException hata) {
-                DogalAfetler.LOGGER.error("Sıcaklık config'i geçersiz, varsayılanlar kullanılıyor: {}", hata.getMessage());
-                o = new Ozet(IsiAlisverisi.Ayarlar.VARSAYILAN, Yalitim.Ayarlar.VARSAYILAN, Esikler.VARSAYILAN,
-                        OrtamSicakligi.Ayarlar.VARSAYILAN, Islaklik.Ayarlar.VARSAYILAN, Hissedilen.Ayarlar.VARSAYILAN,
-                        List.copyOf(liste));
-            }
+            o = new Ozet(kurYaDa(IsiAlisverisi.Ayarlar.class, a.isi, IsiAlisverisi.Ayarlar.VARSAYILAN),
+                    kurYaDa(Yalitim.Ayarlar.class, a.yalitim, Yalitim.Ayarlar.VARSAYILAN),
+                    kurYaDa(Esikler.class, a.esikler, Esikler.VARSAYILAN),
+                    kurYaDa(OrtamSicakligi.Ayarlar.class, a.ortam, OrtamSicakligi.Ayarlar.VARSAYILAN),
+                    kurYaDa(Islaklik.Ayarlar.class, a.islaklik, Islaklik.Ayarlar.VARSAYILAN),
+                    kurYaDa(Hissedilen.Ayarlar.class, a.hissedilen, Hissedilen.Ayarlar.VARSAYILAN), List.copyOf(liste));
             ozet = o;
         }
         return o;
+    }
+
+    /**
+     * Bir bölümü kurar; değerleri geçersizse (ör. elle değiştirilmiş bir eşiğin göçle gelen komşusuyla sırasının bozulması)
+     * yalnız o bölüm varsayılana döner, öteki bölümlerin elle girilmiş değerleri korunur.
+     */
+    private static <R extends Record> R kurYaDa(Class<R> tur, Map<String, ForgeConfigSpec.DoubleValue> degerler,
+            R varsayilan) {
+        try {
+            return kur(tur, degerler);
+        } catch (IllegalStateException hata) {
+            DogalAfetler.LOGGER.error("Sıcaklık config'inin {} bölümü geçersiz, bu bölüm için varsayılanlar kullanılıyor: {}",
+                    tur.getSimpleName(), hata.getMessage());
+            return varsayilan;
+        }
     }
 
     public static int guncellemeAraligiTick() {

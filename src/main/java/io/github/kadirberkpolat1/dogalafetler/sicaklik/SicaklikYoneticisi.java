@@ -31,6 +31,7 @@ import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
@@ -251,13 +252,14 @@ public final class SicaklikYoneticisi {
 
     /**
      * Diğer oyunculara durum parçacıkları (S-08 rev.: kendisine gitmez, üçüncü şahısta istemci kendisi üretir): üşüme ve
-     * donmada 2–3 güncellemede bir ağızdan nefes buharı (dünya donması sürerken onun nefesi zaten çizilir), bunalma ve
-     * yanmada baş/omuz çevresinde ter damlası, ıslakken damlayan su.
+     * donmada 2–3 güncellemede bir ağızdan nefes buharı (üst dünyada dünya donması sürerken onun nefesi zaten
+     * çizilir), bunalma ve yanmada baş/omuz çevresinde ter damlası, ıslakken damlayan su.
      */
     private static void parcaciklariGonder(ServerPlayer oyuncu, Gecici g, SicaklikDurumu durum, double islaklik) {
         ServerLevel level = oyuncu.serverLevel();
         boolean buhar = false;
-        if (durum.soguk() && DunyaDonemi.al(level).donmaIlerlemesi() <= 0) {
+        boolean donmaNefesi = level.dimension() == Level.OVERWORLD && DunyaDonemi.al(level).donmaIlerlemesi() > 0;
+        if (durum.soguk() && !donmaNefesi) {
             g.buharSayaci++;
             if (g.buharSayaci >= 2 + oyuncu.getRandom().nextInt(2)) {
                 g.buharSayaci = 0;

@@ -88,8 +88,13 @@ public final class OrtamOlcer {
         return Boyut.NORMAL;
     }
 
+    /**
+     * Göz hizasına düşen yağış. Gök ışığı camdan geçtiği için {@code gokyuzu} tek başına yetmez: vanilla
+     * {@code isRainingAt} gibi hareket engelleyen en üst blok da gözün üstünde olmamalı (cam çatı altı kuru kalır).
+     */
     private static Yagis yagis(ServerLevel level, Biome biyom, BlockPos goz, boolean gokyuzu) {
-        if (!level.isRaining() || !gokyuzu || level.dimensionType().hasCeiling()) {
+        if (!level.isRaining() || !gokyuzu || level.dimensionType().hasCeiling()
+                || level.getHeightmapPos(Heightmap.Types.MOTION_BLOCKING, goz).getY() > goz.getY()) {
             return Yagis.YOK;
         }
         return switch (biyom.getPrecipitationAt(goz)) {
