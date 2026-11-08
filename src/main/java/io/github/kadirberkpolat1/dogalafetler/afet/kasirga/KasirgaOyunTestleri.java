@@ -86,6 +86,11 @@ public final class KasirgaOyunTestleri {
         OyunTestiTemizligi.batchSonu(level);
     }
 
+    @AfterBatch(batch = "kasirga_cekim_bolgesi")
+    public static void cekimBolgesiSonrasi(ServerLevel level) {
+        OyunTestiTemizligi.batchSonu(level);
+    }
+
     @AfterBatch(batch = "kasirga_dogal")
     public static void dogalSonrasi(ServerLevel level) {
         OyunTestiTemizligi.batchSonu(level);
@@ -453,6 +458,59 @@ public final class KasirgaOyunTestleri {
                 dogrula(y, !domuz.isAlive() || domuz.getHealth() < domuz.getMaxHealth(), "domuz hasar almadı");
             } finally {
                 domuz.discard();
+                bitir(y, onceki);
+            }
+            y.succeed();
+        });
+    }
+
+    /**
+     * Tur 3 (AF3-01, AF3-02): çekim bölgesindeki mob (S2, merkezden 14 blok; yapay zekâsız, hasarsız) çekirdeğe çekilir ve
+     * çekirdekten dışarı savrulmaz. Aynı bölgedeki hayatta kalma oyuncusunun hızına sunucu dokunmaz: oyuncunun çekimi
+     * kendi istemcisinde uygulanır (sahte oyuncunun istemcisi yok, yatay hızı sıfır kalır; eski kod iki tick'te bir yazardı).
+     */
+    @GameTest(template = SAHNE, batch = "kasirga_cekim_bolgesi", timeoutTicks = 200)
+    public static void cekimBolgesindekiMobCekirdegeCekilirSavrulmaz(GameTestHelper y) {
+        zemin(y, false);
+        boolean onceki = blokHasari(y, false);
+        Pig domuz = y.spawn(EntityType.PIG, new BlockPos(30, 2, 16));
+        domuz.setNoAi(true);
+        domuz.setInvulnerable(true);
+        BlockPos m = y.absolutePos(MERKEZ);
+        ServerPlayer oyuncu = CekirdekOyunTestleri.sahteOyuncu(y, new GameProfile(UUID.randomUUID(), "kasirga-cekim"),
+                m.getX() - 10.5, m.getY() - 1, m.getZ() + 0.5);
+        oyuncu.setGameMode(GameType.SURVIVAL);
+        Kasirga kasirga = baslat(y, 2, false, KasirgaEvresi.OLGUN);
+        double cekirdek = kasirga.seviyeBilgisi().tabanYaricapi();
+        double baslangic = Math.hypot(domuz.getX() - kasirga.konum().x, domuz.getZ() - kasirga.konum().z);
+        int[] giris = {-1};
+        int[] tick = {0};
+        double[] enUzak = {0};
+        double[] oyuncuHizi = {0};
+        y.onEachTick(() -> {
+            tick[0]++;
+            double d = Math.hypot(domuz.getX() - kasirga.konum().x, domuz.getZ() - kasirga.konum().z);
+            if (giris[0] < 0 && d < cekirdek) {
+                giris[0] = tick[0];
+            }
+            if (giris[0] >= 0) {
+                enUzak[0] = Math.max(enUzak[0], d);
+            }
+            Vec3 v = oyuncu.getDeltaMovement();
+            oyuncuHizi[0] = Math.max(oyuncuHizi[0], Math.hypot(v.x, v.z));
+        });
+        y.runAfterDelay(100, () -> {
+            try {
+                double son = Math.hypot(domuz.getX() - kasirga.konum().x, domuz.getZ() - kasirga.konum().z);
+                dogrula(y, baslangic > cekirdek + 4, "domuz çekim bölgesinde başlamalı: " + baslangic);
+                dogrula(y, giris[0] >= 0 && giris[0] <= 80, "domuz 80 tick'te çekirdeğe girmedi (giriş " + giris[0] + ", son "
+                        + son + ")");
+                dogrula(y, enUzak[0] < cekirdek + 0.5, "domuz çekirdekten savruldu: en uzak " + enUzak[0] + " / " + cekirdek);
+                dogrula(y, son < cekirdek, "domuz çekirdekte kalmadı: " + son);
+                dogrula(y, oyuncuHizi[0] < 1e-9, "sunucu oyuncunun yatay hızını yazdı: " + oyuncuHizi[0]);
+            } finally {
+                domuz.discard();
+                y.getLevel().getServer().getPlayerList().remove(oyuncu);
                 bitir(y, onceki);
             }
             y.succeed();

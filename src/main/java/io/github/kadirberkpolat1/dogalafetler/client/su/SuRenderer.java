@@ -1137,6 +1137,23 @@ public final class SuRenderer {
         return !uzakBos && uzakCizilenUst.containsKey(a) ? uzakCizilenUst.get(a) : Double.NaN;
     }
 
+    /** {@code (x, z)} sütunu bu karede çizilen yakın tamponun içinde mi (su çizilsin çizilmesin); yakın tampon yoksa hayır. */
+    public static boolean yakinKapsar(int x, int z) {
+        return !yakinBos && komsu(x - (cizOx - YAKIN), z - (cizOz - YAKIN)) >= 0;
+    }
+
+    /**
+     * Yalnız çizilen yakın tamponun {@code (x, z)}'deki sanal su üstü (dalgacıksız; TUR 1 ve 2): kapsamıyorsa, sütun kuruysa,
+     * yalnız gerçek suyun yan yüzü ya da çekilmede açığa çıkan dip çiziliyorsa NaN. Uzak LOD'a düşmez ({@link #cizilenUst}).
+     */
+    public static double yakinSuUstu(int x, int z) {
+        if (yakinBos) {
+            return Double.NaN;
+        }
+        int k = komsu(x - (cizOx - YAKIN), z - (cizOz - YAKIN));
+        return k >= 0 && (CIZ_TUR[k] == 1 || CIZ_TUR[k] == 2) ? CIZ_UST[k] : Double.NaN;
+    }
+
     /**
      * Yalnız otomasyon: çizilen yakın ağın yaşı (yapımının başladığı tick'ten bu yana) ve önceki yüklenen yapımın
      * başlangıcından bununkine geçen tick (ağ yenileme aralığı); yakın ağ yoksa {@code -}.

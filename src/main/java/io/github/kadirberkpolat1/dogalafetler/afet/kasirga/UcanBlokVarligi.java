@@ -85,7 +85,7 @@ public class UcanBlokVarligi extends Entity {
         blok.yaricap = yaricap;
         blok.yukseklik = yukseklik;
         KasirgaSeviyesi s = sahip.seviyeBilgisi();
-        blok.hedefYukseklik = Math.min(25 + level.getRandom().nextDouble() * 35, s.yukseklik() * 0.6);
+        blok.hedefYukseklik = s.ucusYuksekligi(level.getRandom().nextDouble());
         blok.dikeyHiz = 3 + level.getRandom().nextDouble() * 4;
         blok.konumla();
         return blok;

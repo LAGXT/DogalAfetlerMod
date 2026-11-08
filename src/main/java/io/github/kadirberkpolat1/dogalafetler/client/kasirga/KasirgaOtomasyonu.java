@@ -98,6 +98,8 @@ public final class KasirgaOtomasyonu {
     private static final Kamera IC = new Kamera(5, 3, -25);
     /** Huni kenarı 64 bloktan uzakta (kasırga sisi yok); taban rengi ölçümü (K-17). */
     private static final Kamera UZAK = new Kamera(90, 10, -6);
+    /** S5 hunisinin tamamı (144 blok, AF3-05 güç–boy orantısı): 70° dikey görüşte zeminden tepeye. */
+    private static final Kamera TAM_BOY = new Kamera(150, 24, -10);
 
     /** {@code bekle} tick sonra (ve istenen kare alınmışsa) {@code kosul} doğruysa {@code is} çalışır; {@code enCok} tick sonra zorla. */
     private record Adim(String ad, int bekle, BooleanSupplier kosul, int enCok, Runnable is) {
@@ -429,6 +431,8 @@ public final class KasirgaOtomasyonu {
         adim("kontrol karesi", 10, () -> kare("s5_vitrin_kontrol"));
         adim("kontrol bitti", 5, () -> yalnizTozGizle(false));
         adim("vitrin karesi b", 60, () -> kare("s5_vitrin_b"));
+        adim("tam boy kamerası", 10, () -> kamera(server, TAM_BOY));
+        adim("tam boy karesi", 30, () -> kare("s5_tam_boy"));
         adim("uzak taban kamerası", 10, () -> kamera(server, UZAK));
         adim("uzak taban karesi", 30, () -> kare("s5_taban_uzak"));
         adim("uzak kontrol", 5, () -> yalnizTozGizle(true));

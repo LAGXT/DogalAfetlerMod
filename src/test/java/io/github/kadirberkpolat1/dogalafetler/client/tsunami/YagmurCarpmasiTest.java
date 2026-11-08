@@ -66,4 +66,37 @@ class YagmurCarpmasiTest {
         assertFalse(YagmurCarpmasi.sanalUcDestekli(64.0, 66.0, 0.125), "dalga cephesinden havaya taşar");
         assertFalse(YagmurCarpmasi.sanalUcDestekli(Double.NaN, 66.0, 0.125), "uçta çizilen su yok (kıyı, gerçek su)");
     }
+
+    @Test
+    void omruDolanAltSiniriGecenVeYuklenmemisChunktakiDamlaSilinir() {
+        assertFalse(YagmurCarpmasi.damlaBitti(10, 80, 70.0, 24.0, true), "yüklü chunk'ta düşen damla");
+        assertTrue(YagmurCarpmasi.damlaBitti(10, 80, 70.0, 24.0, false), "yüklenmemiş chunk: hiç çarpmaz, yuvayı tutardı");
+        assertTrue(YagmurCarpmasi.damlaBitti(80, 80, 70.0, 24.0, true), "ömrü doldu");
+        assertTrue(YagmurCarpmasi.damlaBitti(10, 80, 23.9, 24.0, true), "kameranın alt sınırını geçti");
+        assertTrue(YagmurCarpmasi.damlaBitti(10, 80, -64.5, -64.0, true), "dünya tabanının altında (boşluk sütunu)");
+    }
+
+    @Test
+    void tepesiDamlaninUstundekiSutunaGirenDamlaYandanGirmistir() {
+        assertTrue(YagmurCarpmasi.yandanGirdi(70, 66.5), "saçağın altına yandan: tepe 3,5 blok yukarıda");
+        assertTrue(YagmurCarpmasi.yandanGirdi(68, 66.9), "tek bloklu çatının hemen altı");
+        assertFalse(YagmurCarpmasi.yandanGirdi(64, 64.5), "zemine üstten iniyor");
+        assertFalse(YagmurCarpmasi.yandanGirdi(63, 62.95), "gerçek suyun (tepe 63, yüzey 62,89) üstünde");
+        assertFalse(YagmurCarpmasi.yandanGirdi(65, 64.6), "yarım bloğun (yüzey 64,5) üstünde");
+    }
+
+    @Test
+    void kuruluHalkaninZeminiGidinceSoner() {
+        assertTrue(YagmurCarpmasi.zeminAyni(64.0, 64.0, 0.125), "zemin yerinde");
+        assertFalse(YagmurCarpmasi.zeminAyni(Double.NaN, 64.0, 0.125), "blok yıkıldı");
+        assertFalse(YagmurCarpmasi.zeminAyni(63.5, 64.0, 0.125), "blok yarım bloka döndü");
+        assertFalse(YagmurCarpmasi.zeminAyni(YagmurCarpmasi.GIZLI, 64.0, 0.125), "üst yüzü çizilmeyen su");
+    }
+
+    @Test
+    void gorunmezBlokHalkaYuzeyiDegil() {
+        assertTrue(YagmurCarpmasi.blokYuzeyi(true, true), "çizilen katı blok");
+        assertFalse(YagmurCarpmasi.blokYuzeyi(false, true), "bariyer: çarpışır ama çizilmez");
+        assertFalse(YagmurCarpmasi.blokYuzeyi(true, false), "çiçek, uzun ot");
+    }
 }

@@ -1,11 +1,16 @@
 package io.github.kadirberkpolat1.dogalafetler.afet.kasirga;
 
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.Carpanlar;
+import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.KasirgaAyarGocu;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.KasirgaKaliteButcesi;
+import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.KasirgaSeviyesi;
 import io.github.kadirberkpolat1.dogalafetler.config.AyarKaydi;
 import net.minecraftforge.common.ForgeConfigSpec;
 
-/** {@code kasirga} bölümleri: oynanış SERVER, görsel CLIENT (madde 1, 10, N13, N17; spike K0-33). */
+/**
+ * {@code kasirga} bölümleri: oynanış SERVER, görsel CLIENT (madde 1, 10, N13, N17; spike K0-33). Değişen varsayılanlar
+ * {@link KasirgaAyarGocu} ile göç eder (K-E61).
+ */
 public final class KasirgaAyarlari {
     private static AyarKaydi.Bolum<Sunucu> sunucu;
     private static AyarKaydi.Bolum<Istemci> istemci;
@@ -15,6 +20,7 @@ public final class KasirgaAyarlari {
 
     static void kaydet() {
         sunucu = AyarKaydi.sunucuBolumu("kasirga", "Kasırga (bölüm A, madde 10)", Sunucu::new);
+        AyarKaydi.sunucuGocu(KasirgaAyarGocu.PLAN);
         istemci = AyarKaydi.istemciBolumu("kasirga", "Kasırga efektleri (madde 1, N13)", Istemci::new);
     }
 
@@ -23,7 +29,7 @@ public final class KasirgaAyarlari {
         return sunucu.get().ucanBlokTavani.get();
     }
 
-    /** Kaldırılan oyuncu ve mob kasırga zemininden en çok bu kadar yükselir. */
+    /** Boyut çarpanı 1'deki S5 kasırgasının kaldırma tavanı (blok); diğer seviyeler yükseklikle orantılı ({@link KasirgaSeviyesi#kaldirmaTavani}). */
     public static double kaldirmaTavani() {
         return sunucu.get().kaldirmaTavani.get();
     }
@@ -68,18 +74,23 @@ public final class KasirgaAyarlari {
             ucanBlokTavani = k.comment("Kasırga başına aynı anda havada en çok gerçek uçan blok (K0-33: en çok 40). Tavan doluyken",
                     "koparılan blok parçalanır: tick başına denemenin en çok dörtte biri, yalnız 1/16'sı eşya düşürür.")
                     .defineInRange("ucanBlokTavani", 40, 0, 40);
-            kaldirmaTavani = k.comment("Kaldırılan oyuncu ve mob kasırga zemininden en çok bu kadar yükselir (blok); düşme hasarı vanilla.")
-                    .defineInRange("kaldirmaTavani", 25.0, 0.0, 64.0);
+            kaldirmaTavani = k.comment("Kaldırılan oyuncu ve mobun kasırga zemininden en çok yükseldiği yükseklik (blok), boyut çarpanı 1'deki",
+                    "S5 için (huni yüksekliğinin dörtte biri); diğer seviyeler ve boyut çarpanı huni yüksekliğiyle orantılı (S1 7,5,",
+                    "S3 18). Kaldırma sürerken düşme sayılmaz; kaldırma bitince düşme hasarı vanilla.")
+                    .defineInRange("kaldirmaTavani", KasirgaSeviyesi.S5_KALDIRMA_TAVANI, 0.0, 64.0);
             boyut = k.comment("Seviye tablosu çarpanı: huni çapı/yüksekliği, etek ve çekim yarıçapı (madde 10).")
                     .defineInRange("boyutCarpani", 1.0, 0.25, 3.0);
             hiz = k.comment("Seviye tablosu çarpanı: hareket hızı (S1 2,0 → S5 4,4 blok/sn).").defineInRange("hizCarpani", 1.0, 0.0, 4.0);
             sure = k.comment("Seviye tablosu çarpanı: olgun evre süresi (S1 60 → S5 180 sn).").defineInRange("sureCarpani", 1.0, 0.1, 10.0);
             cekim = k.comment("Seviye tablosu çarpanı: oyuncu, mob ve eşyalara uygulanan çekim/kaldırma kuvveti (0 kapalı).")
                     .defineInRange("cekimCarpani", 1.0, 0.0, 4.0);
-            blok = k.comment("Seviye tablosu çarpanı: tick başına blok kaldırma (S1 2 → S5 20; TPS kısmasıyla ayrıca çarpılır).")
+            blok = k.comment("Seviye tablosu çarpanı: tick başına blok kaldırma (S1 2 → S5 32; TPS kısmasıyla ayrıca çarpılır).")
                     .defineInRange("blokCarpani", 1.0, 0.0, 4.0);
-            hasar = k.comment("Seviye tablosu çarpanı: huni çekirdeğinin hasarı (S1 1 → S5 4 can/sn) ve enkaz çarpması.")
+            hasar = k.comment("Seviye tablosu çarpanı: huni çekirdeğinin hasarı (S1 1 → S5 6 can/sn) ve enkaz çarpması.")
                     .defineInRange("hasarCarpani", 1.0, 0.0, 10.0);
+            k.comment("Config göçünün sürümü (K-E61): dosya bundan eskiyse açılışta eski varsayılanında kalan kasırga değerleri "
+                    + "yeni varsayılana çekilir, elle değiştirilenlere dokunulmaz. Elle değiştirmeyin.")
+                    .defineInRange("ayarSurumu", KasirgaAyarGocu.GUNCEL, 0, Integer.MAX_VALUE);
         }
     }
 

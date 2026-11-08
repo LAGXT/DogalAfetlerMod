@@ -18,6 +18,7 @@ Kullanım (worktree kökünden): python3 tools/senaryo/tsunami_gorsel.py <kanıt
 `kopuk` (hepsi'de de): Ts2-1 kabul karesi, ayrı S5 koşusunda köpük yakından ve alçaktan (göz tepenin 1,5 blok üstünde, 10° aşağı, cepheye 8–12 blok;
 `tsunami-s5-kopuk-yakin.png` Yüksek, `-yakin-dusuk.png` Düşük; `KAMERA kopuk` ve `DALGA` satırları özette). Ts7 kameraları değişmez.
 Çıkış: 0 geçerli koşu, 1 protokol ihlali/iptal, 2 istemci hatası. FPS pencereleri varsa sonda `TABLO` satırları (Ts1 kabulü, tur 4).
+`KARE` satırlarındaki serpinti/köpük konum sayıları sonda `SERPINTI` satırlarında (kabul: havada, blok içinde, çizimsiz su üstü 0).
 """
 import os
 import re
@@ -152,6 +153,35 @@ def fps_tablosu(metin, log):
     return hepsi_gecerli, hepsi_gecti
 
 
+def serpinti_ozeti(metin, log):
+    """Serpinti ve köpük kabulü: her `KARE` satırında `serpinti_dogan` (son KARE'den beri doğan dalga serpintisi parçacığı),
+    `kopuk_nokta` (karenin köpük noktası) ve bunların son konumuna göre `serpinti_havada` (görünen su üstünden
+    `SerpintiKarari.HAVA_PAYI` = 0,5 bloktan yüksekte ya da altında su yok), `serpinti_blok_icinde` (blok çarpışma şeklinin içinde),
+    `serpinti_cizimsiz_su` (yakın su ağı noktayı kapsıyor ama orada su çizilmiyor); sınıflama istemcide
+    (`SerpintiNoktasi.olcut`). Kabul: üç toplamın hepsi 0 (pay Java'daki HAVA_PAYI'nda, burada sayılar tam). Sonuç: geçti
+    (bool) ya da satır yoksa None."""
+    anahtar = ("havada", "blok_icinde", "cizimsiz_su")
+    toplam = dict.fromkeys(anahtar, 0)
+    dogan = kopuk = kare = 0
+    for m in re.finditer(r"TSUNAMI-OTOMASYON KARE (\S+) .*?serpinti_dogan=(\d+) kopuk_nokta=(\d+) serpinti_havada=(\d+) "
+                         r"serpinti_blok_icinde=(\d+) serpinti_cizimsiz_su=(\d+)", metin):
+        kare += 1
+        dogan += int(m.group(2))
+        kopuk += int(m.group(3))
+        sayi = dict(zip(anahtar, (int(m.group(i)) for i in (4, 5, 6))))
+        for k, v in sayi.items():
+            toplam[k] += v
+        if any(sayi.values()):
+            log(f"SERPINTI {m.group(1)} " + " ".join(f"{k}={v}" for k, v in sayi.items()))
+    if not kare:
+        log("SERPINTI ozet: KARE satırlarında serpinti sayısı yok")
+        return None
+    gecti = not any(toplam.values())
+    log(f"SERPINTI ozet: kare={kare} serpinti_dogan={dogan} kopuk_nokta={kopuk} "
+        + " ".join(f"{k}={v}" for k, v in toplam.items()) + f" kabul={'GECTI' if gecti else 'KALDI'}")
+    return gecti
+
+
 def main():
     kanit = Path(sys.argv[1]).resolve()
     bolum = sys.argv[2] if len(sys.argv) > 2 else "hepsi"
@@ -221,6 +251,7 @@ def main():
     for satir in re.findall(desen, metin):
         log("  " + re.split(r"TSUNAMI-OTOMASYON |DogalAfetler/\]: |\]: ", satir, maxsplit=1)[-1])
     fps_tablosu(metin, log)
+    serpinti_ozeti(metin, log)
     for png in (RUN / "screenshots").glob("tsunami-*.png"):
         if png.stat().st_mtime > duvar_baslangic:
             shutil.copy2(png, kanit / png.name)

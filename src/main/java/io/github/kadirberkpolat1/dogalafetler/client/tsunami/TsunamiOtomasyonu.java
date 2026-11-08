@@ -662,7 +662,7 @@ public final class TsunamiOtomasyonu {
                 GorselOtomasyon.olcumBasla("tsunami", olcum, p.length > 1 ? p[1] : null);
             }
             case 's' -> GorselOtomasyon.kareIste("tsunami", deger + ".png", k -> {
-                log("KARE {} {} kopuk={}", deger, TsunamiYagmuru.ozet(), TsunamiKopugu.sonSegment());
+                log("KARE {} {} kopuk={} {}", deger, TsunamiYagmuru.ozet(), TsunamiKopugu.sonSegment(), SerpintiNoktasi.olcut());
                 for (String halka : TsunamiYagmuru.halkaDokumu()) {
                     log("HALKA {} {}", deger, halka);
                 }
