@@ -7,6 +7,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.DonemSureci;
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
 import io.github.kadirberkpolat1.dogalafetler.core.OyunTestiSureci;
+import io.github.kadirberkpolat1.dogalafetler.core.PulsarYolu;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.GunesZinciri;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.PulsarSecimi;
 import java.util.Optional;
@@ -26,7 +27,9 @@ import net.minecraftforge.eventbus.api.EventPriority;
  * {@code pulsarOlasiligi} ile PULSAR ({@link PulsarSecimi}, dünya tohumu + döngü); kızıl cücenin doğuşunu tamamlar, pulsarı
  * {@link PulsarSureci}'ne bırakır. Evre ilerlemesi PULSAR dışındaki evrelerde bu sürecindir (BÜYÜYEN'inki afetin). Durdurma
  * kaydı çekirdektedir; döngü kimliği (SÜPERNOVA'nın {@code evreBaslangicSaati}) ve kızıl cüce kapı sayacı
- * {@code ekVeri("gunes_zinciri")}'ndedir. İlerleme {@code zamanAdimi()} ile biriktiği için {@link #devamEt} boştur.
+ * {@code ekVeri("gunes_zinciri")}'ndedir. İlerleme {@code zamanAdimi()} ile biriktiği için {@link #devamEt} boştur. Pulsar
+ * yolundaki güneşsiz dönem ve kızıl cüce doğuşu ({@link PulsarYolu#donusYolu}) {@link PulsarSureci}'nindir: bu süreç orada
+ * aktif değildir. Yeni yıldız (doğal ya da komutla) pulsar yolu bayrakları temizlenerek doğar.
  */
 public final class GunesZinciriSureci implements DonemSureci {
     public static final String KIMLIK = "gunes_zinciri";
@@ -85,13 +88,16 @@ public final class GunesZinciriSureci implements DonemSureci {
     @Override
     public boolean aktifMi(ServerLevel ustDunya) {
         DunyaDonemi donem = DunyaDonemi.al(ustDunya);
-        return GunesZinciri.aktif(donem.gunesEvresi(), donem.evreIlerlemesi());
+        return GunesZinciri.aktif(donem.gunesEvresi(), donem.evreIlerlemesi()) && !PulsarYolu.donusYolu(donem);
     }
 
     /** SÜPERNOVA → GÜNEŞSİZ → KIZIL CÜCE (donma ve şafak beklenmez) → doğuş tamam. */
     @Override
     public Optional<Component> asamaIleri(ServerLevel ustDunya) {
         DunyaDonemi donem = DunyaDonemi.al(ustDunya);
+        if (PulsarYolu.donusYolu(donem)) {
+            return Optional.empty();
+        }
         GunesEvresi evre = donem.gunesEvresi();
         if (evre == GunesEvresi.KIZIL_CUCE && donem.evreIlerlemesi() < 1f) {
             donem.evreIlerlemesiAyarla(1f);
@@ -103,13 +109,15 @@ public final class GunesZinciriSureci implements DonemSureci {
         });
     }
 
-    /** {@code /dogalafet kizilcuce baslat} ve {@code asama ileri}: kızıl cüce şimdi doğar (herkese aynı anda). */
+    /** {@code /dogalafet kizilcuce baslat}: kızıl cüce şimdi doğar (herkese aynı anda), pulsar yolu biter. */
     static void dogusBaslat(DunyaDonemi donem, String neden) {
+        PulsarYolu.temizle(donem);
         evreDegistir(donem, GunesEvresi.KIZIL_CUCE, neden);
     }
 
-    /** {@code /dogalafet pulsar baslat}: pulsar şimdi doğar. */
+    /** {@code /dogalafet pulsar baslat}: pulsar şimdi doğar, zinciri baştan. */
     static void pulsarBaslat(DunyaDonemi donem, String neden) {
+        PulsarYolu.temizle(donem);
         evreDegistir(donem, GunesEvresi.PULSAR, neden);
     }
 
@@ -127,6 +135,7 @@ public final class GunesZinciriSureci implements DonemSureci {
     }
 
     private static void yildizDogar(ServerLevel ust, DunyaDonemi donem, String neden) {
+        PulsarYolu.temizle(donem);
         evreDegistir(donem, dogacakYildiz(ust, donem), neden);
     }
 

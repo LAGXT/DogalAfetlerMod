@@ -15,7 +15,9 @@ public enum Ipucu {
     /** Orman yangını: oyuncu bu saniye yanan alanın içinde (saniyede en çok bir sayılır; #5 Yanmadan Çıktım). */
     YANGIN_ALANINDA,
     /** Asit yağmuru: oyuncu afetten hasar aldı (#6 Çatı Altı'yı bozar). */
-    HASAR_ALDI;
+    HASAR_ALDI,
+    /** Pulsar zinciri: kızıl cüce doğuşu bitti, eski güneş geri döndü ("Yeni Şafak"; üst dünyadaki her oyuncuya). */
+    YENI_SAFAK;
 
     public int bit() {
         return 1 << ordinal();

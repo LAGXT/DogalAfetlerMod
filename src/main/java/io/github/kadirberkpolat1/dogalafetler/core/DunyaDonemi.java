@@ -158,6 +158,19 @@ public final class DunyaDonemi extends SavedData {
         return evreBaslangicSaati;
     }
 
+    /**
+     * K-C46: evre ilerlemesini "saat − evre başlangıcı" farkıyla hesaplayan süreç (kara delik yutması) kural açılınca
+     * durduğu süre kadar başlangıcı ileri çeker; en çok şimdiki saate. Evre değişmez ({@link DonemAlani#EVRE_ILERLEMESI}
+     * olayı); istemci geçişleri aynı alandan hesapladığı için senkron acildir.
+     */
+    public void evreBaslangiciniKaydir(long olcekliTick) {
+        long yeni = Math.min(saat, evreBaslangicSaati + Math.max(0L, olcekliTick));
+        if (yeni != evreBaslangicSaati) {
+            evreBaslangicSaati = yeni;
+            degisti(DonemAlani.EVRE_ILERLEMESI, true);
+        }
+    }
+
     // ---------------------------------------------------------------- donma
 
     /** Global donma ilerlemesi G (0–100, madde 9). */

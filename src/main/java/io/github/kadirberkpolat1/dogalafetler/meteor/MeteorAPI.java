@@ -121,7 +121,14 @@ public final class MeteorAPI {
      */
     public static int yagmur(ServerLevel level, Collection<ServerPlayer> oyuncular, int sureTick, double dakikaBasinaAdet,
             double buyukOran, YanginKaynagi kaynak) {
+        return yagmur(level, oyuncular, sureTick, dakikaBasinaAdet, buyukOran, MeteorGorunumu.kaynaktan(kaynak), kaynak);
+    }
+
+    /** Görünümü açıkça seçilmiş yağmur (pulsar dönemi: {@link MeteorGorunumu#PULSAR}). */
+    public static int yagmur(ServerLevel level, Collection<ServerPlayer> oyuncular, int sureTick, double dakikaBasinaAdet,
+            double buyukOran, MeteorGorunumu gorunum, YanginKaynagi kaynak) {
         Objects.requireNonNull(kaynak, "kaynak");
+        Objects.requireNonNull(gorunum, "gorunum");
         Set<UUID> kimlikler = new HashSet<>();
         if (oyuncular != null) {
             for (ServerPlayer o : oyuncular) {
@@ -130,7 +137,7 @@ public final class MeteorAPI {
         }
         long tohum = level.random.nextLong();
         return MeteorYoneticisi.yagmurEkle(level,
-                k -> new MeteorYagmuru(k, kimlikler, sureTick, dakikaBasinaAdet, buyukOran, kaynak, tohum));
+                k -> new MeteorYagmuru(k, kimlikler, sureTick, dakikaBasinaAdet, buyukOran, gorunum, kaynak, tohum));
     }
 
     /** Test: dağıtım halkası ve giriş açısı sabit yağmur (meteorlar test sahnesine düşsün). */
@@ -148,7 +155,7 @@ public final class MeteorAPI {
         }
         long tohum = level.random.nextLong();
         return MeteorYoneticisi.yagmurEkle(level, k -> new MeteorYagmuru(k, kimlikler, sureTick, dakikaBasinaAdet, buyukOran,
-                kaynak, tohum).testAyari(ic, dis, aci, sanslar));
+                MeteorGorunumu.kaynaktan(kaynak), kaynak, tohum).testAyari(ic, dis, aci, sanslar));
     }
 
     public static boolean yagmurDurdur(ServerLevel level, int kimlik) {

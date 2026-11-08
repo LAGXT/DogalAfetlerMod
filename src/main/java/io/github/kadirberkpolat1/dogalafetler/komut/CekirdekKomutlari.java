@@ -35,14 +35,16 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 
 /**
  * Çekirdeğin {@code /dogalafet} alt komutlarının işleri: {@code durum}, {@code start}, {@code stop}, {@code gun}, {@code hiz},
- * {@code siklik}, {@code sifirla}, {@code asama ileri} (KOMUTLAR, N18) ve alt komutsuz kökün kullanım listesi. {@code stop} ve {@code asama ileri} aktif afet yokken dönem
- * süreçlerine ({@link DonemSureci}) gider; {@code stop} afeti durdururken süren süreçleri yalnız hatırlatır (ikinci
- * {@code stop} onları durdurur). Çıktılar yalnız komutu yazan OP'ye gider (N6) ve dil anahtarlarıyla yazılır. Başarılı
- * komut 1, reddedilen 0 döner.
+ * {@code siklik}, {@code sifirla}, {@code asama ileri} (KOMUTLAR, N18) ve alt komutsuz kökün kullanım listesi. {@code durum}
+ * aktif ve durdurulmuş dönem süreçlerinin kendi satırını ({@link DonemSureci#durumSatiri}: aşama, kalan gün) ayrı satır yazar.
+ * {@code stop} ve {@code asama ileri} aktif afet yokken dönem süreçlerine ({@link DonemSureci}) gider; {@code stop} afeti
+ * durdururken süren süreçleri yalnız hatırlatır (ikinci {@code stop} onları durdurur). Çıktılar yalnız komutu yazan OP'ye
+ * gider (N6) ve dil anahtarlarıyla yazılır. Başarılı komut 1, reddedilen 0 döner.
  */
 public final class CekirdekKomutlari {
     private static final String ON = "commands.dogalafetler.";
@@ -138,8 +140,16 @@ public final class CekirdekKomutlari {
                 Component.translatable(deniz.kalici() ? KALICI : GECICI)));
         satirlar.add(Component.translatable(DURUM_DONMA, sayi(donem.donmaIlerlemesi()),
                 Component.translatable(donem.cozulmeDonemi() ? EVET : HAYIR), sayi(donem.buharlasmaDerinligi())));
-        satirlar.add(Component.translatable(DURUM_SURECLER, surecAdlari(yonetici.aktifDonemSurecleri())));
-        satirlar.add(Component.translatable(DURUM_SURECLER_DURAN, duranSurecler(yonetici.durdurulmusDonemSurecleri())));
+        List<DonemSureci> suren = yonetici.aktifDonemSurecleri();
+        Map<DonemSureci, DonemSureci.DurdurmaNedeni> duran = yonetici.durdurulmusDonemSurecleri();
+        satirlar.add(Component.translatable(DURUM_SURECLER, surecAdlari(suren)));
+        satirlar.add(Component.translatable(DURUM_SURECLER_DURAN, duranSurecler(duran)));
+        ServerLevel ust = server.overworld();
+        List<DonemSureci> surecler = new ArrayList<>(suren);
+        surecler.addAll(duran.keySet());
+        for (DonemSureci surec : surecler) {
+            surec.durumSatiri(ust).ifPresent(satirlar::add);
+        }
         satirlar.add(Component.translatable(DURUM_SON_AFETLER, sonAfetler(donem)));
         for (Component satir : satirlar) {
             kaynak.sendSuccess(() -> satir, false);

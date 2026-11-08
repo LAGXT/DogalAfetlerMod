@@ -101,13 +101,15 @@ public final class GunesIstemciOlaylari {
         boolean gok = gokuGoruyor(mc, level);
         return switch (d.gunesEvresi()) {
             case SUPERNOVA -> new GunesGokCizici.Ortuler(0.85f * GokyuzuEgrileri.supernovaFlas(evreSaniyesi(d, pt))
-                    * (gok ? 1f : 0.35f), 0f, 0f);
+                    * (gok ? 1f : 0.35f), 0f, 0f, 0f);
             case BUYUYEN -> new GunesGokCizici.Ortuler(0f,
-                    GunesGorselEgrileri.isiDalgasi(d.evreIlerlemesi(), gunIsigi(level, pt), gok), 0f);
-            case KIZIL_CUCE -> new GunesGokCizici.Ortuler(0f, 0f, GunesGorselEgrileri.safakTonu(d.evreIlerlemesi()));
-            // Pulsar (gökyüzü-2): ısı dalgalanması güneşe değil ısınmaya bağlı, gece de sürer.
+                    GunesGorselEgrileri.isiDalgasi(d.evreIlerlemesi(), gunIsigi(level, pt), gok), 0f, 0f);
+            case KIZIL_CUCE -> new GunesGokCizici.Ortuler(0f, 0f, GunesGorselEgrileri.safakTonu(d.evreIlerlemesi()), 0f);
+            // Pulsar (gökyüzü-2): ısı dalgalanması güneşe değil ısınmaya bağlı, gece de sürer; kızıl-sıcak tonda.
             case PULSAR -> new GunesGokCizici.Ortuler(0f, gok ? PulsarEgrileri.yogunluk(d.evreIlerlemesi())
-                    * (0.6f + 0.4f * gunIsigi(level, pt)) : 0f, 0f);
+                    * (0.6f + 0.4f * gunIsigi(level, pt)) : 0f, 0f, 1f);
+            // Kara delik yutmasının parlaması gökyüzü istemcisinde (PulsarIstemciEfektleri); burada örtü yok.
+            case KARADELIK_YUTMA -> GunesGokCizici.Ortuler.YOK;
             default -> GunesGokCizici.Ortuler.YOK;
         };
     }

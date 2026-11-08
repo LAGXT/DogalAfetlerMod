@@ -19,7 +19,12 @@ public enum GunesEvresi {
      * Kızıl cüce yerine düşük olasılıkla doğan pulsar (gökyüzü-2): dünya donmanın tersine kavrulur. Paket sıra numarasıyla
      * yazıldığı için en sonda kalmalı.
      */
-    PULSAR("pulsar");
+    PULSAR("pulsar"),
+    /**
+     * Pulsarın uzak bir kara delikçe yutulması (pulsar-2): 90 sn'lik gök koreografisi, ardından pulsar yolundaki
+     * {@link #GUNESSIZ}. Paket sıra numarasıyla yazdığı için en sonda kalmalı.
+     */
+    KARADELIK_YUTMA("karadelik_yutma");
 
     private final String kimlik;
 

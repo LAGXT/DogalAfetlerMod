@@ -19,6 +19,7 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.EntityArgument;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -51,11 +52,17 @@ public final class DogalAfetKomutu {
     private static final SuggestionProvider<CommandSourceStack> AFET_ADLARI = (baglam, kurucu) ->
             SharedSuggestionProvider.suggest(Arrays.stream(AfetTuru.values()).map(AfetTuru::kimlik), kurucu);
 
-    /** Süren ve durdurulmuş dönem süreçlerinin kimlikleri ({@code asama ileri [süreç]}, K-C48). */
+    /**
+     * Süren ve durdurulmuş dönem süreçlerinin kimlikleri ve o an geçerli takma adları ({@code asama ileri [süreç]}, K-C48;
+     * {@link DonemSureci#takmaAdlar}).
+     */
     private static final SuggestionProvider<CommandSourceStack> SUREC_ADLARI = (baglam, kurucu) -> {
         AfetYoneticisi yonetici = AfetYoneticisi.al(baglam.getSource().getServer());
+        ServerLevel ust = baglam.getSource().getServer().overworld();
         return SharedSuggestionProvider.suggest(Stream.concat(yonetici.aktifDonemSurecleri().stream(),
-                yonetici.durdurulmusDonemSurecleri().keySet().stream()).map(DonemSureci::kimlik), kurucu);
+                yonetici.durdurulmusDonemSurecleri().keySet().stream())
+                .flatMap(surec -> Stream.concat(Stream.of(surec.kimlik()), surec.takmaAdlar(ust).stream()))
+                .distinct(), kurucu);
     };
 
     /** Süren afetlerin adları ({@code stop <afet>}, AS-8). */

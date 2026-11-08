@@ -11,6 +11,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.mantik.SecimTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SiddetAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SiddetSecici;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SonrakiAfetTahmini;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.TekSeferlikAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.TekSeferlikKurallar;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.ZamanOlcegi;
 import io.github.kadirberkpolat1.dogalafetler.core.olay.AfetAsamaDegistiEvent;
@@ -495,14 +496,15 @@ public final class AfetYoneticisi {
 
     /**
      * {@code /dogalafet asama ileri [süreç]} aktif afet yokken (ya da süreç adı verilince): önce süren, sonra durdurulmuş
-     * dönem süreçlerine sorar; ilk dolu çıktı döner. {@code kimlik} verilirse yalnız o süreç sorulur (K-C48). Durdurulmuş
+     * dönem süreçlerine sorar; ilk dolu çıktı döner. {@code kimlik} verilirse yalnız onu kimliği ya da o anki takma adı
+     * olarak tanıyan süreç sorulur (K-C48, {@link DonemSureci#kimlikEsler}). Durdurulmuş
      * süreç durmuş kalır, yalnız bir aşama geçer (K-C41); böylece tamamlanırsa kaydı silinir.
      */
     public Optional<Component> donemAsamaIleri(Optional<String> kimlik) {
         ServerLevel ust = server.overworld();
         List<DonemSureci> sira = new ArrayList<>(aktifDonemSurecleri());
         sira.addAll(durdurulmusDonemSurecleri().keySet());
-        kimlik.ifPresent(k -> sira.removeIf(surec -> !surec.kimlik().equals(k)));
+        kimlik.ifPresent(k -> sira.removeIf(surec -> !surec.kimlikEsler(k)));
         for (DonemSureci surec : sira) {
             try {
                 Optional<Component> sonuc = surec.asamaIleri(ust);
@@ -726,17 +728,25 @@ public final class AfetYoneticisi {
 
     /** Kayıtlı, gamerule'ü açık ve tek seferlik kuralları geçen türler. */
     private Set<AfetTuru> uygunTurler(GameRules kurallar, CekirdekAyarlari ayar) {
-        DunyaDonemi donem = donem();
         double gun = oyunGunu();
         double puan = gelisimPuani();
         Set<AfetTuru> uygun = EnumSet.noneOf(AfetTuru.class);
         for (AfetTuru tur : AfetKaydi.kayitliTurler()) {
-            if (Kurallar.afetSecilebilir(kurallar, tur) && TekSeferlikKurallar.uygunMu(tur, donem.ayVar(),
-                    donem.gunesEvresi(), gun, puan, ayar.tekSeferlik())) {
+            if (Kurallar.afetSecilebilir(kurallar, tur) && tekSeferlikUygun(tur, gun, puan, ayar.tekSeferlik())) {
                 uygun.add(tur);
             }
         }
         return uygun;
+    }
+
+    /**
+     * Seçim turunun tek seferlik süzgeci (madde 4) bu dönemde türü geçiriyor mu: ay, güneş evresi ve pulsar zincirinin
+     * geçmişi ({@link PulsarYolu#donusYolu}, {@link PulsarYolu#zincirTukendi}) dönemden okunur.
+     */
+    public boolean tekSeferlikUygun(AfetTuru tur, double gun, double puan, TekSeferlikAyarlari ayarlar) {
+        DunyaDonemi donem = donem();
+        return TekSeferlikKurallar.uygunMu(tur, donem.ayVar(), donem.gunesEvresi(), PulsarYolu.donusYolu(donem),
+                PulsarYolu.zincirTukendi(donem), gun, puan, ayarlar);
     }
 
     private int seviyeSec(AfetTuru tur) {
@@ -1323,7 +1333,8 @@ public final class AfetYoneticisi {
     }
 
     private void donemGonder(ServerPlayer oyuncu) {
-        AgKanali.oyuncuyaGonder(oyuncu, DonemPaketi.den(donem(), zamanOlcegi.carpan()));
+        AgKanali.oyuncuyaGonder(oyuncu, DonemPaketi.den(donem(), zamanOlcegi.carpan(),
+                Kurallar.blokHasariAcik(server.getGameRules())));
     }
 
     private void donemSenkronu(DunyaDonemi donem, CekirdekAyarlari ayar) {
@@ -1333,7 +1344,8 @@ public final class AfetYoneticisi {
             return;
         }
         if (!server.getPlayerList().getPlayers().isEmpty()) {
-            AgKanali.herkeseGonder(DonemPaketi.den(donem, zamanOlcegi.carpan()));
+            AgKanali.herkeseGonder(DonemPaketi.den(donem, zamanOlcegi.carpan(),
+                    Kurallar.blokHasariAcik(server.getGameRules())));
         }
         donem.senkronTamam();
         sonDonemPaketi = tickSayaci;

@@ -18,10 +18,13 @@ import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.GokyuzuAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.GokyuzuEgrileri;
+import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.KaraDelikYutmaEgrileri;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.PulsarEgrileri;
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import net.minecraft.Util;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -43,6 +46,9 @@ import org.joml.Vector3f;
  * gün doğumu yelpazesi → derin uzay (Samanyolu, galaksi, nebula, kalıntı, yıldız) → güneş evresi → ay → ufuk altı
  * karanlık disk. Yıldızlar ve şerit kalite ya da yıldız yoğunluğu değişince bir kez derlenen VBO'lardandır. Süpernova
  * koreografisi (çökme → parlama → kabuk) evre başlangıcından beri geçen saniyeyle, uzun sönüm evre ilerlemesiyle çizilir.
+ * Pulsar, kara delik yutması ve pulsar yolundaki kızıl cüce doğuşu 3B nesnelerdir ({@code Pulsar3B}, {@link KaraDelik3B}):
+ * gecikmeli dünya çapasıyla ({@link GokCapasi}) derin uzaydan ve aydan sonra, kameranın dönüşünü taşıyan dünya pozunda
+ * çizilir (gölge arkadakini siler, oyuncu uçunca paralaks yapar).
  */
 final class GokyuzuCizici {
     private static final ResourceLocation GUNES_VANILLA =
@@ -56,7 +62,6 @@ final class GokyuzuCizici {
     private static final ResourceLocation KARA_DELIK = doku("kara_delik");
     private static final ResourceLocation KARA_DELIK_AKIS = doku("kara_delik_akis");
     private static final ResourceLocation KARA_DELIK_JET = doku("kara_delik_jet");
-    private static final ResourceLocation PULSAR_ISIN = doku("pulsar_isin");
     private static final ResourceLocation SN_HALKA = doku("supernova_halka");
     private static final ResourceLocation YILDIZ_ISIN = doku("yildiz_isin");
 
@@ -124,20 +129,18 @@ final class GokyuzuCizici {
     private static final Vector3f KUTUP = new Vector3f(0.25f, 0.94f, 0.22f).normalize();
     /** Galaksilerin kendi dönüşü: saatte bir tur ({@code sn} 3600 sn'de sarılır, açı sürekli kalır). */
     private static final float GALAKSI_DONUS_SN = 3600f;
-    /** Pulsarın dönüş ekseni: bakışa {@code ISIN_EGIMI} açıyla eğik; ışın konisi turda bir kez bakıştan geçer (nabız). */
-    private static final Vector3f PULSAR_EKSEN;
-    private static final Vector3f PULSAR_E1;
-    private static final Vector3f PULSAR_E2;
+    /** Pulsar yolundaki kızıl cüce doğuşunun ışık yayı: doğu ufkunda ±72° (ufkun %40'ı). */
+    private static final float DOGUS_YAYI_YARI = 72f;
+    /** Pulsar yolundaki kızıl cücenin doğuştaki şişkinliği: küre yarıçapı ×(1 + bu·(1 − ilerleme)). */
+    private static final float DOGUS_SISKINLIK = 0.8f;
 
-    static {
-        float g = PulsarEgrileri.ISIN_EGIMI;
-        float yan = (float) Math.toRadians(40);
-        PULSAR_EKSEN = new Vector3f(Mth.sin(g) * Mth.cos(yan), -Mth.cos(g), Mth.sin(g) * Mth.sin(yan)).normalize();
-        PULSAR_E1 = new Vector3f(PULSAR_EKSEN).cross(0f, 0f, 1f).normalize();
-        PULSAR_E2 = new Vector3f(PULSAR_EKSEN).cross(PULSAR_E1).normalize();
-    }
+    /** Pulsar yolundaki 3B kızıl cücenin iç ve kenar rengi. */
+    private static final float[] KIZIL_IC = GokyuzuEgrileri.rgb(0xFF6A3A);
+    private static final float[] KIZIL_KENAR = GokyuzuEgrileri.rgb(0x6E1208);
 
     private static int karaDelikSayisi;
+    private static WeakReference<ClientLevel> capaDunyasi = new WeakReference<>(null);
+    private static GunesEvresi capaEvresi;
 
     private static final Vector3f TEPE = new Vector3f(0, 1, 0);
     private static EfektKalitesi kurulanKalite;
@@ -421,6 +424,8 @@ final class GokyuzuCizici {
 
         RenderSystem.blendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE,
                 GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ZERO);
+        dogusYayi(poz, d, yagmursuz);
+        Matrix4f dunya = new Matrix4f(poz.last().pose());
         poz.pushPose();
         poz.mulPose(Axis.YP.rotationDegrees(-90f));
         poz.mulPose(Axis.XP.rotationDegrees(zaman * 360f));
@@ -435,6 +440,7 @@ final class GokyuzuCizici {
             ay(poz.last().pose(), level, d, yagmursuz);
         }
         poz.popPose();
+        nesneler3B(dunya, level, d, zaman, kamera.getPosition(), yagmursuz, sn);
         AyCarpmasiGokyuzu.ciz(poz.last().pose(), level, pt, yagmursuz, sisKur);
 
         RenderSystem.disableBlend();
@@ -567,11 +573,11 @@ final class GokyuzuCizici {
         if (kalinti > 0f) {
             float genisleme = d.evre() == GunesEvresi.GUNESSIZ ? GokyuzuEgrileri.kalintiGenisleme(d.ilerleme())
                     : d.evre() == GunesEvresi.KIZIL_CUCE || d.evre() == GunesEvresi.PULSAR
-                    ? GokyuzuEgrileri.kalintiGenisleme(1f) : 1f;
+                    || d.evre() == GunesEvresi.KARADELIK_YUTMA ? GokyuzuEgrileri.kalintiGenisleme(1f) : 1f;
             float yari = 100f * (float) Math.tan(Math.toRadians(20)) * genisleme;
             kuad(gunluk, kalintiDokusu, TEPE, yari, 15f, 1f, 1f, 1f, kalinti * Math.max(uzay, 0.35f));
-            if (d.evre() != GunesEvresi.PULSAR) {
-                // Ortadaki sönük pulsar noktası (0,5 Hz); pulsar döneminde onun yerine asıl pulsar çizilir.
+            if (d.evre() != GunesEvresi.PULSAR && d.evre() != GunesEvresi.KARADELIK_YUTMA) {
+                // Ortadaki sönük pulsar noktası (0,5 Hz); pulsar ve yutma döneminde onun yerine asıl pulsar çizilir.
                 float nabiz = 0.55f + 0.45f * Mth.sin(sn * Mth.TWO_PI * 0.5f);
                 kuad(gunluk, YILDIZ_ISIN, TEPE, 2.2f, 45f, 0.7f, 0.85f, 1f, kalinti * nabiz);
             }
@@ -604,7 +610,11 @@ final class GokyuzuCizici {
         }
         float p = d.ilerleme();
         switch (d.evre()) {
-            case NORMAL -> kuad(m, GUNES_VANILLA, TEPE, 30f, 0f, 1f, 1f, 1f, yagmursuz);
+            case NORMAL -> {
+                // Pulsar yolunun sonunda kızıl cüce 20 sn'de söner (3B, nesneler3B), eski güneş belirir.
+                float donus = d.onceki() == GunesEvresi.KIZIL_CUCE ? d.gecis() : 1f;
+                kuad(m, GUNES_VANILLA, TEPE, 30f, 0f, 1f, 1f, 1f, yagmursuz * donus);
+            }
             case BUYUYEN -> buyuyen(m, GokyuzuEgrileri.buyuyenOlcek(p), GokyuzuEgrileri.buyuyenRenk(p), p, yagmursuz, sn);
             case SUPERNOVA -> {
                 float s = d.saniye();
@@ -618,19 +628,164 @@ final class GokyuzuCizici {
                 }
                 supernova(m, p, s, yagmursuz, sn);
             }
-            case GUNESSIZ -> {
+            case GUNESSIZ, PULSAR, KARADELIK_YUTMA -> {
             }
-            case PULSAR -> pulsar(m, p, yagmursuz, sn);
             case KIZIL_CUCE -> {
-                float disk = GUNES_DISK * d.boyutOrani();
-                float dogus = 1f - p;
-                float da = GokyuzuEgrileri.kizilCuceDiskAlfa(p) * yagmursuz;
-                kuad(m, HALE, TEPE, disk * (5f + 3f * dogus), 0f, 1f, 0.3f, 0.15f, (0.4f + 0.3f * dogus) * yagmursuz);
-                kuadOrtu(m, GUNES, TEPE, disk / DOKU_DISK_ORANI, sn * 2f, 1f, 0.416f, 0.227f, da);
-                kuad(m, GUNES, TEPE, disk / DOKU_DISK_ORANI, sn * 2f, 1f, 0.416f, 0.227f, (0.25f + 0.6f * dogus) * da);
-                kuad(m, HALE, TEPE, disk * 1.8f, 0f, 1f, 0.5f, 0.28f, 0.5f * dogus * da);
+                if (!d.pulsarYolu()) {
+                    kizilCuce(m, d, p, yagmursuz, sn);
+                }
             }
         }
+    }
+
+    private static void kizilCuce(Matrix4f m, IstemciGokyuzu.Gorunum d, float p, float a, float sn) {
+        float disk = GUNES_DISK * d.boyutOrani();
+        float dogus = 1f - p;
+        float da = GokyuzuEgrileri.kizilCuceDiskAlfa(p) * a;
+        kuad(m, HALE, TEPE, disk * (5f + 3f * dogus), 0f, 1f, 0.3f, 0.15f, (0.4f + 0.3f * dogus) * a);
+        kuadOrtu(m, GUNES, TEPE, disk / DOKU_DISK_ORANI, sn * 2f, 1f, 0.416f, 0.227f, da);
+        kuad(m, GUNES, TEPE, disk / DOKU_DISK_ORANI, sn * 2f, 1f, 0.416f, 0.227f, (0.25f + 0.6f * dogus) * da);
+        kuad(m, HALE, TEPE, disk * 1.8f, 0f, 1f, 0.5f, 0.28f, 0.5f * dogus * da);
+    }
+
+    /**
+     * 3B nesneler (pulsar-2 tur 4): kameranın dönüşünü taşıyan dünya pozunda, güneş yolundaki yönleri gecikmeli dünya
+     * çapasından. PULSAR → {@code Pulsar3B}; yutma → {@link KaraDelik3B} ve kara deliğe çekilen pulsar; pulsar yolundaki
+     * kızıl cüce doğuşu (ve eski güneşe dönüşte sönüşü) kızıl {@code Pulsar3B.kure}. Normal yol 2B kalır.
+     */
+    private static void nesneler3B(Matrix4f dunya, ClientLevel level, IstemciGokyuzu.Gorunum d, float zaman, Vec3 goz,
+            float yagmursuz, float sn) {
+        capalariGuncelle(level, d.evre(), goz);
+        Pulsar3B.bosKare();
+        KaraDelik3B.bosKare();
+        switch (d.evre()) {
+            case PULSAR -> Pulsar3B.ciz(dunya, GokCapasi.PULSAR.merkez(gunesYoluYonu(0f, zaman), goz),
+                    PulsarEgrileri.yogunluk(d.ilerleme()), yagmursuz, 1f, null, 0f, 1f);
+            case KARADELIK_YUTMA -> karaDelikYutma(dunya, d.saniye(), zaman, goz, yagmursuz, sn);
+            case KIZIL_CUCE -> {
+                if (d.pulsarYolu()) {
+                    kizilCuce3B(dunya, d, d.ilerleme(), yagmursuz, zaman, goz);
+                }
+            }
+            case NORMAL -> {
+                if (d.onceki() == GunesEvresi.KIZIL_CUCE && d.gecis() < 1f) {
+                    kizilCuce3B(dunya, d, 1f, yagmursuz * (1f - d.gecis()), zaman, goz);
+                }
+            }
+            default -> {
+            }
+        }
+        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+        RenderSystem.blendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE,
+                GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ZERO);
+    }
+
+    /**
+     * Çapaları karede bir kez ilerletir. Yeni dünyada (çıkış/boyut) ikisi de sıfırlanır; evre değişiminde çapa, onu
+     * kullanan evre başlarken sıfırlanır (PULSAR → yutma ve kızıl cüce → eski güneş geçişinde nesne sıçramasın).
+     */
+    private static void capalariGuncelle(ClientLevel level, GunesEvresi evre, Vec3 goz) {
+        if (capaDunyasi.get() != level) {
+            capaDunyasi = new WeakReference<>(level);
+            GokCapasi.PULSAR.sifirla();
+            GokCapasi.KARADELIK.sifirla();
+        } else if (evre != capaEvresi) {
+            if (evre == GunesEvresi.PULSAR || evre == GunesEvresi.KIZIL_CUCE) {
+                GokCapasi.PULSAR.sifirla();
+            }
+            if (evre == GunesEvresi.KARADELIK_YUTMA) {
+                GokCapasi.KARADELIK.sifirla();
+            }
+        }
+        capaEvresi = evre;
+        long simdi = Util.getNanos();
+        GokCapasi.PULSAR.guncelle(goz, simdi);
+        GokCapasi.KARADELIK.guncelle(goz, simdi);
+    }
+
+    /** Yutmada pulsarın güneş yolunda kara deliğe doğru açısı (derece; 0 pulsarın yeri). */
+    static float pulsarAcisi(IstemciGokyuzu.Gorunum d) {
+        return d.evre() == GunesEvresi.KARADELIK_YUTMA
+                ? KaraDelikYutmaEgrileri.KARADELIK_ACI * KaraDelikYutmaEgrileri.cekim(d.saniye()) : 0f;
+    }
+
+    /**
+     * Kara delik yutması (PL-4, tur 4): güneş yolunda pulsardan {@link KaraDelikYutmaEgrileri#KARADELIK_ACI} ötede 3B kara
+     * delik; pulsar {@link KaraDelikYutmaEgrileri#cekim} ile ona doğru çekilir, spagettileşir ve parlamada yutulur. Pulsar
+     * kara deliğin yıldızlarından sonra, gölgesinden önce çizilir.
+     */
+    private static void karaDelikYutma(Matrix4f dunya, float s, float zaman, Vec3 goz, float yagmursuz, float sn) {
+        Vector3f yon = gunesYoluYonu(KaraDelikYutmaEgrileri.KARADELIK_ACI, zaman);
+        Vector3f delik = GokCapasi.KARADELIK.merkez(yon, goz);
+        float birim = GokCapasi.KARADELIK.birim(yon, goz);
+        float pa = KaraDelikYutmaEgrileri.pulsarAlfa(s) * yagmursuz;
+        if (pa <= 0.002f) {
+            KaraDelik3B.ciz(dunya, delik, birim, s, yagmursuz, sn, yon, null, 0f, null);
+            return;
+        }
+        Vector3f pulsar = GokCapasi.PULSAR.merkez(
+                gunesYoluYonu(KaraDelikYutmaEgrileri.KARADELIK_ACI * KaraDelikYutmaEgrileri.cekim(s), zaman), goz);
+        float spagetti = KaraDelikYutmaEgrileri.spagetti(s);
+        float titresim = KaraDelikYutmaEgrileri.titresimCarpani(s);
+        float ikinci = 1f - GokyuzuEgrileri.yumusak(KaraDelikYutmaEgrileri.YAKLASMA_SN - 3f,
+                KaraDelikYutmaEgrileri.YAKLASMA_SN, s);
+        KaraDelik3B.ciz(dunya, delik, birim, s, yagmursuz, sn, yon, pulsar, pa,
+                () -> Pulsar3B.ciz(dunya, pulsar, 1f, pa, titresim, delik, spagetti, ikinci));
+    }
+
+    /**
+     * Pulsar yolundaki kızıl cüce: 3B Fresnel küre (iç {@code #FF6A3A}, kenar koyu kızıl) ve çevresinde doğuşla sönen
+     * toplamalı hale; boyut normal yoldaki diskle aynı açı ({@link #GUNES_DISK} × boyut oranı). Doğan yıldız şişkindir:
+     * yarıçap ×(1 + {@value #DOGUS_SISKINLIK}·(1 − p)), p = 1'de (eski güneşe dönüşte) normal boy.
+     */
+    private static void kizilCuce3B(Matrix4f dunya, IstemciGokyuzu.Gorunum d, float p, float a, float zaman, Vec3 goz) {
+        Vector3f yon = gunesYoluYonu(0f, zaman);
+        Vector3f merkez = GokCapasi.PULSAR.merkez(yon, goz);
+        float disk = GUNES_DISK * d.boyutOrani();
+        float dogus = 1f - p;
+        float yari = GokCapasi.PULSAR.birim(yon, goz) * GokCapasi.PULSAR.uzaklik() * disk / 100f
+                * (1f + DOGUS_SISKINLIK * dogus);
+        float da = GokyuzuEgrileri.kizilCuceDiskAlfa(p) * a;
+        Vector3f bakis = new Vector3f(merkez).normalize();
+        kuad(dunya, HALE, bakis, disk * (5f + 3f * dogus), 0f, 1f, 0.3f, 0.15f, (0.4f + 0.3f * dogus) * a);
+        Pulsar3B.kure(dunya, merkez, yari, KIZIL_IC, KIZIL_KENAR, da);
+        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+        RenderSystem.blendFuncSeparate(GlStateManager.SourceFactor.SRC_ALPHA, GlStateManager.DestFactor.ONE,
+                GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ZERO);
+        kuad(dunya, HALE, bakis, disk * 1.8f, 0f, 1f, 0.5f, 0.28f, 0.5f * dogus * da);
+    }
+
+    /**
+     * Pulsar yolundaki kızıl cüce doğuşu: doğu ufkunda ufkun %40'ını (±{@value #DOGUS_YAYI_YARI}°) saran kızıl-turuncu
+     * ışık yayı; dünya çerçevesinde, toplamalı, tek çizim. Normal süpernova yolunun doğuşu değişmez.
+     */
+    private static void dogusYayi(PoseStack poz, IstemciGokyuzu.Gorunum d, float yagmursuz) {
+        if (d.evre() != GunesEvresi.KIZIL_CUCE || !d.pulsarYolu() || d.ilerleme() >= 1f) {
+            return;
+        }
+        float a = 0.85f * (float) Math.pow(1f - d.ilerleme(), 0.6) * yagmursuz;
+        if (a <= 0.003f) {
+            return;
+        }
+        int n = 24;
+        Matrix4f m = poz.last().pose();
+        RenderSystem.setShader(GameRenderer::getPositionColorShader);
+        BufferBuilder bb = Tesselator.getInstance().getBuilder();
+        bb.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+        for (int i = 0; i < n; i++) {
+            for (int k = 0; k < 4; k++) {
+                int j = k == 1 || k == 2 ? i + 1 : i;
+                boolean ust = k >= 2;
+                float f = (float) j / n * 2f - 1f;
+                float w = 1f - f * f;
+                float az = f * DOGUS_YAYI_YARI * Mth.DEG_TO_RAD;
+                float el = (ust ? 3f + 15f * w : -3f) * Mth.DEG_TO_RAD;
+                float yatay = 100f * Mth.cos(el);
+                bb.vertex(m, Mth.cos(az) * yatay, 100f * Mth.sin(el), Mth.sin(az) * yatay)
+                        .color(1f, 0.45f, 0.2f, ust ? 0f : a * (0.25f + 0.75f * w)).endVertex();
+            }
+        }
+        BufferUploader.drawWithShader(bb.end());
     }
 
     /** Şişen güneş: disk normal karışım + %12 toplamalı (parlak gökte sarı-beyaza doymasın), etrafında turuncu hale. */
@@ -670,6 +825,11 @@ final class GokyuzuCizici {
             case SUPERNOVA, PULSAR -> {
                 r = 0.75f;
                 g = 0.85f;
+            }
+            case KARADELIK_YUTMA -> {
+                r = 0.7f;
+                g = 0.62f;
+                b = 0.9f;
             }
             case GUNESSIZ -> {
                 // Güneş yok: hilal yerine yalnız kalıntı ışığıyla soluk gri dolunay diski (#5A6070), evre döngüsü durur.
@@ -711,51 +871,16 @@ final class GokyuzuCizici {
                 GlStateManager.SourceFactor.ONE, GlStateManager.DestFactor.ZERO);
     }
 
-    /**
-     * Pulsar (gökyüzü-2; referans: lacivert uzayda mavi-beyaz nokta ve iki kutuptan çapraz ince ışın): çekirdek, hale ve
-     * dönen eksenin iki ışını. Işının gök düzlemine izdüşümü çizilir (bakışa döndükçe kısalır); bakıştan geçerken
-     * çekirdek ve hale nabız gibi parlar.
-     */
-    private static void pulsar(Matrix4f m, float p, float a, float sn) {
-        float guc = 0.6f + 0.4f * PulsarEgrileri.yogunluk(p);
-        float faz = PulsarEgrileri.isinAcisi(sn);
-        Vector3f b = new Vector3f(PULSAR_E1).mul(Mth.cos(faz)).add(new Vector3f(PULSAR_E2).mul(Mth.sin(faz)))
-                .mul(Mth.sin(PulsarEgrileri.ISIN_EGIMI)).add(new Vector3f(PULSAR_EKSEN).mul(Mth.cos(PulsarEgrileri.ISIN_EGIMI)));
-        // Bakış yönü (pulsardan gözlemciye) −TEPE; iki ışından biri bakışa dönükken nabız.
-        float nabiz = PulsarEgrileri.nabiz(Math.abs(b.y));
-        float izdusum = (float) Math.sqrt(b.x * b.x + b.z * b.z);
-        kuad(m, HALE, TEPE, 16f + 12f * nabiz, 0f, 0.5f, 0.68f, 1f, a * (0.3f + 0.5f * nabiz) * guc);
-        if (izdusum > 1e-3f) {
-            Vector3f yon = new Vector3f(b.x / izdusum, 0f, b.z / izdusum);
-            float boy = 75f * izdusum * guc;
-            float isinA = a * (0.4f + 0.45f * nabiz) * guc;
-            serit(m, PULSAR_ISIN, yon, boy, 0.75f, 0.62f, 0.8f, 1f, isinA);
-            serit(m, PULSAR_ISIN, yon.negate(), boy, 0.75f, 0.62f, 0.8f, 1f, isinA);
-        }
-        kuad(m, HALE, TEPE, 3.4f, 0f, 0.85f, 0.93f, 1f, a);
-        kuad(m, YILDIZ_ISIN, TEPE, 5f + 4f * nabiz, (float) Math.toDegrees(faz) * 0.25f, 0.75f, 0.88f, 1f,
-                a * (0.55f + 0.45f * nabiz));
+    /** Güneş yolunda, güneşin (pulsarın) yerinden {@code aci} derece ötedeki yön (gün dönüşü çerçevesinde). */
+    private static Vector3f gunesYolu(float aci) {
+        float r = aci * Mth.DEG_TO_RAD;
+        return new Vector3f(0f, Mth.cos(r), Mth.sin(r));
     }
 
-    /** TEPE'deki teğet düzlemde merkezden {@code yon} boyunca {@code boy} uzunlukta şerit (doku u: merkez 0 → uç 1). */
-    private static void serit(Matrix4f m, ResourceLocation doku, Vector3f yon, float boy, float yari, float r, float g,
-            float b, float a) {
-        if (a <= 0.002f) {
-            return;
-        }
-        float px = -yon.z * yari;
-        float pz = yon.x * yari;
-        float ux = yon.x * boy;
-        float uz = yon.z * boy;
-        RenderSystem.setShader(GameRenderer::getPositionTexColorShader);
-        RenderSystem.setShaderTexture(0, doku);
-        BufferBuilder bb = Tesselator.getInstance().getBuilder();
-        bb.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX_COLOR);
-        bb.vertex(m, -px, 100f, -pz).uv(0f, 0f).color(r, g, b, a).endVertex();
-        bb.vertex(m, ux - px, 100f, uz - pz).uv(1f, 0f).color(r, g, b, a).endVertex();
-        bb.vertex(m, ux + px, 100f, uz + pz).uv(1f, 1f).color(r, g, b, a).endVertex();
-        bb.vertex(m, px, 100f, pz).uv(0f, 1f).color(r, g, b, a).endVertex();
-        BufferUploader.drawWithShader(bb.end());
+    /** {@link #gunesYolu} yönünün bu karedeki dünya yönü (görsel otomasyonun kadrajı için). */
+    static Vector3f gunesYoluYonu(float aci, float zaman) {
+        return new Quaternionf(Axis.YP.rotationDegrees(-90f)).mul(Axis.XP.rotationDegrees(zaman * 360f))
+                .transform(gunesYolu(aci));
     }
 
     /**

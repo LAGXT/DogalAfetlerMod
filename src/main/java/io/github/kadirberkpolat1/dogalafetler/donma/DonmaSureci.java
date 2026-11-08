@@ -5,6 +5,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
 import io.github.kadirberkpolat1.dogalafetler.core.DonemSureci;
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
+import io.github.kadirberkpolat1.dogalafetler.core.PulsarYolu;
 import io.github.kadirberkpolat1.dogalafetler.donma.mantik.DonmaIlerlemesi;
 import java.util.Optional;
 import net.minecraft.nbt.CompoundTag;
@@ -15,7 +16,9 @@ import net.minecraft.server.level.ServerLevel;
 /**
  * Dünya donması dönem süreci ({@code donma}, madde 9; çekirdek §3a): güneşsiz dönemde G {@code donma.donmaSuresi} boyunca
  * 100'e çıkar; kızıl cücede (çözülme dönemi açık, donma kalıcı değilse) {@code donma.cozulmeSuresi} boyunca tabana iner;
- * güneş normalken ve bağımsız çözülme açıksa 0'a iner. İlerleme {@code zamanAdimi()} ile birikir ({@code devamEt}'te iş
+ * güneş normalken ve bağımsız çözülme açıksa 0'a iner. Pulsar zincirinde (pulsar-2) PULSAR ve KARADELİK_YUTMA donmayı
+ * çözer, pulsar yolundaki kızıl cüce "donma kalıcı"yı yok sayar, eski güneş dönünce ({@link PulsarYolu#gunesDondu})
+ * bağımsız çözülme kapalı olsa da 0'a iner. İlerleme {@code zamanAdimi()} ile birikir ({@code devamEt}'te iş
  * yok). Gamerule bağı güneş patlamasıdır; döngü kimliği yalnız süpernova başlangıç koşulunda karşılaştırılır
  * (K-C46). Ulaşılmış ilerleme durdurmada geri alınmaz. Ayrık aşaması yoktur: {@code asama ileri} bu süreci geçer
  * (varsayılan boş çıktı, K-D31); test aracı {@code /dogalafet donma <yüzde>}.
@@ -46,10 +49,10 @@ final class DonmaSureci implements DonemSureci {
         float g = d.donmaIlerlemesi();
         return switch (d.gunesEvresi()) {
             case GUNESSIZ -> g < 100f - PAY;
-            case KIZIL_CUCE -> d.cozulmeDonemi() && !DonmaAyarlari.kalici() && g > DonmaAyarlari.cozulmeTabani() + PAY;
-            case NORMAL -> DonmaAyarlari.bagimsizCozulme() && g > PAY;
-            // Pulsar (gökyüzü-2): donma durur ve geri çözülür; kalıcı kış ve "donma kalıcı" ayarı yok sayılır.
-            case PULSAR -> g > PAY;
+            case KIZIL_CUCE -> d.cozulmeDonemi() && kaliciDegil(d) && g > DonmaAyarlari.cozulmeTabani() + PAY;
+            case NORMAL -> (DonmaAyarlari.bagimsizCozulme() || PulsarYolu.gunesDondu(d)) && g > PAY;
+            // Pulsar (gökyüzü-2) ve yutulması: donma durur ve geri çözülür; kalıcı kış ve "donma kalıcı" ayarı yok sayılır.
+            case PULSAR, KARADELIK_YUTMA -> g > PAY;
             default -> false;
         };
     }
@@ -66,7 +69,7 @@ final class DonmaSureci implements DonemSureci {
                 y.donemSureciBasladi(this);
             }
         }
-        if (d.gunesEvresi() == GunesEvresi.KIZIL_CUCE && !d.cozulmeDonemi() && !DonmaAyarlari.kalici()) {
+        if (d.gunesEvresi() == GunesEvresi.KIZIL_CUCE && !d.cozulmeDonemi() && kaliciDegil(d)) {
             // kalici doğuştan sonra kapatıldıysa çözülme dönemi doğuş olayını beklemeden açılır.
             d.cozulmeDonemiAyarla(true);
         }
@@ -84,5 +87,10 @@ final class DonmaSureci implements DonemSureci {
                     DonmaAyarlari.cozulmeTabani());
             default -> DonmaIlerlemesi.bagimsizCozulmeAdimi(g, adim, DonmaAyarlari.cozulmeSuresiGun());
         });
+    }
+
+    /** Kızıl cücede çözülme açılabilir mi: "donma kalıcı" kapalı ya da kızıl cüce pulsar yolunda (eski güneş dönecek). */
+    static boolean kaliciDegil(DunyaDonemi d) {
+        return !DonmaAyarlari.kalici() || PulsarYolu.donusYolu(d);
     }
 }
