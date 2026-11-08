@@ -30,9 +30,10 @@ import org.joml.Vector3f;
  * kenarı kararan (limb darkening) dokulu çekirdek küre ({@value #CEKIRDEK_DERECE}°; merkez buz mavisi-beyaz, kenar doygun
  * mavi/mor ve koyu, yüzeyde yavaş kaynayan granülasyon), hacimsel hale (3 eksenli kesişen bilboard + kameraya dönük
  * derinlik katmanları, ~{@value #HALE_DERECE}°; korona ≥ 52°), dipol manyetik alan çizgileri ({@code r = L·sin²θ},
- * toplamalı şeritler), manyetik eksen boyunca iki ışın konisi (iç parlak dış saydam, gök kubbesini geçer) ve konilerin
- * kutup uçlarından dışa saçılan plazma parçacıkları. {@code merkez} gök çapasından gelir ve {@value #UZAKLIK} birime
- * ölçeklenir: kamera merkezli ölçek açıları ve paralaksı değiştirmez, derinlikli katmanlar uzak düzlemi aşmaz.
+ * toplamalı şeritler), manyetik eksen boyunca iki ışın konisi (yalnız iki hüzme: gökte yatay eksen, ekranda pulsarın
+ * sağında ve solunda; iç parlak dış saydam, gök kubbesini geçer) ve konilerin kutup uçlarından dışa saçılan plazma
+ * parçacıkları. {@code merkez} gök çapasından gelir ve {@value #UZAKLIK} birime ölçeklenir: kamera merkezli ölçek
+ * açıları ve paralaksı değiştirmez, derinlikli katmanlar uzak düzlemi aşmaz.
  *
  * <p>Sıra: hale, korona, çatırtı parlaması ve çekirdeğin arkasındaki alan/koni parçaları önce (toplamalı) çizilir; opak
  * küre (normal karışım) onları örter, hale kürenin arkasından taşan bir parlama olarak kalır. Öndeki katmanların küre
@@ -75,11 +76,12 @@ public final class Pulsar3B {
     /** Parçacık ömrü (sn): her parçacık kutuptan dışa akıp söner, yeni nesli karmayla yeniden doğar. */
     private static final float OMUR = 2.4f;
     /**
-     * Manyetik eksenler gök çerçevesinde: güneş (pulsar) yerel +Y'de, teğet düzlemde {@code aci} derece ve gözlemciye
-     * doğru {@code egim} derece yatık (bir koni yakın, öteki uzak: perspektif).
+     * Manyetik eksen gök çerçevesinde: güneş (pulsar) yerel +Y'de, teğet düzlemde {@code aci} derece ve gözlemciye
+     * doğru {@code egim} derece yatık (bir koni yakın, öteki uzak: perspektif). 90° yerel X'tir: gök dönüşünün ekseni,
+     * dünyada kuzey–güney; pulsar doğu–batı yolunda olduğundan bakışa dik ve yatay kalır, iki koni ekranda sağa ve sola
+     * uzanır (üstte ve altta hüzme yok).
      */
-    private static final Vector3f EKSEN = gokEkseni(33f, 8f);
-    private static final Vector3f IKINCI_EKSEN = gokEkseni(-58f, -9f);
+    private static final Vector3f EKSEN = gokEkseni(90f, 4f);
     private static final float[] SOGUK = {219 / 255f, 239 / 255f, 247 / 255f};
     private static final float[] SICAK = {0.90f, 0.80f, 1f};
     private static final float[] BEYAZ = {1f, 1f, 1f};
@@ -103,14 +105,14 @@ public final class Pulsar3B {
 
     /** Kademe başına geometri; sıra {@code EfektKalitesi} ile aynı (Düşük, Orta, Yüksek, Ultra). */
     private record Kademe(int enlem, int boylam, int haleKatman, boolean ikiKopya, int alanCizgi, int alanParca,
-            int koniDilim, int koniHalka, boolean ikinciCift, int parcacik) {
+            int koniDilim, int koniHalka, int parcacik) {
     }
 
     private static final Kademe[] KADEMELER = {
-            new Kademe(8, 12, 2, false, 4, 16, 8, 4, false, 40),
-            new Kademe(12, 18, 4, true, 8, 24, 12, 6, true, 120),
-            new Kademe(16, 24, 6, true, 10, 32, 16, 8, true, 200),
-            new Kademe(20, 32, 8, true, 12, 48, 24, 12, true, 300),
+            new Kademe(8, 12, 2, false, 4, 16, 8, 4, 40),
+            new Kademe(12, 18, 4, true, 8, 24, 12, 6, 120),
+            new Kademe(16, 24, 6, true, 10, 32, 16, 8, 200),
+            new Kademe(20, 32, 8, true, 12, 48, 24, 12, 300),
     };
 
     private static final float[] HIZLI = new float[2];
@@ -128,9 +130,6 @@ public final class Pulsar3B {
     private static final Vector3f A1 = new Vector3f();
     private static final Vector3f E1 = new Vector3f();
     private static final Vector3f E2 = new Vector3f();
-    private static final Vector3f A2 = new Vector3f();
-    private static final Vector3f F1 = new Vector3f();
-    private static final Vector3f F2 = new Vector3f();
     private static final Vector3f TABAN = new Vector3f();
     private static final Vector3f YONLU = new Vector3f();
     private static final Vector3f GECICI = new Vector3f();
@@ -212,11 +211,10 @@ public final class Pulsar3B {
     /**
      * Pulsarı çizer. {@code dunya}: kamera dönüşü pozu; {@code merkez}: gök çapasının kameraya göre konumu; {@code guc}
      * 0–1 (ısınma: buz mavisinden mor-beyaza); {@code titresimCarpani} yutmadaki zirve çarpanı (normalde 1);
-     * {@code cekimHedefi} kara deliğin merkezi (aynı çerçeve; null: yok), {@code spagetti} 0–1 çekirdeğin ona doğru uzaması;
-     * {@code ikinciIsin} ikinci koni çiftinin alfası (Düşük'te tek çift).
+     * {@code cekimHedefi} kara deliğin merkezi (aynı çerçeve; null: yok), {@code spagetti} 0–1 çekirdeğin ona doğru uzaması.
      */
     public static void ciz(Matrix4f dunya, Vector3f merkez, float guc, float alfa, float titresimCarpani,
-            @Nullable Vector3f cekimHedefi, float spagetti, float ikinciIsin) {
+            @Nullable Vector3f cekimHedefi, float spagetti) {
         dortgen = 0;
         maskeSin = 0f;
         if (!(alfa > 0.002f) || merkez.lengthSquared() < 1e-8f) {
@@ -229,7 +227,6 @@ public final class Pulsar3B {
         boolean dusuk = k == KADEMELER[0];
         guc = kenetle(guc);
         spagetti = kenetle(spagetti);
-        ikinciIsin = kenetle(ikinciIsin);
         float a = Math.min(1f, alfa);
         double t = Util.getNanos() * 1e-9;
         float ayar = kenetle((float) GokyuzuAyarlari.pulsarTitresim());
@@ -262,7 +259,6 @@ public final class Pulsar3B {
         float alanA = a * 0.45f * isik * sonum;
         float kayma = (float) (t * 0.35 % 1.0);
         float boy = ISIN_BOY * UZAKLIK;
-        float ikinciA = k.ikinciCift ? isinA * 0.6f * ikinciIsin : 0f;
 
         BufferBuilder bb = basla(KORONA);
         float korona = UZAKLIK * (float) Math.tan(KORONA_DERECE * 0.5f * Mth.DEG_TO_RAD) / KORONA_DOKU;
@@ -292,9 +288,6 @@ public final class Pulsar3B {
         bitir(bb);
         bb = basla(KONI);
         koniCifti(bb, dunya, A1, E1, E2, boy, r, k, true, c, parlak, isinA);
-        if (ikinciA > 0.002f) {
-            koniCifti(bb, dunya, A2, F1, F2, boy * 0.7f, r, k, true, c, parlak, ikinciA);
-        }
         bitir(bb);
 
         kureHazirla(k, TITREK, r, A1, true);
@@ -314,9 +307,6 @@ public final class Pulsar3B {
         bitir(bb);
         bb = basla(KONI);
         koniCifti(bb, dunya, A1, E1, E2, boy, r, k, false, c, parlak, isinA);
-        if (ikinciA > 0.002f) {
-            koniCifti(bb, dunya, A2, F1, F2, boy * 0.7f, r, k, false, c, parlak, ikinciA);
-        }
         bitir(bb);
         bb = basla(PARCACIK);
         parcaciklar(bb, dunya, t, k, r, boy, GokyuzuEgrileri.karistir(c, BEYAZ, 0.4f),
@@ -360,16 +350,14 @@ public final class Pulsar3B {
         e2.set(a).cross(e1).normalize();
     }
 
-    /** Gök çerçevesindeki manyetik eksenlerin bu karedeki dünya yönü (güneş yolu dönüşüyle aynı). */
+    /** Gök çerçevesindeki manyetik eksenin bu karedeki dünya yönü (güneş yolu dönüşüyle aynı). */
     private static void manyetikCerceve() {
         Minecraft mc = Minecraft.getInstance();
         ClientLevel level = mc.level;
         float zaman = level == null ? 0f : level.getTimeOfDay(mc.getPartialTick());
         Quaternionf q = new Quaternionf(Axis.YP.rotationDegrees(-90f)).mul(Axis.XP.rotationDegrees(zaman * 360f));
         q.transform(A1.set(EKSEN));
-        q.transform(A2.set(IKINCI_EKSEN));
         dik(A1, E1, E2);
-        dik(A2, F1, F2);
     }
 
     private static void bicimKur(@Nullable Vector3f hedef, float olcek, float spagetti, float r) {

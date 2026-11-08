@@ -323,7 +323,10 @@ public final class KavurmaKuyrugu {
         return true;
     }
 
-    /** Kül yüzeyinde (ince kül katmanı, kül bloğu ya da üstü açık kaba toprak) seyrek kül birikimi. */
+    /**
+     * Kül yüzeyinde (ince kül katmanı, kül bloğu ya da üstü açık kaba toprak) seyrek kül birikimi. Eski dünyadan kalan 8
+     * katlı katman birikimde Kül Bloğuna döner.
+     */
     private static boolean birikim(Islem islem, BlockPos konum, BlockState ust) {
         Block kul = PulsarKayitlari.KUL_KATMANI.get();
         boolean katman = ust.is(kul);
@@ -337,8 +340,8 @@ public final class KavurmaKuyrugu {
         if (katman) {
             int mevcut = ust.getValue(SnowLayerBlock.LAYERS);
             int yeni = PulsarKavurma.yeniKat(mevcut, ek, PulsarKavurma.BIRIKIM_TAVANI);
-            if (yeni != mevcut) {
-                islem.yaz(konum, ust.setValue(SnowLayerBlock.LAYERS, yeni), TAM);
+            if (yeni != mevcut || mevcut >= PulsarKavurma.KUL_EN_COK_KAT) {
+                islem.yaz(konum, kulKati(ust, yeni), TAM);
             }
             return true;
         }
@@ -413,8 +416,8 @@ public final class KavurmaKuyrugu {
     }
 
     /**
-     * Yanan yaprağın külü: altındaki ilk yaprak ve hava olmayan bloğa iner; kül katmanıysa bir kat artar (en çok 8), üstü
-     * tutan bir zeminse üstüne bir kat konur; bitki ya da sıvı üstüne kül düşmez.
+     * Yanan yaprağın külü: altındaki ilk yaprak ve hava olmayan bloğa iner; kül katmanıysa bir kat artar ve 8 kata
+     * varınca gerçek Kül Bloğu olur, üstü tutan bir zeminse üstüne bir kat konur; bitki ya da sıvı üstüne kül düşmez.
      */
     private static void kulDusur(Islem islem, BlockPos yaprak) {
         ServerLevel level = islem.level;
@@ -429,8 +432,8 @@ public final class KavurmaKuyrugu {
             if (s.is(kul)) {
                 int mevcut = s.getValue(SnowLayerBlock.LAYERS);
                 int yeni = PulsarKavurma.yeniKat(mevcut, 1, PulsarKavurma.KUL_EN_COK_KAT);
-                if (yeni != mevcut) {
-                    islem.yaz(k.immutable(), s.setValue(SnowLayerBlock.LAYERS, yeni), TAM);
+                if (yeni != mevcut || mevcut >= PulsarKavurma.KUL_EN_COK_KAT) {
+                    islem.yaz(k.immutable(), kulKati(s, yeni), TAM);
                 }
                 return;
             }
@@ -441,6 +444,12 @@ public final class KavurmaKuyrugu {
             }
             return;
         }
+    }
+
+    /** {@code kat} katlı kül: 8 kat (tam blok) gerçek Kül Bloğu, daha azı {@code katman}'ın o katı. */
+    static BlockState kulKati(BlockState katman, int kat) {
+        return kat >= PulsarKavurma.KUL_EN_COK_KAT ? PulsarKayitlari.KUL_BLOGU.get().defaultBlockState()
+                : katman.setValue(SnowLayerBlock.LAYERS, kat);
     }
 
     public static void sunucuDurdu(ServerStoppedEvent olay) {

@@ -1,0 +1,14 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "building",
+  "group": "planks",
+  "ingredients": [
+    {
+      "item": "dogalafetler:komurlesmis_kutuk"
+    }
+  ],
+  "result": {
+    "count": 4,
+    "item": "dogalafetler:komurlesmis_tahta"
+  }
+}

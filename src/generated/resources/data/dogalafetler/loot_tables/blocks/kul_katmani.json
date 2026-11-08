@@ -160,14 +160,7 @@
               }
             }
           ],
-          "functions": [
-            {
-              "add": false,
-              "count": 8.0,
-              "function": "minecraft:set_count"
-            }
-          ],
-          "name": "dogalafetler:kul_katmani"
+          "name": "dogalafetler:kul_blogu"
         }
       ],
       "rolls": 1.0

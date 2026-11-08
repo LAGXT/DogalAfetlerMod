@@ -9,6 +9,7 @@ Tek oyunculu Quick Play dünyası `run/saves/pulsar` her koşuda KOK/run/saves/t
 kopyalanır; istemci `-Potomasyon=pulsar` ile açılır ve `client.gokyuzu.PulsarOtomasyonu` adımlarını yürütür (büyük
 pulsar, iki ardışık titreşim karesi, 0,5 sn içinde 6 karelik titreşim serisi, blok hasarı açık 3 eşdeğer günlük kavurma
 sonrası cehennem + meteor izi, 7x7 hava kuyusunda ses derinliği ölçümü, pulsar gecesi, ~30° yandan 3B paralaks karesi,
+ufukta (~12°) ve öğlende (tepede, doğuya bakış) yalnız iki yatay hüzmenin kareleri,
 kara delik yutmasının beş anı tam evre saniyesinde (mercek karesi FOV 30) ve Ultra kademede bir dörtgen ölçümü karesi,
 güneşsiz buzul, kızıl cüce doğuşu, eski güneşin dönüşü). Her kare satırı FPS, TPS, mspt, evre, evre saniyesi, kül
 yağışı, uçan meteor, 3B dörtgen sayısı (Pulsar3B + KaraDelik3B), kavurmanın eşdeğer günü, titreşim ofseti, çekirdek
@@ -60,12 +61,14 @@ CEHENNEM_GUN = 3.0
 MERCEK_FOV = 30
 SES_Y = [48, 16, -20]
 BEKLENEN = ["pulsar_buyuk", "pulsar_titresim_a", "pulsar_titresim_b", *(f"{SERI}_{i}" for i in range(SERI_KARE)),
-            "pulsar_cehennem", "pulsar_gece", "pulsar_3b_yan", "karadelik_yaklasma", "karadelik_mercek",
+            "pulsar_cehennem", "pulsar_gece", "pulsar_3b_yan", "pulsar_ufuk", "pulsar_oglen", "karadelik_yaklasma",
+            "karadelik_mercek",
             "karadelik_spagetti", "karadelik_ultra", "karadelik_parlama", "karadelik_karanlik", "gunessiz_buz",
             "kizil_cuce_dogus", "gunes_dondu"]
 EVRE = {"pulsar_buyuk": "pulsar", "pulsar_titresim_a": "pulsar", "pulsar_titresim_b": "pulsar",
         **{f"{SERI}_{i}": "pulsar" for i in range(SERI_KARE)}, "pulsar_cehennem": "pulsar", "pulsar_gece": "pulsar",
-        "pulsar_3b_yan": "pulsar", "karadelik_yaklasma": "karadelik_yutma", "karadelik_mercek": "karadelik_yutma",
+        "pulsar_3b_yan": "pulsar", "pulsar_ufuk": "pulsar", "pulsar_oglen": "pulsar",
+        "karadelik_yaklasma": "karadelik_yutma", "karadelik_mercek": "karadelik_yutma",
         "karadelik_spagetti": "karadelik_yutma", "karadelik_ultra": "karadelik_yutma",
         "karadelik_parlama": "karadelik_yutma", "karadelik_karanlik": "karadelik_yutma", "gunessiz_buz": "gunessiz",
         "kizil_cuce_dogus": "kizil_cuce", "gunes_dondu": "normal"}
