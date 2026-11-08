@@ -28,8 +28,9 @@ import org.joml.Matrix4f;
 /**
  * Asit yağmurunun yağış çizimi (tasarım notu §2 "Yağmur"): vanilla {@code renderSnowAndRain} ile aynı sütun geometrisi
  * (kameraya dönük dikey dörtgen, sütun başına tohumlu kayma ve hız), kendi dokumuz {@code asit_yagmuru.png} (sarımsı yeşil,
- * vanilla'dan %15 sık damla) ve %20 kalın damla. Yalnız asit alanındaki sütunlar çizilir; alfa alan kenarında 16 blokta
- * söner. Gerçek hava durumu değişmez. Yağmur yarıçapı efekt kalitesiyle 5 / 10 / 10 / 15 (maliyet vanilla ile aynı).
+ * vanilla'dan %15 sık damla) ve %20 kalın damla. Yağmur her yerde yağar (AF2-01): biyomun yağışına bakılmaz, çölde ve kar
+ * biyomunda da asit çizilir (vanilla yağmuru {@link IstemciAsitYagmuru} bastırır). Yağmur yarıçapı efekt kalitesiyle
+ * 5 / 10 / 10 / 15 (maliyet vanilla ile aynı).
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class AsitYagmuruCizici {
@@ -52,9 +53,6 @@ public final class AsitYagmuruCizici {
         }
         Vec3 kam = olay.getCamera().getPosition();
         int r = IstemciAsitYagmuru.kademe().yagmurYaricapi;
-        if (IstemciAsitYagmuru.alanAgirligi(kam.x, kam.z) <= 0 && !kenardaMi(kam, r)) {
-            return;
-        }
         float pt = olay.getPartialTick();
         int tick = olay.getRenderTick();
         LightTexture isik = mc.gameRenderer.lightTexture();
@@ -81,10 +79,6 @@ public final class AsitYagmuruCizici {
         int dortgen = 0;
         for (int cz = iz - r; cz <= iz + r; cz++) {
             for (int cx = ix - r; cx <= ix + r; cx++) {
-                double alan = IstemciAsitYagmuru.alanAgirligi(cx + 0.5, cz + 0.5);
-                if (alan <= 0) {
-                    continue;
-                }
                 int h = level.getHeight(Heightmap.Types.MOTION_BLOCKING, cx, cz);
                 int alt = Math.max(iy - r, h);
                 int ust = Math.max(iy + r, h);
@@ -95,7 +89,7 @@ public final class AsitYagmuruCizici {
                 double dz = cz + 0.5 - kam.z;
                 double uzaklik = Math.sqrt(dx * dx + dz * dz);
                 float oran = (float) (uzaklik / r);
-                float alfa = (float) (((1 - oran * oran) * 0.5 + 0.5) * yogunluk * alan);
+                float alfa = (float) (((1 - oran * oran) * 0.5 + 0.5) * yogunluk);
                 if (alfa <= 0.01f) {
                     continue;
                 }
@@ -133,11 +127,5 @@ public final class AsitYagmuruCizici {
         RenderSystem.disableBlend();
         RenderSystem.depthMask(true);
         isik.turnOffLightLayer();
-    }
-
-    /** Kamera alanın dışında ama kenara yağmur yarıçapı kadar yakınsa dışarıdan da perde görünür. */
-    private static boolean kenardaMi(Vec3 kam, int r) {
-        return IstemciAsitYagmuru.alanAgirligi(kam.x + r, kam.z) > 0 || IstemciAsitYagmuru.alanAgirligi(kam.x - r, kam.z) > 0
-                || IstemciAsitYagmuru.alanAgirligi(kam.x, kam.z + r) > 0 || IstemciAsitYagmuru.alanAgirligi(kam.x, kam.z - r) > 0;
     }
 }

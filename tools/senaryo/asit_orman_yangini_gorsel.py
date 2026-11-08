@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """Asit yağmuru ve orman yangınının görsel kanıtı (K0-21 rev. 2 ekran protokolü, kilit (k)).
 
-Kullanım (worktree kökünden): python3 tools/senaryo/asit_orman_yangini_gorsel.py
+Kullanım (worktree kökünden): python3 tools/senaryo/asit_orman_yangini_gorsel.py [<kanıt klasörü>] [uzak]
+
+`uzak` kipi (AF2-01, asit bütün dünyada): `-PotomasyonBolum=uzak`; S5 asit en yakın çölün 320 blok uzağında (konuma) başlar,
+oyuncu çölde yerde durur. Kareler `asit_uzak` (yaratıcı, çölde asit yağmuru) ve `asit_hud_uzak` (hayatta kalma, maruziyet ekran
+efekti); satırlar merkeze uzaklığı, biyomu, istemci asit yoğunluğunu, vanilla yağmur düzeyini ve canı yazar. pc2:
+`tools/senaryo/pc2_istemci.sh <kanıt>/ asit_orman_yangini_gorsel.py <kanıt> uzak`.
 
 Tek oyunculu Quick Play dünyası `run/saves/asit_orman` her koşuda KOK/run/saves/test'ten (seed 20261105, allowCommands=1) taze
 kopyalanır; istemci `-Potomasyon=asit_orman` ile açılır ve `client.asit_yagmuru.AsitOrmanOtomasyonu` adımları yürütür: asit
@@ -12,7 +17,7 @@ focus_on_activate off]); (b) JVM'de HL_EXEC_RULE_TOKEN yoksa öldürülür; (c) 
 tutmazsa öldürülür; (d) 5 sn'de bir bekçi: etkin pencere bizimse ALARM, süreç öldürülür, odak kaydedilen pencereye
 verilir, koşu geçersiz; (e) oyun içi girdi sayıları kapanış satırından okunur, sıfırdan farklıysa koşu geçersiz.
 Sahibin oturumunda tıklama/odak/workspace değişimi yok. Aynı anda tek runClient (runclient_kilit.py kos); ağır süreç kapısı.
-Sayılar ve adımlar KOK/.vibe/kanit/asit-orman-yangini/gorsel/protokol.log'a, kareler .../gorsel/kareler/'e.
+Sayılar ve adımlar <kanıt>/protokol.log'a (varsayılan KOK/.vibe/kanit/asit-orman-yangini/gorsel), kareler <kanıt>/kareler/'e.
 """
 import hashlib
 import os
@@ -30,7 +35,10 @@ import runclient_kilit  # noqa: E402
 WS = 93
 W = Path(__file__).resolve().parents[2]
 KOK = W.parents[1] if W.parent.name == ".worktrees" else W
-KANIT = KOK / ".vibe/kanit/asit-orman-yangini/gorsel"
+_ARGUMANLAR = sys.argv[1:]
+KIP = "uzak" if "uzak" in _ARGUMANLAR else "hepsi"
+_KANIT = next((a for a in _ARGUMANLAR if a != "uzak"), None)
+KANIT = Path(_KANIT).resolve() if _KANIT else KOK / ".vibe/kanit/asit-orman-yangini/gorsel"
 KARELER = KANIT / "kareler"
 JAVA_HOME = "/home/lagxt/.jdks/jdk-17.0.21+9"
 ISARET = "ASIT_ORMAN_OTOMASYON"
@@ -127,6 +135,7 @@ def main():
                      f"export JAVA_HOME='{JAVA_HOME}'\n"
                      f"exec python3 tools/senaryo/runclient_kilit.py kos '{W}' --bekle 1800 -- "
                      "timeout 3000 ./gradlew runClient --offline --no-daemon --console=plain -PquickPlay=asit_orman -Potomasyon=asit_orman "
+                     f"-PotomasyonBolum={KIP} "
                      f"> '{istemci_log}' 2>&1\n")
     sahip_adres = runclient_kilit.istemci_baslat(betik, WS, log)
     baslangic = time.time()
@@ -161,8 +170,8 @@ def main():
         shutil.copy2(latest, KANIT / f"latest-{no}.log")
         # K-E47 eki (P2-4): orman bitiş karesi yangın söndükten sonra yanık kamerasından; sönmeyip söndürülen koşu satırdan okunur.
         for satir in latest.read_text(errors="replace").splitlines():
-            if any(k in satir for k in ("yangın söndü", "BITIS-KAPISI", "yanık kamerası")):
-                log("bitiş:", satir.split(f"{ISARET} ", 1)[-1])
+            if any(k in satir for k in ("yangın söndü", "BITIS-KAPISI", "yanık kamerası", "uzak:")):
+                log("uzak" if "uzak:" in satir else "bitiş:", satir.split(f"{ISARET} ", 1)[-1])
     sayim = girdi_sayilari(istemci_log)
     if sayim is None:
         log(f"koşu {no} GEÇERSİZ: girdi sayıları satırı yok")
