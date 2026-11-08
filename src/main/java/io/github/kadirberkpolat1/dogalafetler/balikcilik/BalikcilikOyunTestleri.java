@@ -915,13 +915,13 @@ public final class BalikcilikOyunTestleri {
         level.setBlockAndUpdate(delik, BalikcilikKayitlari.BUZ_DELIGI.get().defaultBlockState());
         ServerPlayer o = oyuncu(y, 1, 1);
         y.assertTrue(BuzBalikciligi.buzUstundeMi(o), "oyuncu buz üstünde durmalı: " + level.getBlockState(o.getOnPos()));
-        double once = SicaklikYoneticisi.analiz(o).ortam().toplam();
+        double once = SicaklikYoneticisi.analiz(o).mekan().toplam();
         o.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.FISHING_ROD));
         oltaAt(level, o, delik);
         y.succeedWhen(() -> {
             double sogutma = BuzBalikciligi.sonSogutma(o);
             y.assertTrue(sogutma <= -1.0, "hareketsizlik soğuması henüz güçlenmedi: " + sogutma);
-            double simdi = SicaklikYoneticisi.analiz(o).ortam().toplam();
+            double simdi = SicaklikYoneticisi.analiz(o).mekan().toplam();
             y.assertTrue(simdi <= once - 0.9, "ortam sıcaklığı düşmeli: " + once + " -> " + simdi);
             temizle(y, o);
         });

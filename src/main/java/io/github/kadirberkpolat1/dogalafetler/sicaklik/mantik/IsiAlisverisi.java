@@ -2,13 +2,13 @@ package io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik;
 
 /**
  * Vücut ile ortam arasındaki ısı alışverişi (madde 7b, N3, N4). Vücut sıcaklığı B, −100…+100 vücut birimidir (0 nötr).
- * Ortam °C'si {@code E = (T − T_konfor) · birimPerDerece} ile vücut birimine çevrilir. Model (Newton soğuması + metabolik ısı):
+ * Ortam (hissedilen) °C'si {@code E = (T − T_konfor) · birimPerDerece} ile vücut birimine çevrilir. Model (Newton soğuması + metabolik ısı):
  *
  * <pre>
  * B' = k · w / (1 + I) · [(E − B) + U · (a · (1 + I) − 1)]
  * </pre>
  *
- * {@code k} eşitlenme hızı, {@code w} ıslaklık iletkenliği, {@code I} toplam yalıtım, {@code U} konfor ortamında metabolik
+ * {@code k} eşitlenme hızı, {@code w} ıslaklık iletkenliği (S3-02: {@code suda ? suIletkenlik : 1 + (islakIletkenlik − 1)·W}), {@code I} toplam yalıtım, {@code U} konfor ortamında metabolik
  * ısının karşılığı, {@code a} etkinlik. Fark büyükse değişim hızlı, küçükse yavaştır; yalıtım hızı böler ve dengeyi sıcağa
  * iter (ılık ortamda çok yalıtımlı oyuncu aşırı ısınır). Yünün soğuma kesintisi (N3) yalnız vücut nötrün altındayken
  * (B ≤ 0) soğuma yönünde uygulanır: hız yünsüz yalıtımla hesaplanıp {@code 1 − 0,25·n} ile çarpılır. Nötrün üstündeki
@@ -24,9 +24,12 @@ public final class IsiAlisverisi {
 
     /**
      * @param vucut     vücut sıcaklığı (vücut birimi)
-     * @param ortam     ortam sıcaklığı (°C)
+     * @param ortam     hissedilen sıcaklık (°C, {@link Hissedilen})
+     * @param islaklik  W (0–1, {@link Islaklik})
+     * @param suda      suyun içinde mi (iletkenlik su değeri)
      */
-    public record Girdi(double vucut, double ortam, Etkinlik etkinlik, Islaklik islaklik, Yalitim.Girdi yalitim) {
+    public record Girdi(double vucut, double ortam, Etkinlik etkinlik, double islaklik, boolean suda,
+            Yalitim.Girdi yalitim) {
     }
 
     /**
@@ -54,12 +57,9 @@ public final class IsiAlisverisi {
             };
         }
 
-        public double iletkenlik(Islaklik i) {
-            return switch (i) {
-                case KURU -> 1.0;
-                case ISLAK -> islakIletkenlik;
-                case SUDA -> suIletkenlik;
-            };
+        /** Suda {@code suIletkenlik}; değilse kurudan (1) tam ıslaklığa ({@code islakIletkenlik}) doğrusal. */
+        public double iletkenlik(double islaklik, boolean suda) {
+            return suda ? suIletkenlik : 1 + (islakIletkenlik - 1) * Islaklik.sinirla(islaklik);
         }
     }
 
@@ -68,7 +68,7 @@ public final class IsiAlisverisi {
         double e = a.esdeger(g.ortam());
         double b = g.vucut();
         double etkinlik = a.etkinlik(g.etkinlik());
-        double k = a.esitlenmeHizi() * a.iletkenlik(g.islaklik());
+        double k = a.esitlenmeHizi() * a.iletkenlik(g.islaklik(), g.suda());
         double u = a.metabolikIsi();
         double kuru = Yalitim.kuruToplam(g.yalitim(), y);
         int yun = g.yalitim().yunluParca();
@@ -103,7 +103,7 @@ public final class IsiAlisverisi {
         double yeni = b + hiz * saniye;
         if (b > 0 && yeni < 0) {
             double kalan = saniye - b / -hiz;
-            Girdi notr = new Girdi(0, g.ortam(), g.etkinlik(), g.islaklik(), g.yalitim());
+            Girdi notr = new Girdi(0, g.ortam(), g.etkinlik(), g.islaklik(), g.suda(), g.yalitim());
             yeni = egilim(notr, a, y) * kalan;
         }
         return sinirla(yeni);

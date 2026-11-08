@@ -16,7 +16,8 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 /**
- * Forge olayları: vanilla pişmiş yiyeceklerin çok küçük ısınması (madde 14, {@code LivingEntityUseItemEvent.Finish}; kendi
+ * Forge olayları: vanilla yiyecek ve içeceklerin kademeli ısınma ve serinliği (madde 14, S3-06;
+ * {@code LivingEntityUseItemEvent.Finish}, olayın eşyası yemeden önceki kopyadır: su şişesinin NBT'si okunur; kendi
  * eşyalarımız kendi {@code finishUsingItem}'larında uygular), ölümsüz kopyada azalan verim geçmişi ve açılışta tarif
  * sayısı log'u (dedicated kabulü).
  */
@@ -28,7 +29,7 @@ public final class YiyecekOlaylari {
     @SubscribeEvent
     public static void yemeBitti(LivingEntityUseItemEvent.Finish olay) {
         if (olay.getEntity() instanceof ServerPlayer oyuncu) {
-            YiyecekAPI.vanillaTanimi(olay.getItem().getItem()).ifPresent(tanim -> YiyecekAPI.uygula(oyuncu, tanim));
+            YiyecekAPI.vanillaTanimi(olay.getItem()).ifPresent(tanim -> YiyecekAPI.uygula(oyuncu, tanim));
         }
     }
 
@@ -59,8 +60,9 @@ public final class YiyecekOlaylari {
         }
         int balik = BuiltInRegistries.ITEM.getTag(YiyecekKayitlari.PISMIS_KUTUP_BALIGI).map(t -> t.size()).orElse(0);
         DogalAfetler.LOGGER.info("Yiyecek: {} sıcaklık yiyeceği tarifi yüklendi {}; koşullu atlanan {} {}; #{} etiketinde {} eşya;"
-                + " vanillaIsinma={} ({} yiyecek)", tarifler.size(), tarifler, atlanan.size(), atlanan,
-                YiyecekKayitlari.PISMIS_KUTUP_BALIGI.location(), balik, YiyecekAyarlari.vanillaIsinma(),
-                YiyecekAyarlari.vanillaTanimlari().size());
+                + " vanillaIsinma={} ({} yiyecek), vanillaSerinlik={} ({} yiyecek)", tarifler.size(), tarifler, atlanan.size(),
+                atlanan, YiyecekKayitlari.PISMIS_KUTUP_BALIGI.location(), balik, YiyecekAyarlari.vanillaIsinma(),
+                YiyecekAyarlari.vanillaIsinmaTanimlari().size(), YiyecekAyarlari.vanillaSerinlik(),
+                YiyecekAyarlari.vanillaSerinlikTanimlari().size());
     }
 }

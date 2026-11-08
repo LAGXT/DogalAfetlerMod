@@ -1,0 +1,35 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_beetroot": {
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "minecraft:beetroot"
+            ]
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    },
+    "has_the_recipe": {
+      "conditions": {
+        "recipe": "dogalafetler:tarhana_corbasi"
+      },
+      "trigger": "minecraft:recipe_unlocked"
+    }
+  },
+  "requirements": [
+    [
+      "has_beetroot",
+      "has_the_recipe"
+    ]
+  ],
+  "rewards": {
+    "recipes": [
+      "dogalafetler:tarhana_corbasi"
+    ]
+  },
+  "sends_telemetry_event": false
+}

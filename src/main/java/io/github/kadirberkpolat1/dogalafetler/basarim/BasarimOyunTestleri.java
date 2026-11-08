@@ -926,12 +926,12 @@ public final class BasarimOyunTestleri {
         ServerPlayer serin = oyuncu(y, "corba-serin", 4);
         try {
             dogrula(y, SicaklikKapisi.acikMi(server), "sıcaklık sistemi açık olmalı");
-            // −31 soğuk kademesi: kızarmış patates (vanilla pişmiş yiyeceğin küçük ısınması) ve nötre dönüş.
+            // −31 üşüme (soğuk kademesi): kızarmış patates (vanilla pişmiş yiyeceğin küçük ısınması) ve nötre dönüş.
             ye(soguk, -31, new ItemStack(Items.BAKED_POTATO), 0.75, 600, 2.25);
             VucutSicakligi.ayarla(soguk, 0);
             BasarimOlaylari.saniyelikDenetim(soguk);
             dogrula(y, !kazandi(y, soguk, Basarimlar.CORBA_ICER_ISINIR),
-                    "soğuk kademesinde yenen sayılmaz (donma değil)");
+                    "üşümede yenen sayılmaz (donma hasarı değil)");
             // −80 donma kademesi: Ateşli Güveç ısınması (+8 anında, 180 sn'de +32).
             ye(donan, -80, new ItemStack(Items.MUSHROOM_STEW), 8, 180 * 20, 32);
             BasarimOlaylari.saniyelikDenetim(donan);

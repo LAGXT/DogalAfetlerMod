@@ -1,5 +1,6 @@
 package io.github.kadirberkpolat1.dogalafetler.config;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,9 +27,26 @@ public final class SurumluGocPlani {
         }
     }
 
+    /**
+     * {@code surum}'de liste değerli {@code yol}'un varsayılanı {@code eskiler}'den birinden {@code yeni}'ye geçti. Liste
+     * yalnız eski bir varsayılana öğe öğe, sırasıyla birebir eşitse değişir (elle eklenmiş tek satır listeyi korur).
+     */
+    public record ListeAdimi(int surum, String yol, List<String> yeni, List<List<String>> eskiler) {
+        public ListeAdimi {
+            Objects.requireNonNull(yol, "yol");
+            yeni = List.copyOf(yeni);
+            List<List<String>> kopya = new ArrayList<>();
+            for (List<String> eski : eskiler) {
+                kopya.add(List.copyOf(eski));
+            }
+            eskiler = List.copyOf(kopya);
+        }
+    }
+
     private final String surumYolu;
     private final int guncel;
     private final List<Adim> adimlar;
+    private final List<ListeAdimi> listeAdimlari;
 
     /**
      * @throws IllegalArgumentException tablo sürüme göre sıralı değilse, bir adımın sürümü 1–{@code guncel} dışındaysa, aynı
@@ -36,9 +54,32 @@ public final class SurumluGocPlani {
      *         anahtarının kendisini taşıyorsa
      */
     public SurumluGocPlani(String surumYolu, int guncel, List<Adim> adimlar) {
+        this(surumYolu, guncel, adimlar, List.of());
+    }
+
+    /** Sayı adımlarına ek olarak liste adımlarıyla; liste adımları sayılarla aynı kurallarla denetlenir. */
+    public SurumluGocPlani(String surumYolu, int guncel, List<Adim> adimlar, List<ListeAdimi> listeAdimlari) {
         this.surumYolu = Objects.requireNonNull(surumYolu, "surumYolu");
         this.guncel = guncel;
         this.adimlar = List.copyOf(adimlar);
+        this.listeAdimlari = List.copyOf(listeAdimlari);
+        int listeOnceki = 1;
+        for (int i = 0; i < this.listeAdimlari.size(); i++) {
+            ListeAdimi a = this.listeAdimlari.get(i);
+            if (a.surum() < listeOnceki || a.surum() > guncel) {
+                throw new IllegalArgumentException("Liste göç adımı sırasız ya da sürüm dışı: " + a.yol());
+            }
+            listeOnceki = a.surum();
+            if (a.yol().equals(surumYolu) || a.eskiler().isEmpty() || a.eskiler().contains(a.yeni())) {
+                throw new IllegalArgumentException("Geçersiz liste göç adımı: " + a.yol());
+            }
+            for (int j = 0; j < i; j++) {
+                ListeAdimi b = this.listeAdimlari.get(j);
+                if (b.surum() == a.surum() && b.yol().equals(a.yol())) {
+                    throw new IllegalArgumentException("Aynı sürümde iki liste adımı: " + a.yol());
+                }
+            }
+        }
         int onceki = 1;
         for (int i = 0; i < this.adimlar.size(); i++) {
             Adim a = this.adimlar.get(i);
@@ -60,6 +101,11 @@ public final class SurumluGocPlani {
 
     public static Adim adim(int surum, String yol, Number yeni, Number... eskiler) {
         return new Adim(surum, yol, yeni, List.of(eskiler));
+    }
+
+    @SafeVarargs
+    public static ListeAdimi listeAdimi(int surum, String yol, List<String> yeni, List<String>... eskiler) {
+        return new ListeAdimi(surum, yol, yeni, List.of(eskiler));
     }
 
     public String surumYolu() {
@@ -92,6 +138,37 @@ public final class SurumluGocPlani {
             }
         }
         return degisen;
+    }
+
+    /** Sürüme göre sıralı liste tablosu. */
+    public List<ListeAdimi> listeAdimlari() {
+        return listeAdimlari;
+    }
+
+    /**
+     * {@link #plan}'ın liste karşılığı: dosyadaki liste ({@code oku}; liste değilse ya da yoksa atlanır) bir eski varsayılana
+     * öğe öğe birebir eşitse yol → yeni liste. Öğeler {@code toString} ile karşılaştırılır (TOML okuyucusu dizgi verir).
+     */
+    public Map<String, List<String>> listePlani(int surum, Function<String, Object> oku) {
+        Map<String, List<String>> degisen = new LinkedHashMap<>();
+        for (ListeAdimi a : listeAdimlari) {
+            if (a.surum() <= surum) {
+                continue;
+            }
+            Object deger = degisen.containsKey(a.yol()) ? degisen.get(a.yol()) : oku.apply(a.yol());
+            if (deger instanceof List<?> liste && a.eskiler().contains(dizgiler(liste))) {
+                degisen.put(a.yol(), a.yeni());
+            }
+        }
+        return degisen;
+    }
+
+    private static List<String> dizgiler(List<?> liste) {
+        List<String> sonuc = new ArrayList<>(liste.size());
+        for (Object o : liste) {
+            sonuc.add(String.valueOf(o));
+        }
+        return sonuc;
     }
 
     private static boolean eskiVarsayilan(Number deger, Adim a) {

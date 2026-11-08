@@ -17,6 +17,8 @@ import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Kademe;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.SureliEtki;
 import io.github.kadirberkpolat1.dogalafetler.yiyecek.mantik.EtkiAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.yiyecek.mantik.YiyecekTablosu;
+import io.github.kadirberkpolat1.dogalafetler.yiyecek.mantik.YiyecekTanimi;
+import io.github.kadirberkpolat1.dogalafetler.yiyecek.mantik.Yon;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -33,12 +35,15 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.inventory.CraftingMenu;
 import net.minecraft.world.inventory.TransientCraftingContainer;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.alchemy.PotionUtils;
+import net.minecraft.world.item.alchemy.Potions;
 import net.minecraft.world.item.crafting.CraftingRecipe;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.Recipe;
@@ -127,10 +132,16 @@ public final class YiyecekOyunTestleri {
 
     /** Vanilla yiyeceği {@code LivingEntity.completeUsingItem} gibi yer: bitiş + Forge {@code Finish} olayı. */
     private static void vanillaYe(ServerPlayer o, Item esya) {
-        ItemStack yigin = new ItemStack(esya);
+        vanillaArtis(o, new ItemStack(esya));
+    }
+
+    /** {@link #vanillaYe} yığınla (iksir NBT'si korunur); vücuttaki anında değişimi döndürür. */
+    private static double vanillaArtis(ServerPlayer o, ItemStack yigin) {
+        double once = VucutSicakligi.al(o);
         ItemStack kopya = yigin.copy();
         ItemStack sonuc = yigin.finishUsingItem(o.level(), o);
         ForgeEventFactory.onItemUseFinish(o, kopya, 0, sonuc);
+        return VucutSicakligi.al(o) - once;
     }
 
     private static boolean yakin(double a, double b) {
@@ -292,20 +303,8 @@ public final class YiyecekOyunTestleri {
                     new Ornek("meyve_serbeti", 1, List.of(b, Items.SWEET_BERRIES, Items.SWEET_BERRIES, Items.SWEET_BERRIES,
                             Items.SUGAR, Items.SNOWBALL), List.of()));
             for (Ornek ornek : ornekler) {
-                TransientCraftingContainer tezgah = tezgah(o, ornek.girdi());
-                Optional<CraftingRecipe> tarif = level.getRecipeManager().getRecipeFor(RecipeType.CRAFTING, tezgah, level);
-                dogrula(y, tarif.isPresent() && tarif.get().getId().equals(DogalAfetler.konum(ornek.ad())),
-                        ornek.ad() + " tarifi eşleşmedi: " + tarif.map(Recipe::getId));
-                ItemStack sonuc = tarif.get().assemble(tezgah, level.registryAccess());
-                dogrula(y, sonuc.is(YiyecekKayitlari.esya(ornek.ad())) && sonuc.getCount() == ornek.adet(),
-                        ornek.ad() + " sonucu: " + sonuc);
-                List<Item> kalan = new ArrayList<>();
-                for (ItemStack k : tarif.get().getRemainingItems(tezgah)) {
-                    if (!k.isEmpty()) {
-                        kalan.add(k.getItem());
-                    }
-                }
-                dogrula(y, sayim(kalan).equals(sayim(ornek.kalan())), ornek.ad() + " kalanları: " + kalan);
+                tarifSina(y, level, o, ornek.ad(), YiyecekKayitlari.esya(ornek.ad()), ornek.adet(), ornek.girdi(),
+                        ornek.kalan());
             }
             TransientCraftingContainer eksik = tezgah(o, List.of(b, b, b, Items.MILK_BUCKET));
             dogrula(y, level.getRecipeManager().getRecipeFor(RecipeType.CRAFTING, eksik, level).isEmpty(),
@@ -314,6 +313,188 @@ public final class YiyecekOyunTestleri {
             y.succeed();
         } finally {
             cikar(y, List.of(o));
+        }
+    }
+
+    /** Girdiyle {@code RecipeManager} {@code ad} tarifini bulur; ürün, adet ve kalanlar beklenen gibi. */
+    private static void tarifSina(GameTestHelper y, ServerLevel level, ServerPlayer o, String ad, Item urun, int adet,
+            List<Item> girdi, List<Item> beklenenKalan) {
+        TransientCraftingContainer tezgah = tezgah(o, girdi);
+        Optional<CraftingRecipe> tarif = level.getRecipeManager().getRecipeFor(RecipeType.CRAFTING, tezgah, level);
+        dogrula(y, tarif.isPresent() && tarif.get().getId().equals(DogalAfetler.konum(ad)),
+                ad + " tarifi eşleşmedi: " + tarif.map(Recipe::getId));
+        ItemStack sonuc = tarif.get().assemble(tezgah, level.registryAccess());
+        dogrula(y, sonuc.is(urun) && sonuc.getCount() == adet, ad + " sonucu: " + sonuc);
+        List<Item> kalan = new ArrayList<>();
+        for (ItemStack k : tarif.get().getRemainingItems(tezgah)) {
+            if (!k.isEmpty()) {
+                kalan.add(k.getItem());
+            }
+        }
+        dogrula(y, sayim(kalan).equals(sayim(beklenenKalan)), ad + " kalanları: " + kalan);
+    }
+
+    /**
+     * Sıcaklık-3 tarifleri (S3-06) ve Buz Kovası (S3-05) {@code RecipeManager} ile: her yeni yiyeceğin örneği var; süt
+     * kovasının kovası ve bal şişesinin şişesi geri gelir; kova + buz tek, yığılmayan Buz Kovası verir (kova tükenir).
+     */
+    @GameTest(template = "bos", batch = "yiyecek_yeni_tarif")
+    public static void yeniTariflerVeBuzKovasiTarifi(GameTestHelper y) {
+        ServerLevel level = y.getLevel();
+        ServerPlayer o = oyuncu(y, "yeni-tarif-test", 0);
+        Item b = Items.GLASS_BOTTLE;
+        Item k = Items.BOWL;
+        try {
+            List<Ornek> ornekler = List.of(
+                    new Ornek("maras_dondurmasi", 2, List.of(k, k, Items.MILK_BUCKET, Items.SUGAR, Items.ICE),
+                            List.of(Items.BUCKET)),
+                    new Ornek("soguk_elma_suyu", 2, List.of(b, b, Items.APPLE, Items.APPLE, Items.SNOWBALL), List.of()),
+                    new Ornek("kar_helvasi", 1, List.of(k, Items.SNOWBALL, Items.SNOWBALL, Items.HONEY_BOTTLE),
+                            List.of(Items.GLASS_BOTTLE)),
+                    new Ornek("soguk_komposto", 1, List.of(b, Items.APPLE, Items.SWEET_BERRIES, Items.SUGAR, Items.SNOWBALL),
+                            List.of()),
+                    new Ornek("parlak_sorbe", 1, List.of(k, Items.GLOW_BERRIES, Items.GLOW_BERRIES, Items.PACKED_ICE,
+                            Items.SUGAR), List.of()),
+                    new Ornek("buzlu_kakao", 3, List.of(b, b, b, Items.MILK_BUCKET, Items.COCOA_BEANS, Items.COCOA_BEANS,
+                            Items.ICE), List.of(Items.BUCKET)),
+                    new Ornek("tarhana_corbasi", 3, List.of(k, k, k, Items.MILK_BUCKET, Items.WHEAT, Items.WHEAT,
+                            Items.BEETROOT), List.of(Items.BUCKET)),
+                    new Ornek("kuzu_haslama", 1, List.of(k, Items.COOKED_MUTTON, Items.POTATO, Items.CARROT), List.of()),
+                    new Ornek("kabak_corbasi", 2, List.of(k, k, Items.PUMPKIN, Items.CARROT), List.of()),
+                    new Ornek("sucuklu_yumurta", 1, List.of(k, Items.EGG, Items.EGG, Items.COOKED_BEEF), List.of()),
+                    new Ornek("firinda_elma", 1, List.of(Items.APPLE, Items.SUGAR, Items.HONEY_BOTTLE),
+                            List.of(Items.GLASS_BOTTLE)),
+                    new Ornek("elma_cayi", 2, List.of(b, b, Items.APPLE, Items.SUGAR), List.of()));
+            List<String> beklenen = new ArrayList<>();
+            for (YiyecekTablosu.Kayit kayit : yeniYiyecekler()) {
+                beklenen.add(kayit.ad());
+            }
+            dogrula(y, ornekler.stream().map(Ornek::ad).toList().equals(beklenen), "her yeni yiyeceğin tarif örneği olmalı");
+            for (Ornek ornek : ornekler) {
+                tarifSina(y, level, o, ornek.ad(), YiyecekKayitlari.esya(ornek.ad()), ornek.adet(), ornek.girdi(),
+                        ornek.kalan());
+            }
+            tarifSina(y, level, o, "buz_kovasi", YiyecekKayitlari.BUZ_KOVASI.get(), 1, List.of(Items.BUCKET, Items.ICE),
+                    List.of());
+            dogrula(y, new ItemStack(YiyecekKayitlari.BUZ_KOVASI.get()).getMaxStackSize() == 1, "Buz Kovası yığılmamalı");
+            y.succeed();
+        } finally {
+            cikar(y, List.of(o));
+        }
+    }
+
+    /** Sıcaklık-3'ün yiyecekleri: tabloda madde 14'ün dokuzundan sonrakiler. */
+    private static List<YiyecekTablosu.Kayit> yeniYiyecekler() {
+        return YiyecekTablosu.KAYITLAR.subList(9, YiyecekTablosu.KAYITLAR.size());
+    }
+
+    /**
+     * S3-06: her yeni yiyecek gerçek yeme yoluyla doğru yönde anında etki (± kademe · pay), kendi yönünün gösterge efekti
+     * (amplifier = kademe seviyesi, süre = etki süresi; karşı yön yok), yemek değeri ve boş kap verir; serinleten ve ısıtan
+     * yiyecekler dengeli.
+     */
+    @GameTest(template = "bos", batch = "yiyecek_yeni")
+    public static void yeniYiyeceklerDogruYondeEtkiEfektVeKapVerir(GameTestHelper y) {
+        kuraliAc(y.getLevel().getServer());
+        ServerPlayer o = oyuncu(y, "yeni-yiyecek-test", 0);
+        try {
+            EtkiAyarlari a = YiyecekAyarlari.etki();
+            int isinma = 0;
+            int serinlik = 0;
+            for (YiyecekTablosu.Kayit kayit : yeniYiyecekler()) {
+                YiyecekTanimi t = kayit.tanim();
+                o.removeAllEffects();
+                VucutSicakligi.ayarla(o, 0);
+                o.getFoodData().setFoodLevel(0);
+                ItemStack kalan = ye(o, kayit.ad(), 1);
+                double vucut = VucutSicakligi.al(o);
+                double beklenen = a.miktar(t.buyukluk()) * a.anlikOran() * t.yon().isaret();
+                dogrula(y, Math.signum(vucut) == t.yon().isaret() && yakin(vucut, beklenen),
+                        kayit.ad() + " anında etki " + vucut + ", beklenen " + beklenen);
+                MobEffectInstance efekt = o.getEffect(YiyecekKayitlari.efekt(t.yon()));
+                dogrula(y, efekt != null && efekt.getAmplifier() == t.buyukluk().seviye()
+                        && efekt.getDuration() == t.sureTick(), kayit.ad() + " gösterge efekti: " + efekt);
+                MobEffect karsi = YiyecekKayitlari.efekt(t.yon() == Yon.ISINMA ? Yon.SERINLIK : Yon.ISINMA);
+                dogrula(y, o.getEffect(karsi) == null, kayit.ad() + " karşı yön efekti vermemeli");
+                dogrula(y, o.getFoodData().getFoodLevel() == kayit.besin(), kayit.ad() + " yemek değeri: "
+                        + o.getFoodData().getFoodLevel());
+                boolean kapDogru = switch (kayit.kap()) {
+                    case SISE -> kalan.is(Items.GLASS_BOTTLE) && kalan.getCount() == 1;
+                    case KASE -> kalan.is(Items.BOWL) && kalan.getCount() == 1;
+                    case YOK -> kalan.isEmpty();
+                };
+                dogrula(y, kapDogru, kayit.ad() + " kabı: " + kalan);
+                if (t.yon() == Yon.ISINMA) {
+                    isinma++;
+                } else {
+                    serinlik++;
+                }
+            }
+            dogrula(y, isinma + serinlik >= 10 && isinma >= 5 && serinlik >= 5,
+                    "en az 10 yeni yiyecek, sıcak/soğuk dengeli: " + isinma + "/" + serinlik);
+            y.succeed();
+        } finally {
+            cikar(y, List.of(o));
+        }
+    }
+
+    /**
+     * S3-06 vanilla serinlik: karpuz dilimi çok küçük serinletir ("Serinlik I", 30 sn), su şişesi ve süt kovası küçük
+     * serinletir (sütün efekt temizlemesi gösterge efektini silmez), aynı eşya kimlikli başka iksir (hız) serinletmez;
+     * {@code vanillaSerinlik} kapalıyken serinlik yok (config dosyasına yazılmadan, K-E28).
+     */
+    @GameTest(template = "bos", batch = "yiyecek_vanilla_kademe")
+    public static void vanillaSoguklarSerinletirBaskaIksirSerinletmez(GameTestHelper y) {
+        kuraliAc(y.getLevel().getServer());
+        ServerPlayer o = oyuncu(y, "vanilla-serin-test", 0);
+        try {
+            EtkiAyarlari a = YiyecekAyarlari.etki();
+            VucutSicakligi.ayarla(o, 0);
+            double karpuz = vanillaArtis(o, new ItemStack(Items.MELON_SLICE));
+            dogrula(y, karpuz < 0 && yakin(karpuz, -a.cokKucuk() * a.anlikOran()), "karpuz serinletmeli: " + karpuz);
+            MobEffectInstance efekt = o.getEffect(YiyecekKayitlari.SERINLIK.get());
+            dogrula(y, efekt != null && efekt.getAmplifier() == 0 && efekt.getDuration() == 30 * 20, "Serinlik I 30 sn: "
+                    + efekt);
+            dogrula(y, o.getEffect(YiyecekKayitlari.ICTEN_ISINMA.get()) == null, "karpuz ısıtmamalı");
+            double su = vanillaArtis(o, PotionUtils.setPotion(new ItemStack(Items.POTION), Potions.WATER));
+            dogrula(y, yakin(su, -a.kucuk() * a.anlikOran()), "su şişesi küçük serinletmeli: " + su);
+            double hiz = vanillaArtis(o, PotionUtils.setPotion(new ItemStack(Items.POTION), Potions.SWIFTNESS));
+            dogrula(y, hiz == 0, "hız iksiri serinletmemeli: " + hiz);
+            double sut = vanillaArtis(o, new ItemStack(Items.MILK_BUCKET));
+            dogrula(y, yakin(sut, -a.kucuk() * a.anlikOran()), "süt kovası küçük serinletmeli: " + sut);
+            dogrula(y, o.hasEffect(YiyecekKayitlari.SERINLIK.get()), "sütün temizlemesinden sonra Serinlik görünmeli");
+            YiyecekAyarlari.vanillaSerinlikTesti(false);
+            double kapali = vanillaArtis(o, new ItemStack(Items.SWEET_BERRIES));
+            dogrula(y, kapali == 0, "vanillaSerinlik=false iken serinletmemeli: " + kapali);
+            y.succeed();
+        } finally {
+            YiyecekAyarlari.vanillaSerinlikTesti(null);
+            cikar(y, List.of(o));
+        }
+    }
+
+    /** S3-06 kademeli vanilla ısınma: tavşan yahnisi (küçük, 90 sn) pişmiş sığırdan (çok küçük, 45 sn) fazla ve uzun ısıtır. */
+    @GameTest(template = "bos", batch = "yiyecek_vanilla_kademe")
+    public static void kademeliVanillaIsinmaYahniEttenGuclu(GameTestHelper y) {
+        kuraliAc(y.getLevel().getServer());
+        ServerPlayer et = oyuncu(y, "vanilla-et-test", 0);
+        ServerPlayer yahni = oyuncu(y, "vanilla-yahni-test", 1);
+        try {
+            EtkiAyarlari a = YiyecekAyarlari.etki();
+            VucutSicakligi.ayarla(et, 0);
+            VucutSicakligi.ayarla(yahni, 0);
+            double etArtis = vanillaArtis(et, new ItemStack(Items.COOKED_BEEF));
+            double yahniArtis = vanillaArtis(yahni, new ItemStack(Items.RABBIT_STEW));
+            dogrula(y, yakin(etArtis, a.cokKucuk() * a.anlikOran()), "pişmiş sığır çok küçük: " + etArtis);
+            dogrula(y, yakin(yahniArtis, a.kucuk() * a.anlikOran()) && yahniArtis > etArtis,
+                    "yahni etten fazla ısıtmalı: " + yahniArtis + " / " + etArtis);
+            SureliEtki etSureli = sonEtki(et);
+            SureliEtki yahniSureli = sonEtki(yahni);
+            dogrula(y, etSureli != null && yahniSureli != null && etSureli.sure() == 45 * 20 && yahniSureli.sure() == 90 * 20
+                    && yahniSureli.toplam() > etSureli.toplam(), "yahninin süreli kısmı daha uzun ve büyük olmalı");
+            y.succeed();
+        } finally {
+            cikar(y, List.of(et, yahni));
         }
     }
 

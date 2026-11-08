@@ -31,9 +31,9 @@ class CorbaTakibiTest {
             assertEquals(k == Kademe.DONUYOR, CorbaTakibi.donmaDurumunda(k), k.name());
         }
         Esikler e = Esikler.VARSAYILAN;
-        assertFalse(CorbaTakibi.donmaDurumunda(e.kademe(-31)), "−31 soğuk: yavaşlama, donma değil");
-        assertFalse(CorbaTakibi.donmaDurumunda(e.kademe(-60)), "−60 çok soğuk: buz kenarı, donma değil");
-        assertTrue(CorbaTakibi.donmaDurumunda(e.kademe(-76)), "−76 donma hasarı kademesi");
+        assertFalse(CorbaTakibi.donmaDurumunda(e.kademe(-31)), "−31 (35,45 °C) üşüme: yavaşlama, donma hasarı değil");
+        assertFalse(CorbaTakibi.donmaDurumunda(e.kademe(-60)), "−60 (34,0 °C) donma: buz kenarı, hasar kademesi değil");
+        assertTrue(CorbaTakibi.donmaDurumunda(e.kademe(-76)), "−76 (33,2 °C) donma hasarı kademesi");
     }
 
     @Test

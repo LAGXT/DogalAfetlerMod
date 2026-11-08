@@ -5,12 +5,16 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
-/** Madde 14 tablosu: dokuz yiyecek, adları, yönleri, kademeleri, süreleri ve kapları birebir. */
+/**
+ * Yiyecek tablosu: madde 14'ün dokuz yiyeceği ve sıcaklık-3'ün on iki yiyeceği; adları, yönleri, kademeleri, süreleri ve
+ * kapları birebir.
+ */
 class YiyecekTablosuTest {
     private record Beklenen(String ad, Yon yon, Buyukluk buyukluk, int saniye, YiyecekTablosu.Kap kap) {
     }
@@ -26,11 +30,28 @@ class YiyecekTablosuTest {
             new Beklenen("meyve_serbeti", Yon.SERINLIK, Buyukluk.BUYUK, 120, YiyecekTablosu.Kap.SISE),
             new Beklenen("kutup_baligi_corbasi", Yon.ISINMA, Buyukluk.BUYUK, 150, YiyecekTablosu.Kap.KASE));
 
+    /** S3-06: altı serinletici, altı ısıtıcı; madde 14'ün ardına eklenir (kimlikler ve sıra sabit). */
+    private static final List<Beklenen> SICAKLIK_3 = List.of(
+            new Beklenen("maras_dondurmasi", Yon.SERINLIK, Buyukluk.BUYUK, 120, YiyecekTablosu.Kap.KASE),
+            new Beklenen("soguk_elma_suyu", Yon.SERINLIK, Buyukluk.KUCUK, 90, YiyecekTablosu.Kap.SISE),
+            new Beklenen("kar_helvasi", Yon.SERINLIK, Buyukluk.ORTA, 60, YiyecekTablosu.Kap.KASE),
+            new Beklenen("soguk_komposto", Yon.SERINLIK, Buyukluk.ORTA, 120, YiyecekTablosu.Kap.SISE),
+            new Beklenen("parlak_sorbe", Yon.SERINLIK, Buyukluk.COK_BUYUK, 150, YiyecekTablosu.Kap.KASE),
+            new Beklenen("buzlu_kakao", Yon.SERINLIK, Buyukluk.ORTA, 90, YiyecekTablosu.Kap.SISE),
+            new Beklenen("tarhana_corbasi", Yon.ISINMA, Buyukluk.BUYUK, 150, YiyecekTablosu.Kap.KASE),
+            new Beklenen("kuzu_haslama", Yon.ISINMA, Buyukluk.ORTA, 150, YiyecekTablosu.Kap.KASE),
+            new Beklenen("kabak_corbasi", Yon.ISINMA, Buyukluk.ORTA, 120, YiyecekTablosu.Kap.KASE),
+            new Beklenen("sucuklu_yumurta", Yon.ISINMA, Buyukluk.ORTA, 90, YiyecekTablosu.Kap.KASE),
+            new Beklenen("firinda_elma", Yon.ISINMA, Buyukluk.KUCUK, 90, YiyecekTablosu.Kap.YOK),
+            new Beklenen("elma_cayi", Yon.ISINMA, Buyukluk.KUCUK, 120, YiyecekTablosu.Kap.SISE));
+
     @Test
-    void tabloMadde14IleBirebirAyni() {
-        assertEquals(MADDE_14.size(), YiyecekTablosu.KAYITLAR.size(), "dokuz yiyecek");
-        for (int i = 0; i < MADDE_14.size(); i++) {
-            Beklenen b = MADDE_14.get(i);
+    void tabloMadde14VeSicaklik3IleBirebirAyni() {
+        List<Beklenen> hepsi = new ArrayList<>(MADDE_14);
+        hepsi.addAll(SICAKLIK_3);
+        assertEquals(hepsi.size(), YiyecekTablosu.KAYITLAR.size(), "dokuz + on iki yiyecek");
+        for (int i = 0; i < hepsi.size(); i++) {
+            Beklenen b = hepsi.get(i);
             YiyecekTablosu.Kayit k = YiyecekTablosu.KAYITLAR.get(i);
             assertEquals(b.ad(), k.ad());
             assertEquals("dogalafetler:" + b.ad(), k.tanim().tur(), "azalan verim türü eşya kimliğidir");
@@ -42,6 +63,15 @@ class YiyecekTablosuTest {
             assertEquals(b.ad().equals("atesli_guvec"), k.tanim().sicaktaGuclenir(), "yan etki yalnız Ateşli Güveç'te");
             assertTrue(k.besin() > 0 && k.doygunluk() > 0, b.ad());
         }
+    }
+
+    @Test
+    void yeniYiyeceklerSogukSicakDengeli() {
+        long serinlik = SICAKLIK_3.stream().filter(b -> b.yon() == Yon.SERINLIK).count();
+        assertTrue(SICAKLIK_3.size() >= 10, "en az on yeni yiyecek");
+        assertEquals(SICAKLIK_3.size() - serinlik, serinlik, "serinleten ve ısıtan sayısı eşit");
+        assertTrue(SICAKLIK_3.stream().anyMatch(b -> b.yon() == Yon.SERINLIK && b.buyukluk() == Buyukluk.COK_BUYUK),
+                "Ateşli Güveç'in serin karşılığı var");
     }
 
     @Test

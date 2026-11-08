@@ -1,14 +1,17 @@
-"""Sıcaklık yiyeceklerinin dokularını üretir (madde 14; docs/tasarim/esyalar.md "Sıcaklık yiyecekleri").
+"""Sıcaklık yiyeceklerinin ve Buz Kovası'nın dokularını üretir (madde 14, S3-05, S3-06; docs/tasarim/esyalar.md "Sıcaklık yiyecekleri").
 
 Çıktılar (src/main/resources/assets/dogalafetler/textures/):
-  item/<ad>.png          16x16  dokuz yiyecek: şişeler (salep, çikolata, çay, ayran, şerbet), kaseler (tavuk çorbası,
-                                ateşli güveç, kutup balığı çorbası), buzlu karpuz dilimi
+  item/<ad>.png          16x16  madde 14'ün dokuz yiyeceği: şişeler (salep, çikolata, çay, ayran, şerbet), kaseler (tavuk
+                                çorbası, ateşli güveç, kutup balığı çorbası), buzlu karpuz dilimi; sıcaklık-3'ün on iki yiyeceği:
+                                şişeler (soğuk elma suyu, soğuk komposto, buzlu kakao, elma çayı), kaseler (maraş dondurması, kar
+                                helvası, parıltılı sorbe, tarhana, kuzu haşlama, bal kabağı çorbası, sucuklu yumurta), fırında elma;
+                                buz kovası (vanilla kova silueti, ağzından taşan buz blokları)
   mob_effect/<ad>.png    18x18  "İçten Isınma" (alev) ve "Serinlik" (kar tanesi) durum efekti ikonları
 
 Görsel dil vanilla'ya yakın: vanilla iksir şişesi ve kase silueti, koyu kenar çizgisi, sol üstten ışık. Sıcaklar buhar
 (ve güveçte alev dili), soğuklar kırağı ve buz parlaması taşır: envanterde bir bakışta ısıtan/serinleten ayrılır. Kutup
 balığı çorbası kendi kasesini çizer (parlayan ön ağız, damarlı gölgeli ahşap, krem çorbada somon/beyaz balık ve dereotu)
-ve buharsızdır.
+ve buharsızdır. Dondurma, helva ve sorbe kasenin ağzından kubbe gibi taşar.
 Çalıştırma: KÖK/.venv/bin/python tools/assets/yiyecek_dokular.py (rastgelelik yok; aynı kod → aynı bayt).
 """
 from pathlib import Path
@@ -368,6 +371,223 @@ def serinlik():
     return t
 
 
+# --- Sıcaklık-3 yiyecekleri (S3-06) -----------------------------------------------------------------------------
+def buz_kupu(t, x, y):
+    """2x2 buz küpü: sol üst parlak, sağ alt gölgeli."""
+    t.koy(x, y, rgba("#F2FBFF", 235))
+    t.koy(x + 1, y, rgba("#CFEFFC", 230))
+    t.koy(x, y + 1, rgba("#CFEFFC", 230))
+    t.koy(x + 1, y + 1, rgba("#9ED3EE", 230))
+
+
+def kubbe(t, kenar, ic, parlak):
+    """Kasenin ağzından taşan yuvarlak kubbe (dondurma, helva, sorbe); ışık sol üstten."""
+    hucreler, kenar_h, ic_h = sekil({2: (6, 9), 3: (4, 11), 4: (3, 12), 5: (3, 12)})
+    for (x, y) in sorted(hucreler):
+        if (x, y) in kenar_h and y < 5:
+            t.koy(x, y, rgba(kenar))
+        elif y <= 3 and x <= 7 or (x, y) == (4, 4):
+            t.koy(x, y, rgba(parlak))
+        else:
+            t.koy(x, y, rgba(ic))
+
+
+def soguk_elma_suyu():
+    t = Tuval(16)
+    sise(t, rgba("#E8B84A"), rgba("#F7DA84"), rgba("#B8862A"))
+    buz_kupu(t, 5, 9)
+    buz_kupu(t, 8, 10)
+    t.koy(10, 9, rgba("#C8402C"))  # elma dilimi kabuğu
+    t.koy(10, 8, rgba("#F4E4B0"))
+    kiragi(t, [(3, 10), (12, 9), (12, 11), (4, 13), (11, 13)])
+    parilti(t, 13, 2, "#DFF6FF")
+    return t
+
+
+def soguk_komposto():
+    t = Tuval(16)
+    sise(t, rgba("#9A3B5C"), rgba("#C66A86"), rgba("#6A2240"))
+    for x, y, renk in ((5, 10, "#F1DFA0"), (6, 10, "#E6CD80"),  # elma dilimi
+                       (9, 9, "#5E0E22"), (8, 11, "#5E0E22"), (10, 11, "#7E1A32")):  # dut
+        t.koy(x, y, rgba(renk))
+    buz_kupu(t, 6, 12)
+    kiragi(t, [(3, 9), (12, 10), (12, 12), (4, 13)])
+    parilti(t, 13, 2, "#DFF6FF")
+    return t
+
+
+def buzlu_kakao():
+    t = Tuval(16)
+    sise(t, rgba("#8A5636"), rgba("#B5825A"), rgba("#5C3520"), seviye=7)
+    for x, y in ((5, 7), (6, 7), (8, 7), (9, 7), (7, 6)):  # krema
+        t.koy(x, y, rgba("#F6ECDD"))
+    buz_kupu(t, 5, 9)
+    buz_kupu(t, 9, 10)
+    kiragi(t, [(3, 10), (12, 9), (4, 13), (11, 13), (12, 12)])
+    parilti(t, 13, 2, "#DFF6FF")
+    return t
+
+
+def elma_cayi():
+    t = Tuval(16)
+    sise(t, rgba("#D9822B"), rgba("#F2AE58"), rgba("#A35A16"), seviye=9)
+    for x, y, renk in ((6, 11, "#C8402C"), (7, 11, "#F1DFA0"), (9, 10, "#F1DFA0")):  # elma parçaları
+        t.koy(x, y, rgba(renk))
+    t.koy(5, 10, rgba("#FFD9A0", 200))
+    buhar(t, [(3, 4), (2, 3), (3, 2), (12, 4), (13, 3), (12, 2)], a=135)
+    return t
+
+
+def maras_dondurmasi():
+    """Sütlü, sakızlı beyaz dondurma kubbesi, üstünde Antep fıstığı."""
+    t = Tuval(16)
+    kase(t, rgba("#F4EEE2"), rgba("#FFFFFF"), [])
+    kubbe(t, "#B9B2A2", "#F2ECDF", "#FFFFFF")
+    for x, y in ((6, 2), (9, 3), (5, 4), (10, 4), (8, 4)):  # fıstık
+        t.koy(x, y, rgba("#7DB043"))
+    t.koy(7, 3, rgba("#A6D06A"))
+    kiragi(t, [(2, 6), (13, 7)])
+    parilti(t, 13, 1, "#FFFFFF")
+    return t
+
+
+def kar_helvasi():
+    """Kar yığını üstüne üzüm pekmezi gezdirilmiş."""
+    t = Tuval(16)
+    kase(t, rgba("#E8F3F9"), rgba("#FFFFFF"), [])
+    kubbe(t, "#9FB8C8", "#E6F2F8", "#FFFFFF")
+    for x, y in ((6, 2), (7, 3), (8, 3), (9, 4), (10, 4), (5, 4), (4, 5), (11, 5)):  # pekmez
+        t.koy(x, y, rgba("#6E2A2A"))
+    t.koy(7, 2, rgba("#9A4436"))
+    parilti(t, 13, 1, "#FFFFFF")
+    return t
+
+
+def parlak_sorbe():
+    """Parıltılı meyveden turuncu-altın sorbe, sıkıştırılmış buz kristalleri, içten ışıyan tanecikler."""
+    t = Tuval(16)
+    kase(t, rgba("#F2A33A"), rgba("#FFD36A"), [])
+    kubbe(t, "#B0661A", "#F4A83C", "#FFD36A")
+    for x, y in ((6, 3), (9, 2), (10, 4), (5, 4), (8, 5)):  # parlayan tanecik
+        t.koy(x, y, rgba("#FFF6C0"))
+    for x, y in ((3, 5), (12, 5), (7, 4)):  # buz kristali
+        t.koy(x, y, rgba("#CDEFFF", 235))
+    kiragi(t, [(2, 7), (13, 6)])
+    parilti(t, 13, 1, "#FFFFFF")
+    parilti(t, 2, 1, "#FFF0A8")
+    return t
+
+
+def tarhana_corbasi():
+    t = Tuval(16)
+    kase(t, rgba("#C2502E"), rgba("#E07A4A"), [
+        (5, 7, "#5E9A3C"), (9, 8, "#5E9A3C"), (11, 7, "#3E6E2A"),  # nane
+        (7, 8, "#8E2A1C"), (4, 8, "#8E2A1C"),  # pul biber
+        (8, 7, "#F0A070")])  # yoğurt izi
+    buhar(t, KASE_BUHAR)
+    return t
+
+
+def kuzu_haslama():
+    t = Tuval(16)
+    kase(t, rgba("#D8B878"), rgba("#EED29A"), [
+        (5, 7, "#8A5A3A"), (6, 8, "#6E4428"), (10, 7, "#8A5A3A"),  # kuzu eti
+        (8, 8, "#E8731F"), (12, 8, "#E8731F"),  # havuç
+        (9, 6, "#E6D29A"), (4, 8, "#E6D29A"),  # patates
+        (7, 7, "#5BA03A")])  # maydanoz
+    buhar(t, KASE_BUHAR)
+    return t
+
+
+def kabak_corbasi():
+    t = Tuval(16)
+    kase(t, rgba("#E8892A"), rgba("#F6B04E"), [
+        (6, 7, "#FFF4E0"), (7, 7, "#FFF4E0"), (8, 8, "#FFF4E0"), (9, 8, "#F8E2C0"),  # krema kıvrımı
+        (4, 8, "#5E7A2C"), (11, 7, "#5E7A2C"),  # kabak çekirdeği
+        (10, 6, "#FFE3A0")])
+    buhar(t, KASE_BUHAR)
+    return t
+
+
+def sucuklu_yumurta():
+    t = Tuval(16)
+    kase(t, rgba("#FBF6EA"), rgba("#FFFFFF"), [
+        (5, 7, "#F6B524"), (6, 7, "#E89A10"), (10, 7, "#F6B524"), (11, 7, "#E89A10"),  # sarılar
+        (8, 6, "#8E2A1E"), (8, 8, "#8E2A1E"), (3, 8, "#8E2A1E"), (12, 8, "#8E2A1E"),  # sucuk
+        (9, 6, "#B8463A"), (4, 8, "#B8463A")])
+    buhar(t, KASE_BUHAR)
+    return t
+
+
+def firinda_elma():
+    """Fırında elma: koyulmuş kırmızı kabuk, tepesinde karamelleşmiş bal, sap; buhar."""
+    t = Tuval(16)
+    for y in range(16):
+        for x in range(16):
+            dx, dy = x + 0.5 - 8.0, y + 0.5 - 9.5
+            r = (dx * dx + dy * dy * 1.15) ** 0.5
+            if r > 5.9:
+                continue
+            if r > 5.0:
+                renk = "#5A140E"
+            elif dx + dy < -4.0:
+                renk = "#E0663A"  # sol üst parlama
+            elif dx + dy > 3.0:
+                renk = "#8A2416"
+            else:
+                renk = "#B8361F"
+            t.koy(x, y, rgba(renk))
+    for x, y in ((6, 5), (7, 5), (8, 5), (9, 5), (7, 6), (8, 6), (6, 6), (9, 6), (10, 6)):  # karamel bal
+        t.koy(x, y, rgba("#E0A23C"))
+    for x, y in ((7, 7), (9, 7), (10, 8)):  # süzmesi
+        t.koy(x, y, rgba("#C98222"))
+    t.koy(8, 4, rgba("#5E3B1A"))  # sap
+    t.koy(8, 3, rgba("#5E3B1A"))
+    t.koy(6, 9, rgba("#F4A070", 200))
+    buhar(t, [(4, 3), (3, 2), (4, 1), (11, 3), (12, 2), (11, 1)], a=140)
+    return t
+
+
+# --- Buz Kovası (S3-05; vanilla kova silueti) ----------------------------------------------------------------
+def buz_kovasi():
+    """Vanilla kova: sap, ağız bandı, aşağı daralan metal gövde; ağzından buz blokları taşar, gövdede kırağı."""
+    t = Tuval(16)
+    for x, y in ((2, 4), (2, 3), (3, 2), (4, 1), (11, 1), (12, 2), (13, 3), (13, 4)):  # sap
+        t.koy(x, y, rgba("#3A3A3A"))
+    govde = {4: (2, 13), 5: (2, 13), 6: (3, 12), 7: (3, 12), 8: (3, 12), 9: (3, 12), 10: (4, 11), 11: (4, 11),
+             12: (4, 11), 13: (4, 11), 14: (5, 10)}
+    hucreler, kenar, _ = sekil(govde)
+    for (x, y) in sorted(hucreler):
+        if (x, y) in kenar:
+            renk = "#2E2E2E"
+        elif y == 5:
+            renk = "#E2E2E2" if x <= 6 else "#BDBDBD"  # ağız bandı
+        elif x <= 4 or (x == 5 and y <= 9):
+            renk = "#D0D0D0"
+        elif x >= 10 or y >= 13:
+            renk = "#787878"
+        else:
+            renk = "#A6A6A6"
+        t.koy(x, y, rgba(renk))
+    # ağızdan taşan buz blokları (üç eksenli: üst yüz parlak, ön yüz mavi, derz koyu)
+    for x0, y0 in ((3, 2), (7, 1), (9, 3)):
+        for dx in range(4):
+            for dy in range(3):
+                x, y = x0 + dx, y0 + dy
+                if dx == 3 or dy == 2:
+                    renk = "#4F95C4"
+                elif dy == 0:
+                    renk = "#E8F7FF"
+                else:
+                    renk = "#9CD3F2"
+                t.koy(x, y, rgba(renk))
+    t.koy(4, 3, rgba("#FFFFFF"))
+    t.koy(8, 2, rgba("#FFFFFF"))
+    kiragi(t, [(4, 8), (6, 11), (5, 12), (9, 7)])
+    parilti(t, 14, 1, "#DFF6FF")
+    return t
+
+
 ESYALAR = {
     "sicak_salep": sicak_salep,
     "sicak_cikolata": sicak_cikolata,
@@ -378,6 +598,19 @@ ESYALAR = {
     "buzlu_karpuz": buzlu_karpuz,
     "meyve_serbeti": meyve_serbeti,
     "kutup_baligi_corbasi": kutup_baligi_corbasi,
+    "maras_dondurmasi": maras_dondurmasi,
+    "soguk_elma_suyu": soguk_elma_suyu,
+    "kar_helvasi": kar_helvasi,
+    "soguk_komposto": soguk_komposto,
+    "parlak_sorbe": parlak_sorbe,
+    "buzlu_kakao": buzlu_kakao,
+    "tarhana_corbasi": tarhana_corbasi,
+    "kuzu_haslama": kuzu_haslama,
+    "kabak_corbasi": kabak_corbasi,
+    "sucuklu_yumurta": sucuklu_yumurta,
+    "firinda_elma": firinda_elma,
+    "elma_cayi": elma_cayi,
+    "buz_kovasi": buz_kovasi,
 }
 EFEKTLER = {"icten_isinma": icten_isinma, "serinlik": serinlik}
 

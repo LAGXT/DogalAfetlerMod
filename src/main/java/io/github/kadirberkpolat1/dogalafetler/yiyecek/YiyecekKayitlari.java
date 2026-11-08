@@ -19,9 +19,9 @@ import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
 
 /**
- * Yiyecek kayıtları: madde 14'ün dokuz eşyası (kimlikler {@link YiyecekTablosu}'nda sabit), "İçten Isınma" ve "Serinlik"
- * durum efektleri, kalanı seçilebilir şekilsiz tarif tipi ve Kutup Balığı Çorbası'nın malzeme etiketi (etiketi balıkçılık
- * doldurur). Eşyalar vanilla "Yiyecek ve İçecekler" sekmesinde görünür.
+ * Yiyecek kayıtları: sıcaklık yiyecekleri (kimlikler {@link YiyecekTablosu}'nda sabit), Buz Kovası, "İçten Isınma" ve
+ * "Serinlik" durum efektleri, kalanı seçilebilir şekilsiz tarif tipi ve Kutup Balığı Çorbası'nın malzeme etiketi (etiketi
+ * balıkçılık doldurur). Yiyecekler vanilla "Yiyecek ve İçecekler", Buz Kovası "Araçlar ve Gereçler" sekmesinde görünür.
  */
 public final class YiyecekKayitlari {
     private static final DeferredRegister<Item> ESYALAR = DeferredRegister.create(ForgeRegistries.ITEMS,
@@ -38,6 +38,9 @@ public final class YiyecekKayitlari {
 
     public static final RegistryObject<RecipeSerializer<KalanSecimliTarif>> KALAN_SECIMLI_TARIF =
             SERILESTIRICILER.register("kalan_secimli_sekilsiz", KalanSecimliTarif.Serilestirici::new);
+
+    /** Sol elde serinleten kova (S3-05); etkisini ve erimesini sıcaklık güncellemesi uygular. */
+    public static final RegistryObject<Item> BUZ_KOVASI = ESYALAR.register("buz_kovasi", BuzKovasi::new);
 
     /** Kutup Balığı Çorbası'nın pişmiş balık malzemesi (madde 15'in balıkları; etiketi balıkçılık işçisi doldurur). */
     public static final TagKey<Item> PISMIS_KUTUP_BALIGI = TagKey.create(Registries.ITEM,
@@ -81,6 +84,8 @@ public final class YiyecekKayitlari {
             for (RegistryObject<Item> esya : ESYA.values()) {
                 olay.accept(esya);
             }
+        } else if (olay.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
+            olay.accept(BUZ_KOVASI);
         }
     }
 }

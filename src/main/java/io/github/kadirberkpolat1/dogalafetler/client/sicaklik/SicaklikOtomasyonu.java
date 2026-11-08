@@ -1,8 +1,10 @@
 package io.github.kadirberkpolat1.dogalafetler.client.sicaklik;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.VucutOlcegi;
 import java.util.List;
 import java.util.Locale;
+import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
 import net.minecraft.client.gui.screens.DeathScreen;
@@ -15,24 +17,40 @@ import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.common.Mod;
 
 /**
- * Görsel kanıt otomasyonu (K0-21 rev. 2). Yalnız {@code -Ddogalafetler.otomasyon=sicaklik|sicaklik_coldsweat} ile çalışır;
- * üretimde etkisizdir. {@code sicaklik}: oyuncu OP olunca vücut sıcaklığını sırayla ayarlayıp HUD ve ekran efektlerinin
- * ekran görüntülerini alır, sonra sunucu konsolunun komutları için bekler ve kapanır. {@code sicaklik_coldsweat}: Cold Sweat
- * yüklü tek oyunculu dünyada kapı durumunu loglar ve bir görüntü alır. Klavye, fare ve tekerlek girdileri kapanışa
- * kadar sayılır (sıfırdan farklıysa koşu geçersizdir). Kendi açmadığı duraklatma ekranını kapatır; adımlar durum koşuluyla
- * ilerler.
+ * Görsel kanıt otomasyonu (K0-21 rev. 2, S3-07). Yalnız {@code -Ddogalafetler.otomasyon=sicaklik|sicaklik_coldsweat} ile
+ * çalışır; üretimde etkisizdir. {@code sicaklik}: oyuncu OP olunca vücut sıcaklığını (°C) ve ıslaklığı komutla ayarlayıp
+ * sahneleri sırayla çeker: HUD normal, ıslak, üşüme, donma (iki titreşim fazı), ağır donma, bunalma, yanma (iki nabız
+ * fazı), ağır yanma, termometre menüsü, üçüncü şahısta ağız buharı ve terleme. Birinci şahıs sahnelerinde oyuncunun kendi
+ * parçacık sayısı log'a yazılır (0 olmalı). Sonra sunucu konsolunun komutları için bekler ve kapanır.
+ * {@code sicaklik_coldsweat}: Cold Sweat yüklü tek oyunculu dünyada kapı durumunu loglar ve bir görüntü alır. Klavye, fare
+ * ve tekerlek girdileri kapanışa kadar sayılır (sıfırdan farklıysa koşu geçersizdir). Kendi açmadığı duraklatma ekranını
+ * kapatır; adımlar durum koşuluyla ilerler.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class SicaklikOtomasyonu {
     private static final String MOD = System.getProperty("dogalafetler.otomasyon", "");
     private static final String ON = "SICAKLIK_OTOMASYON ";
+    /** Sahne başında komutların etkisi ve HUD yumuşatması otursun diye beklenen tick. */
+    private static final int OTURMA = 40;
 
-    private record Sahne(String ad, int deger, boolean ikinciKare) {
+    private enum Kip {
+        HUD,
+        /** İkinci kare farklı bir titreşim ya da nabız fazından alınır. */
+        HUD_IKI_KARE,
+        MENU,
+        BUHAR,
+        TER
     }
 
-    private static final List<Sahne> SAHNELER = List.of(new Sahne("notr", 0, false), new Sahne("soguk", -42, false),
-            new Sahne("cok_soguk", -66, false), new Sahne("donuyor", -96, true), new Sahne("sicak", 42, false),
-            new Sahne("cok_sicak", 66, false), new Sahne("yaniyor", 96, true));
+    private record Sahne(String ad, double santigrat, int islaklik, Kip kip) {
+    }
+
+    private static final List<Sahne> SAHNELER = List.of(new Sahne("normal", 37.0, 0, Kip.HUD),
+            new Sahne("islak", 36.8, 80, Kip.HUD), new Sahne("usume", 35.6, 0, Kip.HUD),
+            new Sahne("donma", 34.4, 0, Kip.HUD_IKI_KARE), new Sahne("donma_agir", 32.6, 0, Kip.HUD),
+            new Sahne("bunalma", 38.6, 0, Kip.HUD), new Sahne("yanma", 40.0, 0, Kip.HUD_IKI_KARE),
+            new Sahne("yanma_agir", 41.5, 0, Kip.HUD), new Sahne("termometre", 35.6, 60, Kip.MENU),
+            new Sahne("buhar_3p", 35.6, 0, Kip.BUHAR), new Sahne("ter_3p", 38.8, 0, Kip.TER));
 
     private static int tus;
     private static int fare;
@@ -40,10 +58,14 @@ public final class SicaklikOtomasyonu {
     private static int adim = -1;
     private static int sayac;
     private static int sahne;
-    /** İlk karede çizilmiş barın tick'i ve ofseti (ikinci kare farklı bir titreşim fazından alınır). */
+    /** İlk karede çizilmiş bantın tick'i, ofseti ve nabzı (ikinci kare farklı bir fazdan alınır). */
     private static long ilkTick;
     private static int ilkDx;
     private static int ilkDy;
+    private static float ilkNabiz;
+    /** Sahne başındaki kendi parçacık sayacı ve istemci tick'i. */
+    private static int sahneParcacik;
+    private static long sahneTick;
 
     private SicaklikOtomasyonu() {
     }
@@ -101,6 +123,10 @@ public final class SicaklikOtomasyonu {
         }
     }
 
+    private static void komut(Minecraft mc, String format, Object... argumanlar) {
+        mc.player.connection.sendCommand(String.format(Locale.ROOT, format, argumanlar));
+    }
+
     private static void hud(Minecraft mc) {
         String ad = mc.player.getGameProfile().getName();
         if (adim < 0) {
@@ -113,45 +139,93 @@ public final class SicaklikOtomasyonu {
         }
         if (adim == 0) {
             if (sahne >= SAHNELER.size()) {
-                mc.player.connection.sendCommand("dogalafet sicaklik set " + ad + " 0");
+                mc.options.setCameraType(CameraType.FIRST_PERSON);
+                komut(mc, "dogalafet sicaklik set %s %.1f", ad, VucutOlcegi.NORMAL_C);
+                komut(mc, "dogalafet sicaklik islaklik %s 0", ad);
                 DogalAfetler.LOGGER.info(ON + "bitti; FPS {}", mc.getFps());
                 adim = 2;
                 sayac = 0;
                 return;
             }
             Sahne s = SAHNELER.get(sahne);
-            mc.player.setXRot(8f);
-            mc.player.connection.sendCommand("dogalafet sicaklik set " + ad + " " + s.deger());
+            boolean ucuncu = s.kip() == Kip.BUHAR || s.kip() == Kip.TER;
+            mc.options.setCameraType(ucuncu ? CameraType.THIRD_PERSON_FRONT : CameraType.FIRST_PERSON);
+            mc.player.setXRot(ucuncu ? 0f : 8f);
+            komut(mc, "dogalafet sicaklik set %s %.1f", ad, s.santigrat());
+            komut(mc, "dogalafet sicaklik islaklik %s %d", ad, s.islaklik());
+            sahneParcacik = IstemciSicaklik.kendiParcacikSayisi();
+            sahneTick = IstemciSicaklik.tick();
             adim = 1;
             sayac = 0;
         } else if (adim == 1) {
-            Sahne s = SAHNELER.get(sahne);
-            if (sayac == 40) {
-                kare(mc, s.ad());
-                ilkTick = SicaklikHud.sonTick;
-                ilkDx = SicaklikHud.sonDx;
-                ilkDy = SicaklikHud.sonDy;
-                if (!s.ikinciKare()) {
-                    sahne++;
-                    adim = 0;
-                }
-            } else if (sayac > 40 && s.ikinciKare()) {
-                // Gizli workspace'te istemci ~1 FPS çizer: sabit tick farkı aynı çizimi ya da aynı fazı yakalayabilir.
-                boolean yeniFaz = SicaklikHud.sonTick != ilkTick
-                        && (SicaklikHud.sonDx != ilkDx || SicaklikHud.sonDy != ilkDy);
-                if (yeniFaz || sayac >= 200) {
-                    if (!yeniFaz) {
-                        DogalAfetler.LOGGER.warn(ON + "{}: 160 tick'te farklı titreşim fazı çizilmedi", s.ad());
-                    }
-                    kare(mc, s.ad() + "_b");
-                    sahne++;
-                    adim = 0;
-                }
-            }
+            sahneAdimi(mc, SAHNELER.get(sahne));
         } else if (adim == 2 && sayac >= 400) {
             DogalAfetler.LOGGER.info(ON + "kapanıyor; girdi sayıları: tuş={} fare={} tekerlek={}", tus, fare, teker);
             adim = 3;
             mc.stop();
+        }
+    }
+
+    private static void sonraki() {
+        sahne++;
+        adim = 0;
+    }
+
+    private static void sahneAdimi(Minecraft mc, Sahne s) {
+        switch (s.kip()) {
+            case HUD -> {
+                if (sayac == OTURMA) {
+                    kare(mc, s.ad());
+                    sonraki();
+                }
+            }
+            case HUD_IKI_KARE -> {
+                if (sayac == OTURMA) {
+                    kare(mc, s.ad());
+                    ilkTick = SicaklikHud.sonTick;
+                    ilkDx = SicaklikHud.sonDx;
+                    ilkDy = SicaklikHud.sonDy;
+                    ilkNabiz = SicaklikHud.sonNabiz;
+                } else if (sayac > OTURMA) {
+                    // Gizli workspace'te istemci ~1 FPS çizer: sabit tick farkı aynı çizimi ya da aynı fazı yakalayabilir.
+                    boolean yeniFaz = SicaklikHud.sonTick != ilkTick && (SicaklikHud.sonDx != ilkDx
+                            || SicaklikHud.sonDy != ilkDy || Math.abs(SicaklikHud.sonNabiz - ilkNabiz) > 0.15f);
+                    if (yeniFaz || sayac >= OTURMA + 160) {
+                        if (!yeniFaz) {
+                            DogalAfetler.LOGGER.warn(ON + "{}: 160 tick'te farklı titreşim/nabız fazı çizilmedi", s.ad());
+                        }
+                        kare(mc, s.ad() + "_b");
+                        sonraki();
+                    }
+                }
+            }
+            case MENU -> {
+                if (sayac == OTURMA) {
+                    TermometreEkrani.ac();
+                    DogalAfetler.LOGGER.info(ON + "termometre menüsü açıldı: {}", mc.screen);
+                } else if (sayac == OTURMA + 60) {
+                    kare(mc, s.ad());
+                    mc.setScreen(null);
+                    sonraki();
+                }
+            }
+            case BUHAR -> ucuncuSahis(mc, s, IstemciSicaklik.sonNefesTick(), 3);
+            case TER -> ucuncuSahis(mc, s, IstemciSicaklik.sonTerTick(), 2);
+            default -> throw new IllegalStateException(s.kip().name());
+        }
+    }
+
+    /** Parçacık yeni üretilmişken (ekranda görünürken) kare; 300 tick'te üretilmezse uyarıp yine de çeker. */
+    private static void ucuncuSahis(Minecraft mc, Sahne s, long sonParcacik, int gecikme) {
+        long simdi = IstemciSicaklik.tick();
+        boolean taze = sonParcacik > sahneTick && simdi - sonParcacik >= gecikme && simdi - sonParcacik <= gecikme + 3;
+        if (sayac >= OTURMA && taze || sayac >= OTURMA + 300) {
+            if (!taze) {
+                DogalAfetler.LOGGER.warn(ON + "{}: 300 tick'te kendi parçacığı üretilmedi", s.ad());
+            }
+            kare(mc, s.ad());
+            mc.options.setCameraType(CameraType.FIRST_PERSON);
+            sonraki();
         }
     }
 
@@ -175,9 +249,18 @@ public final class SicaklikOtomasyonu {
     private static void kare(Minecraft mc, String ad) {
         String dosya = "sicaklik_" + ad + ".png";
         Screenshot.grab(mc.gameDirectory, dosya, mc.getMainRenderTarget(), mesaj -> { });
-        DogalAfetler.LOGGER.info(ON + "kare {} (vücut {} kademe {}, FPS {}; bar ofseti dx={} dy={} yanık={} çizim tick'i {})",
-                dosya, String.format(Locale.ROOT, "%.1f", IstemciSicaklik.durum().vucut()),
-                IstemciSicaklik.durum().kademe(), mc.getFps(), SicaklikHud.sonDx, SicaklikHud.sonDy, SicaklikHud.sonYanik,
-                SicaklikHud.sonTick);
+        var d = IstemciSicaklik.durum();
+        DogalAfetler.LOGGER.info(ON + "kare {} (vücut {} °C kademe {} durum {}, ıslaklık {}, hissedilen {} °C, mekan {} °C, "
+                + "eğilim {}; FPS {}; bant dx={} dy={} parlama={} nabız={} şevron={} metin='{}' ikonlar=[{}] üçgen x={} "
+                + "çizim tick'i {}; kamera {}, sahnede kendi parçacığı {})", dosya,
+                sayi(VucutOlcegi.santigrat(d.vucut())), d.kademe(), d.kademe().durum(), sayi(d.islaklik()),
+                sayi(d.hissedilen()), sayi(d.mekan()), sayi(d.egilim()), mc.getFps(), SicaklikHud.sonDx, SicaklikHud.sonDy,
+                sayi(SicaklikHud.sonParlama), sayi(SicaklikHud.sonNabiz), SicaklikHud.sonSevron, SicaklikHud.sonMetin,
+                SicaklikHud.sonIkonlar, SicaklikHud.sonUcgen, SicaklikHud.sonTick, mc.options.getCameraType(),
+                IstemciSicaklik.kendiParcacikSayisi() - sahneParcacik);
+    }
+
+    private static String sayi(double d) {
+        return String.format(Locale.ROOT, "%.2f", d);
     }
 }

@@ -14,9 +14,13 @@ public final class Sicaklik {
         SicaklikIstemciAyarlari.kaydet();
         modBus.addListener(SicaklikAyarlari::configDegisti);
         SicaklikKayitlari.kaydet(modBus);
+        SicaklikParcaciklari.kaydet(modBus);
         SicaklikDurumPaketi.kaydet();
+        SicaklikDokumPaketi.kaydet();
+        SicaklikDokumIstegi.kaydet();
         SicaklikKomutlari.kaydet();
         DataGenerators.ceviriEkle(SicaklikCevirileri::yaz);
+        DataGenerators.ceviriEkle(SicaklikMenuCevirileri::yaz);
         DataGenerators.saglayiciEkle(SicaklikVerileri::ekle);
         if (SicaklikKapisi.coldSweatYuklu()) {
             ColdSweatKoprusu.kur();

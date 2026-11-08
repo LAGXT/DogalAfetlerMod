@@ -46,7 +46,10 @@ public final class ColdSweatKoprusu {
         }
     }
 
-    /** Dünya döneminin °C katkısı (bizim ortam hesabının dönem kalemleri). */
+    /**
+     * Dünya döneminin °C katkısı (bizim mekan hesabının dönem kalemleri). Hissedilen düzeltmeleri (ıslaklık, rüzgâr, sol
+     * el) aktarılmaz: Cold Sweat bunları kendi mekaniğiyle hesaplar.
+     */
     static double donemKatkisi(ServerPlayer oyuncu) {
         SicaklikAyarlari.Ozet ozet = SicaklikAyarlari.al();
         OrtamSicakligi.Sonuc s = OrtamSicakligi.hesapla(OrtamOlcer.girdi(oyuncu, ozet), ozet.ortam());
@@ -55,8 +58,10 @@ public final class ColdSweatKoprusu {
     }
 
     /**
-     * F-18: sıcaklık yiyeceğinin toplam etkisi (bizim vücut birimi) Cold Sweat çekirdek sıcaklığına bir kerede eklenir. İki
-     * ölçek aynı yerde kırılır (0 rahat, ±100 hasar eşiği); dağıtım Cold Sweat'in çekirdek hızına kalır.
+     * F-18: sıcaklık yiyeceğinin toplam etkisi (bizim vücut birimi) Cold Sweat çekirdek sıcaklığına bir kerede eklenir. Bizim
+     * oyuncuya gösterdiğimiz 32…42 °C ({@code VucutOlcegi}: °C = 37 + 0,05 · birim) yalnız görünümdür; iç birim
+     * −100…+100 kalır ve Cold Sweat çekirdeğiyle aynı yerde kırılır (0 rahat, ±100 uç). Bu yüzden birim dönüşümsüz
+     * aktarılır; dağıtım Cold Sweat'in çekirdek hızına kalır.
      */
     public static void yiyecekEtkisi(ServerPlayer oyuncu, double vucutBirimi) {
         Temperature.add(oyuncu, Temperature.Trait.CORE, vucutBirimi);
