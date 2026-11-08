@@ -116,20 +116,31 @@ public final class RadarSunucu {
             return RadarPaketi.sakin(gelismis, menzil, gecmis);
         }
         EtkiAlani alan = okunan.get();
-        boolean global = alan.global() || afet.tur().sunucuGeneli();
+        // N7 gökyüzü anomalisi yalnız sunucu geneli afette (güneş, ay). Her yerde süren bölgesel afet (asit, AF2-06) bölgesel
+        // görünürlük kuralıyla (ön-uyarının gizli başı saklı, aynı boyut) mesafesiz "her yer" olarak görünür.
+        boolean gokyuzu = afet.tur().sunucuGeneli();
+        boolean global = alan.global() || gokyuzu;
+        boolean herYer = global && !gokyuzu;
         boolean ayniBoyut = oyuncu.level().dimension().equals(afet.baglam().boyut());
         double mesafe = global ? 0 : YonMesafe.mesafe(oyuncu.getX(), oyuncu.getZ(), alan.x(), alan.z());
-        RadarGorunumu gorunum = Gorunurluk.radar(afet.asama(), afet.normalOnUyariBasladi(), global, ayniBoyut, mesafe,
+        RadarGorunumu gorunum = Gorunurluk.radar(afet.asama(), afet.normalOnUyariBasladi(), gokyuzu, ayniBoyut, mesafe,
                 menzil);
         if (gorunum == RadarGorunumu.GIZLI) {
             return RadarPaketi.sakin(gelismis, menzil, gecmis);
         }
         long kalanSn = SureBicimi.saniye(yonetici.zamanOlcegi().gercekTick(yonetici.kalanOku(afet)));
-        int x = global ? 0 : (int) Math.floor(alan.x());
-        int z = global ? 0 : (int) Math.floor(alan.z());
+        int x = herYer ? RadarPaketi.HER_YER : global ? 0 : (int) Math.floor(alan.x());
+        int z = herYer ? RadarPaketi.HER_YER : global ? 0 : (int) Math.floor(alan.z());
         float yon = Float.NaN;
         float hiz = 0;
-        if (gelismis && !global && IZ.yon().isPresent()) {
+        Optional<double[]> araHedef = afet.yolHedefi()
+                .filter(h -> YonMesafe.mesafe(alan.x(), alan.z(), h[0], h[1]) >= 1.0);
+        if (gelismis && !global && araHedef.isPresent()) {
+            // Yol tahmini: afetin yöneldiği ara hedef (kasırga rotası), izden daha erken döner.
+            double[] h = araHedef.get();
+            yon = Math.round(YonMesafe.pusulaAcisi(alan.x(), alan.z(), h[0], h[1]) / 5.0) * 5f % 360f;
+            hiz = Math.round(IZ.hiz() * 2) / 2f;
+        } else if (gelismis && !global && IZ.yon().isPresent()) {
             OptionalDouble iz = IZ.yon();
             yon = Math.round(iz.getAsDouble() / 5.0) * 5f % 360f;
             hiz = Math.round(IZ.hiz() * 2) / 2f;
