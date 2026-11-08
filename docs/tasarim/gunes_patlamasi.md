@@ -106,7 +106,7 @@ Kaynaklar:
 ## 8. Meteor yağmuru güncellemesi (meteor-2, 2026-11-07; kararlar `.vibe/kararlar/meteor-2.md`)
 
 Kullanıcı: patlamadan önce ve patlama sırasında meteor az; istek 27 ("koskoca güneş patlıyor, 5–6 tane düşüyor"): aşırı fazla,
-10 dk, boyutlar farklı. Yoğunluk `mantik.MeteorYagmuruEgrisi`: ön-uyarının son `meteorYagmuruOncuSaniye` (90) saniyesinde öncü
+10 dk, boyutlar farklı. Yoğunluk `mantik.MeteorYagmuruEgrisi`: ön-uyarının son `meteorYagmuruOncuSaniye` (90; K-E67: 5 sn ve 25 sn siren, son 30 sn) saniyesinde öncü
 yağmur oyuncu başına 6/dk başlar, siren (güneş büyürken) boyunca doğrusal `meteorYagmuruOncuSonDakikaBasina` 24/dk'ya çıkar;
 AKTIF'in başında `meteorYagmuruSaniye` **600 sn (10 dk)**, sonraki her günün başında `meteorYagmuruGunlukSaniye` 180 sn
 `meteorYagmuruDakikaBasina` **180/dk** (3/sn; ilk hâli 90) gerçek meteor yağmuru, arasında §2'nin 1/40 sn → 1/12 sn arka planı.

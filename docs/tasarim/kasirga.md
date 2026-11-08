@@ -96,7 +96,11 @@ Kaynak: `.vibe/kararlar/spike-kasirga.md` (SK-01…SK-06), `.vibe/rapor/inceleme
 - Spike sonrası güncelleme, 2026-11-06: "Gövde tepe çapı" ve "Etek çapı" sütunları eklendi; gövdenin orta yükseklikteki genişliği (h = 0,5; `h^0.6` = 0,66) S4 ~38,5 / 95 = %41, S5 ~48 / 110 = %44 (kama). Etek yüksekliği S1 6 → S5 14 blok, doğrusal.
 - Yönelim: hedef oyuncudan `[0,5·(R + 56), R + 56]` blok uzakta doğar (R = çekim yarıçapı; S1 32–65, S5 54–107 blok), hedefin başlangıç konumuna doğru ±35° sapmalı yürüyüşle ilerler, 12 bloğuna girince ana yönü donar ve uzaklaşır; doğuş 8 sn (toz girdabı → huni iner), dağılma 10 sn (ip evresi). (Faz 4 düzeltmesi, `.vibe/kararlar/kasirga.md` K-03: eski 80–140 blokta S1–S3’ün hedefi sireni duymazdı; siren alanı etki alanı + 64 blok.)
 - Bloklar `dogalafetler:kasirga_dayanikli` etiketiyle korunur (obsidyen, deepslate, ana kaya varsayılan).
-- Kaldırılan oyuncu en çok 25 blok yükselir; düşme hasarı vanilla.
+- Kaldırılan oyuncu huni yüksekliğinin ¼'üne kadar yükselir (S5 36 blok, `kasirga.kaldirmaTavani`; eski 25); düşme hasarı vanilla.
+- **Güncelleme turu 3 (K-E70, AF3-05):** yukarıdaki tablo yerine seviye satırı tek güç katsayısıyla orantılıdır
+  (`KasirgaSeviyesi`): güç 1 / 1,6 / 2,4 / 3,4 / 4,8; taban 10·g, tepe 16·g, yükseklik 30·g, çekim yarıçapı 15·g, enkaz
+  yüksekliği 3,5·g. S5: taban 48, tepe 76,8, yükseklik 144, çekim 72 blok, 32 blok kaldırma/tick, sertlik ≤ 6, çekirdek 6 can/sn.
+  Hız ve aktif süre değişmedi. Oyuncu çekimi oyuncunun istemcisinde, içe baskın (S5 kenarda 8 b/sn; K-06 rev.).
 
 ### Faz 4 güncellemesi, 2026-11-06
 

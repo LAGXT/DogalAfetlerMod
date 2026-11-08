@@ -267,7 +267,8 @@ başka açıdan); uzun yolculukta gökte kaybolmaz.
 kesişen üç düzlem + derinlik katmanlı hale (~34°) ve korona (~56°) kürenin arkasından taşan parlama gibi; kürenin önüne
 düşen alan çizgisi ve koni parçalarının alfası disk içinde ×0,2. Dipol alan çizgileri r = L·sin²θ (L = 1,9 / 2,6 / 3,4 R),
 manyetik eksende iki koni (iç dar 1,8°, dış 5°; ortası parlak kenarı saydam; gök kubbesini aşar) ve uçlardan saçılan
-plazma. Manyetik eksen gökte sabit (dönme yok). Koni strobu ses döngüsüyle aynı fazda: her vuruşta 4 ms yükseliş, ~30 ms
+plazma. Manyetik eksen gökte sabit (dönme yok), tek eksen 90°/4° (gök dönüşü ekseni, dünyada kuzey–güney): yalnız iki
+hüzme, ekranda pulsarın sağında ve solunda (K-E68, blok-3 BK-3; ikinci koni çifti yok). Koni strobu ses döngüsüyle aynı fazda: her vuruşta 4 ms yükseliş, ~30 ms
 sönüm, 4,5 Hz yavaş şişme; `pulsarTitresim` 1'de parlaklık %45'in altına inmez, 0'da sabit. Yanal titreşim çekirdek, koniler
 ve alan çizgilerine birlikte uygulanır (16 Hz kare dalga, her yarım periyot hale çapının 3–4/90'ı kadar; Düşük 8 Hz).
 
