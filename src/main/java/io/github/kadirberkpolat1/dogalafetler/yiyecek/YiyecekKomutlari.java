@@ -18,8 +18,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 
 /**
- * {@code /dogalafet yiyecek bilgi [oyuncu]} (yalnız OP): madde 14 tablosunun config'le kurulmuş etkileri ve vanilla listesi;
- * oyuncu verilirse azalan verim penceresi süren türler.
+ * {@code /dogalafet yiyecek bilgi [oyuncu]} (yalnız OP): yiyecek tablosunun config'le kurulmuş etkileri ve vanilla ısınma/serinlik
+ * listeleri; oyuncu verilirse azalan verim penceresi süren türler.
  */
 public final class YiyecekKomutlari {
     static final String K = "commands.dogalafetler.yiyecek.";
@@ -49,7 +49,9 @@ public final class YiyecekKomutlari {
         }
         satir(kaynak, Component.translatable(K + "bilgi.vanilla",
                 Component.translatable(K + (YiyecekAyarlari.vanillaIsinma() ? "acik" : "kapali")),
-                YiyecekAyarlari.vanillaTanimlari().size(), sayi(a.cokKucuk())));
+                YiyecekAyarlari.vanillaIsinmaTanimlari().size(),
+                Component.translatable(K + (YiyecekAyarlari.vanillaSerinlik() ? "acik" : "kapali")),
+                YiyecekAyarlari.vanillaSerinlikTanimlari().size()));
         return YiyecekTablosu.KAYITLAR.size();
     }
 

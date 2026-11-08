@@ -24,6 +24,30 @@
     {
       "id": "dogalafetler:kutup_baligi_corbasi",
       "required": false
+    },
+    {
+      "id": "dogalafetler:tarhana_corbasi",
+      "required": false
+    },
+    {
+      "id": "dogalafetler:kuzu_haslama",
+      "required": false
+    },
+    {
+      "id": "dogalafetler:kabak_corbasi",
+      "required": false
+    },
+    {
+      "id": "dogalafetler:sucuklu_yumurta",
+      "required": false
+    },
+    {
+      "id": "dogalafetler:firinda_elma",
+      "required": false
+    },
+    {
+      "id": "dogalafetler:elma_cayi",
+      "required": false
     }
   ]
 }

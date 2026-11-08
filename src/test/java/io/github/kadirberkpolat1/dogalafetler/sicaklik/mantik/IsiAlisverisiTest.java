@@ -15,16 +15,29 @@ class IsiAlisverisiTest {
     /** Süpernova sonrası dondurucu soğuk. */
     private static final double DONDURUCU = -45.0;
 
+    /** Islaklık durumu: W ve suda mı (S3-02 iletkenliği). */
+    private record Islak(double w, boolean suda) {
+    }
+
+    private static final Islak KURU = new Islak(0, false);
+    private static final Islak ISLAK = new Islak(1, false);
+    private static final Islak SUDA = new Islak(0, true);
+
+    private static IsiAlisverisi.Girdi girdi(double vucut, double ortam, Etkinlik etkinlik, Islak islak,
+            Yalitim.Girdi yalitim) {
+        return new IsiAlisverisi.Girdi(vucut, ortam, etkinlik, islak.w(), islak.suda(), yalitim);
+    }
+
     private static double egilim(double vucut, double ortam, Yalitim.Girdi yalitim) {
-        return IsiAlisverisi.egilim(new IsiAlisverisi.Girdi(vucut, ortam, Etkinlik.YURUME, Islaklik.KURU, yalitim), A, Y);
+        return IsiAlisverisi.egilim(girdi(vucut, ortam, Etkinlik.YURUME, KURU, yalitim), A, Y);
     }
 
     /** Sabit ortamda {@code saniye} boyunca 1 Hz adım. */
-    private static double benzet(double vucut, double ortam, Etkinlik etkinlik, Islaklik islaklik,
+    private static double benzet(double vucut, double ortam, Etkinlik etkinlik, Islak islaklik,
             Yalitim.Girdi yalitim, int saniye) {
         double b = vucut;
         for (int i = 0; i < saniye; i++) {
-            b = IsiAlisverisi.adim(new IsiAlisverisi.Girdi(b, ortam, etkinlik, islaklik, yalitim), 1.0, A, Y);
+            b = IsiAlisverisi.adim(girdi(b, ortam, etkinlik, islaklik, yalitim), 1.0, A, Y);
         }
         return b;
     }
@@ -38,18 +51,18 @@ class IsiAlisverisiTest {
         double basta = Math.abs(egilim(0, -30, CIPLAK));
         double yaklasinca = Math.abs(egilim(-50, -30, CIPLAK));
         assertTrue(yaklasinca < basta / 2, basta + " / " + yaklasinca);
-        double birSaniye = benzet(0, -30, Etkinlik.YURUME, Islaklik.KURU, CIPLAK, 1);
+        double birSaniye = benzet(0, -30, Etkinlik.YURUME, KURU, CIPLAK, 1);
         assertTrue(birSaniye < 0 && birSaniye > -2, "anında eşitlenmemeli: " + birSaniye);
     }
 
     @Test
     void hareketIsitirDurmakVeIslaklikSogutur() {
-        IsiAlisverisi.Girdi yurume = new IsiAlisverisi.Girdi(0, 5, Etkinlik.YURUME, Islaklik.KURU, CIPLAK);
+        IsiAlisverisi.Girdi yurume = girdi(0, 5, Etkinlik.YURUME, KURU, CIPLAK);
         double y = IsiAlisverisi.egilim(yurume, A, Y);
-        double k = IsiAlisverisi.egilim(new IsiAlisverisi.Girdi(0, 5, Etkinlik.KOSMA, Islaklik.KURU, CIPLAK), A, Y);
-        double d = IsiAlisverisi.egilim(new IsiAlisverisi.Girdi(0, 5, Etkinlik.DURMA, Islaklik.KURU, CIPLAK), A, Y);
-        double islak = IsiAlisverisi.egilim(new IsiAlisverisi.Girdi(0, 5, Etkinlik.YURUME, Islaklik.ISLAK, CIPLAK), A, Y);
-        double suda = IsiAlisverisi.egilim(new IsiAlisverisi.Girdi(0, 5, Etkinlik.YURUME, Islaklik.SUDA, CIPLAK), A, Y);
+        double k = IsiAlisverisi.egilim(girdi(0, 5, Etkinlik.KOSMA, KURU, CIPLAK), A, Y);
+        double d = IsiAlisverisi.egilim(girdi(0, 5, Etkinlik.DURMA, KURU, CIPLAK), A, Y);
+        double islak = IsiAlisverisi.egilim(girdi(0, 5, Etkinlik.YURUME, ISLAK, CIPLAK), A, Y);
+        double suda = IsiAlisverisi.egilim(girdi(0, 5, Etkinlik.YURUME, SUDA, CIPLAK), A, Y);
         assertTrue(k > y, "koşmak ısıtır");
         assertTrue(d < y, "durmak soğutur");
         assertTrue(islak < y, "ıslaklık soğutur");
@@ -57,8 +70,43 @@ class IsiAlisverisiTest {
     }
 
     @Test
+    void islaklikIletkenligiKurudanTamIslagaDogrusalSudaEnYuksek() {
+        assertEquals(1.0, A.iletkenlik(0, false), 1e-12);
+        assertEquals(A.islakIletkenlik(), A.iletkenlik(1, false), 1e-12);
+        assertEquals(1 + (A.islakIletkenlik() - 1) * 0.5, A.iletkenlik(0.5, false), 1e-12);
+        assertEquals(A.suIletkenlik(), A.iletkenlik(0.3, true), 1e-12, "suda ıslaklıktan bağımsız");
+        assertEquals(A.islakIletkenlik(), A.iletkenlik(2, false), 1e-12, "W 1'e sıkıştırılır");
+    }
+
+    /** S3-02: ıslak oyuncu aynı mekanda kurudan hızlı üşür (hissedilen düşer, iletkenlik artar). */
+    @Test
+    void islakOyuncuSoguktaKurudanHizliUsur() {
+        Hissedilen.Ayarlar h = Hissedilen.Ayarlar.VARSAYILAN;
+        double mekan = 5;
+        double kuruHis = Hissedilen.hesapla(new Hissedilen.Girdi(mekan, 0, false, 64, Yagis.YOK, false, SolEl.YOK), h)
+                .toplam();
+        double islakHis = Hissedilen.hesapla(new Hissedilen.Girdi(mekan, 1, false, 64, Yagis.YOK, false, SolEl.YOK), h)
+                .toplam();
+        double kuru = benzet(0, kuruHis, Etkinlik.YURUME, KURU, CIPLAK, 120);
+        double islak = benzet(0, islakHis, Etkinlik.YURUME, ISLAK, CIPLAK, 120);
+        assertTrue(islak < kuru - 3, "ıslak " + islak + " / kuru " + kuru);
+        assertTrue(Math.abs(egilim(0, islakHis, CIPLAK)) < Math.abs(
+                IsiAlisverisi.egilim(girdi(0, islakHis, Etkinlik.YURUME, ISLAK, CIPLAK), A, Y)), "iletkenlik artırır");
+    }
+
+    /** S3-02 gerçekçi yön: çıplak yürüyen oyuncu hissedilen 3 °C'de ~35,5 °C'ye, −10 °C'de ~34,2 °C'ye iner. */
+    @Test
+    void ciplakOyuncununDengeSicakligiGercekci() {
+        double uc = VucutOlcegi.santigrat(benzet(0, 3, Etkinlik.YURUME, KURU, CIPLAK, 6 * 3600));
+        double eksiOn = VucutOlcegi.santigrat(benzet(0, -10, Etkinlik.YURUME, KURU, CIPLAK, 6 * 3600));
+        assertEquals(35.5, uc, 0.1);
+        assertEquals(34.2, eksiOn, 0.1);
+        assertEquals(SicaklikDurumu.DONMA, Esikler.VARSAYILAN.kademe(VucutOlcegi.birim(eksiOn)).durum());
+    }
+
+    @Test
     void konforluOrtamdaCiplakOyuncuNotrKalir() {
-        double b = benzet(0, A.konforSicakligi(), Etkinlik.YURUME, Islaklik.KURU, CIPLAK, 3600);
+        double b = benzet(0, A.konforSicakligi(), Etkinlik.YURUME, KURU, CIPLAK, 3600);
         assertEquals(Kademe.NOTR, Esikler.VARSAYILAN.kademe(b), "vücut: " + b);
     }
 
@@ -76,11 +124,11 @@ class IsiAlisverisiTest {
     void dortYunluParcaylaNormalSogukteDonmaYok() {
         Yalitim.Girdi dortYun = new Yalitim.Girdi(4, 4, 0, 0);
         for (Etkinlik e : Etkinlik.values()) {
-            double b = benzet(0, NORMAL_SOGUK, e, Islaklik.KURU, dortYun, 6 * 3600);
+            double b = benzet(0, NORMAL_SOGUK, e, KURU, dortYun, 6 * 3600);
             assertTrue(b >= 0, e + ": " + b);
         }
         // Yünsüz aynı soğukta donmaya doğru gider.
-        double yunsuz = benzet(0, NORMAL_SOGUK, Etkinlik.DURMA, Islaklik.KURU, new Yalitim.Girdi(4, 0, 0, 0), 3600);
+        double yunsuz = benzet(0, NORMAL_SOGUK, Etkinlik.DURMA, KURU, new Yalitim.Girdi(4, 0, 0, 0), 3600);
         assertTrue(Esikler.VARSAYILAN.kademe(yunsuz).ordinal() < Kademe.NOTR.ordinal(), "yünsüz: " + yunsuz);
     }
 
@@ -111,19 +159,19 @@ class IsiAlisverisiTest {
     @Test
     void cokYalitimlaSicaktaAsiriIsinirSoguktaIyiGelir() {
         Yalitim.Girdi kalin = new Yalitim.Girdi(4, 4, 4 * 30, 0);
-        double ilik = benzet(0, 22, Etkinlik.YURUME, Islaklik.KURU, kalin, 3600);
+        double ilik = benzet(0, 22, Etkinlik.YURUME, KURU, kalin, 3600);
         assertEquals(Kademe.YANIYOR, Esikler.VARSAYILAN.kademe(ilik), "ılık ortamda: " + ilik);
-        double ciplakIlik = benzet(0, 22, Etkinlik.YURUME, Islaklik.KURU, CIPLAK, 3600);
+        double ciplakIlik = benzet(0, 22, Etkinlik.YURUME, KURU, CIPLAK, 3600);
         assertEquals(Kademe.NOTR, Esikler.VARSAYILAN.kademe(ciplakIlik), "çıplak ılık: " + ciplakIlik);
         Yalitim.Girdi orta = new Yalitim.Girdi(4, 0, 4 * 8, 0);
-        double soguk = benzet(0, NORMAL_SOGUK, Etkinlik.YURUME, Islaklik.KURU, orta, 3600);
+        double soguk = benzet(0, NORMAL_SOGUK, Etkinlik.YURUME, KURU, orta, 3600);
         assertEquals(Kademe.NOTR, Esikler.VARSAYILAN.kademe(soguk), "soğukta tüylü: " + soguk);
     }
 
     @Test
     void vucutOlcekSinirlariniAsmaz() {
-        assertEquals(-100, benzet(0, -200, Etkinlik.DURMA, Islaklik.SUDA, CIPLAK, 36_000), 1e-9);
-        assertEquals(100, benzet(0, 200, Etkinlik.KOSMA, Islaklik.KURU, CIPLAK, 36_000), 1e-9);
+        assertEquals(-100, benzet(0, -200, Etkinlik.DURMA, SUDA, CIPLAK, 36_000), 1e-9);
+        assertEquals(100, benzet(0, 200, Etkinlik.KOSMA, KURU, CIPLAK, 36_000), 1e-9);
     }
 
     /** Yürüyen kuru oyuncunun bu ortamdaki ısınma dengesi: {@code E + U·I} (S-02, etkinlik 1). */
@@ -135,7 +183,7 @@ class IsiAlisverisiTest {
     void dortYunluAsiriIsinmisVucutSerinOrtamdaDengeyeIner() {
         Yalitim.Girdi dortYun = new Yalitim.Girdi(4, 4, 0, 0);
         for (double ortam : new double[] {18, 8}) {
-            double b = benzet(90, ortam, Etkinlik.YURUME, Islaklik.KURU, dortYun, 600);
+            double b = benzet(90, ortam, Etkinlik.YURUME, KURU, dortYun, 600);
             assertTrue(Esikler.VARSAYILAN.kademe(b) != Kademe.YANIYOR, ortam + " °C: " + b);
             assertEquals(denge(ortam, dortYun), b, 1.5, ortam + " °C dengesi");
         }
@@ -147,7 +195,7 @@ class IsiAlisverisiTest {
         Yalitim.Girdi ucYun = new Yalitim.Girdi(4, 3, 0, 0);
         Yalitim.Girdi yunsuz = new Yalitim.Girdi(4, 0, 0, 0);
         assertEquals(egilim(90, 18, yunsuz), egilim(90, 18, ucYun), 1e-12, "nötrün üstünde yün hızı kesmez");
-        double b = benzet(90, 18, Etkinlik.YURUME, Islaklik.KURU, ucYun, 600);
+        double b = benzet(90, 18, Etkinlik.YURUME, KURU, ucYun, 600);
         assertEquals(denge(18, ucYun), b, 1.5);
     }
 
@@ -155,13 +203,13 @@ class IsiAlisverisiTest {
     void yunKesintisiYalnizNotrunAltinda() {
         Yalitim.Girdi dortYun = new Yalitim.Girdi(4, 4, 0, 0);
         for (Etkinlik e : new Etkinlik[] {Etkinlik.DURMA, Etkinlik.YURUME}) {
-            assertEquals(0, benzet(0, NORMAL_SOGUK, e, Islaklik.KURU, dortYun, 3600), 1e-9, "N3: " + e);
+            assertEquals(0, benzet(0, NORMAL_SOGUK, e, KURU, dortYun, 3600), 1e-9, "N3: " + e);
         }
         // Sıcak vücut −10 °C'de nötre iner, sıfırı geçen adım bölünür ve nötrün altında 4 yün soğumayı keser.
-        IsiAlisverisi.Girdi g = new IsiAlisverisi.Girdi(5, NORMAL_SOGUK, Etkinlik.YURUME, Islaklik.KURU, dortYun);
+        IsiAlisverisi.Girdi g = girdi(5, NORMAL_SOGUK, Etkinlik.YURUME, KURU, dortYun);
         assertEquals(0, IsiAlisverisi.adim(g, 120, A, Y), 1e-9, "büyük adım sıfırda durmalı");
-        double ucYun = benzet(20, NORMAL_SOGUK, Etkinlik.YURUME, Islaklik.KURU, new Yalitim.Girdi(4, 3, 0, 0), 600);
-        double yunsuz = benzet(20, NORMAL_SOGUK, Etkinlik.YURUME, Islaklik.KURU, new Yalitim.Girdi(4, 0, 0, 0), 600);
+        double ucYun = benzet(20, NORMAL_SOGUK, Etkinlik.YURUME, KURU, new Yalitim.Girdi(4, 3, 0, 0), 600);
+        double yunsuz = benzet(20, NORMAL_SOGUK, Etkinlik.YURUME, KURU, new Yalitim.Girdi(4, 0, 0, 0), 600);
         assertTrue(ucYun < 0 && ucYun > yunsuz, "nötrün altında 3 yün yavaşlatır: " + ucYun + " / " + yunsuz);
     }
 
@@ -169,7 +217,7 @@ class IsiAlisverisiTest {
     private static int donmaSuresi(double ortam, Yalitim.Girdi yalitim) {
         double b = 0;
         for (int s = 1; s <= 48 * 3600; s++) {
-            b = IsiAlisverisi.adim(new IsiAlisverisi.Girdi(b, ortam, Etkinlik.YURUME, Islaklik.KURU, yalitim), 1.0, A, Y);
+            b = IsiAlisverisi.adim(girdi(b, ortam, Etkinlik.YURUME, KURU, yalitim), 1.0, A, Y);
             if (b <= Esikler.VARSAYILAN.donmaHasari()) {
                 return s;
             }

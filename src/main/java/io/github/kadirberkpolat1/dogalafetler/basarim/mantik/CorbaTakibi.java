@@ -19,8 +19,8 @@ public final class CorbaTakibi {
     private long bitis = YOK;
 
     /**
-     * "Donma durumu": sıcaklığın donma hasarı kademesi ({@code Esikler.donmaHasari}, vars. ≤ −75; yiyecek sözleşmesi §A3 ile
-     * aynı, A-29). Soğuk ve çok soğuk kademeleri (yavaşlama, buz kenarı) sayılmaz.
+     * "Donma durumu": sıcaklığın donma hasarı kademesi ({@code Esikler.donmaHasari}, vars. ≤ −70 = 33,5 °C; yiyecek sözleşmesi §A3 ile
+     * aynı, A-29). Üşüme ve hasarsız donma kademeleri (yavaşlama, buz kenarı) sayılmaz.
      */
     public static boolean donmaDurumunda(Kademe kademe) {
         return kademe == Kademe.DONUYOR;

@@ -3,7 +3,9 @@ package io.github.kadirberkpolat1.dogalafetler.yiyecek;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.config.AyarKaydi;
 import io.github.kadirberkpolat1.dogalafetler.yiyecek.mantik.EtkiAyarlari;
-import io.github.kadirberkpolat1.dogalafetler.yiyecek.mantik.VanillaIsinma;
+import io.github.kadirberkpolat1.dogalafetler.yiyecek.mantik.VanillaSicaklik;
+import io.github.kadirberkpolat1.dogalafetler.yiyecek.mantik.Yon;
+import io.github.kadirberkpolat1.dogalafetler.yiyecek.mantik.YiyecekAyarGocu;
 import io.github.kadirberkpolat1.dogalafetler.yiyecek.mantik.YiyecekTanimi;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -15,15 +17,18 @@ import net.minecraftforge.fml.event.config.ModConfigEvent;
 import net.minecraftforge.registries.ForgeRegistries;
 
 /**
- * SERVER config'in {@code yiyecek} bölümü (madde 14, N17). Etki sayıları {@link EtkiAyarlari}'nın bileşenleridir ve
- * varsayılanları {@link EtkiAyarlari#VARSAYILAN}'dan gelir; kurulmuş kayıt ve çözülmüş vanilla listesi config yüklenince
- * ya da değişince yeniden kurulur. SERVER config istemciye senkronlanır: istemci tooltip'i de buradan okur.
+ * SERVER config'in {@code yiyecek} bölümü (madde 14, N17, S3-06). Etki sayıları {@link EtkiAyarlari}'nın bileşenleridir ve
+ * varsayılanları {@link EtkiAyarlari#VARSAYILAN}'dan gelir; kurulmuş kayıt ve çözülmüş vanilla listeleri config yüklenince
+ * ya da değişince yeniden kurulur. SERVER config istemciye senkronlanır: istemci tooltip'i de buradan okur. Eski varsayılan
+ * vanilla ısınma listesi {@link YiyecekAyarGocu} ile kademeli listeye taşınır.
  */
 public final class YiyecekAyarlari {
     private static AyarKaydi.Bolum<YiyecekAyarlari> bolum;
     private static volatile EtkiAyarlari etki;
-    private static volatile Map<Item, YiyecekTanimi> vanilla;
+    private static volatile Map<Item, YiyecekTanimi> vanillaIsinmaTanimlari;
+    private static volatile Map<Item, YiyecekTanimi> vanillaSerinlikTanimlari;
     private static volatile Boolean vanillaIsinmaTesti;
+    private static volatile Boolean vanillaSerinlikTesti;
 
     private final ForgeConfigSpec.DoubleValue cokKucuk;
     private final ForgeConfigSpec.DoubleValue kucuk;
@@ -37,23 +42,28 @@ public final class YiyecekAyarlari {
     private final ForgeConfigSpec.DoubleValue yanEtkiEsigi;
     private final ForgeConfigSpec.BooleanValue vanillaIsinma;
     private final ForgeConfigSpec.ConfigValue<List<? extends String>> vanillaYiyecekler;
+    private final ForgeConfigSpec.BooleanValue vanillaSerinlik;
+    private final ForgeConfigSpec.ConfigValue<List<? extends String>> vanillaSerinYiyecekler;
     private final ForgeConfigSpec.IntValue balikPismisSaniye;
     private final ForgeConfigSpec.IntValue balikCigSaniye;
 
     private YiyecekAyarlari(ForgeConfigSpec.Builder k) {
         EtkiAyarlari v = EtkiAyarlari.VARSAYILAN;
+        k.comment("Config göçünün sürümü (K-E61): dosya bundan eskiyse açılışta eski varsayılanında kalan yiyecek değerleri "
+                + "yeni varsayılana çekilir, elle değiştirilenlere dokunulmaz. Elle değiştirmeyin.")
+                .defineInRange("ayarSurumu", YiyecekAyarGocu.GUNCEL, 0, Integer.MAX_VALUE);
         k.comment("Etki kademeleri: yiyeceğin toplam sıcaklık etkisi, vücut birimi (ölçeğin bir yanı 100: \"orta %15-25\" = 15-25).",
                 "Sıralı olmalı (cokKucuk <= kucuk <= orta <= buyuk <= cokBuyuk); bozuksa varsayılanlar kullanılır.")
                 .push("kademe");
-        cokKucuk = k.comment("Çok küçük: vanilla pişmiş yiyecekler.")
+        cokKucuk = k.comment("Çok küçük: vanilla pişmiş etler, fırın ürünleri, sulu meyveler ve çiğ balıklar.")
                 .defineInRange("cokKucuk", v.cokKucuk(), 0.0, 100.0);
-        kucuk = k.comment("Küçük (madde 14: %5-10): Isıtıcı Çay, Buzlu Karpuz, çiğ buz balığı.")
+        kucuk = k.comment("Küçük (madde 14: %5-10): Isıtıcı Çay, Buzlu Karpuz, çiğ buz balığı, vanilla çorbalar, süt ve su.")
                 .defineInRange("kucuk", v.kucuk(), 0.0, 100.0);
         orta = k.comment("Orta (%15-25): Sıcak Salep, Sıcak Çikolata, Ayran, pişmiş buz balığı.")
                 .defineInRange("orta", v.orta(), 0.0, 100.0);
-        buyuk = k.comment("Büyük (%30-40): Sıcak Tavuk Çorbası, Kutup Balığı Çorbası, Meyve Şerbeti.")
+        buyuk = k.comment("Büyük (%30-40): Sıcak Tavuk Çorbası, Kutup Balığı Çorbası, Meyve Şerbeti, Maraş Dondurması.")
                 .defineInRange("buyuk", v.buyuk(), 0.0, 100.0);
-        cokBuyuk = k.comment("Çok büyük (büyüğün üstü): Ateşli Güveç, en güçlü soğuk savar.")
+        cokBuyuk = k.comment("Çok büyük (büyüğün üstü): Ateşli Güveç (en güçlü soğuk savar), Parıltılı Sorbe (en güçlü serinletici).")
                 .defineInRange("cokBuyuk", v.cokBuyuk(), 0.0, 100.0);
         k.pop();
         anlikOran = k.comment("Etkinin hemen eklenen payı (0-1); kalanı süre boyunca giderek azalan hızla eklenir.")
@@ -66,10 +76,18 @@ public final class YiyecekAyarlari {
                 .defineInRange("yanEtkiCarpani", v.yanEtkiCarpani(), 1.0, 5.0);
         yanEtkiEsigi = k.comment("Yan etki eşiği: vücut ya da ortam (vücut birimi; 20 = 28 °C ortam) bu değer ve üstündeyse sıcakta sayılır.")
                 .defineInRange("yanEtkiEsigi", v.yanEtkiEsigi(), -100.0, 100.0);
-        vanillaIsinma = k.comment("Vanilla pişmiş yiyecekler çok küçük ve kısa bir ısınma versin mi (madde 14).")
+        vanillaIsinma = k.comment("Vanilla sıcak yiyecekler (vanillaYiyecekler listesi) içten ısınma versin mi (madde 14).")
                 .define("vanillaIsinma", true);
-        vanillaYiyecekler = k.comment("Isınma veren yiyecekler: eşya=saniye (miktar kademe.cokKucuk). Başka modların yiyecekleri de eklenebilir.")
-                .defineListAllowEmpty(List.of("vanillaYiyecekler"), () -> VanillaIsinma.VARSAYILAN, VanillaIsinma::gecerliMi);
+        vanillaYiyecekler = k.comment("Isınma veren yiyecekler: eşya=kademe:saniye (kademe cok_kucuk, kucuk, orta, buyuk, cok_buyuk;",
+                "miktar kademe.* değeri). Eski eşya=saniye satırı cok_kucuk sayılır. Başka modların yiyecekleri de eklenebilir.")
+                .defineListAllowEmpty(List.of(YiyecekAyarGocu.ISINMA_LISTESI), () -> VanillaSicaklik.VARSAYILAN_ISINMA,
+                        VanillaSicaklik::gecerliMi);
+        vanillaSerinlik = k.comment("Vanilla soğuk yiyecek ve içecekler (vanillaSerinYiyecekler listesi) serinlik versin mi.")
+                .define("vanillaSerinlik", true);
+        vanillaSerinYiyecekler = k.comment("Serinlik veren yiyecek ve içecekler: eşya=kademe:saniye (ısınma listesiyle aynı biçim).",
+                "minecraft:potion yalnız su şişesinde serinletir (diğer iksirler aynı kimliği taşır). Bir eşya iki listedeyse ısınma geçerlidir.")
+                .defineListAllowEmpty(List.of("vanillaSerinYiyecekler"), () -> VanillaSicaklik.VARSAYILAN_SERINLIK,
+                        VanillaSicaklik::gecerliMi);
         k.comment("Buz balıkları (madde 15): balıkçılık YiyecekAPI.pismisBalik/cigBalik ile kullanır.").push("balik");
         balikPismisSaniye = k.comment("Pişmiş buz balığının orta ısınma süresi (sn).")
                 .defineInRange("pismisSaniye", 90, 1, YiyecekTanimi.EN_UZUN_SANIYE);
@@ -79,14 +97,16 @@ public final class YiyecekAyarlari {
     }
 
     public static void kaydet() {
-        bolum = AyarKaydi.sunucuBolumu("yiyecek", "Sıcaklık yiyecekleri (madde 14)", YiyecekAyarlari::new);
+        bolum = AyarKaydi.sunucuBolumu(YiyecekAyarGocu.BOLUM, "Sıcaklık yiyecekleri (madde 14)", YiyecekAyarlari::new);
+        AyarKaydi.sunucuGocu(YiyecekAyarGocu.PLAN);
     }
 
     /** Mod veri yolunda: SERVER config yüklenince ya da değişince kurulmuş değerler yeniden kurulur. */
     static void configDegisti(ModConfigEvent olay) {
         if (AyarKaydi.SUNUCU_DOSYASI.equals(olay.getConfig().getFileName())) {
             etki = null;
-            vanilla = null;
+            vanillaIsinmaTanimlari = null;
+            vanillaSerinlikTanimlari = null;
         }
     }
 
@@ -122,6 +142,11 @@ public final class YiyecekAyarlari {
         return test != null ? test : bolum.get().vanillaIsinma.get();
     }
 
+    public static boolean vanillaSerinlik() {
+        Boolean test = vanillaSerinlikTesti;
+        return test != null ? test : bolum.get().vanillaSerinlik.get();
+    }
+
     /**
      * Yalnız GameTest: {@code vanillaIsinma}'yı config dosyasına yazmadan değiştirir, {@code null} config'e döner.
      * {@code ConfigValue.set} dosyayı yeniden yazar; Forge'un izleyici thread'i dosyayı yeniden yüklerken gelen ikinci
@@ -131,24 +156,43 @@ public final class YiyecekAyarlari {
         vanillaIsinmaTesti = deger;
     }
 
+    /** Yalnız GameTest: {@code vanillaSerinlik} için {@link #vanillaIsinmaTesti} kalıbı. */
+    static void vanillaSerinlikTesti(Boolean deger) {
+        vanillaSerinlikTesti = deger;
+    }
+
     /** {@code vanillaYiyecekler} listesinin kayıtlı eşyalara çözülmüş hali; bilinmeyen kimlik WARN ile atlanır. */
-    public static Map<Item, YiyecekTanimi> vanillaTanimlari() {
-        Map<Item, YiyecekTanimi> m = vanilla;
+    public static Map<Item, YiyecekTanimi> vanillaIsinmaTanimlari() {
+        Map<Item, YiyecekTanimi> m = vanillaIsinmaTanimlari;
         if (m == null) {
-            Map<Item, YiyecekTanimi> yeni = new LinkedHashMap<>();
-            for (String satir : bolum.get().vanillaYiyecekler.get()) {
-                VanillaIsinma.Girdi girdi = VanillaIsinma.coz(satir);
-                ResourceLocation kimlik = ResourceLocation.tryParse(girdi.esya());
-                if (kimlik == null || !ForgeRegistries.ITEMS.containsKey(kimlik)) {
-                    DogalAfetler.LOGGER.warn("Yiyecek: vanillaYiyecekler'de kayıtlı olmayan eşya atlandı: {}", girdi.esya());
-                    continue;
-                }
-                yeni.put(ForgeRegistries.ITEMS.getValue(kimlik), VanillaIsinma.tanim(girdi));
-            }
-            m = Map.copyOf(yeni);
-            vanilla = m;
+            m = coz(bolum.get().vanillaYiyecekler.get(), Yon.ISINMA, YiyecekAyarGocu.ISINMA_LISTESI);
+            vanillaIsinmaTanimlari = m;
         }
         return m;
+    }
+
+    /** {@code vanillaSerinYiyecekler} listesinin kayıtlı eşyalara çözülmüş hali; bilinmeyen kimlik WARN ile atlanır. */
+    public static Map<Item, YiyecekTanimi> vanillaSerinlikTanimlari() {
+        Map<Item, YiyecekTanimi> m = vanillaSerinlikTanimlari;
+        if (m == null) {
+            m = coz(bolum.get().vanillaSerinYiyecekler.get(), Yon.SERINLIK, "vanillaSerinYiyecekler");
+            vanillaSerinlikTanimlari = m;
+        }
+        return m;
+    }
+
+    private static Map<Item, YiyecekTanimi> coz(List<? extends String> satirlar, Yon yon, String anahtar) {
+        Map<Item, YiyecekTanimi> yeni = new LinkedHashMap<>();
+        for (String satir : satirlar) {
+            VanillaSicaklik.Girdi girdi = VanillaSicaklik.coz(satir);
+            ResourceLocation kimlik = ResourceLocation.tryParse(girdi.esya());
+            if (kimlik == null || !ForgeRegistries.ITEMS.containsKey(kimlik)) {
+                DogalAfetler.LOGGER.warn("Yiyecek: {}'de kayıtlı olmayan eşya atlandı: {}", anahtar, girdi.esya());
+                continue;
+            }
+            yeni.put(ForgeRegistries.ITEMS.getValue(kimlik), VanillaSicaklik.tanim(girdi, yon));
+        }
+        return Map.copyOf(yeni);
     }
 
     public static int balikPismisSaniye() {

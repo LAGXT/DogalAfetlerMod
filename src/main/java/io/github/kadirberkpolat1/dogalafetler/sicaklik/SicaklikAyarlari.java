@@ -3,9 +3,12 @@ package io.github.kadirberkpolat1.dogalafetler.sicaklik;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.config.AyarKaydi;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Esikler;
+import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Hissedilen;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.IsiAlisverisi;
+import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Islaklik;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.KaynakTanimi;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.OrtamSicakligi;
+import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.SicaklikAyarGocu;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Yalitim;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.RecordComponent;
@@ -27,7 +30,7 @@ public final class SicaklikAyarlari {
 
     /** Config'ten kurulmuş saf ayarlar. */
     public record Ozet(IsiAlisverisi.Ayarlar isi, Yalitim.Ayarlar yalitim, Esikler esikler, OrtamSicakligi.Ayarlar ortam,
-            List<KaynakTanimi> kaynaklar) {
+            Islaklik.Ayarlar islaklik, Hissedilen.Ayarlar hissedilen, List<KaynakTanimi> kaynaklar) {
     }
 
     private record Aralik(double min, double max, String aciklama) {
@@ -43,8 +46,13 @@ public final class SicaklikAyarlari {
     private final Map<String, ForgeConfigSpec.DoubleValue> yalitim;
     private final Map<String, ForgeConfigSpec.DoubleValue> esikler;
     private final Map<String, ForgeConfigSpec.DoubleValue> ortam;
+    private final Map<String, ForgeConfigSpec.DoubleValue> islaklik;
+    private final Map<String, ForgeConfigSpec.DoubleValue> hissedilen;
 
     private SicaklikAyarlari(ForgeConfigSpec.Builder k) {
+        k.comment("Config göçünün sürümü (S3-09): dosya bundan eskiyse açılışta eski varsayılanında kalan sıcaklık değerleri "
+                + "(eşikler, kaynak listesi) yeni varsayılana çekilir, elle değiştirilenlere dokunulmaz. Elle değiştirmeyin.")
+                .defineInRange("ayarSurumu", SicaklikAyarGocu.GUNCEL, 0, Integer.MAX_VALUE);
         guncellemeAraligiTick = k.comment("Vücut sıcaklığı güncelleme aralığı (tick; 20 = saniyede bir).")
                 .defineInRange("guncellemeAraligiTick", 20, 5, 100);
         paketTazelemeTick = k.comment("Değer değişmese de HUD paketinin yeniden gönderildiği aralık (tick).")
@@ -57,25 +65,37 @@ public final class SicaklikAyarlari {
         hasarMiktari = k.comment("Donma ve aşırı ısınma hasarının her vuruştaki miktarı (yarım kalp = 1).")
                 .defineInRange("hasarMiktari", 1.0, 0.5, 20.0);
         kaynaklar = k.comment("Isı (+) ve soğuk (−) kaynakları: blok=güç:yarıçap. Güç kaynağın üzerindeki °C katkısıdır,",
-                "mesafeyle (1 − d/r)² azalır. LIT özelliği olan bloklar (kamp ateşi, fırın) yalnız yanarken sayılır.")
+                "mesafeyle (1 − d/r)² azalır. LIT özelliği olan bloklar (kamp ateşi, fırın) yalnız yanarken sayılır.",
+                "Bilinmeyen blok kimliği sessizce atlanır (kömürleşmiş odunlar kısık ama sürekli ısı verir).")
                 .defineListAllowEmpty(List.of("kaynaklar"), SicaklikAyarlari::varsayilanKaynaklar,
                         KaynakTanimi::gecerliMi);
-        k.comment("Isı alışverişi (madde 7b, N4). Vücut sıcaklığı −100…+100 vücut birimidir, 0 nötr.").push("isi");
+        k.comment("Isı alışverişi (madde 7b, N4). Vücut sıcaklığı −100…+100 vücut birimidir, 0 nötr "
+                + "(oyuncuya 32…42 °C görünür: °C = 37 + 0,05 · birim). Ortam terimi hissedilen sıcaklıktır.").push("isi");
         isi = tanimla(k, IsiAlisverisi.Ayarlar.VARSAYILAN, isiAciklamalari());
         k.pop();
         k.comment("Yalıtım: zırh, yün (N3), tüy (N2) ve termostat kancası (madde 13c, N4).").push("yalitim");
         yalitim = tanimla(k, Yalitim.Ayarlar.VARSAYILAN, yalitimAciklamalari());
         k.pop();
-        k.comment("Vücut sıcaklığı eşikleri ve kademeli etkiler (madde 7c).").push("esikler");
+        k.comment("Vücut sıcaklığı eşikleri ve dört durum (S3-04): üşüme, donma, bunalma, yanma. Değerler vücut "
+                + "birimidir (°C = 37 + 0,05 · birim).").push("esikler");
         esikler = tanimla(k, Esikler.VARSAYILAN, esikAciklamalari());
         k.pop();
-        k.comment("Ortam sıcaklığı (°C, madde 7a, 9, bölüm D ve G).").push("ortam");
+        k.comment("Ortam (mekan) sıcaklığı (°C, madde 7a, 9, bölüm D ve G).").push("ortam");
         ortam = tanimla(k, OrtamSicakligi.Ayarlar.VARSAYILAN, ortamAciklamalari());
+        k.pop();
+        k.comment("Islaklık (S3-03): suda ve yağmurda dolar, kuru yerde mekan sıcaklığına göre kurur; ıslak oyuncu daha "
+                + "hızlı üşür.").push("islaklik");
+        islaklik = tanimla(k, Islaklik.Ayarlar.VARSAYILAN, islaklikAciklamalari());
+        k.pop();
+        k.comment("Hissedilen sıcaklık (S3-02, S3-05): mekan + ıslaklık, rüzgâr ve sol el düzeltmeleri. Vücut bununla "
+                + "ısı alışverişi yapar.").push("hissedilen");
+        hissedilen = tanimla(k, Hissedilen.Ayarlar.VARSAYILAN, hissedilenAciklamalari());
         k.pop();
     }
 
     public static void kaydet() {
         bolum = AyarKaydi.sunucuBolumu("sicaklik", "Sıcaklık sistemi (madde 7)", SicaklikAyarlari::new);
+        AyarKaydi.sunucuGocu(SicaklikAyarGocu.PLAN);
     }
 
     /** Mod veri yolunda: SERVER config yüklenince ya da değişince saf ayarlar yeniden kurulur. */
@@ -93,17 +113,30 @@ public final class SicaklikAyarlari {
             for (String satir : a.kaynaklar.get()) {
                 liste.add(KaynakTanimi.coz(satir));
             }
-            try {
-                o = new Ozet(kur(IsiAlisverisi.Ayarlar.class, a.isi), kur(Yalitim.Ayarlar.class, a.yalitim),
-                        kur(Esikler.class, a.esikler), kur(OrtamSicakligi.Ayarlar.class, a.ortam), List.copyOf(liste));
-            } catch (IllegalStateException hata) {
-                DogalAfetler.LOGGER.error("Sıcaklık config'i geçersiz, varsayılanlar kullanılıyor: {}", hata.getMessage());
-                o = new Ozet(IsiAlisverisi.Ayarlar.VARSAYILAN, Yalitim.Ayarlar.VARSAYILAN, Esikler.VARSAYILAN,
-                        OrtamSicakligi.Ayarlar.VARSAYILAN, List.copyOf(liste));
-            }
+            o = new Ozet(kurYaDa(IsiAlisverisi.Ayarlar.class, a.isi, IsiAlisverisi.Ayarlar.VARSAYILAN),
+                    kurYaDa(Yalitim.Ayarlar.class, a.yalitim, Yalitim.Ayarlar.VARSAYILAN),
+                    kurYaDa(Esikler.class, a.esikler, Esikler.VARSAYILAN),
+                    kurYaDa(OrtamSicakligi.Ayarlar.class, a.ortam, OrtamSicakligi.Ayarlar.VARSAYILAN),
+                    kurYaDa(Islaklik.Ayarlar.class, a.islaklik, Islaklik.Ayarlar.VARSAYILAN),
+                    kurYaDa(Hissedilen.Ayarlar.class, a.hissedilen, Hissedilen.Ayarlar.VARSAYILAN), List.copyOf(liste));
             ozet = o;
         }
         return o;
+    }
+
+    /**
+     * Bir bölümü kurar; değerleri geçersizse (ör. elle değiştirilmiş bir eşiğin göçle gelen komşusuyla sırasının bozulması)
+     * yalnız o bölüm varsayılana döner, öteki bölümlerin elle girilmiş değerleri korunur.
+     */
+    private static <R extends Record> R kurYaDa(Class<R> tur, Map<String, ForgeConfigSpec.DoubleValue> degerler,
+            R varsayilan) {
+        try {
+            return kur(tur, degerler);
+        } catch (IllegalStateException hata) {
+            DogalAfetler.LOGGER.error("Sıcaklık config'inin {} bölümü geçersiz, bu bölüm için varsayılanlar kullanılıyor: {}",
+                    tur.getSimpleName(), hata.getMessage());
+            return varsayilan;
+        }
     }
 
     public static int guncellemeAraligiTick() {
@@ -127,12 +160,7 @@ public final class SicaklikAyarlari {
     }
 
     static List<String> varsayilanKaynaklar() {
-        return List.of("minecraft:lava=40:6", "minecraft:fire=25:4", "minecraft:soul_fire=20:4",
-                "minecraft:campfire=22:5", "minecraft:soul_campfire=16:5", "minecraft:furnace=10:3",
-                "minecraft:blast_furnace=12:3", "minecraft:smoker=8:3", "minecraft:magma_block=12:3",
-                "minecraft:torch=4:2", "minecraft:wall_torch=4:2", "minecraft:lantern=3:2",
-                "minecraft:jack_o_lantern=2:2", "minecraft:ice=-4:3", "minecraft:packed_ice=-6:3",
-                "minecraft:blue_ice=-10:4", "minecraft:snow_block=-2:2", "minecraft:powder_snow=-5:2");
+        return SicaklikAyarGocu.KAYNAKLAR;
     }
 
     private static Map<String, ForgeConfigSpec.DoubleValue> tanimla(ForgeConfigSpec.Builder k, Record varsayilan,
@@ -188,7 +216,8 @@ public final class SicaklikAyarlari {
         m.put("durmaEtkinligi", new Aralik(0.1, 3, "Dururken metabolik çarpan (1'in altı = durmak soğutur)."));
         m.put("yurumeEtkinligi", new Aralik(0.1, 3, "Yürürken metabolik çarpan."));
         m.put("kosmaEtkinligi", new Aralik(0.1, 3, "Koşarken metabolik çarpan (koşmak ısıtır)."));
-        m.put("islakIletkenlik", new Aralik(1, 10, "Yağmurda ıslakken ısı iletkenliği çarpanı."));
+        m.put("islakIletkenlik", new Aralik(1, 10, "Tam ıslakken (W = 1) ısı iletkenliği çarpanı; aradaki ıslaklıkta kurudan "
+                + "(1) doğrusal."));
         m.put("suIletkenlik", new Aralik(1, 20, "Suyun içindeyken ısı iletkenliği çarpanı (soğuk su hızlı soğutur)."));
         m.put("asiriSogukEsigi", new Aralik(-100, 0, "Bu °C ve altında yün ve tüy donmayı yalnız yavaşlatır (madde 7e)."));
         return m;
@@ -211,18 +240,47 @@ public final class SicaklikAyarlari {
 
     private static Map<String, Aralik> esikAciklamalari() {
         Map<String, Aralik> m = new LinkedHashMap<>();
-        m.put("notrBant", new Aralik(1, 50, "HUD'daki nötr bantın yarı genişliği (yalnız görünüm)."));
-        m.put("soguk", new Aralik(-99, -1, "Bu değerin altında yavaşlama başlar."));
-        m.put("cokSoguk", new Aralik(-99, -1, "Bu değerin altında ekranda buz efekti."));
-        m.put("donmaHasari", new Aralik(-100, -1, "Bu değerin altında donma hasarı."));
-        m.put("sicak", new Aralik(1, 99, "Bu değerin üstünde sıcak titreme efekti başlar."));
-        m.put("cokSicak", new Aralik(1, 99, "Bu değerin üstünde güçlü titreme."));
-        m.put("yanmaHasari", new Aralik(1, 100, "Bu değerin üstünde aşırı ısınma hasarı."));
+        m.put("notrBant", new Aralik(1, 50, "HUD'daki nötr bantın yarı genişliği (yalnız görünüm; 10 = 36,5–37,5 °C)."));
+        m.put("soguk", new Aralik(-99, -1, "Üşüme: bu değer ve altında (−20 = 36,0 °C) hafif yavaşlama ve ağız buharı, hasarsız."));
+        m.put("cokSoguk", new Aralik(-99, -1, "Donma: bu değer ve altında (−40 = 35,0 °C) buz kenarı ve titreme."));
+        m.put("donmaHasari", new Aralik(-100, -1, "Bu değer ve altında (−70 = 33,5 °C) donma hasarı."));
+        m.put("sicak", new Aralik(1, 99, "Bunalma: bu değer ve üstünde (+20 = 38,0 °C) terleme ve ek açlık, hasarsız."));
+        m.put("cokSicak", new Aralik(1, 99, "Yanma: bu değer ve üstünde (+50 = 39,5 °C) sıcak hava, yalpa ve daha çok açlık."));
+        m.put("yanmaHasari", new Aralik(1, 100, "Bu değer ve üstünde (+70 = 40,5 °C) aşırı ısınma hasarı."));
         m.put("enCokYavaslama", new Aralik(0, 0.9, "Ölçek ucundaki hareket hızı kesintisi (0,5 = %50)."));
         m.put("donmaAralikBasi", new Aralik(20, 1200, "Donma eşiğindeki hasar aralığı (tick)."));
         m.put("donmaAralikSonu", new Aralik(20, 1200, "−100'deki hasar aralığı (tick)."));
         m.put("yanmaAralikBasi", new Aralik(20, 1200, "Aşırı ısınma eşiğindeki hasar aralığı (tick)."));
         m.put("yanmaAralikSonu", new Aralik(20, 1200, "+100'deki hasar aralığı (tick)."));
+        m.put("bunalmaAclik", new Aralik(0, 4, "Bunalmada saniyede ek açlık yorgunluğu (exhaustion; 4 = 1 açlık puanı)."));
+        m.put("yanmaAclik", new Aralik(0, 4, "Yanmada saniyede ek açlık yorgunluğu (exhaustion; 4 = 1 açlık puanı)."));
+        return m;
+    }
+
+    private static Map<String, Aralik> islaklikAciklamalari() {
+        Map<String, Aralik> m = new LinkedHashMap<>();
+        m.put("suDolum", new Aralik(0.001, 1, "Suyun içinde ya da kabarcık sütununda saniyede ıslanma (0,25 = 4 sn'de tam ıslak)."));
+        m.put("yagmurDolum", new Aralik(0, 1, "Açık havada yağmur altında saniyede ıslanma (0,012 ≈ 83 sn; kar ıslatmaz)."));
+        m.put("firtinaDolum", new Aralik(0, 1, "Açık havada fırtınada saniyede ıslanma."));
+        m.put("kurumaTabani", new Aralik(0.0001, 1, "10 °C'de, ısı kaynağı yokken saniyede kuruma (1/150 ≈ 150 sn); "
+                + "0 °C'de yarısı, 30 °C'de iki katı. Yanan oyuncu anında kurur."));
+        m.put("kaynakHizlandirma", new Aralik(0, 2, "Yakındaki ısı kaynaklarının her °C'sinin kuruma hızına katı "
+                + "(0,1: 10 °C kaynak iki kat hızlı kurutur)."));
+        return m;
+    }
+
+    private static Map<String, Aralik> hissedilenAciklamalari() {
+        Map<String, Aralik> m = new LinkedHashMap<>();
+        m.put("islakSogutma", new Aralik(0, 30, "Tam ıslak oyuncunun hissedilen serinlemesi (°C; buharlaşma, sıcakta da)."));
+        m.put("ruzgarYukseklik", new Aralik(0, 5, "Açık havada Y 64 üstünde blok başına rüzgâr (km/h)."));
+        m.put("ruzgarYagmur", new Aralik(0, 100, "Açık havada yağışta ek rüzgâr (km/h)."));
+        m.put("ruzgarFirtina", new Aralik(0, 100, "Açık havada fırtınada ek rüzgâr (km/h)."));
+        m.put("ruzgarKosma", new Aralik(0, 100, "Koşarken ek rüzgâr (km/h). Rüzgâr soğuğu yalnız 10 °C altında ve "
+                + "4,8 km/h üstünde işler (NWS formulü)."));
+        m.put("buzKovasi", new Aralik(-50, 0, "Sol eldeki Buz Kovasının hissedilen düzeltmesi (°C)."));
+        m.put("lavKovasi", new Aralik(0, 50, "Sol eldeki lav kovasının hissedilen düzeltmesi (°C)."));
+        m.put("erimeEsigi", new Aralik(-30, 100, "Sol eldeki Buz Kovası bu mekan sıcaklığının (°C) üstünde erir; "
+                + "saniyede (mekan − eşik)/10 birikir, 300'de su kovasına döner."));
         return m;
     }
 

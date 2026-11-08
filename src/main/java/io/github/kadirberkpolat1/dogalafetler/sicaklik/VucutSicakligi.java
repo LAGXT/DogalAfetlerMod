@@ -1,6 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.sicaklik;
 
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.IsiAlisverisi;
+import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Islaklik;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.SureliEtki;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,6 +20,8 @@ import net.minecraft.server.level.ServerPlayer;
  * <li>{@link #etkiEkle(ServerPlayer, double, int, double)} — yiyecek/içecek etkisi (madde 14): anında bir miktar + süre
  * boyunca giderek azalan hızla toplam bir miktar; sistem kapalıyken yok sayılır ({@code false}).</li>
  * <li>{@link #ayarla(ServerPlayer, double)} — komut ve testler.</li>
+ * <li>{@link #islaklik(ServerPlayer)}, {@link #islaklikAyarla(ServerPlayer, double)} — ıslaklık W ∈ [0, 1] (S3-03;
+ * anahtar {@code islaklik}, eski kayıtta yok = kuru).</li>
  * </ul>
  */
 public final class VucutSicakligi {
@@ -49,6 +52,25 @@ public final class VucutSicakligi {
 
     static void yaz(ServerPlayer oyuncu, double deger) {
         veri(oyuncu).putDouble("vucut", IsiAlisverisi.sinirla(deger));
+    }
+
+    public static double islaklik(ServerPlayer oyuncu) {
+        return veri(oyuncu).getDouble("islaklik");
+    }
+
+    /** Islaklığı ayarlar (0–1'e sıkıştırılır) ve HUD'u hemen tazeler (komut ve testler). */
+    public static void islaklikAyarla(ServerPlayer oyuncu, double deger) {
+        islaklikYaz(oyuncu, deger);
+        SicaklikYoneticisi.hemenGonder(oyuncu);
+    }
+
+    static void islaklikYaz(ServerPlayer oyuncu, double deger) {
+        double w = Islaklik.sinirla(deger);
+        if (w <= 0) {
+            veri(oyuncu).remove("islaklik");
+        } else {
+            veri(oyuncu).putDouble("islaklik", w);
+        }
     }
 
     /**
@@ -136,7 +158,7 @@ public final class VucutSicakligi {
         veri(oyuncu).putInt("hasarSayaci", Math.max(0, deger));
     }
 
-    /** Respawn: nötr vücut, etkiler ve sayacı silinir (madde 3). */
+    /** Respawn: nötr vücut, etkiler, ıslaklık ve sayaç silinir (madde 3). */
     public static void sifirla(ServerPlayer oyuncu) {
         oyuncu.getPersistentData().put(ETIKET, new CompoundTag());
     }

@@ -1,8 +1,15 @@
-"""Sıcaklık sistemi görsel kanıtı ve dedicated sunucu kabulü (K0-18, K0-21 rev. 2).
+"""Sıcaklık sistemi görsel kanıtı ve dedicated sunucu kabulü (K0-18, K0-21 rev. 2, S3-07, S3-10).
 
 Kullanım (worktree kökünden):
-  python3 tools/senaryo/sicaklik_gorsel.py hud         # runServer + runClient (A), HUD/efekt kareleri, set/bilgi konsolda
-  python3 tools/senaryo/sicaklik_gorsel.py coldsweat   # runClient -Puyum=coldsweat, Quick Play tek oyunculu dünya
+  python3 tools/senaryo/sicaklik_gorsel.py hud [<kanıt/>]   # runServer + runClient (A): HUD normal/ıslak/donma/
+                                                         # bunalma/yanma (1. şahıs), üşümede ağız buharı ve
+                                                         # bunalmada ter + kırmızı kenar (3. şahıs), menü, terin
+                                                         # gök/çimen/kum kareleri; set/islaklik/bilgi konsolda
+  python3 tools/senaryo/sicaklik_gorsel.py coldsweat [<kanıt/>]  # runClient -Puyum=coldsweat, Quick Play tek oyunculu
+
+Kareler ve log'lar verilen kanıt klasörüne (yoksa .vibe/kanit/sicaklik-3/). Her kare satırı (SICAKLIK_OTOMASYON kare ...)
+vücut °C, durum, ıslaklık, bant alanları, hapın konumu ve sahnede oyuncunun kendi parçacık sayısını yazar: birinci şahıs
+sahnelerinde 0 olmalı. Piksel ölçümü koşudan sonra: python3 tools/senaryo/sicaklik_olcum.py <kanıt/>.
 
 Ekran protokolü: istemci yalnız Hyprland exec kuralıyla açılır ([workspace 92 silent; no_initial_focus; no_focus on;
 focus_on_activate off]); JVM'de HL_EXEC_RULE_TOKEN yoksa öldürülür; pencere no_focus=true ve ws 92 doğrulanır; 5 sn'de bir
@@ -26,7 +33,7 @@ WS = 92
 PORT = 25592
 W = Path(__file__).resolve().parents[2]
 KOK = W.parents[1] if W.parent.name == ".worktrees" else W
-KANIT = KOK / ".vibe/kanit/sicaklik"
+KANIT = Path(next((a for a in sys.argv[1:] if "/" in a), KOK / ".vibe/kanit/sicaklik-3")).resolve()
 JAVA_HOME = "/home/lagxt/.jdks/jdk-17.0.21+9"
 KANIT.mkdir(parents=True, exist_ok=True)
 GUNLUK = open(KANIT / "protokol.log", "a", encoding="utf-8")
@@ -219,7 +226,7 @@ def kareleri_tasi():
 
 
 def main():
-    kip = sys.argv[1] if len(sys.argv) > 1 else "hud"
+    kip = next((a for a in sys.argv[1:] if "/" not in a), "hud")
     no = kosu_no(kip)
     for eski in (W / "run/screenshots").glob("sicaklik_*.png"):
         eski.unlink()
@@ -241,7 +248,9 @@ def main():
             sunucu.durdur()
             return 2
         def konsol():
-            sunucu.komut("dogalafet sicaklik set A 10")
+            # Dedicated sunucu kabulü: °C ve ıslaklık komutları konsoldan da çalışır, bilgi yeni kalemleri yazar.
+            sunucu.komut("dogalafet sicaklik set A 36.5")
+            sunucu.komut("dogalafet sicaklik islaklik A 40")
             time.sleep(2)
             sunucu.komut("dogalafet sicaklik bilgi A")
 

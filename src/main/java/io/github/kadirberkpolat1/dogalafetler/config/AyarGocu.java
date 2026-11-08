@@ -60,6 +60,10 @@ final class AyarGocu {
                 degisen.add(e.getKey() + " " + icerik.get(e.getKey()) + " → " + e.getValue());
                 icerik.set(e.getKey(), e.getValue());
             }
+            for (Map.Entry<String, List<String>> e : k.listePlani(surum, icerik::get).entrySet()) {
+                degisen.add(e.getKey() + " eski varsayılan liste → yeni varsayılan (" + e.getValue().size() + " satır)");
+                icerik.set(e.getKey(), new ArrayList<>(e.getValue()));
+            }
             icerik.set(k.surumYolu(), k.guncel());
             ozet.add(k.surumYolu() + " " + surum + " → " + k.guncel()
                     + (degisen.isEmpty() ? ", değişen yok" : ": " + String.join(", ", degisen)));

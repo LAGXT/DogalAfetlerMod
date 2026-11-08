@@ -1,6 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.config;
 
 import static io.github.kadirberkpolat1.dogalafetler.config.SurumluGocPlani.adim;
+import static io.github.kadirberkpolat1.dogalafetler.config.SurumluGocPlani.listeAdimi;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -8,6 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.CekirdekAyarGocu;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.GokyuzuAyarGocu;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.MeteorAyarGocu;
+import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.SicaklikAyarGocu;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -82,5 +85,60 @@ class SurumluGocPlaniTest {
         assertEquals(CekirdekAyarGocu.SURUM_YOLU, CekirdekAyarGocu.PLAN.surumYolu());
         assertEquals(CekirdekAyarGocu.GUNCEL, CekirdekAyarGocu.PLAN.guncel());
         assertEquals(CekirdekAyarGocu.ADIMLAR, CekirdekAyarGocu.PLAN.adimlar());
+    }
+
+    /** Liste adımları: {@code a.l} 1'de [x] ya da [x, y] → [x, y, z], 2'de [x, y, z] → [z]. */
+    private static final SurumluGocPlani LISTE_PLANI = new SurumluGocPlani("a.ayarSurumu", 2, List.of(adim(1, "a.x", 20, 10)),
+            List.of(listeAdimi(1, "a.l", List.of("x", "y", "z"), List.of("x"), List.of("x", "y")),
+                    listeAdimi(2, "a.l", List.of("z"), List.of("x", "y", "z"))));
+
+    @Test
+    void eskiVarsayilanListeYenisineZincirleGecer() {
+        Map<String, Object> dosya = new LinkedHashMap<>();
+        dosya.put("a.l", new ArrayList<>(List.of("x", "y")));
+        assertEquals(Map.of("a.l", List.of("z")), LISTE_PLANI.listePlani(0, dosya::get), "[x, y] → [x, y, z] → [z]");
+        assertEquals(Map.of("a.l", List.of("z")), LISTE_PLANI.listePlani(1,
+                Map.<String, Object>of("a.l", List.of("x", "y", "z"))::get), "sürüm 1'den yalnız 2. adım");
+        assertTrue(LISTE_PLANI.listePlani(2, dosya::get).isEmpty(), "güncel dosyaya dokunulmaz");
+        assertEquals(Map.of("a.x", 20), LISTE_PLANI.plan(0, Map.<String, Object>of("a.x", 10)::get),
+                "sayı adımları liste adımlarıyla birlikte çalışır");
+    }
+
+    @Test
+    void elleDegistirilmisListeVeListeOlmayanDokunulmaz() {
+        assertTrue(LISTE_PLANI.listePlani(0, Map.<String, Object>of("a.l", List.of("x", "q"))::get).isEmpty(),
+                "elle satır");
+        assertTrue(LISTE_PLANI.listePlani(0, Map.<String, Object>of("a.l", List.of("y", "x"))::get).isEmpty(),
+                "sıra farklı");
+        assertTrue(LISTE_PLANI.listePlani(0, Map.<String, Object>of("a.l", "x")::get).isEmpty(), "liste değil");
+        assertTrue(LISTE_PLANI.listePlani(0, Map.<String, Object>of()::get).isEmpty(), "anahtar yok");
+        assertTrue(PLAN.listePlani(0, Map.<String, Object>of("a.l", List.of("x"))::get).isEmpty(),
+                "liste adımsız plan");
+    }
+
+    @Test
+    void bozukListeTablosuKurulmaz() {
+        assertThrows(IllegalArgumentException.class, () -> new SurumluGocPlani("s", 2, List.of(),
+                List.of(listeAdimi(2, "a", List.of("b"), List.of("a")), listeAdimi(1, "c", List.of("b"), List.of("a")))),
+                "sırasız");
+        assertThrows(IllegalArgumentException.class, () -> new SurumluGocPlani("s", 1, List.of(),
+                List.of(listeAdimi(2, "a", List.of("b"), List.of("a")))), "güncelden ileri");
+        assertThrows(IllegalArgumentException.class, () -> new SurumluGocPlani("s", 1, List.of(),
+                List.of(listeAdimi(1, "a", List.of("b")))), "eski liste yok");
+        assertThrows(IllegalArgumentException.class, () -> new SurumluGocPlani("s", 1, List.of(),
+                List.of(listeAdimi(1, "a", List.of("b"), List.of("b")))), "yeni eskilerde");
+        assertThrows(IllegalArgumentException.class, () -> new SurumluGocPlani("s", 1, List.of(),
+                List.of(listeAdimi(1, "a", List.of("b"), List.of("a")), listeAdimi(1, "a", List.of("c"), List.of("b")))),
+                "aynı sürümde iki adım");
+        assertThrows(IllegalArgumentException.class, () -> new SurumluGocPlani("s", 1, List.of(),
+                List.of(listeAdimi(1, "s", List.of("b"), List.of("a")))), "sürüm anahtarı");
+    }
+
+    @Test
+    void sicaklikPlaniOrtakPlaniKullanir() {
+        assertEquals(SicaklikAyarGocu.SURUM_YOLU, SicaklikAyarGocu.PLAN.surumYolu());
+        assertEquals(SicaklikAyarGocu.GUNCEL, SicaklikAyarGocu.PLAN.guncel());
+        assertEquals(SicaklikAyarGocu.LISTE_ADIMLARI, SicaklikAyarGocu.PLAN.listeAdimlari());
+        assertTrue(MeteorAyarGocu.PLAN.listeAdimlari().isEmpty(), "sayı planları liste adımsız kalır");
     }
 }

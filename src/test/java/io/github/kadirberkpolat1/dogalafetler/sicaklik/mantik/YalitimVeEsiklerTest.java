@@ -50,7 +50,7 @@ class YalitimVeEsiklerTest {
         assertEquals(ilimli / 4, Yalitim.termostatCekimi(-40, -30, 1, Y), 1e-12);
         assertEquals(0.01, Yalitim.termostatCekimi(-0.01, -30, 4, Y), 1e-12);
         // Hiçbir koşulda tam koruma yok: dört parça uç soğukta soğumayı yenemez.
-        IsiAlisverisi.Girdi g = new IsiAlisverisi.Girdi(-40, -45, Etkinlik.YURUME, Islaklik.KURU,
+        IsiAlisverisi.Girdi g = new IsiAlisverisi.Girdi(-40, -45, Etkinlik.YURUME, 0, false,
                 new Yalitim.Girdi(4, 0, 0, 4));
         assertTrue(IsiAlisverisi.egilim(g, IsiAlisverisi.Ayarlar.VARSAYILAN, Y) < 0);
     }
@@ -58,28 +58,68 @@ class YalitimVeEsiklerTest {
     @Test
     void kademelerSiraliVeOkunakli() {
         assertEquals(Kademe.NOTR, E.kademe(0));
-        assertEquals(Kademe.NOTR, E.kademe(-29.9));
-        assertEquals(Kademe.SOGUK, E.kademe(-30));
-        assertEquals(Kademe.COK_SOGUK, E.kademe(-55));
-        assertEquals(Kademe.DONUYOR, E.kademe(-75));
-        assertEquals(Kademe.SICAK, E.kademe(30));
-        assertEquals(Kademe.COK_SICAK, E.kademe(55));
-        assertEquals(Kademe.YANIYOR, E.kademe(75));
+        assertEquals(Kademe.NOTR, E.kademe(-19.9));
+        assertEquals(Kademe.SOGUK, E.kademe(-20));
+        assertEquals(Kademe.COK_SOGUK, E.kademe(-40));
+        assertEquals(Kademe.DONUYOR, E.kademe(-70));
+        assertEquals(Kademe.NOTR, E.kademe(19.9));
+        assertEquals(Kademe.SICAK, E.kademe(20));
+        assertEquals(Kademe.COK_SICAK, E.kademe(50));
+        assertEquals(Kademe.YANIYOR, E.kademe(70));
         assertEquals(Kademe.YANIYOR, E.kademe(100));
+    }
+
+    /** S3-04: dört durum °C eşiklerinde (üşüme 36, donma 35, hasar 33,5; bunalma 38, yanma 39,5, hasar 40,5). */
+    @Test
+    void durumlarSantigratEsiklerindeBaslar() {
+        assertEquals(SicaklikDurumu.NORMAL, durum(36.05));
+        assertEquals(SicaklikDurumu.USUME, durum(36.0));
+        assertEquals(SicaklikDurumu.USUME, durum(35.05));
+        assertEquals(SicaklikDurumu.DONMA, durum(35.0));
+        assertEquals(Kademe.DONUYOR, E.kademe(VucutOlcegi.birim(33.5)));
+        assertEquals(SicaklikDurumu.DONMA, Kademe.DONUYOR.durum());
+        assertEquals(SicaklikDurumu.NORMAL, durum(37.95));
+        assertEquals(SicaklikDurumu.BUNALMA, durum(38.0));
+        assertEquals(SicaklikDurumu.YANMA, durum(39.5));
+        assertEquals(Kademe.YANIYOR, E.kademe(VucutOlcegi.birim(40.5)));
+        assertEquals(SicaklikDurumu.YANMA, Kademe.YANIYOR.durum());
+        for (Kademe k : Kademe.values()) {
+            assertEquals(k.hasarli(), k == Kademe.DONUYOR || k == Kademe.YANIYOR, "üşüme ve bunalma hasarsız");
+        }
+    }
+
+    /** S3-04: üşüme ve bunalma hasarsız; bunalma ve yanma ek açlık tüketir, yanma daha çok. */
+    @Test
+    void usumeVeBunalmaHasarsizBunalmaAcikirir() {
+        double usume = VucutOlcegi.birim(35.5);
+        double bunalma = VucutOlcegi.birim(38.5);
+        double yanma = VucutOlcegi.birim(40.0);
+        assertEquals(0, E.hasarAraligi(usume));
+        assertEquals(0, E.hasarAraligi(bunalma));
+        assertEquals(0, E.aclik(usume), 1e-12);
+        assertEquals(0, E.aclik(0), 1e-12);
+        assertEquals(E.bunalmaAclik(), E.aclik(bunalma), 1e-12);
+        assertEquals(E.yanmaAclik(), E.aclik(yanma), 1e-12);
+        assertTrue(E.yanmaAclik() > E.bunalmaAclik() && E.bunalmaAclik() > 0);
+        assertEquals(E.yanmaAclik(), E.aclik(95), 1e-12, "hasarlı yanmada da açlık");
+    }
+
+    private static SicaklikDurumu durum(double santigrat) {
+        return E.kademe(VucutOlcegi.birim(santigrat)).durum();
     }
 
     @Test
     void yavaslamaVeHasarKademeli() {
-        assertEquals(0, E.yavaslama(-29), 1e-12);
-        assertTrue(E.yavaslama(-40) > 0);
+        assertEquals(0, E.yavaslama(-19), 1e-12);
+        assertTrue(E.yavaslama(-30) > 0);
         assertTrue(E.yavaslama(-90) > E.yavaslama(-60));
         assertTrue(E.yavaslama(-100) <= 0.5 + 1e-12);
-        assertEquals(0, E.hasarAraligi(-74.9));
-        assertEquals(0, E.hasarAraligi(74.9));
-        int donmaBasi = E.hasarAraligi(-75);
+        assertEquals(0, E.hasarAraligi(-69.9));
+        assertEquals(0, E.hasarAraligi(69.9));
+        int donmaBasi = E.hasarAraligi(-70);
         int donmaSonu = E.hasarAraligi(-100);
         assertTrue(donmaBasi > donmaSonu && donmaSonu > 0, donmaBasi + " / " + donmaSonu);
-        assertTrue(E.hasarAraligi(75) > E.hasarAraligi(100));
+        assertTrue(E.hasarAraligi(70) > E.hasarAraligi(100));
         assertTrue(donmaSonu >= 20, "ani değil: en sık saniyede bir");
     }
 

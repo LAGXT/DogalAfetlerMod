@@ -4,7 +4,6 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.SicaklikDurumPaketi;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.SicaklikIstemciAyarlari;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
@@ -17,13 +16,16 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 /**
- * Donma ve aşırı ısınma ekran efektleri (madde 7c, N6 — yazı değil): çok soğukta kenarlardan içeri büyüyen buz
- * kristalleri, sıcakta turuncu-kırmızı dalgalanan sıcak hava vinyeti ve hafif kamera yalpası; donarken titreme. Şiddet
- * vücut sıcaklığının eşiklere göre konumundan gelir (eşikler pakette, sunucu config'inden).
+ * Vücut durumu ekran efektleri (§A8, N6 — yazı değil; S3-10). Donma: kenarlardan içeri büyüyen buz kristalleri, ağır
+ * donmada nabızlı. Bunalma: buz kenarının kırmızı karşılığı, aynı derinlikte en az onun kadar belirgin kenarlardan içeri
+ * süzülen ter ve ısı izleri; yanmada daha yoğun ve kalp atışı gibi nabızlı (hasara yaklaştıkça hızlanır), üstüne
+ * dalgalanan sıcak hava ve kamera yalpası. Üşümede ara ara hafif ürperme, donmada hızlı titreme. Kenar izleri vanilla toz
+ * kar kırağısı gibi her kamera kipinde çizilir. Şiddet {@link EkranSiddeti}'nden.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
 public final class SicaklikEkranEfektleri {
     private static final ResourceLocation BUZ = DogalAfetler.konum("textures/misc/sicaklik_buz.png");
+    private static final ResourceLocation BUNALMA = DogalAfetler.konum("textures/misc/sicaklik_bunalma.png");
     private static final ResourceLocation SICAK = DogalAfetler.konum("textures/misc/sicaklik_sicak.png");
 
     private SicaklikEkranEfektleri() {
@@ -34,27 +36,17 @@ public final class SicaklikEkranEfektleri {
         olay.registerAbove(VanillaGuiOverlay.FROSTBITE.id(), "sicaklik_efektleri", SicaklikEkranEfektleri::ciz);
     }
 
-    /** Buz kenarı şiddeti 0–1: çok soğuk eşiğinden ölçek ucuna. */
-    static float buz(SicaklikDurumPaketi d, float vucut) {
-        return Mth.clamp((d.cokSoguk() - vucut) / (d.cokSoguk() + 100f), 0f, 1f);
-    }
-
-    /** Sıcak titreme şiddeti 0–1: sıcak eşiğinden aşırı ısınma hasarı eşiğine. */
-    static float sicak(SicaklikDurumPaketi d, float vucut) {
-        return Mth.clamp((vucut - d.sicak()) / Math.max(1f, d.yanma() - d.sicak()), 0f, 1f);
-    }
-
     private static void ciz(ForgeGui gui, GuiGraphics g, float partialTick, int w, int h) {
-        if (!IstemciSicaklik.acik() || !SicaklikIstemciAyarlari.ekranEfektleri()
-                || Minecraft.getInstance().options.getCameraType() != net.minecraft.client.CameraType.FIRST_PERSON) {
+        if (!IstemciSicaklik.acik() || !SicaklikIstemciAyarlari.ekranEfektleri()) {
             return;
         }
         SicaklikDurumPaketi d = IstemciSicaklik.durum();
         float vucut = IstemciSicaklik.vucut(partialTick);
         float zaman = IstemciSicaklik.tick() + partialTick;
-        float b = buz(d, vucut);
-        float s = sicak(d, vucut);
-        if (b <= 0 && s <= 0) {
+        float b = EkranSiddeti.buzOpaklik(d, vucut, zaman);
+        float k = EkranSiddeti.kirmiziOpaklik(d, vucut, zaman);
+        float s = EkranSiddeti.sicakOpaklik(d, vucut, zaman);
+        if (b <= 0 && k <= 0) {
             return;
         }
         RenderSystem.disableDepthTest();
@@ -62,13 +54,15 @@ public final class SicaklikEkranEfektleri {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         if (b > 0) {
-            float nabiz = vucut <= d.donma() ? 0.08f * Mth.sin(zaman * 0.35f) : 0f;
-            g.setColor(1f, 1f, 1f, Mth.clamp((float) Math.pow(b, 0.7) + nabiz, 0f, 1f));
+            g.setColor(1f, 1f, 1f, b);
             g.blit(BUZ, 0, 0, -90, 0f, 0f, w, h, w, h);
         }
+        if (k > 0) {
+            g.setColor(1f, 1f, 1f, k);
+            g.blit(BUNALMA, 0, 0, -90, 0f, 0f, w, h, w, h);
+        }
         if (s > 0) {
-            float nabiz = vucut >= d.yanma() ? 0.12f * Mth.sin(zaman * 0.45f) : 0f;
-            g.setColor(1f, 1f, 1f, Mth.clamp(0.25f + 0.6f * s + nabiz, 0f, 1f) * Math.min(1f, s * 4f));
+            g.setColor(1f, 1f, 1f, s);
             float kayma = (zaman * 0.9f) % 256f;
             g.blit(SICAK, 0, 0, w, h, 0f, kayma, 256, 256, 256, 256);
         }
@@ -78,7 +72,7 @@ public final class SicaklikEkranEfektleri {
         RenderSystem.enableDepthTest();
     }
 
-    /** Kamera yalpası (Forge veri yolu): sıcakta yavaş sallantı, donarken hızlı titreme. */
+    /** Kamera (Forge veri yolu): yanmada yavaş yalpa, üşümede ara ara ürperme, donmada hızlı titreme. */
     @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
     public static final class Kamera {
         private Kamera() {
@@ -93,8 +87,13 @@ public final class SicaklikEkranEfektleri {
             float pt = (float) olay.getPartialTick();
             float vucut = IstemciSicaklik.vucut(pt);
             float zaman = IstemciSicaklik.tick() + pt;
-            float s = sicak(d, vucut);
-            float titreme = vucut <= d.donma() ? buz(d, vucut) : 0f;
+            float s = EkranSiddeti.sicak(d, vucut);
+            float titreme = EkranSiddeti.titreme(d, vucut);
+            if (vucut > d.cokSoguk()) {
+                // Üşüme: ~6 sn'de bir 1 sn süren ürperme dalgası.
+                float dalga = Mth.sin(zaman * 0.05f);
+                titreme *= dalga > 0.85f ? (dalga - 0.85f) / 0.15f : 0f;
+            }
             if (s <= 0 && titreme <= 0) {
                 return;
             }

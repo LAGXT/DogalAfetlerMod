@@ -188,4 +188,16 @@ class OrtamSicakligiTest {
         }
         assertEquals(s.toplam(), toplam, 1e-9);
     }
+
+    /** Mekan sıcaklığı kişisel düzeltme taşımaz: ıslaklık, rüzgâr ve sol el yalnız hissedilendedir (S3-02). */
+    @Test
+    void mekanHissedilenKalemleriniIcermez() {
+        OrtamSicakligi.Sonuc s = OrtamSicakligi.hesapla(ova().y(200).yagis(Yagis.FIRTINA).kaynaklar(8), A);
+        for (Katki k : Katki.values()) {
+            assertEquals(k.hissedilen(), k == Katki.ISLAKLIK || k == Katki.RUZGAR || k == Katki.SOL_EL, k.name());
+            if (k.hissedilen()) {
+                assertTrue(!s.katkilar().containsKey(k), "mekanda " + k);
+            }
+        }
+    }
 }
