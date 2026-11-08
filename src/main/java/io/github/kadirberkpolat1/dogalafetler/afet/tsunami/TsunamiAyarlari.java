@@ -8,9 +8,11 @@ import net.minecraftforge.common.ForgeConfigSpec;
 public final class TsunamiAyarlari {
     /**
      * Çekilme başladıktan (AKTIF) sonra dalganın açıkta doğmasına kadar geçen süre (sn; K-E67, eski 10): dalga birkaç
-     * saniyede görünür, kıyıya doğuştan ~18 sn sonra varan dalga yine {@code cekilmeSn} (18) dolduktan sonra vurur.
+     * saniyede görünür ve doğuştan {@link TsunamiSeviyesi#KIYIYA_SN} sn sonra kıyıya vurur (AKTIF'in 10. sn'si).
      */
     public static final double VARSAYILAN_DALGA_GECIKME_SN = 2.0;
+    /** Çekilmenin tamamlandığı süre (sn; K-E67, eski 18): dalga vurmadan (10. sn) biter. */
+    public static final double VARSAYILAN_CEKILME_SN = 8.0;
 
     private static AyarKaydi.Bolum<TsunamiAyarlari> bolum;
 
@@ -36,7 +38,7 @@ public final class TsunamiAyarlari {
         aramaYaricapi = k.comment("Deniz aramasının yatay yarıçapı (blok).").defineInRange("aramaYaricapi", 96, 32, 160);
         dalgaGecikmeSn = k.comment("Çekilme başladıktan sonra dalganın açıkta belirmesine kadar geçen süre (sn).")
                 .defineInRange("dalgaGecikmeSn", VARSAYILAN_DALGA_GECIKME_SN, 0.0, 60.0);
-        cekilmeSn = k.comment("Suyun çekilmesinin tamamlandığı süre (sn).").defineInRange("cekilmeSn", 18.0, 1.0, 120.0);
+        cekilmeSn = k.comment("Suyun çekilmesinin tamamlandığı süre (sn).").defineInRange("cekilmeSn", VARSAYILAN_CEKILME_SN, 1.0, 120.0);
         ayCekilmeCarpani = k.comment("Bölüm H: ay çarpması sonrası tsunami çarpanı sürerken çekilme derinliği ve mesafesi çarpanı.")
                 .defineInRange("ayCekilmeCarpani", 1.5, 1.0, 3.0);
         yikimCarpani = k.comment("Tick başına yıkım bütçesi çarpanı (S1 16 … S5 48 blok; ayrıca TPS kısmasıyla çarpılır).")

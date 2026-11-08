@@ -8,28 +8,32 @@ import java.util.Set;
 /**
  * Eşzamanlı doğal afet kuralları (K-E67, kullanıcı isteği "gün geçtikçe sayıları artsın"): oyun gününe göre en çok
  * {@link ZamanlayiciAyarlari#eszamanliSinir} doğal afet aynı anda sürer, hepsi farklı türden. Güneş patlaması ve ay çarpması
- * her zaman tek başınadır: biri sürerken doğal afet başlamaz, başka afet sürerken onlar seçilmez. TPS kısılıyken (K-C37)
- * ikinci ve üçüncü afet ertelenir. Komutla başlatma bu kurallara bağlı değildir (AS-8, K-E62); süren komut afetleri yuvayı
- * yine doldurur. Etki alanları çakışan afet başlamaz ({@code EtkiAlani.kesisir}, yönetici). Saf Java.
+ * her zaman tek başınadır: doğal olanı sürerken doğal afet başlamaz, başka afet sürerken onlar seçilmez. Yuvayı yalnız doğal
+ * afetler doldurur: komutla başlatılan afet (uzun güneş patlaması dahil) doğal takvimi durdurmaz; komutla başlatma da bu
+ * kurallara bağlı değildir (AS-8, K-E62). TPS kısılıyken (K-C37) herhangi bir afet sürerken yenisi ertelenir. Etki alanları
+ * çakışan afet başlamaz ({@code EtkiAlani.kesisir}, yönetici). Saf Java.
  */
 public final class EszamanliAfetler {
     private EszamanliAfetler() {
     }
 
-    /** Yeni bir doğal afet için yuva yok mu. {@code aktifler}: süren afetlerin türleri (ön-uyarı dahil). */
-    public static boolean yuvaDolu(Collection<AfetTuru> aktifler, int sinir, boolean tpsKisik) {
-        if (aktifler.isEmpty()) {
+    /**
+     * Yeni bir doğal afet için yuva yok mu. {@code dogalAktifler}: süren doğal afetlerin türleri (ön-uyarı dahil);
+     * {@code toplamAktif}: komutla başlatılanlar dahil süren afet sayısı.
+     */
+    public static boolean yuvaDolu(Collection<AfetTuru> dogalAktifler, int toplamAktif, int sinir, boolean tpsKisik) {
+        if (toplamAktif <= 0) {
             return false;
         }
         if (tpsKisik) {
             return true;
         }
-        for (AfetTuru tur : aktifler) {
+        for (AfetTuru tur : dogalAktifler) {
             if (tur.sunucuGeneli()) {
                 return true;
             }
         }
-        return aktifler.size() >= Math.max(1, sinir);
+        return dogalAktifler.size() >= Math.max(1, sinir);
     }
 
     /** Doğal seçimin aday türleri: süren türler dışta; bir afet sürerken sunucu geneli türler de dışta. */

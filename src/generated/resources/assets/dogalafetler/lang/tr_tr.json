@@ -118,7 +118,6 @@
   "commands.dogalafetler.durum.gokyuzu": "Ay: %s; güneş: %s (ilerleme %%%s)",
   "commands.dogalafetler.durum.gun": "Oyun günü: %s (ofset %s), hız: x%s, TPS: %s (bütçe x%s)",
   "commands.dogalafetler.durum.kayitli": "Kayıtlı afetler: %s",
-  "commands.dogalafetler.durum.pencere": "patlama penceresi bekleniyor: ~%s",
   "commands.dogalafetler.durum.seviyeler": "Seviye olasılıkları (gün %s, en yüksek seviye %s): %s",
   "commands.dogalafetler.durum.son_afetler": "Son afetler: %s",
   "commands.dogalafetler.durum.surec_durdu.komut": "%s durduruldu (stop)",

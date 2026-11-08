@@ -14,27 +14,30 @@ import org.junit.jupiter.api.Test;
 
 class TsunamiAyarGocuTest {
     private static final String GECIKME = "tsunami.dalgaGecikmeSn";
+    private static final String CEKILME = "tsunami.cekilmeSn";
 
     /** Güncelleme turu 2'nin varsayılanları; ayarSurumu anahtarı o dosyada yok. */
     private static Map<String, Object> eskiDosya() {
         Map<String, Object> d = new LinkedHashMap<>();
         d.put("tsunami.aramaYaricapi", 96);
         d.put(GECIKME, 10.0);
-        d.put("tsunami.cekilmeSn", 18.0);
+        d.put(CEKILME, 18.0);
         return d;
     }
 
     @Test
     void eskiDalgaGecikmesiYeniVarsayilanaCekilir() {
-        assertEquals(Map.of(GECIKME, 2.0), TsunamiAyarGocu.plan(0, eskiDosya()::get));
+        assertEquals(Map.of(GECIKME, 2.0, CEKILME, 8.0), TsunamiAyarGocu.plan(0, eskiDosya()::get));
         assertEquals(TsunamiAyarlari.VARSAYILAN_DALGA_GECIKME_SN, TsunamiAyarGocu.ADIMLAR.get(0).yeni().doubleValue(), 0.0,
                 "tablonun yeni değeri spec varsayılanı");
+        assertEquals(TsunamiAyarlari.VARSAYILAN_CEKILME_SN, TsunamiAyarGocu.ADIMLAR.get(1).yeni().doubleValue(), 0.0);
     }
 
     @Test
     void elleDegistirilenDegerKorunur() {
         Map<String, Object> d = eskiDosya();
         d.put(GECIKME, 6.5);
+        d.put(CEKILME, 12.0);
         assertTrue(TsunamiAyarGocu.plan(0, d::get).isEmpty());
         assertTrue(TsunamiAyarGocu.plan(0, Map.<String, Object>of(GECIKME, 2.0)::get).isEmpty(), "yeni varsayılan kalır");
     }

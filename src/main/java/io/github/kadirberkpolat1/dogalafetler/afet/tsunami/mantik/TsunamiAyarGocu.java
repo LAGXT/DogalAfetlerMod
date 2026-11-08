@@ -15,9 +15,10 @@ public final class TsunamiAyarGocu {
     public static final String SURUM_YOLU = "tsunami.ayarSurumu";
     public static final int GUNCEL = 1;
 
-    /** Sürüme göre sıralı. 1: K-E67 (dalga AKTIF'ten 2 sn sonra doğar). */
+    /** Sürüme göre sıralı. 1: K-E67 (dalga AKTIF'ten 2 sn sonra doğar, çekilme vuruştan önce, 8 sn'de biter). */
     public static final List<SurumluGocPlani.Adim> ADIMLAR = List.of(
-            adim(1, "tsunami.dalgaGecikmeSn", 2.0, 10.0));
+            adim(1, "tsunami.dalgaGecikmeSn", 2.0, 10.0),
+            adim(1, "tsunami.cekilmeSn", 8.0, 18.0));
 
     public static final SurumluGocPlani PLAN = new SurumluGocPlani(SURUM_YOLU, GUNCEL, ADIMLAR);
 

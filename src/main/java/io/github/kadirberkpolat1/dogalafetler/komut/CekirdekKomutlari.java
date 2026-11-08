@@ -84,8 +84,6 @@ public final class CekirdekKomutlari {
     public static final String START_MAKS_ASILDI = ON + "start.maks_asildi";
     /** Gökyüzü-2 istek 26: komutla başlatma gün saati penceresine bakmaz. */
     public static final String START_PENCERE = ON + "start.pencere";
-    /** Gökyüzü-2 Gk1: doğal patlama penceresi beklenirken kalan sürenin yerine. */
-    public static final String DURUM_PENCERE = ON + "durum.pencere";
     public static final String STOP_DURDU = ON + "stop.durdu";
     public static final String STOP_AFET_YOK = ON + "stop.afet_yok";
     public static final String STOP_SURECLER = ON + "stop.surecler";
@@ -123,9 +121,7 @@ public final class CekirdekKomutlari {
         List<Afet> aktifler = yonetici.aktifAfetler();
         for (Afet afet : aktifler) {
             AfetBaglami afetBaglami = afet.baglam();
-            long pencere = afet.pencereBeklemesi();
-            Component kalan = pencere >= 0 ? Component.translatable(DURUM_PENCERE, sure(pencere))
-                    : sure(yonetici.zamanOlcegi().gercekTick(yonetici.kalanOku(afet)));
+            Component kalan = sure(yonetici.zamanOlcegi().gercekTick(yonetici.kalanOku(afet)));
             satirlar.add(Component.translatable(DURUM_AFET, afetAdi(afet.tur()), seviyeMetni(afet.seviye()),
                     Component.translatable(afet.asama().ceviriAnahtari()), afet.altAsama(), kalan));
             Component yaricap = yonetici.etkiAlani(afet).map(CekirdekKomutlari::yaricap)
@@ -504,7 +500,6 @@ public final class CekirdekKomutlari {
         y.ekle(DURUM_AFET_YOK, "No active disaster.", "Aktif afet yok.");
         y.ekle(DURUM_AFET, "Active disaster: %s, %s; phase: %s (sub-phase %s), remaining: %s",
                 "Aktif afet: %s, %s; aşama: %s (alt aşama %s), kalan: %s");
-        y.ekle(DURUM_PENCERE, "time-of-day window awaited: ~%s", "patlama penceresi bekleniyor: ~%s");
         y.ekle(DURUM_AFET_KONUM, "Centre: %s (%s), impact radius: %s, target: %s",
                 "Merkez: %s (%s), etki yarıçapı: %s, hedef: %s");
         y.ekle(DURUM_GUN, "Game day: %s (offset %s), speed: x%s, TPS: %s (budget x%s)",

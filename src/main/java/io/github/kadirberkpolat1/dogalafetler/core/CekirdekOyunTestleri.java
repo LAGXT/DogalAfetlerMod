@@ -6,6 +6,9 @@ import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.config.CekirdekAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.AfetZamanlayicisi;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.OyunGunu;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.SeviyeDurumu;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.SiddetAyarlari;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.SiddetSecici;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SonrakiAfetTahmini;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SonumTipi;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.ZamanlayiciAyarlari;
@@ -45,6 +48,7 @@ import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.Level;
 import net.minecraftforge.common.MinecraftForge;
@@ -445,6 +449,123 @@ public final class CekirdekOyunTestleri {
             server.getPlayerList().remove(c);
         }
         yardimci.succeed();
+    }
+
+    /**
+     * Z4: tek oyuncunun çevresinde alanları çakışmayan iki farklı tür (gün 20, sınır 2) aynı anda doğal olarak başlar;
+     * üçüncü tür sınırda kalır.
+     */
+    @GameTest(template = "bos", batch = "cekirdek_eszamanli_tek")
+    public static void tekOyuncuCevresindeCakismayanIkiDogalAfetBaslar(GameTestHelper yardimci) {
+        MinecraftServer server = yardimci.getLevel().getServer();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(server);
+        yonetici.durdur();
+        DunyaDonemi donem = yonetici.donem();
+        long oncekiOfset = donem.gunOfseti();
+        BlockPos konum = yardimci.absolutePos(BlockPos.ZERO);
+        ServerPlayer oyuncu = sahteOyuncu(yardimci, konum.getX() + 0.5, konum.getY(), konum.getZ() + 0.5);
+        try (AfetKaydi.GeciciKayit deprem = AfetKaydi.geciciKaydet(AfetTuru.DEPREM, () -> ofsetliAfet(AfetTuru.DEPREM, 40));
+                AfetKaydi.GeciciKayit kasirga = AfetKaydi.geciciKaydet(AfetTuru.KASIRGA,
+                        () -> ofsetliAfet(AfetTuru.KASIRGA, -40));
+                AfetKaydi.GeciciKayit sinkhole = AfetKaydi.geciciKaydet(AfetTuru.SINKHOLE,
+                        () -> ofsetliAfet(AfetTuru.SINKHOLE, 0))) {
+            gunAyarla(server, donem, 20);
+            yardimci.assertTrue(yonetici.dogalBaslat(AfetTuru.DEPREM, 1, oyuncu) == AfetYoneticisi.BaslatmaSonucu.BASLADI,
+                    "ilk doğal afet başlamadı");
+            yardimci.assertTrue(yonetici.dogalBaslat(AfetTuru.KASIRGA, 1, oyuncu) == AfetYoneticisi.BaslatmaSonucu.BASLADI,
+                    "aynı oyuncunun öteki yanında, alanı çakışmayan ikinci doğal afet başlamalı");
+            Afet d = yonetici.aktifAfet(AfetTuru.DEPREM).orElseThrow();
+            Afet k = yonetici.aktifAfet(AfetTuru.KASIRGA).orElseThrow();
+            yardimci.assertTrue(d.baglam().hedefOyuncu().equals(oyuncu.getUUID())
+                    && k.baglam().hedefOyuncu().equals(oyuncu.getUUID()), "ikisi de aynı oyuncuyu hedeflemeli");
+            yardimci.assertTrue(!yonetici.etkiAlani(d).orElseThrow().kesisir(yonetici.etkiAlani(k).orElseThrow()),
+                    "alanlar çakışmamalı");
+            yardimci.assertTrue(yonetici.dogalYuvaDolu(), "gün 20'de iki doğal afetle yuva dolu");
+            yardimci.assertTrue(yonetici.dogalBaslat(AfetTuru.SINKHOLE, 1, oyuncu) == AfetYoneticisi.BaslatmaSonucu.ZATEN_AKTIF,
+                    "üçüncü doğal afet başlamamalı");
+        } finally {
+            yonetici.durdur();
+            donem.gunOfsetiAyarla(oncekiOfset);
+            server.getPlayerList().remove(oyuncu);
+        }
+        yardimci.succeed();
+    }
+
+    /**
+     * Z5: komutla başlatılan afet doğal yuvayı doldurmaz (gün 5, sınır 1): komutla deprem sürerken alanı çakışmayan doğal
+     * afet başlar; ondan sonra yuva (doğal afetle) dolar.
+     */
+    @GameTest(template = "bos", batch = "cekirdek_eszamanli_komut")
+    public static void komutAfetiDogalYuvayiDoldurmaz(GameTestHelper yardimci) {
+        ServerLevel level = yardimci.getLevel();
+        MinecraftServer server = level.getServer();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(server);
+        yonetici.durdur();
+        DunyaDonemi donem = yonetici.donem();
+        long oncekiOfset = donem.gunOfseti();
+        BlockPos konum = yardimci.absolutePos(BlockPos.ZERO);
+        ServerPlayer a = sahteOyuncu(yardimci, konum.getX() + 0.5, konum.getY(), konum.getZ() + 0.5);
+        ServerPlayer b = sahteOyuncu(yardimci, konum.getX() + 300.5, konum.getY(), konum.getZ() + 0.5);
+        try (AfetKaydi.GeciciKayit deprem = AfetKaydi.geciciKaydet(AfetTuru.DEPREM,
+                () -> new OyunTestiAfeti(AfetTuru.DEPREM, 8, 6000));
+                AfetKaydi.GeciciKayit kasirga = AfetKaydi.geciciKaydet(AfetTuru.KASIRGA,
+                        () -> new OyunTestiAfeti(AfetTuru.KASIRGA, 8, 6000))) {
+            gunAyarla(server, donem, 5);
+            yardimci.assertTrue(yonetici.elleBaslat(AfetTuru.DEPREM, 1, a, level, konum)
+                    == AfetYoneticisi.BaslatmaSonucu.BASLADI, "komutla deprem başlamadı");
+            yardimci.assertTrue(!yonetici.dogalYuvaDolu(), "komut afeti doğal yuvayı doldurmamalı");
+            yardimci.assertTrue(yonetici.dogalBaslat(AfetTuru.KASIRGA, 1, b) == AfetYoneticisi.BaslatmaSonucu.BASLADI,
+                    "komut afeti sürerken doğal afet başlamalı");
+            yardimci.assertTrue(yonetici.dogalYuvaDolu(), "gün 5'te bir doğal afetle yuva dolu");
+        } finally {
+            yonetici.durdur();
+            donem.gunOfsetiAyarla(oncekiOfset);
+            server.getPlayerList().remove(a);
+            server.getPlayerList().remove(b);
+        }
+        yardimci.succeed();
+    }
+
+    /**
+     * Z1: dünya kaydı sürüm 1'deki {@code sonSeviye} (eski kodda komutla başlatılan S5 de yazıyordu) yüklenirken bir kez
+     * sıfırlanır: kullanıcının dünyasında {@code gun} olasılıkları S4/S5 > 0. Sürüm 2 kaydındaki (doğal) değer korunur, art
+     * arda 4-5 kuralı aynen işler.
+     */
+    @GameTest(template = "bos", batch = "cekirdek_kayit_surum")
+    public static void eskiKayittakiSonSeviyeBirKezSifirlanir(GameTestHelper yardimci) {
+        DunyaDonemi donem = new DunyaDonemi();
+        donem.sonSeviyeAyarla(5);
+        CompoundTag etiket = donem.save(new CompoundTag());
+        yardimci.assertTrue(etiket.getInt("surum") == DunyaDonemi.BICIM_SURUMU && DunyaDonemi.BICIM_SURUMU == 2,
+                "kayıt biçimi 2");
+        SiddetAyarlari ayar = CekirdekAyarlari.al().siddet();
+
+        DunyaDonemi yeni = DunyaDonemi.yukle(etiket.copy());
+        yardimci.assertTrue(yeni.sonSeviye() == 5, "sürüm 2 kaydı korunur: " + yeni.sonSeviye());
+        SeviyeDurumu kural = SeviyeDurumu.hesapla(ayar, 100, 100, 5, SiddetSecici.yuksek(yeni.sonSeviye()), 1.0);
+        yardimci.assertTrue(kural.olasilik(4) == 0 && kural.olasilik(5) == 0
+                && kural.neden(5).equals(Optional.of(SiddetSecici.KapaliNeden.ART_ARDA)), "doğal 5 sonrası art arda kuralı");
+
+        CompoundTag eski = etiket.copy();
+        eski.putInt("surum", 1);
+        DunyaDonemi geri = DunyaDonemi.yukle(eski);
+        yardimci.assertTrue(geri.sonSeviye() == 0, "sürüm 1 kaydında sonSeviye sıfırlanmalı: " + geri.sonSeviye());
+        SeviyeDurumu durum = SeviyeDurumu.hesapla(ayar, 100, 100, 5, SiddetSecici.yuksek(geri.sonSeviye()), 1.0);
+        yardimci.assertTrue(durum.olasilik(4) > 0 && durum.olasilik(5) > 0,
+                "eski kayıttan sonra gün 100'de S4/S5 > 0: " + durum.olasilik(4) + " " + durum.olasilik(5));
+        CompoundTag yeniden = geri.save(new CompoundTag());
+        yardimci.assertTrue(yeniden.getInt("surum") == 2 && yeniden.getInt("sonSeviye") == 0, "bir kez: yeni biçimle yazılır");
+        yardimci.succeed();
+    }
+
+    /** Merkezi hedef oyuncudan x ekseninde {@code dx} blok uzakta seçen test afeti (yarıçap 8). */
+    private static OyunTestiAfeti ofsetliAfet(AfetTuru tur, int dx) {
+        return new OyunTestiAfeti(tur, 8, 6000) {
+            @Override
+            public BlockPos merkezSec(ServerLevel level, ServerPlayer hedef, int seviye, RandomSource rastgele) {
+                return hedef.blockPosition().offset(dx, 0, 0);
+            }
+        };
     }
 
     private static void gunAyarla(MinecraftServer server, DunyaDonemi donem, long gun) {

@@ -95,7 +95,7 @@ class AfetZamanlayicisiTest {
 
     @Test
     void varsayilanAyarlarlaSiklikMakulVeHerAfetGorulur() {
-        AfetSimulasyonu.Sonuc sonuc = new AfetSimulasyonu().afetSuresi(6000).cakisma(true).donemGecisleri(true)
+        AfetSimulasyonu.Sonuc sonuc = new AfetSimulasyonu().afetSuresi(6000).hepsiCakisir().donemGecisleri(true)
                 .kos(10_000_000);
         double gunluk = sonuc.gunlukOlay();
         assertTrue(gunluk > 2.0 && gunluk < 4.0, "günlük afet sayısı makul aralıkta değil: " + gunluk);
@@ -127,7 +127,7 @@ class AfetZamanlayicisiTest {
         List<Double> ay = new ArrayList<>();
         int gunesli = 0;
         for (int i = 0; i < dunya; i++) {
-            AfetSimulasyonu.Sonuc sonuc = new AfetSimulasyonu().tohum(1000 + i).adim(100).afetSuresi(8000).cakisma(true)
+            AfetSimulasyonu.Sonuc sonuc = new AfetSimulasyonu().tohum(1000 + i).adim(100).afetSuresi(8000).hepsiCakisir()
                     .donemGecisleri(true).ilkOlaylardaDur(EnumSet.of(AfetTuru.GUNES_PATLAMASI, AfetTuru.AY_CARPMASI))
                     .kos(sinir);
             OptionalDouble g = sonuc.ilkGun(AfetTuru.GUNES_PATLAMASI);
@@ -202,7 +202,7 @@ class AfetZamanlayicisiTest {
     void carpanSonumundeBeklemeVeTekAfetKuraliBozulmaz() {
         CarpanListesi carpanlar = new CarpanListesi();
         carpanlar.ekle(new GeciciCarpan(AfetTuru.TSUNAMI, GeciciCarpan.EN_COK, 0, 200_000, 200_000, SonumTipi.USTEL));
-        AfetSimulasyonu.Sonuc sonuc = new AfetSimulasyonu().carpanlar(carpanlar).afetSuresi(4000).cakisma(true)
+        AfetSimulasyonu.Sonuc sonuc = new AfetSimulasyonu().carpanlar(carpanlar).afetSuresi(4000).hepsiCakisir()
                 .kos(400_000);
         assertEquals(0, sonuc.ayniAnIhlali());
         assertTrue(sonuc.sayi(AfetTuru.TSUNAMI) > 0);
@@ -374,5 +374,51 @@ class AfetZamanlayicisiTest {
             toplam += AfetZamanlayicisi.turOrani(ayarlar, tur, 1, 1);
         }
         assertEquals(ayarlar.gunlukAfetOrani(), toplam, 1e-9, "tüm türler uygunken toplam oran günlük orana eşit");
+    }
+
+    /** Z2 (K-E67): doğal güneş patlaması yalnız sabah, ay çarpması yalnız gece seçilir; görünme payı da pencerededir. */
+    @Test
+    void dogalGunesVeAyYalnizPenceredeSecilir() {
+        AfetSimulasyonu.Sonuc sonuc = yogun().gun(1000).kos(2_000_000);
+        int gunesSayisi = 0;
+        int aySayisi = 0;
+        for (AfetSimulasyonu.Olay olay : sonuc.olaylar()) {
+            GunSaatiPenceresi pencere = GunSaatiPenceresi.dogalPatlama(olay.tur()).orElse(null);
+            if (pencere == null) {
+                continue;
+            }
+            long pay = GunSaatiPenceresi.gorunmePayi(olay.tur(), OnUyariPenceresi.VARSAYILAN_ERKEN_BILDIRIM,
+                    OnUyariPenceresi.VARSAYILAN_EN_AZ, OnUyariPenceresi.VARSAYILAN_EN_COK);
+            assertTrue(pencere.icinde(olay.baslangic()) && pencere.icinde(olay.baslangic() + pay),
+                    olay.tur() + " pencere dışında seçildi: gün saati " + olay.baslangic() % AfetZamanlayicisi.GUN_TICK);
+            if (olay.tur() == AfetTuru.GUNES_PATLAMASI) {
+                gunesSayisi++;
+            } else {
+                aySayisi++;
+            }
+        }
+        assertTrue(gunesSayisi > 50 && aySayisi > 50, "örnek küçük: güneş " + gunesSayisi + ", ay " + aySayisi);
+        BeklemeDurumu bekleme = new BeklemeDurumu();
+        SplittableRandom rastgele = new SplittableRandom(8);
+        long pay = 800;
+        for (int i = 0; i < 500; i++) {
+            Optional<AfetTuru> gece = AfetZamanlayicisi.sec(YOGUN, new AfetZamanlayicisi.Girdi(false, 18_000, 20, bekleme,
+                    EnumSet.of(AfetTuru.GUNES_PATLAMASI), tur -> GunSaatiPenceresi.dogalSecimCarpani(tur, 18_000, pay, true),
+                    1, true), rastgele);
+            assertTrue(gece.isEmpty(), "gece güneş patlaması seçildi (zorla bile)");
+        }
+    }
+
+    /** Z2: pencere kısıtı seçilebilir payın tersiyle telafi edilir; güneş ve ayın uzun vadeli sıklığı düşmez. */
+    @Test
+    void pencereGunesVeAySikliginiDusurmez() {
+        AfetSimulasyonu.Sonuc acik = yogun().gun(1000).tohum(41).kos(4_000_000);
+        AfetSimulasyonu.Sonuc kapali = yogun().gun(1000).tohum(41).pencere(false).kos(4_000_000);
+        for (AfetTuru tur : new AfetTuru[] {AfetTuru.GUNES_PATLAMASI, AfetTuru.AY_CARPMASI}) {
+            double oran = acik.sayi(tur) / (double) kapali.sayi(tur);
+            System.out.printf(Locale.ROOT, "%s pencereli %d, penceresiz %d (oran %.3f)%n", tur.kimlik(), acik.sayi(tur),
+                    kapali.sayi(tur), oran);
+            assertEquals(1.0, oran, 0.15, tur + " sıklığı pencereyle değişmemeli");
+        }
     }
 }

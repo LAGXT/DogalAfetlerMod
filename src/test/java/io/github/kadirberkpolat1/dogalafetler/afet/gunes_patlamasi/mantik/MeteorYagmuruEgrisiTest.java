@@ -50,11 +50,9 @@ class MeteorYagmuruEgrisiTest {
     }
 
     @Test
-    void pencereBeklenirkenOncuBastaSabitKalir() {
-        assertEquals(9.0, MeteorYagmuruEgrisi.onUyari(0, ON_UYARI, SIREN, ONCU, 6, 24), EPS, "bekleme olmadan uçta 9/dk");
-        assertEquals(6.0, MeteorYagmuruEgrisi.pencereBeklerken(ON_UYARI, ONCU, 6), EPS, "Mt11: beklemede 6/dk");
-        assertEquals(6.0, MeteorYagmuruEgrisi.pencereBeklerken(60, ONCU, 6), EPS, "kısa ön-uyarıda da");
-        assertEquals(0.0, MeteorYagmuruEgrisi.pencereBeklerken(ON_UYARI, 0, 6), EPS, "öncü kapalıysa yağmur yok");
+    void onUyariSonundaOncuArtisSurer() {
+        assertEquals(9.0, MeteorYagmuruEgrisi.onUyari(0, ON_UYARI, SIREN, ONCU, 6, 24), EPS, "ön-uyarı ucunda 9/dk");
+        assertEquals(9.0, MeteorYagmuruEgrisi.siren(0, ON_UYARI, SIREN, ONCU, 6, 24), EPS, "sirende kaldığı yerden");
     }
 
     @Test

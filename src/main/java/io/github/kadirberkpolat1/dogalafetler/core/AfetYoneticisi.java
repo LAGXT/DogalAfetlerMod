@@ -6,6 +6,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.mantik.AfetYogunlugu;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.AfetZamanlayicisi;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.EszamanliAfetler;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.GelisimOlcutu;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.GunSaatiPenceresi;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.HedefSecici;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.OnUyariPenceresi;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.OyunGunu;
@@ -321,14 +322,46 @@ public final class AfetYoneticisi {
         return CekirdekAyarlari.al().zamanlayici().gunCarpani(oyunGunu());
     }
 
-    /** Doğal afet için boş yuva yok mu ({@link EszamanliAfetler#yuvaDolu}; TPS kısılıyken ikinci afet ertelenir, K-C37). */
+    /**
+     * Doğal afet için boş yuva yok mu ({@link EszamanliAfetler#yuvaDolu}): yalnız doğal afetler yuva doldurur (komutla
+     * başlatılan afet doğal takvimi durdurmaz); TPS kısılıyken herhangi bir afet sürerken yenisi ertelenir (K-C37). Her tick
+     * çağrılır: afet yokken hemen döner.
+     */
     public boolean dogalYuvaDolu() {
-        return EszamanliAfetler.yuvaDolu(aktifTurler(), CekirdekAyarlari.al().zamanlayici().eszamanliSinir(oyunGunu()),
-                TpsOlcer.kismaCarpani() < 1.0);
+        List<Afet> afetler = aktifAfetler();
+        if (afetler.isEmpty()) {
+            return false;
+        }
+        List<AfetTuru> dogal = new ArrayList<>(afetler.size());
+        for (Afet afet : afetler) {
+            if (!afet.baglam().elle()) {
+                dogal.add(afet.tur());
+            }
+        }
+        return EszamanliAfetler.yuvaDolu(dogal, afetler.size(),
+                CekirdekAyarlari.al().zamanlayici().eszamanliSinir(oyunGunu()), TpsOlcer.kismaCarpani() < 1.0);
     }
 
     private List<AfetTuru> aktifTurler() {
         return aktifAfetler().stream().map(Afet::tur).toList();
+    }
+
+    /**
+     * Doğal seçimde türün oran çarpanı: geçici çarpan × gün saati penceresi (K-E67, {@link GunSaatiPenceresi#dogalSecimCarpani}:
+     * güneş patlaması ve ay çarpması yalnız seçimden görünmeye kadar geçecek süre de penceredeyken, pencere payıyla telafi
+     * edilmiş oranla).
+     */
+    double secimCarpani(AfetTuru tur) {
+        double carpan = donem().carpan(tur);
+        if (GunSaatiPenceresi.dogalPatlama(tur).isEmpty() || !(carpan > 0)) {
+            return carpan;
+        }
+        CekirdekAyarlari ayar = CekirdekAyarlari.al();
+        long pay = GunSaatiPenceresi.gorunmePayi(tur, ayar.erkenBildirimTick(), ayar.onUyariEnAzTick(),
+                ayar.onUyariEnCokTick());
+        ServerLevel ust = server.overworld();
+        return carpan * GunSaatiPenceresi.dogalSecimCarpani(tur, ust.getDayTime(), zamanOlcegi.gercekTick(pay),
+                ust.getGameRules().getBoolean(GameRules.RULE_DAYLIGHT));
     }
 
     /**
@@ -592,7 +625,7 @@ public final class AfetYoneticisi {
         double siklik = Kurallar.siklikCarpani(kurallar);
         long garanti = ilkAfetGarantiAni(ayar, donem, siklik);
         return SonrakiAfetTahmini.hesapla(ayar.zamanlayici(), donem.saat(), donem.bekleme(),
-                EszamanliAfetler.adaylar(uygunTurler(kurallar, ayar), aktifTurler()), donem::carpan, siklik, gunCarpani(),
+                EszamanliAfetler.adaylar(uygunTurler(kurallar, ayar), aktifTurler()), this::secimCarpani, siklik, gunCarpani(),
                 garanti == Long.MAX_VALUE ? Long.MAX_VALUE : Math.max(0, garanti - donem.saat()));
     }
 
@@ -779,7 +812,7 @@ public final class AfetYoneticisi {
         double siklik = Kurallar.siklikCarpani(kurallar);
         boolean garanti = !zorla && donem.saat() >= ilkAfetGarantiAni(ayar, donem, siklik);
         AfetZamanlayicisi.Girdi girdi = new AfetZamanlayicisi.Girdi(dogalYuvaDolu(), donem.saat(), adim, donem.bekleme(),
-                EszamanliAfetler.adaylar(uygunTurler(kurallar, ayar), aktifTurler()), donem::carpan, siklik, zorla,
+                EszamanliAfetler.adaylar(uygunTurler(kurallar, ayar), aktifTurler()), this::secimCarpani, siklik, zorla,
                 garanti, gunCarpani());
         SecimTuru.Sonuc<UUID> sonuc = SecimTuru.isle(ayar.zamanlayici(), girdi, adayListesi(hedefAdaylari(ayar)),
                 donem.sonHedef().orElse(null), baslatici, rastgele);
@@ -925,15 +958,18 @@ public final class AfetYoneticisi {
         long erken = ayar.erkenBildirimTick();
         long pencere = OnUyariPenceresi.sure(ayar.onUyariEnAzTick(), ayar.onUyariEnCokTick(),
                 SirenTuru.sureTick(afet.tur()) - SirenTuru.STANDART_SURE_TICK, rastgele);
-        AfetBaglami baglam = new AfetBaglami(afet.tur(), seviye, merkez, level.dimension(), hedef, donem.yeniAfetNo(),
+        long afetNo = donem.siradakiAfetNo();
+        AfetBaglami baglam = new AfetBaglami(afet.tur(), seviye, merkez, level.dimension(), hedef, afetNo,
                 erken + pencere, erken, elle);
         try {
             afet.baslat(level, baglam);
             if (!elle && alanCakisiyor(afet, level)) {
+                // Numara harcanmaz: çakışan aday ne olay ne paket gönderdi.
                 afet.durdur(level, false);
                 return BaslatmaSonucu.CAKISIYOR;
             }
         } catch (RuntimeException hata) {
+            donem.afetNoKullan(afetNo);
             DogalAfetler.LOGGER.error("{} başlatılırken hata; afet yumuşak durduruluyor", afet.tur().kimlik(), hata);
             try {
                 afet.durdur(level, false);
@@ -942,6 +978,7 @@ public final class AfetYoneticisi {
             }
             return BaslatmaSonucu.HATA;
         }
+        donem.afetNoKullan(afetNo);
         donem.afetEkle(afet);
         if (!elle) {
             donem.dogalBaslangicEkle();
@@ -959,9 +996,10 @@ public final class AfetYoneticisi {
     }
 
     /**
-     * K-E67: başlatılmış (henüz eklenmemiş) doğal afetin etki alanı aynı boyutta süren bir afetinkiyle çakışıyor mu
-     * (global alanlı bölgesel afet, ör. asit yağmuru, o boyutta her alanla çakışır). Alanı okunamayan süren afet çakışma
-     * sayılmaz (o afet kendi yolunda yumuşak durur).
+     * K-E67: başlatılmış (henüz eklenmemiş) doğal afetin etki alanı aynı boyutta süren bir bölgesel afetinkiyle çakışıyor
+     * mu (global alanlı bölgesel afet, ör. asit yağmuru, o boyutta her alanla çakışır). Süren sunucu geneli afet burada
+     * sayılmaz: doğal olanı yuvayı zaten doldurur, komutla başlatılanı doğal takvimi durdurmaz. Alanı okunamayan süren afet
+     * çakışma sayılmaz (o afet kendi yolunda yumuşak durur).
      */
     private boolean alanCakisiyor(Afet afet, ServerLevel level) {
         List<Afet> surenler = aktifAfetler();
@@ -970,7 +1008,7 @@ public final class AfetYoneticisi {
         }
         EtkiAlani alan = Objects.requireNonNull(afet.etkiAlani(), "etkiAlani() null döndü");
         for (Afet diger : surenler) {
-            if (!diger.baglam().boyut().equals(level.dimension()) && !diger.tur().sunucuGeneli()) {
+            if (diger.tur().sunucuGeneli() || !diger.baglam().boyut().equals(level.dimension())) {
                 continue;
             }
             EtkiAlani digerAlani = alanOku(diger);

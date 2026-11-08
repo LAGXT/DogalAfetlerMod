@@ -17,6 +17,8 @@ import java.util.Map;
 import java.util.Set;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.common.ForgeConfigSpec;
+import net.minecraftforge.fml.event.config.ModConfigEvent;
+import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 
 /**
  * SERVER config'in {@code cekirdek} bölümü: afet yöneticisi, şiddet, tek seferlik olaylar, hedef seçimi, TPS kısması, ağ
@@ -25,6 +27,8 @@ import net.minecraftforge.common.ForgeConfigSpec;
  */
 public final class CekirdekAyarlari {
     private static AyarKaydi.Bolum<CekirdekAyarlari> bolum;
+    private static volatile ZamanlayiciAyarlari zamanlayiciOnbellegi;
+    private static volatile SiddetAyarlari siddetOnbellegi;
 
     private final ForgeConfigSpec.DoubleValue gunlukAfetOrani;
     private final ForgeConfigSpec.IntValue kontrolAraligiTick;
@@ -238,6 +242,15 @@ public final class CekirdekAyarlari {
     public static void kaydet() {
         bolum = AyarKaydi.sunucuBolumu("cekirdek", "Çekirdek: afet yöneticisi ve dünya dönemi", CekirdekAyarlari::new);
         AyarKaydi.sunucuGocu(CekirdekAyarGocu.PLAN);
+        FMLJavaModLoadingContext.get().getModEventBus().addListener(CekirdekAyarlari::configDegisti);
+    }
+
+    /** Mod veri yolunda: SERVER config yüklenince ya da değişince saf ayar önbellekleri yeniden kurulur. */
+    static void configDegisti(ModConfigEvent olay) {
+        if (AyarKaydi.SUNUCU_DOSYASI.equals(olay.getConfig().getFileName())) {
+            zamanlayiciOnbellegi = null;
+            siddetOnbellegi = null;
+        }
     }
 
     public static CekirdekAyarlari al() {
@@ -247,7 +260,17 @@ public final class CekirdekAyarlari {
         return bolum.get();
     }
 
+    /** Zamanlayıcı ayarları; her tick okunur, config yüklenene ya da değişene dek önbellekte ({@link #configDegisti}). */
     public ZamanlayiciAyarlari zamanlayici() {
+        ZamanlayiciAyarlari z = zamanlayiciOnbellegi;
+        if (z == null) {
+            z = zamanlayiciKur();
+            zamanlayiciOnbellegi = z;
+        }
+        return z;
+    }
+
+    private ZamanlayiciAyarlari zamanlayiciKur() {
         Map<AfetTuru, Integer> a = new EnumMap<>(AfetTuru.class);
         Map<AfetTuru, Long> b = new EnumMap<>(AfetTuru.class);
         for (AfetTuru tur : AfetTuru.values()) {
@@ -259,10 +282,16 @@ public final class CekirdekAyarlari {
                 siklikArtisGunu.get(), eszamanliIkiGunu.get(), eszamanliUcGunu.get(), a, b);
     }
 
+    /** Şiddet ayarları; config yüklenene ya da değişene dek önbellekte. */
     public SiddetAyarlari siddet() {
-        return new SiddetAyarlari(seviye2Gunu.get(), seviye3Gunu.get(), seviye4Gunu.get(), seviye5Gunu.get(),
-                nadirlikBaslangic.get(), nadirlikSon.get(), nadirlikGecisGunu.get(), acilisRampaGunu.get(),
-                acilisBaslangicOrani.get(), gelisimDahil.get(), puanBasinaGun.get());
+        SiddetAyarlari s = siddetOnbellegi;
+        if (s == null) {
+            s = new SiddetAyarlari(seviye2Gunu.get(), seviye3Gunu.get(), seviye4Gunu.get(), seviye5Gunu.get(),
+                    nadirlikBaslangic.get(), nadirlikSon.get(), nadirlikGecisGunu.get(), acilisRampaGunu.get(),
+                    acilisBaslangicOrani.get(), gelisimDahil.get(), puanBasinaGun.get());
+            siddetOnbellegi = s;
+        }
+        return s;
     }
 
     public TekSeferlikAyarlari tekSeferlik() {

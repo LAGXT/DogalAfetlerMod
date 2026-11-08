@@ -115,10 +115,8 @@ public final class GunesPatlamasi extends Afet {
         double oncuBas = GunesPatlamasiAyarlari.meteorYagmuruOncuDakikaBasina();
         double oncuSon = GunesPatlamasiAyarlari.meteorYagmuruOncuSonDakikaBasina();
         if (asama == AfetAsamasi.ON_UYARI) {
-            double y = pencereBeklemesi() >= 0
-                    ? MeteorYagmuruEgrisi.pencereBeklerken(baglam().onUyariSuresi(), oncuTick, oncuBas)
-                    : MeteorYagmuruEgrisi.onUyari(asamaKalanTick(), baglam().onUyariSuresi(), sirenSure, oncuTick, oncuBas,
-                            oncuSon);
+            double y = MeteorYagmuruEgrisi.onUyari(asamaKalanTick(), baglam().onUyariSuresi(), sirenSure, oncuTick, oncuBas,
+                    oncuSon);
             yagmurSur(level, y, y > 0);
             return;
         }

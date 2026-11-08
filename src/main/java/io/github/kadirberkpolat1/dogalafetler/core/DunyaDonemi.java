@@ -38,7 +38,11 @@ import net.minecraftforge.common.MinecraftForge;
  */
 public final class DunyaDonemi extends SavedData {
     public static final String VERI_ADI = "dogalafetler_donem";
-    public static final int BICIM_SURUMU = 1;
+    /**
+     * Kayıt biçimi. Sürüm 2 (K-E67): {@code sonSeviye} yalnız doğal afetten yazılır; sürüm 1 kaydındaki değer komutla başlatılmış
+     * afetten de gelmiş olabileceği için yüklenirken bir kez sıfırlanır.
+     */
+    public static final int BICIM_SURUMU = 2;
     /** Gelişmiş Hava Radarı'nın gösterdiği son afet sayısı (madde 13a). */
     public static final int GECMIS_SINIRI = 5;
     public static final float DONMA_EN_COK = 100f;
@@ -445,10 +449,20 @@ public final class DunyaDonemi extends SavedData {
 
     /** Yeni afetin numarası (AS-16): saate eşit ya da büyük, dünyada kesin artan; {@code AfetBaglami.baslangicSaati} olur. */
     long yeniAfetNo() {
-        long no = AfetNumarasi.ver(saat, sonrakiAfetNo);
-        sonrakiAfetNo = AfetNumarasi.sonraki(no);
-        setDirty();
+        long no = siradakiAfetNo();
+        afetNoKullan(no);
         return no;
+    }
+
+    /** Sıradaki afet numarası, harcamadan (K-E67: çakışma yüzünden başlamayan aday numara harcamaz). */
+    long siradakiAfetNo() {
+        return AfetNumarasi.ver(saat, sonrakiAfetNo);
+    }
+
+    /** {@link #siradakiAfetNo} ile alınan numara kullanıldı; sayacı ileri alır. */
+    void afetNoKullan(long no) {
+        sonrakiAfetNo = Math.max(sonrakiAfetNo, AfetNumarasi.sonraki(no));
+        setDirty();
     }
 
     /** İlk afet garantisinin sayıldığı saat (AS-12). */
@@ -705,7 +719,7 @@ public final class DunyaDonemi extends SavedData {
             donem.sonAfetler.removeLast();
         }
         donem.sonHedef = etiket.hasUUID("sonHedef") ? etiket.getUUID("sonHedef") : null;
-        donem.sonSeviye = etiket.getInt("sonSeviye");
+        donem.sonSeviye = etiket.getInt("surum") >= 2 ? etiket.getInt("sonSeviye") : 0;
         for (long baslangic : etiket.getLongArray("dogalBaslangiclar")) {
             donem.dogalBaslangiclar.addLast(baslangic);
         }

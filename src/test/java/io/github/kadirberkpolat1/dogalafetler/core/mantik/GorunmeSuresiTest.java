@@ -9,6 +9,7 @@ import io.github.kadirberkpolat1.dogalafetler.afet.deprem.mantik.SarsintiZarfi;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.KasirgaEvresi;
 import io.github.kadirberkpolat1.dogalafetler.afet.sinkhole.mantik.SinkholeSeviyesi;
 import io.github.kadirberkpolat1.dogalafetler.afet.tsunami.TsunamiAyarlari;
+import io.github.kadirberkpolat1.dogalafetler.afet.tsunami.TsunamiSeviyesi;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.SirenTuru;
 import java.util.EnumMap;
@@ -20,8 +21,9 @@ import org.junit.jupiter.api.Test;
  * K0-19 rev. K-E67 (kullanıcı isteği: "afet aktifleştikten sonra ortaya çıkma süresini 30 saniyeye düşür, hepsini"):
  * afetin seçilmesinden (ya da komutla başlatılmasından) oyuncunun onu görmesine kadar geçen süre = erken bildirim + ön-uyarı
  * penceresi (sunucu geneli türde sirenin fazlası kadar kısa) + siren + türe özel AKTIF sonrası görünme gecikmesi. Varsayılan
- * değerlerle bütün türlerde ortalama 25–35 sn, en kötü durum 35 sn'yi aşmaz. Doğal seçilen güneş patlaması ve ay
- * çarpmasının gün saati penceresi beklemesi (Mt11) bu süreye katılmaz. Süreler ölçekli tick'tir (hız 1'de gerçek tick).
+ * değerlerle bütün türlerde ortalama 25–35 sn, en kötü durum 35 sn'yi aşmaz. Doğal güneş patlaması ve ay çarpmasının gün
+ * saati penceresi seçimde uygulanır (ön-uyarıda bekleme yok); görünme anı pencerede kalır. Süreler ölçekli tick'tir (hız
+ * 1'de gerçek tick).
  */
 class GorunmeSuresiTest {
     private static final int SN = 20;
@@ -127,6 +129,47 @@ class GorunmeSuresiTest {
             int eskiSiren = tur.sunucuGeneli() ? eskiUzunSiren : SirenTuru.STANDART_SURE_TICK;
             double eski = 600 + OnUyariPenceresi.ortalama(900, 1800, 0) + eskiSiren + gorunmeGecikmesi(tur);
             assertTrue(eski / SN > EN_COK_ORTALAMA_SN, tur.kimlik() + " eski ortalama " + eski / SN + " sn");
+        }
+    }
+
+    /**
+     * Z2: doğal güneş patlaması ve ay çarpması yalnız görünme payı da pencereye sığıyorken seçilir; seçilebilir her anda
+     * seçimden görünmeye en çok süre sonra da pencerededir ve bekleme olmadığından süre komutla başlatmayla aynıdır (≤ 35 sn).
+     */
+    @Test
+    void dogalGunesVeAySecimdenGorunmeyeOtuzSaniyePencerede() {
+        for (AfetTuru tur : new AfetTuru[] {AfetTuru.GUNES_PATLAMASI, AfetTuru.AY_CARPMASI}) {
+            Sure s = sure(tur);
+            long pay = GunSaatiPenceresi.gorunmePayi(tur, OnUyariPenceresi.VARSAYILAN_ERKEN_BILDIRIM,
+                    OnUyariPenceresi.VARSAYILAN_EN_AZ, OnUyariPenceresi.VARSAYILAN_EN_COK);
+            assertTrue(pay >= s.enCokTick(), tur.kimlik() + ": pay " + pay + " < en çok " + s.enCokTick());
+            GunSaatiPenceresi pencere = GunSaatiPenceresi.dogalPatlama(tur).orElseThrow();
+            int secilebilir = 0;
+            for (long g = 0; g < GunSaatiPenceresi.GUN_TICK; g += 10) {
+                if (GunSaatiPenceresi.dogalSecimCarpani(tur, g, pay, true) > 0) {
+                    secilebilir++;
+                    assertTrue(pencere.icinde(g + s.enCokTick()), tur.kimlik() + " görünme pencere dışı: " + g);
+                }
+            }
+            assertTrue(secilebilir > 0, tur.kimlik() + " hiç seçilemiyor");
+            assertTrue(s.ortalamaSn() >= EN_AZ_ORTALAMA_SN && s.ortalamaSn() <= EN_COK_ORTALAMA_SN && s.enCokSn() <= EN_KOTU_SN,
+                    tur.kimlik() + " doğal: " + s.ortalamaSn() + " / " + s.enCokSn());
+        }
+    }
+
+    /** Z3: tsunami dalgası kıyıya seçimden ortalama ≤ 40 sn'de vurur (doğuş 2 sn + kıyıya 8 sn; eski ~49 sn). */
+    @Test
+    void tsunamiKiyiyaSecimdenKirkSaniyede() {
+        Sure s = sure(AfetTuru.TSUNAMI);
+        for (int seviye = 1; seviye <= 5; seviye++) {
+            TsunamiSeviyesi sv = TsunamiSeviyesi.al(seviye);
+            double kiyiya = sv.aciklik() / sv.hizTick();
+            System.out.println(String.format(Locale.ROOT, "tsunami S%d kıyı vuruşu seçimden ortalama %.1f sn, en çok %.1f sn",
+                    seviye, (s.ortalamaTick() + kiyiya) / SN, (s.enCokTick() + kiyiya) / SN));
+            assertTrue((s.ortalamaTick() + kiyiya) / SN <= 40, "S" + seviye + " ortalama");
+            assertTrue((s.enCokTick() + kiyiya) / SN <= 45, "S" + seviye + " en çok");
+            assertTrue(kiyiya >= TsunamiAyarlari.VARSAYILAN_CEKILME_SN * SN - TsunamiAyarlari.VARSAYILAN_DALGA_GECIKME_SN * SN,
+                    "çekilme dalga vurmadan biter: S" + seviye);
         }
     }
 }

@@ -118,7 +118,6 @@
   "commands.dogalafetler.durum.gokyuzu": "Moon: %s; sun: %s (progress %s%%)",
   "commands.dogalafetler.durum.gun": "Game day: %s (offset %s), speed: x%s, TPS: %s (budget x%s)",
   "commands.dogalafetler.durum.kayitli": "Registered disasters: %s",
-  "commands.dogalafetler.durum.pencere": "time-of-day window awaited: ~%s",
   "commands.dogalafetler.durum.seviyeler": "Level probabilities (day %s, max level %s): %s",
   "commands.dogalafetler.durum.son_afetler": "Recent disasters: %s",
   "commands.dogalafetler.durum.surec_durdu.komut": "%s stopped (stop)",

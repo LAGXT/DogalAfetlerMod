@@ -27,14 +27,26 @@ class EszamanliAfetlerTest {
 
     @Test
     void yuvaSinirdaDolarSunucuGeneliTekBasinaTpsIkinciyiErteler() {
-        assertFalse(EszamanliAfetler.yuvaDolu(List.of(), 1, true), "boşken TPS kısması ilk afeti engellemez");
-        assertTrue(EszamanliAfetler.yuvaDolu(List.of(AfetTuru.DEPREM), 1, false));
-        assertFalse(EszamanliAfetler.yuvaDolu(List.of(AfetTuru.DEPREM), 2, false));
-        assertTrue(EszamanliAfetler.yuvaDolu(List.of(AfetTuru.DEPREM), 2, true), "TPS kısılıyken ikinci afet ertelenir");
-        assertTrue(EszamanliAfetler.yuvaDolu(List.of(AfetTuru.DEPREM, AfetTuru.KASIRGA), 2, false));
-        assertFalse(EszamanliAfetler.yuvaDolu(List.of(AfetTuru.DEPREM, AfetTuru.KASIRGA), 3, false));
-        assertTrue(EszamanliAfetler.yuvaDolu(List.of(AfetTuru.AY_CARPMASI), 3, false), "ay çarpması tek başına");
-        assertTrue(EszamanliAfetler.yuvaDolu(List.of(AfetTuru.GUNES_PATLAMASI), 3, false), "güneş patlaması tek başına");
+        assertFalse(EszamanliAfetler.yuvaDolu(List.of(), 0, 1, true), "boşken TPS kısması ilk afeti engellemez");
+        assertTrue(EszamanliAfetler.yuvaDolu(List.of(AfetTuru.DEPREM), 1, 1, false));
+        assertFalse(EszamanliAfetler.yuvaDolu(List.of(AfetTuru.DEPREM), 1, 2, false));
+        assertTrue(EszamanliAfetler.yuvaDolu(List.of(AfetTuru.DEPREM), 1, 2, true), "TPS kısılıyken ikinci afet ertelenir");
+        assertTrue(EszamanliAfetler.yuvaDolu(List.of(AfetTuru.DEPREM, AfetTuru.KASIRGA), 2, 2, false));
+        assertFalse(EszamanliAfetler.yuvaDolu(List.of(AfetTuru.DEPREM, AfetTuru.KASIRGA), 2, 3, false));
+        assertTrue(EszamanliAfetler.yuvaDolu(List.of(AfetTuru.AY_CARPMASI), 1, 3, false), "ay çarpması tek başına");
+        assertTrue(EszamanliAfetler.yuvaDolu(List.of(AfetTuru.GUNES_PATLAMASI), 1, 3, false), "güneş patlaması tek başına");
+    }
+
+    /** Z5: komutla başlatılan afetler (uzun güneş patlaması dahil) doğal yuvayı doldurmaz; TPS kısması onları da sayar. */
+    @Test
+    void komutAfetleriDogalYuvayiDoldurmaz() {
+        assertFalse(EszamanliAfetler.yuvaDolu(List.of(), 1, 1, false), "komutla süren tek afet (gün < 15)");
+        assertFalse(EszamanliAfetler.yuvaDolu(List.of(), 3, 1, false), "komutla süren üç afet");
+        assertFalse(EszamanliAfetler.yuvaDolu(List.of(AfetTuru.DEPREM), 2, 2, false), "bir doğal + bir komut, sınır 2");
+        assertTrue(EszamanliAfetler.yuvaDolu(List.of(), 1, 1, true), "TPS kısılıyken komut afeti de yenisini erteler");
+        Set<AfetTuru> komutluGunes = EszamanliAfetler.adaylar(EnumSet.allOf(AfetTuru.class), List.of(AfetTuru.GUNES_PATLAMASI));
+        assertTrue(komutluGunes.contains(AfetTuru.KASIRGA) && !komutluGunes.contains(AfetTuru.AY_CARPMASI),
+                "komutla güneş sürerken bölgesel doğal afet aday, sunucu geneli değil");
     }
 
     @Test
