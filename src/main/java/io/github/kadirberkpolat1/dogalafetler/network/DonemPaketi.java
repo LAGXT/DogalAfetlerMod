@@ -28,6 +28,11 @@ public record DonemPaketi(boolean ayVar, GunesEvresi gunesEvresi, float evreIler
     public static final int BAYRAK_BLOK_HASARI = 2;
     /** NORMAL'e pulsar yolundan dönüldü ({@link PulsarYolu#gunesDondu}). */
     public static final int BAYRAK_GUNES_DONDU = 4;
+    /**
+     * Pulsar süreci duraklatıldı ({@link PulsarYolu#durmaVar}, K-C46): ölçekli saat sürer ama yutma saniyesi donar; istemci
+     * yutmanın saniyesini {@code evreIlerlemesi}'nden alır (açılınca sunucu evre başlangıcını ileri kaydırır).
+     */
+    public static final int BAYRAK_DURAKLATILDI = 8;
 
     /** İstemcinin sunucudan paket gelmeden önceki varsayımı (normal dünya, gamerule varsayılanı). */
     public static final DonemPaketi VARSAYILAN = new DonemPaketi(true, GunesEvresi.NORMAL, 0f, 0L, 0f, false, 0f,
@@ -40,7 +45,8 @@ public record DonemPaketi(boolean ayVar, GunesEvresi gunesEvresi, float evreIler
 
     public static DonemPaketi den(DunyaDonemi donem, double hiz, boolean blokHasari) {
         int bayraklar = (PulsarYolu.donusYolu(donem) ? BAYRAK_DONUS_YOLU : 0) | (blokHasari ? BAYRAK_BLOK_HASARI : 0)
-                | (PulsarYolu.gunesDondu(donem) ? BAYRAK_GUNES_DONDU : 0);
+                | (PulsarYolu.gunesDondu(donem) ? BAYRAK_GUNES_DONDU : 0)
+                | (PulsarYolu.durmaVar(donem) ? BAYRAK_DURAKLATILDI : 0);
         return new DonemPaketi(donem.ayVar(), donem.gunesEvresi(), donem.evreIlerlemesi(), donem.evreBaslangicSaati(),
                 donem.donmaIlerlemesi(), donem.cozulmeDonemi(), donem.buharlasmaDerinligi(), donem.deniz(), donem.saat(),
                 hiz, donem.ayOlaySaati(), bayraklar);
@@ -60,6 +66,10 @@ public record DonemPaketi(boolean ayVar, GunesEvresi gunesEvresi, float evreIler
 
     public boolean gunesDondu() {
         return (bayraklar & BAYRAK_GUNES_DONDU) != 0;
+    }
+
+    public boolean duraklatildi() {
+        return (bayraklar & BAYRAK_DURAKLATILDI) != 0;
     }
 
     public void yaz(FriendlyByteBuf tampon) {

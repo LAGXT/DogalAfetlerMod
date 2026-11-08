@@ -103,6 +103,14 @@ public final class PulsarZinciri {
         return Math.max(0f, Math.min(1f, saniye / YUTMA_SN));
     }
 
+    /**
+     * Duraklatılmış yutmanın saniyesi: ilerleme durma anında {@link #yutmaIlerlemesi} ile yazılır, istemci saati sürse de
+     * buradan donmuş saniyeyi alır (K-C46, Pg3).
+     */
+    public static float duraklamaSaniyesi(float ilerleme) {
+        return Math.max(0f, Math.min(1f, ilerleme)) * YUTMA_SN;
+    }
+
     public static boolean yutmaParlamasiGeldi(float saniye) {
         return saniye >= YUTMA_PARLAMA_SN;
     }

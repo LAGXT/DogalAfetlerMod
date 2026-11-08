@@ -146,12 +146,17 @@ public final class PulsarSureci implements DonemSureci {
 
     /**
      * Etkiler durur (yangınlar yayılmadan yanıp biter); ulaşılmış evre ve süre kayıtları korunur, durma anı yazılır (kural
-     * kaydı komuta çevrilince ilk an kalır).
+     * kaydı komuta çevrilince ilk an kalır). Yutmada ilerleme durma anının saniyesine sabitlenir: istemci duraklamada
+     * koreografiyi oradan dondurur.
      */
     @Override
     public void durdur(ServerLevel ustDunya, DurdurmaNedeni neden) {
         DunyaDonemi donem = DunyaDonemi.al(ustDunya);
         if (!PulsarYolu.durmaVar(donem)) {
+            if (donem.gunesEvresi() == GunesEvresi.KARADELIK_YUTMA) {
+                donem.evreIlerlemesiAyarla(PulsarZinciri.yutmaIlerlemesi(
+                        PulsarZinciri.yutmaSaniyesi(donem.evreBaslangicSaati(), donem.saat())));
+            }
             PulsarYolu.durmaAyarla(donem, oyunTick(ustDunya, donem), donem.saat());
         }
         PulsarEtkileri.bitir(ustDunya.getServer(), donem, "durduruldu (" + neden + ")");

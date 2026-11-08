@@ -8,6 +8,7 @@ import io.github.kadirberkpolat1.dogalafetler.gokyuzu.GokyuzuAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.GokyuzuEgrileri;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.KaraDelikYutmaEgrileri;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.MonotonIlerleme;
+import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.PulsarZinciri;
 import io.github.kadirberkpolat1.dogalafetler.network.DonemPaketi;
 import java.util.Locale;
 import net.minecraft.Util;
@@ -127,8 +128,15 @@ public final class IstemciGokyuzu {
         long anahtar = d.evreBaslangicSaati() * 8 + d.gunesEvresi().ordinal();
         float ilerleme = ILERLEME.guncelle(anahtar, d.evreIlerlemesi(), gecenTick);
         float sabit = sabitSaniye;
-        double gecen = Float.isNaN(sabit) ? Math.max(0.0, IstemciDonem.saat(kismiTick) - d.evreBaslangicSaati())
-                : sabit * 20.0;
+        double gecen;
+        if (!Float.isNaN(sabit)) {
+            gecen = sabit * 20.0;
+        } else if (d.duraklatildi() && d.gunesEvresi() == GunesEvresi.KARADELIK_YUTMA) {
+            // Kural duraklatmasında ölçekli saat sürer; açılınca sunucu evre başlangıcını ileri kaydırır (K-C46).
+            gecen = PulsarZinciri.duraklamaSaniyesi(d.evreIlerlemesi()) * PulsarZinciri.SANIYE_TICK;
+        } else {
+            gecen = Math.max(0.0, IstemciDonem.saat(kismiTick) - d.evreBaslangicSaati());
+        }
         float boyut = 0.6f;
         float renk = 1f;
         try {

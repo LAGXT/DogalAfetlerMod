@@ -61,6 +61,17 @@ class PulsarZinciriTest {
         assertTrue(PulsarZinciri.YUTMA_PARLAMA_SN < PulsarZinciri.YUTMA_SN);
     }
 
+    /** Pg3: duraklamada istemcinin ilerlemeden aldığı saniye durma anının saniyesine eşit (saat sürse de donar). */
+    @Test
+    void duraklamaSaniyesiIlerlemedenGeriDoner() {
+        for (int i = 0; i <= 900; i++) {
+            float sn = i / 10f;
+            assertEquals(sn, PulsarZinciri.duraklamaSaniyesi(PulsarZinciri.yutmaIlerlemesi(sn)), 1e-4f, "sn " + sn);
+        }
+        assertEquals(0f, PulsarZinciri.duraklamaSaniyesi(-0.2f));
+        assertEquals(PulsarZinciri.YUTMA_SN, PulsarZinciri.duraklamaSaniyesi(1.5f));
+    }
+
     @Test
     void aktiflikYalnizPulsarYolunda() {
         assertTrue(PulsarZinciri.aktif(GunesEvresi.PULSAR, 0f, false));

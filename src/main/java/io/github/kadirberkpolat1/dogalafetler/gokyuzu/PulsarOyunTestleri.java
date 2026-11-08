@@ -579,7 +579,8 @@ public final class PulsarOyunTestleri {
 
     /**
      * K-C46: yutmanın ~30. sn'sinde kural kapanır, kapalıyken ölçekli saat 90 sn'den fazla ilerler; açılınca saniye
-     * kaldığı yerden sürer, 55. sn parlaması yutma sürerken bir kez gelir, sonra güneşsiz dönem.
+     * kaldığı yerden sürer, 55. sn parlaması yutma sürerken bir kez gelir, sonra güneşsiz dönem. Pg3: kapalıyken paket
+     * duraklama bayrağını taşır ve ilerlemesi durma saniyesinde sabit kalır (istemci koreografiyi dondurur, geri sarmaz).
      */
     @GameTest(template = "bos", batch = "pulsar2_kural_yutma", timeoutTicks = 300)
     public static void kuralKapaliYutmaKaldigiYerdenSurer(GameTestHelper y) {
@@ -593,6 +594,7 @@ public final class PulsarOyunTestleri {
         int once = PulsarSureci.yutmaPatlamasiSayisi();
         int[] adim = {0};
         float[] snDurma = {0f};
+        float[] paketIlerleme = {0f};
         boolean[] parlamaGoruldu = {false};
         yonetici.hizAyarla(50);
         y.succeedWhen(() -> {
@@ -607,6 +609,11 @@ public final class PulsarOyunTestleri {
                 snDurma[0] = PulsarZinciri.yutmaSaniyesi(donem.evreBaslangicSaati(), PulsarYolu.durmaSaati(donem));
                 y.assertTrue(snDurma[0] < PulsarZinciri.YUTMA_PARLAMA_SN && !PulsarYolu.yutmaPatlamasiOldu(donem),
                         "parlamadan önce durmalı: " + snDurma[0]);
+                DonemPaketi p = DonemPaketi.den(donem, 1.0);
+                paketIlerleme[0] = p.evreIlerlemesi();
+                float snPaket = PulsarZinciri.duraklamaSaniyesi(p.evreIlerlemesi());
+                y.assertTrue(p.duraklatildi() && Math.abs(snPaket - snDurma[0]) < 1e-3f,
+                        "duraklama paketi: bayrak " + p.duraklatildi() + ", saniye " + snPaket + " / " + snDurma[0]);
                 yonetici.hizAyarla(1000);
                 adim[0] = 1;
                 y.fail("kural kapalı");
@@ -617,12 +624,16 @@ public final class PulsarOyunTestleri {
                 if (donem.saat() - PulsarYolu.durmaSaati(donem) < 2 * PulsarZinciri.YUTMA_SN * PulsarZinciri.SANIYE_TICK) {
                     y.fail("kapalıyken saat ilerliyor");
                 }
+                DonemPaketi p = DonemPaketi.den(donem, 1.0);
+                y.assertTrue(p.duraklatildi() && p.evreIlerlemesi() == paketIlerleme[0],
+                        "kapalıyken paket ilerlemesi sabit: " + paketIlerleme[0] + " → " + p.evreIlerlemesi());
                 yonetici.hizAyarla(50);
                 gunesKurali(y, true);
                 yonetici.kurallariDenetle();
                 float simdi = PulsarZinciri.yutmaSaniyesi(donem.evreBaslangicSaati(), donem.saat());
                 y.assertTrue(!yonetici.surecDurdu(surec) && Math.abs(simdi - snDurma[0]) < 1e-3f,
                         "saniye kaldığı yerden: " + snDurma[0] + " → " + simdi);
+                y.assertTrue(!DonemPaketi.den(donem, 1.0).duraklatildi(), "açılınca duraklama bayrağı kalkar");
                 adim[0] = 2;
                 y.fail("yutma sürüyor");
             }
