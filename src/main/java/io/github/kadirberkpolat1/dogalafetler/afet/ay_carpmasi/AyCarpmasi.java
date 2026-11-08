@@ -26,8 +26,8 @@ import net.minecraft.sounds.SoundSource;
  * Ay çarpması (bölüm H; tasarım {@code docs/tasarim/ay_carpmasi.md}). Sunucu geneli, seviyesiz, tek seferlik:
  *
  * <ul>
- * <li>SIREN (60 sn, K0-19): ay {@link AyDurumu#YAKLASIYOR}; istemci yaklaşan ve parçalanan ayı olay saatinden çizer;
- * 40. sn'den uğultu, 55. sn'den çıtırtı (global ortam katmanı).</li>
+ * <li>SIREN (25 sn, K0-19 rev. K-E67): ay {@link AyDurumu#YAKLASIYOR}; istemci yaklaşan ve parçalanan ayı olay saatinden
+ * çizer; 15. sn'den uğultu, 22. sn'den çıtırtı (global ortam katmanı).</li>
  * <li>AKTIF başı = çarpma: ay {@link AyDurumu#YOK} (çarpma saatiyle; deniz yükselmesi süreci bunu dinler), tsunami
  * çarpanı eklenir, siren çekirdekte fade-out olur. 1,5 sn sonra güm (her oyuncuya), 3–15 sn sarsıntı (kamera
  * istemcide, düşen bloklar burada), 10. sn'den {@code meteorSuresiSn} ay parçası yağmuru ({@link MeteorAPI}).</li>
@@ -45,10 +45,13 @@ public final class AyCarpmasi extends Afet {
     static final int SARSINTI_SON_TICK = Math.round(AyEgrileri.SARSINTI_SON_SN * 20);
     static final int METEOR_BAS_TICK = Math.round(AyEgrileri.METEOR_BAS_SN * 20);
 
-    /** Ortam katmanlarının eğrisi gerçek tick'tir: uğultu 40–55 sn'de, çıtırtı 55–59 sn'de girer. */
-    private static final int UGULTU_BAS = 800;
-    private static final int UGULTU_TAM = 1100;
-    private static final int CITIRTI_TAM = 1180;
+    /**
+     * Ortam katmanlarının eğrisi gerçek tick'tir, yaklaşmanın sonuna göre: uğultu son 10 sn'de girer (15–22 sn),
+     * çıtırtı 22–24,5 sn'de.
+     */
+    private static final int UGULTU_BAS = Math.round((AyEgrileri.YAKLASMA_SN - 10f) * 20);
+    private static final int UGULTU_TAM = Math.round((AyEgrileri.YAKLASMA_SN - 3f) * 20);
+    private static final int CITIRTI_TAM = Math.round((AyEgrileri.YAKLASMA_SN - 0.5f) * 20);
 
     private long aktifGecen;
     private boolean gumCaldi;

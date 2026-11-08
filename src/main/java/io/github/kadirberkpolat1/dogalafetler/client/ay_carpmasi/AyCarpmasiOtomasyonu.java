@@ -29,7 +29,7 @@ import net.minecraftforge.fml.common.Mod;
  * çalışır; üretimde etkisizdir. Gece, seyirci kamera doğuş noktasının {@value #KAMERA_YUKSEKLIGI} blok üstünde (ağaçlar
  * ve arazi ufku kapatmaz) yaklaşma yönüne (doğu-güneydoğu) bakar. Sıra: tepeye bakan önce karesi; vitrin açısından
  * afetsiz FPS tabanı ({@code s5_ay_taban}); ön-uyarı (değişiklik yok); siren boyunca ufkun 12° üstüne bakarak büyüyen ve
- * parçalanan ay; son saniyeler ağır çekimde (sunucu tick'inde 47. sn'den hız 0,1 = {@code /dogalafet hiz} alt sınırı) vitrin
+ * parçalanan ay; son saniyeler ağır çekimde (sunucu tick'inde 20. sn'den hız 0,1 = {@code /dogalafet hiz} alt sınırı) vitrin
  * açısından (ufkun 4° üstü: ay, parlama ve patlama aynı kadrajda); 3 boyutlu patlama 0,3 / 1 / 2 sn, 3. sn'de kamera
  * {@value #YUKSELTME} blok yükseltilmiş (patlama dünyada sabit: kadrajda aşağı kayar), 8. sn'de patlama yok (tam genlikte kısa
  * sarsıntı dizisinden sonra, H.3). Yaklaşma, patlama ve sarsıntı karelerinde istemcinin ay saati kare alınana dek karenin
@@ -70,9 +70,9 @@ public final class AyCarpmasiOtomasyonu {
 
     /** Patlamanın dünyaya bağlı olduğunu gösteren karede kameranın yükseltilmesi (blok). */
     private static final int YUKSELTME = 80;
-    private static final Kare[] YAKLASMA = {new Kare("02_siren_5sn", 5f), new Kare("03_parcalanma_24sn", 24f),
-            new Kare("04_catlaklar_38sn", 38f), new Kare("05_son_yaklasma_51sn", 51f), new Kare("06_vitrin_54sn", 54f),
-            new Kare("07_vitrin_58sn", 58f)};
+    private static final Kare[] YAKLASMA = {new Kare("02_siren_2sn", 2f), new Kare("03_parcalanma_10sn", 10f),
+            new Kare("04_catlaklar_16sn", 16f), new Kare("05_son_yaklasma_21sn", 21.5f), new Kare("06_vitrin_22sn", 22.5f),
+            new Kare("07_vitrin_24sn", 24.2f)};
     /** Patlama anları (0,3 / 1 / 2 / 8 sn) ve yükseltilmiş kamera; {@value #SARSINTI_SIRASI}. kareden önce sarsıntı dizisi. */
     private static final Kare[] CARPMA = {new Kare("08_patlama_0sn", 0.3f), new Kare("08b_patlama_1sn", 1f),
             new Kare("09_patlama_2sn", 2f), new Kare("09b_patlama_3sn_yukari", 3f, YUKSELTME),
@@ -92,7 +92,7 @@ public final class AyCarpmasiOtomasyonu {
     private static int olcumBas = -1;
     private static boolean olcumBitti;
     /** Ağır çekim {yaklaşma saniyesi, hız}; 0,1 {@code /dogalafet hiz} alt sınırıdır (daha küçüğü 0,1'e kenetlenir). */
-    private static final float[][] YAVASLATMA = {{47f, 0.1f}};
+    private static final float[][] YAVASLATMA = {{20f, 0.1f}};
     private static volatile int yavaslatma;
     private static volatile boolean sunucuHazir;
     private static volatile BlockPos kamera;

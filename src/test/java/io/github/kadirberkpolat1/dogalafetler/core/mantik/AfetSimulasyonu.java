@@ -1,23 +1,53 @@
 package io.github.kadirberkpolat1.dogalafetler.core.mantik;
 
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
+import io.github.kadirberkpolat1.dogalafetler.core.EtkiAlani;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.OptionalDouble;
 import java.util.Set;
 import java.util.SplittableRandom;
+import java.util.random.RandomGenerator;
 
 /**
  * Afet yöneticisinin saf mantığını Minecraft'sız koşturan test simülasyonu. Seçim sunucudakiyle aynı yoldan geçer
  * ({@link SecimTuru}: zamanlayıcı + hedef sıralaması + erteleme); uygun türler her adımda {@link TekSeferlikKurallar} ile
- * dünyanın gününden, ay ve güneş durumundan ve gelişim puanından kurulur. Afetler sabit süre sürer; yer her zaman uygundur.
- * {@code donemGecisleri}: ay çarpması ayı kaldırır (ve tsunami çarpanını ekler), güneş patlaması güneşi NORMAL dışına alır.
+ * dünyanın gününden, ay ve güneş durumundan ve gelişim puanından kurulur. Eşzamanlı doğal afetler, gün çarpanı, yoğunluk
+ * zayıflatması ve güneş/ay gün saati penceresi yöneticidekiyle aynı kurallardandır ({@link EszamanliAfetler},
+ * {@link ZamanlayiciAyarlari#gunCarpani}, {@link AfetYogunlugu}, {@link GunSaatiPenceresi#dogalSecimCarpani}; K-E67); gün
+ * saati simülasyon saatinin 24000'e göre kalanıdır (0 = gün doğumu). Seviye yöneticideki gibi başlatmadan önce tür başına
+ * seçilir. Afetler sabit süre ya da {@link #sureler} ile tür ve seviyeye göre sürer; yer her zaman uygundur; ilk afet
+ * garantisi (AS-12) yöneticideki gibi işler. Etki alanı: {@link #alanlar} verilirse her afet hedef oyuncunun çevresinde
+ * modelin çizdiği alana yerleşir (oyuncular birbirinden {@value #OYUNCU_ARALIGI} blok uzakta) ve süren bir bölgesel afetin
+ * alanıyla kesişirse çakışır ({@code EtkiAlani.kesisir}); {@link #hepsiCakisir} süren afet varken her yeni afeti
+ * çakıştırır (tek yuva: bekleme zinciri sınamaları); ikisi de yoksa hiç çakışma yok. {@code donemGecisleri}: ay çarpması
+ * ayı kaldırır (ve tsunami çarpanını ekler), güneş patlaması güneşi NORMAL dışına alır.
  */
 final class AfetSimulasyonu {
     record Olay(AfetTuru tur, int seviye, long baslangic, long bitis, int hedef) {
+    }
+
+    /** Oyuncular arası uzaklık (blok): farklı oyuncuya giden afetler çakışmaz. */
+    static final double OYUNCU_ARALIGI = 10_000;
+
+    /** Hedef oyuncuya göre etki alanı (oyuncu 0, 0'da); global alan {@link EtkiAlani#herYer()}. */
+    @FunctionalInterface
+    interface AlanModeli {
+        EtkiAlani alan(AfetTuru tur, int seviye, RandomGenerator rastgele);
+    }
+
+    private record Aktif(Olay olay, EtkiAlani alan) {
+    }
+
+    /** Afetin tür ve seviyesine göre başlangıcından bitişine süresi (tick). */
+    @FunctionalInterface
+    interface SureTablosu {
+        long sure(AfetTuru tur, int seviye);
     }
 
     record Sonuc(EnumMap<AfetTuru, Integer> sayilar, List<Olay> olaylar, int ayniAnIhlali, long toplamTick) {
@@ -50,6 +80,10 @@ final class AfetSimulasyonu {
     private CarpanListesi carpanlar = new CarpanListesi();
     private int oyuncuSayisi = 1;
     private long afetSuresi = 6000;
+    private SureTablosu sureler;
+    private boolean hepsiCakisir;
+    private AlanModeli alanlar;
+    private boolean pencere = true;
     private double siklik = 1.0;
     private long tohum = 20261105L;
     private int maksSiddet = 5;
@@ -84,6 +118,32 @@ final class AfetSimulasyonu {
 
     AfetSimulasyonu afetSuresi(long tick) {
         this.afetSuresi = tick;
+        this.sureler = null;
+        return this;
+    }
+
+    AfetSimulasyonu sureler(SureTablosu tablo) {
+        this.sureler = tablo;
+        return this;
+    }
+
+    /** Süren afet varken başlayan her doğal afet onunla çakışır: tek yuva gibi (bekleme zinciri sınamaları). */
+    AfetSimulasyonu hepsiCakisir() {
+        this.hepsiCakisir = true;
+        this.alanlar = null;
+        return this;
+    }
+
+    /** Afetler hedef oyuncunun çevresinde modelin alanına yerleşir; kesişen alan çakışır. */
+    AfetSimulasyonu alanlar(AlanModeli model) {
+        this.alanlar = model;
+        this.hepsiCakisir = false;
+        return this;
+    }
+
+    /** Güneş/ay gün saati penceresi (varsayılan açık; kapalı: eski, gün saatinden bağımsız oran). */
+    AfetSimulasyonu pencere(boolean acik) {
+        this.pencere = acik;
         return this;
     }
 
@@ -151,11 +211,17 @@ final class AfetSimulasyonu {
         for (int i = 0; i < oyuncuSayisi; i++) {
             adaylar.add(new HedefSecici.Aday<>(i, false));
         }
+        EnumMap<AfetTuru, Long> paylar = new EnumMap<>(AfetTuru.class);
+        for (AfetTuru tur : AfetTuru.values()) {
+            paylar.put(tur, GunSaatiPenceresi.gorunmePayi(tur, OnUyariPenceresi.VARSAYILAN_ERKEN_BILDIRIM,
+                    OnUyariPenceresi.VARSAYILAN_EN_AZ, OnUyariPenceresi.VARSAYILAN_EN_COK));
+        }
         Set<AfetTuru> kalanDurma = EnumSet.noneOf(AfetTuru.class);
         kalanDurma.addAll(durmaTurleri);
         Integer sonHedef = null;
         boolean oncekiYuksek = false;
-        Olay aktif = null;
+        List<Aktif> aktifler = new ArrayList<>();
+        ArrayDeque<Long> dogalBaslangiclar = new ArrayDeque<>();
         int ihlal = 0;
         boolean ay = ayVar;
         GunesEvresi gunes = evre;
@@ -166,14 +232,18 @@ final class AfetSimulasyonu {
         long son = toplamTick;
 
         for (long saat = 0; saat < toplamTick; saat += adim) {
-            if (aktif != null && saat >= aktif.bitis()) {
-                bekleme.afetBitti(aktif.tur(), aktif.seviye(), saat, zamanlayici, siklik);
-                if (aktif.tur().seviyeli()) {
-                    oncekiYuksek = SiddetSecici.yuksek(aktif.seviye());
-                }
-                aktif = null;
-            }
             double gun = gunSabit ? baslangicGunu : baslangicGunu + saat / (double) AfetZamanlayicisi.GUN_TICK;
+            double gunCarpani = zamanlayici.gunCarpani(gun);
+            for (Iterator<Aktif> it = aktifler.iterator(); it.hasNext();) {
+                Olay biten = it.next().olay();
+                if (saat >= biten.bitis()) {
+                    bekleme.afetBitti(biten.tur(), biten.seviye(), saat, zamanlayici, siklik, gunCarpani);
+                    if (biten.tur().seviyeli()) {
+                        oncekiYuksek = SiddetSecici.yuksek(biten.seviye());
+                    }
+                    it.remove();
+                }
+            }
             long gunTam = (long) Math.floor(gun);
             if (gunTam != uygunGunu || ay != uygunAy || gunes != uygunGunes) {
                 uygun = EnumSet.noneOf(AfetTuru.class);
@@ -187,25 +257,48 @@ final class AfetSimulasyonu {
                 uygunGunes = gunes;
             }
             final long simdi = saat;
-            AfetZamanlayicisi.Girdi girdi = new AfetZamanlayicisi.Girdi(aktif != null, saat, adim, bekleme, uygun,
-                    tur -> carpanlar.carpan(tur, simdi), siklik, false);
-            SecimTuru.Sonuc<Integer> secim = SecimTuru.isle(zamanlayici, girdi, adaylar, sonHedef, (tur, hedef) -> true,
-                    rastgele);
+            final long gunSaati = Math.floorMod(saat, AfetZamanlayicisi.GUN_TICK);
+            List<AfetTuru> aktifTurler = aktifler.stream().map(a -> a.olay().tur()).toList();
+            boolean yuvaDolu = EszamanliAfetler.yuvaDolu(aktifTurler, aktifTurler.size(), zamanlayici.eszamanliSinir(gun),
+                    false);
+            boolean garanti = olaylar.isEmpty() && zamanlayici.ilkAfetGarantiTick() > 0
+                    && saat >= AfetZamanlayicisi.beklemeOlcekle(zamanlayici.ilkAfetGarantiTick(), siklik);
+            AfetZamanlayicisi.Girdi girdi = new AfetZamanlayicisi.Girdi(yuvaDolu, saat, adim, bekleme,
+                    EszamanliAfetler.adaylar(uygun, aktifTurler),
+                    tur -> carpanlar.carpan(tur, simdi) * (pencere
+                            ? GunSaatiPenceresi.dogalSecimCarpani(tur, gunSaati, paylar.get(tur), true) : 1.0),
+                    siklik, false, garanti, gunCarpani);
+            while (!dogalBaslangiclar.isEmpty() && dogalBaslangiclar.peekFirst() <= saat - AfetZamanlayicisi.GUN_TICK) {
+                dogalBaslangiclar.removeFirst();
+            }
+            final boolean oncekiYuksekSimdi = oncekiYuksek;
+            double yuk = AfetYogunlugu.yuk(dogalBaslangiclar.size(), gun, siklik);
+            EnumMap<AfetTuru, Integer> seviyeler = new EnumMap<>(AfetTuru.class);
+            EtkiAlani[] yeniAlan = new EtkiAlani[1];
+            SecimTuru.Sonuc<Integer> secim = SecimTuru.isle(zamanlayici, girdi, adaylar, sonHedef, (tur, hedef) -> {
+                int seviye = seviyeler.computeIfAbsent(tur, t -> t.seviyeli()
+                        ? SiddetSecici.sec(siddet, gun, maksSiddet, oncekiYuksekSimdi, yuk, rastgele) : 0);
+                yeniAlan[0] = yerlestir(tur, seviye, hedef, rastgele);
+                return cakisir(aktifler, yeniAlan[0]) ? SecimTuru.Deneme.CAKISTI : SecimTuru.Deneme.BASLADI;
+            }, rastgele);
             if (!secim.basladi()) {
                 continue;
             }
-            if (aktif != null) {
+            if (yuvaDolu || aktifTurler.contains(secim.tur())) {
                 ihlal++;
                 continue;
             }
             AfetTuru tur = secim.tur();
-            int seviye = tur.seviyeli() ? SiddetSecici.sec(siddet, gun, maksSiddet, oncekiYuksek, rastgele) : 0;
+            int seviye = seviyeler.getOrDefault(tur, 0);
             Integer hedef = secim.hedef();
             if (hedef != null) {
                 sonHedef = hedef;
             }
-            aktif = new Olay(tur, seviye, saat, saat + afetSuresi, hedef == null ? -1 : hedef);
-            olaylar.add(aktif);
+            long sure = sureler == null ? afetSuresi : sureler.sure(tur, seviye);
+            Olay olay = new Olay(tur, seviye, saat, saat + sure, hedef == null ? -1 : hedef);
+            aktifler.add(new Aktif(olay, yeniAlan[0]));
+            olaylar.add(olay);
+            dogalBaslangiclar.addLast(saat);
             sayilar.merge(tur, 1, Integer::sum);
             if (donemGecisleri && tur == AfetTuru.AY_CARPMASI) {
                 ay = false;
@@ -221,5 +314,27 @@ final class AfetSimulasyonu {
             }
         }
         return new Sonuc(sayilar, olaylar, ihlal, son);
+    }
+
+    /** Hedef oyuncunun çevresinde mutlak alan; model yoksa ya da sunucu geneli türde global. */
+    private EtkiAlani yerlestir(AfetTuru tur, int seviye, Integer hedef, SplittableRandom rastgele) {
+        if (alanlar == null || tur.sunucuGeneli() || hedef == null) {
+            return EtkiAlani.herYer();
+        }
+        EtkiAlani a = alanlar.alan(tur, seviye, rastgele);
+        return a.global() ? a : EtkiAlani.daire(a.x() + hedef * OYUNCU_ARALIGI, 0, a.z(), a.yaricap());
+    }
+
+    /** Yöneticideki gibi: yalnız süren bölgesel afetlerle (sunucu geneli yuvayı zaten doldurur). */
+    private boolean cakisir(List<Aktif> aktifler, EtkiAlani yeni) {
+        for (Aktif aktif : aktifler) {
+            if (aktif.olay().tur().sunucuGeneli()) {
+                continue;
+            }
+            if (hepsiCakisir || alanlar != null && yeni.kesisir(aktif.alan())) {
+                return true;
+            }
+        }
+        return false;
     }
 }

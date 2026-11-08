@@ -44,7 +44,10 @@ import net.minecraftforge.gametest.PrefixGameTestTemplate;
 @PrefixGameTestTemplate(false)
 public final class GunesPatlamasiOyunTestleri {
     private static final float EPS = 1e-4f;
-    /** Öncü pencerenin son 600 tick'inde (hız 1) en az bu kadar meteor atılır: varsayılanlarla 5,6–7,5 (eskiden 0). */
+    /**
+     * Öncü pencerede (ön-uyarının son {@code meteorYagmuruOncuSaniye}'si + 25 sn siren, hız 1) en az bu kadar meteor atılır:
+     * varsayılanlarla 30 sn'de 6 → 24/dk, ~7 (K-E67; eskiden ön-uyarının son 600 tick'i, 5,6–7,5).
+     */
     private static final int ONCU_ESIK = 4;
     /** Siren testinin değiştirdiği {@code afetBlokHasari}'nın eski değeri; geri konunca null. */
     private static Boolean eskiBlokHasari;
@@ -344,9 +347,10 @@ public final class GunesPatlamasiOyunTestleri {
     }
 
     /**
-     * meteor-2 (kullanıcı isteği 2026-11-07): ön-uyarının sonunda öncü meteor yağmuru başlar ve artar; AKTIF'in ve sonraki
-     * günün başında yağmur yoğunluğu {@code meteorYagmuruDakikaBasina}'dır. Ön-uyarı hız 4'le geçilir, son 600 tick hız
-     * 1'de sayılır (yağmur yoğunluğu gerçek dakikadır). Sayı atılan meteordur (oyuncusuz dünyada doğuş noktasına; tavan ya da
+     * meteor-2 (kullanıcı isteği 2026-11-07, K-E67): ön-uyarının sonunda öncü meteor yağmuru başlar ve siren boyunca artar;
+     * AKTIF'in ve sonraki günün başında yağmur yoğunluğu {@code meteorYagmuruDakikaBasina}'dır. Ön-uyarı hız 4'le geçilir,
+     * öncü pencere (ön-uyarının son {@code meteorYagmuruOncuSaniye}'si ve siren) hız 1'de, AKTIF'e kendiliğinden geçene dek
+     * sayılır (yağmur yoğunluğu gerçek dakikadır). Sayı atılan meteordur (oyuncusuz dünyada doğuş noktasına; tavan ya da
      * yüklü olmayan chunk yüzünden uçmayan dahil). Krater blok bütçesi ve uçan meteor tavanı hiçbir tick'te aşılmaz.
      */
     @GameTest(template = "bos", batch = "gunes_patlamasi_oncu", timeoutTicks = 1200)
@@ -360,6 +364,7 @@ public final class GunesPatlamasiOyunTestleri {
         GunesPatlamasi afet = baslat(y, yonetici);
         YanginKaynagi kaynak = afet.kaynak();
         double yagmur = GunesPatlamasiAyarlari.meteorYagmuruDakikaBasina();
+        long oncuTick = GunesPatlamasiAyarlari.meteorYagmuruOncuSaniye() * 20L;
         yonetici.hizAyarla(4);
         int[] bas = {-1};
         long[] basTick = {0};
@@ -368,21 +373,20 @@ public final class GunesPatlamasiOyunTestleri {
         y.onEachTick(() -> {
             asim[0] = Math.max(asim[0], MeteorAPI.sonKraterIslemi(level) - MeteorAPI.sonKraterButcesi(level));
             enCokUcan[0] = Math.max(enCokUcan[0], MeteorAPI.aktifMeteorSayisi(level));
-            if (bas[0] < 0 && afet.asama() == AfetAsamasi.ON_UYARI && afet.asamaKalanTick() <= 600) {
+            if (bas[0] < 0 && afet.asama() == AfetAsamasi.ON_UYARI && afet.asamaKalanTick() <= oncuTick) {
                 yonetici.hizAyarla(1);
                 bas[0] = MeteorAPI.atilanMeteorSayisi(level, kaynak);
                 basTick[0] = y.getTick();
             }
         });
         y.startSequence()
-                .thenWaitUntil(() -> y.assertTrue(afet.asama() == AfetAsamasi.SIREN, "siren bekleniyor: " + afet.asama()))
+                .thenWaitUntil(() -> y.assertTrue(afet.asama() == AfetAsamasi.AKTIF, "AKTIF bekleniyor: " + afet.asama()))
                 .thenExecute(() -> {
                     int oncu = MeteorAPI.atilanMeteorSayisi(level, kaynak) - bas[0];
-                    DogalAfetler.LOGGER.info("Güneş GameTest: ön-uyarının son {} tick'inde {} öncü meteor (yağmur {}/dk)",
+                    DogalAfetler.LOGGER.info("Güneş GameTest: öncü pencerenin {} tick'inde {} öncü meteor (yağmur {}/dk)",
                             y.getTick() - basTick[0], oncu, MeteorAPI.yagmurYogunlugu(level, afet.yagmurKimlik()));
                     y.assertTrue(bas[0] >= 0, "öncü pencereye hız 1'de girilmeli");
-                    y.assertTrue(oncu >= ONCU_ESIK, "ön-uyarıda öncü meteor sayısı " + oncu + " < " + ONCU_ESIK);
-                    yonetici.asamaIleri();
+                    y.assertTrue(oncu >= ONCU_ESIK, "öncü pencerede meteor sayısı " + oncu + " < " + ONCU_ESIK);
                 })
                 .thenIdle(2)
                 .thenExecute(() -> {

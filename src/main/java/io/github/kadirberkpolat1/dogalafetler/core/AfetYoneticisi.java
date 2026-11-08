@@ -2,17 +2,22 @@ package io.github.kadirberkpolat1.dogalafetler.core;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.config.CekirdekAyarlari;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.AfetYogunlugu;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.AfetZamanlayicisi;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.EszamanliAfetler;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.GelisimOlcutu;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.GunSaatiPenceresi;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.HedefSecici;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.OnUyariPenceresi;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.OyunGunu;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SecimTuru;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.SeviyeDurumu;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SiddetAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SiddetSecici;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SonrakiAfetTahmini;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.TekSeferlikAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.TekSeferlikKurallar;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.ZamanlayiciAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.ZamanOlcegi;
 import io.github.kadirberkpolat1.dogalafetler.core.olay.AfetAsamaDegistiEvent;
 import io.github.kadirberkpolat1.dogalafetler.core.olay.AfetBasladiEvent;
@@ -66,7 +71,8 @@ import net.minecraftforge.fml.common.Mod;
 /**
  * Afet yöneticisi (madde 3, 4, 10, 11): sunucu tick'inde zamanlayıcıyı çalıştırır, afet seçer, yaşam döngüsünü ilerletir,
  * siren isteklerini ve afet durum paketlerini etkilenebilecek oyunculara gönderir, "sağ çıkan" takibini yapar ve afet
- * bitince {@link AfetBittiEvent} yayınlar. Doğal seçim yalnız hiç afet yokken çalışır; komut aynı anda birden çok afet
+ * bitince {@link AfetBittiEvent} yayınlar. Doğal seçim boş afet yuvası varken çalışır: oyun gününe göre en çok 1–3 doğal
+ * afet, farklı türden, etki alanları çakışmadan ({@link EszamanliAfetler}, K-E67); komut aynı anda birden çok afet
  * başlatabilir, aynı türden yalnız bir tane (AS-8). Afet yuvası dışında süren dönem süreçleri
  * {@link #donemSureciKaydet} ile katılır; {@code stop} ve gamerule onları durdurur, gamerule ile duran süreç kural açılınca
  * sürer (madde 11, K-C41). Karar mantığı {@code core.mantik}'tedir; bu sınıf Minecraft bağlantısıdır. Afet kodunun
@@ -81,6 +87,8 @@ public final class AfetYoneticisi {
         ZATEN_AKTIF,
         KAYITLI_DEGIL,
         YER_UYGUN_DEGIL,
+        /** Doğal afetin etki alanı süren bir afetinkiyle çakışıyor (K-E67; komutla başlatmada olmaz). */
+        CAKISIYOR,
         HEDEF_YOK,
         HATA
     }
@@ -291,11 +299,69 @@ public final class AfetYoneticisi {
         return CekirdekAyarlari.al().gelisimOlcutu().topla(puanlar);
     }
 
-    /** Verilen oyun günündeki seviye olasılıkları (S1–S5; gamerule üst sınırı ve art arda 4-5 kuralı dahil). */
-    public double[] seviyeOlasiliklari(double gun) {
+    /**
+     * Verilen oyun günündeki seviye olasılıkları ve 0 olanların nedeni: doğal seçimin kullandığı değerler (gelişim
+     * kriteri, gamerule üst sınırı, art arda 4-5 kuralı, afet yoğunluğu dahil; K-E67).
+     */
+    public SeviyeDurumu seviyeDurumu(double gun) {
         SiddetAyarlari ayar = CekirdekAyarlari.al().siddet();
-        return SiddetSecici.olasiliklar(ayar, SiddetSecici.etkinGun(ayar, gun, gelisimPuani()),
-                Kurallar.maksSiddet(server.getGameRules()), SiddetSecici.yuksek(donem().sonSeviye()));
+        return SeviyeDurumu.hesapla(ayar, gun, SiddetSecici.etkinGun(ayar, gun, gelisimPuani()),
+                Kurallar.maksSiddet(server.getGameRules()), SiddetSecici.yuksek(donem().sonSeviye()), afetYuku(gun));
+    }
+
+    /** Afet yoğunluğu yükü ({@link AfetYogunlugu#yuk}): son gündeki doğal afetler ve {@code afetSikligi}. */
+    public double afetYuku(double gun) {
+        return AfetYogunlugu.yuk(donem().sonGunDogalAfetSayisi(), gun, Kurallar.siklikCarpani(server.getGameRules()));
+    }
+
+    /**
+     * Oyun gününün takvim çarpanı (K-E67, {@link ZamanlayiciAyarlari#gunCarpani}): bölgesel afetlerin oranını {@code afetSikligi}
+     * gibi çarpar, yeni başlayan beklemeleri böler.
+     */
+    public double gunCarpani() {
+        return CekirdekAyarlari.al().zamanlayici().gunCarpani(oyunGunu());
+    }
+
+    /**
+     * Doğal afet için boş yuva yok mu ({@link EszamanliAfetler#yuvaDolu}): yalnız doğal afetler yuva doldurur (komutla
+     * başlatılan afet doğal takvimi durdurmaz); TPS kısılıyken herhangi bir afet sürerken yenisi ertelenir (K-C37). Her tick
+     * çağrılır: afet yokken hemen döner.
+     */
+    public boolean dogalYuvaDolu() {
+        List<Afet> afetler = aktifAfetler();
+        if (afetler.isEmpty()) {
+            return false;
+        }
+        List<AfetTuru> dogal = new ArrayList<>(afetler.size());
+        for (Afet afet : afetler) {
+            if (!afet.baglam().elle()) {
+                dogal.add(afet.tur());
+            }
+        }
+        return EszamanliAfetler.yuvaDolu(dogal, afetler.size(),
+                CekirdekAyarlari.al().zamanlayici().eszamanliSinir(oyunGunu()), TpsOlcer.kismaCarpani() < 1.0);
+    }
+
+    private List<AfetTuru> aktifTurler() {
+        return aktifAfetler().stream().map(Afet::tur).toList();
+    }
+
+    /**
+     * Doğal seçimde türün oran çarpanı: geçici çarpan × gün saati penceresi (K-E67, {@link GunSaatiPenceresi#dogalSecimCarpani}:
+     * güneş patlaması ve ay çarpması yalnız seçimden görünmeye kadar geçecek süre de penceredeyken, pencere payıyla telafi
+     * edilmiş oranla).
+     */
+    double secimCarpani(AfetTuru tur) {
+        double carpan = donem().carpan(tur);
+        if (GunSaatiPenceresi.dogalPatlama(tur).isEmpty() || !(carpan > 0)) {
+            return carpan;
+        }
+        CekirdekAyarlari ayar = CekirdekAyarlari.al();
+        long pay = GunSaatiPenceresi.gorunmePayi(tur, ayar.erkenBildirimTick(), ayar.onUyariEnAzTick(),
+                ayar.onUyariEnCokTick());
+        ServerLevel ust = server.overworld();
+        return carpan * GunSaatiPenceresi.dogalSecimCarpani(tur, ust.getDayTime(), zamanOlcegi.gercekTick(pay),
+                ust.getGameRules().getBoolean(GameRules.RULE_DAYLIGHT));
     }
 
     /**
@@ -376,7 +442,8 @@ public final class AfetYoneticisi {
     /**
      * {@code /dogalafet start}: bekleme ve gamerule kurallarını atlar; başka türden süren afetler engel değildir, aynı türden
      * süren afet varsa reddeder (AS-8). {@code seviye} boşsa
-     * şiddet seçiciyle seçilir (seviyesiz afette yok sayılır). {@code hedef} boşsa uygun bir çevrim içi oyuncu, o da
+     * şiddet seçiciyle seçilir (seviyesiz afette yok sayılır); verilen seviye {@code afetMaksSiddet}'i aşabilir (komut çıktısı
+     * bunu belirtir, K-E67). {@code hedef} boşsa uygun bir çevrim içi oyuncu, o da
      * yoksa {@code konumLevel}/{@code konum} kullanılır.
      */
     public BaslatmaSonucu elleBaslat(AfetTuru tur, Integer seviye, ServerPlayer hedef, ServerLevel konumLevel,
@@ -417,6 +484,17 @@ public final class AfetYoneticisi {
             throw new IllegalArgumentException(tur.kimlik() + " sunucu geneli değil");
         }
         return sunucuGeneliBaslat(tur, false);
+    }
+
+    /**
+     * Yalnız GameTest: bölgesel türü doğal seçimin başlattığı gibi (elle değil) oyuncuda başlatır; eşzamanlı doğal afet
+     * kuralları ve alan çakışması (K-E67) ancak böyle sınanır.
+     */
+    BaslatmaSonucu dogalBaslat(AfetTuru tur, int seviye, ServerPlayer hedef) {
+        if (tur.sunucuGeneli()) {
+            throw new IllegalArgumentException(tur.kimlik() + " bölgesel değil");
+        }
+        return oyuncuyaBaslat(tur, seviye, hedef, false);
     }
 
     /** Süren bütün afetleri temizce durdurur ({@code /dogalafet stop}); afet yoksa {@code false}. */
@@ -529,10 +607,14 @@ public final class AfetYoneticisi {
      */
     public Optional<AfetTuru> secimYap(boolean zorla) {
         CekirdekAyarlari ayar = CekirdekAyarlari.al();
-        return turuIsle(zorla, ayar.kontrolAraligiTick(), (tur, hedef) -> true).map(SecimTuru.Sonuc::tur);
+        return turuIsle(zorla, ayar.kontrolAraligiTick(), (tur, hedef) -> SecimTuru.Deneme.BASLADI)
+                .map(SecimTuru.Sonuc::tur);
     }
 
-    /** Afet yokken sonraki doğal afet seçiminin tahmini (ölçekli tick); doğal seçim olamıyorsa boş. */
+    /**
+     * Boş doğal afet yuvası varken sonraki doğal afet seçiminin tahmini (ölçekli tick; süren türler dışta); doğal seçim
+     * olamıyorsa boş.
+     */
     public Optional<SonrakiAfetTahmini> sonrakiAfetTahmini() {
         GameRules kurallar = server.getGameRules();
         if (!kurallar.getBoolean(Kurallar.DOGAL_AFETLER_ACIK)) {
@@ -542,8 +624,9 @@ public final class AfetYoneticisi {
         DunyaDonemi donem = donem();
         double siklik = Kurallar.siklikCarpani(kurallar);
         long garanti = ilkAfetGarantiAni(ayar, donem, siklik);
-        return SonrakiAfetTahmini.hesapla(ayar.zamanlayici(), donem.saat(), donem.bekleme(), uygunTurler(kurallar, ayar),
-                donem::carpan, siklik, garanti == Long.MAX_VALUE ? Long.MAX_VALUE : Math.max(0, garanti - donem.saat()));
+        return SonrakiAfetTahmini.hesapla(ayar.zamanlayici(), donem.saat(), donem.bekleme(),
+                EszamanliAfetler.adaylar(uygunTurler(kurallar, ayar), aktifTurler()), this::secimCarpani, siklik, gunCarpani(),
+                garanti == Long.MAX_VALUE ? Long.MAX_VALUE : Math.max(0, garanti - donem.saat()));
     }
 
     /**
@@ -662,7 +745,7 @@ public final class AfetYoneticisi {
                 afetiIsle(afet, adim);
             }
         }
-        if (afetler.isEmpty() && otomatikSecim) {
+        if (otomatikSecim && !dogalYuvaDolu()) {
             secimKontrolu(donem, ayar);
         }
         if (tickSayaci % ayar.afetPaketAraligiTick() == 0) {
@@ -688,10 +771,10 @@ public final class AfetYoneticisi {
         Optional<SecimTuru.Sonuc<UUID>> sonuc = turuIsle(false, gecen, (tur, hedef) -> {
             int seviye = seviyeler.computeIfAbsent(tur, this::seviyeSec);
             if (tur.sunucuGeneli()) {
-                return sunucuGeneliBaslat(tur, false) == BaslatmaSonucu.BASLADI;
+                return deneme(sunucuGeneliBaslat(tur, false));
             }
             ServerPlayer oyuncu = server.getPlayerList().getPlayer(hedef);
-            return oyuncu != null && oyuncuyaBaslat(tur, seviye, oyuncu, false) == BaslatmaSonucu.BASLADI;
+            return oyuncu == null ? SecimTuru.Deneme.YER_YOK : deneme(oyuncuyaBaslat(tur, seviye, oyuncu, false));
         });
         sonuc.ifPresent(tur -> {
             for (AfetTuru ertelenen : tur.ertelenenler()) {
@@ -703,9 +786,18 @@ public final class AfetYoneticisi {
         });
     }
 
+    private static SecimTuru.Deneme deneme(BaslatmaSonucu sonuc) {
+        return switch (sonuc) {
+            case BASLADI -> SecimTuru.Deneme.BASLADI;
+            case CAKISIYOR -> SecimTuru.Deneme.CAKISTI;
+            default -> SecimTuru.Deneme.YER_YOK;
+        };
+    }
+
     /**
      * Bir seçim turunu sunucu durumuyla kurar ve {@link SecimTuru} ile işler. Çevrim içi (izleyici olmayan) oyuncu yoksa ya da
      * {@code dogalAfetlerAcik=false} ise boş; hedef adayı (ayarlı boyutlarda oyuncu) yoksa yalnız sunucu geneli afetler (N11).
+     * Süren türler aday değildir; yuva doluysa seçim yok (K-E67).
      */
     private Optional<SecimTuru.Sonuc<UUID>> turuIsle(boolean zorla, long adim, SecimTuru.Baslatici<UUID> baslatici) {
         GameRules kurallar = server.getGameRules();
@@ -719,8 +811,9 @@ public final class AfetYoneticisi {
         DunyaDonemi donem = donem();
         double siklik = Kurallar.siklikCarpani(kurallar);
         boolean garanti = !zorla && donem.saat() >= ilkAfetGarantiAni(ayar, donem, siklik);
-        AfetZamanlayicisi.Girdi girdi = new AfetZamanlayicisi.Girdi(!donem.aktifAfetler().isEmpty(), donem.saat(), adim,
-                donem.bekleme(), uygunTurler(kurallar, ayar), donem::carpan, siklik, zorla, garanti);
+        AfetZamanlayicisi.Girdi girdi = new AfetZamanlayicisi.Girdi(dogalYuvaDolu(), donem.saat(), adim, donem.bekleme(),
+                EszamanliAfetler.adaylar(uygunTurler(kurallar, ayar), aktifTurler()), this::secimCarpani, siklik, zorla,
+                garanti, gunCarpani());
         SecimTuru.Sonuc<UUID> sonuc = SecimTuru.isle(ayar.zamanlayici(), girdi, adayListesi(hedefAdaylari(ayar)),
                 donem.sonHedef().orElse(null), baslatici, rastgele);
         return sonuc.basladi() || !sonuc.ertelenenler().isEmpty() ? Optional.of(sonuc) : Optional.empty();
@@ -754,9 +847,10 @@ public final class AfetYoneticisi {
             return 0;
         }
         SiddetAyarlari ayar = CekirdekAyarlari.al().siddet();
-        double gun = SiddetSecici.etkinGun(ayar, oyunGunu(), gelisimPuani());
+        long oyunGunu = oyunGunu();
+        double gun = SiddetSecici.etkinGun(ayar, oyunGunu, gelisimPuani());
         return SiddetSecici.sec(ayar, gun, Kurallar.maksSiddet(server.getGameRules()),
-                SiddetSecici.yuksek(donem().sonSeviye()), rastgele);
+                SiddetSecici.yuksek(donem().sonSeviye()), afetYuku(oyunGunu), rastgele);
     }
 
     /** Ayarlı boyutlardaki (N11), izleyici olmayan, canlı çevrim içi oyuncular. */
@@ -846,9 +940,15 @@ public final class AfetYoneticisi {
         return afetiBaslat(afet, level, merkez, seviye, hedef, elle);
     }
 
-    /** AS-8: doğal başlatma için herhangi bir süren afet, komut için aynı türden süren afet yuvayı doldurur. */
+    /**
+     * AS-8, K-E67: komut için aynı türden süren afet yuvayı doldurur; doğal başlatma için ayrıca eşzamanlı doğal afet
+     * kuralları ({@link EszamanliAfetler}: güne göre sınır, sunucu geneli afet tek başına, TPS kısması).
+     */
     private boolean yuvaDolu(AfetTuru tur, boolean elle) {
-        return elle ? aktifAfet(tur).isPresent() : !aktifAfetler().isEmpty();
+        if (aktifAfet(tur).isPresent()) {
+            return true;
+        }
+        return !elle && (dogalYuvaDolu() || EszamanliAfetler.adaylar(Set.of(tur), aktifTurler()).isEmpty());
     }
 
     private BaslatmaSonucu afetiBaslat(Afet afet, ServerLevel level, BlockPos merkez, int seviye, UUID hedef,
@@ -856,12 +956,20 @@ public final class AfetYoneticisi {
         CekirdekAyarlari ayar = CekirdekAyarlari.al();
         DunyaDonemi donem = donem();
         long erken = ayar.erkenBildirimTick();
-        long pencere = OnUyariPenceresi.sure(ayar.onUyariEnAzTick(), ayar.onUyariEnCokTick(), rastgele);
-        AfetBaglami baglam = new AfetBaglami(afet.tur(), seviye, merkez, level.dimension(), hedef, donem.yeniAfetNo(),
+        long pencere = OnUyariPenceresi.sure(ayar.onUyariEnAzTick(), ayar.onUyariEnCokTick(),
+                SirenTuru.sureTick(afet.tur()) - SirenTuru.STANDART_SURE_TICK, rastgele);
+        long afetNo = donem.siradakiAfetNo();
+        AfetBaglami baglam = new AfetBaglami(afet.tur(), seviye, merkez, level.dimension(), hedef, afetNo,
                 erken + pencere, erken, elle);
         try {
             afet.baslat(level, baglam);
+            if (!elle && alanCakisiyor(afet, level)) {
+                // Numara harcanmaz: çakışan aday ne olay ne paket gönderdi.
+                afet.durdur(level, false);
+                return BaslatmaSonucu.CAKISIYOR;
+            }
         } catch (RuntimeException hata) {
+            donem.afetNoKullan(afetNo);
             DogalAfetler.LOGGER.error("{} başlatılırken hata; afet yumuşak durduruluyor", afet.tur().kimlik(), hata);
             try {
                 afet.durdur(level, false);
@@ -870,7 +978,11 @@ public final class AfetYoneticisi {
             }
             return BaslatmaSonucu.HATA;
         }
+        donem.afetNoKullan(afetNo);
         donem.afetEkle(afet);
+        if (!elle) {
+            donem.dogalBaslangicEkle();
+        }
         if (hedef != null) {
             donem.sonHedefAyarla(hedef);
         }
@@ -881,6 +993,32 @@ public final class AfetYoneticisi {
                 baglam.onUyariSuresi(), elle ? " (elle)" : "");
         MinecraftForge.EVENT_BUS.post(new AfetBasladiEvent(afet, level));
         return BaslatmaSonucu.BASLADI;
+    }
+
+    /**
+     * K-E67: başlatılmış (henüz eklenmemiş) doğal afetin etki alanı aynı boyutta süren bir bölgesel afetinkiyle çakışıyor
+     * mu (global alanlı bölgesel afet, ör. asit yağmuru, o boyutta her alanla çakışır). Süren sunucu geneli afet burada
+     * sayılmaz: doğal olanı yuvayı zaten doldurur, komutla başlatılanı doğal takvimi durdurmaz. Alanı okunamayan süren afet
+     * çakışma sayılmaz (o afet kendi yolunda yumuşak durur).
+     */
+    private boolean alanCakisiyor(Afet afet, ServerLevel level) {
+        List<Afet> surenler = aktifAfetler();
+        if (surenler.isEmpty()) {
+            return false;
+        }
+        EtkiAlani alan = Objects.requireNonNull(afet.etkiAlani(), "etkiAlani() null döndü");
+        for (Afet diger : surenler) {
+            if (diger.tur().sunucuGeneli() || !diger.baglam().boyut().equals(level.dimension())) {
+                continue;
+            }
+            EtkiAlani digerAlani = alanOku(diger);
+            if (digerAlani != null && alan.kesisir(digerAlani)) {
+                DogalAfetler.LOGGER.info("{} başlamadı: etki alanı süren {} ile çakışıyor", afet.tur().kimlik(),
+                        diger.tur().kimlik());
+                return true;
+            }
+        }
+        return false;
     }
 
     private void afetiIsle(Afet afet, int adim) {
@@ -1132,8 +1270,9 @@ public final class AfetYoneticisi {
         if (neden != BitisNedeni.IPTAL) {
             donem.gecmiseEkle(new GecmisKaydi(afet.tur(), baglam.seviye(), baglam.merkez(), baglam.boyut(), saat));
             donem.bekleme().afetBitti(afet.tur(), baglam.seviye(), saat, CekirdekAyarlari.al().zamanlayici(),
-                    donem.uygulananSiklik());
-            if (afet.tur().seviyeli()) {
+                    donem.uygulananSiklik(), gunCarpani());
+            // K-E67: art arda 4-5 kuralı yalnız doğal afetler arasındadır; komutla başlatılan seviye sonrakini kısıtlamaz.
+            if (afet.tur().seviyeli() && !baglam.elle()) {
                 donem.sonSeviyeAyarla(baglam.seviye());
             }
             donem.setDirty();

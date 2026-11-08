@@ -13,11 +13,19 @@ import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
 import io.github.kadirberkpolat1.dogalafetler.core.OyunTestiAfeti;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.OyunGunu;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.SeviyeDurumu;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SonumTipi;
+import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
+import java.util.ArrayList;
+import java.util.List;
+import net.minecraft.commands.CommandSource;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.level.GameRules;
 import net.minecraftforge.event.ForgeEventFactory;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
@@ -137,5 +145,123 @@ public final class KomutOyunTestleri {
         yardimci.assertTrue(yonetici.zamanOlcegi().carpan() == 1.0, "hız 1'e dönmedi");
         yardimci.assertTrue(yonetici.aktifAfet().isEmpty(), "aktif afet kaldı");
         yardimci.succeed();
+    }
+
+    /**
+     * Kullanıcı şikayeti (K-E67): "{@code /dogalafet gun} ile günü artırsak bile seviye 4-5 %0 gösteriyor". Komutla başlatılan
+     * seviye 5 afet bitince sonraki doğal seçimin S4/S5 olasılığı sıfırlanmaz (önceki doğal afet sayılmaz); {@code gun}
+     * çıktısı olasılık yazar; {@code afetMaksSiddet} üstündeki komut seviyesi uygulanır ve çıktıda belirtilir; {@code durum}
+     * %0 olan seviyenin nedenini yazar.
+     */
+    @GameTest(template = "bos", batch = "cekirdek_komut_seviye")
+    public static void elleSeviyeBesSonrakiOlasiliklariSifirlamaz(GameTestHelper yardimci) {
+        MinecraftServer server = yardimci.getLevel().getServer();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(server);
+        GameRules.IntegerValue maks = server.getGameRules().getRule(Kurallar.AFET_MAKS_SIDDET);
+        int oncekiMaks = maks.get();
+        try (AfetKaydi.GeciciKayit kayit = AfetKaydi.geciciKaydet(AfetTuru.KASIRGA,
+                () -> new OyunTestiAfeti(AfetTuru.KASIRGA, 8, 100))) {
+            yonetici.sifirla();
+            maks.set(5, server);
+            yardimci.assertTrue(calistir(yardimci, "dogalafet gun 100") == 1, "gun 100 başarısız");
+            yardimci.assertTrue(calistir(yardimci, "dogalafet start kasirga 5") == 1, "start kasirga 5 başarısız");
+            yardimci.assertTrue(yonetici.aktifAfet(AfetTuru.KASIRGA).map(Afet::seviye).orElse(0) == 5, "seviye 5 değil");
+            yardimci.assertTrue(calistir(yardimci, "dogalafet stop") == 1, "stop başarısız");
+            yardimci.assertTrue(yonetici.donem().sonSeviye() == 0, "komutla başlayan seviye son seviyeye yazılmamalı");
+            SeviyeDurumu durum = yonetici.seviyeDurumu(100);
+            yardimci.assertTrue(durum.olasilik(4) > 0 && durum.olasilik(5) > 0,
+                    "elle S5'ten sonra gün 100'de S4/S5 > 0 olmalı: " + durum.olasilik(4) + " " + durum.olasilik(5));
+
+            List<Component> gun = toplaVeCalistir(yardimci, "dogalafet gun 100");
+            Component olasiliklar = arguman(gun, CekirdekKomutlari.GUN_AYARLANDI, 1);
+            yardimci.assertTrue(olasiliklar != null, "gun çıktısı yok: " + gun);
+            String metin = olasiliklar.getString();
+            yardimci.assertTrue(metin.contains("S4 ") && !metin.contains("S4 0.0%") && !metin.contains("S5 0.0%"),
+                    "gun 100 çıktısında S4/S5 %0: " + metin);
+
+            maks.set(3, server);
+            List<Component> start = toplaVeCalistir(yardimci, "dogalafet start kasirga 5");
+            yardimci.assertTrue(yonetici.aktifAfet(AfetTuru.KASIRGA).map(Afet::seviye).orElse(0) == 5,
+                    "komut afetMaksSiddet'i aşabilmeli");
+            yardimci.assertTrue(arguman(start, CekirdekKomutlari.START_MAKS_ASILDI, 0) != null,
+                    "maks aşımı çıktıda belirtilmeli: " + start);
+            List<Component> durumSatirlari = toplaVeCalistir(yardimci, "dogalafet durum");
+            Component seviyeler = arguman(durumSatirlari, CekirdekKomutlari.DURUM_SEVIYELER, 2);
+            yardimci.assertTrue(seviyeler != null && anahtarVar(seviyeler, CekirdekKomutlari.SEVIYE_NEDEN_MAKS),
+                    "durum %0 seviyenin nedenini (afetMaksSiddet) yazmalı: " + seviyeler);
+        } finally {
+            yonetici.durdur();
+            maks.set(oncekiMaks, server);
+            yonetici.sifirla();
+        }
+        yardimci.succeed();
+    }
+
+    /** Komutu çıktısı toplanan OP kaynağıyla çalıştırır; başarı ve hata satırlarını döner. */
+    private static List<Component> toplaVeCalistir(GameTestHelper yardimci, String komut) {
+        MinecraftServer server = yardimci.getLevel().getServer();
+        List<Component> satirlar = new ArrayList<>();
+        CommandSource toplayici = new CommandSource() {
+            @Override
+            public void sendSystemMessage(Component mesaj) {
+                satirlar.add(mesaj);
+            }
+
+            @Override
+            public boolean acceptsSuccess() {
+                return true;
+            }
+
+            @Override
+            public boolean acceptsFailure() {
+                return true;
+            }
+
+            @Override
+            public boolean shouldInformAdmins() {
+                return false;
+            }
+        };
+        try {
+            server.getCommands().getDispatcher().execute(komut, server.createCommandSourceStack().withSource(toplayici)
+                    .withPermission(DogalAfetKomutu.YETKI_SEVIYESI));
+        } catch (CommandSyntaxException hata) {
+            yardimci.fail("/" + komut + " çalışmadı: " + hata.getMessage());
+        }
+        return satirlar;
+    }
+
+    /** {@code anahtar} çeviri anahtarlı satırın {@code sira}. argümanı (Component değilse metne çevrilir); yoksa null. */
+    private static Component arguman(List<Component> satirlar, String anahtar, int sira) {
+        for (Component satir : satirlar) {
+            if (satir.getContents() instanceof TranslatableContents t && t.getKey().equals(anahtar)) {
+                Object[] arg = t.getArgs();
+                if (sira >= arg.length) {
+                    return Component.empty();
+                }
+                return arg[sira] instanceof Component c ? c : Component.literal(String.valueOf(arg[sira]));
+            }
+        }
+        return null;
+    }
+
+    /** Bileşende (kardeşleri ve çeviri argümanları dahil) {@code anahtar} çevirisi geçiyor mu. */
+    private static boolean anahtarVar(Component bilesen, String anahtar) {
+        if (bilesen.getContents() instanceof TranslatableContents t) {
+            if (t.getKey().equals(anahtar)) {
+                return true;
+            }
+            for (Object arg : t.getArgs()) {
+                if (arg instanceof Component c && anahtarVar(c, anahtar)) {
+                    return true;
+                }
+            }
+        }
+        for (Component kardes : bilesen.getSiblings()) {
+            if (anahtarVar(kardes, anahtar)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

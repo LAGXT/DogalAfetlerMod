@@ -31,7 +31,7 @@ class SecimTuruTest {
         int sunucuGeneli = 0;
         for (int i = 0; i < 2000; i++) {
             SecimTuru.Sonuc<String> sonuc = SecimTuru.isle(A, zorla(new BeklemeDurumu(), EnumSet.allOf(AfetTuru.class)),
-                    List.of(), null, (tur, hedef) -> true, rastgele);
+                    List.of(), null, (tur, hedef) -> SecimTuru.Deneme.BASLADI, rastgele);
             assertTrue(sonuc.basladi());
             assertTrue(sonuc.tur().sunucuGeneli(), "hedef yokken bölgesel afet seçildi: " + sonuc.tur());
             assertNull(sonuc.hedef());
@@ -40,7 +40,7 @@ class SecimTuruTest {
         assertEquals(2000, sunucuGeneli);
         SecimTuru.Sonuc<String> bolgesel = SecimTuru.isle(A,
                 zorla(new BeklemeDurumu(), EnumSet.of(AfetTuru.DEPREM, AfetTuru.KASIRGA)), List.of(), null,
-                (tur, hedef) -> true, rastgele);
+                (tur, hedef) -> SecimTuru.Deneme.BASLADI, rastgele);
         assertTrue(!bolgesel.basladi() && bolgesel.ertelenenler().isEmpty(), "hedefsiz bölgesel afet başlamamalı");
     }
 
@@ -54,7 +54,7 @@ class SecimTuruTest {
             SecimTuru.Sonuc<String> sonuc = SecimTuru.isle(A, zorla(bekleme, EnumSet.of(AfetTuru.DEPREM, AfetTuru.KASIRGA)),
                     adaylar("a", "b", "c"), null, (tur, hedef) -> {
                         denemeler.merge(tur, 1, Integer::sum);
-                        return tur != AfetTuru.DEPREM;
+                        return tur != AfetTuru.DEPREM ? SecimTuru.Deneme.BASLADI : SecimTuru.Deneme.YER_YOK;
                     }, rastgele);
             assertEquals(AfetTuru.KASIRGA, sonuc.tur(), "uygun yeri olan tür başlamalı");
             if (sonuc.ertelenenler().contains(AfetTuru.DEPREM)) {
@@ -71,7 +71,7 @@ class SecimTuruTest {
     void hicbirTurBaslayamazsaHepsiErtelenir() {
         BeklemeDurumu bekleme = new BeklemeDurumu();
         SecimTuru.Sonuc<String> sonuc = SecimTuru.isle(A, zorla(bekleme, EnumSet.of(AfetTuru.DEPREM, AfetTuru.KASIRGA)),
-                adaylar("a"), null, (tur, hedef) -> false, new SplittableRandom(3));
+                adaylar("a"), null, (tur, hedef) -> SecimTuru.Deneme.YER_YOK, new SplittableRandom(3));
         assertTrue(!sonuc.basladi());
         assertEquals(EnumSet.of(AfetTuru.DEPREM, AfetTuru.KASIRGA), sonuc.ertelenenler());
     }
@@ -81,7 +81,7 @@ class SecimTuruTest {
         SplittableRandom rastgele = new SplittableRandom(4);
         for (int i = 0; i < 500; i++) {
             SecimTuru.Sonuc<String> sonuc = SecimTuru.isle(A, zorla(new BeklemeDurumu(), EnumSet.of(AfetTuru.DEPREM)),
-                    adaylar("a", "b"), "a", (tur, hedef) -> true, rastgele);
+                    adaylar("a", "b"), "a", (tur, hedef) -> SecimTuru.Deneme.BASLADI, rastgele);
             assertEquals("b", sonuc.hedef());
         }
     }
@@ -93,9 +93,36 @@ class SecimTuruTest {
         int[] cagri = new int[1];
         SecimTuru.Sonuc<String> sonuc = SecimTuru.isle(A, girdi, adaylar("a"), null, (tur, hedef) -> {
             cagri[0]++;
-            return true;
+            return SecimTuru.Deneme.BASLADI;
         }, new SplittableRandom(5));
         assertTrue(!sonuc.basladi());
         assertEquals(0, cagri[0]);
+    }
+
+    @Test
+    void cakisanTurErtelenmezSiradakiDenenir() {
+        SplittableRandom rastgele = new SplittableRandom(6);
+        boolean cakismaGoruldu = false;
+        for (int i = 0; i < 200; i++) {
+            BeklemeDurumu bekleme = new BeklemeDurumu();
+            boolean[] depremDenendi = new boolean[1];
+            SecimTuru.Sonuc<String> sonuc = SecimTuru.isle(A, zorla(bekleme, EnumSet.of(AfetTuru.DEPREM, AfetTuru.KASIRGA)),
+                    adaylar("a", "b"), null, (tur, hedef) -> {
+                        if (tur == AfetTuru.DEPREM) {
+                            depremDenendi[0] = true;
+                            return SecimTuru.Deneme.CAKISTI;
+                        }
+                        return SecimTuru.Deneme.BASLADI;
+                    }, rastgele);
+            assertEquals(AfetTuru.KASIRGA, sonuc.tur(), "çakışmayan tür başlamalı");
+            assertTrue(sonuc.ertelenenler().isEmpty(), "çakışan tür ertelenmemeli");
+            assertTrue(!bekleme.turBeklemede(AfetTuru.DEPREM, SAAT), "çakışan tür beklemeye girmemeli");
+            cakismaGoruldu |= depremDenendi[0];
+        }
+        assertTrue(cakismaGoruldu, "deprem hiç denenmedi");
+        BeklemeDurumu bekleme = new BeklemeDurumu();
+        SecimTuru.Sonuc<String> hepsi = SecimTuru.isle(A, zorla(bekleme, EnumSet.of(AfetTuru.DEPREM, AfetTuru.KASIRGA)),
+                adaylar("a"), null, (tur, hedef) -> SecimTuru.Deneme.CAKISTI, rastgele);
+        assertTrue(!hepsi.basladi() && hepsi.ertelenenler().isEmpty(), "hepsi çakışınca tur boş biter, erteleme yok");
     }
 }

@@ -9,7 +9,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
-/** Gökyüzü-2 istek 26: güneş yalnız sabah, ay yalnız gece patlar; pencere sınırları ve erteleme hesabı. */
+/** Gökyüzü-2 istek 26: güneş yalnız sabah, ay yalnız gece patlar; pencere sınırları ve seçim kuralı (K-E67). */
 class GunSaatiPenceresiTest {
     private static final GunSaatiPenceresi SABAH = GunSaatiPenceresi.SABAH;
     private static final GunSaatiPenceresi GECE = GunSaatiPenceresi.GECE;
@@ -42,57 +42,56 @@ class GunSaatiPenceresiTest {
         assertThrows(IllegalArgumentException.class, () -> new GunSaatiPenceresi(0, 24_001));
     }
 
+    /** K-E67: pencere seçimde uygulanır; seçim anı ve seçimden {@code pay} sonraki görünme anı pencerede olmalı. */
     @Test
-    void ertelemeAktifiPencereyeDusurur() {
-        long siren = 1_200;
-        assertEquals(4_800, SABAH.bekleme(18_000, siren), "gece: ertesi gün doğumunda AKTIF");
-        assertEquals(0, SABAH.bekleme(23_000, siren), "şafaktan az önce: siren bitince pencere");
-        assertEquals(18_000, SABAH.bekleme(4_800, siren), "siren pencereyi kaçırıyor: ertesi gün");
-        assertEquals(0, SABAH.bekleme(4_799, siren), "son an: AKTIF 5999'da");
-        assertEquals(5_800, GECE.bekleme(6_000, siren), "gündüz: AKTIF 13000'de");
-        assertEquals(0, GECE.bekleme(11_800, siren));
-        assertEquals(14_000, GECE.bekleme(23_000 - 1_200, siren), "gece sonu kaçtı: ertesi akşam 13000'de AKTIF");
-        for (long g = 0; g < 48_000; g += 137) {
+    void secimAniVeGorunmeAniPencerede() {
+        long pay = 800;
+        assertTrue(SABAH.secilebilir(0, pay));
+        assertTrue(SABAH.secilebilir(5_199, pay), "son an: görünme 5999'da");
+        assertFalse(SABAH.secilebilir(5_200, pay), "pencerenin son 40 sn'si");
+        assertFalse(SABAH.secilebilir(23_500, pay), "şafaktan önce seçilmez");
+        assertFalse(SABAH.secilebilir(18_000, pay));
+        assertTrue(GECE.secilebilir(13_000, pay));
+        assertFalse(GECE.secilebilir(22_201, pay));
+        assertFalse(GECE.secilebilir(6_000, pay));
+        assertFalse(SABAH.secilebilir(0, 6_000), "pay pencereden uzunsa hiç seçilmez");
+        for (long g = -24_000; g < 48_000; g += 37) {
             for (GunSaatiPenceresi p : new GunSaatiPenceresi[] {SABAH, GECE}) {
-                long w = p.bekleme(g, siren);
-                assertTrue(w >= 0 && w < GunSaatiPenceresi.GUN_TICK, "bekleme bir günden kısa");
-                assertTrue(p.icinde(g + w + siren), "beklemeden sonra AKTIF pencerede: " + g);
-                assertTrue(w == 0 || !p.icinde(g + w - 1 + siren), "en erken an: " + g);
+                if (p.secilebilir(g, pay)) {
+                    for (long t = 0; t <= pay; t += 50) {
+                        assertTrue(p.icinde(g + t), "seçimden " + t + " tick sonra pencere dışı: " + g);
+                    }
+                }
             }
+        }
+        assertEquals(5_200 / 24_000.0, SABAH.secimPayi(pay), 1e-12);
+        assertEquals(9_200 / 24_000.0, GECE.secimPayi(pay), 1e-12);
+    }
+
+    /** Varsayılan ön-uyarı ve siren ile görünme payı 800 tick (ön-uyarı 100 + 60, siren 500, emniyet 140). */
+    @Test
+    void varsayilanGorunmePayi() {
+        for (AfetTuru tur : new AfetTuru[] {AfetTuru.GUNES_PATLAMASI, AfetTuru.AY_CARPMASI}) {
+            assertEquals(800, GunSaatiPenceresi.gorunmePayi(tur, OnUyariPenceresi.VARSAYILAN_ERKEN_BILDIRIM,
+                    OnUyariPenceresi.VARSAYILAN_EN_AZ, OnUyariPenceresi.VARSAYILAN_EN_COK), tur.kimlik());
         }
     }
 
+    /** Doğal seçim çarpanı: pencere dışı 0, içinde seçim payının tersi (günlük ortalama korunur); kural yoksa ya da döngü kapalıysa 1. */
     @Test
-    void dogalBaslangicBeklerKomutVeDonguKapaliBeklemez() {
-        Optional<GunSaatiPenceresi> gunes = GunSaatiPenceresi.dogalPatlama(AfetTuru.GUNES_PATLAMASI);
-        assertTrue(GunSaatiPenceresi.bekle(gunes, false, true, 18_000, 1_200, 0), "doğal, gece: bekler");
-        assertFalse(GunSaatiPenceresi.bekle(gunes, false, true, 1_000, 1_200, 0), "doğal, sabah: başlar");
-        assertFalse(GunSaatiPenceresi.bekle(gunes, true, true, 18_000, 1_200, 0), "komut pencereye bakmaz");
-        assertFalse(GunSaatiPenceresi.bekle(gunes, false, false, 18_000, 1_200, 0), "gün döngüsü kapalı: beklenmez");
-        assertFalse(GunSaatiPenceresi.bekle(Optional.empty(), false, true, 18_000, 1_200, 0), "pencere kuralı olmayan tür");
-        Optional<GunSaatiPenceresi> ay = GunSaatiPenceresi.dogalPatlama(AfetTuru.AY_CARPMASI);
-        assertTrue(GunSaatiPenceresi.bekle(ay, false, true, 6_000, 1_200, 0), "doğal ay, gündüz: bekler");
-        assertFalse(GunSaatiPenceresi.bekle(ay, false, true, 15_000, 2, 0), "doğal ay, gece (hiz 1000 sireni 2 tick)");
-    }
-
-    @Test
-    void beklemeBirGundenUzunSurmez() {
-        Optional<GunSaatiPenceresi> ay = GunSaatiPenceresi.dogalPatlama(AfetTuru.AY_CARPMASI);
-        long sinir = GunSaatiPenceresi.EN_COK_BEKLEME;
-        assertEquals(24_000L, sinir, "üst sınır bir MC günü");
-        assertTrue(GunSaatiPenceresi.bekle(ay, false, true, 6_000, 1_200, sinir - 1), "sınırdan bir tick önce bekler");
-        assertFalse(GunSaatiPenceresi.bekle(ay, false, true, 6_000, 1_200, sinir), "saat kilitli: sınırda bekleme biter");
-        assertFalse(GunSaatiPenceresi.bekle(ay, false, true, 6_000, 1_200, sinir + 5_000));
-        // Saati kilitli (6000'de duran) dünyayı tick tick sür: tam sınırda bitmeli.
-        long beklenen = 0;
-        while (GunSaatiPenceresi.bekle(ay, false, true, 6_000, 1_200, beklenen)) {
-            beklenen++;
-        }
-        assertEquals(sinir, beklenen, "kilitli saatte bekleme tam 24000 tick");
-        for (long g = 0; g < 24_000; g += 97) {
-            for (GunSaatiPenceresi p : new GunSaatiPenceresi[] {SABAH, GECE}) {
-                assertTrue(p.bekleme(g, 1_200) < sinir, "normal döngüde pencere sınırdan önce gelir: " + g);
+    void dogalSecimCarpaniGunlukOrtalamayiKorur() {
+        long pay = 800;
+        assertEquals(0.0, GunSaatiPenceresi.dogalSecimCarpani(AfetTuru.GUNES_PATLAMASI, 18_000, pay, true));
+        assertEquals(0.0, GunSaatiPenceresi.dogalSecimCarpani(AfetTuru.AY_CARPMASI, 6_000, pay, true));
+        assertEquals(1.0, GunSaatiPenceresi.dogalSecimCarpani(AfetTuru.GUNES_PATLAMASI, 18_000, pay, false),
+                "gün döngüsü kapalı: pencere yok");
+        assertEquals(1.0, GunSaatiPenceresi.dogalSecimCarpani(AfetTuru.DEPREM, 18_000, pay, true));
+        for (AfetTuru tur : new AfetTuru[] {AfetTuru.GUNES_PATLAMASI, AfetTuru.AY_CARPMASI}) {
+            double toplam = 0;
+            for (long g = 0; g < GunSaatiPenceresi.GUN_TICK; g++) {
+                toplam += GunSaatiPenceresi.dogalSecimCarpani(tur, g, pay, true);
             }
+            assertEquals(GunSaatiPenceresi.GUN_TICK, toplam, 1e-6, tur.kimlik() + ": gün boyu ortalama çarpan 1");
         }
     }
 }

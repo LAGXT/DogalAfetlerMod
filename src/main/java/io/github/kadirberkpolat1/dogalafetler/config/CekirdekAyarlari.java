@@ -4,6 +4,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.CekirdekAyarGocu;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.GelisimKriteri;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.GelisimOlcutu;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.OnUyariPenceresi;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SiddetAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SonumTipi;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.TekSeferlikAyarlari;
@@ -16,6 +17,8 @@ import java.util.Map;
 import java.util.Set;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.common.ForgeConfigSpec;
+import net.minecraftforge.fml.event.config.ModConfigEvent;
+import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 
 /**
  * SERVER config'in {@code cekirdek} bölümü: afet yöneticisi, şiddet, tek seferlik olaylar, hedef seçimi, TPS kısması, ağ
@@ -24,6 +27,8 @@ import net.minecraftforge.common.ForgeConfigSpec;
  */
 public final class CekirdekAyarlari {
     private static AyarKaydi.Bolum<CekirdekAyarlari> bolum;
+    private static volatile ZamanlayiciAyarlari zamanlayiciOnbellegi;
+    private static volatile SiddetAyarlari siddetOnbellegi;
 
     private final ForgeConfigSpec.DoubleValue gunlukAfetOrani;
     private final ForgeConfigSpec.IntValue kontrolAraligiTick;
@@ -32,6 +37,10 @@ public final class CekirdekAyarlari {
     private final ForgeConfigSpec.LongValue ertelemeTick;
     private final ForgeConfigSpec.LongValue baslangicBeklemeTick;
     private final ForgeConfigSpec.LongValue ilkAfetGarantiTick;
+    private final ForgeConfigSpec.DoubleValue siklikArtisCarpani;
+    private final ForgeConfigSpec.DoubleValue siklikArtisGunu;
+    private final ForgeConfigSpec.IntValue eszamanliIkiGunu;
+    private final ForgeConfigSpec.IntValue eszamanliUcGunu;
     private final Map<AfetTuru, ForgeConfigSpec.IntValue> agirliklar = new EnumMap<>(AfetTuru.class);
     private final Map<AfetTuru, ForgeConfigSpec.LongValue> turBeklemeleri = new EnumMap<>(AfetTuru.class);
 
@@ -85,8 +94,9 @@ public final class CekirdekAyarlari {
                 .defineInRange("ayarSurumu", CekirdekAyarGocu.GUNCEL, 0, Integer.MAX_VALUE);
         k.comment("Afet zamanlayıcısı (madde 4). Sabit takvim yoktur; her afet olasılıkla ve bekleme kurallarıyla seçilir.")
                 .push("zamanlayici");
-        gunlukAfetOrani = k.comment("Bekleme dışındayken bir Minecraft gününde beklenen afet sayısı (sekiz türün hepsi",
-                "seçilebilirken). Oyuncu sayısından bağımsızdır; afetSikligi gamerule'ü bunu çarpar.")
+        gunlukAfetOrani = k.comment("Bekleme dışındayken bir Minecraft gününde beklenen afet sayısı (oyun günü 0'da, sekiz türün",
+                "hepsi seçilebilirken). Oyuncu sayısından bağımsızdır; afetSikligi gamerule'ü ve (bölgesel afetlerde) gün çarpanı",
+                "bunu çarpar.")
                 .defineInRange("gunlukAfetOrani", z.gunlukAfetOrani(), 0.0, 100.0);
         kontrolAraligiTick = k.comment("Zamanlayıcının kaç tick'te bir zar attığı (olasılık aralığa göre ölçeklenir).")
                 .defineInRange("kontrolAraligiTick", 20, 1, 1200);
@@ -103,6 +113,17 @@ public final class CekirdekAyarlari {
         ilkAfetGarantiTick = k.comment("Dünyada (ya da sifirla'dan sonra) henüz hiç afet olmadıysa bu süre dolunca doğal afet",
                 "seçimi garanti edilir; beklemeler ve uygunluk yine geçerlidir (afetSikligi çarpanına bölünür). 0 = garanti yok.")
                 .defineInRange("ilkAfetGarantiTick", z.ilkAfetGarantiTick(), 0L, 100_000_000L);
+        siklikArtisCarpani = k.comment("Oyun günü ilerledikçe bölgesel afetler sıklaşır: gün çarpanı gün 0'da 1, siklikArtisGunu'nde",
+                "bu değer (arası doğrusal, sonra sabit). afetSikligi gibi oranı çarpar ve yeni başlayan beklemeleri böler; güneş",
+                "patlaması ve ay çarpmasının oranına yalnız dördüncü kökü uygulanır. 1 = günden bağımsız.")
+                .defineInRange("siklikArtisCarpani", z.siklikArtisCarpani(), 1.0, 100.0);
+        siklikArtisGunu = k.comment("Gün çarpanının siklikArtisCarpani'na vardığı oyun günü.")
+                .defineInRange("siklikArtisGunu", z.siklikArtisGunu(), 0.0, 1_000_000.0);
+        eszamanliIkiGunu = k.comment("Bu oyun gününden itibaren iki doğal afet aynı anda sürebilir (farklı türler, etki alanları",
+                "çakışmadan; güneş patlaması ve ay çarpması her zaman tek başına).")
+                .defineInRange("eszamanliIkiGunu", z.eszamanliIkiGunu(), 0, 1_000_000);
+        eszamanliUcGunu = k.comment("Bu oyun gününden itibaren üç doğal afet aynı anda sürebilir.")
+                .defineInRange("eszamanliUcGunu", z.eszamanliUcGunu(), 0, 1_000_000);
         k.pop();
 
         k.comment("Afet başına olasılık ağırlığı ve kendi beklemesi. Nadirlik sırası (madde 4): altı sık afet birbirine yakın,",
@@ -117,13 +138,15 @@ public final class CekirdekAyarlari {
         }
         k.pop();
 
-        k.comment("Gizli ön-uyarı penceresi (madde 4): afet seçildikten sonra siren çalmadan önceki süre.").push("onUyari");
-        onUyariEnAzTick = k.comment("Pencerenin en kısa süresi (900 tick = 45 sn).")
-                .defineInRange("enAzTick", 900, 0, 72_000);
-        onUyariEnCokTick = k.comment("Pencerenin en uzun süresi (1800 tick = 90 sn).")
-                .defineInRange("enCokTick", 1800, 0, 72_000);
-        erkenBildirimTick = k.comment("Pencerenin önüne eklenen erken bölüm: yalnız Hassas Sismograf görür (madde 13b).")
-                .defineInRange("erkenBildirimTick", 600, 0, 72_000);
+        k.comment("Gizli ön-uyarı penceresi (madde 4): afet seçildikten sonra siren çalmadan önceki süre. Varsayılanlarla",
+                "seçimden görünmeye (ön-uyarı + 10 sn siren) ortalama ~30 sn geçer. Sireni 25 sn olan güneş patlaması ve ay",
+                "çarpmasında pencere sirenin fazlası (15 sn) kadar kısalır.").push("onUyari");
+        onUyariEnAzTick = k.comment("Pencerenin en kısa süresi (200 tick = 10 sn).")
+                .defineInRange("enAzTick", OnUyariPenceresi.VARSAYILAN_EN_AZ, 0, 72_000);
+        onUyariEnCokTick = k.comment("Pencerenin en uzun süresi (360 tick = 18 sn).")
+                .defineInRange("enCokTick", OnUyariPenceresi.VARSAYILAN_EN_COK, 0, 72_000);
+        erkenBildirimTick = k.comment("Pencerenin önüne eklenen erken bölüm (100 tick = 5 sn): yalnız Hassas Sismograf görür",
+                "(madde 13b).").defineInRange("erkenBildirimTick", OnUyariPenceresi.VARSAYILAN_ERKEN_BILDIRIM, 0, 72_000);
         k.pop();
 
         SiddetAyarlari s = SiddetAyarlari.VARSAYILAN;
@@ -219,6 +242,15 @@ public final class CekirdekAyarlari {
     public static void kaydet() {
         bolum = AyarKaydi.sunucuBolumu("cekirdek", "Çekirdek: afet yöneticisi ve dünya dönemi", CekirdekAyarlari::new);
         AyarKaydi.sunucuGocu(CekirdekAyarGocu.PLAN);
+        FMLJavaModLoadingContext.get().getModEventBus().addListener(CekirdekAyarlari::configDegisti);
+    }
+
+    /** Mod veri yolunda: SERVER config yüklenince ya da değişince saf ayar önbellekleri yeniden kurulur. */
+    static void configDegisti(ModConfigEvent olay) {
+        if (AyarKaydi.SUNUCU_DOSYASI.equals(olay.getConfig().getFileName())) {
+            zamanlayiciOnbellegi = null;
+            siddetOnbellegi = null;
+        }
     }
 
     public static CekirdekAyarlari al() {
@@ -228,7 +260,17 @@ public final class CekirdekAyarlari {
         return bolum.get();
     }
 
+    /** Zamanlayıcı ayarları; her tick okunur, config yüklenene ya da değişene dek önbellekte ({@link #configDegisti}). */
     public ZamanlayiciAyarlari zamanlayici() {
+        ZamanlayiciAyarlari z = zamanlayiciOnbellegi;
+        if (z == null) {
+            z = zamanlayiciKur();
+            zamanlayiciOnbellegi = z;
+        }
+        return z;
+    }
+
+    private ZamanlayiciAyarlari zamanlayiciKur() {
         Map<AfetTuru, Integer> a = new EnumMap<>(AfetTuru.class);
         Map<AfetTuru, Long> b = new EnumMap<>(AfetTuru.class);
         for (AfetTuru tur : AfetTuru.values()) {
@@ -236,13 +278,20 @@ public final class CekirdekAyarlari {
             b.put(tur, turBeklemeleri.get(tur).get());
         }
         return new ZamanlayiciAyarlari(gunlukAfetOrani.get(), genelBeklemeTick.get(), siddetBeklemeCarpani.get(),
-                ertelemeTick.get(), baslangicBeklemeTick.get(), ilkAfetGarantiTick.get(), a, b);
+                ertelemeTick.get(), baslangicBeklemeTick.get(), ilkAfetGarantiTick.get(), siklikArtisCarpani.get(),
+                siklikArtisGunu.get(), eszamanliIkiGunu.get(), eszamanliUcGunu.get(), a, b);
     }
 
+    /** Şiddet ayarları; config yüklenene ya da değişene dek önbellekte. */
     public SiddetAyarlari siddet() {
-        return new SiddetAyarlari(seviye2Gunu.get(), seviye3Gunu.get(), seviye4Gunu.get(), seviye5Gunu.get(),
-                nadirlikBaslangic.get(), nadirlikSon.get(), nadirlikGecisGunu.get(), acilisRampaGunu.get(),
-                acilisBaslangicOrani.get(), gelisimDahil.get(), puanBasinaGun.get());
+        SiddetAyarlari s = siddetOnbellegi;
+        if (s == null) {
+            s = new SiddetAyarlari(seviye2Gunu.get(), seviye3Gunu.get(), seviye4Gunu.get(), seviye5Gunu.get(),
+                    nadirlikBaslangic.get(), nadirlikSon.get(), nadirlikGecisGunu.get(), acilisRampaGunu.get(),
+                    acilisBaslangicOrani.get(), gelisimDahil.get(), puanBasinaGun.get());
+            siddetOnbellegi = s;
+        }
+        return s;
     }
 
     public TekSeferlikAyarlari tekSeferlik() {

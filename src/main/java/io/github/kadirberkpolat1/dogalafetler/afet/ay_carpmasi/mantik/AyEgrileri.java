@@ -7,12 +7,15 @@ package io.github.kadirberkpolat1.dogalafetler.afet.ay_carpmasi.mantik;
  * çarpma süresince monotondur (istemci saatinin sanilik geri düzeltmesi titreme yapmasın, K-C35).
  */
 public final class AyEgrileri {
-    /** Yaklaşma = siren süresi (K0-19). */
-    public static final float YAKLASMA_SN = 60f;
+    /** Yaklaşma = siren süresi (K0-19 rev. K-E67: 25 sn, eski 60 sn; evreler oranla ölçeklendi). */
+    public static final float YAKLASMA_SN = 25f;
     /** Parçalanma (çatlaklar, kopan parçalar) başlangıcı. */
-    public static final float PARCALANMA_SN = 20f;
-    /** Son yaklaşma: ay ufka iner, alt kenarı atmosferde kızarır. */
-    public static final float SON_YAKLASMA_SN = 50f;
+    public static final float PARCALANMA_SN = 8f;
+    /** Üç çatlak aşamasının aralığı ve her birinin belirme süresi. */
+    public static final float CATLAK_ARALIGI_SN = 5.5f;
+    public static final float CATLAK_BELIRME_SN = 2.5f;
+    /** Son yaklaşma: ay ufka iner, alt kenarı atmosferde kızarır (son 4 sn). */
+    public static final float SON_YAKLASMA_SN = 21f;
     /** Yaklaşma yönü: +X'ten (doğu) +Z'ye (güney) doğru derece; dünyada sabit, herkes aynı yönde görür. */
     public static final float AZIMUT_DERECE = 20f;
     public static final float YAKLASMA_EGIMI = 35f;
@@ -55,21 +58,21 @@ public final class AyEgrileri {
         return u * u * (3f - 2f * u);
     }
 
-    /** Ayın vanilla ay boyuna oranı {@code 1 + 13·t³} (t = s / 60): son saniyelerde hızla büyür. */
+    /** Ayın vanilla ay boyuna oranı {@code 1 + 13·t³} (t = s / {@link #YAKLASMA_SN}): son saniyelerde hızla büyür. */
     public static float olcek(float sn) {
         float t = sinirla(sn / YAKLASMA_SN);
         return 1f + (EN_BUYUK_OLCEK - 1f) * t * t * t;
     }
 
-    /** Ayın ufuktan yüksekliği (derece): 50 sn'ye kadar 35°, son 10 sn'de 4°'ye iner. */
+    /** Ayın ufuktan yüksekliği (derece): son yaklaşmaya kadar 35°, son 4 sn'de 4°'ye iner. */
     public static float egim(float sn) {
         return YAKLASMA_EGIMI + (SON_EGIM - YAKLASMA_EGIMI) * yumusak((sn - SON_YAKLASMA_SN) / (YAKLASMA_SN - SON_YAKLASMA_SN));
     }
 
-    /** Üç aşamalı çatlak katmanının alfası ({@code asama} 1–3): 20, 33 ve 46. sn'de 6 sn'de belirir. */
+    /** Üç aşamalı çatlak katmanının alfası ({@code asama} 1–3): 8; 13,5 ve 19. sn'de 2,5 sn'de belirir. */
     public static float catlak(int asama, float sn) {
-        float bas = PARCALANMA_SN + 13f * (Math.max(1, Math.min(3, asama)) - 1);
-        return yumusak((sn - bas) / 6f);
+        float bas = PARCALANMA_SN + CATLAK_ARALIGI_SN * (Math.max(1, Math.min(3, asama)) - 1);
+        return yumusak((sn - bas) / CATLAK_BELIRME_SN);
     }
 
     /** Kopan parçaların yörünge yayı boyunca yayılması (0–1). */
@@ -78,7 +81,7 @@ public final class AyEgrileri {
         return (float) Math.pow(u, 1.5);
     }
 
-    /** Atmosfere giren alt kenarın ve ufkun kızarması (0–1), son 10 sn. */
+    /** Atmosfere giren alt kenarın ve ufkun kızarması (0–1), son yaklaşma boyunca. */
     public static float kizarma(float sn) {
         return yumusak((sn - SON_YAKLASMA_SN) / (YAKLASMA_SN - SON_YAKLASMA_SN));
     }

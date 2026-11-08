@@ -32,11 +32,23 @@ public final class BeklemeDurumu {
         return bitis == null ? 0 : Math.max(0, bitis - saat);
     }
 
-    /** Afet bitti: genel ve tür beklemesi şiddete göre uzayarak, {@code afetSikligi}'na bölünerek başlar. */
+    /** Afet bitti: genel ve tür beklemesi şiddete göre uzayarak, {@code afetSikligi}'na bölünerek başlar (gün çarpanı 1). */
     public void afetBitti(AfetTuru tur, int seviye, long saat, ZamanlayiciAyarlari ayarlar, double siklik) {
+        afetBitti(tur, seviye, saat, ayarlar, siklik, 1.0);
+    }
+
+    /**
+     * Afet bitti: genel ve tür beklemesi şiddete göre uzayarak, {@code afetSikligi}'na ve oyun gününün takvim çarpanına
+     * ({@link ZamanlayiciAyarlari#gunCarpani}, K-E67) bölünerek başlar; dönem olayının (sunucu geneli) kendi beklemesi gün
+     * çarpanına bölünmez.
+     */
+    public void afetBitti(AfetTuru tur, int seviye, long saat, ZamanlayiciAyarlari ayarlar, double siklik,
+            double gunCarpani) {
         double uzama = ayarlar.siddetUzamasi(tur, seviye);
-        long genel = AfetZamanlayicisi.beklemeOlcekle(Math.round(ayarlar.genelBeklemeTick() * uzama), siklik);
-        long kendi = AfetZamanlayicisi.beklemeOlcekle(Math.round(ayarlar.turBekleme(tur) * uzama), siklik);
+        double gunluk = gunCarpani > 0 && !Double.isInfinite(gunCarpani) ? gunCarpani : 1.0;
+        long genel = AfetZamanlayicisi.beklemeOlcekle(Math.round(ayarlar.genelBeklemeTick() * uzama / gunluk), siklik);
+        long kendi = AfetZamanlayicisi.beklemeOlcekle(
+                Math.round(ayarlar.turBekleme(tur) * uzama / (tur.sunucuGeneli() ? 1.0 : gunluk)), siklik);
         genelBitis = Math.max(genelBitis, saat + genel);
         turBitis.merge(tur, saat + kendi, Math::max);
     }

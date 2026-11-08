@@ -39,6 +39,13 @@ public record SonrakiAfetTahmini(long enErken, long ortalama, long enGec) {
      */
     public static Optional<SonrakiAfetTahmini> hesapla(ZamanlayiciAyarlari ayarlar, long saat, BeklemeDurumu bekleme,
             Set<AfetTuru> uygunTurler, ToDoubleFunction<AfetTuru> carpan, double siklik, long garantiKalan) {
+        return hesapla(ayarlar, saat, bekleme, uygunTurler, carpan, siklik, 1.0, garantiKalan);
+    }
+
+    /** {@code gunCarpani}: oyun gününün takvim çarpanı ({@link ZamanlayiciAyarlari#gunCarpani}; bölgesel oranlara uygulanır). */
+    public static Optional<SonrakiAfetTahmini> hesapla(ZamanlayiciAyarlari ayarlar, long saat, BeklemeDurumu bekleme,
+            Set<AfetTuru> uygunTurler, ToDoubleFunction<AfetTuru> carpan, double siklik, double gunCarpani,
+            long garantiKalan) {
         long baslangic = Math.max(0, AfetZamanlayicisi.beklemeOlcekle(ayarlar.baslangicBeklemeTick(), siklik) - saat);
         long kapali = Math.max(baslangic, bekleme.genelKalan(saat));
         List<Katilim> katilimlar = new ArrayList<>();
@@ -47,7 +54,7 @@ public record SonrakiAfetTahmini(long enErken, long ortalama, long enGec) {
             if (!(c > 0) || Double.isInfinite(c)) {
                 continue;
             }
-            double oran = AfetZamanlayicisi.turOrani(ayarlar, tur, c, siklik);
+            double oran = AfetZamanlayicisi.turOrani(ayarlar, tur, c, siklik, gunCarpani);
             if (oran > 0) {
                 katilimlar.add(new Katilim(Math.max(kapali, bekleme.turKalan(tur, saat)),
                         oran / AfetZamanlayicisi.GUN_TICK));

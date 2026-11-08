@@ -33,4 +33,15 @@ public record EtkiAlani(double x, double y, double z, double yaricap, boolean gl
         double r = yaricap + Math.max(0, ek);
         return dx * dx + dz * dz <= r * r;
     }
+
+    /** İki alan yatayda üst üste biniyor mu (K-E67, eşzamanlı doğal afet); global alan her alanla kesişir. */
+    public boolean kesisir(EtkiAlani diger) {
+        if (global || diger.global) {
+            return true;
+        }
+        double dx = diger.x - x;
+        double dz = diger.z - z;
+        double r = yaricap + diger.yaricap;
+        return dx * dx + dz * dz < r * r;
+    }
 }

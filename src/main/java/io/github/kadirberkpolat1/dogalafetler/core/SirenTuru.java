@@ -1,8 +1,8 @@
 package io.github.kadirberkpolat1.dogalafetler.core;
 
 /**
- * Siren türü ve süresi (madde 5, K0-19). Sireni çalan {@code uyari} paketidir; çekirdek yalnız "hangi tür, kaç tick"
- * bildirir. Güneş patlamasının kendi ürkütücü sireni vardır; ay çarpması standart sireni 60 sn çalar. Saf Java'dır.
+ * Siren türü ve süresi (madde 5, K0-19 rev. K-E67). Sireni çalan {@code uyari} paketidir; çekirdek yalnız "hangi tür, kaç
+ * tick" bildirir. Güneş patlamasının kendi ürkütücü sireni vardır; ay çarpması standart sireni 25 sn çalar. Saf Java'dır.
  */
 public enum SirenTuru {
     STANDART("standart"),
@@ -10,8 +10,11 @@ public enum SirenTuru {
 
     /** Madde 5: güneş patlaması dışındaki afetlerde 10 sn. */
     public static final int STANDART_SURE_TICK = 200;
-    /** Bölüm D ve H: siren başladıktan 60 sn sonra meteorlar / çarpma (K0-19). */
-    public static final int UZUN_SURE_TICK = 1200;
+    /**
+     * Bölüm D ve H: siren başladıktan 25 sn sonra meteorlar / çarpma (K0-19 rev. K-E67: kullanıcı isteğiyle afetin
+     * seçilmesinden görünmesine ~30 sn; eski 60 sn).
+     */
+    public static final int UZUN_SURE_TICK = 500;
 
     private final String kimlik;
 
@@ -29,7 +32,7 @@ public enum SirenTuru {
 
     /**
      * AS-9: aynı anda birden çok afet siren aşamasındayken oyuncunun duyacağı sirenin önceliği (büyük olan çalar, ötekiler
-     * susar): ay çarpması (60 sn) &gt; güneş patlaması &gt; diğerleri (10 sn).
+     * susar): ay çarpması (25 sn) &gt; güneş patlaması &gt; diğerleri (10 sn).
      */
     public static int oncelik(AfetTuru tur) {
         return switch (tur) {
