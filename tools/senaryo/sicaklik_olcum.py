@@ -5,13 +5,16 @@ Kullanım: python3 tools/senaryo/sicaklik_olcum.py <kanıt/>   (sicaklik_gorsel.
 Çıktı <kanıt/>/olcum.txt ve ekrana. Ölçüler:
   kenar   ekran kenarı bandı (kısa kenarın %12'si; alttaki %25 HUD/sıcak çubuğu için dışarıda) aynı kameranın normal
           karesine göre: ortalama CIELAB ΔE (görünür renk farkı), ΔE > 10 olan piksel oranı, ortalama RGB farkı ve
-          kızıllık (R - (G+B)/2) ile beyazlık (en küçük kanal) değişimi. Birinci şahıs kareleri `normal`, üçüncü şahıs
-          kareleri `normal_3p` ile karşılaştırılır.
-  ter     lacivert kontürlü, parlak gövdeli damla lekeleri (ikisini de içeren bağlı bileşen, en az 12 piksel): sayı ve
-          her damlanın çevresindeki zemine WCAG karşıtlığı (kontür ya da gövdeden yüksek olanı).
-  buhar   `normal_3p`'ye göre ekranın orta üst bölgesinde açılan (L* +8, ΔE > 10) piksel sayısı ve ortalama ΔE.
-  hap     HUD hapının içinde sayı pikselleri (log'daki sayı rengine yakın) ile hap içi zemininin WCAG karşıtlığı.
-          Kare satırında hap konumu yoksa (S3-10 öncesi koşu) yerleşimden hesaplanır ve sayı durum rengindedir.
+          kızıllık (R - (G+B)/2) ile beyazlık (en küçük kanal) değişimi. Birinci şahıs kareleri `normal`, aynı kamera
+          açısındaki üçüncü şahıs kareleri (`usume`, `bunalma`) `normal_3p` ile karşılaştırılır; farklı açılı `ter_*` dışında.
+  ter     ter dokusunun tam paleti (lacivert kontür 10,30,84 ve buz beyazı gövde 196,240,255, ±12): ikisini de içeren
+          bağlı bileşen (6–800 piksel) bir damla; sayı ve her damlanın çevresindeki zemine WCAG karşıtlığı (kontür ya
+          da gövdeden yüksek olanı).
+  buhar   `usume` ve `bunalma` (karşılaştırma) için `normal_3p`'ye göre ekranın orta üst bölgesinde açılan (L* +8,
+          ΔE > 10) piksel sayısı ve ortalama ΔE.
+  hap     HUD hapının içinde sayı pikselleri (log'daki sayı rengine yakın) ile hap içi zemininin WCAG karşıtlığı ve
+          zeminin ortanca rengi. Kare satırında hap konumu yoksa (S3-10 öncesi koşu) yerleşimden hesaplanır ve sayı
+          durum rengindedir.
 """
 import re
 import sys
@@ -23,6 +26,8 @@ from PIL import Image
 
 KARE = re.compile(r"SICAKLIK_OTOMASYON kare (sicaklik_\w+)\.png \((.*)\)\s*$")
 KONTUR = (18, 14, 12)
+TER_KONTUR, TER_GOVDE = (10, 30, 84), (196, 240, 255)
+AYNI_KAMERA_3P = ("usume", "bunalma")
 # S3-10 öncesi hap sayısı durum rengindeydi (HudCizimi.renk).
 ESKI_SAYI_RENGI = {"NORMAL": "e8e6de", "USUME": "a6ddf8", "DONMA": "5eaeff", "BUNALMA": "ffb54a", "YANMA": "ff5a36"}
 # HudCizimi: bant genişliği 182, hap sol kenarı 74, hap 34x11; bantın tepesi ekranın altından 47 GUI pikseli.
@@ -109,21 +114,19 @@ def bilesenler(maske):
 
 
 def ter(kare):
-    r, g, b = kare[..., 0], kare[..., 1], kare[..., 2]
-    kontur = (r < 70) & (g < 90) & (b >= 45) & (b < 170) & (b - r >= 30)
-    govde = (r >= 140) & (g >= 200) & (b >= 220) & (g - r >= 25)
-    h, w = r.shape
+    kontur = np.abs(kare - np.array(TER_KONTUR)).max(axis=2) <= 12
+    govde = np.abs(kare - np.array(TER_GOVDE)).max(axis=2) <= 12
+    h, w = kontur.shape
     damlalar = []
     for ys, xs in bilesenler(kontur | govde):
-        if len(ys) < 12 or not kontur[ys, xs].any() or not govde[ys, xs].any():
+        if not 6 <= len(ys) <= 800 or not kontur[ys, xs].any() or not govde[ys, xs].any():
             continue
         y0, y1 = max(0, ys.min() - 4), min(h, ys.max() + 5)
         x0, x1 = max(0, xs.min() - 4), min(w, xs.max() + 5)
         kutu = np.ones((y1 - y0, x1 - x0), bool)
         kutu[ys - y0, xs - x0] = False
         zemin = np.median(kare[y0:y1, x0:x1][kutu], axis=0)
-        k = max(karsitlik(np.median(kare[ys, xs][kontur[ys, xs]], axis=0), zemin),
-                karsitlik(np.median(kare[ys, xs][govde[ys, xs]], axis=0), zemin))
+        k = max(karsitlik(TER_KONTUR, zemin), karsitlik(TER_GOVDE, zemin))
         damlalar.append((len(ys), k, zemin))
     return damlalar
 
@@ -156,7 +159,8 @@ def hap(kare, satir):
     zemin = ~sayi & ~kontur
     if not sayi.any():
         return None
-    return sayi.sum(), karsitlik(np.median(ic[sayi], axis=0), np.median(ic[zemin], axis=0))
+    taban = np.median(ic[zemin], axis=0)
+    return sayi.sum(), karsitlik(np.median(ic[sayi], axis=0), taban), "%02x%02x%02x" % tuple(int(c) for c in taban)
 
 
 def main():
@@ -172,10 +176,13 @@ def main():
         parcacik = alan(satir, r"kendi parçacığı (\d+)")
         durum, vucut = alan(satir, r"durum (\w+)"), alan(satir, r"vücut ([\d.]+)")
         parcalar = [f"{ad}: durum {durum}, vücut {vucut} °C, kamera {kamera}, kendi parçacığı {parcacik}"]
-        ref = kareler.get("normal" if kamera == "FIRST_PERSON" else "normal_3p")
-        if ref is not None and ad not in ("normal", "normal_3p", "menu") and ref.shape == kare.shape:
+        birinci = kamera == "FIRST_PERSON"
+        ref = kareler.get("normal" if birinci else "normal_3p")
+        karsilastir = ref is not None and ref.shape == kare.shape and ad not in ("normal", "normal_3p", "menu") and (
+            birinci or ad in AYNI_KAMERA_3P)
+        if karsilastir:
             parcalar.append("kenar " + " ".join(f"{k}={v:.1f}" for k, v in kenar(kare, ref).items()))
-        if kamera != "FIRST_PERSON" and ad != "menu":
+        if not birinci:
             damlalar = ter(kare)
             if damlalar:
                 k = sorted(d[1] for d in damlalar)
@@ -183,13 +190,13 @@ def main():
                                 f"{k[0]:.1f} ortanca {k[len(k) // 2]:.1f}")
             else:
                 parcalar.append("ter damlası 0")
-            if ref is not None and ref.shape == kare.shape and ad != "normal_3p":
+            if karsilastir:
                 n, de = buhar(kare, ref)
                 parcalar.append(f"buhar (orta üst, açılan) {n} piksel ΔE {de:.1f}")
         if ad != "menu":
             sonuc = hap(kare, satir)
             parcalar.append("hap sayısı bulunamadı" if sonuc is None
-                            else f"hap sayısı {sonuc[0]} piksel, zemine karşıtlık {sonuc[1]:.2f}:1")
+                            else f"hap sayısı {sonuc[0]} piksel, zemine karşıtlık {sonuc[1]:.2f}:1 (hap içi #{sonuc[2]})")
         cikti.append(" | ".join(parcalar))
     metin = "\n".join(cikti) + "\n"
     (kanit / "olcum.txt").write_text(metin, encoding="utf-8")

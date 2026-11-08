@@ -117,7 +117,13 @@ public final class SicaklikHud {
         sonSevron = sevron;
     }
 
+    /**
+     * Atlas parçası; yarı saydam pikseller (hap içi, nabız ve parlama katmanı) karışsın diye karışım her seferinde açılır:
+     * {@code fill} ve yazı çizimi kendi render tipini kapatırken karışımı kapatır (yoksa nabız katmanı hapı düz boyar).
+     */
     private static void parca(GuiGraphics g, int x, int y, int u, int v, int gen, int yuk) {
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
         g.blit(DOKU, x, y, u, v, gen, yuk, DOKU_G, DOKU_Y);
     }
 

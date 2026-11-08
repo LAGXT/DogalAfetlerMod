@@ -63,7 +63,7 @@ public final class SicaklikOtomasyonu {
             new Sahne("bunalma", 38.6, 0, Kip.TER, 0f, null),
             new Sahne("yanma", 40.0, 0, Kip.HUD_IKI_KARE, 8f, null),
             new Sahne("menu", 35.6, 60, Kip.MENU, 8f, null),
-            new Sahne("ter_gok", 38.8, 0, Kip.TER, 35f, null),
+            new Sahne("ter_gok", 38.8, 0, Kip.TER, 20f, null),
             new Sahne("ter_cimen", 38.8, 0, Kip.TER, -35f, "minecraft:grass_block"),
             new Sahne("ter_kum", 38.8, 0, Kip.TER, -35f, "minecraft:sand"));
 
@@ -227,19 +227,24 @@ public final class SicaklikOtomasyonu {
                     sonraki();
                 }
             }
-            case BUHAR -> ucuncuSahis(mc, s, IstemciSicaklik.sonNefesTick(), 3);
-            case TER -> ucuncuSahis(mc, s, IstemciSicaklik.sonTerTick(), 2);
+            case BUHAR -> ucuncuSahis(mc, s, IstemciSicaklik.sonNefesTick(), 3, true);
+            // Ter karesi en az üç damla havadayken: tek damla başın arkasında kalabilir.
+            case TER -> ucuncuSahis(mc, s, IstemciSicaklik.sonTerTick(), 2, IstemciSicaklik.sonTerSayisi(15) >= 3);
             default -> throw new IllegalStateException(s.kip().name());
         }
     }
 
-    /** Parçacık yeni üretilmişken (ekranda görünürken) kare; 300 tick'te üretilmezse uyarıp yine de çeker. */
-    private static void ucuncuSahis(Minecraft mc, Sahne s, long sonParcacik, int gecikme) {
+    /**
+     * Parçacık yeni üretilmişken (ekranda görünürken) ve {@code yeterli} iken kare; 300 tick'te olmazsa uyarıp yine de
+     * çeker.
+     */
+    private static void ucuncuSahis(Minecraft mc, Sahne s, long sonParcacik, int gecikme, boolean yeterli) {
         long simdi = IstemciSicaklik.tick();
-        boolean taze = sonParcacik > sahneTick && simdi - sonParcacik >= gecikme && simdi - sonParcacik <= gecikme + 3;
+        boolean taze = sonParcacik > sahneTick && simdi - sonParcacik >= gecikme && simdi - sonParcacik <= gecikme + 3
+                && yeterli;
         if (sayac >= OTURMA && taze || sayac >= OTURMA + 300) {
             if (!taze) {
-                DogalAfetler.LOGGER.warn(ON + "{}: 300 tick'te kendi parçacığı üretilmedi", s.ad());
+                DogalAfetler.LOGGER.warn(ON + "{}: 300 tick'te yeterli taze kendi parçacığı üretilmedi", s.ad());
             }
             kare(mc, s.ad());
             mc.options.setCameraType(CameraType.FIRST_PERSON);

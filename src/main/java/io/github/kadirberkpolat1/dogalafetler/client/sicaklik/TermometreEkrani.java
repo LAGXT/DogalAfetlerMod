@@ -173,8 +173,7 @@ public final class TermometreEkrani extends Screen {
     public void render(GuiGraphics g, int fareX, int fareY, float pt) {
         renderBackground(g);
         Gorunum v = gorunum();
-        RenderSystem.enableBlend();
-        g.blit(DOKU, sol, ust, 0, 0, GENISLIK, YUKSEKLIK, DOKU_G, DOKU_Y);
+        parca(g, sol, ust, 0, 0, GENISLIK, YUKSEKLIK);
         g.drawString(font, title, sol + 8, ust + 6, METIN, false);
         model(g, v, fareX, fareY);
         vucutSutunu(g, v, IstemciSicaklik.vucut(pt));
@@ -186,6 +185,16 @@ public final class TermometreEkrani extends Screen {
         RenderSystem.disableBlend();
         super.render(g, fareX, fareY, pt);
         ipucu(g, v, fareX, fareY);
+    }
+
+    /**
+     * Atlas parçası; cam ve parlama katmanları yarı saydam olduğu için karışım her seferinde açılır ({@code fill} ve yazı
+     * çizimi karışımı kapatır; yoksa tüpün ön camı sıvıyı örter).
+     */
+    private static void parca(GuiGraphics g, int x, int y, int u, int v, int gen, int yuk) {
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        g.blit(DOKU, x, y, u, v, gen, yuk, DOKU_G, DOKU_Y);
     }
 
     /** Fareyi izleyen oyuncu; donmada hafif mavi, yanmada hafif kızıl tonda. */
@@ -215,7 +224,7 @@ public final class TermometreEkrani extends Screen {
         int ok = okSayisi(v.egilim);
         int oy = ust + 32 + (3 - ok) * 2 + (int) (IstemciSicaklik.tick() / 6 % 2);
         for (int i = 0; i < ok; i++) {
-            g.blit(DOKU, x + w + 4, oy + i * 5, 440, v.egilim > 0 ? 0 : 6, 7, 4, DOKU_G, DOKU_Y);
+            parca(g, x + w + 4, oy + i * 5, 440, v.egilim > 0 ? 0 : 6, 7, 4);
         }
         g.drawString(font, Component.translatable(ON + "durum." + v.durum.anahtar()), x, ust + 51, renk, true);
 
@@ -247,8 +256,8 @@ public final class TermometreEkrani extends Screen {
         int x = sol + HIS_X;
         g.drawString(font, Component.translatable(ON + "hissedilen"), x, ust + 20, METIN, false);
         int w = buyukYaz(g, tam(v.hissedilen) + " °C", x, ust + 31, sivi(v.hissedilen));
-        g.blit(DOKU, x + w + 4, ust + 35, 428, 0, 6, 7, DOKU_G, DOKU_Y);
-        g.blit(DOKU, x, ust + 51, 420, 0, 6, 7, DOKU_G, DOKU_Y);
+        parca(g, x + w + 4, ust + 35, 428, 0, 6, 7);
+        parca(g, x, ust + 51, 420, 0, 6, 7);
         g.drawString(font, Component.translatable(ON + "mekan", tam(v.mekan) + " °C"), x + 9, ust + 51, METIN, false);
         if (v.dokum != null) {
             g.drawString(font, Component.translatable(ON + "ruzgar", tam(v.dokum.ruzgarKmh())), x + 9, ust + 63,
@@ -270,21 +279,21 @@ public final class TermometreEkrani extends Screen {
         }
         g.fill(tx - 1, termoY(KONFOR_UST), tx, termoY(KONFOR_ALT) + 1, 0xFF4CAF50);
 
-        g.blit(DOKU, tx - 2, ust + 94, 360, 0, 16, 16, DOKU_G, DOKU_Y);
-        g.blit(DOKU, tx, ty, 330, 0, 12, 80, DOKU_G, DOKU_Y);
+        parca(g, tx - 2, ust + 94, 360, 0, 16, 16);
+        parca(g, tx, ty, 330, 0, 12, 80);
         int renk = sivi(sivi);
         g.setColor((renk >> 16 & 0xFF) / 255f, (renk >> 8 & 0xFF) / 255f, (renk & 0xFF) / 255f, 1f);
-        g.blit(DOKU, tx - 2, ust + 94, 378, 0, 16, 16, DOKU_G, DOKU_Y);
+        parca(g, tx - 2, ust + 94, 378, 0, 16, 16);
         g.setColor(1f, 1f, 1f, 1f);
-        g.blit(DOKU, tx - 2, ust + 94, 396, 0, 16, 16, DOKU_G, DOKU_Y);
+        parca(g, tx - 2, ust + 94, 396, 0, 16, 16);
         g.fill(tx + 3, Math.round(termoYf(sivi)), tx + 9, ust + 100, renk);
         g.fill(tx + 3, Math.round(termoYf(sivi)), tx + 9, Math.round(termoYf(sivi)) + 1, 0x60FFFFFF);
-        g.blit(DOKU, tx, ty, 344, 0, 12, 80, DOKU_G, DOKU_Y);
+        parca(g, tx, ty, 344, 0, 12, 80);
 
         int my = Mth.clamp(Math.round(termoYf(sivi)), ust + TERMO_UST_Y - 2, ust + TERMO_ALT_Y + 2);
         int hy = Mth.clamp(termoY(v.hissedilen), ust + TERMO_UST_Y - 2, ust + TERMO_ALT_Y + 2);
-        g.blit(DOKU, tx + 13, my - 3, 420, 0, 6, 7, DOKU_G, DOKU_Y);
-        g.blit(DOKU, tx + (Math.abs(hy - my) < 7 ? 19 : 13), hy - 3, 428, 0, 6, 7, DOKU_G, DOKU_Y);
+        parca(g, tx + 13, my - 3, 420, 0, 6, 7);
+        parca(g, tx + (Math.abs(hy - my) < 7 ? 19 : 13), hy - 3, 428, 0, 6, 7);
     }
 
     private void ikonlar(GuiGraphics g, Gorunum v) {
@@ -295,7 +304,7 @@ public final class TermometreEkrani extends Screen {
             if (etkin) {
                 g.fill(x - 1, y - 1, x + 17, y + 17, 0x30FFFFFF);
             }
-            g.blit(DOKU, x, y, i * 16, etkin ? 224 : 240, 16, 16, DOKU_G, DOKU_Y);
+            parca(g, x, y, i * 16, etkin ? 224 : 240, 16, 16);
         }
         g.drawString(font, yuzde(v.islaklik), sol + IKON_X[0] + 18, ust + IKON_Y + 4,
                 Islaklik.gorunur(v.islaklik) ? SOGUK_METIN : SOLUK, false);

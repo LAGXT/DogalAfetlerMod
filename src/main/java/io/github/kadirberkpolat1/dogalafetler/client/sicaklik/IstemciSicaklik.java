@@ -57,6 +57,10 @@ public final class IstemciSicaklik {
     private static int kendiParcacik;
     private static long sonNefes = -1;
     private static long sonTer = -1;
+    /** Görsel kanıt: son {@value #TER_HALKASI} ter damlasının tick'i (halka). */
+    private static final int TER_HALKASI = 8;
+    private static final long[] TER_TICKLERI = new long[TER_HALKASI];
+    private static int terSirasi;
 
     private IstemciSicaklik() {
     }
@@ -132,6 +136,17 @@ public final class IstemciSicaklik {
         return sonTer;
     }
 
+    /** Son {@code pencere} tick içinde üretilen kendi ter damlası sayısı (en çok {@value #TER_HALKASI}). */
+    static int sonTerSayisi(long pencere) {
+        int n = 0;
+        for (int i = 0; i < Math.min(terSirasi, TER_HALKASI); i++) {
+            if (tick - TER_TICKLERI[i] <= pencere) {
+                n++;
+            }
+        }
+        return n;
+    }
+
     @SubscribeEvent
     public static void istemciTick(TickEvent.ClientTickEvent olay) {
         if (olay.phase != TickEvent.Phase.END) {
@@ -181,7 +196,7 @@ public final class IstemciSicaklik {
             return;
         }
         if (sd == SicaklikDurumu.BUNALMA || sd == SicaklikDurumu.YANMA) {
-            float olasilik = sd == SicaklikDurumu.YANMA ? 0.3f : 0.15f;
+            float olasilik = sd == SicaklikDurumu.YANMA ? 0.4f : 0.2f;
             if (r.nextFloat() < olasilik) {
                 ter(mc, o, r);
             }
@@ -216,6 +231,7 @@ public final class IstemciSicaklik {
                 Math.sin(aci) * 0.01);
         kendiParcacik++;
         sonTer = tick;
+        TER_TICKLERI[terSirasi++ % TER_HALKASI] = tick;
     }
 
     /** Hasarlı kademede sunucunun diğer oyunculara gönderdiğiyle aynı sayı ve saçılımda alev ya da kar tanesi. */
