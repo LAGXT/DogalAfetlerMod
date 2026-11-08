@@ -23,10 +23,10 @@ import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 
 /**
- * Meteorun çizimi (tasarım notu "Meteor"): dönen kaya kümesi gövde (güneş: magma + karataş/bazalt, ay: kalsit + bazalt/tüf),
- * önünde additive plazma kabuğu ve ışık halesi, arkasında iki katmanlı additive iz şeridi (içte beyaz-sarı / mavi-beyaz
- * çekirdek, dışta turuncu / mavi; uzakta dışı en az {@value #DIS_EN_AZ_PIKSEL}, içi {@value #IC_EN_AZ_PIKSEL} piksel),
- * inişe 1,5 sn kala yerde büyüyen parlama diski. Işık motoruna dokunulmaz.
+ * Meteorun çizimi (tasarım notu "Meteor"): dönen kaya kümesi gövde (güneş ve pulsar: magma + karataş/bazalt, ay: kalsit +
+ * bazalt/tüf), önünde additive plazma kabuğu ve ışık halesi, arkasında iki katmanlı additive iz şeridi (içte beyaz-sarı /
+ * mavi-beyaz / pembe-beyaz çekirdek, dışta turuncu / mavi / kızıl; uzakta dışı en az {@value #DIS_EN_AZ_PIKSEL}, içi
+ * {@value #IC_EN_AZ_PIKSEL} piksel), inişe 1,5 sn kala yerde büyüyen parlama diski. Işık motoruna dokunulmaz.
  */
 final class MeteorCizici extends EntityRenderer<MeteorVarligi> {
     private static final ResourceLocation PLAZMA = DogalAfetler.konum("textures/entity/meteor_plazmasi.png");
@@ -40,6 +40,25 @@ final class MeteorCizici extends EntityRenderer<MeteorVarligi> {
     private static final double GOVDE_MESAFESI = 96;
     private static final float[][] PARCALAR = {{0.42F, 0.3F, 0.1F}, {-0.38F, 0.25F, -0.2F}, {0.05F, -0.4F, 0.35F},
         {-0.1F, 0.1F, -0.45F}};
+
+    /** Görünümün renkleri (r, g, b): dış ve iç iz, iç ve dış plazma, iniş diski. */
+    private record Palet(float[] izDis, float[] izIc, float[] plazmaIc, float[] plazmaDis, float[] disk) {
+        static Palet icin(MeteorGorunumu g) {
+            return switch (g) {
+                case AY -> AY_PALETI;
+                case PULSAR -> PULSAR_PALETI;
+                default -> GUNES_PALETI;
+            };
+        }
+    }
+
+    private static final Palet GUNES_PALETI = new Palet(new float[] {1.0F, 0.42F, 0.10F}, new float[] {1.0F, 0.88F, 0.55F},
+            new float[] {1.0F, 0.92F, 0.62F}, new float[] {0.65F, 0.30F, 0.08F}, new float[] {1.0F, 0.48F, 0.12F});
+    private static final Palet AY_PALETI = new Palet(new float[] {0.30F, 0.50F, 1.0F}, new float[] {0.85F, 0.94F, 1.0F},
+            new float[] {0.75F, 0.88F, 1.0F}, new float[] {0.20F, 0.32F, 0.60F}, new float[] {0.35F, 0.55F, 1.0F});
+    /** Pulsar: beyaz çekirdekli kızıl plazma (kan kırmızısı dış iz, pembe-beyaz iç iz). */
+    private static final Palet PULSAR_PALETI = new Palet(new float[] {1.0F, 0.14F, 0.10F}, new float[] {1.0F, 0.90F, 0.88F},
+            new float[] {1.0F, 0.96F, 0.96F}, new float[] {0.70F, 0.06F, 0.08F}, new float[] {1.0F, 0.20F, 0.14F});
 
     private final BlockRenderDispatcher bloklar;
 
@@ -57,6 +76,7 @@ final class MeteorCizici extends EntityRenderer<MeteorVarligi> {
     @Override
     public void render(MeteorVarligi m, float yaw, float kismi, PoseStack ps, MultiBufferSource tampon, int isik) {
         boolean ay = m.gorunum() == MeteorGorunumu.AY;
+        Palet palet = Palet.icin(m.gorunum());
         double boyOlcegi = m.olcek();
         float olcek = (float) MeteorOlcegi.ara(boyOlcegi, 1.1, 2.6, 0.6, 3.4);
         Vec3 hiz = m.getDeltaMovement();
@@ -71,13 +91,10 @@ final class MeteorCizici extends EntityRenderer<MeteorVarligi> {
         VertexConsumer izTampon = tampon.getBuffer(MeteorIsikTipi.ISIK.apply(IZ));
         double uzunluk = m.izUzunlugu();
         double piksel = pikselAcisi();
-        if (ay) {
-            iz(ps, izTampon, yon, uzunluk, goz, 1.95F * olcek, DIS_EN_AZ_PIKSEL * piksel, 0.30F, 0.50F, 1.0F, 1.125F);
-            iz(ps, izTampon, yon, uzunluk * 0.7, goz, 0.75F * olcek, IC_EN_AZ_PIKSEL * piksel, 0.85F, 0.94F, 1.0F, 1.5F);
-        } else {
-            iz(ps, izTampon, yon, uzunluk, goz, 1.95F * olcek, DIS_EN_AZ_PIKSEL * piksel, 1.0F, 0.42F, 0.10F, 1.125F);
-            iz(ps, izTampon, yon, uzunluk * 0.7, goz, 0.75F * olcek, IC_EN_AZ_PIKSEL * piksel, 1.0F, 0.88F, 0.55F, 1.5F);
-        }
+        float[] c = palet.izDis();
+        iz(ps, izTampon, yon, uzunluk, goz, 1.95F * olcek, DIS_EN_AZ_PIKSEL * piksel, c[0], c[1], c[2], 1.125F);
+        c = palet.izIc();
+        iz(ps, izTampon, yon, uzunluk * 0.7, goz, 0.75F * olcek, IC_EN_AZ_PIKSEL * piksel, c[0], c[1], c[2], 1.5F);
 
         if (goz.lengthSqr() < GOVDE_MESAFESI * GOVDE_MESAFESI) {
             govde(m, ps, tampon, ay, olcek, yas);
@@ -85,13 +102,10 @@ final class MeteorCizici extends EntityRenderer<MeteorVarligi> {
 
         VertexConsumer plazma = tampon.getBuffer(MeteorIsikTipi.ISIK.apply(PLAZMA));
         float titresim = 0.92F + 0.08F * Mth.sin(yas * 1.7F);
-        if (ay) {
-            pano(ps, plazma, yon.scale(0.35 * olcek), 2.0F * olcek * titresim, 0.75F, 0.88F, 1.0F, 1.0F);
-            pano(ps, plazma, Vec3.ZERO, 5.0F * olcek, 0.20F, 0.32F, 0.60F, 0.6F);
-        } else {
-            pano(ps, plazma, yon.scale(0.35 * olcek), 2.0F * olcek * titresim, 1.0F, 0.92F, 0.62F, 1.0F);
-            pano(ps, plazma, Vec3.ZERO, 5.0F * olcek, 0.65F, 0.30F, 0.08F, 0.6F);
-        }
+        c = palet.plazmaIc();
+        pano(ps, plazma, yon.scale(0.35 * olcek), 2.0F * olcek * titresim, c[0], c[1], c[2], 1.0F);
+        c = palet.plazmaDis();
+        pano(ps, plazma, Vec3.ZERO, 5.0F * olcek, c[0], c[1], c[2], 0.6F);
 
         Vec3 inis = m.inis();
         double kalan = m.inisKalanTick();
@@ -100,11 +114,8 @@ final class MeteorCizici extends EntityRenderer<MeteorVarligi> {
             float boy = (float) MeteorOlcegi.ara(boyOlcegi, 2.6, 5.5, 1.6, 7.0) * (0.3F + 0.7F * k);
             float guc = 0.25F + 0.75F * k;
             Vec3 p = inis.subtract(merkez).add(0, 0.04, 0);
-            if (ay) {
-                disk(ps, plazma, p, boy, 0.35F * guc, 0.55F * guc, 1.0F * guc);
-            } else {
-                disk(ps, plazma, p, boy, 1.0F * guc, 0.48F * guc, 0.12F * guc);
-            }
+            c = palet.disk();
+            disk(ps, plazma, p, boy, c[0] * guc, c[1] * guc, c[2] * guc);
         }
         super.render(m, yaw, kismi, ps, tampon, isik);
     }

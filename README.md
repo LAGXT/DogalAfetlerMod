@@ -15,15 +15,16 @@ deniz, aysız gökyüzü, kızıl cüce güneş) dünyada kalıcıdır.
 3. [Derlemek (Windows ve Linux)](#derlemek-windows-ve-linux)
 4. [Afetler](#afetler)
 5. [Ortak sistemler](#ortak-sistemler)
-6. [Komutlar](#komutlar)
-7. [Gamerule'lar](#gamerulelar)
-8. [Config dosyaları ve önemli ayarlar](#config-dosyaları-ve-önemli-ayarlar)
-9. [Başarımlar](#başarımlar)
-10. [Cold Sweat ile birlikte kullanmak](#cold-sweat-ile-birlikte-kullanmak)
-11. [Ses ve doku dosyaları](#ses-ve-doku-dosyaları)
-12. [Bilinen sınırlar](#bilinen-sınırlar)
-13. [Belgeler](#belgeler)
-14. [Lisans](#lisans)
+6. [Eşyalar](#eşyalar)
+7. [Komutlar](#komutlar)
+8. [Gamerule'lar](#gamerulelar)
+9. [Config dosyaları ve önemli ayarlar](#config-dosyaları-ve-önemli-ayarlar)
+10. [Başarımlar](#başarımlar)
+11. [Cold Sweat ile birlikte kullanmak](#cold-sweat-ile-birlikte-kullanmak)
+12. [Ses ve doku dosyaları](#ses-ve-doku-dosyaları)
+13. [Bilinen sınırlar](#bilinen-sınırlar)
+14. [Belgeler](#belgeler)
+15. [Lisans](#lisans)
 
 ## Kurulum (Windows'ta oynamak)
 
@@ -86,11 +87,11 @@ sonraki bekleme biraz uzar.
 
 | Afet | Komut adı | Seviye | Kısaca |
 |---|---|---|---|
-| Kasırga | `kasirga` | 1–5 | Dönen huni, toz/enkaz bulutu; blokları, mobları ve oyuncuları havaya çeker, yolunda iz bırakır, ilerleyip dağılır. |
+| Kasırga | `kasirga` | 1–5 | Dönen huni, toz/enkaz bulutu; blokları, mobları ve oyuncuları havaya çeker, yolunda iz bırakır, ilerleyip dağılır. Bir oyuncunun yakınında doğar ama kimseyi izlemez: 10–20 saniyede bir yeni rastgele bir yöne döner (bazen bir oyuncunun 32–96 blok yakınına, üstüne değil), doğduğu yerden 512 bloktan uzağa gitmez ve yüklü alanın içinde kalır. |
 | Tsunami | `tsunami` | 1–5 | Yalnız geniş deniz kıyısında başlar. Önce sular çekilir, sonra dalga karaya ilerler: oyuncuları ve mobları sürükler, önce cam ve yaprakları, sonra ahşabı (yüksek seviyede taş yapıları) yıkar, dalganın girdiği mağaraları geçici olarak doldurur. Su, modun kendi çizdiği "sanal su"dur; haritaya gerçek su bloğu dökülmez. |
 | Deprem | `deprem` | 1–5 | Haritayı yaran fay hattı; yaprak ve ahşap gibi sağlam olmayan bloklar yıkılıp düşer, sağlam bloklar daha az etkilenir. Ekran sarsıntısı mesafeyle azalır; seviye 3 ve üstünde artçı sarsıntılar olur. |
 | Sinkhole | `sinkhole` | 1–5 | Çatlama ve titremeden sonra dairesel çöküş; bloklar çukura dolar. |
-| Asit yağmuru | `asit_yagmuru` | 1–5 | Yeşilimsi yağış ve dumanlanma; sert olmayan blokları yavaş yavaş aşındırır, açıktaki oyuncuya orta düzeyde hasar verir; çatı altı korur. |
+| Asit yağmuru | `asit_yagmuru` | 1–5 | Bütün dünyada normal yağmur gibi yağar (vanilla yağmur da açılır, bitince önceki hava geri gelir; çölde ve karlı biyomda da asit yağar). Yeşilimsi yağış ve dumanlanma; her oyuncunun çevresindeki sert olmayan blokları yavaş yavaş aşındırır, başı açık her oyuncuya saniyede yarım kalp hasar verir (2 kalbin altına indirmez); çatı altı korur. Radarda "her yer" görünür. |
 | Orman yangını | `orman_yangini` | 1–5 | Ortak yangın sistemiyle yanıcı olan her şeye yayılır, yağmurda söner; yakınındaki ortam ısınır. |
 | Güneş patlaması | `gunes_patlamasi` | yok | En nadir afet, tek seferlik. Uzun siren; güneş büyür, meteorlar yağar, dünya 5 gün boyunca kavrulur, sonunda **süpernova**. Ardından güneşsiz dönem, dünyanın donması ve **kızıl cüce** güneşin doğuşu gelir (aşağıda "Dünya dönemleri"). |
 | Ay çarpması | `ay_carpmasi` | yok | Güneş patlamasından biraz daha sık, tek seferlik. Ay yaklaşır ve çarpar (ekran ve harita sallanır), 1–2 dakika ay parçaları yağar, gökte enkaz halkası kalır. 10 dakika sonra deniz seviyesi kalıcı olarak yükselmeye başlar ve tsunamiler bir süre daha sık olur. Ay bir daha oluşmaz. |
@@ -104,8 +105,13 @@ Güneş patlaması ve ay çarpması yalnız dünya yeterince yaşlanınca seçil
 - **Dünya dönemleri:** güneş (normal → büyüyen → süpernova → güneşsiz → kızıl cüce ya da düşük olasılıkla pulsar) ve ay
   (var/yok) birbirinden bağımsızdır ve dünyaya kaydedilir; sonradan giren oyuncu aynı gökyüzünü görür. Güneşsiz dönemde dünya
   birkaç günde donar (çimenin üstüne kar katmanı, buz, kırağı rengi; donma uzaktaki chunk'lara oyuncu geldikçe yetişir). Kızıl
-  cüce doğunca dünya kısmen çözülür, kalıcı kış bölgeleri donuk kalır; pulsar dünyayı ısıtır, çimeni kavurur, yangın çıkarır ve
-  donmuş dünyayı çözer.
+  cüce doğunca dünya kısmen çözülür, kalıcı kış bölgeleri donuk kalır. **Pulsar** (düşük olasılık) güneşten kat kat büyük, sağa
+  sola hızla titreşen 3B bir nötron yıldızıdır (mavi-beyaz çekirdek, manyetik alan çizgileri, saniyede ~11 kez nabızlanan iki
+  ışın konisi ve aynı vuruşta tıklayan bir ses; ses yer altında ve üstü kapalı yerlerde azalır, boğuk ve yankılı duyulur):
+  15 oyun günü boyunca dünya cehenneme döner (çimen kavrulur ve küle döner,
+  ağaçlar yanıp kömürleşir, kül yağar, seyrek lav gözeleri açılır, dakikada 12 meteor düşer, sıcaklık çok yükselir). Sonra uzak
+  bir kara delik pulsarı 90 saniyede yutar (gündüz başlar); dünya 10 gün buzul kıyamete sürüklenir (küller kar altında kalır),
+  ardından kızıl cüce doğar ve doğuş bitince eski güneş geri gelir.
 - **Vücut sıcaklığı:** biyom, gün/gece, yükseklik, ısı kaynakları, yağmur ve dünya dönemi ortam sıcaklığını belirler; HUD'daki
   gösterge vücut sıcaklığını gösterir. Aşırı soğuk ve sıcak hasar verir. Zırha yün eklemek (yünlü zırh), tüy işlemek (parça
   başına en çok 30) ve Termostat Plakası eklemek (çok sıcakta aşırı ısınmayı azaltır) sıcaklığı dengeler.
@@ -125,6 +131,28 @@ Güneş patlaması ve ay çarpması yalnız dünya yeterince yaşlanınca seçil
   yeniden donar. Delikten beş yeni soğuk su balığı (Buz Alabalığı, Buz Kefali, Derin Soğuk Somonu, Donmuş Ringa, Kutup Morinası)
   ve nadiren hazine çıkar; Kutup Balığı Çorbası bunlardan yapılır.
 
+## Eşyalar
+
+Hava Radarı ve Sismograf vanilla çalışma masasında yapılır. İkisi de tarif kitabında (çalışma masasındaki yeşil kitap, kılıç ve
+kazma simgeli sekme) dünyaya ilk girişte görünür; JEI gerekmez. Gelişmiş sürümler kitapta Hava Radarı, Sismograf ya da
+Kozmik Çekirdek envantere girince açılır. Kozmik Çekirdek meteor kraterlerinde çok nadir çıkar, eşyanın açıklaması da bunu söyler.
+
+| Eşya | Tarif (3×3, üst / orta / alt sıra) | Malzemeler |
+|---|---|---|
+| Hava Radarı | Demir · Cam · Demir / Kızıltaş · Pusula · Kızıltaş / Demir · Bakır · Demir | 4 demir külçesi, 1 cam, 2 kızıltaş, 1 pusula, 1 bakır külçesi |
+| Sismograf | Demir · Kağıt · Demir / Çubuk · Kızıltaş · Çubuk / Taş · Bakır · Taş | 2 demir külçesi, 1 kağıt, 2 çubuk, 1 kızıltaş, 2 taş, 1 bakır külçesi |
+| Gelişmiş Hava Radarı | şekilsiz | 1 Hava Radarı + 1 Kozmik Çekirdek |
+| Hassas Sismograf | şekilsiz | 1 Sismograf + 1 Kozmik Çekirdek |
+| Meteorit Külçesi | şekilsiz | 3 Meteorit Parçası + 1 demir külçesi |
+| Termostat Plakası | şekilsiz | 1 Meteorit Külçesi + 1 altın külçesi + 1 kızıltaş + 1 demir külçesi |
+| Yünlü zırh | şekilsiz, zırh eki | 1 zırh parçası + 1 yün (herhangi bir renk) |
+| Termostatlı zırh | şekilsiz, zırh eki | 1 zırh parçası + 1 Termostat Plakası |
+
+"Demir" demir külçesi, "Bakır" bakır külçesi, "Taş" düz taştır (kırık taş olmaz). Meteorit Külçesi kitapta Meteorit
+Parçası, Termostat Plakası Meteorit Külçesi envantere girince açılır. Zırh ekleri vanilla deri zırh boyası gibi özel tariftir:
+çalışma masasında çalışır ama tarif kitabında görünmez; yünün ve Termostat Plakası'nın açıklaması birleştirmeyi anlatır. Gelişmiş tarifler Kozmik Çekirdek etiketi
+(`#dogalafetler:kozmik_cekirdek`) boşken yüklenmez; etiketi boşaltan bir veri paketi yoksa her zaman yüklüdür.
+
 ## Komutlar
 
 Bütün komutlar `/dogalafet` altındadır ve **yalnız OP** (yetki seviyesi 2) kullanabilir. Afet adları: `kasirga`, `tsunami`,
@@ -132,9 +160,10 @@ Bütün komutlar `/dogalafet` altındadır ve **yalnız OP** (yetki seviyesi 2) 
 
 | Komut | Ne yapar |
 |---|---|
-| `/dogalafet start <afet> [seviye] [oyuncu]` | Afeti hemen başlatır (beklemeyi, gamerule'ü ve gün saati penceresini atlar; aktif afet varken reddeder). Doğal güneş patlaması yalnız sabah (gün saati 0–6000), ay çarpması yalnız gece (13000–23000) patlar; komutla başlatma bu pencereye bakmaz. |
-| `/dogalafet stop` | Aktif afeti temizce durdurur; afet yoksa süren dünya dönemi süreçlerini durdurur. |
-| `/dogalafet durum` | Aktif afet, aşama, seviye, kalan süre, beklemeler, çarpanlar, deniz seviyesi, ay/güneş, donma ve buharlaşma. |
+| `/dogalafet start <afet> [seviye] [oyuncu]` | Afeti hemen başlatır (beklemeyi, gamerule'ü ve gün saati penceresini atlar). Farklı türden afetler aynı anda sürebilir; aynı türden ikincisi "zaten sürüyor" diye reddedilir. Doğal afet yalnız hiç afet yokken seçilir. Doğal güneş patlaması yalnız sabah (gün saati 0–6000), ay çarpması yalnız gece (13000–23000) patlar; komutla başlatma bu pencereye bakmaz. |
+| `/dogalafet stop [afet]` | Afet adı verilmezse süren bütün afetleri, verilirse yalnız o afeti temizce durdurur; afet yoksa süren dünya dönemi süreçlerini durdurur. Stop ile biten afette alandaki oyuncular sağ çıkmış sayılır (başarımlar gelir). |
+| `/dogalafet` | Kullanabildiğiniz alt komutların listesi. |
+| `/dogalafet durum` | Aktif afetler, aşama, seviye, kalan süre, beklemeler, sonraki afet tahmini, çarpanlar, deniz seviyesi, ay/güneş, donma, buharlaşma ve süren dönem süreçlerinin aşaması (pulsar zincirinde kalan gün). |
 | `/dogalafet sicaklik set <oyuncu> <değer>` | Oyuncunun vücut sıcaklığını ayarlar. |
 | `/dogalafet sicaklik bilgi <oyuncu>` | Vücut ve ortam sıcaklığı, kalemler, yalıtım. |
 | `/dogalafet denizseviyesi <değer> [kademeli]` | Deniz seviyesi artışını ayarlar/sıfırlar (0–6 blok; `kademeli` yavaşça). |
@@ -143,10 +172,11 @@ Bütün komutlar `/dogalafet` altındadır ve **yalnız OP** (yetki seviyesi 2) 
 | `/dogalafet donma bilgi` | Donma ilerlemesi, dönem, buharlaşma, işlenen chunk kuyruğu. |
 | `/dogalafet kizilcuce baslat` | Beklemeyi atlayıp kızıl cüce doğuşunu başlatır. |
 | `/dogalafet kizilcuce bilgi` | Gökyüzü dönemi, çözülme ilerlemesi, bulunduğunuz chunk kalıcı kış mı. |
-| `/dogalafet pulsar baslat` | Kızıl cüce yerine pulsarı hemen doğurur (olasılık, donma ve şafak beklenmez; zaten pulsarsa ya da güneş patlaması sürüyorsa reddeder). |
+| `/dogalafet pulsar baslat` | Kızıl cüce yerine pulsarı hemen doğurur (olasılık, donma ve şafak beklenmez; zaten pulsarsa ya da güneş patlaması sürüyorsa reddeder). Pulsar zinciri: pulsar (15 gün) → kara delik yutması (90 sn) → buzul kıyamet (10 gün) → kızıl cüce doğuşu → eski güneş. |
 | `/dogalafet gun <sayı>` | Oyun gününü ayarlar ve seviye olasılıklarını gösterir. |
 | `/dogalafet odul meteor [parca\|cekirdek\|hepsi] [adet] [oyuncu]` | Test için Meteorit Parçası / Kozmik Çekirdek verir. |
-| `/dogalafet asama ileri [süreç]` | Aktif afeti ya da bir dünya dönemi sürecini sonraki aşamaya geçirir. |
+| `/dogalafet asama ileri [afet\|süreç]` | Ad verilmezse ilk başlayan afeti, süren bir afetin adı verilirse onu, süreç adı verilirse o dünya dönemi sürecini sonraki aşamaya geçirir. Pulsar zinciri için `pulsar` (her aşamada; pulsarda ilk adım ısınmayı tamamlar) ya da o aşamadayken `karadelik`, `gunessiz`, `kizilcuce`. |
+| `/dogalafet siklik [yüzde]` | Afet sıklığını (`afetSikligi` gamerule'ü, 0–1000) gösterir ya da ayarlar; süren beklemeler hemen ölçeklenir ve "sonraki afet: ~N gün (aralık X–Y gün)" yazılır. Değer dünyada kalıcıdır. |
 | `/dogalafet hiz <çarpan>` | Afet ve dönem zamanlayıcılarını hızlandırır (1 = normal; yeniden başlatınca 1'e döner). |
 | `/dogalafet sifirla` | Dünyanın afet ve dönem durumunu ilk hâline döndürür (ay, güneş, deniz, donma). |
 
@@ -171,7 +201,7 @@ Hepsi `/gamerule <ad> [değer]` ile okunur/değiştirilir (tab tamamlamalı) ve 
 |---|---|---|---|
 | `dogalAfetlerAcik` | boolean | `true` | Bütün afet sistemini açar/kapatır. |
 | `kasirgaAfeti`, `tsunamiAfeti`, `depremAfeti`, `asitYagmuruAfeti`, `sinkholeAfeti`, `ormanYanginiAfeti`, `gunesPatlamasiAfeti`, `ayCarpmasiAfeti` | boolean | `true` | Afetleri tek tek açar/kapatır. |
-| `afetSikligi` | int | `100` | Afet sıklığı yüzdesi (50 = yarı, 200 = iki katı). |
+| `afetSikligi` | int | `100` | Afet sıklığı yüzdesi (50 = yarı, 200 = iki katı; 0–1000, üstü 1000 sayılır). Oranın yanında ilk gün beklemesi ve afetler arası beklemeler de bu çarpana bölünür; değişince OP'lere sonraki afet tahmini yazılır. `/dogalafet siklik` aynı değeri ayarlar. |
 | `afetMaksSiddet` | int | `5` | Oluşabilecek en yüksek seviye (1–5). |
 | `afetBlokHasari` | boolean | `true` | Kapalıyken afetler blok yıkmaz, yakmaz, dondurmaz, çözmez; oyuncu ve mob hasarı sürer. |
 | `sicaklikSistemi` | boolean | `true` | Vücut sıcaklığı sistemini ve HUD'u açar/kapatır. |
@@ -179,7 +209,11 @@ Hepsi `/gamerule <ad> [değer]` ile okunur/değiştirilir (tab tamamlamalı) ve 
 - Kapatılan afet bir daha seçilmez. Henüz duyurulmamış (ön-uyarıdaki) afet sessizce iptal olur; başlamış afet güvenle biter.
   Süren güneş patlaması ya da ay çarpması yumuşakça durur (tamamlanmamış güneş büyümesi geri alınır); güneş zinciri gibi dönem
   süreçleri duraklar ve kural açılınca kaldıkları yerden sürer. Ulaşılmış dönemler (aysız gök, donma, kızıl cüce) geri alınmaz.
-- `/dogalafet start` ile elle başlatılan afet gamerule'lerden etkilenmez.
+- `/dogalafet start` ile elle başlatılan afet gamerule'lerden etkilenmez; başarımları doğal afetinki gibi verir.
+- Yeni dünyada ilk afet en erken 5 dakika sonra (`cekirdek.zamanlayici.baslangicBeklemeTick` 6000), afetler arası en az
+  bekleme 5 dakika (`genelBeklemeTick` 6000), aynı afetin tekrarı 1 oyun günü (`beklemeTick` 24000). Dünyada henüz hiç afet
+  olmadıysa ilk oyun gününün sonunda (`ilkAfetGarantiTick` 24000) bir doğal afet garanti edilir. Eski varsayılanlarda kalan
+  config değerleri açılışta yenilerine çekilir (`cekirdek.ayarSurumu`, yedekli); elle değiştirilenlere dokunulmaz.
 - **Haritayı korumak için:** afet ateşi vanilla `doFireTick`'ten bağımsızdır; `doFireTick false` afet yangınlarını durdurmaz.
   Haritayı afetlerden korumanın tek yolu `afetBlokHasari false`'tur.
 
@@ -201,6 +235,7 @@ Dosya ilk açılışta bütün anahtarlar ve açıklamalarıyla yazılır. Her s
 | `yangin.parcacikYogunlugu`, `su.parcacikYogunlugu`, `donma.parcacikYogunlugu`, `meteor.izYogunlugu`, `gokyuzu.yildizYogunlugu` | `1,0` | Efekt kalitesinin üstüne parçacık ince ayarı (0 = kapalı). |
 | `deprem.sarsintiCarpani` | `100` | Deprem ekran sarsıntısı (% 0–200). |
 | `ay_carpmasi.ekranSarsintisi`, `ay_carpmasi.parlama` | `1,0` | Ay çarpmasının ekran sarsıntısı ve parlaması (0 = kapalı; harekete/ışığa duyarlı oyuncular için). |
+| `gokyuzu.pulsarTitresim` | `1,0` | Pulsarın hızlı titreşimi, ışın konilerinin strobu ve kısa beyaz parlamaları (0 = kapalı: koniler sabit yanar, yalnız yavaş sarsıntı kalır). **Fotosensitivite:** pulsar dönemi saniyede ~16 kez titreşen ışık, saniyede ~11 kez nabızlanan büyük ışın konileri (parlaklık %45 ile %100 arasında; tam kararmaz) ve saniyede ~2 kısa parlama içerir; ışığa duyarlı oyuncular 0 yapmalı. Kara delik yutmasının 55. saniyesindeki parlama ve sarsıntı `ay_carpmasi.parlama` gibi kapatılamaz, 1,5 sn sürer. |
 
 ### Sunucu: yıkım hızı ve afet başına çarpanlar
 
@@ -213,7 +248,7 @@ hücresi). Sunucu TPS'i düşünce bu bütçeler kendiliğinden kısılır.
 | Tsunami | `tsunami.yikimCarpani` (1,0), `tsunami.yikimBolumTick` (1) | `yikimEsyaOrani` (0,3), `ayCekilmeCarpani` (1,5) |
 | Deprem | `deprem.blokButcesi` (seviye başına 32 … 128 blok/tick) | `yikimYaricapi` (16 … 100 blok) |
 | Sinkhole | `sinkhole.blokButcesi` (400 blok/tick) | |
-| Asit yağmuru | `asit_yagmuru.eszamanliAsindirma` (64 blok) | `kaymaHizi` (0,3 blok/sn) |
+| Asit yağmuru | `asit_yagmuru.blokButcesi` (32 sütun/tick, oyuncuların çevresinden), `asit_yagmuru.eszamanliAsindirma` (64 blok) | `asindirmaBlokSaniye` (oyuncu başına 2 … 16 blok/sn), `yaricap` (aşınmanın oyuncu çevresi, 32 … 128 blok) |
 | Orman yangını / ortak yangın | `yangin.yayilmaHizCarpani` (1,0; 0 yayılmayı kapatır), `yangin.tickButcesi` (64 hücre/tick) | `yangin.aktifTavan` (1500 hücre), `orman_yangini.yanikIziButcesi` (8) |
 | Ay çarpması | `ay_carpmasi.sarsintiYogunlugu` (0,30) | |
 | Meteorlar | `meteor.kraterBlokButcesi` (512 blok işlemi/tick) | `meteor.kucukYanginYogunlugu` / `buyukYanginYogunlugu` |
@@ -231,15 +266,20 @@ hücresi). Sunucu TPS'i düşünce bu bütçeler kendiliğinden kısılır.
 | `su.aysonrasiBeklemeDk`, `su.denizHedefArtis` | `10`, `4` | Ay çarpmasından sonra deniz yükselmesinin beklemesi (gerçek dakika) ve hedefi (blok). |
 | `gokyuzu.kizilCuceGecikmeGun` | `7` | Donma %100'e ulaştıktan sonra kızıl cücenin doğmasına kadar gün. |
 | `gokyuzu.pulsarOlasiligi` | `0,15` | Süpernova sonrası doğal doğuşta kızıl cüce yerine pulsar doğma olasılığı (dünya tohumundan belirlenir). |
-| `gokyuzu.pulsarIsinmaGun` | `2` | Pulsarın dünya etkilerinin (sıcaklık, kavrulma, yangın, buharlaşma) tam güce çıkma süresi, MC günü. |
-| `gokyuzu.pulsarYanginDakikaBasina` | `20` | Tam güçte oyuncu başına dakikada yeni yangın odağı (`afetBlokHasari false` iken yok). |
-| `gokyuzu.pulsarKavrulmaOlasiligi` | `0,6` | Tam güçte güneşe açık çimenin kaba toprağa dönme denemesi olasılığı (tick başına, oyuncu başına). |
+| `gokyuzu.pulsarGun` | `15` | Pulsar döneminin süresi (oyun günü; uyku ilerletir, `/time set` ilerletmez). Bitince kara delik yutması gündüz penceresinde (gün saati 3000–7200) başlar. |
+| `gokyuzu.pulsarIsinmaGun` | `1` | Pulsarın dünya etkilerinin tam güce çıkma süresi, MC günü (eski varsayılan 2 göçle 1'e çekilir). |
+| `gokyuzu.pulsarYanginDakikaBasina` | `24` | Tam güçte oyuncu başına (gerçek) dakikada yeni yangın odağı (`afetBlokHasari false` iken yok; eski 20 göçle 24'e çekilir). |
+| `gokyuzu.pulsarKavrulmaOlasiligi` | `0,6` | Tam güçte bir kavurma denemesinin isabet olasılığı. Deneme sayısı alanla orantılı: varsayılanla 3 oyun gününde 96 blok yarıçapta çimen kalmaz, ağaçlar kömür ve kül olur (çimen → kaba toprak → kül bloğu, yaprak → kül katmanı, kütük → kömürleşmiş kütük). |
+| `gokyuzu.pulsarMeteorDakikaBasina` | `12` | Pulsar boyunca oyuncu başına dakikada meteor (güneş patlaması ve ay çarpması 180). |
+| `gokyuzu.pulsarBlokButcesi` | `256` | Pulsarın tick başına en çok blok değişimi (kavurma, kül, lav; TPS düşünce kısılır). |
+| `gokyuzu.pulsarLav` | `true` | Kavrulan yüzeyde seyrek tek bloklu lav gözeleri. |
+| `gokyuzu.pulsarSonrasiGunessizGun` | `10` | Kara delik yutmasından sonra buzul kıyametin süresi (oyun günü); bitince kızıl cüce ilk şafakta doğar. |
 | `sicaklik.sicaklikSistemiModu` | `OTOMATIK` | `OTOMATIK`: Cold Sweat yüklüyse kendi sıcaklık sistemi kapalı; `ACIK` / `KAPALI`. |
 | `basarim.etkiAlaniPayi` | `0` | "Sağ çıkma" için afet yarıçapına eklenen pay (blok). |
 
 ## Başarımlar
 
-Modun kendi başarım sekmesi **Doğal Afetler**'dir; 27 başarım vardır. "Sağ çıkmak": afetin etki alanındayken afet bitene kadar
+Modun kendi başarım sekmesi **Doğal Afetler**'dir; 28 başarım vardır (kök dahil). "Sağ çıkmak": afetin etki alanındayken afet bitene kadar
 ölmemek. Çok oyunculuda her oyuncu kendi başarımını kazanır.
 
 **Ödüller:** görev 15 XP; hedef 40 XP ve 1–2 Sıcak Salep; meydan okuma 100 XP ve bir ünvan. Ünvanlar: Kozmik Kâşif, Kutup
@@ -277,6 +317,7 @@ hayatta kalmada üretimle, yaratıcı kipte eşya envantere girince. XP miktarla
 | 24 | Felaket Ustası | meydan okuma | Seviye 5 bir afetten sağ çık. |
 | 25 | Hepsini Atlattım | meydan okuma, gizli | Sekiz afetin hepsinden en az bir kez sağ çık. |
 | 26 | Birlikte Hayatta | hedef, gizli | En az 3 oyuncu aynı afeti aynı anda atlatsın. |
+| 27 | Yeni Şafak | görev | Pulsar zincirinin sonunda eski güneşin geri dönüşünü üst dünyada canlı yaşa. |
 
 ## Cold Sweat ile birlikte kullanmak
 
@@ -336,11 +377,15 @@ Sesler (mono Ogg Vorbis, 48 kHz). Ölçü: entegre ses yüksekliği / gerçek te
 | `gunes_kizil_cuce_akor.ogg` | -27.0 LUFS / -14.5 dBTP / 4.5 sn | 33,6 KB | `tools/assets/gunes_sesleri.py` |
 | `gunes_supernova_basinc.ogg` | -25.0 LUFS / -9.3 dBTP / 8.0 sn | 38,3 KB | `tools/assets/gunes_sesleri.py` |
 | `gunes_supernova_kristal.ogg` | -29.9 LUFS / -18.2 dBTP / 20.0 sn | 151,7 KB | `tools/assets/gunes_sesleri.py` |
+| `karadelik_yutma.ogg` | -22.9 LUFS / -13.0 dBTP / 8.0 sn | 40,0 KB | `tools/assets/ses_uret.py` |
+| `karadelik_yutma_yankili.ogg` | -23.0 LUFS / -10.0 dBTP / 8.0 sn | 45,1 KB | `tools/assets/ses_uret.py` |
 | `kasirga_ruzgar.ogg` | -26.1 LUFS / -9.9 dBTP / 12.0 sn | 87,4 KB | `tools/assets/ses_uret.py` |
 | `kasirga_ugultu.ogg` | -25.9 LUFS / -9.6 dBTP / 16.0 sn | 99,9 KB | `tools/assets/ses_uret.py` |
 | `meteor_patlama.ogg` | -23.0 LUFS / -6.5 dBTP / 7.0 sn | 49,3 KB | `tools/assets/ses_uret.py` |
 | `meteor_ucus.ogg` | -26.0 LUFS / -12.0 dBTP / 8.0 sn | 51,3 KB | `tools/assets/ses_uret.py` |
 | `ortam_test.ogg` | -26.0 LUFS / -11.0 dBTP / 12.0 sn | 74,0 KB | `tools/assets/ses_uret.py` |
+| `pulsar_vurus.ogg` | -26.0 LUFS / -13.7 dBTP / 8.0 sn | 79,7 KB | `tools/assets/ses_uret.py` |
+| `pulsar_vurus_yankili.ogg` | -26.0 LUFS / -14.8 dBTP / 8.0 sn | 67,1 KB | `tools/assets/ses_uret.py` |
 | `sinkhole_cokus.ogg` | -22.0 LUFS / -7.4 dBTP / 6.0 sn | 41,8 KB | `tools/assets/deprem_ses.py` |
 | `siren_gunes.ogg` | -20.9 LUFS / -9.3 dBTP / 20.0 sn | 120,7 KB | `tools/assets/ses_uret.py` |
 | `siren_standart.ogg` | -20.0 LUFS / -12.9 dBTP / 10.0 sn | 66,9 KB | `tools/assets/ses_uret.py` |
@@ -366,16 +411,16 @@ Eşya simgeleri (16×16).
 | `hava_radari.png` | 16x16 | 0,3 KB | `tools/assets/esya_radar_dokular.py` |
 | `isitici_cay.png` | 16x16 | 0,3 KB | `tools/assets/yiyecek_dokular.py` |
 | `kozmik_cekirdek.png` | 16x16 | 0,4 KB | `tools/assets/meteor_dokular.py` |
-| `kutup_baligi_corbasi.png` | 16x16 | 0,3 KB | `tools/assets/yiyecek_dokular.py` |
-| `kutup_morinasi.png` | 16x16 | 0,5 KB | `tools/assets/balikcilik_dokular.py` |
+| `kutup_baligi_corbasi.png` | 16x16 | 0,4 KB | `tools/assets/yiyecek_dokular.py` |
+| `kutup_morinasi.png` | 16x16 | 0,4 KB | `tools/assets/balikcilik_dokular.py` |
 | `meteorit_kulcesi.png` | 16x16 | 0,3 KB | `tools/assets/meteor_dokular.py` |
 | `meteorit_parcasi.png` | 16x16 | 0,4 KB | `tools/assets/meteor_dokular.py` |
 | `meyve_serbeti.png` | 16x16 | 0,4 KB | `tools/assets/yiyecek_dokular.py` |
 | `pismis_buz_alabaligi.png` | 16x16 | 0,4 KB | `tools/assets/balikcilik_dokular.py` |
 | `pismis_buz_kefali.png` | 16x16 | 0,4 KB | `tools/assets/balikcilik_dokular.py` |
-| `pismis_derin_soguk_somonu.png` | 16x16 | 0,5 KB | `tools/assets/balikcilik_dokular.py` |
+| `pismis_derin_soguk_somonu.png` | 16x16 | 0,4 KB | `tools/assets/balikcilik_dokular.py` |
 | `pismis_donmus_ringa.png` | 16x16 | 0,4 KB | `tools/assets/balikcilik_dokular.py` |
-| `pismis_kutup_morinasi.png` | 16x16 | 0,5 KB | `tools/assets/balikcilik_dokular.py` |
+| `pismis_kutup_morinasi.png` | 16x16 | 0,4 KB | `tools/assets/balikcilik_dokular.py` |
 | `sicak_cikolata.png` | 16x16 | 0,3 KB | `tools/assets/yiyecek_dokular.py` |
 | `sicak_salep.png` | 16x16 | 0,3 KB | `tools/assets/yiyecek_dokular.py` |
 | `sicak_tavuk_corbasi.png` | 16x16 | 0,3 KB | `tools/assets/yiyecek_dokular.py` |
@@ -394,12 +439,15 @@ Blok dokuları (16×16; `.mcmeta` animasyon tanımıdır).
 | `buz_deligi_kenar.png` | 16x16 | 0,8 KB | `tools/assets/balikcilik_dokular.py` |
 | `ince_buz.png` | 16x16 | 0,8 KB | `tools/assets/donma_dokular.py` |
 | `kiragili_cimen_ust.png` | 16x16 | 0,7 KB | `tools/assets/donma_dokular.py` |
+| `komurlesmis_kutuk.png` | 16x16 | 0,7 KB | `tools/assets/pulsar_dokular.py` |
+| `komurlesmis_kutuk_top.png` | 16x16 | 0,7 KB | `tools/assets/pulsar_dokular.py` |
+| `kul.png` | 16x16 | 0,7 KB | `tools/assets/pulsar_dokular.py` |
 | `su_kopuk.png` | 16x256 | 8,0 KB | `tools/assets/su_kopuk.py` |
 | `su_kopuk.png.mcmeta` | — | 0,1 KB | `tools/assets/su_kopuk.py` |
 
 #### `assets/dogalafetler/textures/particle/`
 
-Parçacık dokuları (yangın, asit, meteor). Parçacık tanımları (`particles/*.json`) `runData` ile `src/generated/` altına yazılır.
+Parçacık dokuları (yangın, asit, meteor, pulsar külü ve koru). Parçacık tanımları (`particles/*.json`) `runData` ile `src/generated/` altına yazılır.
 
 | Dosya | Boyut / ölçü | Dosya boyutu | Üreten betik |
 |---|---|---|---|
@@ -415,6 +463,22 @@ Parçacık dokuları (yangın, asit, meteor). Parçacık tanımları (`particles
 | `asit_sicramasi_1.png` | 8x8 | 0,1 KB | `tools/assets/asit_yagmuru_dokulari.py` |
 | `asit_sicramasi_2.png` | 8x8 | 0,1 KB | `tools/assets/asit_yagmuru_dokulari.py` |
 | `asit_sicramasi_3.png` | 8x8 | 0,2 KB | `tools/assets/asit_yagmuru_dokulari.py` |
+| `kar_tanesi_0.png` | 16x16 | 0,3 KB | `tools/assets/donma_dokular.py` |
+| `kar_tanesi_1.png` | 16x16 | 0,3 KB | `tools/assets/donma_dokular.py` |
+| `kar_tanesi_2.png` | 16x16 | 0,5 KB | `tools/assets/donma_dokular.py` |
+| `kar_tanesi_3.png` | 16x16 | 0,3 KB | `tools/assets/donma_dokular.py` |
+| `kor_0.png` | 16x16 | 0,3 KB | `tools/assets/pulsar_dokular.py` |
+| `kor_1.png` | 16x16 | 0,3 KB | `tools/assets/pulsar_dokular.py` |
+| `kor_2.png` | 16x16 | 0,2 KB | `tools/assets/pulsar_dokular.py` |
+| `kor_3.png` | 16x16 | 0,2 KB | `tools/assets/pulsar_dokular.py` |
+| `kul_tozu_0.png` | 16x16 | 0,3 KB | `tools/assets/pulsar_dokular.py` |
+| `kul_tozu_1.png` | 16x16 | 0,3 KB | `tools/assets/pulsar_dokular.py` |
+| `kul_tozu_2.png` | 16x16 | 0,2 KB | `tools/assets/pulsar_dokular.py` |
+| `kul_tozu_3.png` | 16x16 | 0,3 KB | `tools/assets/pulsar_dokular.py` |
+| `kul_yagisi_0.png` | 16x16 | 0,2 KB | `tools/assets/pulsar_dokular.py` |
+| `kul_yagisi_1.png` | 16x16 | 0,2 KB | `tools/assets/pulsar_dokular.py` |
+| `kul_yagisi_2.png` | 16x16 | 0,3 KB | `tools/assets/pulsar_dokular.py` |
+| `kul_yagisi_3.png` | 16x16 | 0,4 KB | `tools/assets/pulsar_dokular.py` |
 | `meteor_duman_0.png` | 16x16 | 0,8 KB | `tools/assets/meteor_dokular.py` |
 | `meteor_duman_1.png` | 16x16 | 0,8 KB | `tools/assets/meteor_dokular.py` |
 | `meteor_duman_2.png` | 16x16 | 0,8 KB | `tools/assets/meteor_dokular.py` |
@@ -450,7 +514,7 @@ Asit yağmuru yağış sütunu.
 
 #### `assets/dogalafetler/textures/environment/gokyuzu/`
 
-Gökyüzü: güneş evreleri, süpernova kabuğu, nebula, kızıl cüce, yıldız ve galaksi katmanları.
+Gökyüzü: güneş evreleri, süpernova kabuğu, nebula, kızıl cüce, pulsar ve kara delik yutması, yıldız ve galaksi katmanları.
 
 | Dosya | Boyut / ölçü | Dosya boyutu | Üreten betik |
 |---|---|---|---|
@@ -470,6 +534,8 @@ Gökyüzü: güneş evreleri, süpernova kabuğu, nebula, kızıl cüce, yıldı
 | `gunes.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `hale.png` | 256x256 | 7,5 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `hale.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
+| `isi_dalgasi.png` | 256x64 | 6,2 KB | `tools/assets/pulsar_gok_dokulari.py` |
+| `isi_dalgasi.png.mcmeta` | — | 0,1 KB | `tools/assets/pulsar_gok_dokulari.py` |
 | `kalinti_1024.png` | 1024x1024 | 1027,4 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `kalinti_1024.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `kalinti_2048.png` | 2048x2048 | 2996,3 KB | `tools/assets/gokyuzu_dokulari.py` |
@@ -482,6 +548,26 @@ Gökyüzü: güneş evreleri, süpernova kabuğu, nebula, kızıl cüce, yıldı
 | `kara_delik_akis.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `kara_delik_jet.png` | 64x512 | 3,9 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `kara_delik_jet.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
+| `karadelik_3b_disk_soluk.png` | 1024x128 | 31,7 KB | `tools/assets/karadelik_3b_dokulari.py` |
+| `karadelik_3b_disk_soluk.png.mcmeta` | — | 0,1 KB | `tools/assets/karadelik_3b_dokulari.py` |
+| `karadelik_3b_halka.png` | 16x64 | 0,2 KB | `tools/assets/karadelik_3b_dokulari.py` |
+| `karadelik_3b_halka.png.mcmeta` | — | 0,1 KB | `tools/assets/karadelik_3b_dokulari.py` |
+| `karadelik_3b_parilti_soluk.png` | 256x64 | 1,9 KB | `tools/assets/karadelik_3b_dokulari.py` |
+| `karadelik_3b_parilti_soluk.png.mcmeta` | — | 0,1 KB | `tools/assets/karadelik_3b_dokulari.py` |
+| `karadelik_3b_tup.png` | 256x64 | 8,3 KB | `tools/assets/karadelik_3b_dokulari.py` |
+| `karadelik_3b_tup.png.mcmeta` | — | 0,1 KB | `tools/assets/karadelik_3b_dokulari.py` |
+| `karadelik_3b_yildiz.png` | 32x32 | 0,5 KB | `tools/assets/karadelik_3b_dokulari.py` |
+| `karadelik_3b_yildiz.png.mcmeta` | — | 0,1 KB | `tools/assets/karadelik_3b_dokulari.py` |
+| `karadelik_buyuk_256.png` | 256x256 | 31,3 KB | `tools/assets/pulsar_gok_dokulari.py` |
+| `karadelik_buyuk_256.png.mcmeta` | — | 0,1 KB | `tools/assets/pulsar_gok_dokulari.py` |
+| `karadelik_buyuk_512.png` | 512x512 | 77,0 KB | `tools/assets/pulsar_gok_dokulari.py` |
+| `karadelik_buyuk_512.png.mcmeta` | — | 0,1 KB | `tools/assets/pulsar_gok_dokulari.py` |
+| `karadelik_disk_akis.png` | 512x512 | 95,5 KB | `tools/assets/pulsar_gok_dokulari.py` |
+| `karadelik_disk_akis.png.mcmeta` | — | 0,1 KB | `tools/assets/pulsar_gok_dokulari.py` |
+| `karadelik_foton.png` | 256x256 | 16,0 KB | `tools/assets/pulsar_gok_dokulari.py` |
+| `karadelik_foton.png.mcmeta` | — | 0,1 KB | `tools/assets/pulsar_gok_dokulari.py` |
+| `karadelik_mercek.png` | 512x512 | 109,8 KB | `tools/assets/pulsar_gok_dokulari.py` |
+| `karadelik_mercek.png.mcmeta` | — | 0,1 KB | `tools/assets/pulsar_gok_dokulari.py` |
 | `nebula_karisik_128.png` | 128x128 | 16,5 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `nebula_karisik_128.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `nebula_karisik_256.png` | 256x256 | 55,1 KB | `tools/assets/gokyuzu_dokulari.py` |
@@ -500,10 +586,28 @@ Gökyüzü: güneş evreleri, süpernova kabuğu, nebula, kızıl cüce, yıldı
 | `nebula_mavi_256.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `nebula_mavi_512.png` | 512x512 | 117,0 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `nebula_mavi_512.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
-| `pulsar_isin.png` | 512x64 | 2,0 KB | `tools/assets/gokyuzu_dokulari.py` |
-| `pulsar_isin.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
+| `pulsar3b_alan.png` | 256x32 | 2,4 KB | `tools/assets/pulsar_3b_dokulari.py` |
+| `pulsar3b_alan.png.mcmeta` | — | 0,1 KB | `tools/assets/pulsar_3b_dokulari.py` |
+| `pulsar3b_hale_katman.png` | 256x256 | 19,5 KB | `tools/assets/pulsar_3b_dokulari.py` |
+| `pulsar3b_hale_katman.png.mcmeta` | — | 0,1 KB | `tools/assets/pulsar_3b_dokulari.py` |
+| `pulsar3b_koni.png` | 512x64 | 6,6 KB | `tools/assets/pulsar_3b_dokulari.py` |
+| `pulsar3b_koni.png.mcmeta` | — | 0,1 KB | `tools/assets/pulsar_3b_dokulari.py` |
+| `pulsar3b_parcacik.png` | 64x64 | 2,2 KB | `tools/assets/pulsar_3b_dokulari.py` |
+| `pulsar3b_parcacik.png.mcmeta` | — | 0,1 KB | `tools/assets/pulsar_3b_dokulari.py` |
+| `pulsar3b_yuzey.png` | 256x256 | 58,7 KB | `tools/assets/pulsar_3b_dokulari.py` |
+| `pulsar3b_yuzey.png.mcmeta` | — | 0,1 KB | `tools/assets/pulsar_3b_dokulari.py` |
+| `pulsar_cekirdek.png` | 256x256 | 20,0 KB | `tools/assets/pulsar_gok_dokulari.py` |
+| `pulsar_cekirdek.png.mcmeta` | — | 0,1 KB | `tools/assets/pulsar_gok_dokulari.py` |
+| `pulsar_hale.png` | 256x256 | 17,5 KB | `tools/assets/pulsar_gok_dokulari.py` |
+| `pulsar_hale.png.mcmeta` | — | 0,1 KB | `tools/assets/pulsar_gok_dokulari.py` |
+| `pulsar_isin_keskin.png` | 512x32 | 1,5 KB | `tools/assets/pulsar_gok_dokulari.py` |
+| `pulsar_isin_keskin.png.mcmeta` | — | 0,1 KB | `tools/assets/pulsar_gok_dokulari.py` |
+| `pulsar_korona.png` | 512x512 | 61,1 KB | `tools/assets/pulsar_gok_dokulari.py` |
+| `pulsar_korona.png.mcmeta` | — | 0,1 KB | `tools/assets/pulsar_gok_dokulari.py` |
 | `samanyolu.png` | 2048x256 | 422,8 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `samanyolu.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
+| `spagetti.png` | 256x64 | 5,3 KB | `tools/assets/pulsar_gok_dokulari.py` |
+| `spagetti.png.mcmeta` | — | 0,1 KB | `tools/assets/pulsar_gok_dokulari.py` |
 | `supernova_halka.png` | 512x512 | 99,6 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `supernova_halka.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `supernova_isin.png` | 512x512 | 35,9 KB | `tools/assets/gokyuzu_dokulari.py` |

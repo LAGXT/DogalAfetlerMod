@@ -2,7 +2,8 @@
 """İş kuyruğu koşucusu (K-E51, K-E53, K-E60): bir makinenin spool'unu ve ortak `oto` spool'unu (`sira.py`) izler, en çok
 --yuva iş koşar (kuyruk dışı ağır süreçler de yuva tutar), biten işi biten/'e yazar ve KÖK/.vibe/pano.md'yi günceller
 (değişiklikte ve 30 sn'de bir; pc2 koşucusu panoyu pc2'deki aynı yola da kopyalar: pc2'de `watch cat`). pc2 koşucusu ayrıca
-PC2_SUREC_ARALIK_SN'de bir pc2'deki Gradle istemcilerini ssh ile okur (`sira.pc2_surecleri_coz`, kuyruk dışı sayimı).
+PC2_SUREC_ARALIK_SN'de bir pc2'deki Gradle istemcilerini ssh ile okur (`sira.pc2_surecleri_coz`, kuyruk dışı sayimı);
+okuma başarısızsa pc2 yuvaları kapalıdır (K-E60 rev. 2, `sira.pc2_erisim_hatasi`): oto işi ana'ya, pc2 işi bekler.
 
 Kullanım: sira_kosucu.py --makine ana|pc2 [--yuva 2]
 Ayakta kalma: systemd --user `dogalafet-sira@<makine>` (tools/senaryo/dogalafet-sira@.service, KillMode=process: koşucu
@@ -182,11 +183,13 @@ class Kosucu:
         return self.bos_onbellek[makine]
 
     def engel(self, makine, veri):
-        """`makine` bu işi şimdi neden alamaz (None: alır): koşucusu yok, boş yuvası yetmiyor, aynı klasörden işi koşuyor
-        (makine başına klasör başına tek iş; pc2'de uzak.sh klasör kilidi de; `klasor_engeli`). Ana makinede istemci işi
-        yaşayan Hyprland ve tek istemci, oto işi boş RAM >= KAPI_RAM_MB ister."""
+        """`makine` bu işi şimdi neden alamaz (None: alır): koşucusu yok, pc2 erişilemiyor (K-E60 rev. 2), boş yuvası
+        yetmiyor, aynı klasörden işi koşuyor (makine başına klasör başına tek iş; pc2'de uzak.sh klasör kilidi de;
+        `klasor_engeli`). Ana makinede istemci işi yaşayan Hyprland ve tek istemci, oto işi boş RAM >= KAPI_RAM_MB ister."""
         if makine != self.makine and not sira.kosucu_canli(makine):
             return f"{makine} koşucusu yok"
+        if makine == "pc2" and sira.pc2_erisim_hatasi():
+            return "pc2 erişilemiyor"
         if self.bos(makine) < sira.gerek(veri, makine):
             return f"{makine}: boş yuva {self.bos(makine)}"
         kosan = [v for _, v in sira.isler(makine, "kosan")]
@@ -259,23 +262,26 @@ class Kosucu:
         spool = tuple(sorted(str(p.relative_to(sira.SPOOL)) for p in sira.SPOOL.glob("*/*/[!.]*.json")))
         return spool, tuple(d["pid"] for m in sira.MAKINELER for d in sira.dis_surecler(m))
 
-    def pc2_surec_topla(self):
+    def pc2_oku(self):
         """pc2'deki Gradle istemcilerini ve uzak.sh oturum dosyalarını ssh ile okuyup `pc2/surecler.json`'a yazar (pc2'nin
-        giriş kabuğu fish: betik `bash -s`'e stdin'den gider)."""
+        giriş kabuğu fish: betik `bash -s`'e stdin'den gider). ssh başarısızsa {zaman, hata}: pc2 yuvaları kapanır."""
         betik = ('ps -eo pid=,ppid=,etimes=,args=; echo @@; '
                  'for f in /tmp/uzak-*.pid; do [ -f "$f" ] && echo "$f $(cat "$f")"; done; true')
+        try:
+            sonuc = subprocess.run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5",
+                                    os.environ.get("UZAK_MAKINE", "pc2"), "bash", "-s"], input=betik,
+                                   capture_output=True, text=True, timeout=20)
+            if sonuc.returncode != 0:
+                raise OSError(sonuc.stderr.strip()[:200] or f"ssh çıkış {sonuc.returncode}")
+            ps_metni, _, dosyalar = sonuc.stdout.partition("@@")
+            veri = {"zaman": time.time(), "surecler": sira.pc2_surecleri_coz(ps_metni, dosyalar)}
+        except (OSError, subprocess.TimeoutExpired) as hata:
+            veri = {"zaman": time.time(), "hata": str(hata)}
+        sira.json_yaz(sira.dizin("pc2") / sira.PC2_SURECLER, veri)
+
+    def pc2_surec_topla(self):
         while not self.dur:
-            try:
-                sonuc = subprocess.run(["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5",
-                                        os.environ.get("UZAK_MAKINE", "pc2"), "bash", "-s"], input=betik,
-                                       capture_output=True, text=True, timeout=20)
-                if sonuc.returncode != 0:
-                    raise OSError(sonuc.stderr.strip()[:200] or f"ssh çıkış {sonuc.returncode}")
-                ps_metni, _, dosyalar = sonuc.stdout.partition("@@")
-                veri = {"zaman": time.time(), "surecler": sira.pc2_surecleri_coz(ps_metni, dosyalar)}
-            except (OSError, subprocess.TimeoutExpired) as hata:
-                veri = {"zaman": time.time(), "hata": str(hata)}
-            sira.json_yaz(sira.dizin("pc2") / sira.PC2_SURECLER, veri)
+            self.pc2_oku()
             time.sleep(sira.PC2_SUREC_ARALIK_SN)
 
     def pc2_kopyala(self):

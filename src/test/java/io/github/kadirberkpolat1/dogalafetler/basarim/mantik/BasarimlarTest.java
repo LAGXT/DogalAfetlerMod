@@ -11,7 +11,7 @@ import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
-/** Madde 12 listesi birebir: kök + 26 başarım, türler ve gizliler şartnamedeki gibi. */
+/** Madde 12 listesi birebir: kök + 26 başarım + N29 "Yeni Şafak" (27), türler ve gizliler şartnamedeki gibi. */
 class BasarimlarTest {
     private static final Map<Integer, BasarimTuru> TURLER = Map.ofEntries(
             Map.entry(0, BasarimTuru.GOREV), Map.entry(1, BasarimTuru.GOREV), Map.entry(2, BasarimTuru.GOREV),
@@ -23,11 +23,11 @@ class BasarimlarTest {
             Map.entry(18, BasarimTuru.HEDEF), Map.entry(19, BasarimTuru.GOREV), Map.entry(20, BasarimTuru.GOREV),
             Map.entry(21, BasarimTuru.HEDEF), Map.entry(22, BasarimTuru.MEYDAN_OKUMA), Map.entry(23, BasarimTuru.HEDEF),
             Map.entry(24, BasarimTuru.MEYDAN_OKUMA), Map.entry(25, BasarimTuru.MEYDAN_OKUMA),
-            Map.entry(26, BasarimTuru.HEDEF));
+            Map.entry(26, BasarimTuru.HEDEF), Map.entry(27, BasarimTuru.GOREV));
 
     @Test
-    void kokVeYirmiAltiBasarim() {
-        assertEquals(27, Basarimlar.values().length);
+    void kokVeYirmiYediBasarim() {
+        assertEquals(28, Basarimlar.values().length);
         Set<Integer> numaralar = new HashSet<>();
         Set<String> yollar = new HashSet<>();
         for (Basarimlar b : Basarimlar.values()) {
@@ -36,7 +36,7 @@ class BasarimlarTest {
             assertTrue(b.yol().matches("[a-z_]+"), b.yol());
             assertEquals(TURLER.get(b.no()), b.tur(), b.yol());
         }
-        assertEquals(27, numaralar.size());
+        assertEquals(28, numaralar.size());
         assertEquals(Basarimlar.KOK, Basarimlar.numarayla(0).orElseThrow());
         assertEquals("root", Basarimlar.KOK.yol());
         assertEquals("Felaket Başlıyor", Basarimlar.KOK.turkceAd());

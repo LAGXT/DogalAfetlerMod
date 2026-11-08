@@ -44,14 +44,14 @@ final class MeteorYagmuru {
     private OdulZari.Sanslar sanslar;
 
     MeteorYagmuru(int kimlik, Set<UUID> oyuncular, int sureTick, double dakikaBasina, double buyukOran,
-            YanginKaynagi kaynak, long tohum) {
+            MeteorGorunumu gorunum, YanginKaynagi kaynak, long tohum) {
         this.kimlik = kimlik;
         this.oyuncular = Set.copyOf(oyuncular);
         this.kalanTick = sureTick;
         this.dakikaBasina = Math.max(0, dakikaBasina);
         this.buyukOran = Math.max(0, Math.min(1, buyukOran));
         this.kaynak = kaynak;
-        this.gorunum = MeteorGorunumu.kaynaktan(kaynak);
+        this.gorunum = gorunum;
         this.rastgele = new Random(tohum);
         this.dagitim = new MeteorDagitimi(rastgele.nextInt(1024));
     }

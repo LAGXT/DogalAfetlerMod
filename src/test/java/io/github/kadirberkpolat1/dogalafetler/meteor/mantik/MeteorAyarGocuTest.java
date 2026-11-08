@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.github.kadirberkpolat1.dogalafetler.config.SurumluGocPlani;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -91,7 +92,7 @@ class MeteorAyarGocuTest {
     void tabloSiraliYeniEskilerdeYokTekAdim() {
         Set<String> gorulen = new HashSet<>();
         int onceki = 0;
-        for (MeteorAyarGocu.Adim a : MeteorAyarGocu.ADIMLAR) {
+        for (SurumluGocPlani.Adim a : MeteorAyarGocu.ADIMLAR) {
             assertTrue(a.surum() >= onceki && a.surum() >= 1 && a.surum() <= MeteorAyarGocu.GUNCEL, a.yol());
             onceki = a.surum();
             assertTrue(gorulen.add(a.surum() + "/" + a.yol()), "aynı sürümde iki adım: " + a.yol());

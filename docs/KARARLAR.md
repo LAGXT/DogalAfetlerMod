@@ -32,7 +32,8 @@ metnindeki "14" sayısı şartnameyle çelişiyor, şartname kazanır (GOREV gir
 olmadığı için `Kurallar` sınıfı `FMLCommonSetupEvent.enqueueWork` içinde ana thread'de yüklenir. Vanilla
 `IntegerValue` aralık denetlemediği için değerler okunurken sıkıştırılır: `afetMaksSiddet` [1, 5] (madde 11),
 `afetSikligi` [0, 1000] (üst sınır bu kararın: %1000 = on kat; daha yüksek değer bekleme kuralı nedeniyle zaten fark
-yaratmaz). Okuyucular `Kurallar.maksSiddet(...)`, `Kurallar.siklikCarpani(...)`, `Kurallar.afetSecilebilir(...)` kullanır.
+yaratmaz; **rev. K-E62:** beklemeler de sıklığa bölündüğü için %1000 gerçekten ~on kat afet verir, 1000 üstü 1000 sayılır ve OP'lere
+bildirilir). Okuyucular `Kurallar.maksSiddet(...)`, `Kurallar.siklikCarpani(...)`, `Kurallar.afetSecilebilir(...)` kullanır.
 
 **K0-06 `/dogalafet` kayıt kancası.** Kök `DogalAfetKomutu`'nda, `requires(hasPermission(2))`. Diğer paketler mod
 inşasında `KomutKaydi.ekle(LiteralArgumentBuilder)` ya da argümanları `CommandBuildContext` isteyen komutlar için
@@ -117,7 +118,10 @@ yazılırdı. Final metotlar sırayı korur (ör. `baslat` iki kez çağrılamaz
 **K-C2 Zamanlayıcı: tür başına bağımsız oran.** λ_t = `gunlukAfetOrani × afetSikligi × çarpan_t × ağırlık_t / Σağırlık`
 (afet/gün); kontrol aralığında olay olasılığı `1 − e^(−Λ·adım/24000)`, tür λ_t/Λ ile seçilir. Kapalı, beklemedeki ya da tek
 seferliği tükenmiş tür Λ'ya girmez (kalanlar sıklaşmaz). Oyuncu sayısı hiçbir yerde yok (madde 3). Kontrol saniyede bir;
-olasılık adıma göre ölçeklendiği için sıklığı değiştirmez.
+olasılık adıma göre ölçeklendiği için sıklığı değiştirmez. **Rev. (K-E62, AS-1…AS-5, 2026-11-08):** `afetSikligi` artık bütün
+takvimi ölçekler: oran × sıklık, başlangıç (`baslangicBeklemeTick`), genel (`genelBeklemeTick` × şiddet uzaması) ve tür
+(`beklemeTick`) beklemeleri ÷ sıklık (`AfetZamanlayicisi.beklemeOlcekle`); 11.4'ün "200 = iki katı" gerçekleşen afet sayısı olarak
+okunur. Sıklık 0'da seçim yok, süreler değişmez; N14 ertelemesi, afetin kendi süresi ve `/dogalafet start` ölçeklenmez.
 
 **K-C3 Art arda 4–5, katı okuma.** Madde 10 "Seviye 4-5 afetler ardışık gelmesin (aynı seviye art arda en fazla bir kez)".
 Önceki seviyeli afet 4 ya da 5 idiyse bu seçimde 4 ve 5'in ikisi de dıştadır; parantezdeki kural bunun özel hâlidir ve
@@ -226,7 +230,7 @@ yazım `flat`; Minecraft ikisini de `minecraft:flat`'e çözer).
 
 ### İnceleme düzeltmeleri (inceleme-cekirdek P1/P2, şef kararları)
 
-**K-C25 Dönem süreçleri `core.DonemSureci` (B1, madde 11).** Afet yuvası dışında süren süreçler arayüzle kaydolur
+**K-C25 Dönem süreçleri `core.DonemSureci` (B1, madde 11).** **Rev. (K-E62 AS-8):** "afet yuvası" artık tek afet değil, başlama sıralı liste (`DunyaDonemi.aktifAfetler()`); komutla farklı türler aynı anda sürer, aynı tür iki kez başlamaz, doğal seçim yalnız liste boşken. Afet yuvası dışında süren süreçler arayüzle kaydolur
 (`AfetYoneticisi.donemSureciKaydet`, mod kurucusunda; kimlik benzersiz). `/dogalafet stop` aktif afet yokken süren
 bütün süreçleri durdurur ve hangilerini durdurduğunu yazar; `afetTuru`'nun gamerule'ü ya da `dogalAfetlerAcik` kapanınca
 aynı yol saniyede bir çalışır (`kurallariDenetle`); `durum` süren süreçleri listeler; `asama ileri` aktif afet yokken
@@ -459,7 +463,18 @@ başına iş: 11³ blok taraması (~1 300 `getBlockState`, oyuncunun yüklü çe
 söner (ısı çarpması sönmez); vanilla donma (`setTicksFrozen`) tam donunca kendi hasarını ekler. Bunun yerine
 `dogalafetler:donma`/`asiri_isinma` hasarı, aralık eşikte 6 sn'den uçta 2 sn'ye kısalır (yarım kalp); alev/kar tanesi
 parçacıkları görsel işaret verir. Aşırı ısınma `is_fire` etiketlidir: Ateşe Direnç iksiri korur (Cold Sweat ile aynı oyuncu
-beklentisi). Zırh hasarı azaltmaz (`bypasses_armor`), geri tepme yok.
+beklentisi). Zırh hasarı azaltmaz (`bypasses_armor`), geri tepme yok. **Rev. (K-E66, pulsar-2 PL-44 `8300c75`): kendi ekranına
+parçacık gitmez.** Alev (4 `FLAME`) ve kar (6 `SNOWFLAKE`) parçacıkları yalnız aynı boyuttaki diğer oyunculara gider
+(`SicaklikYoneticisi.etkileriUygula`, `ServerLevel.sendParticles(alıcı, …)`, vanilla 32 blok sınırı): gözün 0,6 blok altında
+doğan 8×8 sprite birinci şahısta 32–75 px'lik bloklu turuncu/beyaz leke oluyordu (pulsar `karadelik_spagetti` karesinde koşu
+11'de 30 149 px; hayatta kalma oyuncusu pulsarda ve buzulda aynı lekeyi görürdü). Oyuncunun kendisi sıcaklığı HUD, vinyet ve
+hasarla okur (S-10, S-11). Kanıt: dal GameTest 144/144 (`.vibe/kanit/pulsar-2/gametest-8.log`), görsel koşu 13'te kara delik
+karelerinde leke 0 px; entegrasyonda filtresiz kapı (K-E66). **PL-45 (`0d8e98d`, entegrasyon `002afc7`; inceleme tur 4 Pi1, Pi2):**
+oyuncunun kendisi için istemci parçacığı, durum paketindeki kademe hasarlıyken (`DONUYOR`/`YANIYOR`) ve kamera birinci şahıs
+değilken saniyede bir üretir (`IstemciSicaklik`; sunucuyla aynı: alev 4 / kar tanesi 6, saçılım 0,3 / 0,5 / 0,3, hız 0,01;
+duraklatılmış oyunda ve izleyicide yok): üçüncü şahısta kendi alevini/kar tanesini görür, birinci şahısta leke yok. Sunucu
+kodu değişmedi. GameTest `hasarParcacigiKendisineGitmezYanindakineGider` (batch `sicaklik_hasar`: vücut 95 oyuncunun kanalında
+`ClientboundLevelParticlesPacket` 0, 3 blok yanındaki nötr oyuncuda `FLAME` ≥ 1).
 
 **S-09 Yavaşlama hareket hızı değiştiricisi.** `MOVEMENT_SPEED` üzerinde sabit UUID'li geçici `MULTIPLY_TOTAL` değiştirici; soğuk
 eşiğinden (−30) ölçek ucuna %0→%50. Slowness efekti kullanılmadı (ikon/parçacık görünür, süt ile silinir, süre yönetimi ister).
@@ -819,13 +834,15 @@ gölge (normal karışım), dönen akış dokusu (12–22°/sn), iki kutuptan 6,
 benzeri üç düğüm. Düşük: jet ve akış yok. Yalnız zengin uzayda (ayın olmadığı ya da güneş zinciri sonrası) ve
 `nebulaKatmani` açıkken.
 
-**G2-7 Pulsar görünümü.** Güneş yolunda (kalıntı nebulasının ortasında, Yengeç gibi): mavi-beyaz çekirdek, hale, dönen eksenin
+**G2-7 Pulsar görünümü.** **Yerini aldı (K-E66, PL-6, PL-28, PL-31, PL-33):** dönen ışın ve nabız yerine 16 Hz titreşim, 10,875 Hz
+strob (`PulsarStrob`, en düşük %45) ve 3B pulsar (`Pulsar3B`, gök çapası); CLIENT `gokyuzu.pulsarTitresim` fotosensitivite için. Güneş yolunda (kalıntı nebulasının ortasında, Yengeç gibi): mavi-beyaz çekirdek, hale, dönen eksenin
 iki ışını (4 sn'de bir tur; eksen bakışa 52° eğik, koni yarı açısı 52° → turda bir kez bakıştan geçer), ışının gök
 düzlemine izdüşümü çizilir (bakışa döndükçe kısalır) ve hizalanınca hale ile çekirdek nabız gibi parlar
 (`nabiz = hiza^12`). Gök: gece lacivert `#060A1C`, gündüz ısınmayla kızıl-sıcak pus `#8A3A22` / sis `#B0522C`; uzay gündüz %55;
 ışık haritası sıcak ton. Görünür dönüş gerçek pulsarın (30 Hz) yerine 0,25 Hz: ekranda titreme olmasın.
 
-**G2-8 Pulsar dünya etkileri.** Sıcaklık için ayrı config anahtarı eklenmedi (sıcaklık parçasının kayıt `record`'u ve
+**G2-8 Pulsar dünya etkileri.** **Yerini aldı (K-E66, PL-12, PL-18, PL-19):** sıcaklık çarpanı 2,0, yangın tavanı tam `aktifTavan`, kavurma
+tek bütçeli `KavurmaKuyrugu`. Sıcaklık için ayrı config anahtarı eklenmedi (sıcaklık parçasının kayıt `record`'u ve
 yansımalı config tablosu değişirdi); çarpan sabit 1,2 (vars. +45,6 °C açık havada, Nether 52'ye yakın). Donma pulsarda
 `donma.kalici`'ya bakılmadan çözülür: "buzul kıyametinin tersi" isteği. Yangın sayısı gerçek tick'le (hızla çoğalmaz):
 `/dogalafet hiz` yangın sistemini boğmasın.
@@ -2426,7 +2443,7 @@ deseni): atlatılan türler, balık toplamı, ünvan, kutup sayacı, deniz ölü
 sunucuda okunur, istemciye gitmez, &lt; 200 bayttır, oyuncu dosyasıyla kaydedilir; ölümde ve End dönüşünde `Clone` ile kopyalanır.
 Kısa ömürlü durum (yıldızlı gece sayacı, çorba takibi, yangın saniyesi tekilliği) bellekte, çıkışta silinir.
 
-**A-04 "Sağ çıkan" türetimi.** `SagCikanTuretimi`: doğal olmayan bitişte boş; olaydaki `sagCikanlar ∩ etkilenenler`;
+**A-04 "Sağ çıkan" türetimi.** `SagCikanTuretimi`: doğal olmayan bitişte boş (**rev. K-E62 AS-13:** `AfetBittiEvent.basarimSayilir()` DOGAL ya da KOMUT; KURAL, IPTAL, HATA sayılmaz; SARTNAME N26); olaydaki `sagCikanlar ∩ etkilenenler`;
 `basarim.etkiAlaniPayi` (vars. 0) > 0 ise başarım kendisi de izler: AKTIF aşamada saniyede bir etki alanı + pay içindeki oyuncu
 izine `alanda`, afet sürerken ölünce `oldu` yazılır; bitişte `alanda ∧ ¬oldu ∧ çevrim içi` olanlar da sağ çıkandır. Madde 12'deki
 "afet yarıçapında, config'den ayarlanabilir" yarıçapın kendisi afetin seviye tablosundadır (Faz 4); pay başarıma özgü ek alandır.
@@ -2617,6 +2634,15 @@ vanilla kökün kendisi `announce_to_chat=false`, duyurusuz olduğu için sınan
 karesi ve scoreboard kurulumu kalktı (A-35 Bs1 geçersiz); `sohbet_duyurusu` karesi duyuruları gösterir.
 İnceleme Bb3: mod yalnız vanilla susarken duyurur (`!DisplayInfo.shouldAnnounceChat()` ve `announceAdvancements`); veri paketi
 `announce_to_chat=true` yaparsa duyuru vanillanındır (ünvansız), çift mesaj olmaz.
+
+**A-38 "Yeni Şafak" (kullanıcı isteği pulsar-2; N29, K-E66).** Pulsar zincirinin sonunda eski güneş dönünce üst dünyadaki canlı
+oyuncular `dogalafetler:dogalafetler/yeni_safak`'ı kazanır: no 27, görev (15 XP), gizli değil, ebeveyn Süpernova Tanığı (güneş
+dalı), ikon `minecraft:clock`; ölçüt `BasitOlcut("yeni_safak")`. Tetik başarım sisteminde: `DonemDegistiEvent(GUNES_EVRESI)` evre
+NORMAL ve `PulsarYolu.gunesDondu` (PulsarSureci bayrağı evreden önce yazar, çözülme bitince siler); süpernova yolundan,
+K-C26 geri almasından ve `sifirla`'dan gelen NORMAL vermez. pulsar-2'nin `BasarimIpucuEvent(oyuncu, Ipucu.YENI_SAFAK)`'ı kalktı:
+ipucu afet izine yazılır, pulsar bir afet değil (AS-17 sonrası kurucu kaynak afet ister; derlenmiyordu); `Ipucu.YENI_SAFAK` silindi
+(bit hiç kaydedilmedi). Sekme 28 advancement (kök + 27). GameTest `eskiGunesPulsarYolundanDonunceYeniSafak` (batch
+`basarim_yeni_safak`: bayraksız NORMAL vermez, ölü oyuncu almaz), `unvanKomutuVerirKaldirir` 28 yüklü; JUnit `BasarimlarTest` 28.
 
 ### Reddedilen yollar
 
@@ -3098,7 +3124,7 @@ ve entegratör notları (§E) o dosyada kalır. Şef kararları "Şef kararları
 Rapor `.vibe/rapor/asit-orman-yangini.md`, inceleme `.vibe/rapor/inceleme-asit-orman-yangini.md` (kabul, P0/P1 = 0, P2 = 8),
 doğrulama `.vibe/rapor/dogrulama-asit-orman-yangini.md` (9/9), birleştirme `.vibe/rapor/entegrasyon-4.md`.
 
-**AO-01 Asit yağmuru yaşam döngüsü.** `AsitYagmuru extends Afet`: merkez hedef oyuncunun bloğu (çekirdek varsayılanı),
+**AO-01 Asit yağmuru yaşam döngüsü.** **Rev. (K-E64, AF2-01/02):** etki alanı her yer (`EtkiAlani.herYer()`), kayma ve `kaymaHizi` kalktı; AKTIF boyunca vanilla yağmur açılır, bitişte önceki hava geri yüklenir. `AsitYagmuru extends Afet`: merkez hedef oyuncunun bloğu (çekirdek varsayılanı),
 alan seviye tablosundaki yarıçapla `EtkiAlani.daire`, AKTIF süresi tablodaki saniye. Alan günün rüzgârı yönünde
 (`YanginMantigi.gununRuzgari`, ortak yangının dumanıyla aynı yön) `asit_yagmuru.kaymaHizi` (0,3 blok/sn) ile kayar.
 Yoğunluk AKTIF'in ilk 10 sn'sinde 0→1, son 15 sn'de 1→0 (`AsitKurallari.yogunluk`); 0,15 altında (giriş/çıkış çisesi)
@@ -3127,7 +3153,7 @@ yalnız kalsit çözünür. Etikete yangının sağlayıcısında (§A4 "satır 
 `#minecraft:terracotta` eklendi: tasarımın "cam sera ile korunma" fikri ve sağlam yapı malzemeleri. `afetBlokHasari=false`
 iken örnekleme yapılmaz ve kuyruktaki örtüler ilk tick'te kalkar. Değişen her chunk için `SanalSu.chunkDegisti` (Faz 4 kuralı).
 
-**AO-03 Oyuncu hasarı ve öldürmeme garantisi.** 4 tick'te bir, alanın içindeki (yatay) her canlı, izleyici ve yaratıcı olmayan
+**AO-03 Oyuncu hasarı ve öldürmeme garantisi.** **Rev. (K-E64, AF2-03):** "alanın içindeki" kalktı: afetin boyutundaki başı açık her oyuncu. 4 tick'te bir, alanın içindeki (yatay) her canlı, izleyici ve yaratıcı olmayan
 oyuncu için `MOTION_BLOCKING` yüksekliği göz bloğunun üstünde değilse oyuncu açıktadır (`AsitKurallari.acikta`; yaprak
 da çatı sayılır). Açıkta geçen süre birikir; seviye aralığı (80/60/40/50/40 tick) dolunca hasar (0,5/0,5/0,5/1/1 can
 puanı) `dogalafetler:asit` tipiyle verilir. Hasar canı `asitMinimumCan` (4 = 2 kalp) altına indirmez (`hasarMiktari`); 0'sa
@@ -3174,7 +3200,7 @@ kullanır (Y-03), afet ayrı rüzgâr vermez. Ortam ısısı (madde 7) motorun s
 4 + 2√n, en çok 18 °C, yarıçap 6 + √n); seviye farkı yanan hücre sayısı üzerinden doğar. Afet `SicaklikKancalari`'nı doğrudan
 çağırmaz (çift kaynak olurdu).
 
-**AO-10 Asit yağmuru istemcisi.** Durum `AfetDurumPaketi`'nden (merkez, yarıçap, aşama, `ozel.y`, `ozel.a`); merkez ve
+**AO-10 Asit yağmuru istemcisi.** **Rev. (K-E64, AF2-01/02):** alan ağırlığı ve sis yarıçapı kalktı, yağış kameranın bulunduğu her yerde ve her biyomda; vanilla yağmur `setRainLevel(0)` ile bastırılır. Durum `AfetDurumPaketi`'nden (merkez, yarıçap, aşama, `ozel.y`, `ozel.a`); merkez ve
 yoğunluk 1 Hz paket arasında yumuşatılır; görünen yoğunluk ve bulut tavanı seviyeyle 0,4 / 0,55 / 0,7 / 0,85 / 1
 çarpılır (`AsitKurallari.gorselCarpan`; tasarım §2 "S1 seyrek çise, S5 yoğun sağanak"; görsel koşu 1'de S1 ve S5 aktif kareleri
 aynı tondayı: sarı-yeşil piksel %58,4 / %57,0). Yağış `RenderLevelStageEvent.AFTER_WEATHER`'da vanilla `renderSnowAndRain` sütun
@@ -3261,7 +3287,7 @@ performans kabulü koşu 3, `-PoyunTestiAfeti=kasirga`) "Şef kararları (Faz 4)
 Rapor `.vibe/rapor/kasirga.md`, inceleme `.vibe/rapor/inceleme-kasirga.md`, `-2.md`, `-3.md` (son: kabul, P0/P1 = 0), doğrulama
 `.vibe/rapor/dogrulama-kasirga.md`, `-2.md`, `-3.md`, birleştirme `.vibe/rapor/entegrasyon-4.md`.
 
-**K-01 Durum afette, varlık yalnız görüntü taşıyıcısı (spike B8).** Konum, yön, hedef, AKTIF'te geçen süre ve kaldırılan
+**K-01 Durum afette, varlık yalnız görüntü taşıyıcısı (spike B8).** **Rev. (K-E64, AF2-22):** yüklü alan dışına çıkacak adımda kasırga durur ve yeni ara hedef ister; zaten dışarıdaysa soyut ilerler, yüklü adaylar öncelikli. Konum, yön, hedef, AKTIF'te geçen süre ve kaldırılan
 blok sayısı `Kasirga` afetinin NBT'sindedir (`DunyaDonemi` üzerinden çekirdek kaydeder); `KasirgaVarligi` `noSave` ve sahibi
 olmadan kendini atar. Varlık yalnız kasırga konumu entity-ticking iken vardır; yüklü alan dışına çıkan kasırga soyut ilerler
 (zemin yüksekliği yüklü değilse son yükseklikte), oyuncu gelince varlık yeniden doğar. Spike'ta varlık yaşam döngüsünü kendi
@@ -3272,7 +3298,7 @@ bulutu belirir, uzak uğultu 10 sn'de açılır). AKTIF = doğuş 8 sn → olgun
 dağılma 2 sn; sonra BITIS (hemen). Süreler ölçekli afet tick'idir (`/dogalafet hiz` hızlandırır). Gerekçe: madde 5 "afet aslı
 etkisine geçtiği anda siren söner" → huni AKTIF ile iner; siren sırasında gökyüzünde beliren duvar bulutu gerçek olayın sırasıdır.
 
-**K-03 Doğuş noktası siren menzilinde.** Tasarım notu §6 "hedef oyuncudan 80–140 blok uzakta doğar" diyordu; siren yalnız etki
+**K-03 Doğuş noktası siren menzilinde.** **Rev. (K-E64, AF2-20/21):** doğuş aynı; hedefin başlangıç konumuna yürüyüş (`hedefX/Z`, `hedefVar`, `hedefGecildi`, `anaYon`) kalktı, yerine `KasirgaRotasi` rastgele dolaşımı. Tasarım notu §6 "hedef oyuncudan 80–140 blok uzakta doğar" diyordu; siren yalnız etki
 alanı + 64 blok içindekilere gider (çekirdek §4, N11) ve etki alanı çekim yarıçapıdır (S1 9). 80–140 blokta S1-S3 hedefi
 sireni duymazdı (madde 5 ihlali). Doğuş mesafesi `[0,5·(R + 56), R + 56]` (S1 32–65, S5 54–107 blok; `Yonelim.dogusMesafesi`, JUnit
 `dogusMesafesiSirenMenzilindeVeSapmaSinirli`). Kasırga hedefin başlangıç konumuna doğru 2 sn'de bir yeniden çekilen ±35° sapmayla
@@ -3421,7 +3447,7 @@ Kaynak `.vibe/kararlar/afet-fizik.md` (birleştirme `is/entegrasyon-6`, 2026-11-
 
 #### Kasırga çekimi (istek 5)
 
-**AF-20 Çekim olasılığı seviye × uzaklık.** Kök neden: K-04 yıkım yarıçapının (çekim yarıçapının %60'ı, S5 ~2900 sütun)
+**AF-20 Çekim olasılığı seviye × uzaklık.** **Rev. (K-E64):** çekim ve yıkım aynen; kasırganın konumunu artık hedef izleme değil `KasirgaRotasi` belirler. Kök neden: K-04 yıkım yarıçapının (çekim yarıçapının %60'ı, S5 ~2900 sütun)
 herhangi bir sütununun yalnız en üst bloğunu alıyordu; tavan (40 uçan) doluyken S5'te tick başına 5 blok parçalanıyordu: ağacın
 tepe yaprağı gidiyor, gövdeye sıra gelmiyordu. Karar (`KasirgaYikimi`, JUnit): sütun alana göre eşit seçilir; huni taban
 yarıçapı içinde seviyenin çekirdek olasılığıyla (S1…S5 0,6 / 0,75 / 0,9 / 1 / 1), kenara doğru doğrusal azalarak kenar
@@ -4414,7 +4440,8 @@ entegratör git için `/usr/bin/git` kullanır. Patch'ler `--binary` ile alını
 - spike-gokyuzu: kanca (b) sarmalayan `DimensionSpecialEffects`, (c) yedek.
 
 **K0-24 Faz 1 inceleme kararları (donma).** Madde 9 tasarım notuna karşı kazanır. **Rev. (K-E52):** varsayılan tabloda çimen ↔
-kırağılı çimen satırı yok; çimen çimen kalır, kırağı yalnız biyom rengi tonlaması.
+kırağılı çimen satırı yok; çimen çimen kalır, kırağı yalnız biyom rengi tonlaması. **İstisna (K-E66, PL-16):** pulsar külü
+`kul_katmani` donmada kara döner, çözülmede kül geri gelmez (tek yönlü); kalıcı iz `kul_blogu`.
 
 - Çözülme sırası: önce kırağı/ince kar, sonra buz kenardan içeri; ılık bölge önce (yönlü histerezis eşikleri).
 - Kış ağırlığı sütun düzeyindedir: maske (chunk köşelerinden çift doğrusal) ⊕ 3×3 chunk soğuk biyom oranı ⊕ yükseklik
@@ -5758,7 +5785,7 @@ cümlesi kullanıcı kararıyla eskidi: ünvan yalnız `AdvancementEarnEvent`'te
 "Topla/bul" (#7, #22) `minecraft:inventory_changed` = eşyaya ilk kez sahip olmak; "craft et" (#15, #16) üretim ya da yaratıcı kipte
 envantere girme (A-36, A-16 rev.). SARTNAME N16 yeniden yazıldı.
 
-**K-E58 Asit yağmuru hasarı her seviyede yarım kalp/sn (istek 18; madde 10 netleştirmesi).** Madde 10'un asit satırı (SARTNAME:117,
+**K-E58 Asit yağmuru hasarı her seviyede yarım kalp/sn (istek 18; madde 10 netleştirmesi).** **Rev. (K-E64):** etki alanı her yer, vanilla yağmur açılır; hasar afetin boyutundaki başı açık her oyuncuya (değer aynı). Madde 10'un asit satırı (SARTNAME:117,
 "oyuncuya verilen hasar … artar") kullanıcı isteğiyle değişti: yağmur sürdükçe başı açık oyuncu `asit_yagmuru.hasarSaniye`
 (1,0 can/sn) alır; seviye yarıçapı, süreyi ve aşınmayı büyütür. `asitMinimumCan` (2 kalp) öldürmeme garantisi aynen (madde 10
 "S5'te bile öldürücü olmasın"). Eski `hasar`/`hasarAraligiTick` config anahtarları kalktı (AO-03 rev., GC-5); SARTNAME N20.
@@ -5919,6 +5946,23 @@ Sınama `test_sira.py` 18/18 (`test_dagitim_bos_yuvasi_cok_olana_esitlikte_pc2`:
 pc2, ana, pc2, ana, `2/2 · 2/2`; `test_dagitim_dolu_makine_atlanir`: pc2 dolu → ana, ana dolu → pc2). Canlı kanıt
 `.vibe/kanit/sira-4/dagitim-2.md`.
 
+**K-E60 rev. 2 pc2 erişilemezken yuvaları kapalı (şef kararı, 2026-11-08; entegratör, `is/entegrasyon-7` `f1d8db4`).** Kullanıcı
+gözlemi: pc2 06:00'dan beri erişilemiyor (`No route to host`, büyük olasılıkla Windows açık) ama pano "pc2 çalışıyor" diyordu ve
+oto işleri pc2'ye düşüp `uzak.sh` çıkış 4 ile ölüyordu (afet-fizik-2 ve entegrasyon `compile-3`, `1108-060053626-56`): "koşucusu
+yaşıyor" makinenin erişilebilir olduğu anlamına gelmiyordu. Karar: pc2 koşucusunun zaten 5 sn'de bir yaptığı ssh okuması
+(`Kosucu.pc2_oku`, `ssh -o BatchMode=yes -o ConnectTimeout=5 pc2 bash -s`) başarısızsa ve okuma tazeyse (`PC2_SUREC_TAZE_SN` 60)
+pc2 yuvaları kapalıdır (`sira.pc2_erisim_hatasi`): `Kosucu.engel` "pc2 erişilemiyor" döner, oto işi ana'ya gider, `--makine pc2`
+(ve `pc2_istemci.sh`) işi ölmeden bekler; `sira.py ekle` pc2 işinde UYARI basar; pano koşucu satırında "pc2 erişilemiyor
+(<neden>)", `Yuva: pc2 0/0`, bekleyen pc2 işinde "bekliyor (n.; pc2 erişilemiyor)". ssh yeniden geçince bir sonraki okumada pc2
+kendiliğinden açılır. Okuma yoksa (koşucu yeni başladı) eski davranış sürer. Reddedilen: ayrı `ssh pc2 true` döngüsü (aynı bilgiyi
+ikinci ssh ile alır). Bilinen sınır: pc2 düştüğü an ile ilk başarısız okuma arasında (≤ ~10 sn: 5 sn aralık + 5 sn bağlantı
+zaman aşımı) pc2'ye verilen oto işi yine çıkış 4 ile biter (yeniden kuyruğa alma yok). Sınama `test_sira.py` 19/19
+(`test_pc2_erisilemezse_yuvalari_kapali_oto_ana_pc2_isi_bekler`: sahte ssh çıkış 255 → oto işi ana, pc2 işi bekler, pano "pc2
+erişilemiyor (No route to host)" ve `Yuva: ana 1/2 · pc2 0/0`; sahte ssh geçince pc2 işi pc2'de koşar). Canlı: KÖK'te `sira.py`/
+`sira_kosucu.py` dalın sürümüyle değiştirildi (K-E53 kalıbı; birleşmede `checkout --` ile geri alınır), koşucular 06:23:06'da
+yeniden başladı (kuyruk boştu, kesilen iş yok); deneme oto işi `1108-062327862-4f` ana'da koştu, pc2 işi `1108-062327776-b6`
+"pc2 erişilemiyor" ile bekledi ve iptal edildi. Kanıt `.vibe/kanit/entegrasyon-7/pano-pc2-kapali.txt`, `test_sira-1.log`.
+
 **K-E61 Sunucu config göçü: `ayarSurumu` ile eski varsayılan yeni varsayılana çekilir, elle değer korunur (şef kararı MT2-31,
 Mt22; 2026-11-08; uygulama meteor-2 `20fe851`, entegrasyon `7745c47`).** Forge `serverconfig` dünya klasöründe yaşar ve var
 olan dosyada aralık içindeki değere dokunmaz; varsayılan değişince var olan dünya eski değeri okur (meteor 90 → 180/dk, tavan
@@ -5951,6 +5995,139 @@ kuralının bekçisi yok (öneri: N19 denetiminde yayımlanmış sürümün vars
 JUnit `MeteorAyarGocuTest` (eski varsayılan → yeni, ara sürüm zinciri, elle değer korunur, güncel sürüme dokunulmaz, sayı
 türü), `AyarGocuTest` (yedek ve numara, bozuk toml değişmez, yazılamayan klasörde dosya değişmez), GameTest
 `eskiAyarDosyasiAcilistaGocEderElleDegerKorunur` (batch `meteor_goc`, yedeği de sınar); entegrasyon dalında tam kapı (K-E59).
+**Rev. (entegrasyon 7, `2b3d5c8`): tek kalıp.** Bölümler yalnız `config.SurumluGocPlani` tablosu verir (`AyarKaydi.sunucuGocu(plan)`;
+eski `sunucuGocu(surumYolu, guncel, plan)` imzası, `AyarKaydi.GocPlani` ve `AyarGocu.Kayit` kalktı). `CekirdekAyarGocu`
+(`cekirdek.ayarSurumu`, AS-11), `MeteorAyarGocu` (`meteor.ayarSurumu`, MT2-31) ve `GokyuzuAyarGocu` (`gokyuzu.ayarSurumu`, PL-24)
+yalnız `SURUM_YOLU`, `GUNCEL`, `ADIMLAR`, `PLAN` taşır; tablo doğrulaması (sıra, sürüm aralığı, yeni değer eskilerde değil) ve
+plan `SurumluGocPlani`'nda, dosya/yedek/atomik yazım yalnız `config.AyarGocu`'da. Çekirdeğin eşitliği tam eşitlikten 1e-9
+toleransa geçti (tamsayı bekleme değerlerinde fark yok). JUnit `SurumluGocPlaniTest.bolumlerOrtakPlaniKullanir` üç bölümü sınar;
+`CekirdekAyarGocuTest`, `MeteorAyarGocuTest`, `GokyuzuAyarGocuTest`, `AyarGocuTest` korundu.
+
+## Teslim sonrası — güncelleme turu 2
+
+**K-E62 Afet sıklığı beklemeleri de ölçekler, `/dogalafet siklik` (kullanıcı şikâyeti: "afetSikligi etkisiz"; şef kararı,
+2026-11-08; dal `is/afet-siklik` `1f51c8c`, entegrasyon `is/entegrasyon-7` `5dc7c91`).** Kök neden: K-C2 `afetSikligi`'nı yalnız
+Poisson oranına çarpıyordu; başlangıç beklemesi (24 000 tick), genel bekleme (12 000 × şiddet uzaması) ve tür beklemesi (48 000)
+sıklıktan bağımsızdı. Oturum ölçeğinde beklemeler baskın olduğu için %1000 de %100 gibi görünüyordu ve geri bildirim yoktu
+(kullanıcı log'u: oturumun tamamı ilk gün beklemesinde, 0 afet; 1000 üstü sessizce 1000). Kararlar (`.vibe/kararlar/afet-siklik.md`):
+AS-1 oran × sıklık, üç bekleme ÷ sıklık (K-C2 rev.); AS-2 sıklık değişince süren beklemelerin kalanı `eski/yeni` ile çarpılır
+(`BeklemeDurumu.siklikDegisti`), bitiş anlarının hangi sıklıkla hesaplandığı `DunyaDonemi.uygulananSiklik`'te (NBT, yoksa 1,0 = eski
+kayıt ölçeksiz; 0 kaydedilmez) kalıcı, yeniden açılışta çift ölçekleme yok; AS-3 vanilla `/gamerule` geri çağırması olmadığı için
+`AfetYoneticisi.tick` ham değeri her tick karşılaştırır, değişimde OP'lere ve konsola "Afet sıklığı artık %S" (+ sınır dışı uyarısı)
+ve sonraki afet satırı; oturumun ilk okuması sessiz; K-C46 döngü kimliği, dönem süreçleri ve `sifirla` (beklemeler 0,
+`uygulananSiklik` korunur) etkilenmez; AS-4 `core.mantik.SonrakiAfetTahmini` zamanlayıcının kurallarıyla kapalı biçimde sonraki afetin
+ortalamasını ve %90 aralığını verir (geçici çarpanlar bugünkü değerle, `hiz` hesaba katılır), `/dogalafet durum` ve `siklik` bu
+satırı yazar; AS-5 `/dogalafet siklik` okur, `/dogalafet siklik <0..1000>` aynı gamerule'ü yazar (çekirdek alt komutu,
+`CEKIRDEK_ALT_KOMUTLARI`); alt komutsuz `/dogalafet` kullanılabilir alt komutları listeler (önceden "Bilinmeyen veya eksik komut").
+Şartnamede ayrı sıklık komutu vaat edilmiyor (KOM.1–KOM.17); komut kolaylıktır. SARTNAME N8 ve N18'e ek, yeni N25; IZLEME 3.7,
+11.4, yeni KOM.18 ve N25. Kanıt: JUnit `AfetZamanlayicisiTest` (`beklemeOlcekleSikligaBoler`,
+`onKatSiklikBaslangicBeklemesiniOndaBireIndirir`, `gerceklesenAfetSayisiSikliklaOrantili`), `BeklemeDurumuTest` (`siklikBeklemeyiBoler`,
+`siklikDegisinceKalanOlceklenir`), `SonrakiAfetTahminiTest` (5 vaka); GameTest `siklikKomutuBeklemeyiOlcekleriKaliciTahminKisalir`
+(batch `cekirdek_siklik`; dalda `gametest:Komut|Cekirdek @be725cf0ad39` 20/20). Ağ protokolü değişmez (yeni paket yok). **Bilinen sınır (AS-6, `fe0b99e`):** %1000 gerçekleşen afet sayısında ≈ ×5 verir, ×10 değil: afetin kendi süresi sıklıkla kısalmaz ve yuvayı tutar. **Tur 2 (`is/afet-siklik` `7fa414f`, entegrasyon `88e43f3`):** (a) K-C2 rev. 2 varsayılanları: başlangıç 6 000, genel 6 000 × şiddet uzaması, altı sık afetin tür beklemesi 24 000 (ay/güneş değişmedi); `cekirdek.zamanlayici.ilkAfetGarantiTick` 24 000 (AS-12: hiç afet olmamış dünyada süre ÷ sıklık dolunca seçim olasılığı 1; 0 kapalı); eski varsayılanlar `cekirdek.ayarSurumu` 1 göçüyle (`core.mantik.CekirdekAyarGocu`, K-E61 kalıbı). (b) **Komutla çoklu afet** (kullanıcı kararı: "en fazla 1" kalktı; şef varsayımı: aynı tür iki kez başlatılamaz, `ZATEN_AKTIF`): `DunyaDonemi` başlama sıralı liste (`aktifAfetler()`, `aktifAfet()` = en erken, `aktifAfet(tur)`; NBT `aktifAfetler`, eski tek etiket okunur); doğal seçim yalnız liste boşken; siren önceliği ay > güneş > diğer (`SirenTuru.oncelik`, AS-9; düşük öncelikli siren çalınmaz); `stop [afet]`, `asama ileri [afet|süreç]`; radar/sismograf oyuncunun gördüğü en yakın afet (AS-10). Çekirdek §A sözleşmesi değişti (K-C25 rev.). (c) **Başarım komutla da sayılır** (AS-13; A-04 rev., SARTNAME N26). (d) `AfetDurumPaketi` "yok" paketi türü taşır (tel biçimi değişti): protokol 8 listesinde, entegratör tek sefer artırır. **Bilinen sınırlar:** AS-14 komutla başlayan kasırga/asit oyuncuyu etki alanına almadıysa başarım yok (asit için **kapandı (K-E64)**: etki alanı her yer; kasırga için açık, rota oyuncuya 32 bloktan yaklaşmaz); ana makinede TPS ölçülmedi (`cekirdek_sunucu` pc2 20,00). Kanıt defter `7fa414f`: `test @ec9ade7bf8bb`, `gametest:Komut|Cekirdek|Basarim @3958f1dbfa47`, `cekirdek_sunucu @97427cfb3aef`. **P2 kapanışı (`e7113a7`, entegrasyon `49f95dc`):** AS-15 başarım yalnız AKTIF'e girmiş afetin DOGAL ya da stop bitişinde sayılır (`AfetBittiEvent.aktifeGirdi`); `sifirla` afetleri IPTAL ile durdurur ve sayılmaz, stop tamamlanmamış süreci geri aldıysa (`surecGeriAlindi`, K-C26 güneş BUYUYEN → NORMAL) sayılmaz. AS-16 afet numarası dönemdeki sayacın (`DunyaDonemi.yeniAfetNo()` = `max(saat, sonrakiAfetNo)`, 2'şer, NBT `sonrakiAfetNo`, `sifirla` dokunmaz; `core.mantik.AfetNumarasi`), aynı tick'te başlayan iki afet aynı numarayı almaz. AS-17 `BasarimIpucuEvent(oyuncu, ipucu, kaynakAfet)` kaynak afetin türünü ve numarasını taşır; ipucu yalnız o numaralı AKTIF afetin izine yazılır. **Bilinen sınır (As10):** TPS kısması ortak çarpandır ama blok/efekt bütçeleri afet başınadır; aynı anda çok afetin ortak tavanı yok (yangın ve meteor tavanları ortak), çok afeti birden başlatmak OP'nin sorumluluğundadır. Kanıt defter `e7113a7`: `test @bd89ed8094f1`, `gametest:Komut|Cekirdek|Basarim @d77f144bb058`.
+
+**K-E63 Her tarifin tarif kitabı kilidi var (kullanıcı şikâyeti: "tarif kitabında radar/sismograf yok"; şef kararı, 2026-11-08;
+dal `is/tarif-2` `7dbe2a8`, entegrasyon `is/entegrasyon-7`).** Kök neden: Hava Radarı, Sismograf, Gelişmiş/Hassas sürümleri,
+Meteorit Külçesi ve Termostat Plakası tarifleri için `unlockedBy` kilit başarımı (`advancements/recipes/...`) üretilmiyordu;
+tarif çalışıyor ama kitapta hiç açılmıyordu. Kural: her `recipes/*.json` için datagen'de `unlockedBy` kilit başarımı zorunlu
+(`RadarSismografVerileri`, `MeteorVerileri`); bekçi GameTest `herTarifinKitapKilidiVarMeteorTarifleriGirdiyleAcilir`
+(`EsyaOyunTestleri`; kilidi olmayan tarif testi kırar; bekçi her tarifi kilit başarımının `rewards.recipes` alanıyla eşler, Tr1 `ca15ab5`). Ağ protokolü etkilenmez. Kanıt: defter `gametest:Esya|Meteor
+@59b0622ceb16` (`7dbe2a8`, `.vibe/kanit/tarif-2/gametest-2.log`); filtresiz kapı güncelleme turu 2 sonunda.
+
+**K-E64 Asit yağmuru bütün dünyada, kasırga rastgele dolaşır (kullanıcı şikâyeti: "asit yağmuru yalnız hedefte yağıyor, kasırga
+oyuncuyu takip ediyor"; şef kararları 1–3, 2026-11-08; dal `is/afet-fizik-2` `9dcdeff`, entegrasyon `26cdbfa`).** Ayrıntı
+`.vibe/kararlar/afet-fizik-2.md` AF2-01…AF2-24. **Asit:** etki alanı `EtkiAlani.herYer()` (`AfetTuru.sunucuGeneli()` değişmedi; hedef
+oyuncu yalnız komut uyumluluğu ve doğuş bilgisi, AF2-01/04); AKTIF'e geçerken dünyanın havası saklanır ve vanilla yağmur açılır,
+kesilirse yeniden açılır, bitişte (stop, doğal, sıfırla, hata) önceki hava geri yüklenir (`AsitHavasi`, AF2-02; yağmur ateşi söndürür,
+ortamı soğutur: bilerek); hasar afetin boyutundaki başı açık her oyuncuya (AF2-03, K-E58 değeri); aşınma oyuncuların çevresinde
+yüklü chunk'larda, tick bütçesi `asit_yagmuru.blokButcesi` 32 × TPS kısması (AF2-05); radar asidi mesafesiz "her yer" gösterir
+(`RadarPaketi.HER_YER` merkez işareti, tel biçimi aynı; N7 anomalisi yalnız güneş/ay, AF2-06). **Kasırga:** hedef izleme kalktı (AF2-20);
+`afet.kasirga.mantik.KasirgaRotasi` (saf, belirlenimci) 200–400 ölçekli tick'te (10–20 sn) bir yeni ara hedef: %70 rastgele (önceki
+bacağın yönü ±60°, 48–128 blok), %30 rastgele bir oyuncunun 32–96 blok çevresinde sabit nokta; hiçbir ara hedef oyuncuya 32 bloktan
+yakın değil; rota başlangıcından 512 blok sınırı, yüklü alan (AF2-21/22); rota NBT'de, kayıttan aynı ara hedeflerle sürer
+(AF2-23); çekirdekte yeni salt okunur `Afet.yolHedefi()`, Gelişmiş radarın hareket oku ara hedefe yönelir (AF2-24). Diğer
+afetlerin denetimi (AF2-10 tablosu): hedef oyuncuya bağlı başka afet yok. Rev.: AO-01, AO-03, AO-10, K-E58, K-01, K-03, AF-20; N7
+yorumu AF2-06; SARTNAME N27, N28. **Birleştirme (entegratör):** `RadarSunucu` içerik çakışması (afet-siklik AS-10 çoklu seçim ↔
+afet-fizik-2 her yer/ara hedef) birleştirmede çözüldü: görünürlük aday başına afet-fizik-2 kuralıyla (`gokyuzu` parametresi);
+seçimde **bölgesel afet küresel olandan (asit, güneş, ay) önce**, bölgeseller arasında en yakın, küreseller arasında önce başlayan
+(AS-17 başarım izi kuralıyla aynı; afet-siklik'te güneş/ay mesafe 0 ile bölgeseli bastırıyordu); ara hedef oku ve iz oku
+yalnız izlenen afetin hızını kullanır. Kuyruktan `compileJava` (`1108-045226262-23`) BUILD SUCCESSFUL, derleme düzeltmesi gerekmedi
+(`BasarimIpucuEvent` 3 parametreli kurucu ve `aktifAfet(tur)` okumaları kendiliğinden birleşti; GameTest/otomasyon sınıflarındaki
+birincil `aktifAfet()` okumaları AS-8 gereği kaldı). Kanıt (dal): defter `test @5696f220eb1e` (`9dcdeff`, 626/0),
+`asit_orman_yangini_sunucu @6613b103634f`, GameTest `Asit|Kasirga|Esya` 37/37 (`.vibe/kanit/afet-fizik-2/gametest-1.log`, süzgeçli);
+filtresiz kapı güncelleme turu 2 sonunda. **Tur 2 (`9a179ff`, entegrasyon `98f47ae`):** AF2-08 küresel alanlı bölgesel afet yalnız kendi boyutunu etkiler: "her boyut" yalnız `tur().sunucuGeneli()` (güneş, ay); `AfetYoneticisi.etkilenebilecekOyuncular`, `takipGuncelle` ve `olumuKaydet`'teki `|| alan.global()` kalktı (asidin sireni, durum paketi, etkilenen ve ölüm kaydı yalnız afetin boyutunda; Nether/End'deki oyuncu Çatı Altı/Felaket Ustası almaz). Afet-siklik bu üç metodu afet listesine çevirmişti; birleşik kodda üç koşulun da kalktığı koddan doğrulandı (`grep alan.global()` `AfetYoneticisi`'nde boş), birleştirme düzeltmesi gerekmedi; güneş/ay yolu her metotta ilk koşul olarak aynen. Af6 izleyici oyuncu aşınma merkezi değil (yaratıcı için tur 3). AF2-25 kasırga her yeni ara hedefte yönünü hemen çevirir, 512 sınırında ve yüklü alan kenarında zorunlu seçim en az `KasirgaRotasi.ZORUNLU_ARALIK` 200 ölçekli tick arayla (eski `YENIDEN_SECIM_TICK` 20; tick başına seçim ve log seli yok), ara hedef satırı yalnız görsel otomasyonda (K-E42). Kanıt (birleşik `98f47ae`, kuyruktan): `compileJava` `1108-051906281-c7` BUILD SUCCESSFUL; GameTest `TEST_FILTRE='Asit|Cekirdek|Radar'` 30/30 (`1108-051906370-4b`, `gametest:Asit|Cekirdek|Radar @7f5d793f1096`; `baskaBoyuttakiOyuncuAsittenEtkilenmez` ve `cokluAfetteRadar…` dahil); dal defteri `test @659ddd6aedde`, `kasirga_sunucu @dfbc430396e4`. **Bilinen sınırlar:** asit boyunca vanilla yağmuru soğuk biyomda kar katmanı bırakır ve kazanları doldurur, `afetBlokHasari=false` iken de (AF2-07; mixin'siz çözüm yok, normal yağmurun etkisi); kayıttaki asit atılırsa (kayıtsız tür, okunamayan kayıt) saklanan hava geri yazılmaz, yağmur `doWeatherCycle` açıkken en çok 1 dk sonra biter (AF2-09 a); istemci bastırması tick sonunda olduğu için AKTIF başında ve bitişte sunucu yağmur düzeyi değişirken yüksek FPS'te vanilla yağmur bir iki kare titreyebilir (AF2-09 b); eski dünyada ilk açılışta
+`Incorrect key asit_yagmuru.kaymaHizi` WARN bir kez; asit ekran vinyeti değerlendirici modelce görülmedi; ana makinede FPS
+ölçülmedi. Radar seçim sırası GameTest ile sınandı: `EsyaOyunTestleri.cokluAfetteRadarBolgeseliOnceKureselleriBaslamaSirasiylaGosterir` (batch `esya_radar_coklu`; yalnız asit "her yer", asitten sonra başlayan deprem gösterilir, asit + güneş arasında önce başlayan, ikisinin üstüne deprem; asit etki alanı her yer olan taklit) `20903d0`, kuyruk `1108-045740832-56`, defter `gametest:Radar|Cekirdek @c7887b40968c` 19/19. **Tur 3 (`9b4de30`, entegrasyon `40d1472`):** aşınma süzgeci yalnız izleyiciyi dışlar, yaratıcı oyuncunun çevresi de aşınır (şef kararı Ag2, AF2-05: "her yerde, herkes görsün"; hasar süzgeci `maruzMu` yaratıcı/izleyici/ölü aynı), `AsitYagmuru` Javadoc'u etki alanını afetin boyutuyla sınırlar (Ag1, AF2-08).
+
+**K-E65 Protokol "8" (K-C47 tek artış; entegratör `entegrator-2`, 2026-11-08; `is/entegrasyon-7` `b9db98b`).** Güncelleme turu 2'nin
+tel biçimi değişiklikleri tek artışta: (1) `cekirdek/afet_durumu` (`AfetDurumPaketi`, afet-siklik AS-8): tür `aktif` bayrağından önce
+yazılır ve `yok(tur)` paketinde de taşınır (istemci yalnız o türü siler); (2) `cekirdek/donem` (`DonemPaketi`, pulsar-2 §A3): evre
+`writeEnum` sıra numarasıyla, yeni `GunesEvresi.KARADELIK_YUTMA` sıra 6 (enum sonunda; eski istemci `readEnum`'da çözemez), son
+alan VarInt `bayraklar` (`BAYRAK_DONUS_YOLU` 1, `BAYRAK_BLOK_HASARI` 2, `BAYRAK_GUNES_DONDU` 4, `BAYRAK_DURAKLATILDI` 8; sonuncusu
+pulsar-2 PL-42 Pg3 `ad6df79`, aynı VarInt içinde yeni bit, tel biçimi ve protokol 8 değişmez); (3) yeni `gokyuzu/yutma` paketi
+(`PulsarSesleri`, alansız): ada göre sıralı kimlikler kayar (`meteor/sarsinti` 4 → 5 …). `RadarPaketi.HER_YER` (afet-fizik-2) merkez
+işaretidir, tel biçimi aynı; tarif-2 paket değiştirmedi. Uyumsuz istemci el sıkışmada reddedilir. Tek dokunulan yer
+`network.AgKanali.PROTOKOL_SURUMU`; README, SARTNAME ve TEST-RAPORU'nda protokol numarası geçmez. Kanıt (`8c8c497`, kuyruktan, ana makine; pc2 06:00'dan beri erişilemez): `runData` `1108-060053791-1c` BUILD SUCCESSFUL (`yeni_safak.json` ve dil satırları `3837d3c`), `compileJava` `1108-060538709-49` (runData derlemişti, UP-TO-DATE), JUnit 720/0 `1108-060538824-4a` (`test @a9525110bf20`), GameTest `TEST_FILTRE='Pulsar|Gokyuzu|Cekirdek|Komut|Basarim|Meteor'` 101/101 `1108-060538937-39` (`@4575c27178fe`; "13 ağ paketi kaydedildi (protokol 8)", `gokyuzu/yutma` 4, `meteor/sarsinti` 5; göç GameTest'i üç bölümü tek geçişte göç ettirir; en büyük batch 5), N19 245/245 fark 0. Son: pulsar-2 `cbb5d98` birleştikten sonra filtresiz kapı `f172807` (kuyruktan, ana makine; pc2 erişilemez, K-E60 rev. 2 ile oto işleri ana'ya): `runData` `1108-065252850-3a` fark yok (`15f0d25`, written 0), `compileJava` `1108-065909458-c7` BUILD SUCCESSFUL, JUnit 722/0 `1108-065909550-22` (`test @fa6bc46006f4`), filtresiz GameTest 274/274 `1108-065909640-7a` (`FILTRE=yok`, `gametest @4d4690de1520`, protokol 8, en büyük batch 7), N19 245/245 fark 0 (`8f45ddf`). İlk filtresiz koşu (`15f0d25`, `1108-065253125-25`) 273/274: `dusenMeteorKraterAcarSertBlokKorunur` "meteor varlığı oluşmalı" (zorlanmış chunk ilk tick'te varlık işlemeyince `MeteorAPI.dusur` doğrudan çarpıp boş döner; AY-12 yarışı, eski ~140 koşuda görülmemişti); birleştirme düzeltmesi `f172807`: üç meteor GameTest'i sahne merkezi varlık işleyince düşürür (`MeteorOyunTestleri.varlikIsleyinceDusur`).
+
+**K-E66 Pulsar zinciri: 15 gün pulsar, kara delik yutması, buzul kıyamet, eski güneşin dönüşü; 3B ve ses (kullanıcı isteği:
+"pulsar yetersiz"; şef kararları, 2026-11-08; dal `is/pulsar-2` `b0a8878`, entegrasyon `be5ec37`).** Ayrıntı `.vibe/kararlar/pulsar-2.md`
+PL-1…PL-45. **Zincir** (`gokyuzu.PulsarSureci`, süreç kimliği `pulsar`; saf kurallar `gokyuzu.mantik.PulsarZinciri`): PULSAR
+(`gokyuzu.pulsarGun` 15 oyun günü, ilk `pulsarIsinmaGun` 1 gün ısınma) → tek yeni evre `KARADELIK_YUTMA` (90 sn, doğal geçişte gündüz
+penceresi [3000, 7200), en çok bir gün bekler; 55. sn'de tek seferlik patlama sesi ve sarsıntı) → GUNESSIZ buzul kıyamet
+(`pulsarSonrasiGunessizGun` 10 gün + ilk şafak) → KIZIL_CUCE doğuşu → NORMAL (eski güneş). Buzul ve doğuş mevcut evrelerdir,
+`core.PulsarYolu` bayrakları (`donusYolu`, `gunesDondu`, `zincirTukendi`; `DunyaDonemi.ekVeri("pulsar")`) ayırt eder (PL-1).
+Süreler K-C29 oyun günüyle (PL-2), kural duraklaması kaldığı yerden sürer (PL-35, K-C46). Eski güneş dönünce donma bağımsız
+çözülür ve `zincirTukendi` kalıcı yazılır: güneş patlaması yalnız `tekrarlanabilir` açıkken yeniden seçilir (PL-9, PL-36; madde 4).
+**Dünya etkileri:** kavurma tek bütçeli `KavurmaKuyrugu` (`pulsarBlokButcesi` 256 × TPS kısması, 96 blok, örtülü yer kavrulmaz,
+`SanalSu.chunkDegisti`, `afetBlokHasari` kapısı), kül katmanı/bloğu, kömürleşmiş kütük, lav gözesi (`pulsarLav`), meteor oyuncu başına
+12/dk (`MeteorGorunumu.PULSAR`, uzun yeni `MeteorAPI.yagmur` overload'u), yangın 24/dk tam `aktifTavan`, sıcaklık çarpanı 2,0 (PL-11…PL-19,
+PL-37, PL-38); kül → kar tek yönlü (PL-16, K0-24 istisnası). **Görünüm ve ses:** 3B pulsar ve kara delik (gök çapası, mercek,
+akresyon diski, spagettileşme; PL-27…PL-33), 16 Hz titreşim ve 10,875 Hz strob (CLIENT `pulsarTitresim`; 1'de bile koni en düşük %45,
+0'da strob yok: fotosensitivite, PL-29), yutma sesi ve sarsıntısı `gokyuzu/yutma` paketiyle (PL-20), ses varyant çapraz geçişi (PL-34).
+G2-7 ve G2-8'in yerini alır. **Komutlar:** `asama ileri pulsar` (ısınma tamamsa evre geçer) ve o aşamadayken `karadelik`, `gunessiz`,
+`kizilcuce` takma adları (`DonemSureci.kimlikEsler/takmaAdlar`), `durum`'da pulsar zinciri satırı (`DonemSureci.durumSatiri`).
+**§A sözleşmeleri:** `GunesEvresi.KARADELIK_YUTMA` (enum sonu), `PulsarYolu` (tek erişimci), `DonemPaketi.bayraklar`,
+`AfetYoneticisi.tekSeferlikUygun`, `TekSeferlikKurallar.uygunMu(..., donusYolu, zincirTukendi, ...)`, `PulsarEtkileri.tick/bitir`,
+`KavurmaKuyrugu`, `PulsarKayitlari`, `MeteorGorunumu.PULSAR`, `PulsarSesleri`; ayrıntı `.vibe/kararlar/pulsar-2.md` §A, `gokyuzu-2.md` §A rev.
+**Entegrasyon (be5ec37 ve sonrası):** çakışmalar README komut tablosu (afet-siklik çoklu afet/`stop [afet]`/`siklik` + pulsar
+zinciri ve takma adlar: ikisi de kaldı), `AfetYoneticisi` import (ikisi de), `CekirdekKomutlari` javadoc (birleşik metin);
+`GunesEvresi`, `DonemPaketi`, `DogalAfetKomutu` (`ASAMA_HEDEFLERI` = süren afetler + süreç kimlikleri ve takma adlar),
+`GokyuzuKomutlari`, `MeteorAPI`, `OrtamSicakligi`, `DonmaSureci`, `sounds.json`, dil dosyaları kendiliğinden. Derleme kırılması:
+`PulsarSureci` iki parametreli `BasarimIpucuEvent(oyuncu, Ipucu.YENI_SAFAK)` (afet-siklik AS-17 sonrası yok) → A-38 Yeni Şafak
+başarımı (`e01ed41`, N29). Protokol "8" K-E65 (`b9db98b`). Config göçü tek kalıp K-E61 rev. (`2b3d5c8`). Kullanılmayan
+`pulsar_isin.png` ve `karadelik_3b_disk.png` (+ `.mcmeta`) silindi, üretim betiklerinden çıktı (`51ba3cf`; PL-25'in "yerinde kaldı"sı
+kalktı; `karadelik_3b_dokulari.py` tüpün tohum sırasını korur, N19); PL-42'den sonra `karadelik_3b_disk_sicak.png` ve
+`karadelik_3b_parilti.png` (+ `.mcmeta`) da silindi (`8f45ddf`; oyun `_disk_soluk`/`_parilti_soluk` çizer, kendi tohumları 20261112). SARTNAME N29 (Yeni Şafak), N30 (güneşin dönüşü yalnız pulsar
+yolu, fotosensitivite). **Tur 5 ve inceleme 2 (`cbb5d98`, entegrasyon `8f45ddf`):** PL-41 dört karenin son görsel turu (koyu opak parlama silüeti, karanlık
+karesi 65. sn ve mor kalıntı + ufuk korları, buzulda göl + tipi ×4 + koyu gök + tam kırağı, doğuşta koyu şafak + şişkinlik ×2,5);
+PL-42 Pg2 disk kazancı Doppler'den önce ve kırpılmış (min(1, a · 3,5) · Doppler; yaklaşan 1, uzaklaşan ×0,3; doyma geçişi kalktı),
+soluk dokular (doygunluk ≤ 0,3); Pg3 KURAL duraklamasında yutma koreografisi donar (`DonemPaketi.BAYRAK_DURAKLATILDI` 8,
+`PulsarSureci.durdur` ilerlemeyi durma saniyesine yazar, istemci `PulsarZinciri.duraklamaSaniyesi`); Pg4 dörtgen ölçümü Ultra
+kademede ayrı karede (`karadelik_ultra`): pulsar 2 736 ≤ 6 000, kara delik 3 016 ≤ 6 000 (pay başına); Pg5 kalıntı nebulası kararı saf
+`GokyuzuEgrileri.kalintiGecisi`/`oncekiYol` (eski güneşe dönüşte kalıntı belirmez); otomasyon vanilla bulutları kapatır (yalnız
+`-Potomasyon`). Görsel koşu 8 (ana makine): `karadelik_mercek` Doppler oranı 2,24 (ölçüt ≥ 2,0), disk doygunluğu 0,156,
+benzerlik 3,00; `karadelik_spagetti` korku 3,00. **İnceleme 3, PL-43 (`0c36023`, entegrasyon `01fd1fe`; yalnız `KaraDelik3B` ve tasarım notu):** Ph1 disk köşesinin parlaklığı
+Doppler çarpanı (≤ 1) × besleme eğrisi × (1 + 0,8·morluk); Pg2'nin 3,5 kazancı kalktı, kırpma yalnız Doppler çarpanında (önceki
+`min(1, a·3,5·(1 + 0,8·mor))` yutmanın 12–80. sn'sinde hep 1 veriyor, besleme eğrisini ve PL-41'in mor kalıntı ×1,8'ini etkisiz
+kılıyordu); 1'i aşan pay ayrı toplamalı kalıntı geçişinde. Ph2 merceklenmiş yaylarda Doppler yalnız yanal bantta: köşenin
+merceklenmiş görüntüsünün gölge merkezinden yatay uzaklığı ≥ 1 gölge yarıçapında diskin Doppler'i, ≤ 0,5'te orta sütun (üst yay
+0,9, altı 1,0), arası yumuşak (iki ara deneme oranı bozdu: cos²φ 1,61, disk düzleminden seçim 1,76). Görsel koşu 11: `karadelik_mercek`
+oran 2,04 (ölçüt ≥ 2,0), doygunluk 0,153, orta sütun tepesi 0,81 / 0,87 (referans 0,90 / 0,99); kontrol `pulsar_buyuk` 3,67,
+spagetti korku 3,00. Şef kararı: `karadelik_parlama` karesinin ana ölçütü okunurluk (parlama anında korku uygun ölçüt değil;
+okunurluk 3,00, korku 1,67–2,00 bilgi): bilinen sınır listesinden çıktı. **İnceleme 3 son tur, PL-44 (`931cdd0`, entegrasyon
+`6f1d35b`; şef kararı: Ph2 ölçütü referansa bağlı):** "oran ≥ 2,0" yanlış hedefti, kullanıcı referansa benzerlik istedi; yeni ölçüt
+`karadelik_mercek` sol/sağ oranı referansın ±0,2 bandında (referans 1,61 → 1,45–1,80), doygunluk ≤ 0,3, orta sütun tepesi üst
+≥ 0,85 / alt ≥ 0,9, gölge tam siyah. Merceklenmiş yaylarda (arka yarı, ikinci görüntü) Doppler 0,7 derinlikte
+(`KaraDelik3B.YAY_DOPPLER`: `1 + 0,7·(Doppler − 1)`, uzaklaşan uç ×0,51; ön yarıda tam Doppler; PL-43'ün görüntü konumundan bant
+seçimi kalır); Doppler'siz yaylar (`8300c75`) oranı 1,15'e indirmişti. Orta sütun: üst yay 1,0, alttaki ön yarı ve ikinci
+görüntü 1,12 (`TEPE_ALT`; 1'i aşan pay kalıntı geçişinde, Doppler çarpanı ≤ 1). Görsel koşu 13 (ana makine): oran 1,60,
+doygunluk 0,161, orta sütun tepesi 0,89 / 0,95, gölgenin üst yarısı L 0, karanlık kalıntı parlak pikseli 10 758 (≥ koşu 7'nin
+10 042); mercek okunurluk 3,00 / benzerlik 3,00, spagetti korku 3,00, kontrol `pulsar_buyuk` 3,00; bütün PL-44 ölçütleri tuttu.
+Spagetti karesindeki turuncu leke pulsar değil sıcaklık parçacığıydı: hasarlı sıcaklık kademesinde oyuncunun kendisine giden
+`FLAME`/`SNOWFLAKE` (S-08 rev.: kendi ekranına parçacık gitmez; PL-45 `0d8e98d`: üçüncü şahısta istemci kendi parçacığını üretir; `sicaklik/` değişti, kapı filtresiz). **Bilinen sınırlar:**
+pc2 kare koşularında FPS 15–19 (K-E29 b, bilgi; ana makine koşu 6 en düşük 29); üç kare değerlendirici model ölçütünün (PL-39,
+≥ 3) altında: `karadelik_karanlik` (korku 2,67, koşu 13), `gunessiz_buz` (2,00) ve `kizil_cuce_dogus` (2,00; koşu 7, 3 örnek);
+referansla çift karşılaştırma bilgi (koşu 13'e karşı koşu 7: mercek 0/6, spagetti 2/6, karanlık 4/6); yeni deneme yok, kullanıcı
+oyunda karar verir; yutma parlaması (1,5 sn tepe) `pulsarTitresim`'le ölçeklenmez. Kanıt: son kapı `002afc7` (pulsar-2 `0d8e98d` PL-45 birleşmesi; kuyruktan, ana makine, pc2 erişilemez): `runData` `1108-092158365-c9` fark yok (written 0), `compileJava` `1108-092158463-8b` BUILD SUCCESSFUL (UP-TO-DATE), JUnit 722/0 `1108-092158563-11` (`test @04189671f2ed`), filtresiz GameTest 275/275 `1108-092158681-a2` (`FILTRE=yok`, `gametest @9eba541c6d95`, protokol 8, en büyük batch 7; yeni `hasarParcacigiKendisineGitmezYanindakineGider` dahil), N19 245/245 fark 0; pano `pano-8.txt` (önceki `6f1d35b`: JUnit 722/0, filtresiz 274/274, `pano-7.txt`).
 
 ## Açık noktalar (Faz 2b)
 
@@ -6121,14 +6298,18 @@ P2-9 `5-matris` kabulünde. Kapanış eşlemesi (K-E50) her maddenin sonunda:
 |---|---|---|---|---|
 | çekirdek | `cekirdek.zamanlayici.gunlukAfetOrani` | 0,8 | afet / MC günü (bekleme dışı) | bekleme ve afet süresiyle gerçekleşen ~0,43/gün (simülasyon, 5 dk süren afetle) ≈ 46 dk'da bir; 2–3 saatlik oturumda 3–4 afet (madde 4 "hiç olmayacak kadar nadir değil, bunaltıcı değil"); JUnit 417 günlük simülasyonda 0,25–1,0 aralığını doğrular |
 | çekirdek | `cekirdek.zamanlayici.kontrolAraligiTick` | 20 | tick | saniyede bir zar; olasılık adıma göre ölçeklenir, sıklığı değiştirmez |
-| çekirdek | `cekirdek.zamanlayici.genelBeklemeTick` | 12 000 | tick (10 dk, yarım gün) | madde 4 en az bekleme: afetten sonra toparlanma payı |
+| çekirdek | `cekirdek.zamanlayici.genelBeklemeTick` | 12 000 | tick (10 dk, yarım gün) | madde 4 en az bekleme: afetten sonra toparlanma payı; K-E62: ÷ `afetSikligi` (%200 → yarısı) |
 | çekirdek | `cekirdek.zamanlayici.siddetBeklemeCarpani` | 0,25 | oran | madde 10 "biraz uzasın": S3 ×1,25, S4 ×1,5, S5 ve seviyesiz ×1,75 |
 | çekirdek | `cekirdek.zamanlayici.ertelemeTick` | 6 000 | tick (5 dk) | N14: uygun yer yoksa türün yeniden denenmesi; oyuncular bu sürede yer değiştirir |
-| çekirdek | `cekirdek.zamanlayici.baslangicBeklemeTick` | 24 000 | tick (1 gün) | yeni dünyada ilk gün afetsiz; barınak kurulabilsin |
+| çekirdek | `cekirdek.zamanlayici.baslangicBeklemeTick` | 24 000 | tick (1 gün) | yeni dünyada ilk gün afetsiz; barınak kurulabilsin; K-E62: ÷ `afetSikligi`; tur 2: varsayılan 6 000 (eski 24 000, `cekirdek.ayarSurumu` göçü) |
+| çekirdek | `cekirdek.zamanlayici.ilkAfetGarantiTick` (yeni) | 24 000 | tick (÷ sıklık; 0 kapalı) | K-E62 AS-12: ilk gün en az bir afet |
+| çekirdek | `cekirdek.ayarSurumu` (yeni) | 1 | sürüm | K-E61 göçü (AS-11) |
+| çekirdek (NBT) | `DunyaDonemi.uygulananSiklik` (yeni) | 1,0 | çarpan (`afetSikligi`/100; 0 kaydedilmez) | K-E62 AS-2: süren beklemelerin hangi sıklıkla hesaplandığı; yoksa 1,0 = eski kayıt ölçeksiz, yeniden açılışta çift ölçekleme yok |
+| çekirdek (komut) | `/dogalafet siklik [yüzde]` (yeni) | — | yüzde (0–1000, Brigadier) | K-E62 AS-5: `afetSikligi` gamerule'ünü okur/yazar; sonraki afet tahmini (ortalama + %90 aralık, `SonrakiAfetTahmini`) |
 | çekirdek | `cekirdek.afetler.{kasirga,tsunami,deprem,asit_yagmuru,sinkhole,orman_yangini}.agirlik` | 100 | ağırlık | madde 4 "görece sık, birbirine yakın" |
 | çekirdek | `cekirdek.afetler.ay_carpmasi.agirlik` | 32 | ağırlık | nadir: uygun olduktan sonra λ ≈ 0,04/gün (~25 günde bir) |
 | çekirdek | `cekirdek.afetler.gunes_patlamasi.agirlik` | 20 | ağırlık | en nadir: uygun olduktan sonra λ ≈ 0,025/gün (~40 günde bir); oyun boyunca yaşanabilir |
-| çekirdek | `cekirdek.afetler.<altı sık afet>.beklemeTick` | 48 000 | tick (2 gün) | aynı tür art arda gelmesin |
+| çekirdek | `cekirdek.afetler.<altı sık afet>.beklemeTick` | 48 000 | tick (2 gün) | aynı tür art arda gelmesin; K-E62: ÷ `afetSikligi` |
 | çekirdek | `cekirdek.afetler.ay_carpmasi.beklemeTick` | 240 000 | tick (10 gün) | tek seferlik; yalnız ay geri gelirse (sifirla) anlamlı |
 | çekirdek | `cekirdek.afetler.gunes_patlamasi.beklemeTick` | 480 000 | tick (20 gün) | tekrarlanabilir açıkken iki güneş patlaması arası |
 | çekirdek | `cekirdek.onUyari.enAzTick` / `enCokTick` | 900 / 1 800 | tick (45 / 90 sn) | şartname madde 4 |
@@ -6208,7 +6389,7 @@ P2-9 `5-matris` kabulünde. Kapanış eşlemesi (K-E50) her maddenin sonunda:
 | sıcaklık | `ortam.kisBolgesiDususu` | 25 | °C | kalıcı kış bölgesi ~−35 °C (aşırı soğuk) |
 | sıcaklık (istemci) | `sicaklik.hudGorunur` / `hudXOfset` / `hudYOfset` / `ortamOkuGoster` / `ekranEfektleri` / `kameraTitremesi` | true / 0 / 0 / true / true / true | — | madde 7d "pozisyonu ve görünürlüğü config'den" |
 | sıcaklık (istemci sabiti) | `KALP_BOSLUGU` | 2 | GUI px | GC-4: düşük canda vanilla kalp titremesi işaretçiye binmesin (`leftHeight/rightHeight` 54 → 56) |
-| sıcaklık (sabit) | `OrtamSicakligi.PULSAR_ARTIS_CARPANI` | 1,2 | × `gunesPatlamasiArtisi` | G2-8: pulsarda açık havada +45,6 °C (Nether'e yakın); ayrı config yok |
+| sıcaklık (sabit) | `OrtamSicakligi.PULSAR_ARTIS_CARPANI` | 2,0 (eski 1,2; K-E66 PL-19: açık havada ~+76 °C) | × `gunesPatlamasiArtisi` | G2-8: pulsarda açık havada +45,6 °C (Nether'e yakın); ayrı config yok |
 | uyarı | `uyari.sirenSes` | 28 | — | madde 5 "%25–30"; aralığın ortası (S-01) |
 | uyarı | `uyari.ortamTavan` | 40 | — | örnek katman (−26 LUFS) %40'ta ≈ −34 LUFS, %28 siren (−20 LUFS) ≈ −31 LUFS: ortam sirenden ~3 dB, siren sırasında ~6 dB alçak; konuşma bandı ayrıca −6 dB çentikli |
 | uyarı | `uyari.standartFadeOutTick` | 40 (2 sn) | — | ses.md §2 "2,0 sn üstel fade-out" |
@@ -6233,10 +6414,29 @@ P2-9 `5-matris` kabulünde. Kapanış eşlemesi (K-E50) her maddenin sonunda:
 | gökyüzü | sabit: süpernova çökmesi | 8 sn | — | vitrin koreografisi (G9) |
 | gökyüzü | sabit: şafak | 23000 | — | vanilla gün doğumu yelpazesinin başladığı saat |
 | gökyüzü | `gokyuzu.pulsarOlasiligi` (SERVER) | 0,15 | olasılık (0–1) | G2 §A2: süpernova sonrası doğuşta pulsar; kullanıcı "düşük olasılık" |
-| gökyüzü | `gokyuzu.pulsarIsinmaGun` (SERVER) | 2,0 | MC günü (0,05–30) | G2 §A3: etkiler birden değil iki günde tam güce (madde 9 yavaşlık ilkesi) |
-| gökyüzü | `gokyuzu.pulsarYanginDakikaBasina` (SERVER) | 20 | tutuşma/dk/oyuncu (0–120) | orman yangını S3 odak sıklığı mertebesi; gerçek tick, yangın tavanının yarısıyla sınırlı (G2-8) |
+| gökyüzü | `gokyuzu.pulsarIsinmaGun` (SERVER) | 1,0 (eski 2,0) | MC günü (0,05–30) | K-E66 PL-24: şef "ilk 1 gün ısınma"; `gokyuzu.ayarSurumu` göçü 2 → 1 |
+| gökyüzü | `gokyuzu.pulsarYanginDakikaBasina` (SERVER) | 24 (eski 20) | tutuşma/dk/oyuncu (0–120) | K-E66 PL-18: şef; gerçek tick, tavan tam `aktifTavan`; göç 20 → 24 |
+| gökyüzü | `gokyuzu.pulsarGun` (SERVER) | 15 | oyun günü (1–120) | K-E66 PL-2: kullanıcı "15 Minecraft günü" (K-C29 oyun günü) |
+| gökyüzü | `gokyuzu.pulsarMeteorDakikaBasina` (SERVER) | 12 | meteor/dk/oyuncu (0–180) | K-E66 PL-17: "onlar kadar sık değil", güneş/ay 180'in 1/15'i |
+| gökyüzü | `gokyuzu.pulsarBlokButcesi` (SERVER) | 256 | blok değişimi/tick (0–4096) | K-E66 PL-12: × TPS kısması, donma bütçesiyle aynı |
+| gökyüzü | `gokyuzu.pulsarLav` (SERVER) | true | — | K-E66 PL-38: lav gözesi açık/kapalı |
+| gökyüzü | `gokyuzu.pulsarSonrasiGunessizGun` (SERVER) | 10 | oyun günü (1–120) | K-E66: kullanıcı kızıl cüce oluşumu "yine 10 gün" |
+| gökyüzü | `gokyuzu.ayarSurumu` (SERVER) | 1 | sürüm | K-E61 göçü (PL-24) |
+| gökyüzü (İ) | `gokyuzu.pulsarTitresim` (CLIENT) | 1,0 | çarpan (0–1) | K-E66 PL-6/PL-29: erişilebilirlik; 0'da strob ve hızlı titreşim yok, 1'de bile koni en düşük %45 |
+| gökyüzü (sabit) | `PulsarZinciri.YUTMA_SN` / `YUTMA_PARLAMA_SN`; `YUTMA_PENCERESI_BAS/SON` | 90 / 55 sn; [3000, 7200) | ölçekli sn; gün saati | K-E66 PL-5, PL-7 |
+| gökyüzü (sabit) | `PulsarStrob.VURUS_HZ` / `STROB_HZ` / `EN_DUSUK`; `PulsarTitresimi` hızlı frekans | 10,875 / 4,5 Hz / 0,45; 16 Hz (Düşük 8) | — | K-E66 PL-6, PL-28, PL-29, PL-33 |
+| gökyüzü (sabit) | kavurma yarıçapı / lav paydası / en yakın oyuncu; `PulsarKavurma` 3 günde isabet / tavan | 96 blok / 1/400 / 24 blok; 16 / sütun, 64 deneme/merkez/tick | — | K-E66 PL-12, PL-37 |
+| gökyüzü (sabit) | `GokCapasi` uzaklık / τ; `KaraDelikYutmaEgrileri.SON_CAP` | 800 blok / 60 sn (pulsar), 120 sn (kara delik); 2° (90. sn; 72. sn 8,2°) | — | K-E66 PL-27, PL-31 |
+| gökyüzü (sabit) | `KaraDelikYutmaEgrileri.ORTU_TEPE` / `ORTU_TABAN` | %50 / %15 (0,3 sn tepe, 1,2 sn iniş) | — | K-E66 PL-27 |
+| gökyüzü (sabit) | `KaraDelik3B` disk köşesi: Doppler yaklaşan, uzaklaşan | 1, ×0,3 (yalnız Doppler çarpanı kırpılır, ≤ 1; besleme eğrisi × (1 + 0,8·morluk), 1'i aşan pay kalıntı geçişinde) | — | K-E66 PL-42 Pg2, PL-43 Ph1 (Pg2'nin 3,5 kazancı kalktı) |
+| gökyüzü (sabit) | `KaraDelik3B.YAY_DOPPLER` | 0,7 | 0–1 | K-E66 PL-44: merceklenmiş yaylarda Doppler derinliği (ön yarıda 1); oran referans 1,61'in ±0,2 bandında, ölçülen 1,60 |
+| gökyüzü (sabit) | `KaraDelik3B.TEPE_ALT` (alttaki orta sütun; üstteki yay 1) | 1,12 | — | K-E66 PL-44 (PL-43: 0,9 / 1,0); ölçülen tepe 0,89 / 0,95 |
+| gökyüzü (sabit) | kırağı vinyeti (`KIRAGI_ILK`, `KIRAGI_TAM`) | %45 / %100 | — | K-E66 PL-27, PL-41 |
+| gökyüzü (sabit) | buzul sisi (görüş, başlangıç); tipi (`TIPI_KAR_KATI`, `TIPI_RUZGAR_KATI`); tipi rüzgârı düzeyi | ×0,45 / ×0,1; ×4 / ×6; 0,55 | — | K-E66 PL-27, PL-41 |
+| gökyüzü (sabit) | ufuk koru alfası, kalıntı ek kazancı; doğuş şişkinliği, koyu şafak gücü | 0,85 / 0,8; 1,5 / 0,85 (ilerleme 0,15–0,9) | — | K-E66 PL-41 |
+| gökyüzü (sabit) | `SesSonumu` derinlik adımı, yankılı tavan | −%25 / 16 blok, 0,35 | — | K-E66 PL-34 |
 | gökyüzü | `gokyuzu.pulsarKavrulmaOlasiligi` (SERVER) | 0,6 | olasılık (0–1) | güneş patlaması kavrulmasının (0,5) biraz üstü |
-| gökyüzü (sabit) | pulsar dönüşü | 4 sn/tur (0,25 Hz) | — | G2-7: gerçek pulsarın 30 Hz'i ekranda titrer |
+| gökyüzü (sabit) | pulsar dönüşü | — (kalktı; eski 4 sn/tur) | — | G2-7 yerine K-E66 strob ve titreşim |
 | yangın | `yangin.tickButcesi` (SERVER) | 64 | hücre/tick | tasarım §5; hücre 10 tick'te bir işlendiğinden 640 hücre tam hızda döner, ötesi yakınlık sırasıyla yavaşlar; işleniş başına ~5 blok okuma + 3 deneme |
 | yangın | `yangin.aktifTavan` (SERVER) | 1500 | hücre / boyut | tasarım §5; 5–10 kişilik oyunda birkaç eşzamanlı meteor krateri + bir orman yangını; SavedData ~60 KB |
 | yangın | `yangin.yayilmaHizCarpani` (SERVER) | 1,0 | çarpan | vanilla yayılma hızı ölçeği (çimen 60 → deneme başına %60); 0 yayılmayı kapatır |
@@ -6452,14 +6652,19 @@ P2-9 `5-matris` kabulünde. Kapanış eşlemesi (K-E50) her maddenin sonunda:
 | sinkhole | `sinkhole.blokButcesi` | 400 | blok/tick | tasarım §5 |
 | sinkhole | `sinkhole.dusenBlokTavani` | 60 | varlık | tasarım §5 "Yüksek" |
 | sinkhole (kod) | sarkma / durulma | 3 / 14 | sn | tasarım §2 zaman çizelgesi |
-| asit yağmuru | `asit_yagmuru.yaricap` (SERVER) | 32, 48, 64, 96, 128 | blok (S1…S5) | tasarım §6; S5 bir köyü ve çevresindeki ormanı kaplar |
+| asit yağmuru | `asit_yagmuru.yaricap` (SERVER) | 32, 48, 64, 96, 128 | blok (S1…S5) | K-E64: artık yağış alanı değil, aşınmanın oyuncu çevresi; tasarım §6; S5 bir köyü ve çevresindeki ormanı kaplar |
 | asit yağmuru | `asit_yagmuru.sureSaniye` | 60, 90, 120, 180, 240 | sn | tasarım §6; S5'te bir orman 4 dk'da yapraksız kalır |
-| asit yağmuru | `asit_yagmuru.asindirmaBlokSaniye` | 2, 4, 7, 11, 16 | blok/sn (tam yoğunluk) | bölüm E "yavaş yavaş"; S5'te 240 sn'de ~3500 yüzey bloğu, 128 blokluk alanın %7'si |
+| asit yağmuru | `asit_yagmuru.asindirmaBlokSaniye` | 2, 4, 7, 11, 16 | blok/sn (tam yoğunluk; K-E64: oyuncu başına) | bölüm E "yavaş yavaş"; S5'te 240 sn'de ~3500 yüzey bloğu, 128 blokluk alanın %7'si |
 | asit yağmuru | `asit_yagmuru.hasarSaniye` (eski `hasar` 0,5/0,5/0,5/1/1 ve `hasarAraligiTick` 80/60/40/50/40 kalktı) | 1,0 | can/sn | istek 18 (GC-5, K-E58): her seviyede yarım kalp/sn; seviye yarıçap, süre ve aşınmayı büyütür; `asitMinimumCan` korur |
 | asit yağmuru | `asit_yagmuru.tasSeviyesi` | 3 | seviye | tasarım §6: taş tuğla S3+ |
 | asit yağmuru | `asit_yagmuru.asitMinimumCan` | 4,0 | can puanı | madde 10 "Seviye 5'te bile öldürücü olmasın": 2 kalbin altına inmez |
 | asit yağmuru | `asit_yagmuru.eszamanliAsindirma` | 64 | blok | S5 16 blok/sn × ortalama çatlak 4 sn; tasarım §5'in 32'si bu hızı kesiyordu (kırılma örtüsü paketi küçük, yalnız 32 blok içindekilere) |
-| asit yağmuru | `asit_yagmuru.kaymaHizi` | 0,3 | blok/sn | tasarım §6; S5 240 sn'de 72 blok kayar, oyuncu alanda kalır |
+| asit yağmuru | `asit_yagmuru.kaymaHizi` | — (kalktı; eski 0,3) | — | K-E64 AF2-01: kayan alan yok |
+| asit yağmuru | `asit_yagmuru.blokButcesi` (SERVER, yeni) | 32 (0–512) | sütun/tick | K-E64 AF2-05: dünya geneli aşınma oyuncu çevresinde, × TPS kısması |
+| asit yağmuru (kod) | `YAGMUR_YENILEME_TICK` / `YAGMUR_SURESI_TICK`; istemci `SONUM_TICK` | 200 / 1200; 100 | tick | K-E64 AF2-02: vanilla yağmur tutulur, bitişte sönüm |
+| kasırga (kod) | `KasirgaRotasi` ara hedef aralığı / `RASTGELE_ORANI` / sapma / mesafe | 200–400 ölçekli tick (10–20 sn) / 0,7 / ±60° / 48–128 blok | — | K-E64 AF2-21: %70 rastgele, %30 oyuncu yakını |
+| kasırga (kod) | oyuncu yakını `OYUNCU_EN_AZ/EN_COK`, `OYUNCUYA_EN_AZ`; `EN_COK_UZAKLIK`; `VARIS` | 32–96, 32; 512; 12 | blok | K-E64 AF2-21/22: oyuncunun üstüne hedef yok, rota sınırı |
+| kasırga (kod) | zorunlu seçim aralığı `KasirgaRotasi.ZORUNLU_ARALIK` | 200 (= `ARALIK_EN_AZ`; eski `YENIDEN_SECIM_TICK` 20) | ölçekli tick | K-E64 AF2-25: sınırda / yüklü alan kenarında tick başına seçim ve log seli olmasın |
 | asit yağmuru (istemci) | (sabit) görsel yoğunluk `AsitKurallari.gorselCarpan` | 0,25 / 0,55 / 0,7 / 0,85 / 1 | çarpan (S1…S5) | tasarım §2 "S1 seyrek çise, S5 yoğun sağanak"; S1 0,4'te hafif yağmur görünüyordu (AOi-2, K-E39) |
 | orman yangını | `orman_yangini.baslangicYaricapi` (SERVER) | 3, 6, 10, 16, 24 | blok | tasarım §6; ortak yangın `alanTutustur` en çok 24 |
 | orman yangını | `orman_yangini.yogunluk` | 0, 0,2, 0,4, 0,7, 1 | 0–1 | yangın §A1 önerisi: yayılma ×0,5…×1,8, sıçrama yok/2/5/8/12 blok |

@@ -167,7 +167,7 @@ final class AfetSimulasyonu {
 
         for (long saat = 0; saat < toplamTick; saat += adim) {
             if (aktif != null && saat >= aktif.bitis()) {
-                bekleme.afetBitti(aktif.tur(), aktif.seviye(), saat, zamanlayici);
+                bekleme.afetBitti(aktif.tur(), aktif.seviye(), saat, zamanlayici, siklik);
                 if (aktif.tur().seviyeli()) {
                     oncekiYuksek = SiddetSecici.yuksek(aktif.seviye());
                 }
@@ -178,7 +178,7 @@ final class AfetSimulasyonu {
             if (gunTam != uygunGunu || ay != uygunAy || gunes != uygunGunes) {
                 uygun = EnumSet.noneOf(AfetTuru.class);
                 for (AfetTuru tur : AfetTuru.values()) {
-                    if (TekSeferlikKurallar.uygunMu(tur, ay, gunes, gunTam, puan, tekSeferlik)) {
+                    if (TekSeferlikKurallar.uygunMu(tur, ay, gunes, false, false, gunTam, puan, tekSeferlik)) {
                         uygun.add(tur);
                     }
                 }

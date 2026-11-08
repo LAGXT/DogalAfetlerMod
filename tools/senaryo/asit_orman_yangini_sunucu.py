@@ -5,17 +5,21 @@
 tools/senaryo/cekirdek_sunucu.py'den gelir (K-E13); dünya `run-server/asit-orman-senaryo` her koşuda sıfırdan üretilir.
 
 Koşu 1:
-- Asit yağmuru S1: start, asama ileri x2 (AKTIF, log "asit yağmuru: seviye 1 alan 32 blok"), 15 sn yağış, durum, stop
-  ("Acid Rain stopped.", log "asit yağmuru bitti: seviye 1 N blok aşındı"). Asit dayanıklı cam ve taş yerinde.
-- Asit yağmuru S5: start, AKTIF, 15 sn, `forge tps` (tepe TPS), asama ileri (doğal bitiş), durum (aktif afet yok).
+- Asit yağmuru S1: start, asama ileri x2 (AKTIF, log "asit yağmuru: seviye 1 her yerde" ve "vanilla yağmuru açıldı (önceki
+  hava …)", AF2-01/02), `weather clear` → "vanilla havası yağmuru kesmişti, yağmur yeniden açıldı", 15 sn yağış, durum,
+  stop ("Acid Rain stopped.", log "asit yağmuru bitti: seviye 1 N blok aşındı" ve "önceki hava geri yüklendi (…)" açılıştaki
+  özetle aynı). Asit dayanıklı cam ve taş yerinde.
+- Asit yağmuru S5: start, AKTIF, 15 sn, `forge tps` (tepe TPS > 18), asama ileri (doğal bitiş, hava geri yüklendi), durum
+  (aktif afet yok); vanilla yağmurunun sönmesi (0,01/tick) 5 sn beklenir: orman yangını yağmurda söner.
 - Orman yangını S3: y=199 meşe tahta + y=200 kalıcı yaprak döşemesi (13x13) ve ortada yanmaz taş; 0 201 0'da start,
   AKTIF (log "orman yangını: seviye 3 başlangıç alanı"), yangin bilgi (> 0), stop ("Wildfire stopped.", yangının temiz
   kaynağı kapandı), bilgi (0), döşemede `afet_atesi` kalmadı, taş yerinde.
 - Orman yangını S5: döşeme yeniden, start, AKTIF, `forge tps`; §6 #10: yangın sürerken 144 uzak chunk forceload ile
   üretilir, yönetici `yangın kısma: ... bütçe 64 -> 32|16` yazar; asama ileri (doğal bitiş: yayılma durur, hücreler en
   geç 30 sn'de yanıp biter), bilgi 0'a iner. Son olarak asit yağmuru S2 AKTIF bırakılır ve sunucu kapanır.
-Koşu 2 (aynı dünya): açılışta aktif asit yağmuru geri yüklenir (seviye 2, AKTIF), durum, stop, sifirla; döşeme yeniden,
-orman yangını S2 AKTIF'e getirilir (bilgi > 0) ve sunucu kapanır.
+Koşu 2 (aynı dünya): açılışta aktif asit yağmuru geri yüklenir (seviye 2, AKTIF), durum, stop (saklanan hava kayıttan
+dönüşte de geri yüklenir: "önceki hava geri yüklendi"), 5 sn yağmur sönümü, sifirla; döşeme yeniden, orman yangını S2
+AKTIF'e getirilir (bilgi > 0) ve sunucu kapanır.
 Koşu 3 (aynı dünya, inceleme AOi-8, kasırga Kn5 deseni): açılışta aktif orman yangını geri yüklenir (seviye 2, AKTIF), durum,
 stop (yangının temiz kaynağı kapanır), bilgi 0, döşemede `afet_atesi` kalmadı, sifirla.
 Sonda üç log denetlenir: `invalid dist` yok, istisna yok, config düzeltme WARN'ı yok, `[basarim] ... yayıncı olarak kayıtlı
@@ -47,13 +51,21 @@ def asit_s1(sunucu):
     sunucu.komut("dogalafet asama ileri", r"Acid Rain phase: Siren")
     isaret = sunucu.isaret()
     sunucu.komut("dogalafet asama ileri", r"Acid Rain phase: Active")
-    sunucu.bekle(r"asit yağmuru: seviye 1 alan 32 blok, 60 sn", isaret, 10, "S1 tablo değerleri")
+    sunucu.bekle(r"asit yağmuru: seviye 1 her yerde, 60 sn", isaret, 10, "S1 tablo değerleri")
+    acilis = sunucu.bekle(r"asit yağmuru: vanilla yağmuru açıldı \(önceki hava (.*)\)", isaret, 10, "AF2-02 yağmur açıldı")
+    onceki = re.search(r"önceki hava (.*)\)", acilis).group(1)
+    isaret = sunucu.isaret()
+    sunucu.komut("weather clear", r"Set the weather to clear")
+    sunucu.bekle(r"asit yağmuru: vanilla havası yağmuru kesmişti, yağmur yeniden açıldı", isaret, 10,
+                 "AF2-02 /weather clear asit sürerken geri alındı")
     time.sleep(YAGIS_SANIYE)
     sunucu.komut("dogalafet durum", r"Active disaster: Acid Rain, Level 1 .*phase: Active", "durum (asit S1 aktif)")
     isaret = sunucu.isaret()
     sunucu.komut("dogalafet stop", r"Acid Rain stopped\.")
     sunucu.bekle(r"asit yağmuru bitti: seviye 1 [0-9]+ blok aşındı, [0-9]+ çatlak örtüsü kaldırıldı", isaret, 10,
                  "stop: çatlak kuyruğu temizlendi")
+    sunucu.bekle(r"asit yağmuru: önceki hava geri yüklendi \(" + re.escape(onceki) + r"\)", isaret, 10,
+                 "AF2-02 bitişte önceki hava aynen geri yüklendi")
     sunucu.komut("execute if block 3 200 3 minecraft:glass", r"Test passed", "cam (asit dayanıklı) yerinde")
     sunucu.komut("execute if block 4 200 3 minecraft:stone", r"Test passed", "taş (asit dayanıklı) yerinde")
 
@@ -63,13 +75,19 @@ def asit_s5(sunucu):
     sunucu.komut("dogalafet asama ileri", r"Acid Rain phase: Siren")
     isaret = sunucu.isaret()
     sunucu.komut("dogalafet asama ileri", r"Acid Rain phase: Active")
-    sunucu.bekle(r"asit yağmuru: seviye 5 alan 128 blok, 240 sn", isaret, 10, "S5 tablo değerleri")
+    sunucu.bekle(r"asit yağmuru: seviye 5 her yerde, 240 sn", isaret, 10, "S5 tablo değerleri")
     time.sleep(YAGIS_SANIYE)
-    sunucu.komut("forge tps", r"Overall.*Mean TPS", "tepe anında TPS (asit S5)")
+    tps = sunucu.komut("forge tps", r"Overall.*Mean TPS", "tepe anında TPS (asit S5)")
+    sunucu.yaz(f"### tepe anı (asit S5, küresel): {tps.strip()}")
+    olcum = re.search(r"Mean TPS: ([0-9.,]+)", tps)
+    if olcum and float(olcum.group(1).replace(",", ".")) <= 18:
+        raise cs.SenaryoHatasi(f"asit S5 tepe anında TPS 18'in altında: {tps.strip()}")
     isaret = sunucu.isaret()
     sunucu.komut("dogalafet asama ileri", r"Acid Rain (phase: Ending|has ended)")
     sunucu.bekle(r"asit yağmuru bitti: seviye 5 [0-9]+ blok aşındı", isaret, 10, "S5 doğal bitiş")
+    sunucu.bekle(r"asit yağmuru: önceki hava geri yüklendi", isaret, 10, "S5 bitişte hava geri yüklendi")
     sunucu.komut("dogalafet durum", r"No active disaster\.", "durum (afet yok)")
+    time.sleep(5)
 
 
 def doseme(sunucu):
@@ -143,7 +161,11 @@ def kosu2(sunucu):
     sunucu.bekle(r"Done \(", 0, cs.ACILIS_SURESI, "açılış")
     sunucu.bekle(r"Aktif afet geri yüklendi: asit_yagmuru seviye 2 aşama aktif", 0, 30, "aktif asit yağmuru geri yüklendi")
     sunucu.komut("dogalafet durum", r"Active disaster: Acid Rain, Level 2 .*phase: Active", "durum (asit korundu)")
+    isaret = sunucu.isaret()
     sunucu.komut("dogalafet stop", r"Acid Rain stopped\.")
+    sunucu.bekle(r"asit yağmuru: önceki hava geri yüklendi \(yağmur=", isaret, 10,
+                 "AF2-02 kayıttan dönen asit saklanan havayı geri yükledi")
+    time.sleep(5)
     sunucu.komut("dogalafet sifirla", r"disaster and era state was reset")
     doseme(sunucu)
     sunucu.komut("execute positioned 0 201 0 run dogalafet start orman_yangini 2", r"Wildfire started \(Level 2 ")

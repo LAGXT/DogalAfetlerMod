@@ -12,6 +12,7 @@ import java.util.random.RandomGenerator;
  * aralığında ({@code adimTick}) en az bir afet çıkma olasılığı {@code 1 − e^(−Λ·adim/24000)}'dir; Λ uygun türlerin
  * oranlarının toplamıdır, tür λ_t/Λ olasılıkla seçilir. Oyuncu sayısı hesaba girmez (madde 3). Aynı anda iki afet,
  * genel bekleme, afet başına bekleme ve başlangıç beklemesi seçimi engeller; geçici çarpan yalnız oranı çarpar.
+ * {@code afetSikligi} bütün takvimi ölçekler (11.4 "200 = iki katı"): oranı çarpar, beklemeleri böler ({@link #beklemeOlcekle}).
  */
 public final class AfetZamanlayicisi {
     /** Bir Minecraft günü (tick). */
@@ -29,22 +30,39 @@ public final class AfetZamanlayicisi {
      * @param carpan       türün geçici olasılık çarpanı (yoksa 1)
      * @param siklik       {@code afetSikligi} gamerule çarpanı (100 → 1.0)
      * @param zorla        olay olasılığı 1 sayılır, bekleme ve sıklık yok sayılır; uygunluk filtresi korunur (test ve komut)
+     * @param garanti      ilk afet garantisi (AS-12): olay olasılığı 1 sayılır, beklemeler ve uygunluk korunur
      */
     public record Girdi(boolean afetAktif, long saat, long adimTick, BeklemeDurumu bekleme, Set<AfetTuru> uygunTurler,
-            ToDoubleFunction<AfetTuru> carpan, double siklik, boolean zorla) {
+            ToDoubleFunction<AfetTuru> carpan, double siklik, boolean zorla, boolean garanti) {
         public Girdi {
             Objects.requireNonNull(bekleme, "bekleme");
             Objects.requireNonNull(uygunTurler, "uygunTurler");
             Objects.requireNonNull(carpan, "carpan");
         }
 
+        public Girdi(boolean afetAktif, long saat, long adimTick, BeklemeDurumu bekleme, Set<AfetTuru> uygunTurler,
+                ToDoubleFunction<AfetTuru> carpan, double siklik, boolean zorla) {
+            this(afetAktif, saat, adimTick, bekleme, uygunTurler, carpan, siklik, zorla, false);
+        }
+
         /** Aynı girdi, başka uygun tür kümesi ve zorlama ile. */
         public Girdi ile(Set<AfetTuru> turler, boolean zorlama) {
-            return new Girdi(afetAktif, saat, adimTick, bekleme, turler, carpan, siklik, zorlama);
+            return new Girdi(afetAktif, saat, adimTick, bekleme, turler, carpan, siklik, zorlama, garanti);
         }
     }
 
     private AfetZamanlayicisi() {
+    }
+
+    /**
+     * Bir bekleme süresinin {@code afetSikligi}'na göre etkin hâli: süre sıklığa bölünür (2 → yarı, 0,5 → iki kat). Sıklık 0'da
+     * seçim zaten yoktur; süre olduğu gibi kalır.
+     */
+    public static long beklemeOlcekle(long tick, double siklik) {
+        if (!(siklik > 0) || Double.isInfinite(siklik)) {
+            return tick;
+        }
+        return Math.round(tick / siklik);
     }
 
     /** Türün etkin oranı (afet/gün). */
@@ -70,7 +88,8 @@ public final class AfetZamanlayicisi {
             return Optional.empty();
         }
         long saat = girdi.saat();
-        if (!girdi.zorla() && (saat < ayarlar.baslangicBeklemeTick() || girdi.bekleme().genelBeklemede(saat))) {
+        if (!girdi.zorla() && (saat < beklemeOlcekle(ayarlar.baslangicBeklemeTick(), girdi.siklik())
+                || girdi.bekleme().genelBeklemede(saat))) {
             return Optional.empty();
         }
         double[] oranlar = new double[TURLER.length];
@@ -100,7 +119,7 @@ public final class AfetZamanlayicisi {
         if (!(toplam > 0)) {
             return Optional.empty();
         }
-        if (!girdi.zorla() && rastgele.nextDouble() >= olayOlasiligi(toplam, girdi.adimTick())) {
+        if (!girdi.zorla() && !girdi.garanti() && rastgele.nextDouble() >= olayOlasiligi(toplam, girdi.adimTick())) {
             return Optional.empty();
         }
         double secim = rastgele.nextDouble() * toplam;

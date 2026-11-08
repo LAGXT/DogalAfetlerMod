@@ -16,8 +16,10 @@ import net.minecraftforge.network.NetworkEvent;
 /**
  * {@code esya/radar}: radarı elinde tutan oyuncuya giden gösterge durumu (madde 3, 13a). Durum değişince (en çok
  * {@code esya.radar.paketAraligiTick}, varsayılan 1 Hz) yalnız o oyuncuya; radar bırakılınca tek {@link #YOK}. Merkez
- * blok koordinatıdır; yön ve mesafeyi istemci her karede oyuncunun konumu ve bakışıyla hesaplar. Normal radarda seviye,
- * hareket ve geçmiş hiç gönderilmez (madde 13a: "normal radar afet seviyesini göstermesin"). ~30 bayt, geçmişle ~45.
+ * blok koordinatıdır; yön ve mesafeyi istemci her karede oyuncunun konumu ve bakışıyla hesaplar. Her yerde süren bölgesel
+ * afette (asit yağmuru, AF2-06) merkez {@link #HER_YER} işaretidir: gösterge mesafe yerine "her yer" yazar (tel biçimi aynı).
+ * Normal radarda seviye, hareket ve geçmiş hiç gönderilmez (madde 13a: "normal radar afet seviyesini göstermesin").
+ * ~30 bayt, geçmişle ~45.
  *
  * @param elde        radar elde mi; false ise diğer alanlar anlamsız ({@link #YOK})
  * @param menzil      radarın menzili (blok; gösterge ölçeği)
@@ -30,6 +32,8 @@ public record RadarPaketi(boolean elde, boolean gelismis, int menzil, RadarGorun
         List<Gecmis> gecmis) {
     public static final String AD = "esya/radar";
     public static final int GECMIS_SINIRI = 5;
+    /** {@code merkezX}/{@code merkezZ} bu değerse afet her yerdedir (küresel etki alanı, gökyüzü anomalisi değil). */
+    public static final int HER_YER = Integer.MIN_VALUE;
     public static final RadarPaketi YOK = new RadarPaketi(false, false, 0, RadarGorunumu.GIZLI, AfetTuru.KASIRGA,
             AfetAsamasi.BITIS, 0, 0, 0, -1, Float.NaN, 0, List.of());
 
@@ -39,6 +43,11 @@ public record RadarPaketi(boolean elde, boolean gelismis, int menzil, RadarGorun
 
     public RadarPaketi {
         gecmis = List.copyOf(gecmis.size() > GECMIS_SINIRI ? gecmis.subList(0, GECMIS_SINIRI) : gecmis);
+    }
+
+    /** Afet her yerde mi (AF2-06): gösterge yön oku ve mesafe yerine "her yer" gösterir. */
+    public boolean herYer() {
+        return merkezX == HER_YER && merkezZ == HER_YER;
     }
 
     /** Radar elde ama gösterilecek afet yok: "gökyüzü sakin". */

@@ -27,18 +27,16 @@ import java.util.Map;
  * yazılır (art arda {@code ConfigValue.set} dosya izleyicisiyle yarışır, K-E28). Yazım kesilmesin diye yeni içerik aynı
  * klasörde geçici dosyaya yazılır, özgün dosya {@code <dosya>.bak-ayarSurumu<eski>}'ye (varsa {@code -2}, {@code -3}, …)
  * kopyalanır, sonra geçici dosya atomik taşınır. Okuma ya da yazma hatasında tek WARN, dosyaya dokunulmaz, Forge eski
- * değerlerle sürer. Çalışırken elle düzenlenen dosya (Forge'un yeniden yüklemesi) göç ettirilmez.
+ * değerlerle sürer. Çalışırken elle düzenlenen dosya (Forge'un yeniden yüklemesi) göç ettirilmez. Bölümler yalnız
+ * tablolarını ({@link SurumluGocPlani}) verir; dosya, yedek ve atomik yazım tek yerde, burada (K-E61 rev.).
  */
 final class AyarGocu {
-    record Kayit(String surumYolu, int guncel, AyarKaydi.GocPlani plan) {
-    }
-
     private AyarGocu() {
     }
 
     /** Değişiklik varsa dosyayı yazar ve tek satırlık özeti döndürür; dosya yoksa, göçler güncelse ya da hata olursa null. */
-    static String uygula(Path dosya, List<Kayit> kayitlar) {
-        if (kayitlar.isEmpty() || !Files.isRegularFile(dosya)) {
+    static String uygula(Path dosya, List<SurumluGocPlani> planlar) {
+        if (planlar.isEmpty() || !Files.isRegularFile(dosya)) {
             return null;
         }
         CommentedConfig icerik = TomlFormat.newConfig(LinkedHashMap::new);
@@ -50,7 +48,7 @@ final class AyarGocu {
         }
         List<String> ozet = new ArrayList<>();
         int enEski = Integer.MAX_VALUE;
-        for (Kayit k : kayitlar) {
+        for (SurumluGocPlani k : planlar) {
             Object okunan = icerik.get(k.surumYolu());
             int surum = okunan instanceof Number n ? n.intValue() : 0;
             if (surum >= k.guncel()) {
@@ -58,7 +56,7 @@ final class AyarGocu {
             }
             enEski = Math.min(enEski, surum);
             List<String> degisen = new ArrayList<>();
-            for (Map.Entry<String, ?> e : k.plan().plan(surum, icerik::get).entrySet()) {
+            for (Map.Entry<String, Number> e : k.plan(surum, icerik::get).entrySet()) {
                 degisen.add(e.getKey() + " " + icerik.get(e.getKey()) + " → " + e.getValue());
                 icerik.set(e.getKey(), e.getValue());
             }

@@ -1,0 +1,35 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_meteorit_kulcesi": {
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "dogalafetler:meteorit_kulcesi"
+            ]
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    },
+    "has_the_recipe": {
+      "conditions": {
+        "recipe": "dogalafetler:termostat_plakasi"
+      },
+      "trigger": "minecraft:recipe_unlocked"
+    }
+  },
+  "requirements": [
+    [
+      "has_meteorit_kulcesi",
+      "has_the_recipe"
+    ]
+  ],
+  "rewards": {
+    "recipes": [
+      "dogalafetler:termostat_plakasi"
+    ]
+  },
+  "sends_telemetry_event": false
+}

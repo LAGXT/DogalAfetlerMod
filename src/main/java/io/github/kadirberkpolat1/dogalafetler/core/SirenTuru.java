@@ -27,6 +27,18 @@ public enum SirenTuru {
         return tur == AfetTuru.GUNES_PATLAMASI ? GUNES : STANDART;
     }
 
+    /**
+     * AS-9: aynı anda birden çok afet siren aşamasındayken oyuncunun duyacağı sirenin önceliği (büyük olan çalar, ötekiler
+     * susar): ay çarpması (60 sn) &gt; güneş patlaması &gt; diğerleri (10 sn).
+     */
+    public static int oncelik(AfetTuru tur) {
+        return switch (tur) {
+            case AY_CARPMASI -> 3;
+            case GUNES_PATLAMASI -> 2;
+            default -> 1;
+        };
+    }
+
     /** Sirenin ölçekli (afet saati) tick cinsinden süresi. */
     public static int sureTick(AfetTuru tur) {
         return tur.sunucuGeneli() ? UZUN_SURE_TICK : STANDART_SURE_TICK;

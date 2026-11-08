@@ -352,16 +352,6 @@ def kara_delik_jet(w=64, h=512):
     kaydet("kara_delik_jet", np.ones((h, w, 3), np.float32) * renk("#D4E2FF")[None, None, :], np.clip(a, 0, 1))
 
 
-def pulsar_isin(w=512, h=64):
-    """Pulsar ışını: u = 0 merkez → 1 uç; ince parlak çekirdek ve geniş soluk örtü, uçta söner."""
-    x, y = izgara(w, h)
-    u = (x + 1) / 2
-    boy = np.exp(-u / 0.42) * yumusak_basamak(1.0, 0.8, u)
-    en = np.exp(-(y / 0.14) ** 2) + 0.3 * np.exp(-(y / 0.45) ** 2)
-    kaydet("pulsar_isin", np.ones((h, w, 3), np.float32) * renk("#C4D8FF")[None, None, :], np.clip(boy * en, 0, 1))
-
-
-
 def main() -> None:
     print(f"Hedef: {HEDEF}")
     rng = np.random.default_rng(20261105)
@@ -385,7 +375,6 @@ def main() -> None:
     kara_delik(rng2)
     kara_delik_akis(rng2)
     kara_delik_jet()
-    pulsar_isin()
 
 
 if __name__ == "__main__":

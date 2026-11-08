@@ -7,6 +7,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.AfetKaydi;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
 import io.github.kadirberkpolat1.dogalafetler.core.CekirdekOyunTestleri;
+import io.github.kadirberkpolat1.dogalafetler.core.EtkiAlani;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
 import io.github.kadirberkpolat1.dogalafetler.core.OyunTestiAfeti;
 import io.github.kadirberkpolat1.dogalafetler.esya.mantik.RadarGorunumu;
@@ -21,9 +22,13 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
+import net.minecraft.advancements.Advancement;
+import net.minecraft.advancements.CriteriaTriggers;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -251,6 +256,94 @@ public final class EsyaOyunTestleri {
     }
 
     /**
+     * Çoklu afette radarın seçimi (K-E64, entegrasyon 7 `RadarSunucu` çözümü): görünen bölgesel afet küresel afetten önce
+     * gelir (sonra başlasa da), küreseller arasında önce başlayan. Asit, etki alanı her yer olan taklittir (gerçek asidin hava ve
+     * aşınması radar seçimini etkilemez; gerçek asidin "her yer" paketi `AsitOyunTestleri`'nde); güneş patlaması SIREN'de anomali.
+     */
+    @GameTest(template = "bos", batch = "esya_radar_coklu", timeoutTicks = 100)
+    public static void cokluAfetteRadarBolgeseliOnceKureselleriBaslamaSirasiylaGosterir(GameTestHelper yardimci) {
+        ServerLevel level = yardimci.getLevel();
+        MinecraftServer server = level.getServer();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(server);
+        yonetici.durdur();
+        yonetici.donem().gunesEvresiAyarla(GunesEvresi.NORMAL);
+        BlockPos merkez = yardimci.absolutePos(BlockPos.ZERO);
+        ServerPlayer radarli = CekirdekOyunTestleri.sahteOyuncu(yardimci, merkez.getX() + 0.5, merkez.getY(),
+                merkez.getZ() + 30.5);
+        radarVer(radarli, false);
+        try (AfetKaydi.GeciciKayit asit = AfetKaydi.geciciKaydet(AfetTuru.ASIT_YAGMURU,
+                () -> new OyunTestiAfeti(AfetTuru.ASIT_YAGMURU, 16, 100) {
+                    @Override
+                    public EtkiAlani etkiAlani() {
+                        return EtkiAlani.herYer();
+                    }
+                });
+                AfetKaydi.GeciciKayit deprem = AfetKaydi.geciciKaydet(AfetTuru.DEPREM,
+                        () -> new OyunTestiAfeti(AfetTuru.DEPREM, 16, 100));
+                AfetKaydi.GeciciKayit gunes = AfetKaydi.geciciKaydet(AfetTuru.GUNES_PATLAMASI,
+                        () -> new OyunTestiAfeti(AfetTuru.GUNES_PATLAMASI, 16, 100))) {
+            Afet a = cokluBaslat(yardimci, yonetici, AfetTuru.ASIT_YAGMURU, radarli, merkez);
+            normalPencereyeTek(yardimci, a);
+            RadarPaketi p = RadarSunucu.durum(radarli);
+            yardimci.assertTrue(p.gorunum() == RadarGorunumu.AFET && p.tur() == AfetTuru.ASIT_YAGMURU && p.herYer()
+                    && Float.isNaN(p.hareketYonu()), "yalnız asit: 'her yer' olmalı: " + p);
+
+            Afet d = cokluBaslat(yardimci, yonetici, AfetTuru.DEPREM, radarli, merkez);
+            normalPencereyeTek(yardimci, d);
+            p = RadarSunucu.durum(radarli);
+            yardimci.assertTrue(p.gorunum() == RadarGorunumu.AFET && p.tur() == AfetTuru.DEPREM && !p.herYer()
+                    && p.merkezX() == d.baglam().merkez().getX() && p.merkezZ() == d.baglam().merkez().getZ(),
+                    "asit + deprem: sonra başlayan bölgesel deprem gösterilmeli: " + p);
+            yardimci.assertTrue(yonetici.durdur(AfetTuru.DEPREM), "deprem durmadı");
+            p = RadarSunucu.durum(radarli);
+            yardimci.assertTrue(p.tur() == AfetTuru.ASIT_YAGMURU && p.herYer(), "deprem durunca asit dönmeli: " + p);
+
+            Afet g = cokluBaslat(yardimci, yonetici, AfetTuru.GUNES_PATLAMASI, radarli, merkez);
+            yardimci.assertTrue(yonetici.asamaIleri(AfetTuru.GUNES_PATLAMASI) && g.asama() == AfetAsamasi.SIREN,
+                    "güneş SIREN'e geçmedi");
+            p = RadarSunucu.durum(radarli);
+            yardimci.assertTrue(p.gorunum() == RadarGorunumu.AFET && p.tur() == AfetTuru.ASIT_YAGMURU && p.herYer(),
+                    "asit önce başladı, güneş sonra: asit gösterilmeli: " + p);
+
+            yonetici.durdur();
+            yonetici.donem().gunesEvresiAyarla(GunesEvresi.NORMAL);
+            g = cokluBaslat(yardimci, yonetici, AfetTuru.GUNES_PATLAMASI, radarli, merkez);
+            yardimci.assertTrue(yonetici.asamaIleri(AfetTuru.GUNES_PATLAMASI) && g.asama() == AfetAsamasi.SIREN,
+                    "güneş SIREN'e geçmedi (2)");
+            a = cokluBaslat(yardimci, yonetici, AfetTuru.ASIT_YAGMURU, radarli, merkez);
+            normalPencereyeTek(yardimci, a);
+            p = RadarSunucu.durum(radarli);
+            yardimci.assertTrue(p.gorunum() == RadarGorunumu.ANOMALI && p.tur() == AfetTuru.GUNES_PATLAMASI,
+                    "güneş önce başladı, asit sonra: güneş anomalisi gösterilmeli: " + p);
+
+            d = cokluBaslat(yardimci, yonetici, AfetTuru.DEPREM, radarli, merkez);
+            normalPencereyeTek(yardimci, d);
+            p = RadarSunucu.durum(radarli);
+            yardimci.assertTrue(p.gorunum() == RadarGorunumu.AFET && p.tur() == AfetTuru.DEPREM,
+                    "güneş + asit + deprem: bölgesel deprem gösterilmeli: " + p);
+        } finally {
+            yonetici.durdur();
+            yonetici.donem().gunesEvresiAyarla(GunesEvresi.NORMAL);
+            server.getPlayerList().remove(radarli);
+        }
+        yardimci.succeed();
+    }
+
+    private static Afet cokluBaslat(GameTestHelper yardimci, AfetYoneticisi yonetici, AfetTuru tur, ServerPlayer hedef,
+            BlockPos merkez) {
+        yardimci.assertTrue(yonetici.elleBaslat(tur, tur.seviyeli() ? 1 : null, hedef, yardimci.getLevel(), merkez)
+                == AfetYoneticisi.BaslatmaSonucu.BASLADI, "afet başlamadı: " + tur.kimlik());
+        return yonetici.aktifAfet(tur).orElseThrow();
+    }
+
+    /** Bir afeti normal ön-uyarı penceresine ilerletir (afetin kendi tick'i; aşama ON_UYARI'da kalır). */
+    private static void normalPencereyeTek(GameTestHelper yardimci, Afet afet) {
+        afet.tick(yardimci.getLevel(), (int) afet.baglam().erkenBildirimSuresi());
+        yardimci.assertTrue(afet.asama() == AfetAsamasi.ON_UYARI && afet.normalOnUyariBasladi(),
+                "normal ON_UYARI penceresine geçilmedi: " + afet.tur().kimlik());
+    }
+
+    /**
      * Sismograf hotbar'da: deprem ON_UYARI normal penceresinde algılanır (yüzde, yaklaşık merkez; seviye yok), SIREN'de öncü
      * sarsıntı sürer, AKTIF'te ana sarsıntı (istemci "Ana sarsıntı" yazar).
      */
@@ -419,6 +512,137 @@ public final class EsyaOyunTestleri {
         }
         DogalAfetler.LOGGER.info("Eşya GameTest: gelişmiş tarifler yüklü, {} ile craft edildi", cekirdek);
         yardimci.succeed();
+    }
+
+    /** Temel iki tarif koşulsuz yüklü ve çalışma masasında (3x3 tezgah + {@code RecipeManager.getRecipeFor}) ürünü verir. */
+    @GameTest(template = "bos", batch = "esya_tarif")
+    public static void temelTariflerCalismaMasasindaUrunVerir(GameTestHelper yardimci) {
+        ServerPlayer oyuncu = CekirdekOyunTestleri.sahteOyuncu(yardimci, 0.5, 2, 0.5);
+        try {
+            calismaMasasi(yardimci, oyuncu, EsyaKayitlari.TARIF_HAVA_RADARI, EsyaKayitlari.HAVA_RADARI.get(), Items.IRON_INGOT,
+                    Items.GLASS, Items.IRON_INGOT, Items.REDSTONE, Items.COMPASS, Items.REDSTONE, Items.IRON_INGOT,
+                    Items.COPPER_INGOT, Items.IRON_INGOT);
+            calismaMasasi(yardimci, oyuncu, EsyaKayitlari.TARIF_SISMOGRAF, EsyaKayitlari.SISMOGRAF.get(), Items.IRON_INGOT,
+                    Items.PAPER, Items.IRON_INGOT, Items.STICK, Items.REDSTONE, Items.STICK, Items.STONE, Items.COPPER_INGOT,
+                    Items.STONE);
+        } finally {
+            yardimci.getLevel().getServer().getPlayerList().remove(oyuncu);
+        }
+        yardimci.succeed();
+    }
+
+    /**
+     * JEI'siz oyuncu tarifi yalnız vanilla tarif kitabında görür: temel tarifler oyuncunun ilk tick'inde ({@code minecraft:tick})
+     * ya da demir külçesi envantere girince kitaba girer. Gelişmişler başta kapalıdır, temel eşya envantere girince açılır.
+     */
+    @GameTest(template = "bos", batch = "esya_tarif")
+    public static void tarifKitabiTemelleriOyunBasindaGelismisleriTemelEsyaylaAcar(GameTestHelper yardimci) {
+        MinecraftServer server = yardimci.getLevel().getServer();
+        List<ResourceLocation> temeller = List.of(EsyaKayitlari.TARIF_HAVA_RADARI, EsyaKayitlari.TARIF_SISMOGRAF);
+        List<ResourceLocation> gelismisler = List.of(EsyaKayitlari.TARIF_GELISMIS_HAVA_RADARI,
+                EsyaKayitlari.TARIF_HASSAS_SISMOGRAF);
+        ServerPlayer yeni = CekirdekOyunTestleri.sahteOyuncu(yardimci, 0.5, 2, 0.5);
+        ServerPlayer demirli = CekirdekOyunTestleri.sahteOyuncu(yardimci, 1.5, 2, 0.5);
+        try {
+            for (ResourceLocation tarif : temeller) {
+                yardimci.assertTrue(!kitapta(yardimci, server, yeni, tarif), "tick'ten önce kitapta: " + tarif);
+            }
+            // ServerPlayer.doTick her tick'te bunu çağırır.
+            CriteriaTriggers.TICK.trigger(yeni);
+            for (ResourceLocation tarif : temeller) {
+                yardimci.assertTrue(kitapta(yardimci, server, yeni, tarif), "ilk tick'te kitapta değil: " + tarif);
+            }
+            for (ResourceLocation tarif : gelismisler) {
+                yardimci.assertTrue(!kitapta(yardimci, server, yeni, tarif), "temel eşyasız kitapta: " + tarif);
+            }
+            envantereKoy(demirli, Items.IRON_INGOT);
+            for (ResourceLocation tarif : temeller) {
+                yardimci.assertTrue(kitapta(yardimci, server, demirli, tarif), "demir külçesiyle kitapta değil: " + tarif);
+            }
+            envantereKoy(demirli, EsyaKayitlari.HAVA_RADARI.get(), EsyaKayitlari.SISMOGRAF.get());
+            for (ResourceLocation tarif : gelismisler) {
+                yardimci.assertTrue(kitapta(yardimci, server, demirli, tarif), "temel eşyayla kitapta değil: " + tarif);
+            }
+        } finally {
+            server.getPlayerList().remove(yeni);
+            server.getPlayerList().remove(demirli);
+        }
+        DogalAfetler.LOGGER.info("Eşya GameTest: temel tarifler ilk tick'te, gelişmişler temel eşyayla tarif kitabında");
+        yardimci.succeed();
+    }
+
+    /**
+     * Yüklü her {@code dogalafetler} tarifi bir tarif kitabı başarımının ({@code dogalafetler:recipes/**}) ödül listesinde
+     * ({@code rewards.recipes}); yoksa tarif kitabında hiç görünmez. Özel tarifler ({@code isSpecial}, zırh ekleri) vanilla kitapta zaten görünmez, muaf. Meteor tarifleri
+     * girdi meteor eşyası envantere girince açılır.
+     */
+    @GameTest(template = "bos", batch = "esya_tarif")
+    public static void herTarifinKitapKilidiVarMeteorTarifleriGirdiyleAcilir(GameTestHelper yardimci) {
+        MinecraftServer server = yardimci.getLevel().getServer();
+        Set<ResourceLocation> kilitler = new HashSet<>();
+        for (Advancement a : server.getAdvancements().getAllAdvancements()) {
+            if (DogalAfetler.MOD_ID.equals(a.getId().getNamespace()) && a.getId().getPath().startsWith("recipes/")) {
+                kilitler.addAll(Arrays.asList(a.getRewards().getRecipes()));
+            }
+        }
+        List<String> kilitsiz = new ArrayList<>();
+        List<String> ozel = new ArrayList<>();
+        int sayi = 0;
+        for (Recipe<?> tarif : server.getRecipeManager().getRecipes()) {
+            if (!DogalAfetler.MOD_ID.equals(tarif.getId().getNamespace())) {
+                continue;
+            }
+            if (tarif.isSpecial()) {
+                ozel.add(tarif.getId().getPath());
+            } else if (!kilitler.contains(tarif.getId())) {
+                kilitsiz.add(tarif.getId().getPath());
+            } else {
+                sayi++;
+            }
+        }
+        yardimci.assertTrue(kilitsiz.isEmpty(), "tarif kitabı başarımı olmayan tarifler: " + kilitsiz);
+        yardimci.assertTrue(sayi > 0, "hiç dogalafetler tarifi yüklenmedi");
+        ServerPlayer oyuncu = CekirdekOyunTestleri.sahteOyuncu(yardimci, 0.5, 2, 0.5);
+        try {
+            ResourceLocation kulce = DogalAfetler.konum("meteorit_kulcesi");
+            ResourceLocation plaka = DogalAfetler.konum("termostat_plakasi");
+            yardimci.assertTrue(!oyuncu.getRecipeBook().contains(kulce) && !oyuncu.getRecipeBook().contains(plaka),
+                    "meteor tarifleri girdisiz kitapta");
+            envantereKoy(oyuncu, MeteorEsyaKayitlari.METEORIT_PARCASI.get());
+            yardimci.assertTrue(oyuncu.getRecipeBook().contains(kulce), "Meteorit Parçasıyla kitapta değil: " + kulce);
+            envantereKoy(oyuncu, MeteorEsyaKayitlari.METEORIT_KULCESI.get());
+            yardimci.assertTrue(oyuncu.getRecipeBook().contains(plaka), "Meteorit Külçesiyle kitapta değil: " + plaka);
+        } finally {
+            server.getPlayerList().remove(oyuncu);
+        }
+        DogalAfetler.LOGGER.info("Eşya GameTest: {} tarifin kitap kilidi var, özel (kitapsız) {}", sayi, ozel);
+        yardimci.succeed();
+    }
+
+    private static void calismaMasasi(GameTestHelper yardimci, ServerPlayer oyuncu, ResourceLocation kimlik, Item sonuc,
+            Item... dokuz) {
+        ServerLevel level = yardimci.getLevel();
+        TransientCraftingContainer tezgah = tezgah(oyuncu, dokuz);
+        Optional<CraftingRecipe> eslesen = level.getRecipeManager().getRecipeFor(RecipeType.CRAFTING, tezgah, level);
+        yardimci.assertTrue(eslesen.isPresent() && eslesen.get().getId().equals(kimlik), "çalışma masası bulmadı: " + kimlik);
+        yardimci.assertTrue(eslesen.get().assemble(tezgah, level.registryAccess()).is(sonuc), "ürün yanlış: " + kimlik);
+    }
+
+    /** Tarif kitabı başarımı ({@code recipes/tools/<tarif>}) tamam ve tarif oyuncunun kitabında. */
+    private static boolean kitapta(GameTestHelper yardimci, MinecraftServer server, ServerPlayer oyuncu,
+            ResourceLocation tarif) {
+        Advancement kilit = server.getAdvancements().getAdvancement(tarif.withPrefix("recipes/tools/"));
+        yardimci.assertTrue(kilit != null, "tarif kitabı başarımı yok: " + tarif);
+        boolean acik = oyuncu.getAdvancements().getOrStartProgress(kilit).isDone();
+        yardimci.assertTrue(acik == oyuncu.getRecipeBook().contains(tarif), "başarım ve tarif kitabı uyuşmuyor: " + tarif);
+        return acik;
+    }
+
+    private static void envantereKoy(ServerPlayer oyuncu, Item... esyalar) {
+        for (Item esya : esyalar) {
+            oyuncu.getInventory().add(new ItemStack(esya));
+        }
+        oyuncu.inventoryMenu.broadcastChanges();
     }
 
     private static void hucreler(GameTestHelper yardimci, Ingredient[] desen, String ad, Item... beklenen) {

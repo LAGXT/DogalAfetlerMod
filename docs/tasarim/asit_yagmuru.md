@@ -113,3 +113,32 @@ Notun üzerinden değişenler:
 - **Ekran:** maruz kaldıkça sürekli sarı-yeşil kenar vinyeti ve kenarlardan döngüyle akan damla izleri (0,5 sn'de belirir ve
   söner, vuruşun %45'i); her hasarda 0,3 sn'lik vuruş üstüne biner. Üçüncü kişi kamerada oyuncunun başından seyrek cızlama
   dumanı. Koşul istemcide sunucuyla aynı kuralı okur (ham yoğunluk, alan yarıçapı, `MOTION_BLOCKING`), yeni paket yok.
+
+## afet-fizik-2 (2026-11-08): bütün dünyada
+
+Kullanıcı isteği: "Asit yağmuru her yerde yağmıyor; bir kullanıcıya targetlandıysa o kullanıcının olduğu yerde yağıyor. Her
+kullanıcıda yağsın, herkes görebilsin; asit yağmuru tüm dünyada yağsın, normal yağmur gibi, herkese etki etsin." Kararlar
+`.vibe/kararlar/afet-fizik-2.md` (AF2-01…AF2-09). Notun üzerinden değişenler:
+
+- **Alan yok, her yer:** etki alanı `EtkiAlani.herYer()`; afet kaymaz (`kaymaHizi` kalktı). "Her yer" afetin boyutudur (üst
+  dünya): siren, durum paketi, hasar ve başarım sayımı o boyuttaki herkese; Nether/End'deki oyuncu asitten etkilenmez (AF2-08).
+  §2'deki "merkezden 1,5R içinde sis", "alan kenarında 16 blokluk geçiş" ve §6'daki "alan hedef oyuncunun çevresinde doğar"
+  uygulanmaz: sis, bulut tavanı, yağış, sıçrama ve buhar kameranın bulunduğu her yerde. Seviye tablosundaki yarıçap artık
+  aşınmanın her oyuncunun çevresindeki örnekleme yarıçapıdır.
+- **Gerçek hava değişir (§2 "sunucu rain açmaz" yerine):** AKTIF'e geçerken dünyanın havası saklanır, vanilla yağmuru açılır ve
+  AKTIF boyunca tutulur (vanilla döngüsünün kesmesi, gök gürültüsü ve `/weather clear` bir tick'te geri alınır; asidin
+  "zehirli sessizliği" §4 korunur). Bitişte saklanan hava aynen geri gelir; `doWeatherCycle` kuralına dokunulmaz. Yağmur
+  normal yağmur gibi ateşi söndürür, oyuncuyu ıslatır ve ortamı serinletir (sıcaklık sistemi).
+- **Çizim:** vanilla yağmur istemcide AKTIF boyunca ve bitişten sonra 5 sn (sunucu yağmuru 0,01/tick sönerken) çizilmez
+  (`ClientLevel.setRainLevel(0)`, donma istemcisinin kar kipiyle aynı yol); asit yağışı biyomun yağışına bakmadan çizilir: çölde
+  ve kar biyomunda da asit yağar (kar yerine asit).
+- **Hasar her oyuncuya:** başı göğe açık her oyuncu (yaratıcı, izleyici, ölü ve chunk'ı yüklenmemiş olan hariç) saniyede
+  `hasarSaniye`; `asitMinimumCan` (4) aynen. Hedefe 500 blok uzaktaki oyuncu da hasar alır (GameTest).
+- **Aşınma oyuncuların çevresinde:** her örnek rastgele bir oyuncu seçer (izleyici hariç, yaratıcı dahil; yarısı 24 blok, yarısı
+  seviye yarıçapı); hız oyuncu başına tablo değeri, tick örnekleme bütçesi `asit_yagmuru.blokButcesi` (32) × TPS kısması;
+  yüklenmemiş chunk okunmaz.
+- **Bilinen sınır (AF2-07):** gerçek yağmur soğuk biyomda vanilla kar katmanı biriktirir ve kazanları doldurur (istemci orada
+  asit çizer); bu `afetBlokHasari=false` iken de olur, mixin'siz engellenemez.
+- **Radar:** asit "gökyüzü anomalisi" (N7, yalnız güneş ve ay) değildir: normal ön-uyarı penceresinden itibaren radar "Asit
+  Yağmuru, her yer" ve geri sayım gösterir, yön oku yoktur.
+- **Vitrin anı (§3) çöl eki:** çölde, yağmur görmeyen bir yerde sarı-yeşil sağanak; görsel kanıt `asit_uzak` karesi.

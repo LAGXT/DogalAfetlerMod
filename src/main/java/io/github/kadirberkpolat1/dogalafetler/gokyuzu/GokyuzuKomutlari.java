@@ -27,7 +27,8 @@ import net.minecraft.world.level.GameRules;
 import net.minecraftforge.fml.loading.FMLEnvironment;
 
 /**
- * {@code /dogalafet kizilcuce baslat|bilgi} ve {@code /dogalafet pulsar baslat} (KOMUTLAR, N18; pulsar gökyüzü-2). Geliştirme
+ * {@code /dogalafet kizilcuce baslat|bilgi} ve {@code /dogalafet pulsar baslat} (KOMUTLAR, N18; pulsar gökyüzü-2; pulsar
+ * zincirinin kalan süresi {@code bilgi}'de ve {@code /dogalafet durum}'da, pulsar-2). Geliştirme
  * ortamında (üretim jar'ında yok) görsel kanıt için {@code /dogalafet gokyuzutest evre <evre> [ilerleme] | ay <var|yok> |
  * donma <yüzde>} de kaydedilir. Çıktılar yalnız komutu yazana gider (N6); başarılı komut 1, reddedilen 0 döner.
  */
@@ -66,6 +67,14 @@ public final class GokyuzuKomutlari {
     static final String PULSAR_BASLADI = "commands.dogalafetler.pulsar.basladi";
     static final String PULSAR_ZATEN = "commands.dogalafetler.pulsar.zaten";
     static final String KALAN_PULSAR = ON + "bilgi.kalan.pulsar";
+    static final String KALAN_KARADELIK = ON + "bilgi.kalan.karadelik";
+    static final String KALAN_BUZUL = ON + "bilgi.kalan.buzul";
+    static final String KALAN_BUZUL_DONGUSUZ = ON + "bilgi.kalan.buzul_dongusuz";
+    static final String KALAN_BUZUL_SAFAK = ON + "bilgi.kalan.buzul_safak";
+    static final String KALAN_DONUS_DOGUS = ON + "bilgi.kalan.donus_dogus";
+    static final String KALAN_GUNES_DONDU = ON + "bilgi.kalan.gunes_dondu";
+    static final String ASAMA_ESKI_GUNES = "commands.dogalafetler.gokyuzu.eski_gunes";
+    static final String DURUM_PULSAR = "commands.dogalafetler.pulsar.durum";
 
     private static final List<KizilCuceBilgiKatkisi> KATKILAR = new CopyOnWriteArrayList<>();
 
@@ -103,7 +112,12 @@ public final class GokyuzuKomutlari {
                     .then(Commands.literal("yildiz")
                             .then(Commands.literal("kizil_cuce").executes(b -> testYildiz(b, GunesEvresi.KIZIL_CUCE)))
                             .then(Commands.literal("pulsar").executes(b -> testYildiz(b, GunesEvresi.PULSAR)))
-                            .then(Commands.literal("secim").executes(b -> testYildiz(b, null)))));
+                            .then(Commands.literal("secim").executes(b -> testYildiz(b, null))))
+                    .then(Commands.literal("pulsarmerkez")
+                            .then(Commands.literal("dogus").executes(b -> testMerkez(b, true)))
+                            .then(Commands.literal("kaldir").executes(b -> testMerkez(b, false)))
+                            .then(Commands.literal("bilgi").executes(b -> yaz(b.getSource(),
+                                    Component.literal("[test] " + KavurmaKuyrugu.ozet(b.getSource().getServer().overworld())))))));
         }
     }
 
@@ -111,6 +125,16 @@ public final class GokyuzuKomutlari {
     private static int testYildiz(CommandContext<CommandSourceStack> b, GunesEvresi yildiz) {
         GunesZinciriSureci.zorlananYildiz = yildiz;
         return yaz(b.getSource(), Component.literal("[test] yeni yıldız = " + (yildiz == null ? "secim" : yildiz.kimlik())));
+    }
+
+    /** Geliştirme: oyuncusuz sunucuda (TPS senaryosu) pulsarın kavurma ve yangın merkezi dünya doğuş noktası olur. */
+    private static int testMerkez(CommandContext<CommandSourceStack> b, boolean dogus) {
+        if (dogus) {
+            KavurmaKuyrugu.merkezKaynagiAyarla(l -> List.of(l.getSharedSpawnPos()));
+        } else {
+            KavurmaKuyrugu.merkezKaynagiAyarla(null);
+        }
+        return yaz(b.getSource(), Component.literal("[test] pulsar merkezi = " + (dogus ? "dogus" : "oyuncular")));
     }
 
     static int baslat(CommandContext<CommandSourceStack> baglam) {
@@ -121,7 +145,7 @@ public final class GokyuzuKomutlari {
             kaynak.sendFailure(Component.translatable(ZATEN));
             return 0;
         }
-        if (yonetici.aktifAfet().filter(a -> a.tur() == AfetTuru.GUNES_PATLAMASI).isPresent()) {
+        if (yonetici.aktifAfet(AfetTuru.GUNES_PATLAMASI).isPresent()) {
             kaynak.sendFailure(Component.translatable(AFET_SURUYOR));
             return 0;
         }
@@ -142,7 +166,7 @@ public final class GokyuzuKomutlari {
             kaynak.sendFailure(Component.translatable(PULSAR_ZATEN));
             return 0;
         }
-        if (yonetici.aktifAfet().filter(a -> a.tur() == AfetTuru.GUNES_PATLAMASI).isPresent()) {
+        if (yonetici.aktifAfet(AfetTuru.GUNES_PATLAMASI).isPresent()) {
             kaynak.sendFailure(Component.translatable(AFET_SURUYOR));
             return 0;
         }
@@ -189,6 +213,10 @@ public final class GokyuzuKomutlari {
     }
 
     private static Component kalan(DunyaDonemi donem, ServerLevel ust) {
+        Optional<Component> pulsar = PulsarSureci.kalanMetni(ust, donem);
+        if (pulsar.isPresent()) {
+            return pulsar.get();
+        }
         GunesZinciri.Ayarlar ayar = GokyuzuAyarlari.zincir();
         float p = donem.evreIlerlemesi();
         return switch (donem.gunesEvresi()) {
@@ -207,7 +235,6 @@ public final class GokyuzuKomutlari {
             }
             case KIZIL_CUCE -> p < 1f ? Component.translatable(KALAN_DOGUS, yuzde(p * 100f))
                     : Component.translatable(KALAN_TAMAM);
-            case PULSAR -> Component.translatable(KALAN_PULSAR, yuzde(p * 100f));
             default -> Component.translatable(KALAN_BASLAMADI);
         };
     }
@@ -233,11 +260,11 @@ public final class GokyuzuKomutlari {
         return 1;
     }
 
-    private static String yuzde(float deger) {
+    static String yuzde(float deger) {
         return String.format(Locale.ROOT, "%.1f", deger);
     }
 
-    private static Component gun(double tick) {
+    static Component gun(double tick) {
         return Component.translatable(GUN, String.format(Locale.ROOT, "%.2f", Math.max(0.0, tick) / GunesZinciri.GUN_TICK));
     }
 
@@ -283,7 +310,23 @@ public final class GokyuzuKomutlari {
         y.ekle(ASAMA_PULSAR_TAMAM, "%s: pulsar at full strength", "%s: pulsar tam güçte");
         y.ekle(PULSAR_BASLADI, "A pulsar is born: the world begins to burn.", "Pulsar doğdu: dünya kavrulmaya başlıyor.");
         y.ekle(PULSAR_ZATEN, "The pulsar era has already begun.", "Pulsar dönemi zaten başladı.");
-        y.ekle(KALAN_PULSAR, "Pulsar era: heating %s%%", "Pulsar dönemi: ısınma %%%s");
-        y.ekle(PulsarSureci.AD_ANAHTARI, "Pulsar era (scorching world)", "Pulsar dönemi (kavrulan dünya)");
+        y.ekle(KALAN_PULSAR, "Pulsar era: heating %s%%; a black hole swallows the pulsar in %s.",
+                "Pulsar dönemi: ısınma %%%s; kara delik pulsarı %s sonra yutar.");
+        y.ekle(KALAN_KARADELIK, "The black hole is swallowing the pulsar: %s s left.",
+                "Kara delik pulsarı yutuyor: %s sn kaldı.");
+        y.ekle(KALAN_BUZUL, "Ice age: a red dwarf rises %s from now, at the first dawn after that.",
+                "Buzul kıyamet: kızıl cüce %s sonra, ardından gelen ilk şafakta doğar.");
+        y.ekle(KALAN_BUZUL_DONGUSUZ, "Ice age: a red dwarf rises %s from now (daylight cycle is off: dawn is not awaited).",
+                "Buzul kıyamet: kızıl cüce %s sonra doğar (gün döngüsü kapalı: şafak beklenmez).");
+        y.ekle(KALAN_BUZUL_SAFAK, "Ice age ends: the red dwarf rises at the next dawn (%s ticks of daytime).",
+                "Buzul kıyamet bitiyor: kızıl cüce ilk şafakta doğar (gün saatinde %s tick).");
+        y.ekle(KALAN_DONUS_DOGUS, "Red dwarf dawn %s%% (%s left); then the old sun returns.",
+                "Kızıl cüce doğuşu %%%s (%s kaldı); ardından eski güneş geri gelir.");
+        y.ekle(KALAN_GUNES_DONDU, "The old sun has returned; the ice is thawing (freeze %s%%).",
+                "Eski güneş geri döndü; buzlar çözülüyor (donma %%%s).");
+        y.ekle(ASAMA_ESKI_GUNES, "%s: the old sun has returned", "%s: eski güneş geri döndü");
+        y.ekle(DURUM_PULSAR, "Pulsar chain: %s; %s", "Pulsar zinciri: %s; %s");
+        y.ekle(PulsarSureci.AD_ANAHTARI, "Pulsar chain (scorching world, black hole, ice age, old sun)",
+                "Pulsar zinciri (kavrulan dünya, kara delik, buzul kıyamet, eski güneş)");
     }
 }

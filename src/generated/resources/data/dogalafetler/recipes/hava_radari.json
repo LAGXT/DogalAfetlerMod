@@ -25,5 +25,6 @@
   ],
   "result": {
     "item": "dogalafetler:hava_radari"
-  }
+  },
+  "show_notification": true
 }

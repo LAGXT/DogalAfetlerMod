@@ -65,6 +65,8 @@ public final class KavrulmaRengi {
         float kuruluk = switch (d.gunesEvresi()) {
             case BUYUYEN -> GunesGorselEgrileri.kuruluk(d.evreIlerlemesi());
             case PULSAR -> GunesGorselEgrileri.KURULUK_TAVANI * PulsarEgrileri.yogunluk(d.evreIlerlemesi());
+            // Yutma boyunca kavrulmuş kalır (evre ilerlemesi burada ısınma değil, 90 sn'lik koreografidir).
+            case KARADELIK_YUTMA -> GunesGorselEgrileri.KURULUK_TAVANI;
             default -> 0f;
         };
         int yeni = GunesGorselEgrileri.kurulukBasamagi(kuruluk);

@@ -21,6 +21,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.DenizSeviyesi;
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import io.github.kadirberkpolat1.dogalafetler.core.EtkiAlani;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
+import io.github.kadirberkpolat1.dogalafetler.core.PulsarYolu;
 import io.github.kadirberkpolat1.dogalafetler.core.olay.AfetBittiEvent;
 import io.github.kadirberkpolat1.dogalafetler.core.olay.DonemDegistiEvent;
 import io.github.kadirberkpolat1.dogalafetler.core.olay.SirenIstegiEvent;
@@ -48,6 +49,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameRules;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
@@ -109,7 +111,8 @@ public final class BasarimOlaylari {
 
     /**
      * Afet bittiğinde sağ çıkanlar: afet başarımları (tür, seviye, o afetteki koşullar), "Hepsini Atlattım" kümesi ve
-     * "Birlikte Hayatta". Doğal olmayan bitişte (stop, kural, iptal, hata) hiçbiri sayılmaz.
+     * "Birlikte Hayatta". Komutla başlayan ve stop ile durdurulan afet de sayılır; kural, iptal ve hata bitişinde hiçbiri
+     * sayılmaz ({@link AfetBittiEvent#basarimSayilir()}, AS-13).
      */
     @SubscribeEvent
     public static void afetBitti(AfetBittiEvent olay) {
@@ -136,7 +139,7 @@ public final class BasarimOlaylari {
                 }
             }
         }
-        Set<UUID> sagCikanlar = SagCikanTuretimi.sagCikanlar(olay.dogalBitti(), olay.etkilenenler(), olay.sagCikanlar(),
+        Set<UUID> sagCikanlar = SagCikanTuretimi.sagCikanlar(olay.basarimSayilir(), olay.etkilenenler(), olay.sagCikanlar(),
                 payliAlanda, payliOlenler, cevrimici);
         Set<Ipucu> olayli = BasarimIpucuEvent.YAYINCILAR.olayli(olay.tur());
         for (UUID kimlik : sagCikanlar) {
@@ -161,12 +164,14 @@ public final class BasarimOlaylari {
     /**
      * Faz 4 afetinin ipucu (§A.3): türü o ipucunun kayıtlı yayıncısıysa oyuncunun izine olay kaynağı olarak yazılır.
      * Kayıtsız kaynaktan gelen olay yok sayılır ve tür + ipucu başına bir kez uyarılır: o türde tek kaynak yedek
-     * denetimdir (A-35). Yalnız AKTIF aşamada.
+     * denetimdir (A-35). Yalnız AKTIF aşamada ve yalnız olayın kaynak afetine yazılır (AS-17: aynı anda küresel bir afet
+     * AKTIF olsa da bölgesel afetin ipucu kaybolmaz).
      */
     @SubscribeEvent
     public static void ipucuGeldi(BasarimIpucuEvent olay) {
         ServerPlayer oyuncu = olay.oyuncu();
-        aktifAsamadakiAfet(oyuncu.server).ifPresent(afet -> {
+        AfetYoneticisi.al(oyuncu.server).aktifAfet(olay.kaynakTur())
+                .filter(afet -> afetNo(afet) == olay.kaynakNo() && afet.asama() == AfetAsamasi.AKTIF).ifPresent(afet -> {
             switch (BasarimIpucuEvent.YAYINCILAR.olayGeldi(afet.tur(), olay.ipucu())) {
                 case KABUL -> isaretle(oyuncu, afet, olay.ipucu(), true);
                 case UYAR_YOK_SAY -> DogalAfetler.LOGGER.warn("[basarim] {} ipucu olayı {} afetinden geldi ama tür "
@@ -181,7 +186,7 @@ public final class BasarimOlaylari {
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void hasarAldi(LivingDamageEvent olay) {
         if (olay.getEntity() instanceof ServerPlayer oyuncu && olay.getAmount() > 0) {
-            aktifAsamadakiAfet(oyuncu.server)
+            aktifAsamadakiAfet(oyuncu)
                     .filter(afet -> yedekAcik(afet, Ipucu.HASAR_ALDI) && alanda(oyuncu, afet))
                     .ifPresent(afet -> isaretle(oyuncu, afet, Ipucu.HASAR_ALDI, false));
         }
@@ -193,13 +198,13 @@ public final class BasarimOlaylari {
             return;
         }
         MinecraftServer server = oyuncu.server;
-        AfetYoneticisi.al(server).aktifAfet().ifPresent(afet -> {
+        for (Afet afet : AfetYoneticisi.al(server).aktifAfetler()) {
             AfetIzi iz = BasarimVerisi.afetIzi(oyuncu);
             if (iz.no() == afetNo(afet) && !iz.oldu) {
                 iz.oldu = true;
                 BasarimVerisi.afetIziYaz(oyuncu, iz);
             }
-        });
+        }
         KutupSayaci kutup = BasarimVerisi.kutup(oyuncu);
         kutup.olum();
         BasarimVerisi.kutupYaz(oyuncu, kutup);
@@ -232,7 +237,7 @@ public final class BasarimOlaylari {
         if (!oyuncu.isAlive()) {
             return;
         }
-        Optional<Afet> aktif = aktifAsamadakiAfet(oyuncu.server);
+        Optional<Afet> aktif = aktifAsamadakiAfet(oyuncu);
         if (aktif.isEmpty()) {
             return;
         }
@@ -276,7 +281,7 @@ public final class BasarimOlaylari {
     }
 
     private static void afetIziniGuncelle(ServerPlayer oyuncu) {
-        Optional<Afet> aktif = aktifAsamadakiAfet(oyuncu.server);
+        Optional<Afet> aktif = aktifAsamadakiAfet(oyuncu);
         if (aktif.isEmpty() || !oyuncu.isAlive() || oyuncu.isSpectator() || !alanda(oyuncu, aktif.get())) {
             return;
         }
@@ -452,6 +457,13 @@ public final class BasarimOlaylari {
                             BasarimOlcutleri.SUPERNOVA_GORUNDU.tetikle(oyuncu);
                         }
                     }
+                } else if (donem.gunesEvresi() == GunesEvresi.NORMAL && PulsarYolu.gunesDondu(donem)) {
+                    // N29: gunesDondu evreden önce yazılır; süpernova yolu ve geri alma (bayrak yok) sayılmaz.
+                    for (ServerPlayer oyuncu : server.getPlayerList().getPlayers()) {
+                        if (oyuncu.isAlive() && oyuncu.level().dimension() == Level.OVERWORLD) {
+                            BasarimOlcutleri.YENI_SAFAK.tetikle(oyuncu);
+                        }
+                    }
                 }
             }
             case SIFIRLAMA -> {
@@ -554,8 +566,31 @@ public final class BasarimOlaylari {
 
     // ---------------------------------------------------------------- yardımcılar
 
-    private static Optional<Afet> aktifAsamadakiAfet(MinecraftServer server) {
-        return AfetYoneticisi.al(server).aktifAfet().filter(afet -> afet.asama() == AfetAsamasi.AKTIF);
+    /**
+     * Oyuncu için AKTIF aşamadaki afet: birden çok sürüyorsa (AS-8) oyuncunun alanında olduğu ilk bölgesel afet, yoksa
+     * alanında olduğu ilk küresel afet (ay, güneş: herkes alanda sayılır; AS-17), hiçbirinin alanında değilse AKTIF olanların
+     * ilki. Oyuncunun izi tek afete bağlıdır ({@link AfetIzi}): küresel + bölgesel afette iz bölgesel afettedir.
+     */
+    private static Optional<Afet> aktifAsamadakiAfet(ServerPlayer oyuncu) {
+        Afet kuresel = null;
+        Afet ilk = null;
+        for (Afet afet : AfetYoneticisi.al(oyuncu.server).aktifAfetler()) {
+            if (afet.asama() != AfetAsamasi.AKTIF) {
+                continue;
+            }
+            if (alanda(oyuncu, afet)) {
+                if (!afet.tur().sunucuGeneli()) {
+                    return Optional.of(afet);
+                }
+                if (kuresel == null) {
+                    kuresel = afet;
+                }
+            }
+            if (ilk == null) {
+                ilk = afet;
+            }
+        }
+        return Optional.ofNullable(kuresel != null ? kuresel : ilk);
     }
 
     /** Afet numarası: başlangıç saati ({@code AfetBittiEvent.baslangicSaati()} ile aynı). */

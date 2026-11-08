@@ -36,49 +36,77 @@ class TekSeferlikKurallarTest {
 
     @Test
     void ayYoksaAyCarpmasiSecilmez() {
-        assertTrue(TekSeferlikKurallar.uygunMu(AfetTuru.AY_CARPMASI, true, GunesEvresi.NORMAL, 500, 0, A));
-        assertFalse(TekSeferlikKurallar.uygunMu(AfetTuru.AY_CARPMASI, false, GunesEvresi.NORMAL, 500, 0, A));
+        assertTrue(TekSeferlikKurallar.uygunMu(AfetTuru.AY_CARPMASI, true, GunesEvresi.NORMAL, false, false, 500, 0,
+                A));
+        assertFalse(TekSeferlikKurallar.uygunMu(AfetTuru.AY_CARPMASI, false, GunesEvresi.NORMAL, false, false, 500, 0,
+                A));
     }
 
     @Test
     void gunKriterindePuanaBakilmaz() {
-        assertFalse(TekSeferlikKurallar.uygunMu(AfetTuru.GUNES_PATLAMASI, true, GunesEvresi.NORMAL,
+        assertFalse(TekSeferlikKurallar.uygunMu(AfetTuru.GUNES_PATLAMASI, true, GunesEvresi.NORMAL, false, false,
                 A.gunesPatlamasiMinGun() - 1, 1000, A));
-        assertTrue(TekSeferlikKurallar.uygunMu(AfetTuru.GUNES_PATLAMASI, true, GunesEvresi.NORMAL,
+        assertTrue(TekSeferlikKurallar.uygunMu(AfetTuru.GUNES_PATLAMASI, true, GunesEvresi.NORMAL, false, false,
                 A.gunesPatlamasiMinGun(), 0, A));
-        assertFalse(TekSeferlikKurallar.uygunMu(AfetTuru.AY_CARPMASI, true, GunesEvresi.NORMAL,
+        assertFalse(TekSeferlikKurallar.uygunMu(AfetTuru.AY_CARPMASI, true, GunesEvresi.NORMAL, false, false,
                 A.ayCarpmasiMinGun() - 1, 1000, A));
-        assertTrue(TekSeferlikKurallar.uygunMu(AfetTuru.AY_CARPMASI, true, GunesEvresi.NORMAL, A.ayCarpmasiMinGun(),
-                0, A));
+        assertTrue(TekSeferlikKurallar.uygunMu(AfetTuru.AY_CARPMASI, true, GunesEvresi.NORMAL, false, false,
+                A.ayCarpmasiMinGun(), 0, A));
     }
 
     @Test
     void puanKriterindeOyuncuGelisimiBeklenir() {
         TekSeferlikAyarlari puan = A.kriterlerIle(GelisimKriteri.PUAN, GelisimKriteri.PUAN);
-        assertFalse(TekSeferlikKurallar.uygunMu(AfetTuru.GUNES_PATLAMASI, true, GunesEvresi.NORMAL, 1000,
+        assertFalse(TekSeferlikKurallar.uygunMu(AfetTuru.GUNES_PATLAMASI, true, GunesEvresi.NORMAL, false, false, 1000,
                 A.gunesPatlamasiPuanEsigi() - 0.5, puan));
-        assertTrue(TekSeferlikKurallar.uygunMu(AfetTuru.GUNES_PATLAMASI, true, GunesEvresi.NORMAL, 0,
+        assertTrue(TekSeferlikKurallar.uygunMu(AfetTuru.GUNES_PATLAMASI, true, GunesEvresi.NORMAL, false, false, 0,
                 A.gunesPatlamasiPuanEsigi(), puan));
-        assertFalse(TekSeferlikKurallar.uygunMu(AfetTuru.AY_CARPMASI, true, GunesEvresi.NORMAL, 1000,
+        assertFalse(TekSeferlikKurallar.uygunMu(AfetTuru.AY_CARPMASI, true, GunesEvresi.NORMAL, false, false, 1000,
                 A.ayCarpmasiPuanEsigi() - 0.5, puan));
     }
 
     @Test
     void gunesPatlamasiYalnizNormalGunesteSecilir() {
-        assertTrue(TekSeferlikKurallar.uygunMu(AfetTuru.GUNES_PATLAMASI, true, GunesEvresi.NORMAL, 500, 100, A));
+        assertTrue(TekSeferlikKurallar.uygunMu(AfetTuru.GUNES_PATLAMASI, true, GunesEvresi.NORMAL, false, false, 500,
+                100, A));
         for (GunesEvresi evre : new GunesEvresi[] {GunesEvresi.BUYUYEN, GunesEvresi.SUPERNOVA, GunesEvresi.GUNESSIZ,
                 GunesEvresi.KIZIL_CUCE}) {
-            assertFalse(TekSeferlikKurallar.uygunMu(AfetTuru.GUNES_PATLAMASI, true, evre, 500, 100, A), evre.name());
+            assertFalse(TekSeferlikKurallar.uygunMu(AfetTuru.GUNES_PATLAMASI, true, evre, false, false, 500, 100, A),
+                    evre.name());
         }
     }
 
     @Test
     void kizilCuceDonemindeTekrarlanabilirAyariylaSecilir() {
         TekSeferlikAyarlari tekrar = A.gunesTekrarIle(true);
-        assertTrue(TekSeferlikKurallar.uygunMu(AfetTuru.GUNES_PATLAMASI, true, GunesEvresi.KIZIL_CUCE, 500, 100,
-                tekrar));
-        assertFalse(TekSeferlikKurallar.uygunMu(AfetTuru.GUNES_PATLAMASI, true, GunesEvresi.GUNESSIZ, 500, 100,
-                tekrar), "güneşsiz dönemde tekrar ayarı açık olsa da seçilmez");
+        assertTrue(TekSeferlikKurallar.uygunMu(AfetTuru.GUNES_PATLAMASI, true, GunesEvresi.KIZIL_CUCE, false, false,
+                500, 100, tekrar));
+        assertFalse(TekSeferlikKurallar.uygunMu(AfetTuru.GUNES_PATLAMASI, true, GunesEvresi.GUNESSIZ, false, false, 500,
+                100, tekrar), "güneşsiz dönemde tekrar ayarı açık olsa da seçilmez");
+    }
+
+    @Test
+    void eskiGunesDonuncePatlamaYalnizTekrarlanabilirAyariylaSecilir() {
+        assertFalse(TekSeferlikKurallar.uygunMu(AfetTuru.GUNES_PATLAMASI, true, GunesEvresi.NORMAL, false, true, 500,
+                100, A), "varsayılan: pulsar yolundan dönen güneş yeniden patlamaz");
+        assertTrue(TekSeferlikKurallar.uygunMu(AfetTuru.GUNES_PATLAMASI, true, GunesEvresi.NORMAL, false, true, 500,
+                100, A.gunesTekrarIle(true)), "tekrarlanabilir: eskisi gibi seçilir");
+        assertFalse(TekSeferlikKurallar.uygunMu(AfetTuru.GUNES_PATLAMASI, true, GunesEvresi.NORMAL, false, true,
+                A.gunesPatlamasiMinGun() - 1, 100, A.gunesTekrarIle(true)), "tekrarda da gelişim kriteri beklenir");
+        assertTrue(TekSeferlikKurallar.uygunMu(AfetTuru.AY_CARPMASI, true, GunesEvresi.NORMAL, false, true, 500, 100,
+                A), "ay çarpması zincirden etkilenmez");
+    }
+
+    @Test
+    void pulsarYolundakiDogustaTekrarlanabilirAyarlaDaSecilmez() {
+        for (TekSeferlikAyarlari ayar : new TekSeferlikAyarlari[] {A, A.gunesTekrarIle(true)}) {
+            for (GunesEvresi evre : new GunesEvresi[] {GunesEvresi.GUNESSIZ, GunesEvresi.KIZIL_CUCE}) {
+                assertFalse(TekSeferlikKurallar.uygunMu(AfetTuru.GUNES_PATLAMASI, true, evre, true, false, 500, 100,
+                        ayar), evre + " tekrar=" + ayar.gunesPatlamasiTekrarlanabilir());
+            }
+        }
+        assertTrue(TekSeferlikKurallar.uygunMu(AfetTuru.GUNES_PATLAMASI, true, GunesEvresi.KIZIL_CUCE, false, true, 500,
+                100, A.gunesTekrarIle(true)), "süpernova yolunun kızıl cücesinde tekrar ayarıyla seçilir");
     }
 
     @Test
@@ -88,7 +116,8 @@ class TekSeferlikKurallarTest {
                 continue;
             }
             for (GunesEvresi evre : GunesEvresi.values()) {
-                assertTrue(TekSeferlikKurallar.uygunMu(tur, false, evre, 0, 0, A), tur + " " + evre);
+                assertTrue(TekSeferlikKurallar.uygunMu(tur, false, evre, false, false, 0, 0, A), tur + " " + evre);
+                assertTrue(TekSeferlikKurallar.uygunMu(tur, false, evre, true, true, 0, 0, A), tur + " " + evre);
             }
         }
     }

@@ -18,15 +18,19 @@ import net.minecraftforge.network.NetworkEvent;
 /**
  * Aktif afetin istemciye giden durumu (madde 3: herkes aynı afeti aynı yerde, aynı aşamada görür). Aşama değişiminde ve
  * {@code cekirdek.ag.afetPaketAraligiTick} aralığında (1 Hz) yalnız etki alanı + ek mesafe içindeki oyunculara, sunucu
- * geneli afette herkese gider; ON_UYARI gizlidir (madde 4). Alandan çıkan ve afet biten oyunculara {@link #YOK} gider.
+ * geneli afette herkese gider; ON_UYARI gizlidir (madde 4). Alandan çıkan ve afet biten oyunculara o türün {@link #yok}
+ * paketi gider. Aynı anda birden çok afet sürebilir (AS-8, her türden en çok bir); istemci türe göre saklar.
  * {@code merkez} etki alanının güncel merkezidir (hareketli afette yürür; sunucu geneli afette başlangıç merkezi);
  * {@code kalanTick} gerçek tick'tir (-1 bilinmiyor); {@code afetNo} afetin başlangıç saati (yeni afeti ayırmak için);
  * {@code ozel} afetin kendi görüntü parametreleri.
  */
 public record AfetDurumPaketi(boolean aktif, AfetTuru tur, int seviye, BlockPos merkez, ResourceLocation boyut,
         float yaricap, boolean global, AfetAsamasi asama, int altAsama, long kalanTick, long afetNo, CompoundTag ozel) {
-    public static final AfetDurumPaketi YOK = new AfetDurumPaketi(false, AfetTuru.KASIRGA, 0, BlockPos.ZERO,
-            Level.OVERWORLD.location(), 0f, false, AfetAsamasi.BITIS, 0, -1L, 0L, new CompoundTag());
+    /** {@code tur} türünden afet bu oyuncu için yok (bitti ya da alandan çıktı). */
+    public static AfetDurumPaketi yok(AfetTuru tur) {
+        return new AfetDurumPaketi(false, tur, 0, BlockPos.ZERO, Level.OVERWORLD.location(), 0f, false, AfetAsamasi.BITIS,
+                0, -1L, 0L, new CompoundTag());
+    }
 
     /** {@code alan}: afetin bu tick'teki etki alanı (yönetici hatasız okuduğunu doğrular). */
     public static AfetDurumPaketi den(Afet afet, EtkiAlani alan, long kalanGercekTick, CompoundTag ozel) {
@@ -39,10 +43,10 @@ public record AfetDurumPaketi(boolean aktif, AfetTuru tur, int seviye, BlockPos 
 
     public void yaz(FriendlyByteBuf tampon) {
         tampon.writeBoolean(aktif);
+        tampon.writeEnum(tur);
         if (!aktif) {
             return;
         }
-        tampon.writeEnum(tur);
         tampon.writeVarInt(seviye);
         tampon.writeBlockPos(merkez);
         tampon.writeResourceLocation(boyut);
@@ -56,10 +60,11 @@ public record AfetDurumPaketi(boolean aktif, AfetTuru tur, int seviye, BlockPos 
     }
 
     public static AfetDurumPaketi oku(FriendlyByteBuf tampon) {
-        if (!tampon.readBoolean()) {
-            return YOK;
-        }
+        boolean aktif = tampon.readBoolean();
         AfetTuru tur = tampon.readEnum(AfetTuru.class);
+        if (!aktif) {
+            return yok(tur);
+        }
         int seviye = tampon.readVarInt();
         BlockPos merkez = tampon.readBlockPos();
         ResourceLocation boyut = tampon.readResourceLocation();

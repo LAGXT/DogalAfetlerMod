@@ -32,6 +32,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.InputEvent;
@@ -60,11 +61,16 @@ import net.minecraftforge.fml.config.ModConfig;
  * {@value #OLCUM_TICK} tick); ek satır TPS'i ve yanan hücreyi yazar. Kareler A-34 kapısından geçer
  * ({@link GorselOtomasyon#kareIste}, istekten sonra en az 20 yeni kare); kare beklenirken adım motoru durur. Ön-uyarı
  * penceresi {@code hiz 20} ile kısaltılır, radar karesinden önce hız 1'e döner. Kare satırı FPS'i, parçacık sayısını ve
- * kamerayı yazar. Klavye, fare ve tekerlek girdileri kapanışa kadar sayılır.
+ * kamerayı yazar. Klavye, fare ve tekerlek girdileri kapanışa kadar sayılır. {@code -Ddogalafetler.otomasyon.bolum=uzak} yalnız
+ * AF2-01 karelerini alır ({@link #uzakDizisi}): çölde, asit merkezinden {@value #UZAK_MESAFE} blok uzakta yağmur ve maruziyet.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class AsitOrmanOtomasyonu {
     private static final boolean AKTIF = "asit_orman".equals(System.getProperty("dogalafetler.otomasyon", ""));
+    /** {@code uzak} (AF2-01): yalnız çölde, merkezden 320 blok uzakta asit yağmuru ve maruziyet kareleri. */
+    private static final boolean UZAK = "uzak".equals(System.getProperty("dogalafetler.otomasyon.bolum", "hepsi"));
+    /** Uzak kipte asidin başlatıldığı nokta çöldeki oyuncudan bu kadar doğuda. */
+    private static final int UZAK_MESAFE = 320;
     private static final String ON = "ASIT_ORMAN_OTOMASYON ";
     private static final double KAMERA_UZAKLIGI = 34;
     private static final double YAKIN_GOZ = 4;
@@ -104,17 +110,23 @@ public final class AsitOrmanOtomasyonu {
     private static double yanikZ;
     private static long yanikN;
     private static volatile boolean sondu;
+    /** Uzak kipte asit merkezi (sunucu thread'inde yazılır, istemcide okunur). */
+    private static volatile BlockPos uzakMerkez;
 
     static {
         ADIMLAR.add(bekle(100));
         ADIMLAR.add(AsitOrmanOtomasyonu::cizimAyari);
-        ADIMLAR.add(sunucu(AsitOrmanOtomasyonu::hazirla));
-        ADIMLAR.add(bekle(240));
-        ADIMLAR.add(arayuz(false));
-        dizi(AfetTuru.ASIT_YAGMURU, "asit", 300, 300, 400, 60, AsitOrmanOtomasyonu::asitKamera);
-        ADIMLAR.add(sunucu(s -> komut(s, "time set 13000")));
-        dizi(AfetTuru.ORMAN_YANGINI, "orman", 400, 120, 400, 500, AsitOrmanOtomasyonu::ormanKamera);
-        ADIMLAR.add(kalite(null));
+        if (UZAK) {
+            uzakDizisi();
+        } else {
+            ADIMLAR.add(sunucu(AsitOrmanOtomasyonu::hazirla));
+            ADIMLAR.add(bekle(240));
+            ADIMLAR.add(arayuz(false));
+            dizi(AfetTuru.ASIT_YAGMURU, "asit", 300, 300, 400, 60, AsitOrmanOtomasyonu::asitKamera);
+            ADIMLAR.add(sunucu(s -> komut(s, "time set 13000")));
+            dizi(AfetTuru.ORMAN_YANGINI, "orman", 400, 120, 400, 500, AsitOrmanOtomasyonu::ormanKamera);
+            ADIMLAR.add(kalite(null));
+        }
     }
 
     private AsitOrmanOtomasyonu() {
@@ -218,6 +230,47 @@ public final class AsitOrmanOtomasyonu {
             olc("s5_" + ad + "_sonra", null, null);
             ADIMLAR.add(sunucu(s -> olcum(s, ad + "_sonra")));
         }
+    }
+
+    /**
+     * AF2-01 uzak kip: S5 asit çöldeki oyuncunun {@value #UZAK_MESAFE} blok doğusunda (konuma, hedefsiz) başlar; yağmur her
+     * yerde yağdığından çölde de görünür (vanilla çölde yağdırmaz). {@code asit_uzak} yaratıcıda (hasarsız), {@code asit_hud_uzak}
+     * hayatta kalmada ve arayüz açık (maruziyet vinyeti ve damla izleri).
+     */
+    private static void uzakDizisi() {
+        ADIMLAR.add(sunucu(AsitOrmanOtomasyonu::uzakHazirla));
+        ADIMLAR.add(bekle(240));
+        ADIMLAR.add(arayuz(false));
+        ADIMLAR.add(sunucu(AsitOrmanOtomasyonu::uzakBaslat));
+        ADIMLAR.add(sunucu(s -> ileri(s, AfetAsamasi.SIREN)));
+        ADIMLAR.add(sunucu(s -> ileri(s, AfetAsamasi.AKTIF)));
+        ADIMLAR.add(bekle(300));
+        ADIMLAR.add(uzakDurum("asit_uzak"));
+        ADIMLAR.add(kare("asit_uzak"));
+        ADIMLAR.add(sunucu(s -> oyunKipi(s, GameType.SURVIVAL)));
+        ADIMLAR.add(arayuz(true));
+        ADIMLAR.add(bekle(60));
+        ADIMLAR.add(uzakDurum("asit_hud_uzak"));
+        ADIMLAR.add(kare("asit_hud_uzak"));
+        ADIMLAR.add(arayuz(false));
+        ADIMLAR.add(sunucu(s -> oyunKipi(s, GameType.CREATIVE)));
+        ADIMLAR.add(sunucu(AsitOrmanOtomasyonu::dur));
+    }
+
+    /** Kare öncesi durum satırı (istemci thread'i; sunucu yağmuru ve can sunucu nesnesinden okunur, yalnız log). */
+    private static Adim uzakDurum(String ad) {
+        return (mc, s, t) -> {
+            BlockPos m = uzakMerkez;
+            double mesafe = m == null ? -1 : Math.hypot(mc.player.getX() - m.getX() - 0.5, mc.player.getZ() - m.getZ() - 0.5);
+            String biyom = mc.level.getBiome(mc.player.blockPosition()).unwrapKey().map(k -> k.location().toString())
+                    .orElse("?");
+            DogalAfetler.LOGGER.info(ON + String.format(Locale.ROOT, "uzak: %s merkeze %.0f blok, biyom %s, asit yoğunluğu %.2f, "
+                    + "vanilla yağmur düzeyi %.2f, sunucu yağmuru %b, maruz %b, ekran efekti %.2f, can %.1f", ad, mesafe,
+                    biyom, IstemciAsitYagmuru.yogunluk(), mc.level.getRainLevel(1f), s.overworld().isRaining(),
+                    IstemciAsitYagmuru.maruzMu(mc.level, mc.player), AsitEkranEfekti.maruziyet(),
+                    oyuncu(s).getHealth()));
+            return true;
+        };
     }
 
     private static Adim bekle(int tick) {
@@ -336,7 +389,7 @@ public final class AsitOrmanOtomasyonu {
 
     /** Sıcak karelerden ({@code h}: x, z, yanan hücre üçlüleri) ağırlık merkezi; istemci tick'inde saniyede bir. */
     private static void yanikTopla() {
-        IstemciAfetDurumu.aktif().filter(p -> p.tur() == AfetTuru.ORMAN_YANGINI).ifPresent(p -> {
+        IstemciAfetDurumu.aktif(AfetTuru.ORMAN_YANGINI).ifPresent(p -> {
             int[] h = p.ozel().getIntArray("h");
             for (int i = 0; i + 2 < h.length; i += 3) {
                 yanikX += (double) h[i] * h[i + 2];
@@ -402,7 +455,7 @@ public final class AsitOrmanOtomasyonu {
     private static Adim yakinKamera() {
         return (mc, s, t) -> {
             if (t == 1) {
-                long[] asinan = IstemciAfetDurumu.aktif().filter(p -> p.tur() == AfetTuru.ASIT_YAGMURU)
+                long[] asinan = IstemciAfetDurumu.aktif(AfetTuru.ASIT_YAGMURU)
                         .map(p -> p.ozel().getLongArray("a")).orElse(new long[0]);
                 BlockPos enYakin = null;
                 double uzaklik = Double.MAX_VALUE;
@@ -513,6 +566,53 @@ public final class AsitOrmanOtomasyonu {
         asitKamera(s);
         DogalAfetler.LOGGER.info(ON + "orman {} ({}), kamera y={}", m.toShortString(), bulunan == null ? "bulunamadı"
                 : bulunan.getSecond().unwrapKey().map(k -> k.location().toString()).orElse("?"), ust + 4);
+    }
+
+    /** Uzak kip: kurallar, öğle, en yakın çöl; yaratıcı oyuncu çölün yüzeyinde yerde, hafif aşağı bakar. */
+    private static void uzakHazirla(IntegratedServer s) {
+        for (String k : new String[] {"gamerule sendCommandFeedback false", "gamerule doDaylightCycle false",
+                "gamerule doWeatherCycle false", "gamerule doMobSpawning false", "time set 5000", "weather clear"}) {
+            komut(s, k);
+        }
+        ServerLevel level = s.overworld();
+        BlockPos dogus = level.getSharedSpawnPos();
+        Pair<BlockPos, Holder<Biome>> bulunan = level.findClosestBiome3d(h -> h.is(Biomes.DESERT), dogus, 6400, 32, 64);
+        BlockPos m = bulunan == null ? dogus : bulunan.getFirst();
+        ServerPlayer o = oyuncu(s);
+        o.setGameMode(GameType.CREATIVE);
+        o.getAbilities().flying = false;
+        o.onUpdateAbilities();
+        // Yüklü olmayan chunk'ta yükseklik dünyanın tabanını dönerdi: çöl doğuştan uzak olabilir.
+        level.getChunk(m.getX() >> 4, m.getZ() >> 4);
+        int ust = level.getHeight(Heightmap.Types.MOTION_BLOCKING, m.getX(), m.getZ());
+        o.teleportTo(level, m.getX() + 0.5, ust, m.getZ() + 0.5, -90F, 8F);
+        uzakMerkez = new BlockPos(m.getX() + UZAK_MESAFE, ust, m.getZ());
+        DogalAfetler.LOGGER.info(ON + "uzak: çöl {} ({}), oyuncu y={}, asit merkezi {}", m.toShortString(),
+                bulunan == null ? "bulunamadı" : "minecraft:desert", ust, uzakMerkez.toShortString());
+    }
+
+    /**
+     * Uzak kip: S5 asidin hedefi oyuncudur, ama başladığı an oyuncu çölden {@value #UZAK_MESAFE} blok doğudadır (merkez orada;
+     * hedefsiz başlatma çevrim içi oyuncuyu hedef seçerdi), sonra hemen çöle döner. Asit her yerde yağdığından merkez
+     * davranışı etkilemez (AF2-01); kare satırı merkeze gerçek uzaklığı yazar.
+     */
+    private static void uzakBaslat(IntegratedServer s) {
+        AfetYoneticisi y = AfetYoneticisi.al(s);
+        y.durdur();
+        ServerLevel level = s.overworld();
+        ServerPlayer o = oyuncu(s);
+        double cx = o.getX();
+        double cy = o.getY();
+        double cz = o.getZ();
+        float yaw = o.getYRot();
+        float pitch = o.getXRot();
+        level.getChunk(uzakMerkez.getX() >> 4, uzakMerkez.getZ() >> 4);
+        o.teleportTo(level, uzakMerkez.getX() + 0.5, uzakMerkez.getY(), uzakMerkez.getZ() + 0.5, yaw, pitch);
+        AfetYoneticisi.BaslatmaSonucu sonuc = y.elleBaslat(AfetTuru.ASIT_YAGMURU, 5, o, level, o.blockPosition());
+        o.teleportTo(level, cx, cy, cz, yaw, pitch);
+        y.aktifAfet().ifPresent(a -> uzakMerkez = a.baglam().merkez());
+        DogalAfetler.LOGGER.info(ON + "uzak: asit_yagmuru S5 başlatma {} merkez {} (hedef oyuncu, sonra çöle döndü)", sonuc,
+                y.aktifAfet().map(a -> a.baglam().merkez().toShortString()).orElse("-"));
     }
 
     private static void asitKamera(IntegratedServer s) {

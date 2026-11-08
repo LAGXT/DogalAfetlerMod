@@ -28,5 +28,6 @@
   ],
   "result": {
     "item": "dogalafetler:sismograf"
-  }
+  },
+  "show_notification": true
 }

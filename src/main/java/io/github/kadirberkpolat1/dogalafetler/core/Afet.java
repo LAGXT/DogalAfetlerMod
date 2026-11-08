@@ -54,6 +54,8 @@ public abstract class Afet {
     private long pencereBeklenen;
     /** Pencereye kalan gerçek tick; beklenmiyorsa -1 (yalnız gösterim, kalıcı değil). */
     private long pencereKalan = -1;
+    /** Hareketli afetin yöneldiği ara hedef {x, z}; bildirmeyen afette {@code null} (kalıcı değil; afet her tick yazar). */
+    private double[] yolHedefi;
 
     protected Afet(AfetTuru tur) {
         this.tur = Objects.requireNonNull(tur, "tur");
@@ -244,6 +246,15 @@ public abstract class Afet {
         return Collections.unmodifiableSet(olenler);
     }
 
+    /**
+     * Hareketli afetin şu an yöneldiği ara hedef {x, z} (Gelişmiş Hava Radarı'nın yol tahmini); bildirmeyen afette boş.
+     * Alanı afetin kendisi {@link #yolHedefiAyarla} ile yazar; alt sınıf kancası olmadığından korumalı okuma gerekmez
+     * (K-C46).
+     */
+    public final Optional<double[]> yolHedefi() {
+        return yolHedefi == null ? Optional.empty() : Optional.of(yolHedefi.clone());
+    }
+
     // ---------------------------------------------------------------- çekirdeğin çağırdıkları
 
     /** Afeti ON_UYARI aşamasında başlatır; bir kez çağrılır. */
@@ -320,6 +331,11 @@ public abstract class Afet {
     /** Uzun afetin alt aşamasını değiştirir; yönetici değişimi olay ve paketle duyurur. */
     protected final void altAsamaAyarla(int yeni) {
         altAsama = Math.max(0, yeni);
+    }
+
+    /** Hareketli afet yöneldiği ara hedefi bildirir ({@link #yolHedefi()}). */
+    protected final void yolHedefiAyarla(double x, double z) {
+        yolHedefi = new double[] {x, z};
     }
 
     private void gec(ServerLevel level, AfetAsamasi yeni) {

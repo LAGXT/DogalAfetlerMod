@@ -276,6 +276,133 @@ def bant_gecirgen(sinyal: np.ndarray, alt: float, ust: float) -> np.ndarray:
     return np.fft.irfft(np.fft.rfft(sinyal) * maske, sinyal.size)
 
 
+def karadelik_yutma() -> np.ndarray:
+    """Kara delik yutması (tek seferlik, 8 sn; pulsar-2 PL-4 "kütleçekim dalgası"): tersine çevrilmiş chirp, 90 Hz'den
+    25 Hz'e 7 sn'de logaritmik düşen bas (ikinci harmonik −10 dB; 0,15 sn'de dolar, yavaşça söner), altında 20–100 Hz
+    gürleme ve üstünde ilk saniyelerde yoğun, sonra seyrekleşen çatırtı (300–2400 Hz kısa kıvılcımlar, 0,1–5 sn);
+    son 1 sn kosinüsle sıfıra iner. Yumuşak sınırlayıcı (tanh) tepe/ses yüksekliği oranını −6 dBTP / −23 LUFS'a
+    sığdırır (ses.md §4 kural 2, meteor_patlama ile aynı kural)."""
+    uretec = np.random.default_rng(20261112)
+    sure = 8.0
+    n = int(sure * ORNEKLEME)
+    t = np.arange(n) / ORNEKLEME
+    frekans = 90.0 * (25.0 / 90.0) ** np.clip(t / 7.0, 0.0, 1.0)
+    faz = 2.0 * np.pi * np.cumsum(frekans) / ORNEKLEME
+    zarf = (1.0 - np.exp(-t / 0.15)) * (0.55 + 0.45 * np.exp(-t / 2.5))
+    bas = (np.sin(faz) + db(-10) * np.sin(2.0 * faz)) * zarf
+    gurleme = alcak_geciren(pembe_gurultu(n, uretec, alt=20.0, ust=100.0), 80.0)
+    gurleme *= db(-12) / np.sqrt(np.mean(gurleme**2)) * zarf
+    catirti = np.zeros(n)
+    boy = int(0.008 * ORNEKLEME)
+    for an in 0.1 + 4.9 * uretec.power(0.5, size=140):
+        i = int(an * ORNEKLEME)
+        catirti[i:i + boy] += (uretec.normal(size=boy) * np.exp(-np.arange(boy) / (0.0015 * ORNEKLEME))
+                               * np.exp(-an / 2.0))[: n - i]
+    catirti = bant_gecirgen(catirti, 300.0, 2400.0)
+    catirti *= db(-6) / max(np.max(np.abs(catirti)), 1e-9)
+    sinyal = bas + gurleme + catirti
+    sinyal *= np.where(t > sure - 1.0, yumusak((sure - t) / 1.0), 1.0)
+    sinyal /= np.max(np.abs(sinyal))
+    return np.tanh(2.0 * sinyal) / np.tanh(2.0)
+
+
+PULSAR_DONGU_SN = 8.0
+# Döngüde tam sayı vuruş: 87 / 8,0 sn = 10,875 Hz (videoda ölçülen 10,87 Hz; PL-28). İstemcide koni strobu aynı sayıyı kullanır.
+PULSAR_VURUS_ADEDI = 87
+# Boğuk-yankılı varyant (pulsar-2 tur 4 D): 800 Hz alçak geçiren + sönümlü çok vuruşlu yankı. Gecikmeler vuruş periyodunun
+# (91,95 ms) katlarına denk gelmez; yankı vuruşları yeni vuruş gibi değil, kuyruk gibi duyulur.
+BOGUK_KESIM_HZ = 800.0
+YANKI_GECIKMELERI_SN = (0.067, 0.139, 0.211, 0.283, 0.347, 0.401)
+YANKI_KAZANCLARI = (0.60, 0.45, 0.34, 0.25, 0.18, 0.13)
+
+
+def boguk_yanki(sinyal: np.ndarray, dairesel: bool) -> np.ndarray:
+    """Üstü kapalı / derindeki dinleyici: 800 Hz alçak geçiren, ardından sönümlü gecikmeli kopyalar. Döngülü seste
+    gecikme dairesel (kuyruk başa sarılır), tek seferlik seste doğrusal (dosya sonunda kesilir)."""
+    boguk = alcak_geciren(sinyal, BOGUK_KESIM_HZ)
+    sonuc = boguk.copy()
+    for gecikme, kazanc in zip(YANKI_GECIKMELERI_SN, YANKI_KAZANCLARI):
+        k = int(round(gecikme * ORNEKLEME))
+        if dairesel:
+            sonuc += kazanc * np.roll(boguk, k)
+        else:
+            sonuc[k:] += kazanc * boguk[:-k]
+    return sonuc
+
+
+def pulsar_vurus_ham() -> np.ndarray:
+    """Pulsar vuruşu, döndürülmeden: i. vuruş tam t = i · 8/87 sn'de başlar. Her vuruş 1,2 ms'lik 0,7–2,2 kHz tık ve 256 Hz
+    temelli (4 ms ince yapı, vuruştan vuruşa ±3 Hz sapma) harmonik vızıltı darbesi (3 ms'de dolar, τ 22 ms söner) ile
+    120–400 Hz plazma gövdesi; vuruş gücü %82–100 arasında değişir (gerçek pulsar darbeleri eşit değildir). Altında sürekli
+    40–80 Hz uğultu (55 Hz kısmi ton + pembe gürültü), üstünde 8 sn'de 40 seyrek 1–4 kHz çatırtı; konuşma bandına −6 dB
+    çentik. Yumuşak sınırlayıcı (tanh) tepe/ses yüksekliği oranını −12 dBTP / −26 LUFS'a sığdırır. Bütün bileşenler
+    döngüde periyodik (87 vuruş, tam turlu ton, FFT gürültüsü, sarılan çatırtı)."""
+    uretec = np.random.default_rng(20261113)
+    sure, adet = PULSAR_DONGU_SN, PULSAR_VURUS_ADEDI
+    n = int(sure * ORNEKLEME)
+    t = np.arange(n) / ORNEKLEME
+    periyot = sure / adet
+    yerel = np.mod(t, periyot)
+    sira = np.floor(t / periyot).astype(int) % adet
+    guc = (0.82 + 0.18 * uretec.random(adet))[sira]
+    temel = 256.0 + uretec.normal(0.0, 3.0, adet)[sira]
+    faz = 2.0 * np.pi * temel * yerel
+    harmonikler = (1.0, 0.7, 0.5, 0.38, 0.28, 0.2, 0.14, 0.1)
+    vizilti = sum(a * np.sin((k + 1) * faz + 0.7 * k * k) for k, a in enumerate(harmonikler))
+    vizilti *= (1.0 - np.exp(-yerel / 0.003)) * np.exp(-yerel / 0.022) * guc
+    etkin = np.sqrt(np.mean(vizilti**2))
+    tik = bant_gecirgen(uretec.normal(size=n), 700.0, 2200.0) * np.exp(-yerel / 0.0012) * guc
+    tik *= 0.3 * etkin / np.sqrt(np.mean(tik**2))
+    govde = bant_gecirgen(pembe_gurultu(n, uretec, alt=110.0, ust=420.0), 120.0, 400.0)
+    govde *= np.exp(-yerel / 0.03) * (1.0 - np.exp(-yerel / 0.004)) * guc
+    govde *= 0.35 * etkin / np.sqrt(np.mean(govde**2))
+    ugultu = alcak_geciren(pembe_gurultu(n, uretec, alt=38.0, ust=90.0), 80.0)
+    ugultu /= np.sqrt(np.mean(ugultu**2))
+    ugultu += 0.8 * np.sin(tam_turlu_faz(np.full(n, 55.0)))
+    ugultu *= 0.22 * etkin / np.sqrt(np.mean(ugultu**2))
+    catirti = np.zeros(n)
+    boy = int(0.004 * ORNEKLEME)
+    for an in uretec.uniform(0.0, sure, size=40):
+        i = int(an * ORNEKLEME)
+        parca = uretec.normal(size=boy) * np.exp(-np.arange(boy) / (0.0008 * ORNEKLEME))
+        k = min(boy, n - i)
+        catirti[i:i + k] += parca[:k]
+        catirti[:boy - k] += parca[k:]
+    catirti = bant_gecirgen(catirti, 1000.0, 4000.0)
+    catirti *= db(-18) * np.max(np.abs(vizilti)) / max(np.max(np.abs(catirti)), 1e-9)
+    sinyal = konusma_centigi(vizilti + tik + govde + ugultu + catirti)
+    sinyal /= np.max(np.abs(sinyal))
+    return np.tanh(3.5 * sinyal) / np.tanh(3.5)
+
+
+def vurus_oncesi_sifir_gecisi(sinyal: np.ndarray) -> int:
+    """İlk vuruştan (dosya sonu = döngüde ilk vuruşun hemen öncesi) geriye en yakın yükselen sıfır geçişi; kuru ve yankılı
+    varyant aynı miktarda döndürülür, ikisinde de vuruşlar aynı örnekte kalır (aynı anda başlatılınca faz aynı)."""
+    gecisler = np.nonzero((sinyal[:-1] < 0.0) & (sinyal[1:] >= 0.0))[0]
+    return int(gecisler[-1]) + 1
+
+
+def pulsar_vurus() -> np.ndarray:
+    """Pulsar vuruşu (döngülü, 8 sn, 87 vuruş): ham sinyal ilk vuruştan hemen önceki sıfır geçişinden başlar."""
+    ham = pulsar_vurus_ham()
+    return np.roll(ham, -vurus_oncesi_sifir_gecisi(ham))
+
+
+def pulsar_vurus_yankili() -> np.ndarray:
+    """Pulsar vuruşunun boğuk-yankılı varyantı (üstü kapalı / derindeki dinleyici): aynı ham sinyal, dairesel boğuk yankı,
+    kuru varyantla aynı döndürme."""
+    ham = pulsar_vurus_ham()
+    return np.roll(boguk_yanki(ham, dairesel=True), -vurus_oncesi_sifir_gecisi(ham))
+
+
+def karadelik_yutma_yankili() -> np.ndarray:
+    """Kara delik yutmasının boğuk-yankılı varyantı: aynı sinyal, doğrusal boğuk yankı, son 1 sn yeniden kosinüsle sıfıra."""
+    sinyal = karadelik_yutma()
+    t = np.arange(sinyal.size) / ORNEKLEME
+    sure = sinyal.size / ORNEKLEME
+    return boguk_yanki(sinyal, dairesel=False) * np.where(t > sure - 1.0, yumusak((sure - t) / 1.0), 1.0)
+
+
 @dataclass(frozen=True)
 class SesTanimi:
     uret: Callable[[], np.ndarray]
@@ -287,6 +414,11 @@ class SesTanimi:
     tiz_tavani_db: float
     # Tek seferlik seste (çarpma) döngü dikişi ölçülmez.
     dongu: bool = True
+    # Vuruşlu seste (pulsar) vuruş frekansı: zarf spektrumu, ince yapı ve bant payları ölçülür.
+    vurus_hz: float | None = None
+    # Vuruş fazı (istemcide koni strobunun dayandığı) yalnız kuru seste ölçülür; yankılı varyantın katlanmış zarfında
+    # gecikmeli kopyalar doğrudan sesle karışır, varyant aynı ham sinyalden aynı döndürmeyle üretildiği için fazı aynıdır.
+    vurus_fazi: bool = False
 
 
 SESLER: dict[str, SesTanimi] = {
@@ -304,6 +436,17 @@ SESLER: dict[str, SesTanimi] = {
     "meteor_ucus": SesTanimi(meteor_ucus, -26.0, -6.0, (35.0, 220.0), 2500.0, -30.0),
     # Meteor çarpması: tek seferlik darbe (−23 LUFS, tepe ≤ −6 dBTP), vuruş ve uğultu 20–120 Hz baskın.
     "meteor_patlama": SesTanimi(meteor_patlama, -23.0, -6.0, (20.0, 120.0), 2500.0, -25.0, dongu=False),
+    # Kara delik yutması: tek seferlik (−23 LUFS, tepe ≤ −6 dBTP; meteor_patlama ile aynı), 90 → 25 Hz düşen bas baskın.
+    "karadelik_yutma": SesTanimi(karadelik_yutma, -23.0, -6.0, (20.0, 120.0), 2500.0, -25.0, dongu=False),
+    # Pulsar vuruşu (pulsar-2 tur 4 D, olcum.md): döngülü, −26 LUFS, tepe ≤ −12 dBTP (kulak patlatmasın); 250–500 Hz baskın.
+    "pulsar_vurus": SesTanimi(pulsar_vurus, -26.0, -12.0, (250.0, 500.0), 2500.0, -20.0,
+                              vurus_hz=PULSAR_VURUS_ADEDI / PULSAR_DONGU_SN, vurus_fazi=True),
+    # Boğuk-yankılı varyant: aynı döngü ve düzey, 800 Hz alçak geçiren; 2,5 kHz üstü en az 30 dB aşağıda.
+    "pulsar_vurus_yankili": SesTanimi(pulsar_vurus_yankili, -26.0, -12.0, (250.0, 500.0), 2500.0, -30.0,
+                                      vurus_hz=PULSAR_VURUS_ADEDI / PULSAR_DONGU_SN),
+    # Yutmanın boğuk-yankılı varyantı: kuru dosyayla aynı kural (−23 LUFS, −6 dBTP, 20–120 Hz baskın).
+    "karadelik_yutma_yankili": SesTanimi(karadelik_yutma_yankili, -23.0, -6.0, (20.0, 120.0), 2500.0, -25.0,
+                                         dongu=False),
 }
 
 
@@ -373,6 +516,42 @@ def bant_enerjisi_db(sinyal: np.ndarray, alt: float, ust: float) -> float:
     return float(10.0 * np.log10(max(spektrum[bant].sum(), 1e-30) / spektrum.sum()))
 
 
+# Pulsar videosunun bant dağılımı (.vibe/gorev/pulsar-2-referans/olcum.md): (alt, üst Hz, enerji payı %).
+REFERANS_BANTLARI = ((20, 60, 0.9), (60, 120, 3.9), (120, 250, 17.9), (250, 500, 46.4), (500, 1000, 15.1),
+                     (1000, 2000, 12.8), (2000, 4000, 1.4), (4000, 8000, 1.2), (8000, 16000, 0.5))
+
+
+def vurus_olcumu(sinyal: np.ndarray, vurus_hz: float) -> tuple[float, float, float, float, list[float]]:
+    """Videonun ölçümüyle aynı yöntem: (zarf spektrumunun 3–30 Hz tepesi, 100–2000 Hz otokorelasyonunun 2–8 ms tepesi ms,
+    vuruş başlangıcı ms, zarf tepesi ms, bant payları %). Başlangıç (en dik yükseliş) ve tepe, 4 ms ortalanmış zarfın
+    vuruş periyoduna katlanmış ortalamasından (1 ms kutular): i. vuruşun dosyada i / vurus_hz sn'den kaç ms sonra."""
+    ms = ORNEKLEME // 1000
+    zarf = np.abs(bant_gecirgen(sinyal, 150.0, 2000.0))
+    zarf = zarf[: zarf.size // ms * ms].reshape(-1, ms).mean(axis=1)
+    salinim = zarf - zarf.mean()
+    spektrum = np.abs(np.fft.rfft(salinim * np.hanning(salinim.size)))
+    frekanslar = np.fft.rfftfreq(salinim.size, 1.0 / 1000.0)
+    aralik = (frekanslar > 3.0) & (frekanslar < 30.0)
+    zarf_tepesi = float(frekanslar[aralik][np.argmax(spektrum[aralik])])
+
+    oto = np.fft.irfft(np.abs(np.fft.rfft(bant_gecirgen(sinyal, 100.0, 2000.0))) ** 2)
+    alt, ust = int(0.002 * ORNEKLEME), int(0.008 * ORNEKLEME)
+    ince_yapi = (alt + int(np.argmax(oto[alt:ust]))) / ORNEKLEME * 1000.0
+
+    # 4 ms = bir vızıltı periyodu: her vuruşta aynı fazda başlayan 250 Hz dalgacığı zarftan silinir.
+    duz = sum(np.roll(zarf, k) for k in (-2, -1, 0, 1)) / 4.0
+    periyot_ms = 1000.0 / vurus_hz
+    kutu = np.floor(np.mod(np.arange(duz.size) + 0.5, periyot_ms)).astype(int)
+    profil = np.bincount(kutu, weights=duz) / np.bincount(kutu)
+    tepe = int(np.argmax(profil))
+    baslangic = float(np.argmax(profil - np.roll(profil, 1)))
+
+    guc = np.abs(np.fft.rfft(sinyal)) ** 2
+    sf = np.fft.rfftfreq(sinyal.size, 1.0 / ORNEKLEME)
+    paylar = [100.0 * float(guc[(sf >= a) & (sf < u)].sum() / guc.sum()) for a, u, _ in REFERANS_BANTLARI]
+    return zarf_tepesi, ince_yapi, baslangic, float(tepe), paylar
+
+
 def uret(ad: str, tanim: SesTanimi, gecici: Path) -> list[str]:
     sinyal = tanim.uret()
     sinyal = sinyal / np.max(np.abs(sinyal)) * db(-12)
@@ -413,6 +592,25 @@ def uret(ad: str, tanim: SesTanimi, gecici: Path) -> list[str]:
         hatalar.append(f"baskın {baskin[0]:.0f} Hz hedef bant {alt:.0f}–{ust:.0f} Hz dışında")
     if tiz > tanim.tiz_tavani_db:
         hatalar.append(f"{tanim.tiz_esik_hz:.0f} Hz üstü {tiz:.1f} dB > {tanim.tiz_tavani_db:.0f} dB")
+    vurus_satirlari = ""
+    if tanim.vurus_hz is not None:
+        zarf_tepesi, ince_yapi, baslangic, zarf_zirvesi, paylar = vurus_olcumu(cozulmus, tanim.vurus_hz)
+        if abs(zarf_tepesi - tanim.vurus_hz) > 0.07:
+            hatalar.append(f"zarf tepesi {zarf_tepesi:.3f} Hz, vuruş {tanim.vurus_hz:.3f} Hz")
+        if not 3.5 <= ince_yapi <= 4.5:
+            hatalar.append(f"ince yapı {ince_yapi:.2f} ms, hedef 3.5–4.5 ms (250 Hz vızıltı)")
+        if paylar[3] < 35.0:
+            hatalar.append(f"250–500 Hz payı %{paylar[3]:.1f} < %35")
+        vurus_satirlari = (
+            f"Vuruş (olcum.md yöntemi; referans 10.87 Hz, 4 ms ince yapı): zarf spektrumu tepesi {zarf_tepesi:.3f} Hz "
+            f"(hedef {tanim.vurus_hz:.3f} Hz, çözünürlük {1.0 / sure:.3f} Hz); otokorelasyon ince yapısı {ince_yapi:.2f} ms "
+            f"({1000.0 / ince_yapi:.0f} Hz)\n"
+            + (f"Vuruş fazı: i. vuruşun zarfı dosyada i/{tanim.vurus_hz:.3f} sn'den {baslangic:.0f} ms sonra en dik yükselir, "
+               f"{zarf_zirvesi:.0f} ms sonra tepededir (4 ms ortalanmış zarf, 1 ms kutular)\n" if tanim.vurus_fazi else
+               "Vuruş fazı: kuru varyantla aynı (aynı ham sinyal, aynı döndürme; doğrudan ses gecikmesiz)\n")
+            + "Bant payı % (ölçülen / video): "
+            + "; ".join(f"{a}–{u} Hz {p:.1f} / {r:.1f}" for (a, u, r), p in zip(REFERANS_BANTLARI, paylar)) + "\n"
+        )
     rapor = (
         f"Dosya: {ogg.relative_to(KOK)} ({ogg.stat().st_size} bayt, {sure:.1f} sn, mono, {ORNEKLEME} Hz, Vorbis q5)\n"
         f"Hedef (docs/tasarim/ses.md §4): {tanim.hedef_lufs:.1f} LUFS ±1, gerçek tepe <= {tanim.tepe_tavani_dbtp:.1f} dBTP, "
@@ -424,6 +622,7 @@ def uret(ad: str, tanim: SesTanimi, gecici: Path) -> list[str]:
         f">{tanim.tiz_esik_hz:.0f} Hz {tiz:.1f} dB; >8000 Hz {ust_tiz:.1f} dB\n"
         + (f"Döngü dikişi: |ilk - son| / en büyük iç adım = {dikis:.3f} (<= 1 ise süreksizlik yok); ilk örnek = {sinyal[0]:+.5f}\n"
            if tanim.dongu else "Tek seferlik: döngü dikişi ölçülmez (son 1 sn kosinüsle sıfıra iner).\n")
+        + vurus_satirlari
         + f"Hedefle karşılaştırma: {'UYGUN' if not hatalar else 'UYGUN DEĞİL: ' + '; '.join(hatalar)}\n\n"
         f"ffmpeg -i {ogg.name} -af ebur128=peak=true -f null -\n{ozet}\n"
     )

@@ -1,9 +1,11 @@
 package io.github.kadirberkpolat1.dogalafetler.komut;
 
+import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.tree.CommandNode;
 import io.github.kadirberkpolat1.dogalafetler.core.Afet;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetBaglami;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetKaydi;
@@ -15,6 +17,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.DonemSureci;
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import io.github.kadirberkpolat1.dogalafetler.core.EtkiAlani;
 import io.github.kadirberkpolat1.dogalafetler.core.GecmisKaydi;
+import io.github.kadirberkpolat1.dogalafetler.core.SiklikBilgisi;
 import io.github.kadirberkpolat1.dogalafetler.core.TpsOlcer;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.GeciciCarpan;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.GunSaatiPenceresi;
@@ -32,14 +35,16 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 
 /**
  * Çekirdeğin {@code /dogalafet} alt komutlarının işleri: {@code durum}, {@code start}, {@code stop}, {@code gun}, {@code hiz},
- * {@code sifirla}, {@code asama ileri} (KOMUTLAR, N18). {@code stop} ve {@code asama ileri} aktif afet yokken dönem
- * süreçlerine ({@link DonemSureci}) gider; {@code stop} afeti durdururken süren süreçleri yalnız hatırlatır (ikinci
- * {@code stop} onları durdurur). Çıktılar yalnız komutu yazan OP'ye gider (N6) ve dil anahtarlarıyla yazılır. Başarılı
- * komut 1, reddedilen 0 döner.
+ * {@code siklik}, {@code sifirla}, {@code asama ileri} (KOMUTLAR, N18) ve alt komutsuz kökün kullanım listesi. {@code durum}
+ * aktif ve durdurulmuş dönem süreçlerinin kendi satırını ({@link DonemSureci#durumSatiri}: aşama, kalan gün) ayrı satır yazar.
+ * {@code stop} ve {@code asama ileri} aktif afet yokken dönem süreçlerine ({@link DonemSureci}) gider; {@code stop} afeti
+ * durdururken süren süreçleri yalnız hatırlatır (ikinci {@code stop} onları durdurur). Çıktılar yalnız komutu yazan OP'ye
+ * gider (N6) ve dil anahtarlarıyla yazılır. Başarılı komut 1, reddedilen 0 döner.
  */
 public final class CekirdekKomutlari {
     private static final String ON = "commands.dogalafetler.";
@@ -73,9 +78,11 @@ public final class CekirdekKomutlari {
     public static final String STOP_DURDU = ON + "stop.durdu";
     public static final String STOP_AFET_YOK = ON + "stop.afet_yok";
     public static final String STOP_SURECLER = ON + "stop.surecler";
+    public static final String STOP_TUR_YOK = ON + "stop.tur_yok";
     public static final String STOP_SURECLER_SURUYOR = ON + "stop.surecler_suruyor";
     public static final String GUN_AYARLANDI = ON + "gun.ayarlandi";
     public static final String HIZ_AYARLANDI = ON + "hiz.ayarlandi";
+    public static final String YARDIM_BASLIK = ON + "yardim.baslik";
     public static final String SIFIRLA_TAMAM = ON + "sifirla.tamam";
     public static final String ASAMA_AFET = ON + "asama.afet";
     public static final String ASAMA_AFET_BITTI = ON + "asama.afet_bitti";
@@ -102,9 +109,8 @@ public final class CekirdekKomutlari {
         long gun = yonetici.oyunGunu();
         List<Component> satirlar = new ArrayList<>();
         satirlar.add(Component.translatable(DURUM_BASLIK));
-        Optional<Afet> aktif = yonetici.aktifAfet();
-        if (aktif.isPresent()) {
-            Afet afet = aktif.get();
+        List<Afet> aktifler = yonetici.aktifAfetler();
+        for (Afet afet : aktifler) {
             AfetBaglami afetBaglami = afet.baglam();
             long pencere = afet.pencereBeklemesi();
             Component kalan = pencere >= 0 ? Component.translatable(DURUM_PENCERE, sure(pencere))
@@ -115,12 +121,14 @@ public final class CekirdekKomutlari {
                     .orElseGet(() -> Component.translatable(BILINMIYOR));
             satirlar.add(Component.translatable(DURUM_AFET_KONUM, afetBaglami.merkez().toShortString(),
                     afetBaglami.boyut().location().toString(), yaricap, oyuncuAdi(server, afetBaglami.hedefOyuncu())));
-        } else {
+        }
+        if (aktifler.isEmpty()) {
             satirlar.add(Component.translatable(DURUM_AFET_YOK));
         }
         satirlar.add(Component.translatable(DURUM_GUN, gun, donem.gunOfseti(), sayi(yonetici.zamanOlcegi().carpan()),
                 sayi(TpsOlcer.tps()), sayi(TpsOlcer.kismaCarpani())));
         satirlar.add(Component.translatable(DURUM_BEKLEME, sure(donem.genelBeklemeKalan()), turBeklemeleri(donem)));
+        satirlar.add(SiklikBilgisi.sonrakiSatiri(yonetici));
         satirlar.add(Component.translatable(DURUM_CARPANLAR, carpanlar(donem)));
         satirlar.add(Component.translatable(DURUM_SEVIYELER, gun, Kurallar.maksSiddet(server.getGameRules()),
                 seviyeOlasiliklari(yonetici.seviyeOlasiliklari(gun))));
@@ -132,8 +140,16 @@ public final class CekirdekKomutlari {
                 Component.translatable(deniz.kalici() ? KALICI : GECICI)));
         satirlar.add(Component.translatable(DURUM_DONMA, sayi(donem.donmaIlerlemesi()),
                 Component.translatable(donem.cozulmeDonemi() ? EVET : HAYIR), sayi(donem.buharlasmaDerinligi())));
-        satirlar.add(Component.translatable(DURUM_SURECLER, surecAdlari(yonetici.aktifDonemSurecleri())));
-        satirlar.add(Component.translatable(DURUM_SURECLER_DURAN, duranSurecler(yonetici.durdurulmusDonemSurecleri())));
+        List<DonemSureci> suren = yonetici.aktifDonemSurecleri();
+        Map<DonemSureci, DonemSureci.DurdurmaNedeni> duran = yonetici.durdurulmusDonemSurecleri();
+        satirlar.add(Component.translatable(DURUM_SURECLER, surecAdlari(suren)));
+        satirlar.add(Component.translatable(DURUM_SURECLER_DURAN, duranSurecler(duran)));
+        ServerLevel ust = server.overworld();
+        List<DonemSureci> surecler = new ArrayList<>(suren);
+        surecler.addAll(duran.keySet());
+        for (DonemSureci surec : surecler) {
+            surec.durumSatiri(ust).ifPresent(satirlar::add);
+        }
         satirlar.add(Component.translatable(DURUM_SON_AFETLER, sonAfetler(donem)));
         for (Component satir : satirlar) {
             kaynak.sendSuccess(() -> satir, false);
@@ -155,7 +171,7 @@ public final class CekirdekKomutlari {
                 BlockPos.containing(kaynak.getPosition()));
         switch (sonuc) {
             case BASLADI -> {
-                Afet afet = yonetici.aktifAfet().orElseThrow();
+                Afet afet = yonetici.aktifAfet(tur).orElseThrow();
                 AfetBaglami afetBaglami = afet.baglam();
                 Component mesaj = Component.translatable(START_BASLADI, afetAdi(tur), seviyeMetni(afet.seviye()),
                         afetBaglami.merkez().toShortString(), oyuncuAdi(kaynak.getServer(), afetBaglami.hedefOyuncu()),
@@ -165,8 +181,7 @@ public final class CekirdekKomutlari {
                         START_PENCERE, afetAdi(tur), p.bas(), p.son()), false));
                 return 1;
             }
-            case ZATEN_AKTIF -> kaynak.sendFailure(Component.translatable(START_ZATEN_AKTIF,
-                    afetAdi(yonetici.aktifAfet().map(Afet::tur).orElse(tur))));
+            case ZATEN_AKTIF -> kaynak.sendFailure(Component.translatable(START_ZATEN_AKTIF, afetAdi(tur)));
             case KAYITLI_DEGIL -> kaynak.sendFailure(Component.translatable(START_KAYITLI_DEGIL, afetAdi(tur)));
             case YER_UYGUN_DEGIL, HEDEF_YOK -> kaynak.sendFailure(Component.translatable(START_YER_UYGUN_DEGIL, afetAdi(tur)));
             case HATA -> kaynak.sendFailure(Component.translatable(START_HATA, afetAdi(tur)));
@@ -174,12 +189,31 @@ public final class CekirdekKomutlari {
         return 0;
     }
 
-    static int stop(CommandContext<CommandSourceStack> baglam) {
+    /**
+     * {@code stop}: süren bütün afetleri durdurur; afet yoksa dönem süreçlerini. {@code stop <afet>}: yalnız o türden süren afeti
+     * (AS-8).
+     */
+    static int stop(CommandContext<CommandSourceStack> baglam, Optional<String> ad) {
         CommandSourceStack kaynak = baglam.getSource();
         AfetYoneticisi yonetici = AfetYoneticisi.al(kaynak.getServer());
-        Optional<AfetTuru> tur = yonetici.aktifAfet().map(Afet::tur);
-        if (tur.isPresent() && yonetici.durdur()) {
-            kaynak.sendSuccess(() -> Component.translatable(STOP_DURDU, afetAdi(tur.get())), false);
+        if (ad.isPresent()) {
+            Optional<AfetTuru> secilen = AfetTuru.kimlikIle(ad.get());
+            if (secilen.isEmpty()) {
+                kaynak.sendFailure(Component.translatable(START_BILINMEYEN, ad.get()));
+                return 0;
+            }
+            if (!yonetici.durdur(secilen.get())) {
+                kaynak.sendFailure(Component.translatable(STOP_TUR_YOK, afetAdi(secilen.get())));
+                return 0;
+            }
+            kaynak.sendSuccess(() -> Component.translatable(STOP_DURDU, afetAdi(secilen.get())), false);
+            return 1;
+        }
+        List<Afet> afetler = yonetici.aktifAfetler();
+        if (yonetici.durdur()) {
+            for (Afet afet : afetler) {
+                kaynak.sendSuccess(() -> Component.translatable(STOP_DURDU, afetAdi(afet.tur())), false);
+            }
             List<DonemSureci> suren = yonetici.aktifDonemSurecleri();
             if (!suren.isEmpty()) {
                 Component adlar = surecAdlari(suren);
@@ -218,6 +252,44 @@ public final class CekirdekKomutlari {
         return 1;
     }
 
+    /**
+     * {@code siklik [yüzde]}: {@code afetSikligi} gamerule'ünü (kalıcı, dünya verisinde) okur ya da yazar. Yazınca süren
+     * beklemeler hemen yeni sıklığa ölçeklenir ve sonraki afet tahmini gösterilir; {@code /gamerule afetSikligi} ile aynı
+     * değerdir.
+     */
+    static int siklik(CommandContext<CommandSourceStack> baglam, Integer yuzde) {
+        CommandSourceStack kaynak = baglam.getSource();
+        MinecraftServer server = kaynak.getServer();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(server);
+        List<Component> satirlar = new ArrayList<>();
+        if (yuzde == null) {
+            SiklikBilgisi.sinirUyarisi(yonetici).ifPresent(satirlar::add);
+            satirlar.add(SiklikBilgisi.sonrakiSatiri(yonetici));
+        } else {
+            server.getGameRules().getRule(Kurallar.AFET_SIKLIGI).set(yuzde, server);
+            yonetici.siklikDenetle(false);
+            satirlar.addAll(SiklikBilgisi.degisimSatirlari(yonetici));
+        }
+        for (Component satir : satirlar) {
+            kaynak.sendSuccess(() -> satir, false);
+        }
+        return 1;
+    }
+
+    /** Alt komutsuz {@code /dogalafet}: kaynakın kullanabildiği alt komutların kullanımı, alfabetik. */
+    static int yardim(CommandContext<CommandSourceStack> baglam) {
+        CommandSourceStack kaynak = baglam.getSource();
+        CommandDispatcher<CommandSourceStack> dagitici = kaynak.getServer().getCommands().getDispatcher();
+        CommandNode<CommandSourceStack> kok = dagitici.getRoot().getChild(DogalAfetKomutu.KOK);
+        List<String> kullanimlar = new ArrayList<>(dagitici.getSmartUsage(kok, kaynak).values());
+        kullanimlar.sort(null);
+        kaynak.sendSuccess(() -> Component.translatable(YARDIM_BASLIK), false);
+        for (String kullanim : kullanimlar) {
+            kaynak.sendSuccess(() -> Component.literal("/" + DogalAfetKomutu.KOK + " " + kullanim), false);
+        }
+        return 1;
+    }
+
     static int sifirla(CommandContext<CommandSourceStack> baglam) {
         CommandSourceStack kaynak = baglam.getSource();
         AfetYoneticisi.al(kaynak.getServer()).sifirla();
@@ -225,14 +297,18 @@ public final class CekirdekKomutlari {
         return 1;
     }
 
-    /** {@code asama ileri [süreç]}: süreç adı verilirse aktif afete dokunmadan yalnız o dönem süreci ilerler (K-C48). */
+    /**
+     * {@code asama ileri [afet|süreç]}: ad yoksa birincil afet, süren bir afetin adıysa o afet (AS-8), değilse yalnız o dönem
+     * süreci ilerler (K-C48).
+     */
     static int asamaIleri(CommandContext<CommandSourceStack> baglam, Optional<String> surec) {
         CommandSourceStack kaynak = baglam.getSource();
         MinecraftServer server = kaynak.getServer();
         AfetYoneticisi yonetici = AfetYoneticisi.al(server);
-        Optional<AfetTuru> tur = yonetici.aktifAfet().map(Afet::tur);
-        if (surec.isEmpty() && tur.isPresent() && yonetici.asamaIleri()) {
-            Optional<Afet> sonra = yonetici.aktifAfet();
+        Optional<AfetTuru> tur = surec.isEmpty() ? yonetici.aktifAfet().map(Afet::tur)
+                : AfetTuru.kimlikIle(surec.get()).filter(t -> yonetici.aktifAfet(t).isPresent());
+        if (tur.isPresent() && yonetici.asamaIleri(tur.get())) {
+            Optional<Afet> sonra = yonetici.aktifAfet(tur.get());
             Component mesaj = sonra.isPresent()
                     ? Component.translatable(ASAMA_AFET, afetAdi(tur.get()),
                             Component.translatable(sonra.get().asama().ceviriAnahtari()))
@@ -240,7 +316,7 @@ public final class CekirdekKomutlari {
             kaynak.sendSuccess(() -> mesaj, false);
             return 1;
         }
-        Optional<Component> donemMesaji = yonetici.donemAsamaIleri(surec);
+        Optional<Component> donemMesaji = tur.isPresent() ? Optional.empty() : yonetici.donemAsamaIleri(surec);
         if (donemMesaji.isPresent()) {
             Component mesaj = donemMesaji.get();
             kaynak.sendSuccess(() -> mesaj, false);
@@ -419,17 +495,20 @@ public final class CekirdekKomutlari {
                 + "arasında patlar).");
         y.ekle(START_BILINMEYEN, "Unknown disaster: %s", "Bilinmeyen afet: %s");
         y.ekle(START_KAYITLI_DEGIL, "%s is not registered yet.", "%s henüz kayıtlı değil.");
-        y.ekle(START_ZATEN_AKTIF, "A disaster is already active: %s. Use /dogalafet stop first.",
-                "Zaten aktif bir afet var: %s. Önce /dogalafet stop.");
+        y.ekle(START_ZATEN_AKTIF, "%s is already running; other disasters can be started alongside it.",
+                "%s zaten sürüyor; başka türden afetler yanında başlatılabilir.");
         y.ekle(START_YER_UYGUN_DEGIL, "No suitable place found for %s.", "%s için uygun yer bulunamadı.");
         y.ekle(START_HATA, "%s could not be started; see the server log.", "%s başlatılamadı; sunucu log'una bakın.");
         y.ekle(STOP_DURDU, "%s stopped.", "%s durduruldu.");
+        y.ekle(STOP_TUR_YOK, "No %s is running.", "Süren %s yok.");
         y.ekle(STOP_AFET_YOK, "There is no disaster or era process to stop.", "Durdurulacak afet ya da dönem süreci yok.");
         y.ekle(STOP_SURECLER, "Era processes stopped: %s", "Dönem süreçleri durduruldu: %s");
         y.ekle(STOP_SURECLER_SURUYOR, "Era processes still running: %s; run /dogalafet stop again to stop them.",
                 "Süren dönem süreçleri: %s; durdurmak için yeniden /dogalafet stop.");
         y.ekle(GUN_AYARLANDI, "Game day set to %s. Level weights: %s", "Oyun günü %s olarak ayarlandı. Seviye ağırlıkları: %s");
         y.ekle(HIZ_AYARLANDI, "Disaster and era timers run at x%s.", "Afet ve dönem zamanlayıcıları x%s hızında.");
+        y.ekle(YARDIM_BASLIK, "Natural Disasters commands (OP):", "Doğal Afetler komutları (OP):");
+        SiklikBilgisi.cevirileriYaz(y);
         y.ekle(SIFIRLA_TAMAM, "The world's disaster and era state was reset.",
                 "Dünyanın afet ve dönem durumu ilk hâline döndürüldü.");
         y.ekle(ASAMA_AFET, "%s phase: %s", "%s aşaması: %s");

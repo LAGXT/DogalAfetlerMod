@@ -435,8 +435,7 @@ public final class GunesPatlamasiOtomasyonu {
     }
 
     private static boolean afetAsamasi(AfetAsamasi asama) {
-        return IstemciAfetDurumu.aktif()
-                .filter(p -> p.aktif() && p.tur() == AfetTuru.GUNES_PATLAMASI && p.asama() == asama).isPresent();
+        return IstemciAfetDurumu.aktif(AfetTuru.GUNES_PATLAMASI).filter(p -> p.asama() == asama).isPresent();
     }
 
     private static float tps(IntegratedServer server) {

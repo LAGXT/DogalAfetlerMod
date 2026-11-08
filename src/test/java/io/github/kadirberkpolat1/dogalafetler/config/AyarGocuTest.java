@@ -12,7 +12,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -20,8 +19,8 @@ import org.junit.jupiter.api.io.TempDir;
 /** MT2-31 / inceleme-4 Mt27: göç yazımı yedekli ve atomik; okuma/yazma hatasında dosya değişmez. */
 class AyarGocuTest {
     private static final String ESKI = "[meteor]\n	varlikTavani = 96\n";
-    private static final List<AyarGocu.Kayit> GOC = List.of(new AyarGocu.Kayit("meteor.ayarSurumu", 1,
-            (surum, oku) -> Map.of("meteor.varlikTavani", 448)));
+    private static final List<SurumluGocPlani> GOC = List.of(new SurumluGocPlani("meteor.ayarSurumu", 1,
+            List.of(SurumluGocPlani.adim(1, "meteor.varlikTavani", 448, 96))));
 
     @Test
     void yazmadanOnceYedekAlinirVarOlanYedekEzilmez(@TempDir Path klasor) throws IOException {

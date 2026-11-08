@@ -40,8 +40,9 @@ public final class AsitAyarlari {
         return sunucu.get().eszamanliAsindirma.get();
     }
 
-    public static double kaymaHizi() {
-        return sunucu.get().kaymaHizi.get();
+    /** Tick başına oyuncuların çevresinden örneklenen en çok yüzey sütunu (TPS kısmasıyla çarpılır; AF2-05). */
+    public static int blokButcesi() {
+        return sunucu.get().blokButcesi.get();
     }
 
     private static <T> List<T> liste(ForgeConfigSpec.ConfigValue<List<? extends Number>> deger, List<T> varsayilan,
@@ -71,14 +72,15 @@ public final class AsitAyarlari {
         private final ForgeConfigSpec.IntValue tasSeviyesi;
         private final ForgeConfigSpec.DoubleValue minimumCan;
         private final ForgeConfigSpec.IntValue eszamanliAsindirma;
-        private final ForgeConfigSpec.DoubleValue kaymaHizi;
+        private final ForgeConfigSpec.IntValue blokButcesi;
 
         private Sunucu(ForgeConfigSpec.Builder k) {
             AsitKurallari.Tablo v = AsitKurallari.Tablo.VARSAYILAN;
-            yaricap = liste(k, "yaricap", "Yağış alanı yarıçapı (blok).", v.yaricap(), 4, 256);
+            yaricap = liste(k, "yaricap", "Yağmur bütün dünyada yağar; aşınma her oyuncunun bu yarıçapı içinden örneklenir (blok).",
+                    v.yaricap(), 4, 256);
             sureSaniye = liste(k, "sureSaniye", "AKTIF yağış süresi (sn).", v.sureSaniye(), 10, 3600);
-            asindirma = liste(k, "asindirmaBlokSaniye", "Tam yoğunlukta saniyede aşınan en çok blok.", v.asindirma(), 0,
-                    256);
+            asindirma = liste(k, "asindirmaBlokSaniye", "Tam yoğunlukta her oyuncunun çevresinde saniyede aşınan en çok blok.",
+                    v.asindirma(), 0, 256);
             hasarSaniye = k.comment("Gökyüzüne açık oyuncunun maruz kaldığı her saniye aldığı hasar (can puanı; 1 = yarım"
                     + " kalp). Seviyeden bağımsız; çatı altında 0.").defineInRange("hasarSaniye", 1.0, 0.0, 20.0);
             tasSeviyesi = k.comment("Kırıktaş ve taş tuğlanın aşınmaya başladığı seviye (6: hiç).")
@@ -87,8 +89,9 @@ public final class AsitAyarlari {
                     .defineInRange("asitMinimumCan", 4.0, 0.0, 20.0);
             eszamanliAsindirma = k.comment("Aynı anda çatlak örtüsü taşıyan (aşınmakta olan) en çok blok; S5 hızı × ortalama çatlak süresi (4 sn).")
                     .defineInRange("eszamanliAsindirma", 64, 1, 256);
-            kaymaHizi = k.comment("Yağış alanının günün rüzgârı yönünde kayma hızı (blok/sn).")
-                    .defineInRange("kaymaHizi", 0.3, 0.0, 5.0);
+            blokButcesi = k.comment("Tick başına oyuncuların çevresindeki yüklü chunk'lardan örneklenen en çok yüzey sütunu"
+                    + " (oyuncu başına 3–16, toplamı bu sayı × TPS kısması; 0: aşınma yok).")
+                    .defineInRange("blokButcesi", 32, 0, 512);
         }
     }
 }

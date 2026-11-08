@@ -12,6 +12,8 @@ public final class SicaklikCevirileri {
     public static void yaz(CeviriYazici y) {
         y.ekle("tooltip.dogalafetler.tuy", "Feather Upgrade: %s", "Tüy Upgrade'i: %s");
         y.ekle("tooltip.dogalafetler.yunlu", "Woolen", "Yünlü");
+        y.ekle("tooltip.dogalafetler.yun.tarif", "Craft with an armor piece: woolen armor keeps you warm",
+                "Bir zırh parçasıyla birleştir: yünlü zırh soğuğa karşı ısıtır");
 
         y.ekle("death.attack.dogalafetler.donma", "%1$s froze to death", "%1$s donarak öldü");
         y.ekle("death.attack.dogalafetler.donma.player", "%1$s froze to death while fighting %2$s",

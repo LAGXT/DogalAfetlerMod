@@ -522,7 +522,7 @@ public final class Sinkhole extends Afet {
             boolean dustu = o.getY() < zemin + (altAsama() == COKUS && fazGecen <= seviyeBilgisi().cekirdekTick() ? 2.5 : 0);
             if (icinde && dustu && o.getY() >= enAltY - 2) {
                 dusenler.add(o.getUUID());
-                MinecraftForge.EVENT_BUS.post(new BasarimIpucuEvent(o, Ipucu.CUKURA_DUSTU));
+                MinecraftForge.EVENT_BUS.post(new BasarimIpucuEvent(o, Ipucu.CUKURA_DUSTU, this));
             }
         }
     }

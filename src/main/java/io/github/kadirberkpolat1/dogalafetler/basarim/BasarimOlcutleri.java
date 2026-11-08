@@ -46,10 +46,11 @@ public final class BasarimOlcutleri {
     public static final EsikOlcutu BALIK_TUTULDU = new EsikOlcutu("balik_tutuldu", "min", false);
     public static final EsikOlcutu BIRLIKTE_HAYATTA = new EsikOlcutu("birlikte_hayatta", "min", false);
     public static final BasitOlcut HEPSINI_ATLATTI = new BasitOlcut("hepsini_atlatti");
+    public static final BasitOlcut YENI_SAFAK = new BasitOlcut("yeni_safak");
 
     private static final List<CriterionTrigger<?>> HEPSI = List.of(SIREN_DUYULDU, AFETTEN_SAG_CIKTI, SUPERNOVA_GORUNDU,
             YILDIZLI_GECE, DONMA_ILERLEMESI, KUTUP_SIGINAGI, DENIZ_YUKSELDI, ESYA_URETILDI, TUY_UPGRADE,
-            YUNLU_PARCA, CORBA_ICER_ISINIR, BALIK_TUTULDU, BIRLIKTE_HAYATTA, HEPSINI_ATLATTI);
+            YUNLU_PARCA, CORBA_ICER_ISINIR, BALIK_TUTULDU, BIRLIKTE_HAYATTA, HEPSINI_ATLATTI, YENI_SAFAK);
 
     private BasarimOlcutleri() {
     }
@@ -100,6 +101,7 @@ public final class BasarimOlcutleri {
             case FELAKET_USTASI -> tek(AFETTEN_SAG_CIKTI.ornek(null, 5, null));
             case HEPSINI_ATLATTIM -> tek(HEPSINI_ATLATTI.ornek());
             case BIRLIKTE_HAYATTA -> tek(BIRLIKTE_HAYATTA.ornek(3));
+            case YENI_SAFAK -> tek(YENI_SAFAK.ornek());
         };
     }
 

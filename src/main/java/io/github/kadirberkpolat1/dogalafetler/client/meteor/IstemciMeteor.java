@@ -11,6 +11,7 @@ import com.mojang.blaze3d.vertex.VertexSorting;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.esya.MeteorEsyaKayitlari;
+import io.github.kadirberkpolat1.dogalafetler.gokyuzu.PulsarKayitlari;
 import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorGorunumu;
 import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorKayitlari;
@@ -112,7 +113,7 @@ public final class IstemciMeteor {
             if (p.suya()) {
                 suCarpmasi(level, nokta, boy, yogunluk);
             } else {
-                karaCarpmasi(level, nokta, boy, ay, yogunluk);
+                karaCarpmasi(level, nokta, boy, p.gorunumu(), yogunluk);
             }
         }
     }
@@ -126,7 +127,8 @@ public final class IstemciMeteor {
         return Math.max(0, MeteorOlcegi.ara(boy, kucuk, buyuk));
     }
 
-    private static void karaCarpmasi(ClientLevel level, Vec3 n, double boy, boolean ay, double y) {
+    private static void karaCarpmasi(ClientLevel level, Vec3 n, double boy, MeteorGorunumu gorunum, double y) {
+        boolean ay = gorunum == MeteorGorunumu.AY;
         RandomSource r = level.random;
         double cap = MeteorOlcegi.ara(boy, 1.1, 2.6, 0.6, 3.4);
         double halkaHizi = 4 * cap / 7.0;
@@ -146,7 +148,8 @@ public final class IstemciMeteor {
         for (int i = 0; i < enkazSayisi; i++) {
             hizli(enkaz, n.add(0, 0.6, 0), yarikure(r, 0.25, 0.55, 1.05));
         }
-        ParticleOptions kivilcim = (ay ? MeteorKayitlari.KIVILCIM_AY : MeteorKayitlari.KIVILCIM).get();
+        ParticleOptions kivilcim = gorunum == MeteorGorunumu.PULSAR ? PulsarKayitlari.KOR.get()
+                : (ay ? MeteorKayitlari.KIVILCIM_AY : MeteorKayitlari.KIVILCIM).get();
         int kivilcimSayisi = adet(r, say(boy, 18, 44) * y);
         for (int i = 0; i < kivilcimSayisi; i++) {
             hizli(kivilcim, n.add(0, 0.5, 0), yarikure(r, 0.35, 0.3, 0.95));

@@ -21,7 +21,7 @@ public final class MeteorAyarlari {
     static void kaydet() {
         sunucu = AyarKaydi.sunucuBolumu("meteor", "Meteor, krater ve meteor ödülleri (madde 13c, bölüm D/H)", Sunucu::new);
         istemci = AyarKaydi.istemciBolumu("meteor", "Meteor efektleri (madde 13c, N13)", Istemci::new);
-        AyarKaydi.sunucuGocu(MeteorAyarGocu.SURUM_YOLU, MeteorAyarGocu.GUNCEL, MeteorAyarGocu::plan);
+        AyarKaydi.sunucuGocu(MeteorAyarGocu.PLAN);
     }
 
     public static OdulZari.Sanslar sanslar() {

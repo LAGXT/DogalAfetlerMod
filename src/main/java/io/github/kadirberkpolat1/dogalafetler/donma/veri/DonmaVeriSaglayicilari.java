@@ -6,6 +6,7 @@ import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.donma.DonmaBloklari;
 import io.github.kadirberkpolat1.dogalafetler.donma.DonmaIsleyici;
 import io.github.kadirberkpolat1.dogalafetler.donma.DonmaTablosuYukleyici;
+import io.github.kadirberkpolat1.dogalafetler.gokyuzu.PulsarKayitlari;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -101,6 +102,9 @@ public final class DonmaVeriSaglayicilari {
                             Blocks.POLISHED_DEEPSLATE, Blocks.DEEPSLATE_BRICKS, Blocks.DEEPSLATE_TILES, Blocks.SANDSTONE,
                             Blocks.SMOOTH_SANDSTONE, Blocks.CUT_SANDSTONE, Blocks.RED_SANDSTONE, Blocks.SMOOTH_RED_SANDSTONE,
                             Blocks.CUT_RED_SANDSTONE, Blocks.QUARTZ_BLOCK, Blocks.SMOOTH_QUARTZ, Blocks.TERRACOTTA);
+            // Pulsar külü kar altında kalır (PL-5): kül bloğu doğal zemin, kömürleşmiş kütük yapı gibi geç karlanır.
+            tag(DonmaIsleyici.KAR_ZEMINI).add(PulsarKayitlari.KUL_BLOGU.get());
+            tag(DonmaIsleyici.YAPI_KAR_ZEMINI).add(PulsarKayitlari.KOMURLESMIS_KUTUK.get());
         }
     }
 

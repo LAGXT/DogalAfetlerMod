@@ -24,6 +24,9 @@ public final class RadarCevirileri {
         y.ekle("item.dogalafetler.gelismis_hava_radari.ipucu",
                 "Longer range; also shows severity, movement and the last 5 disasters.",
                 "Daha uzun menzil; şiddet seviyesini, hareket yönünü ve son 5 afeti de gösterir.");
+        y.ekle("item.dogalafetler.gelismis_hava_radari.tarif",
+                "Needs a Weather Radar and a Cosmic Core first (found very rarely in meteor craters).",
+                "Önce Hava Radarı ve Kozmik Çekirdek gerekir (meteor kraterlerinde çok nadir çıkar).");
         y.ekle(ON + "sakin", "Sky is calm", "Gökyüzü sakin");
         y.ekle(ON + "menzil", "Range %s m", "Menzil %s m");
         y.ekle(ON + "anomali", "Sky anomaly", "Gökyüzü anomalisi");

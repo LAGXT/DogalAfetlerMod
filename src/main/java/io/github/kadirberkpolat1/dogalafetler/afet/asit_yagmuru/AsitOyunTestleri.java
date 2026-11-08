@@ -8,9 +8,18 @@ import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.Ipucu;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetAsamasi;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
+import io.github.kadirberkpolat1.dogalafetler.core.EtkiAlani;
 import io.github.kadirberkpolat1.dogalafetler.core.OyunTestiTemizligi;
+import io.github.kadirberkpolat1.dogalafetler.core.olay.SirenIstegiEvent;
+import io.github.kadirberkpolat1.dogalafetler.esya.EsyaKayitlari;
+import io.github.kadirberkpolat1.dogalafetler.esya.mantik.RadarGorunumu;
+import io.github.kadirberkpolat1.dogalafetler.esya.radar.RadarPaketi;
+import io.github.kadirberkpolat1.dogalafetler.esya.radar.RadarSunucu;
 import io.github.kadirberkpolat1.dogalafetler.yangin.YanginEtiketleri;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import net.minecraft.core.BlockPos;
@@ -20,11 +29,17 @@ import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.storage.ServerLevelData;
 import net.minecraftforge.fml.util.ObfuscationReflectionHelper;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
@@ -38,39 +53,237 @@ import net.minecraftforge.gametest.PrefixGameTestTemplate;
 @PrefixGameTestTemplate(false)
 public final class AsitOyunTestleri {
     private static final String SAHNE = "yangin_sahne";
+    /** Uzak oyuncu testinde yüzeyi karşılaştırılan kare: açık oyuncunun çevresinde ±{@value} blok (çatılı oyuncu içeride). */
+    private static final int UZAK_ALAN = 30;
+    /** Uzak oyuncu testinin zorla yüklediği chunk'lar; batch sonunda bırakılır. */
+    private static final List<ChunkPos> ZORLA_YUKLU = new ArrayList<>();
 
     private AsitOyunTestleri() {
     }
 
     @AfterBatch(batch = "asit_hasar")
     public static void hasarSonrasi(ServerLevel level) {
-        OyunTestiTemizligi.batchSonu(level);
+        batchSonu(level);
     }
 
     @AfterBatch(batch = "asit_blok_hasari")
     public static void blokHasariSonrasi(ServerLevel level) {
-        OyunTestiTemizligi.batchSonu(level);
+        batchSonu(level);
     }
 
     @AfterBatch(batch = "asit_stop")
     public static void stopSonrasi(ServerLevel level) {
-        OyunTestiTemizligi.batchSonu(level);
+        batchSonu(level);
     }
 
     @AfterBatch(batch = "asit_basarim")
     public static void basarimSonrasi(ServerLevel level) {
-        OyunTestiTemizligi.batchSonu(level);
+        batchSonu(level);
     }
 
     @AfterBatch(batch = "asit_hiz")
     public static void hizSonrasi(ServerLevel level) {
         AfetYoneticisi.al(level.getServer()).hizAyarla(1);
-        OyunTestiTemizligi.batchSonu(level);
+        batchSonu(level);
     }
 
     @AfterBatch(batch = "asit_saniye")
     public static void saniyeSonrasi(ServerLevel level) {
+        batchSonu(level);
+    }
+
+    @AfterBatch(batch = "asit_hava")
+    public static void havaSonrasi(ServerLevel level) {
+        batchSonu(level);
+    }
+
+    @AfterBatch(batch = "asit_uzak")
+    public static void uzakSonrasi(ServerLevel level) {
+        batchSonu(level);
+    }
+
+    @AfterBatch(batch = "asit_boyut")
+    public static void boyutSonrasi(ServerLevel level) {
+        batchSonu(level);
+    }
+
+    /**
+     * Batch sonu: afet durur (önceki hava geri yüklenir), kural, dinleyici ve sahte oyuncular döner, zorla yüklenen uzak
+     * chunk'lar bırakılır. Hava yağmıyorsa yağmur düzeyi de sıfırlanır: AF2-02 vanilla yağmuru 0,01/tick ile söner, sıradaki
+     * batch'in ateşi sönmesin.
+     */
+    private static void batchSonu(ServerLevel level) {
         OyunTestiTemizligi.batchSonu(level);
+        for (ChunkPos c : ZORLA_YUKLU) {
+            level.setChunkForced(c.x, c.z, false);
+        }
+        ZORLA_YUKLU.clear();
+        if (!level.getLevelData().isRaining()) {
+            level.setRainLevel(0f);
+        }
+    }
+
+    /**
+     * AF2-01/02: asit AKTIF olunca vanilla yağmuru bütün dünyada açılır ({@code level.isRaining()}) ve AKTIF boyunca tutulur
+     * ({@code /weather clear} bir tick'te geri alınır); bitince önceki hava (açık hava sayacı dahil) aynen geri gelir ve yağmur
+     * söner. Etki alanı küreseldir; Hava Radarı asidi gökyüzü anomalisi değil "her yer" olarak gösterir (AF2-06).
+     */
+    @GameTest(template = SAHNE, batch = "asit_hava", timeoutTicks = 200)
+    public static void asitVanillaYagmurunuAcarBitinceHavayiGeriYukler(GameTestHelper y) {
+        ServerLevel level = y.getLevel();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(level.getServer());
+        yonetici.durdur();
+        ServerLevelData veri = (ServerLevelData) level.getLevelData();
+        level.setWeatherParameters(12345, 0, false, false);
+        level.setRainLevel(0f);
+        BlockPos radarP = y.absolutePos(new BlockPos(2, 1, 2));
+        ServerPlayer radarci = OyunTestiTemizligi.oyuncu(y, radarP.getX() + 0.5, radarP.getY(), radarP.getZ() + 0.5);
+        radarci.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(EsyaKayitlari.HAVA_RADARI.get()));
+        AsitYagmuru afet = baslat(y, 3, y.absolutePos(new BlockPos(4, 1, 4)));
+        y.assertTrue(veri.isRaining() && veri.getClearWeatherTime() == 0, "AKTIF'e geçince vanilla yağmuru açılmalı");
+        y.assertTrue(yonetici.etkiAlani(afet).map(EtkiAlani::global).orElse(false), "asit etki alanı küresel olmalı");
+        RadarPaketi radar = RadarSunucu.durum(radarci);
+        y.assertTrue(radar.gorunum() == RadarGorunumu.AFET && radar.herYer() && radar.tur() == AfetTuru.ASIT_YAGMURU,
+                "radar asidi 'her yer' göstermeli: " + radar);
+        y.runAfterDelay(40, () -> {
+            y.assertTrue(level.isRaining(), "40 tick'te level.isRaining() true olmalı (düzey " + level.getRainLevel(1f) + ")");
+            level.setWeatherParameters(6000, 0, false, false);
+        });
+        y.runAfterDelay(43, () -> {
+            boolean tutuldu = veri.isRaining() && veri.getClearWeatherTime() == 0;
+            yonetici.durdur();
+            cikar(level, List.of(radarci));
+            y.assertTrue(tutuldu, "asit sürerken /weather clear geri alınmalı");
+            y.assertTrue(!veri.isRaining() && veri.getClearWeatherTime() == 12345, "bitişte önceki hava geri gelmeli: yağmur="
+                    + veri.isRaining() + " açık=" + veri.getClearWeatherTime());
+        });
+        y.runAfterDelay(120, () -> {
+            y.assertTrue(!level.isRaining(), "bitişten sonra yağmur sönmeli (düzey " + level.getRainLevel(1f) + ")");
+            y.succeed();
+        });
+    }
+
+    /**
+     * AF2-08 (inceleme Af1): küresel alanlı bölgesel afet yalnız kendi boyutunu etkiler. Asit sürerken Nether'daki oyuncu siren
+     * isteği ve durum paketi almaz, etkilenenlere girmez, doğal bitişte Çatı Altı almaz; üst dünyada cam çatı altındaki oyuncu
+     * üçünü de alır.
+     */
+    @GameTest(template = SAHNE, batch = "asit_boyut", timeoutTicks = 260)
+    public static void baskaBoyuttakiOyuncuAsittenEtkilenmez(GameTestHelper y) {
+        ServerLevel level = y.getLevel();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(level.getServer());
+        yonetici.durdur();
+        ServerLevel nether = level.getServer().getLevel(Level.NETHER);
+        y.assertTrue(nether != null, "Nether boyutu yok");
+        zemin(y);
+        for (int x = 5; x <= 7; x++) {
+            for (int z = 5; z <= 7; z++) {
+                y.setBlock(new BlockPos(x, 4, z), Blocks.GLASS);
+            }
+        }
+        BlockPos catiP = y.absolutePos(new BlockPos(6, 1, 6));
+        ServerPlayer ust = OyunTestiTemizligi.oyuncu(y, catiP.getX() + 0.5, catiP.getY(), catiP.getZ() + 0.5);
+        ServerPlayer alt = OyunTestiTemizligi.oyuncu(y, catiP.getX() + 0.5, catiP.getY(), catiP.getZ() + 0.5);
+        alt.teleportTo(nether, 0.5, 70, 0.5, 0f, 0f);
+        y.assertTrue(alt.level() == nether, "oyuncu Nether'e geçmedi");
+        List<ServerPlayer> hepsi = List.of(ust, alt);
+        for (ServerPlayer o : hepsi) {
+            o.setGameMode(GameType.SURVIVAL);
+            o.setHealth(20f);
+        }
+        List<ServerPlayer> sirenAlan = new ArrayList<>();
+        OyunTestiTemizligi.dinle(SirenIstegiEvent.class, olay -> {
+            if (olay.afetTuru() == AfetTuru.ASIT_YAGMURU) {
+                sirenAlan.addAll(olay.oyuncular());
+            }
+        });
+        AsitYagmuru afet = baslat(y, 5, catiP);
+        y.assertTrue(sirenAlan.contains(ust) && !sirenAlan.contains(alt),
+                "siren yalnız üst dünyadakine gitmeli: üst " + sirenAlan.contains(ust) + ", Nether " + sirenAlan.contains(alt));
+        List<ServerPlayer> paket = yonetici.etkilenebilecekOyuncular(afet);
+        y.assertTrue(paket.contains(ust) && !paket.contains(alt),
+                "durum paketi yalnız üst dünyadakine gitmeli: üst " + paket.contains(ust) + ", Nether " + paket.contains(alt));
+        y.onEachTick(() -> hepsi.forEach(AsitOyunTestleri::hasarAlabilir));
+        y.runAfterDelay(40, () -> {
+            Set<UUID> etkilenen = Set.copyOf(afet.etkilenenler());
+            for (int i = 0; i < 6 && yonetici.aktifAfet().isPresent(); i++) {
+                yonetici.asamaIleri();
+            }
+            Advancement catiAlti = level.getServer().getAdvancements()
+                    .getAdvancement(BasarimKimlikleri.basarim(Basarimlar.CATI_ALTI));
+            y.assertTrue(catiAlti != null, "advancement yüklü değil (runData?)");
+            boolean ustAldi = ust.getAdvancements().getOrStartProgress(catiAlti).isDone();
+            boolean altAldi = alt.getAdvancements().getOrStartProgress(catiAlti).isDone();
+            boolean bitti = yonetici.aktifAfet().isEmpty() && afet.sonlandi();
+            yonetici.durdur();
+            cikar(level, hepsi);
+            y.assertTrue(etkilenen.contains(ust.getUUID()), "üst dünyadaki oyuncu etkilenen olmalı");
+            y.assertTrue(!etkilenen.contains(alt.getUUID()), "Nether'daki oyuncu etkilenen olmamalı");
+            y.assertTrue(bitti, "asit doğal bitmeli: " + afet.asama());
+            y.assertTrue(ustAldi, "çatı altındaki üst dünya oyuncusu Çatı Altı almalı");
+            y.assertTrue(!altAldi, "Nether'daki oyuncu asitten Çatı Altı almamalı");
+            y.succeed();
+        });
+    }
+
+    /**
+     * AF2-03/05: hedeften 500+ blok uzaktaki göğe açık oyuncu da hasar alır, aynı yerde cam çatı altındaki almaz; uzak
+     * oyuncuların çevresindeki yüzey de aşınır (örnekleme her oyuncunun çevresinden). Uzak alanın 5×5 chunk'ı eşzamanlı
+     * üretilir ve test boyunca zorla yüklü tutulur (K-E21).
+     */
+    @GameTest(template = SAHNE, batch = "asit_uzak", timeoutTicks = 260)
+    public static void uzaktakiAcikOyuncuHasarAlirCatiAltindakiAlmaz(GameTestHelper y) {
+        ServerLevel level = y.getLevel();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(level.getServer());
+        yonetici.durdur();
+        zemin(y);
+        BlockPos hedefP = y.absolutePos(new BlockPos(2, 1, 2));
+        ServerPlayer hedef = OyunTestiTemizligi.oyuncu(y, hedefP.getX() + 0.5, hedefP.getY(), hedefP.getZ() + 0.5);
+        int ux = ((hedefP.getX() + 512) >> 4 << 4) + 8;
+        int uz = (hedefP.getZ() >> 4 << 4) + 8;
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dz = -2; dz <= 2; dz++) {
+                ChunkPos c = new ChunkPos((ux >> 4) + dx, (uz >> 4) + dz);
+                level.getChunk(c.x, c.z);
+                level.setChunkForced(c.x, c.z, true);
+                ZORLA_YUKLU.add(c);
+            }
+        }
+        int zeminY = level.getHeight(Heightmap.Types.MOTION_BLOCKING, ux, uz);
+        BlockPos acikP = new BlockPos(ux, zeminY, uz);
+        BlockPos catiP = new BlockPos(ux + 6, zeminY, uz);
+        for (int x = -1; x <= 1; x++) {
+            for (int z = -1; z <= 1; z++) {
+                level.setBlock(catiP.offset(x, 3, z), Blocks.GLASS.defaultBlockState(), 3);
+            }
+        }
+        ServerPlayer acik = OyunTestiTemizligi.oyuncu(y, acikP.getX() + 0.5, acikP.getY(), acikP.getZ() + 0.5);
+        ServerPlayer cati = OyunTestiTemizligi.oyuncu(y, catiP.getX() + 0.5, catiP.getY(), catiP.getZ() + 0.5);
+        List<ServerPlayer> hepsi = List.of(hedef, acik, cati);
+        for (ServerPlayer o : hepsi) {
+            o.setGameMode(GameType.SURVIVAL);
+            o.setHealth(20f);
+        }
+        BlockState[] ilkYuzey = yuzey(level, acikP, UZAK_ALAN);
+        AsitYagmuru afet = baslat(y, 5, hedefP, hedef);
+        y.onEachTick(() -> hepsi.forEach(AsitOyunTestleri::hasarAlabilir));
+        y.runAfterDelay(170, () -> {
+            float hedefCan = hedef.getHealth();
+            float acikCan = acik.getHealth();
+            float catiCan = cati.getHealth();
+            int degisen = degisenYuzey(ilkYuzey, yuzey(level, acikP, UZAK_ALAN));
+            double uzaklik = Math.hypot(acikP.getX() - hedefP.getX(), acikP.getZ() - hedefP.getZ());
+            boolean aktif = afet.asama() == AfetAsamasi.AKTIF;
+            yonetici.durdur();
+            cikar(level, hepsi);
+            y.assertTrue(aktif, "afet 170 tick boyunca AKTIF kalmalı");
+            y.assertTrue(uzaklik >= 500, "uzak oyuncu hedeften en az 500 blok uzakta olmalı: " + uzaklik);
+            y.assertTrue(acikCan <= 16f, "hedeften " + Math.round(uzaklik) + " blok uzaktaki açık oyuncu hasar almalı: can " + acikCan);
+            y.assertTrue(catiCan == 20f, "uzaktaki çatı altındaki oyuncu hasar almamalı: can " + catiCan);
+            y.assertTrue(hedefCan <= 16f, "hedef oyuncu da hasar almalı: can " + hedefCan);
+            y.assertTrue(degisen > 0, "uzak oyuncuların çevresinde yüzey aşınmalı (değişen " + degisen + ")");
+            y.succeed();
+        });
     }
 
     /**
@@ -228,7 +441,10 @@ public final class AsitOyunTestleri {
         });
     }
 
-    /** Madde 11 {@code afetBlokHasari=false}: AKTIF asit yağmurunda hiçbir blok aşınma kuyruğuna girmez, sahne aynı kalır. */
+    /**
+     * Madde 11 {@code afetBlokHasari=false}: AKTIF asit yağmurunda hiçbir blok aşınma kuyruğuna girmez, sahne aynı kalır.
+     * Sahnenin ortasında bir oyuncu durur: kural açık olsa örnekleme onun çevresindeki tahta ve yaprakları bulurdu (AF2-05).
+     */
     @GameTest(template = SAHNE, batch = "asit_blok_hasari", timeoutTicks = 200)
     public static void blokHasariKapaliykenAsitBlokDegistirmez(GameTestHelper y) {
         ServerLevel level = y.getLevel();
@@ -242,6 +458,9 @@ public final class AsitOyunTestleri {
             }
         }
         int ilk = ozet(y);
+        BlockPos ortaP = y.absolutePos(new BlockPos(4, 2, 4));
+        ServerPlayer goren = OyunTestiTemizligi.oyuncu(y, ortaP.getX() + 0.5, ortaP.getY(), ortaP.getZ() + 0.5);
+        goren.setGameMode(GameType.SURVIVAL);
         AsitYagmuru afet = baslat(y, 5, y.absolutePos(new BlockPos(4, 1, 4)));
         BlockPos tahta = y.absolutePos(new BlockPos(2, 1, 2));
         boolean kuyruk = afet.kuyrugaAl(level, tahta);
@@ -251,6 +470,7 @@ public final class AsitOyunTestleri {
             int sonBekleyen = afet.bekleyenAsinma();
             yonetici.durdur();
             OyunTestiTemizligi.blokHasari(level, onceki);
+            cikar(level, List.of(goren));
             y.assertTrue(bekleyen <= 1 && sonBekleyen == 0, "blok hasarı kapalıyken kuyruk boşalmalı: " + sonBekleyen
                     + " (elle eklenen " + kuyruk + ")");
             y.assertTrue(son == ilk, "blok hasarı kapalıyken sahne değişmemeli");
@@ -336,9 +556,14 @@ public final class AsitOyunTestleri {
     }
 
     private static AsitYagmuru baslat(GameTestHelper y, int seviye, BlockPos merkez) {
+        return baslat(y, seviye, merkez, null);
+    }
+
+    /** {@code hedef}: komut uyumluluğu için hedef oyuncu (asitte etkisi yok, AF2-01); {@code null} konuma başlatır. */
+    private static AsitYagmuru baslat(GameTestHelper y, int seviye, BlockPos merkez, ServerPlayer hedef) {
         ServerLevel level = y.getLevel();
         AfetYoneticisi yonetici = AfetYoneticisi.al(level.getServer());
-        AfetYoneticisi.BaslatmaSonucu sonuc = yonetici.elleBaslat(AfetTuru.ASIT_YAGMURU, seviye, null, level, merkez);
+        AfetYoneticisi.BaslatmaSonucu sonuc = yonetici.elleBaslat(AfetTuru.ASIT_YAGMURU, seviye, hedef, level, merkez);
         y.assertTrue(sonuc == AfetYoneticisi.BaslatmaSonucu.BASLADI, "asit yağmuru başlamadı: " + sonuc);
         AsitYagmuru afet = (AsitYagmuru) yonetici.aktifAfet().orElseThrow();
         yonetici.asamaIleri();
@@ -370,6 +595,31 @@ public final class AsitOyunTestleri {
 
     private static BlockState kaliciYaprak() {
         return Blocks.OAK_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true);
+    }
+
+    /** Merkezin ±{@code r} karesindeki sütunların gökyüzünü gören en üst bloğu ({@code MOTION_BLOCKING} altı). */
+    private static BlockState[] yuzey(ServerLevel level, BlockPos merkez, int r) {
+        int kenar = 2 * r + 1;
+        BlockState[] sonuc = new BlockState[kenar * kenar];
+        BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
+        for (int i = 0; i < kenar; i++) {
+            for (int j = 0; j < kenar; j++) {
+                int x = merkez.getX() - r + i;
+                int z = merkez.getZ() - r + j;
+                sonuc[i * kenar + j] = level.getBlockState(p.set(x, level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z) - 1, z));
+            }
+        }
+        return sonuc;
+    }
+
+    private static int degisenYuzey(BlockState[] once, BlockState[] sonra) {
+        int n = 0;
+        for (int i = 0; i < once.length; i++) {
+            if (once[i] != sonra[i]) {
+                n++;
+            }
+        }
+        return n;
     }
 
     private static int ozet(GameTestHelper y) {

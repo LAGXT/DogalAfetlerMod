@@ -148,8 +148,12 @@ public final class OrtamSicakligi {
         return Math.sin(Math.PI * t / 12000.0);
     }
 
-    /** Pulsar döneminin ısısı: {@code gunesPatlamasiArtisi}'nın katı (ayrı config anahtarı yerine; gökyüzü-2 kararları). */
-    public static final double PULSAR_ARTIS_CARPANI = 1.2;
+    /** Pulsar döneminin ısısı: {@code gunesPatlamasiArtisi}'nın katı (ayrı config anahtarı yerine; pulsar-2 PL-3 c). */
+    public static final double PULSAR_ARTIS_CARPANI = 2.0;
+    /** Pulsarda sudan serinlemenin payı (sıcak suyun serinletmesi yarıya iner). */
+    public static final double PULSAR_SU_ORANI = 0.5;
+    /** Kara delik yutmasında pulsar ısısı bu evre ilerlemesinde 0'a söner (90 sn'nin 60. saniyesi). */
+    public static final double YUTMA_SONME_ILERLEMESI = 0.667;
 
     public static Sonuc hesapla(Girdi g, Ayarlar a) {
         EnumMap<Katki, Double> k = new EnumMap<>(Katki.class);
@@ -195,9 +199,12 @@ public final class OrtamSicakligi {
             case BUYUYEN -> a.gunesPatlamasiArtisi() * sinirla01(g.evreIlerlemesi())
                     * (g.gokyuzu() ? 1.0 : a.golgeOrani());
             case SUPERNOVA -> a.supernovaKalintisi() * (1 - sinirla01(g.evreIlerlemesi()));
-            // Pulsar (gökyüzü-2): buzul kıyametinin tersi, ısınmayla güneş patlaması tepesinin 1,2 katı (vars. +45,6 °C).
+            // Pulsar: buzul kıyametinin tersi, ısınmayla güneş patlaması tepesinin 2 katı (vars. +76 °C açık havada).
             case PULSAR -> PULSAR_ARTIS_CARPANI * a.gunesPatlamasiArtisi() * sinirla01(g.evreIlerlemesi())
                     * (g.gokyuzu() ? 1.0 : a.golgeOrani());
+            // Kara delik yutması: pulsarın tam ısısı parlama sonuna kadar doğrusal söner.
+            case KARADELIK_YUTMA -> PULSAR_ARTIS_CARPANI * a.gunesPatlamasiArtisi()
+                    * sinirla01(1 - g.evreIlerlemesi() / YUTMA_SONME_ILERLEMESI) * (g.gokyuzu() ? 1.0 : a.golgeOrani());
             default -> 0.0;
         };
         k.put(Katki.GUNES_EVRESI, evreKatkisi * koruma);
@@ -212,7 +219,8 @@ public final class OrtamSicakligi {
 
     private static void sonKalemler(Girdi g, Ayarlar a, EnumMap<Katki, Double> k) {
         if (g.suda()) {
-            k.put(Katki.SU, a.su());
+            boolean pulsar = g.boyut() == Boyut.NORMAL && g.gunesEvresi() == GunesEvresi.PULSAR;
+            k.put(Katki.SU, a.su() * (pulsar ? PULSAR_SU_ORANI : 1.0));
         }
         if (g.kaynaklar() != 0) {
             k.put(Katki.KAYNAKLAR, Math.max(a.kaynakAltSiniri(), Math.min(a.kaynakUstSiniri(), g.kaynaklar())));

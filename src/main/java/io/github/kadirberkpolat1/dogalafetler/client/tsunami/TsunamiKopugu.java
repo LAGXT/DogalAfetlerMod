@@ -82,7 +82,7 @@ public final class TsunamiKopugu {
         SanalSuDunyasi d = SanalSu.istemci;
         Minecraft mc = Minecraft.getInstance();
         if (d == null || mc.level == null || d.dalgalar().isEmpty()
-                || IstemciAfetDurumu.aktif().filter(p -> p.tur() == AfetTuru.TSUNAMI).isEmpty()) {
+                || IstemciAfetDurumu.aktif(AfetTuru.TSUNAMI).isEmpty()) {
             return;
         }
         long cpu0 = GorselOtomasyon.AKTIF ? IPLIK.getCurrentThreadCpuTime() : 0;

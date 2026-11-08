@@ -72,8 +72,7 @@ public final class IstemciOrmanYangini {
             return;
         }
         saat++;
-        Optional<AfetDurumPaketi> paket = IstemciAfetDurumu.aktif().filter(p -> p.tur() == AfetTuru.ORMAN_YANGINI
-                && p.boyut().equals(level.dimension().location())
+        Optional<AfetDurumPaketi> paket = IstemciAfetDurumu.aktif(AfetTuru.ORMAN_YANGINI).filter(p -> p.boyut().equals(level.dimension().location())
                 && (p.asama() == AfetAsamasi.AKTIF || p.asama() == AfetAsamasi.BITIS));
         kareler = paket.map(p -> p.ozel().getIntArray("h")).orElse(new int[0]);
         hucre = paket.map(p -> p.ozel().getInt("n")).orElse(0);

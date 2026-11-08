@@ -19,9 +19,12 @@ import org.joml.Matrix4f;
  * ({@code position_color}); tasarım §5 kalite tablosu: aurora katmanı Düşük 1 / Orta 2 / Yüksek ve Ultra 3.
  */
 final class GunesGokCizici {
-    /** Ekran örtüleri: süpernova parlaması, ısı dalgalanması ve şafak tonu (0–1). */
-    record Ortuler(float flas, float isi, float safak) {
-        static final Ortuler YOK = new Ortuler(0f, 0f, 0f);
+    /**
+     * Ekran örtüleri: süpernova parlaması, ısı dalgalanması ve şafak tonu (0–1); {@code kizil} ısı şeritlerini sıcak
+     * turuncudan pulsarın kızıl-sıcak tonuna çeker.
+     */
+    record Ortuler(float flas, float isi, float safak, float kizil) {
+        static final Ortuler YOK = new Ortuler(0f, 0f, 0f, 0f);
 
         boolean bos() {
             return flas < 0.003f && isi < 0.003f && safak < 0.003f;
@@ -153,12 +156,14 @@ final class GunesGokCizici {
             };
             float ust = gy * 0.1f;
             float yukseklik = (ust + gy) / serit;
+            float yesil = Mth.lerp(o.kizil(), 0.78f, 0.42f);
+            float mavi = Mth.lerp(o.kizil(), 0.5f, 0.2f);
             for (int j = 0; j < serit; j++) {
                 float y0 = -gy + j * yukseklik;
                 float kayma = gx * 0.015f * Mth.sin(zaman * 0.25f + j * 1.3f);
                 float alfa = o.isi() * 0.075f * (0.55f + 0.45f * Mth.sin(zaman * 0.17f + j * 2.1f))
                         * (1f - 0.6f * j / serit);
-                dortgen(b, -gx + kayma, y0, gx + kayma, y0 + yukseklik * 0.6f, 1f, 0.78f, 0.5f, alfa);
+                dortgen(b, -gx + kayma, y0, gx + kayma, y0 + yukseklik * 0.6f, 1f, yesil, mavi, alfa);
             }
         }
         if (o.flas() > 0f) {

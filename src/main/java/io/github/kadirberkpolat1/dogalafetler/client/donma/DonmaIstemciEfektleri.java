@@ -4,6 +4,7 @@ import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciDonem;
 import io.github.kadirberkpolat1.dogalafetler.config.EfektKalitesi;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
+import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
 import io.github.kadirberkpolat1.dogalafetler.donma.DonmaAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.donma.DonmaParcaciklari;
 import io.github.kadirberkpolat1.dogalafetler.donma.mantik.DonmaEsikleri;
@@ -107,6 +108,9 @@ public final class DonmaIstemciEfektleri {
         if (durum.cozulmeDonemi() && g < 99f) {
             damla(level, oyuncu, r, c);
         }
+        if (durum.gunesEvresi() == GunesEvresi.KIZIL_CUCE && durum.donusYolu() && durum.evreIlerlemesi() < 1f) {
+            karBuhari(level, oyuncu, r, c);
+        }
     }
 
     /** Yağmuru istemcide kara çevirir; biyom ve sunucu havası değişmez. */
@@ -147,7 +151,7 @@ public final class DonmaIstemciEfektleri {
 
     private static void kar(ClientLevel level, LocalPlayer o, RandomSource r, double c) {
         BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
-        for (int i = sayi(r, 10.0 * c * karSiddeti); i > 0; i--) {
+        for (int i = sayi(r, 10.0 * c * karSiddeti * (tipi() ? TIPI_KAR_KATI : 1.0)); i > 0; i--) {
             double x = o.getX() + (r.nextDouble() - 0.5) * 32;
             double z = o.getZ() + (r.nextDouble() - 0.5) * 32;
             double y = o.getY() + 6 + r.nextDouble() * 10;
@@ -169,6 +173,30 @@ public final class DonmaIstemciEfektleri {
             if (s.is(Blocks.WATER) && s.getFluidState().isSource() && level.getBlockState(p.set(x, y + 1, z)).isAir()) {
                 level.addParticle(ParticleTypes.CLOUD, x + r.nextDouble(), y + 1.05, z + r.nextDouble(),
                         (r.nextDouble() - 0.5) * 0.01, 0.015 + r.nextDouble() * 0.02, (r.nextDouble() - 0.5) * 0.01);
+            }
+        }
+    }
+
+    /** Pulsar yolundaki buzul kıyamette tipi: kar dört kat (PL-27'de iki, PL-41 ×2), kar tanesi rüzgârla yataya yakın. */
+    static final double TIPI_KAR_KATI = 4.0;
+    static final double TIPI_RUZGAR_KATI = 6.0;
+
+    static boolean tipi() {
+        DonemPaketi d = IstemciDonem.durum();
+        return d.gunesEvresi() == GunesEvresi.GUNESSIZ && d.donusYolu();
+    }
+
+    /** Pulsar yolundaki kızıl cüce doğuşu: ilk ışıkta karın ve buzun üstünden buhar (parçacık sınırı 32 blok). */
+    private static void karBuhari(ClientLevel level, LocalPlayer o, RandomSource r, double c) {
+        BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
+        for (int i = sayi(r, 10.0 * c); i > 0; i--) {
+            int x = (int) Math.floor(o.getX() + (r.nextDouble() - 0.5) * 60);
+            int z = (int) Math.floor(o.getZ() + (r.nextDouble() - 0.5) * 60);
+            int y = level.getHeight(Heightmap.Types.WORLD_SURFACE, x, z) - 1;
+            BlockState s = level.getBlockState(p.set(x, y, z));
+            if (s.is(Blocks.SNOW) || s.is(Blocks.SNOW_BLOCK) || s.is(BlockTags.ICE)) {
+                level.addParticle(ParticleTypes.CLOUD, x + r.nextDouble(), y + 0.9, z + r.nextDouble(),
+                        (r.nextDouble() - 0.5) * 0.01, 0.02 + r.nextDouble() * 0.03, (r.nextDouble() - 0.5) * 0.01);
             }
         }
     }

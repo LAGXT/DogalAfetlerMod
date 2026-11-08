@@ -1,0 +1,55 @@
+{
+  "parent": "minecraft:recipes/root",
+  "conditions": [
+    {
+      "type": "forge:not",
+      "value": {
+        "type": "forge:tag_empty",
+        "tag": "dogalafetler:kozmik_cekirdek"
+      }
+    }
+  ],
+  "criteria": {
+    "has_hava_radari": {
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "dogalafetler:hava_radari"
+            ]
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    },
+    "has_kozmik_cekirdek": {
+      "conditions": {
+        "items": [
+          {
+            "tag": "dogalafetler:kozmik_cekirdek"
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    },
+    "has_the_recipe": {
+      "conditions": {
+        "recipe": "dogalafetler:gelismis_hava_radari"
+      },
+      "trigger": "minecraft:recipe_unlocked"
+    }
+  },
+  "requirements": [
+    [
+      "has_hava_radari",
+      "has_kozmik_cekirdek",
+      "has_the_recipe"
+    ]
+  ],
+  "rewards": {
+    "recipes": [
+      "dogalafetler:gelismis_hava_radari"
+    ]
+  },
+  "sends_telemetry_event": false
+}

@@ -24,9 +24,10 @@ import net.minecraftforge.server.ServerLifecycleHooks;
 /**
  * Donma sisteminin kayıt noktası (madde 9, N9, N10): config, bloklar, chunk capability'si, veri paketi yükleyicisi, kuyruk,
  * dönem süreçleri ({@code donma}, {@code buharlasma}), komutlar ve datagen katkıları. Dünya dönemi olaylarını dinler:
- * kızıl cüce doğunca çözülme dönemi açılır ve kış parametreleri dünyaya sabitlenir; süpernova yeni donma döngüsünü
- * başlatır; güneş büyümesi bitince buharlaşma derinliği 0'a iner (sular geri gelir, N9); {@code sifirla} yeni bir veri
- * döngüsü açar ve bizim kar/buzumuz kuyrukla 0'a çözülür (D4). Yalnız {@code DogalAfetler} kurucusundan çağrılır.
+ * kızıl cüce doğunca (pulsar yolunda "donma kalıcı" açık olsa da) çözülme dönemi açılır ve kış parametreleri dünyaya
+ * sabitlenir, eski güneş dönünce NORMAL'de çözülme sürer; süpernova yeni donma döngüsünü başlatır; güneş
+ * büyümesi ya da pulsar (yutulması dahil) bitince buharlaşma derinliği 0'a iner (sular geri gelir, N9); {@code sifirla}
+ * yeni bir veri döngüsü açar ve bizim kar/buzumuz kuyrukla 0'a çözülür (D4). Yalnız {@code DogalAfetler} kurucusundan çağrılır.
  */
 public final class DonmaSistemi {
     private static DonmaSureci donmaSureci;
@@ -82,12 +83,14 @@ public final class DonmaSistemi {
         switch (olay.alan()) {
             case GUNES_EVRESI -> {
                 GunesEvresi evre = d.gunesEvresi();
-                if (evre == GunesEvresi.SUPERNOVA || evre == GunesEvresi.PULSAR) {
+                if (evre == GunesEvresi.SUPERNOVA || evre == GunesEvresi.PULSAR || evre == GunesEvresi.KARADELIK_YUTMA) {
                     d.cozulmeDonemiAyarla(false);
-                } else if (evre == GunesEvresi.KIZIL_CUCE && !DonmaAyarlari.kalici()) {
+                } else if (evre == GunesEvresi.KIZIL_CUCE && DonmaSureci.kaliciDegil(d)) {
                     d.cozulmeDonemiAyarla(true);
                 }
-                if (evre != GunesEvresi.BUYUYEN && evre != GunesEvresi.PULSAR && d.buharlasmaDerinligi() > 0f) {
+                // Yutma 90 sn sürer: buharlaşan sular pulsar yolundaki güneşsiz dönemde geri gelir.
+                if (evre != GunesEvresi.BUYUYEN && evre != GunesEvresi.PULSAR && evre != GunesEvresi.KARADELIK_YUTMA
+                        && d.buharlasmaDerinligi() > 0f) {
                     d.buharlasmaDerinligiAyarla(0f);
                 }
             }

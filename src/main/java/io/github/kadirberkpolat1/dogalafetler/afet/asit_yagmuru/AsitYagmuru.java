@@ -11,7 +11,6 @@ import io.github.kadirberkpolat1.dogalafetler.core.EtkiAlani;
 import io.github.kadirberkpolat1.dogalafetler.core.TpsOlcer;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
-import io.github.kadirberkpolat1.dogalafetler.yangin.mantik.YanginMantigi;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import java.util.ArrayList;
@@ -34,13 +33,16 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraftforge.common.MinecraftForge;
 
 /**
- * Asit yağmuru (bölüm E, madde 10, tasarım notu {@code docs/tasarim/asit_yagmuru.md}). Alan hedef oyuncunun çevresinde
- * doğar ve günün rüzgârıyla kayar; AKTIF'te yağmur 10 sn'de yoğunlaşır, son 15 sn'de seyrelir. Yağmur sürdükçe gökyüzüne
- * açık oyuncu saniyede {@code hasarSaniye} hasar alır (seviyeden bağımsız; can {@code asitMinimumCan} altına inmez; çatı
- * altı hiç hasar yok). Gökyüzünü gören yüzey blokları önce 3–5 sn çatlak örtüsü taşır, sonra dönüşür
- * ({@code afetBlokHasari=false} iken hiç aşınma yok). Yağmur, sis ve
- * dumanlar istemcide {@code client.asit_yagmuru} tarafından bu afetin durum paketinden çizilir; afet ses çalmaz, sireni
- * çekirdek çalar.
+ * Asit yağmuru (bölüm E, madde 10, tasarım notu {@code docs/tasarim/asit_yagmuru.md}). AKTIF iken afetin boyutunun (üst
+ * dünya) her yerinde normal yağmur gibi yağar (AF2-01): etki alanı {@link EtkiAlani#herYer()}; siren, durum paketi ve
+ * "etkilenen" yalnız afetin boyutundaki oyunculara (her boyut yalnız sunucu geneli afette, güneş/ay; AF2-08). Sunucu
+ * vanilla yağmurunu açıp tutar ve bitişte önceki havayı geri yükler ({@link AsitHavasi}). Yağmur 10 sn'de yoğunlaşır, son
+ * 15 sn'de seyrelir; sürdükçe başı gökyüzüne açık her oyuncu saniyede {@code hasarSaniye} hasar alır (seviyeden bağımsız;
+ * can {@code asitMinimumCan} altına inmez; çatı altı hiç hasar yok). Her oyuncunun çevresindeki yüklü chunk'larda gökyüzünü
+ * gören yüzey blokları bütçeyle örneklenir, önce 3–5 sn çatlak örtüsü taşır, sonra dönüşür ({@code afetBlokHasari=false}
+ * iken hiç aşınma yok). Hedef oyuncu yalnız komut uyumluluğu için kalır, etkisi yoktur. Yağmur, sis ve dumanlar istemcide
+ * {@code client.asit_yagmuru} tarafından bu afetin durum paketinden her biyomda (çöl ve kar dahil) çizilir; afet ses çalmaz,
+ * sireni çekirdek çalar.
  */
 public final class AsitYagmuru extends Afet {
     private static final int HASAR_ADIMI = 4;
@@ -48,13 +50,10 @@ public final class AsitYagmuru extends Afet {
     private static final int KIMLIK_TABANI = -0x41534900;
     private static final int KIMLIK_ARALIGI = 4096;
     private static final int SES_TAVANI = 4;
-    /** Oyuncu çevresinden örnekleme yarıçapı (blok). */
+    /** Örneklerin yarısının seçildiği oyuncu çevresi (blok): değişim görenin önünde olur. */
     private static final double YAKIN_ORNEK = 24;
     private static final int ISTEMCI_ASINMA_TAVANI = 32;
 
-    private double x;
-    private double y;
-    private double z;
     private double birikim;
     private int sonrakiKimlik;
     private int asinanToplam;
@@ -63,6 +62,10 @@ public final class AsitYagmuru extends Afet {
     /** Son hasar denetiminden beri ilerleyen ölçekli tick (K-C11): {@code /dogalafet hiz} maruziyeti de hızlandırır. */
     private int bekleyenAdim;
     private Double yogunlukZorlamasi;
+    /** AKTIF'e geçerken saklanan vanilla hava durumu; asit havayı devralmadıysa {@code null} (kayıtta). */
+    private CompoundTag oncekiHava;
+    /** Son "vanilla havası geri alındı" log'unun oyun saati (log sel olmasın; kalıcı değil). */
+    private long sonGeriAlmaLogu = -200;
 
     public AsitYagmuru() {
         super(AfetTuru.ASIT_YAGMURU);
@@ -74,24 +77,18 @@ public final class AsitYagmuru extends Afet {
 
     @Override
     public EtkiAlani etkiAlani() {
-        return EtkiAlani.daire(x, y, z, ayar().yaricap());
-    }
-
-    @Override
-    protected void baslarken(ServerLevel level) {
-        BlockPos m = baglam().merkez();
-        x = m.getX() + 0.5;
-        y = m.getY();
-        z = m.getZ() + 0.5;
+        return EtkiAlani.herYer();
     }
 
     @Override
     protected void asamaDegisti(ServerLevel level, AfetAsamasi eski, AfetAsamasi yeni) {
         if (yeni == AfetAsamasi.AKTIF) {
             AsitKurallari.Seviye s = ayar();
-            DogalAfetler.LOGGER.info("asit yağmuru: seviye {} alan {} blok, {} sn, {} blok/sn aşınma, {} can/sn ({})",
-                    seviye(), s.yaricap(), s.sureTick() / 20, s.asindirmaSaniye(), AsitAyarlari.hasarSaniye(),
+            DogalAfetler.LOGGER.info("asit yağmuru: seviye {} her yerde, {} sn, oyuncu başına {} blok/sn aşınma ({} blok çevre, "
+                    + "tick bütçesi {}), {} can/sn ({})", seviye(), s.sureTick() / 20, s.asindirmaSaniye(), s.yaricap(),
+                    AsitAyarlari.blokButcesi(), AsitAyarlari.hasarSaniye(),
                     Kurallar.blokHasariAcik(level.getGameRules()) ? "blok hasarı açık" : "blok hasarı kapalı");
+            havayiTut(level);
         }
     }
 
@@ -100,7 +97,7 @@ public final class AsitYagmuru extends Afet {
         if (asama != AfetAsamasi.AKTIF) {
             return;
         }
-        kaydir(level, adim);
+        havayiTut(level);
         double yogunluk = yogunluk();
         if (yogunluk > 0) {
             bekleyenAdim += adim;
@@ -134,26 +131,29 @@ public final class AsitYagmuru extends Afet {
         asinanlariBirak(level);
         maruziyet.clear();
         bekleyenAdim = 0;
+        if (oncekiHava != null) {
+            AsitHavasi.geriYukle(level, oncekiHava);
+            DogalAfetler.LOGGER.info("asit yağmuru: önceki hava geri yüklendi ({})", AsitHavasi.ozet(oncekiHava));
+            oncekiHava = null;
+        }
         DogalAfetler.LOGGER.info("asit yağmuru bitti: seviye {} {} blok aşındı, {} çatlak örtüsü kaldırıldı", seviye(),
                 asinanToplam, kalan);
     }
 
     @Override
     protected void ozelDurumYaz(CompoundTag etiket) {
-        etiket.putDouble("x", x);
-        etiket.putDouble("y", y);
-        etiket.putDouble("z", z);
         etiket.putDouble("birikim", birikim);
         etiket.putInt("toplam", asinanToplam);
+        if (oncekiHava != null) {
+            etiket.put("hava", oncekiHava.copy());
+        }
     }
 
     @Override
     protected void ozelDurumOku(CompoundTag etiket) {
-        x = etiket.getDouble("x");
-        y = etiket.getDouble("y");
-        z = etiket.getDouble("z");
         birikim = etiket.getDouble("birikim");
         asinanToplam = etiket.getInt("toplam");
+        oncekiHava = etiket.contains("hava") ? etiket.getCompound("hava").copy() : null;
     }
 
     /** {@code y}: yağmur yoğunluğu 0–1; {@code a}: şu an aşınan bloklar (istemcide yoğun cızlama dumanları). */
@@ -185,32 +185,46 @@ public final class AsitYagmuru extends Afet {
         return asinanlar.size();
     }
 
-    /** Alan günün rüzgârı yönünde (ortak yangının dumanıyla aynı yön) {@code kaymaHizi} ile kayar. */
-    private void kaydir(ServerLevel level, int adim) {
-        double[] ruzgar = YanginMantigi.gununRuzgari(level.getGameTime() / 24000L);
-        double guc = Math.hypot(ruzgar[0], ruzgar[1]);
-        if (guc <= 0 || adim <= 0) {
-            return;
+    /**
+     * Hava ilk kez saklanır (kayıttan dönen eski afette de), sonra vanilla yağmuru açık tutulur; vanilla havası yağmuru
+     * kesmişse ({@code /weather clear}, döngü) geri alınır ve 10 sn'de en çok bir satır yazılır.
+     */
+    private void havayiTut(ServerLevel level) {
+        boolean ilk = oncekiHava == null;
+        if (ilk) {
+            oncekiHava = AsitHavasi.sakla(level);
+            if (oncekiHava == null) {
+                return;
+            }
+            DogalAfetler.LOGGER.info("asit yağmuru: vanilla yağmuru açıldı (önceki hava {})", AsitHavasi.ozet(oncekiHava));
         }
-        double yol = AsitAyarlari.kaymaHizi() * adim / 20.0;
-        x += ruzgar[0] / guc * yol;
-        z += ruzgar[1] / guc * yol;
+        if (AsitHavasi.tut(level) == AsitHavasi.Sonuc.GERI_ALINDI && !ilk
+                && level.getGameTime() - sonGeriAlmaLogu >= 200) {
+            sonGeriAlmaLogu = level.getGameTime();
+            DogalAfetler.LOGGER.info("asit yağmuru: vanilla havası yağmuru kesmişti, yağmur yeniden açıldı");
+        }
     }
 
     /**
-     * Başının üstü gökyüzüne açık oyuncu açıkta geçirdiği her saniye {@code hasarSaniye} hasar alır; hasar anında başarım
+     * Hasar koşulu (AF2-03): yaratıcı, izleyici ya da ölü değil ve başının üstü gökyüzüne açık; yağmur her yerde yağdığından
+     * konum koşulu yok (çöl ve kar biyomu dahil). Oyuncunun chunk'ı henüz yüklenmediyse (ışınlanma) bu denetim atlanır.
+     */
+    static boolean maruzMu(ServerLevel level, ServerPlayer oyuncu) {
+        if (oyuncu.isSpectator() || oyuncu.isCreative() || !oyuncu.isAlive() || !level.isLoaded(oyuncu.blockPosition())) {
+            return false;
+        }
+        int harita = level.getHeight(Heightmap.Types.MOTION_BLOCKING, oyuncu.getBlockX(), oyuncu.getBlockZ());
+        return AsitKurallari.acikta(harita, oyuncu.getEyeY());
+    }
+
+    /**
+     * Başının üstü gökyüzüne açık her oyuncu açıkta geçirdiği her saniye {@code hasarSaniye} hasar alır; hasar anında başarım
      * ipucu (Çatı Altı'nı bozar). Maruziyet {@code adim} ölçekli tick kadar birikir ({@link AsitKurallari#maruziyet}).
      */
     private void oyunculariDenetle(ServerLevel level, int adim) {
         float hasar = AsitAyarlari.hasarSaniye();
-        EtkiAlani alan = etkiAlani();
         for (ServerPlayer oyuncu : level.players()) {
-            if (oyuncu.isSpectator() || oyuncu.isCreative() || !oyuncu.isAlive()
-                    || !alan.iceriyor(oyuncu.getX(), oyuncu.getY(), oyuncu.getZ(), 0)) {
-                continue;
-            }
-            int harita = level.getHeight(Heightmap.Types.MOTION_BLOCKING, oyuncu.getBlockX(), oyuncu.getBlockZ());
-            if (!AsitKurallari.acikta(harita, oyuncu.getEyeY())) {
+            if (!maruzMu(level, oyuncu)) {
                 continue;
             }
             AsitKurallari.Maruziyet m = AsitKurallari.maruziyet(maruziyet.getOrDefault(oyuncu.getUUID(), 0), adim);
@@ -220,47 +234,36 @@ public final class AsitYagmuru extends Afet {
             }
             float miktar = AsitKurallari.hasarMiktari(oyuncu.getHealth(), hasar, AsitAyarlari.minimumCan());
             if (miktar > 0 && oyuncu.hurt(AsitKayitlari.hasar(level), miktar)) {
-                MinecraftForge.EVENT_BUS.post(new BasarimIpucuEvent(oyuncu, Ipucu.HASAR_ALDI));
+                MinecraftForge.EVENT_BUS.post(new BasarimIpucuEvent(oyuncu, Ipucu.HASAR_ALDI, this));
             }
         }
     }
 
     /**
-     * Alandan rastgele yüzey sütunları örneklenir; aşınabilir blok hız birikimi el verdikçe çatlak kuyruğuna girer. Alanda oyuncu
-     * (gözlemci dahil) varsa örneklerin yarısı rastgele bir oyuncunun 24 blok çevresinden seçilir: değişim görenin önünde olur.
+     * Aşınma oyuncuların (izleyici hariç; yaratıcı oyuncunun çevresi de aşınır, AF2-05) çevresinden örneklenir: her örnek
+     * rastgele bir oyuncu seçer, yarısı onun 24 blok, yarısı seviyenin yarıçapı içinden; yüklü olmayan sütun atlanır (chunk
+     * yüklenmez). Tick bütçesi {@code blokButcesi} × TPS kısması; aşınabilir blok hız birikimi el verdikçe çatlak kuyruğuna
+     * girer.
      */
     private void asindir(ServerLevel level, double yogunluk, int adim) {
+        List<ServerPlayer> oyuncular = level.players().stream().filter(o -> !o.isSpectator()).toList();
+        if (oyuncular.isEmpty()) {
+            return;
+        }
         AsitKurallari.Seviye s = ayar();
         double kisma = TpsOlcer.kismaCarpani();
-        birikim = AsitKurallari.birikimEkle(birikim, s.asindirmaSaniye(), yogunluk, kisma, adim);
+        int n = oyuncular.size();
+        birikim = AsitKurallari.birikimEkle(birikim, s.asindirmaSaniye(), n, yogunluk, kisma, adim);
+        int ornek = AsitKurallari.ornekButcesi(s.asindirmaSaniye(), kisma, n, AsitAyarlari.blokButcesi());
         int tavan = AsitAyarlari.eszamanliAsindirma();
         RandomSource r = level.getRandom();
-        EtkiAlani alan = etkiAlani();
-        List<ServerPlayer> gorenler = new ArrayList<>();
-        for (ServerPlayer oyuncu : level.players()) {
-            if (alan.iceriyor(oyuncu.getX(), oyuncu.getY(), oyuncu.getZ(), 0)) {
-                gorenler.add(oyuncu);
-            }
-        }
-        int ornek = AsitKurallari.ornekSayisi(s.asindirmaSaniye(), kisma);
         for (int i = 0; i < ornek && birikim >= 1 && asinanlar.size() < tavan; i++) {
-            double cx = x;
-            double cz = z;
-            double menzil = s.yaricap();
-            if (!gorenler.isEmpty() && r.nextBoolean()) {
-                ServerPlayer goren = gorenler.get(r.nextInt(gorenler.size()));
-                cx = goren.getX();
-                cz = goren.getZ();
-                menzil = Math.min(YAKIN_ORNEK, menzil);
-            }
+            ServerPlayer goren = oyuncular.get(r.nextInt(n));
+            double menzil = r.nextBoolean() ? Math.min(YAKIN_ORNEK, s.yaricap()) : s.yaricap();
             double aci = r.nextDouble() * Math.PI * 2;
             double uzaklik = Math.sqrt(r.nextDouble()) * menzil;
-            double px = cx + Math.cos(aci) * uzaklik;
-            double pz = cz + Math.sin(aci) * uzaklik;
-            if (!alan.iceriyor(px, y, pz, 0)) {
-                continue;
-            }
-            BlockPos aday = AsitAsindirici.aday(level, Mth.floor(px), Mth.floor(pz), s.tasAsinir());
+            BlockPos aday = AsitAsindirici.aday(level, Mth.floor(goren.getX() + Math.cos(aci) * uzaklik),
+                    Mth.floor(goren.getZ() + Math.sin(aci) * uzaklik), s.tasAsinir());
             if (aday == null
                     || r.nextDouble() >= AsitKurallari.kabulOlasiligi(AsitAsindirici.sinif(level.getBlockState(aday)))) {
                 continue;

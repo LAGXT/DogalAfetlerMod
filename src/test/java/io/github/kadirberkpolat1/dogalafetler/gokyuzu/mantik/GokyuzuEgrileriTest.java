@@ -2,13 +2,36 @@ package io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
 import java.util.Random;
 import org.junit.jupiter.api.Test;
 
 class GokyuzuEgrileriTest {
     private static final float EPS = 1e-6f;
+
+    /** Ps4: eski güneşe dönüşün 20 sn'lik geçişinde kalıntı nebulası belirmez; süpernova yolunda kalıntı sürer. */
+    @Test
+    void eskiGunesDonusundeKalintiNebulasiBelirmez() {
+        boolean yol = GokyuzuEgrileri.oncekiYol(false, true);
+        assertTrue(yol, "NORMAL'de dönüş yolu bayrağı kalkar, güneş döndü bayrağı önceki yolu bildirir");
+        assertFalse(GokyuzuEgrileri.oncekiYol(false, false));
+        for (int i = 0; i <= 100; i++) {
+            float gecis = i / 100f;
+            assertEquals(0f, GokyuzuEgrileri.kalintiGecisi(GunesEvresi.NORMAL, 0f, gecis * 20f, false,
+                    GunesEvresi.KIZIL_CUCE, yol, gecis), 0f, "dönüş geçişi " + gecis);
+            assertEquals(0f, GokyuzuEgrileri.kalintiGecisi(GunesEvresi.KIZIL_CUCE, gecis, gecis * 20f, true,
+                    GunesEvresi.GUNESSIZ, true, gecis), 0f, "pulsar yolundaki doğuş " + gecis);
+        }
+        assertEquals(0.85f, GokyuzuEgrileri.kalintiGecisi(GunesEvresi.NORMAL, 0f, 0f, false, GunesEvresi.KIZIL_CUCE,
+                false, 0f), EPS, "bayrak olmasaydı geçişin başında kalıntı görünürdü");
+        assertEquals(0.85f, GokyuzuEgrileri.kalintiPayi(GunesEvresi.KIZIL_CUCE, 1f, 1e6f, false), EPS,
+                "süpernova yolundaki kızıl cücede kalıntı sürer");
+        assertEquals(0f, GokyuzuEgrileri.kalintiGecisi(GunesEvresi.NORMAL, 0f, 1e6f, false, GunesEvresi.KIZIL_CUCE,
+                false, 1f), 0f, "geçiş bitince NORMAL'de kalıntı yok");
+    }
 
     @Test
     void buyuyenGunesMonotonBuyurVeTuruncuyaKayar() {

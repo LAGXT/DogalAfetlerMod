@@ -145,7 +145,7 @@ class AfetZamanlayicisiTest {
     void minimumBeklemeIcindeSecimYok() {
         ZamanlayiciAyarlari ayarlar = ZamanlayiciAyarlari.VARSAYILAN.gunlukOranIle(1_000_000).baslangicBeklemeIle(0);
         BeklemeDurumu bekleme = new BeklemeDurumu();
-        bekleme.afetBitti(AfetTuru.KASIRGA, 1, 1000, ayarlar);
+        bekleme.afetBitti(AfetTuru.KASIRGA, 1, 1000, ayarlar, 1.0);
         long bitis = 1000 + ayarlar.genelBeklemeTick();
         SplittableRandom rastgele = new SplittableRandom(1);
         Set<AfetTuru> hepsi = EnumSet.allOf(AfetTuru.class);
@@ -178,7 +178,7 @@ class AfetZamanlayicisiTest {
         long[] kalanlar = new long[6];
         for (int seviye = 1; seviye <= 5; seviye++) {
             BeklemeDurumu bekleme = new BeklemeDurumu();
-            bekleme.afetBitti(AfetTuru.DEPREM, seviye, 0, ayarlar);
+            bekleme.afetBitti(AfetTuru.DEPREM, seviye, 0, ayarlar, 1.0);
             kalanlar[seviye] = bekleme.genelKalan(0);
         }
         assertEquals(ayarlar.genelBeklemeTick(), kalanlar[1]);
@@ -258,7 +258,7 @@ class AfetZamanlayicisiTest {
     void zorlaBeklemeyiYokSayarAmaUygunlukFiltresiniKorur() {
         ZamanlayiciAyarlari ayarlar = ZamanlayiciAyarlari.VARSAYILAN;
         BeklemeDurumu bekleme = new BeklemeDurumu();
-        bekleme.afetBitti(AfetTuru.DEPREM, 5, 0, ayarlar);
+        bekleme.afetBitti(AfetTuru.DEPREM, 5, 0, ayarlar, 1.0);
         SplittableRandom rastgele = new SplittableRandom(4);
         Set<AfetTuru> kasirgasiz = EnumSet.complementOf(EnumSet.of(AfetTuru.KASIRGA));
         for (int i = 0; i < 2000; i++) {
@@ -278,6 +278,77 @@ class AfetZamanlayicisiTest {
         ZamanlayiciAyarlari ayarlar = ZamanlayiciAyarlari.VARSAYILAN.baslangicBeklemeIle(0);
         AfetSimulasyonu.Sonuc sonuc = new AfetSimulasyonu().zamanlayici(ayarlar).gun(1000).siklik(0).kos(5_000_000);
         assertEquals(0, sonuc.toplam());
+    }
+
+    /** K-C2 rev. 2 (AS-11): kullanıcı ilk afeti ilk oyun gününde görsün. */
+    @Test
+    void varsayilanBeklemelerIlkGunIcinKisa() {
+        ZamanlayiciAyarlari a = ZamanlayiciAyarlari.VARSAYILAN;
+        assertEquals(6_000, a.baslangicBeklemeTick());
+        assertEquals(6_000, a.genelBeklemeTick());
+        assertEquals(24_000, a.ilkAfetGarantiTick());
+        for (AfetTuru tur : SIK_ALTI) {
+            assertEquals(24_000, a.turBekleme(tur), tur.kimlik());
+        }
+        assertEquals(240_000, a.turBekleme(AfetTuru.AY_CARPMASI));
+        assertEquals(480_000, a.turBekleme(AfetTuru.GUNES_PATLAMASI));
+    }
+
+    /** AS-12: garanti olay olasılığını 1 yapar ama beklemeleri ve uygunluğu korur. */
+    @Test
+    void garantiOlasiligiBirYaparBeklemeyiKorur() {
+        ZamanlayiciAyarlari ayarlar = ZamanlayiciAyarlari.VARSAYILAN.gunlukOranIle(1e-9);
+        SplittableRandom rastgele = new SplittableRandom(6);
+        Set<AfetTuru> hepsi = EnumSet.allOf(AfetTuru.class);
+        long saat = ayarlar.baslangicBeklemeTick();
+        for (int i = 0; i < 200; i++) {
+            assertTrue(AfetZamanlayicisi.sec(ayarlar, new AfetZamanlayicisi.Girdi(false, saat, 20, new BeklemeDurumu(), hepsi,
+                    tur -> 1, 1, false, true), rastgele).isPresent(), "garanti seçim yapmalı");
+        }
+        assertTrue(AfetZamanlayicisi.sec(ayarlar, new AfetZamanlayicisi.Girdi(false, saat, 20, new BeklemeDurumu(), hepsi,
+                tur -> 1, 1, false, false), rastgele).isEmpty(), "garantisiz çok düşük oranda seçim olmamalı");
+        assertTrue(AfetZamanlayicisi.sec(ayarlar, new AfetZamanlayicisi.Girdi(false, saat - 1, 20, new BeklemeDurumu(),
+                hepsi, tur -> 1, 1, false, true), rastgele).isEmpty(), "garanti başlangıç beklemesini aşmamalı");
+        assertTrue(AfetZamanlayicisi.sec(ayarlar, new AfetZamanlayicisi.Girdi(true, saat, 20, new BeklemeDurumu(), hepsi,
+                tur -> 1, 1, false, true), rastgele).isEmpty(), "afet sürerken garanti seçim yapmamalı");
+        AfetZamanlayicisi.Girdi g = new AfetZamanlayicisi.Girdi(false, saat, 20, new BeklemeDurumu(), hepsi, tur -> 1, 1,
+                false, true);
+        assertTrue(g.ile(EnumSet.of(AfetTuru.DEPREM), false).garanti(), "ile() garantiyi korumalı");
+    }
+
+    @Test
+    void beklemeOlcekleSikligaBoler() {
+        assertEquals(1_200, AfetZamanlayicisi.beklemeOlcekle(12_000, 10));
+        assertEquals(24_000, AfetZamanlayicisi.beklemeOlcekle(12_000, 0.5));
+        assertEquals(12_000, AfetZamanlayicisi.beklemeOlcekle(12_000, 1));
+        assertEquals(12_000, AfetZamanlayicisi.beklemeOlcekle(12_000, 0), "sıklık 0'da süre değişmez");
+    }
+
+    @Test
+    void onKatSiklikBaslangicBeklemesiniOndaBireIndirir() {
+        ZamanlayiciAyarlari ayarlar = ZamanlayiciAyarlari.VARSAYILAN.gunlukOranIle(1_000_000);
+        SplittableRandom rastgele = new SplittableRandom(5);
+        Set<AfetTuru> hepsi = EnumSet.allOf(AfetTuru.class);
+        long bitis = ayarlar.baslangicBeklemeTick() / 10;
+        assertTrue(AfetZamanlayicisi.sec(ayarlar, new AfetZamanlayicisi.Girdi(false, bitis - 1, 20, new BeklemeDurumu(),
+                hepsi, tur -> 1, 10, false), rastgele).isEmpty());
+        assertTrue(AfetZamanlayicisi.sec(ayarlar, new AfetZamanlayicisi.Girdi(false, bitis, 20, new BeklemeDurumu(),
+                hepsi, tur -> 1, 10, false), rastgele).isPresent());
+    }
+
+    /**
+     * Kullanıcı şikayeti (2026-11-08): {@code afetSikligi} yalnız oranı çarpıyordu; başlangıç, genel ve tür beklemeleri sabit
+     * kaldığı için %1000 gerçekte ~3 katıydı. 11.4 "200 = iki katı": varsayılan beklemelerle gerçekleşen afet sayısı sıklıkla
+     * orantılı olmalı (afet süresi kısa tutuldu; afetin kendisi sıklıkla kısalmaz).
+     */
+    @Test
+    void gerceklesenAfetSayisiSikliklaOrantili() {
+        double normal = new AfetSimulasyonu().afetSuresi(20).gun(1000).kos(20_000_000).gunlukOlay();
+        double iki = new AfetSimulasyonu().afetSuresi(20).gun(1000).siklik(2).kos(20_000_000).gunlukOlay();
+        double on = new AfetSimulasyonu().afetSuresi(20).gun(1000).siklik(10).kos(20_000_000).gunlukOlay();
+        System.out.printf(Locale.ROOT, "günlük afet: %%100 %.3f, %%200 %.3f, %%1000 %.3f%n", normal, iki, on);
+        assertEquals(2.0, iki / normal, 0.3, "%200 iki katı olmalı: " + normal + " / " + iki);
+        assertEquals(10.0, on / normal, 1.5, "%1000 on katı olmalı: " + normal + " / " + on);
     }
 
     @Test

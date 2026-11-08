@@ -2,6 +2,7 @@ package io.github.kadirberkpolat1.dogalafetler.meteor;
 
 import io.github.kadirberkpolat1.dogalafetler.config.EfektKalitesi;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
+import io.github.kadirberkpolat1.dogalafetler.gokyuzu.PulsarKayitlari;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.MeteorOlcegi;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.OdulZari;
 import io.github.kadirberkpolat1.dogalafetler.meteor.mantik.Yorunge;
@@ -216,7 +217,8 @@ public final class MeteorVarligi extends Entity {
         boolean ay = gorunum() == MeteorGorunumu.AY;
         double olcek = MeteorOlcegi.ara(olcek(), 1.0, 2.4, 0.6, 3.0);
         SimpleParticleType plazma = (ay ? MeteorKayitlari.PLAZMA_AY : MeteorKayitlari.PLAZMA).get();
-        SimpleParticleType kivilcim = (ay ? MeteorKayitlari.KIVILCIM_AY : MeteorKayitlari.KIVILCIM).get();
+        SimpleParticleType kivilcim = gorunum() == MeteorGorunumu.PULSAR ? PulsarKayitlari.KOR.get()
+                : (ay ? MeteorKayitlari.KIVILCIM_AY : MeteorKayitlari.KIVILCIM).get();
         Vec3 geri = hiz.scale(-1);
         int plazmaSayisi = adet(5 * olcek * yogunluk);
         for (int i = 0; i < plazmaSayisi; i++) {

@@ -20,7 +20,9 @@ JAVA_HOME'u (mise Java 21 olabilir) kaydedilmez: kaydında JAVA_HOME olmayan iş
        kendi spool'una, sonra oto'ya bakar ve işi `rename` ile kendi kosan/'ına alır (kayıttaki `makine` koşan makine olur,
        `kaynak` oto; kimlik değişmez). Dağıtım (K-E60 rev.): iş, onu alabilen makinelerden boş yuvası en çok olana gider
        (koşan + kuyruk dışı yük sayılır; eşitlikte pc2): 2/2 yuvayla 1. iş pc2, 2. ana, 3. pc2, 4. ana; bir makine
-       alamıyorsa (dolu, aynı klasörden işi koşuyor, koşucusu yok) öteki alır. Ana makinede ağır süreç ≤ 2
+       alamıyorsa (dolu, aynı klasörden işi koşuyor, koşucusu yok, erişilemiyor) öteki alır. pc2 erişilemezken (K-E60
+       rev. 2: pc2 koşucusunun 5 sn'lik ssh okuması başarısız) pc2 yuvaları kapalıdır: oto işi ana'ya gider, pc2 işi
+       bekler, ssh yeniden geçince pc2 kendiliğinden açılır. Ana makinede ağır süreç ≤ 2
        (kuyruğun işleri + kuyruk dışı Gradle), boş RAM >= KAPI_RAM_MB (4096); istemci işi bir yuva, tek istemci ve
        yaşayan Hyprland ister (yoksa pc2'ye kalır). pc2 istemci işini `pc2_istemci.sh <kanıt/> <betik> …` ile iki yuvada koşar.
   ana  ekranlı iş (runClient, runData, UZAK=0, --olcum, kanıtı belirsiz istemci işi, istemcili sunucu) ya da `--makine ana`.
@@ -300,6 +302,8 @@ def ekle(makine, komut, yuva=1, istemci=False, log=None, cwd=None, olcum=False, 
             cikti(f"SIRA: UYARI {m} koşucusu çalışmıyor; iş bekler. Başlat: systemctl --user start "
                   f"dogalafet-sira@{m} (ya da nohup python3 tools/senaryo/sira_kosucu.py --makine {m} &)",
                   file=sys.stderr)
+    if makine == "pc2" and (hata := pc2_erisim_hatasi()):
+        cikti(f"SIRA: UYARI pc2 erişilemiyor ({hata}); iş bekler, pc2 geri gelince koşar", file=sys.stderr)
     return kimlik
 
 
@@ -452,6 +456,15 @@ def pc2_okumasi():
     return veri if veri and time.time() - veri.get("zaman", 0) <= PC2_SUREC_TAZE_SN and "surecler" in veri else None
 
 
+def pc2_erisim_hatasi():
+    """K-E60 rev. 2: pc2 koşucusunun son ssh okuması (PC2_SUREC_TAZE_SN içinde) başarısızsa hata metni, değilse None.
+    Hata varken pc2 yuvaları kapalı sayılır: oto işi ana'ya gider, pc2 işi bekler (koşucu `engel`, pano)."""
+    veri = json_oku(dizin("pc2") / PC2_SURECLER)
+    if veri and time.time() - veri.get("zaman", 0) <= PC2_SUREC_TAZE_SN and "hata" in veri:
+        return veri["hata"] or "ssh başarısız"
+    return None
+
+
 def dis_surecler(makine):
     """Kuyruk dışı ağır süreçler: o makinede koşan bir işe ait olmayan Gradle istemcileri. pc2 okuması yoksa boş."""
     kosan = {v["id"] for _, v in isler(makine, "kosan")}
@@ -560,12 +573,20 @@ def pano_metni(son_biten=10):
     simdi = time.time()
     kosucular, yuvalar = [], []
     dislar = {m: dis_surecler(m) for m in MAKINELER}
+    erisim = pc2_erisim_hatasi()
     for makine in MAKINELER:
         bilgi = json_oku(dizin(makine) / "kosucu.json") or {}
-        kosucular.append(f"{makine} {'çalışıyor' if kosucu_canli(makine) else 'YOK'}")
-        yuvalar.append(f"{makine} {doluluk(makine, dislar[makine])}/{bilgi.get('yuva', YUVA)}")
+        kapali = makine == "pc2" and erisim
+        if not kosucu_canli(makine):
+            durum = "YOK"
+        elif kapali:
+            durum = f"erişilemiyor ({erisim.rsplit(': ', 1)[-1][:60]})"
+        else:
+            durum = "çalışıyor"
+        kosucular.append(f"{makine} {durum}")
+        yuvalar.append(f"{makine} {doluluk(makine, dislar[makine])}/{0 if kapali else bilgi.get('yuva', YUVA)}")
     yuvalar.append(f"oto bekleyen {len(isler('oto', 'bekleyen'))}")
-    if pc2_okumasi() is None:
+    if erisim is None and pc2_okumasi() is None:
         yuvalar.append("pc2 kuyruk dışı bilinmiyor (süreç okuması yok)")
     satirlar = ["# DogalAfetlerMod iş panosu", "",
                 f"Güncellendi {time.strftime('%Y-%m-%d %H:%M:%S')} · koşucu: {' · '.join(kosucular)}", "",
@@ -583,8 +604,9 @@ def pano_metni(son_biten=10):
             satirlar.append(f"| pid {d['pid']} | {makine} | {time.strftime('%H:%M:%S', time.localtime(d['baslangic']))} | "
                             f"kuyruk dışı | {sure_metni(simdi - d['baslangic'])} | 1 | {komut.replace('|', '\\|')} | - |")
     for makine in SPOOLLAR:
+        neden = "; pc2 erişilemiyor" if makine == "pc2" and erisim else ""
         for sira, (_, v) in enumerate(isler(makine, "bekleyen"), 1):
-            satirlar.append(f"| {v['id']} | {makine} | - | bekliyor ({sira}.) | {sure_metni(simdi - v['eklendi'])} | "
+            satirlar.append(f"| {v['id']} | {makine} | - | bekliyor ({sira}.{neden}) | {sure_metni(simdi - v['eklendi'])} | "
                             f"{v['yuva']} | {komut_metni(v)} | {v['log']} |")
         biten += [v for _, v in isler(makine, "biten")]
     for v in sorted(biten, key=lambda v: v.get("bitti", 0), reverse=True)[:son_biten]:

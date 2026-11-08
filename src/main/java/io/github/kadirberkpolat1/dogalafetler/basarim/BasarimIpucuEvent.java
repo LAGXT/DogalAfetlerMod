@@ -2,6 +2,7 @@ package io.github.kadirberkpolat1.dogalafetler.basarim;
 
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.Ipucu;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.IpucuKaynaklari;
+import io.github.kadirberkpolat1.dogalafetler.core.Afet;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import java.util.Objects;
 import net.minecraft.server.level.ServerPlayer;
@@ -17,8 +18,10 @@ import net.minecraftforge.eventbus.api.Event;
  *
  * <pre>{@code
  * BasarimIpucuEvent.yayinciKaydet(AfetTuru.SINKHOLE, Ipucu.CUKURA_DUSTU);            // mod kurucusunda
- * MinecraftForge.EVENT_BUS.post(new BasarimIpucuEvent(oyuncu, Ipucu.CUKURA_DUSTU));  // oyuncu çukura düştüğünde
+ * MinecraftForge.EVENT_BUS.post(new BasarimIpucuEvent(oyuncu, Ipucu.CUKURA_DUSTU, this));  // afetin içinden
  * }</pre>
+ *
+ * Olay kaynak afetin türünü ve numarasını taşır (AS-17): aynı anda birden çok afet AKTIF iken ipucu yalnız o afete yazılır.
  */
 public class BasarimIpucuEvent extends Event {
     /** Hangi afet türü hangi ipucunu kendisi yayınlıyor. */
@@ -26,10 +29,15 @@ public class BasarimIpucuEvent extends Event {
 
     private final ServerPlayer oyuncu;
     private final Ipucu ipucu;
+    private final AfetTuru kaynakTur;
+    private final long kaynakNo;
 
-    public BasarimIpucuEvent(ServerPlayer oyuncu, Ipucu ipucu) {
+    /** {@code kaynak}: ipucunu yayınlayan afet (numarası {@code baglam().baslangicSaati()}). */
+    public BasarimIpucuEvent(ServerPlayer oyuncu, Ipucu ipucu, Afet kaynak) {
         this.oyuncu = Objects.requireNonNull(oyuncu, "oyuncu");
         this.ipucu = Objects.requireNonNull(ipucu, "ipucu");
+        this.kaynakTur = kaynak.tur();
+        this.kaynakNo = kaynak.baglam().baslangicSaati();
     }
 
     public ServerPlayer oyuncu() {
@@ -38,6 +46,15 @@ public class BasarimIpucuEvent extends Event {
 
     public Ipucu ipucu() {
         return ipucu;
+    }
+
+    public AfetTuru kaynakTur() {
+        return kaynakTur;
+    }
+
+    /** Kaynak afetin numarası ({@code AfetBaglami.baslangicSaati}, AS-16). */
+    public long kaynakNo() {
+        return kaynakNo;
     }
 
     /** Afet türü bu ipuçlarını kendisi yayınlar: başarımın yedek denetimi o türde kapanır. Mod kurucusunda bir kez. */

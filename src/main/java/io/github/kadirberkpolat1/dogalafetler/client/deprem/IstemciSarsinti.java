@@ -74,7 +74,7 @@ public final class IstemciSarsinti {
             return;
         }
         saat++;
-        Optional<AfetDurumPaketi> durum = IstemciAfetDurumu.aktif();
+        Optional<AfetDurumPaketi> durum = sarsintiDurumu();
         if (IstemciAfetDurumu.surum() != surum) {
             surum = IstemciAfetDurumu.surum();
             durum.ifPresent(IstemciSarsinti::paketGeldi);
@@ -118,6 +118,17 @@ public final class IstemciSarsinti {
         return ArtciSarsintisi.oyuncuGenligi(a.tepe(), a.gecen() + kismi, a.sure(), d, a.menzil()) * a.fade();
     }
 
+    /** Sarsıntıyı veren afet (ikisi birden sürebilir, AS-8): AKTIF olan, ikisi de AKTIF ya da değilse deprem. */
+    private static Optional<AfetDurumPaketi> sarsintiDurumu() {
+        Optional<AfetDurumPaketi> deprem = IstemciAfetDurumu.aktif(AfetTuru.DEPREM);
+        Optional<AfetDurumPaketi> sinkhole = IstemciAfetDurumu.aktif(AfetTuru.SINKHOLE);
+        if (sinkhole.filter(p -> p.asama() == AfetAsamasi.AKTIF).isPresent()
+                && deprem.filter(p -> p.asama() == AfetAsamasi.AKTIF).isEmpty()) {
+            return sinkhole;
+        }
+        return deprem.or(() -> sinkhole);
+    }
+
     private static void paketGeldi(AfetDurumPaketi p) {
         if (p.afetNo() != afetNo) {
             afetNo = p.afetNo();
@@ -146,7 +157,7 @@ public final class IstemciSarsinti {
             return new double[] {0, 0};
         }
         double artciGenlik = artciGenligi(oyuncu, kismi);
-        Optional<AfetDurumPaketi> durum = IstemciAfetDurumu.aktif();
+        Optional<AfetDurumPaketi> durum = sarsintiDurumu();
         if (durum.isEmpty() || durum.get().asama() != AfetAsamasi.AKTIF) {
             return new double[] {artciGenlik * carpan, 0};
         }

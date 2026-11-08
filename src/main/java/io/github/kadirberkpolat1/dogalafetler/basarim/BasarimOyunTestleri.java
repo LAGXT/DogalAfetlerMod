@@ -20,6 +20,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.DenizSeviyesi;
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
 import io.github.kadirberkpolat1.dogalafetler.core.OyunTestiAfeti;
+import io.github.kadirberkpolat1.dogalafetler.core.PulsarYolu;
 import io.github.kadirberkpolat1.dogalafetler.core.olay.AfetBittiEvent;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.Gokyuzu;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
@@ -71,7 +72,7 @@ import net.minecraftforge.gametest.PrefixGameTestTemplate;
 import net.minecraftforge.registries.ForgeRegistries;
 
 /**
- * Başarımların oyun içi testleri (GOREV §6 #16; 27 başarımın her biri en az bir testte kazanılır, tablo rapor §6 #16):
+ * Başarımların oyun içi testleri (GOREV §6 #16; 28 başarımın her biri en az bir testte kazanılır, tablo rapor §6 #16):
  * gerçek afet yaşam döngüsü ({@link OyunTestiAfeti}, geçici kayıt; sunucu geneli güneş ve ay dahil), sahte oyuncular ve
  * datagen'le üretilmiş advancement'lar. Faz 4 afetinin iç davranışına bağlı koşullar (#2, #4, #5, #6) afetin
  * yayınlayacağı {@link BasarimIpucuEvent} testten yayınlanarak sınanır. Her test kendi oyuncularını açar; tek afet
@@ -177,7 +178,8 @@ public final class BasarimOyunTestleri {
     }
 
     private static void ipucu(ServerPlayer o, Ipucu ipucu) {
-        MinecraftForge.EVENT_BUS.post(new BasarimIpucuEvent(o, ipucu));
+        MinecraftForge.EVENT_BUS.post(new BasarimIpucuEvent(o, ipucu,
+                AfetYoneticisi.al(o.server).aktifAfet().orElseThrow()));
     }
 
     @GameTest(template = "bos", batch = "basarim_siren")
@@ -217,17 +219,77 @@ public final class BasarimOyunTestleri {
         y.succeed();
     }
 
+    /**
+     * AS-13 (kullanıcı isteği 2026-11-08): komutla başlatılan ({@code elleBaslat} = {@code /dogalafet start}) ve stop ile
+     * durdurulan afette alandaki oyuncu sağ çıkmış sayılır; kural ile kesilen afet sayılmaz.
+     */
     @GameTest(template = "bos", batch = "basarim_stop")
-    public static void stopIleBitenAfetSagCikmaSayilmaz(GameTestHelper y) {
+    public static void komutlaBaslayipStopIleBitenAfetSagCikmaSayilir(GameTestHelper y) {
         ServerPlayer a = oyuncu(y, "stop-a", 0);
+        ServerPlayer b = null;
         try {
             kasirga(y, 5, a, true, () -> { });
             dogrula(y, kazandi(y, a, Basarimlar.KOK), "siren duyuldu");
-            dogrula(y, !kazandi(y, a, Basarimlar.ILK_RUZGAR) && !kazandi(y, a, Basarimlar.FELAKET_USTASI),
-                    "stop ile biten afet (dogalBitti false) sayılmaz");
-            dogrula(y, BasarimVerisi.atlatilanlar(a).boyut() == 0, "stop atlatılanlara yazılmaz");
+            dogrula(y, kazandi(y, a, Basarimlar.ILK_RUZGAR) && kazandi(y, a, Basarimlar.FELAKET_USTASI),
+                    "komutla başlayıp stop ile biten S5 kasırga İlk Rüzgâr ve Felaket Ustası vermeli");
+            dogrula(y, BasarimVerisi.atlatilanlar(a).iceriyor(AfetTuru.KASIRGA), "stop atlatılanlara yazılmalı");
+            b = oyuncu(y, "kural-b", 0);
+            Set<UUID> kim = Set.of(b.getUUID());
+            BasarimOlaylari.afetBitti(new AfetBittiEvent(AfetTuru.DEPREM, 2, b.blockPosition(), Level.OVERWORLD, kim, kim,
+                    -7_000_000L, -6_999_999L, BitisNedeni.KURAL));
+            dogrula(y, !kazandi(y, b, Basarimlar.SALLANAN_ZEMIN) && BasarimVerisi.atlatilanlar(b).boyut() == 0,
+                    "kural ile kesilen afet sayılmamalı");
         } finally {
-            cikar(y, List.of(a));
+            cikar(y, b == null ? List.of(a) : List.of(a, b));
+        }
+        y.succeed();
+    }
+
+    /**
+     * AS-15 (inceleme As9, şef kararı): siren aşamasında (AKTIF'e girmeden) stop, {@code sifirla} ve güneş sürecini geri alan
+     * stop başarımda sayılmaz; süreci geri almayan stop sayılır.
+     */
+    @GameTest(template = "bos", batch = "basarim_sayilmaz")
+    public static void sifirlaSirendeStopVeGeriAlinanGunesSayilmaz(GameTestHelper y) {
+        ServerPlayer a = oyuncu(y, "siren-stop", 0);
+        List<ServerPlayer> oyuncular = new ArrayList<>(List.of(a));
+        ServerLevel level = y.getLevel();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(level.getServer());
+        yonetici.durdur();
+        try (AfetKaydi.GeciciKayit kayit = AfetKaydi.geciciKaydet(AfetTuru.KASIRGA,
+                () -> new OyunTestiAfeti(AfetTuru.KASIRGA, YARICAP, 100))) {
+            BlockPos merkez = y.absolutePos(BlockPos.ZERO);
+            dogrula(y, yonetici.elleBaslat(AfetTuru.KASIRGA, 2, a, level, merkez) == AfetYoneticisi.BaslatmaSonucu.BASLADI,
+                    "kasırga başlamadı");
+            yonetici.asamaIleri();
+            yonetici.durdur();
+            dogrula(y, !kazandi(y, a, Basarimlar.ILK_RUZGAR), "AKTIF'e girmeden stop edilen afet sayılmaz");
+
+            dogrula(y, yonetici.elleBaslat(AfetTuru.KASIRGA, 2, a, level, merkez) == AfetYoneticisi.BaslatmaSonucu.BASLADI,
+                    "ikinci kasırga başlamadı");
+            yonetici.asamaIleri();
+            yonetici.asamaIleri();
+            dogrula(y, yonetici.aktifAfet().orElseThrow().asama() == AfetAsamasi.AKTIF, "AKTIF'e geçmedi");
+            yonetici.sifirla();
+            dogrula(y, yonetici.aktifAfet().isEmpty(), "sifirla afeti durdurmadı");
+            dogrula(y, !kazandi(y, a, Basarimlar.ILK_RUZGAR) && BasarimVerisi.atlatilanlar(a).boyut() == 0,
+                    "sifirla ile biten afet sayılmaz");
+
+            ServerPlayer geriAlinan = oyuncu(y, "gunes-geri", 0);
+            ServerPlayer tamam = oyuncu(y, "gunes-tamam", 0);
+            oyuncular.add(geriAlinan);
+            oyuncular.add(tamam);
+            Set<UUID> g = Set.of(geriAlinan.getUUID());
+            BasarimOlaylari.afetBitti(new AfetBittiEvent(AfetTuru.GUNES_PATLAMASI, 0, merkez, Level.OVERWORLD, g, g,
+                    -6_000_000L, -5_999_999L, BitisNedeni.KOMUT, true, true));
+            dogrula(y, !kazandi(y, geriAlinan, Basarimlar.GUNESI_ATLATTIM), "süreci geri alınan güneş stop'u sayılmaz");
+            Set<UUID> t = Set.of(tamam.getUUID());
+            BasarimOlaylari.afetBitti(new AfetBittiEvent(AfetTuru.GUNES_PATLAMASI, 0, merkez, Level.OVERWORLD, t, t,
+                    -5_000_000L, -4_999_999L, BitisNedeni.KOMUT, true, false));
+            dogrula(y, kazandi(y, tamam, Basarimlar.GUNESI_ATLATTIM), "süreci geri almayan stop sayılır");
+        } finally {
+            yonetici.durdur();
+            cikar(y, oyuncular);
         }
         y.succeed();
     }
@@ -601,11 +663,11 @@ public final class BasarimOyunTestleri {
             }
             AfetTuru son = turler[turler.length - 1];
             dogrula(y, !kazandi(y, a, Basarimlar.HEPSINI_ATLATTIM), "7 tür yetmez");
-            bitti(a, son, son.seviyeli() ? 1 : 0, no--, BitisNedeni.KOMUT);
+            bitti(a, son, son.seviyeli() ? 1 : 0, no--, BitisNedeni.KURAL);
             dogrula(y, !kazandi(y, a, Basarimlar.HEPSINI_ATLATTIM) && !gorunur(y, a, Basarimlar.HEPSINI_ATLATTIM),
-                    "stop ile biten 8. tür sayılmaz; gizli kalır");
-            bitti(a, son, son.seviyeli() ? 1 : 0, no--, BitisNedeni.DOGAL);
-            dogrula(y, kazandi(y, a, Basarimlar.HEPSINI_ATLATTIM), "sekiz tür Hepsini Atlattım verir");
+                    "kural ile kesilen 8. tür sayılmaz; gizli kalır");
+            bitti(a, son, son.seviyeli() ? 1 : 0, no--, BitisNedeni.KOMUT);
+            dogrula(y, kazandi(y, a, Basarimlar.HEPSINI_ATLATTIM), "stop ile biten 8. türle sekiz tür Hepsini Atlattım verir");
             dogrula(y, gorunur(y, a, Basarimlar.HEPSINI_ATLATTIM), "açılınca görünür");
             dogrula(y, BasarimVerisi.unvan(a).orElse(null) == Unvan.HER_SEYI_ATLATAN, "meydan okuma ünvanı");
             dogrula(y, kazandi(y, a, Basarimlar.GUNESI_ATLATTIM) && kazandi(y, a, Basarimlar.AY_DUSTU)
@@ -686,7 +748,7 @@ public final class BasarimOyunTestleri {
             String ad = a.getDisplayName().getString();
             dogrula(y, ad.equals("komut-a"), "ad öneksiz: " + ad);
             int bilgi = komut(server, "dogalafet basarim bilgi");
-            dogrula(y, bilgi == Basarimlar.values().length, "27 başarım yüklü: " + bilgi);
+            dogrula(y, bilgi == Basarimlar.values().length, "28 başarım yüklü: " + bilgi);
         } finally {
             cikar(y, List.of(a));
         }
@@ -757,6 +819,35 @@ public final class BasarimOyunTestleri {
             dogrula(y, !kazandi(y, b, Basarimlar.GUNESI_ATLATTIM) && !kazandi(y, b, Basarimlar.SUPERNOVA_TANIGI),
                     "süreçte ölen ikisini de almaz");
             dogrula(y, !kazandi(y, a, Basarimlar.FIRTINAYA_MEYDAN_OKU), "seviyesiz afet seviye başarımı vermez");
+        } finally {
+            yonetici.sifirla();
+            cikar(y, List.of(a, b));
+        }
+        y.succeed();
+    }
+
+    /**
+     * N29 "Yeni Şafak": eski güneş pulsar yolundan ({@code PulsarYolu.gunesDondu}) dönünce üst dünyadaki canlı oyuncular
+     * kazanır; bayraksız NORMAL'e dönüş (süpernova yolu, geri alma, sıfırlama) vermez, ölü oyuncu almaz.
+     */
+    @GameTest(template = "bos", batch = "basarim_yeni_safak")
+    public static void eskiGunesPulsarYolundanDonunceYeniSafak(GameTestHelper y) {
+        AfetYoneticisi yonetici = AfetYoneticisi.al(y.getLevel().getServer());
+        DunyaDonemi donem = yonetici.donem();
+        ServerPlayer a = oyuncu(y, "safak-a", 0);
+        ServerPlayer b = oyuncu(y, "safak-b", 2);
+        try {
+            yonetici.sifirla();
+            donem.gunesEvresiAyarla(GunesEvresi.KIZIL_CUCE);
+            donem.gunesEvresiAyarla(GunesEvresi.NORMAL);
+            dogrula(y, !kazandi(y, a, Basarimlar.YENI_SAFAK), "pulsar yolu olmadan NORMAL'e dönüş Yeni Şafak değil");
+            donem.gunesEvresiAyarla(GunesEvresi.KIZIL_CUCE);
+            b.kill();
+            PulsarYolu.gunesDonduAyarla(donem, true);
+            donem.gunesEvresiAyarla(GunesEvresi.NORMAL);
+            dogrula(y, kazandi(y, a, Basarimlar.YENI_SAFAK), "eski güneş pulsar yolundan dönünce Yeni Şafak");
+            dogrula(y, !kazandi(y, b, Basarimlar.YENI_SAFAK), "ölü oyuncu almaz");
+            dogrula(y, gorunur(y, a, Basarimlar.YENI_SAFAK), "güneş dalında görünür");
         } finally {
             yonetici.sifirla();
             cikar(y, List.of(a, b));

@@ -142,6 +142,43 @@ class OrtamSicakligiTest {
     }
 
     @Test
+    void pulsarGunesPatlamasiTepesininIkiKati() {
+        assertEquals(2.0, OrtamSicakligi.PULSAR_ARTIS_CARPANI, 1e-12);
+        double tam = OrtamSicakligi.hesapla(ova().evre(GunesEvresi.PULSAR, 1), A).katki(Katki.GUNES_EVRESI);
+        assertEquals(2.0 * A.gunesPatlamasiArtisi(), tam, 1e-9);
+        assertEquals(tam / 2, OrtamSicakligi.hesapla(ova().evre(GunesEvresi.PULSAR, 0.5), A).katki(Katki.GUNES_EVRESI),
+                1e-9);
+        double golge = OrtamSicakligi.hesapla(ova().evre(GunesEvresi.PULSAR, 1).gokyuzu(false).yuzeyY(64), A)
+                .katki(Katki.GUNES_EVRESI);
+        assertEquals(tam * A.golgeOrani(), golge, 1e-9);
+        assertTrue(t(ova().evre(GunesEvresi.PULSAR, 1)) > t(ova().evre(GunesEvresi.BUYUYEN, 1)) + 30);
+    }
+
+    @Test
+    void pulsardaSudanSerinlemeYari() {
+        double normal = OrtamSicakligi.hesapla(ova().suda(true), A).katki(Katki.SU);
+        double pulsar = OrtamSicakligi.hesapla(ova().suda(true).evre(GunesEvresi.PULSAR, 1), A).katki(Katki.SU);
+        assertEquals(A.su(), normal, 1e-12);
+        assertEquals(A.su() * 0.5, pulsar, 1e-12);
+        assertEquals(A.su(), OrtamSicakligi.hesapla(ova().suda(true).boyut(Boyut.NETHER)
+                .evre(GunesEvresi.PULSAR, 1), A).katki(Katki.SU), 1e-12);
+    }
+
+    @Test
+    void karaDelikYutmasindaPulsarIsisiAltmisinciSaniyedeSoner() {
+        double tam = OrtamSicakligi.hesapla(ova().evre(GunesEvresi.PULSAR, 1), A).katki(Katki.GUNES_EVRESI);
+        assertEquals(tam, OrtamSicakligi.hesapla(ova().evre(GunesEvresi.KARADELIK_YUTMA, 0), A)
+                .katki(Katki.GUNES_EVRESI), 1e-9);
+        double yari = OrtamSicakligi.hesapla(ova().evre(GunesEvresi.KARADELIK_YUTMA, 0.3335), A)
+                .katki(Katki.GUNES_EVRESI);
+        assertEquals(tam / 2, yari, 1e-6);
+        assertEquals(0, OrtamSicakligi.hesapla(ova().evre(GunesEvresi.KARADELIK_YUTMA, 0.667), A)
+                .katki(Katki.GUNES_EVRESI), 1e-12);
+        assertEquals(0, OrtamSicakligi.hesapla(ova().evre(GunesEvresi.KARADELIK_YUTMA, 1), A)
+                .katki(Katki.GUNES_EVRESI), 1e-12);
+    }
+
+    @Test
     void katkilarToplamaEsit() {
         OrtamSicakligi.Sonuc s = OrtamSicakligi.hesapla(ova().gunSaati(15000).y(150).yagis(Yagis.KAR).kaynaklar(5)
                 .evre(GunesEvresi.KIZIL_CUCE, 0.3).donma(60).kisAgirligi(0.5), A);

@@ -446,12 +446,12 @@ public final class DepremOtomasyonu {
 
     /** Sinkhole'un AKTIF alt aşaması; yoksa -1 (ON_UYARI ve SIREN paketleri de alt aşama 0 taşır). */
     private static int altAsama() {
-        return IstemciAfetDurumu.aktif().filter(p -> p.tur() == AfetTuru.SINKHOLE && p.asama() == AfetAsamasi.AKTIF)
+        return IstemciAfetDurumu.aktif(AfetTuru.SINKHOLE).filter(p -> p.asama() == AfetAsamasi.AKTIF)
                 .map(AfetDurumPaketi::altAsama).orElse(-1);
     }
 
     private static boolean depremAsamasi(AfetAsamasi asama) {
-        return IstemciAfetDurumu.aktif().filter(p -> p.tur() == AfetTuru.DEPREM && p.asama() == asama).isPresent();
+        return IstemciAfetDurumu.aktif(AfetTuru.DEPREM).filter(p -> p.asama() == asama).isPresent();
     }
 
     private static int dusenSayisi(Minecraft mc) {
