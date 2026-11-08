@@ -9,9 +9,9 @@ import net.minecraft.client.particle.TextureSheetParticle;
 import net.minecraft.core.particles.SimpleParticleType;
 
 /**
- * Vücut durumu parçacıkları (§A8). Nefes buharı: ağızdan çıkan yarı saydam bulutçuk; hızla yavaşlar, büyür, hafifçe
- * yükselir ve söner. Ter damlası: baş ve omuz hizasından düşen küçük damla; yerçekimiyle hızlanır, zemine değince
- * sıçrama karesine geçip kısa sürede kaybolur.
+ * Vücut durumu parçacıkları (§A8, S3-10). Nefes buharı: ağızdan çıkan yarı saydam bulutçuk; hızla yavaşlar, büyür,
+ * hafifçe yükselir ve söner. Ter damlası: baş ve omuz hizasından düşen damla (lacivert kontür, parlak gövde, düşüş izi:
+ * gökte, çimende ve kumda seçilir); yerçekimiyle hızlanır, zemine değince sıçrama karesine geçip kısa sürede kaybolur.
  */
 final class SicaklikParcacigi extends TextureSheetParticle {
     private final SpriteSet kareler;
@@ -37,23 +37,22 @@ final class SicaklikParcacigi extends TextureSheetParticle {
         switch (tur) {
             case BUHAR -> {
                 lifetime = 22 + random.nextInt(10);
-                quadSize = 0.07F + random.nextFloat() * 0.04F;
+                quadSize = 0.10F + random.nextFloat() * 0.05F;
                 hasPhysics = false;
                 gravity = -0.012F;
                 friction = 0.86F;
                 float ton = 0.92F + random.nextFloat() * 0.08F;
                 setColor(ton, ton, Math.min(1F, ton + 0.04F));
-                alpha = 0.55F;
+                alpha = 0.72F;
                 setSpriteFromAge(kareler);
             }
             case TER -> {
                 lifetime = 26 + random.nextInt(10);
-                quadSize = 0.035F + random.nextFloat() * 0.02F;
+                quadSize = 0.07F + random.nextFloat() * 0.03F;
                 hasPhysics = true;
-                gravity = 0.55F;
+                gravity = 0.4F;
                 friction = 0.98F;
-                setColor(1F, 0.97F, 0.9F);
-                alpha = 0.85F;
+                alpha = 1F;
                 setSprite(kareler.get(random.nextInt(3), 3));
             }
             default -> throw new IllegalStateException(tur.name());

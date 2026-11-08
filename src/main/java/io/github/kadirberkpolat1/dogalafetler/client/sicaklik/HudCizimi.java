@@ -29,6 +29,8 @@ public final class HudCizimi {
     /** Hapın sol kenarı (74) ve sıcak tüpün sol kenarı (108). */
     public static final int HAP_X = YARIM;
     public static final int SICAK_X = YARIM + HAP_G;
+    /** Hap sayısının dört yönlü koyu konturu (ARGB): nabız ve parlama sırasında da rakamları zeminden ayırır. */
+    public static final int KONTUR = 0xFF120E0C;
 
     /** Bantın sol kenarındaki etkin durum ikonları, çizim sırasıyla; {@code u} atlas sütunu. */
     public enum Ikon {
@@ -155,6 +157,20 @@ public final class HudCizimi {
             case DONMA -> 0xFF5EAEFF;
             case BUNALMA -> 0xFFFFB54A;
             case YANMA -> 0xFFFF5A36;
+        };
+    }
+
+    /**
+     * Hapın vücut sayısının rengi (ARGB): durum renginin %65 beyaza açılmışı. Koyu hap içinde, nabızın en parlak anında
+     * bile en az 5:1 karşıtlık; çevresinde {@link #KONTUR}.
+     */
+    public static int sayiRengi(SicaklikDurumu durum) {
+        return switch (durum) {
+            case NORMAL -> 0xFFF7F6F3;
+            case USUME -> 0xFFE0F3FD;
+            case DONMA -> 0xFFC7E3FF;
+            case BUNALMA -> 0xFFFFE5C0;
+            case YANMA -> 0xFFFFC5B9;
         };
     }
 

@@ -9,11 +9,11 @@
                                       45 yanma, 54 normal termometre); v=48 şevron 5x4 (0 aşağı, 6 yukarı), (12,48) boş
                                       üçgen 5x3
   misc/sicaklik_buz.png       256x256 buz kenarı (alfa): kenarlardan içeri dallanan buz kristalleri + kırağı
-  misc/sicaklik_bunalma.png   256x256 buz kenarının kırmızı karşılığı: kenarlardan içeri süzülen ter izleri + ısı lekeleri
+  misc/sicaklik_bunalma.png   256x256 buz kenarının kırmızı karşılığı (aynı kenar maskesi): süzülen ter izleri + ısı lekeleri
   misc/sicaklik_sicak.png     256x256 sıcak hava vinyeti; dikey yönde kesintisiz (efekt onu yukarı kaydırır)
   mob_effect/islak.png        18x18   Islak gösterge efekti: su damlası
   particle/nefes_buhari_0..3  8x8     nefes buharı bulutçuğu (yaşla dağılır)
-  particle/ter_damlasi_0..3   8x8     ter damlası (0-2 düşen damla çeşitleri, 3 zeminde sıçrama)
+  particle/ter_damlasi_0..3   8x8     ter damlası: lacivert kontür, parlak gövde, düşüş izi (0-2 düşen, 3 sıçrama)
 
 Çalıştırma: KÖK/.venv/bin/python tools/assets/sicaklik_dokulari.py (aynı tohum -> aynı bayt).
 """
@@ -262,7 +262,7 @@ def buz_dokusu():
 
 
 def ter_izi(d, rnd, x, y, uzunluk, kalinlik):
-    """Aşağı süzülen ter izi: hafif kıvrılarak iner, ucunda parlak bir damla birikir."""
+    """Aşağı süzülen ter izi: hafif kıvrılarak iner, ucunda parlak bir damla birikir. Buz kristali kadar opak."""
     noktalar = [(x, y)]
     adim = 6
     for i in range(1, int(uzunluk / adim) + 1):
@@ -270,52 +270,54 @@ def ter_izi(d, rnd, x, y, uzunluk, kalinlik):
         noktalar.append((x, y + i * adim))
     for (x1, y1), (x2, y2) in zip(noktalar, noktalar[1:]):
         t = y1 / 256
-        d.line([(x1, y1), (x2, y2)], fill=(232, 52, 34, int(170 - 60 * t)), width=kalinlik)
+        d.line([(x1, y1), (x2, y2)], fill=(240, 44, 30, int(225 - 50 * t)), width=kalinlik)
     ux, uy = noktalar[-1]
-    r = kalinlik + 1.2
-    d.ellipse([ux - r, uy - r * 0.8, ux + r, uy + r * 1.3], fill=(255, 96, 70, 215))
-    d.ellipse([ux - r * 0.45, uy - r * 0.5, ux + r * 0.05, uy], fill=(255, 196, 170, 200))
+    r = kalinlik + 1.4
+    d.ellipse([ux - r, uy - r * 0.8, ux + r, uy + r * 1.3], fill=(255, 70, 46, 235))
+    d.ellipse([ux - r * 0.45, uy - r * 0.5, ux + r * 0.05, uy], fill=(255, 200, 176, 225))
 
 
 def bunalma_dokusu():
+    """Buz kenarının kırmızı karşılığı (S3-10): aynı kenar maskesi ve kırağı yoğunluğunda lekeli kızarma, kristallerin
+    yerinde aşağı süzülen ter izleri, alttan ısı kıvrımları; ortası aynı ölçüde açık kalır."""
     n = 256
     rnd = random.Random(20261108)
     yy, xx = np.mgrid[0:n, 0:n].astype(np.float64)
     dx = (xx - (n - 1) / 2) / (n / 2)
     dy = (yy - (n - 1) / 2) / (n / 2)
     r = np.sqrt(dx ** 2 * 0.9 + dy ** 2 * 1.1)
-    kenar = np.clip((r - 0.6) / 0.5, 0, 1) ** 1.5
-    # Isı lekeleri: 16x16 gürültü yumuşakça büyütülür, kenar kızarması lekeli olur.
+    kenar = np.clip((r - 0.62) / 0.5, 0, 1) ** 1.6
+    # Isı lekeleri: 16x16 gürültü yumuşakça büyütülür; buzdaki kırağı gürültüsünün yerini alır.
     leke = np.random.default_rng(11).random((16, 16))
     leke = np.array(Image.fromarray((leke * 255).astype(np.uint8), "L").resize((n, n), Image.BICUBIC)) / 255.0
     taban = np.zeros((n, n, 4), dtype=np.uint8)
-    taban[..., 0] = np.clip(150 + 70 * leke, 0, 255).astype(np.uint8)
-    taban[..., 1] = (14 + 20 * leke).astype(np.uint8)
-    taban[..., 2] = 8
-    taban[..., 3] = (np.clip(kenar * (0.5 + 0.5 * leke), 0, 1) * 185).astype(np.uint8)
+    taban[..., 0] = np.clip(215 + 40 * leke, 0, 255).astype(np.uint8)
+    taban[..., 1] = (34 + 40 * leke).astype(np.uint8)
+    taban[..., 2] = (22 + 20 * leke).astype(np.uint8)
+    taban[..., 3] = (np.clip(kenar * (0.55 + 0.45 * leke), 0, 1) * 200).astype(np.uint8)
     img = Image.fromarray(taban, "RGBA")
     iz = Image.new("RGBA", (n, n), (0, 0, 0, 0))
     d = ImageDraw.Draw(iz)
     # Üst kenardan süzülen izler.
-    for _ in range(24):
-        ter_izi(d, rnd, rnd.uniform(0, n), -2, rnd.uniform(26, 84), rnd.choice((1, 1, 2)))
+    for _ in range(28):
+        ter_izi(d, rnd, rnd.uniform(0, n), -2, rnd.uniform(30, 90), rnd.choice((1, 2, 2)))
     # Yan kenarlarda içeri doğru kısa, aşağı inen izler.
-    for _ in range(18):
+    for _ in range(22):
         sol = rnd.random() < 0.5
-        x = rnd.uniform(1, 18) if sol else n - 1 - rnd.uniform(1, 18)
-        ter_izi(d, rnd, x, rnd.uniform(0, n - 40), rnd.uniform(14, 46), 1)
-    # Alt kenardan yükselen soluk ısı kıvrımları.
-    for _ in range(14):
+        x = rnd.uniform(1, 20) if sol else n - 1 - rnd.uniform(1, 20)
+        ter_izi(d, rnd, x, rnd.uniform(0, n - 40), rnd.uniform(16, 50), rnd.choice((1, 2)))
+    # Alt kenardan yükselen ısı kıvrımları.
+    for _ in range(16):
         x0 = rnd.uniform(0, n)
-        boy = rnd.uniform(20, 50)
+        boy = rnd.uniform(24, 56)
         faz = rnd.uniform(0, 2 * math.pi)
         noktalar = [(x0 + 3 * math.sin(faz + t / 6), n + 1 - t) for t in range(0, int(boy), 2)]
-        d.line(noktalar, fill=(255, 120, 60, 90), width=1)
-    iz = iz.filter(ImageFilter.GaussianBlur(0.5))
+        d.line(noktalar, fill=(255, 96, 50, 170), width=2)
+    iz = iz.filter(ImageFilter.GaussianBlur(0.4))
     img = Image.alpha_composite(img, iz)
     a = np.array(img).astype(np.float64)
-    # Ekranın ortası açık kalır.
-    a[..., 3] *= np.clip((r - 0.32) / 0.45, 0, 1)
+    # Ekranın ortası açık kalır (buz kenarıyla aynı sönme).
+    a[..., 3] *= np.clip((r - 0.35) / 0.45, 0, 1)
     return Image.fromarray(a.astype(np.uint8), "RGBA")
 
 
@@ -392,41 +394,44 @@ def buhar_karesi(i):
     return Image.fromarray(img, "RGBA")
 
 
+# Düşen damla: koyu lacivert kontür (açık gökte ve kumda seçilir), parlak buz beyazı gövde ve beyaz parlama (koyu
+# zeminde seçilir), üstte düşüş izi. 3: zeminde sıçrama.
 TER_KARELERI = [
-    ["        ",
-     "   o    ",
-     "  oho   ",
-     "  o_o   ",
-     "  ooo   ",
-     "        ",
-     "        ",
-     "        "],
-    ["        ",
-     "   o    ",
-     "   o    ",
-     "  oho   ",
-     "  o_o   ",
-     "  o_o   ",
-     "   o    ",
-     "        "],
-    ["        ",
-     "        ",
+    ["   t    ",
+     "   t    ",
      "   oo   ",
-     "  oh_o  ",
-     "  o__o  ",
+     "  ohLo  ",
+     "  oLLo  ",
+     "  oLLo  ",
      "   oo   ",
-     "        ",
+     "        "],
+    ["   t    ",
+     "   tt   ",
+     "   tt   ",
+     "   oo   ",
+     "  ohLo  ",
+     "  oLLo  ",
+     "   oo   ",
+     "        "],
+    ["        ",
+     "    t   ",
+     "   oo   ",
+     "  ohLo  ",
+     " ohLLLo ",
+     " oLLLLo ",
+     "  oooo  ",
      "        "],
     ["        ",
      "        ",
-     "        ",
-     " o    o ",
+     " h    h ",
+     "  o  o  ",
      "        ",
      "  oooo  ",
-     " o_hh_o ",
+     " oLhLLo ",
      "  oooo  "],
 ]
-TER_PALET = {"o": (150, 196, 236, 235), "_": (214, 236, 255, 225), "h": (255, 255, 255, 255)}
+TER_PALET = {"o": (10, 30, 84, 255), "L": (196, 240, 255, 255), "h": (255, 255, 255, 255),
+             "t": (214, 244, 255, 150)}
 
 
 def ter_karesi(i):

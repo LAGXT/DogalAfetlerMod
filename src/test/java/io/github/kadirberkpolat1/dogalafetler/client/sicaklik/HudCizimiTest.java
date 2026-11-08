@@ -5,7 +5,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.SicaklikDurumu;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
+import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
 
 /** S3-07 (§A8): sıcaklık bantının oyuncunun gördüğü yerleşim, dolum, çentik, şevron, metin ve animasyon davranışı. */
@@ -122,5 +126,62 @@ class HudCizimiTest {
         assertTrue(HudCizimi.parlama(103, 100, 0f) > 0f && HudCizimi.parlama(103, 100, 0f) < 1f);
         assertEquals(0f, HudCizimi.parlama(100 + HudCizimi.PARLAMA_TICK, 100, 0f), "parlama 6 tick'te biter");
         assertEquals(0f, HudCizimi.parlama(50, -1, 0f), "durum hiç değişmediyse parlama yok");
+    }
+
+    /**
+     * S3-10: hapın vücut sayısı her durumda okunur. Sayı rengi ile hap içinin (atlasın gerçek pikseli; nabızın en parlak
+     * anı, siyah ve beyaz dünya zemini üstünde) karşıtlığı WCAG AA ölçüsüyle en az 4,5:1; parlama anında sayıyı ayıran
+     * koyu kontur ile en az 7:1.
+     */
+    @Test
+    void hapSayisiHerDurumdaZemindenAyrilir() throws IOException {
+        BufferedImage atlas;
+        try (InputStream girdi = HudCizimiTest.class.getResourceAsStream(
+                "/assets/dogalafetler/textures/gui/sicaklik/hud.png")) {
+            atlas = ImageIO.read(girdi);
+        }
+        // Atlas: haplar v=16, u = 36 · sıra; beyaz nabız/parlama hapı u=180. (17, 5) sayının ortasındaki iç piksel.
+        int beyazIc = atlas.getRGB(180 + 17, 16 + 5);
+        for (SicaklikDurumu durum : SicaklikDurumu.values()) {
+            int ic = atlas.getRGB(HudCizimi.hapSirasi(durum) * 36 + 17, 16 + 5);
+            float nabiz = HudCizimi.nabiz(durum, YANMA, SICAK, YANMA, 0f);
+            int nabizKatmani = (Math.round((beyazIc >>> 24) * nabiz) << 24) | (HudCizimi.renk(durum) & 0xFFFFFF);
+            for (int zemin : new int[] {0x000000, 0xFFFFFF}) {
+                int arka = ust(nabizKatmani, ust(ic, zemin));
+                double k = kontrast(HudCizimi.sayiRengi(durum), arka);
+                assertTrue(k >= 4.5, durum + " zemin " + Integer.toHexString(zemin) + ": sayı "
+                        + Integer.toHexString(HudCizimi.sayiRengi(durum)) + " hap içi " + Integer.toHexString(arka)
+                        + " karşıtlık " + k);
+            }
+            double kontur = kontrast(HudCizimi.sayiRengi(durum), HudCizimi.KONTUR);
+            assertTrue(kontur >= 7, durum + ": sayı ile kontur karşıtlığı " + kontur);
+        }
+    }
+
+    /** ARGB ön renk, RGB zeminin üstünde (normal karışım); sonuç RGB. */
+    private static int ust(int on, int zemin) {
+        double a = (on >>> 24) / 255.0;
+        int s = 0;
+        for (int kaydir = 0; kaydir <= 16; kaydir += 8) {
+            double c = (on >> kaydir & 0xFF) * a + (zemin >> kaydir & 0xFF) * (1 - a);
+            s |= (int) Math.round(c) << kaydir;
+        }
+        return s;
+    }
+
+    private static double kontrast(int a, int b) {
+        double la = parlaklik(a);
+        double lb = parlaklik(b);
+        return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+    }
+
+    /** WCAG göreli parlaklık. */
+    private static double parlaklik(int rgb) {
+        return 0.2126 * kanal(rgb >> 16 & 0xFF) + 0.7152 * kanal(rgb >> 8 & 0xFF) + 0.0722 * kanal(rgb & 0xFF);
+    }
+
+    private static double kanal(int c) {
+        double s = c / 255.0;
+        return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
     }
 }

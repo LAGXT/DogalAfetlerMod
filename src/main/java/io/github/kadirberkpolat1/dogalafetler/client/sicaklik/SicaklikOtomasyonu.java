@@ -17,11 +17,14 @@ import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.common.Mod;
 
 /**
- * Görsel kanıt otomasyonu (K0-21 rev. 2, S3-07). Yalnız {@code -Ddogalafetler.otomasyon=sicaklik|sicaklik_coldsweat} ile
- * çalışır; üretimde etkisizdir. {@code sicaklik}: oyuncu OP olunca vücut sıcaklığını (°C) ve ıslaklığı komutla ayarlayıp
- * sahneleri sırayla çeker: HUD normal, ıslak, üşüme, donma (iki titreşim fazı), ağır donma, bunalma, yanma (iki nabız
- * fazı), ağır yanma, termometre menüsü, üçüncü şahısta ağız buharı ve terleme. Birinci şahıs sahnelerinde oyuncunun kendi
- * parçacık sayısı log'a yazılır (0 olmalı). Sonra sunucu konsolunun komutları için bekler ve kapanır.
+ * Görsel kanıt otomasyonu (K0-21 rev. 2, S3-07, S3-10). Yalnız {@code -Ddogalafetler.otomasyon=sicaklik|sicaklik_coldsweat}
+ * ile çalışır; üretimde etkisizdir. {@code sicaklik}: oyuncu OP olunca vücut sıcaklığını (°C) ve ıslaklığı komutla ayarlayıp
+ * sahneleri sırayla çeker: birinci şahısta HUD normal, ıslak, donma, bunalma, yanma (iki nabız fazı); üçüncü şahısta
+ * aynı kameradan normal karşılaştırma karesi, üşümede ağız buharı, bunalmada ter ve kırmızı kenar; termometre
+ * menüsü; terin gök, çimen ve kum önünde üç kare (zemin oyuncunun altına {@code fill} ile serilir, kamera açısı arka
+ * planı seçer). Birinci şahıs sahnelerinde oyuncunun kendi parçacık sayısı log'a yazılır (0 olmalı); her kare satırı
+ * hapın ekran konumunu ve sayı rengini de yazar (piksel ölçümü {@code tools/senaryo/sicaklik_olcum.py}). Sonra sunucu
+ * konsolunun komutları için bekler ve kapanır.
  * {@code sicaklik_coldsweat}: Cold Sweat yüklü tek oyunculu dünyada kapı durumunu loglar ve bir görüntü alır. Klavye, fare
  * ve tekerlek girdileri kapanışa kadar sayılır (sıfırdan farklıysa koşu geçersizdir). Kendi açmadığı duraklatma ekranını
  * kapatır; adımlar durum koşuluyla ilerler.
@@ -35,6 +38,8 @@ public final class SicaklikOtomasyonu {
 
     private enum Kip {
         HUD,
+        /** Üçüncü şahıs önden HUD karesi: aynı kameradaki buhar, ter ve kenar karelerinin karşılaştırma zemini. */
+        HUD_3P,
         /** İkinci kare farklı bir titreşim ya da nabız fazından alınır. */
         HUD_IKI_KARE,
         MENU,
@@ -42,15 +47,25 @@ public final class SicaklikOtomasyonu {
         TER
     }
 
-    private record Sahne(String ad, double santigrat, int islaklik, Kip kip) {
+    /**
+     * @param bakis  oyuncunun baş eğimi; üçüncü şahıs önden kamerada artı değer kamerayı göğe, eksi zemine çevirir
+     * @param zemin  sahne başında oyuncunun altına serilen blok; {@code null} dokunulmaz
+     */
+    private record Sahne(String ad, double santigrat, int islaklik, Kip kip, float bakis, String zemin) {
     }
 
-    private static final List<Sahne> SAHNELER = List.of(new Sahne("normal", 37.0, 0, Kip.HUD),
-            new Sahne("islak", 36.8, 80, Kip.HUD), new Sahne("usume", 35.6, 0, Kip.HUD),
-            new Sahne("donma", 34.4, 0, Kip.HUD_IKI_KARE), new Sahne("donma_agir", 32.6, 0, Kip.HUD),
-            new Sahne("bunalma", 38.6, 0, Kip.HUD), new Sahne("yanma", 40.0, 0, Kip.HUD_IKI_KARE),
-            new Sahne("yanma_agir", 41.5, 0, Kip.HUD), new Sahne("termometre", 35.6, 60, Kip.MENU),
-            new Sahne("buhar_3p", 35.6, 0, Kip.BUHAR), new Sahne("ter_3p", 38.8, 0, Kip.TER));
+    private static final List<Sahne> SAHNELER = List.of(new Sahne("normal", 37.0, 0, Kip.HUD, 8f, null),
+            new Sahne("islak", 36.8, 80, Kip.HUD, 8f, null),
+            new Sahne("donma", 34.4, 0, Kip.HUD, 8f, null),
+            new Sahne("bunalma_1p", 38.6, 0, Kip.HUD, 8f, null),
+            new Sahne("normal_3p", 37.0, 0, Kip.HUD_3P, 0f, null),
+            new Sahne("usume", 35.6, 0, Kip.BUHAR, 0f, null),
+            new Sahne("bunalma", 38.6, 0, Kip.TER, 0f, null),
+            new Sahne("yanma", 40.0, 0, Kip.HUD_IKI_KARE, 8f, null),
+            new Sahne("menu", 35.6, 60, Kip.MENU, 8f, null),
+            new Sahne("ter_gok", 38.8, 0, Kip.TER, 35f, null),
+            new Sahne("ter_cimen", 38.8, 0, Kip.TER, -35f, "minecraft:grass_block"),
+            new Sahne("ter_kum", 38.8, 0, Kip.TER, -35f, "minecraft:sand"));
 
     private static int tus;
     private static int fare;
@@ -148,9 +163,12 @@ public final class SicaklikOtomasyonu {
                 return;
             }
             Sahne s = SAHNELER.get(sahne);
-            boolean ucuncu = s.kip() == Kip.BUHAR || s.kip() == Kip.TER;
+            boolean ucuncu = s.kip() == Kip.BUHAR || s.kip() == Kip.TER || s.kip() == Kip.HUD_3P;
             mc.options.setCameraType(ucuncu ? CameraType.THIRD_PERSON_FRONT : CameraType.FIRST_PERSON);
-            mc.player.setXRot(ucuncu ? 0f : 8f);
+            mc.player.setXRot(s.bakis());
+            if (s.zemin() != null) {
+                komut(mc, "fill ~-8 ~-1 ~-8 ~8 ~-1 ~8 %s", s.zemin());
+            }
             komut(mc, "dogalafet sicaklik set %s %.1f", ad, s.santigrat());
             komut(mc, "dogalafet sicaklik islaklik %s %d", ad, s.islaklik());
             sahneParcacik = IstemciSicaklik.kendiParcacikSayisi();
@@ -173,7 +191,7 @@ public final class SicaklikOtomasyonu {
 
     private static void sahneAdimi(Minecraft mc, Sahne s) {
         switch (s.kip()) {
-            case HUD -> {
+            case HUD, HUD_3P -> {
                 if (sayac == OTURMA) {
                     kare(mc, s.ad());
                     sonraki();
@@ -252,12 +270,14 @@ public final class SicaklikOtomasyonu {
         var d = IstemciSicaklik.durum();
         DogalAfetler.LOGGER.info(ON + "kare {} (vücut {} °C kademe {} durum {}, ıslaklık {}, hissedilen {} °C, mekan {} °C, "
                 + "eğilim {}; FPS {}; bant dx={} dy={} parlama={} nabız={} şevron={} metin='{}' ikonlar=[{}] üçgen x={} "
-                + "çizim tick'i {}; kamera {}, sahnede kendi parçacığı {})", dosya,
+                + "çizim tick'i {}; kamera {}, sahnede kendi parçacığı {}; hap x={} y={} ölçek={} sayı rengi={})", dosya,
                 sayi(VucutOlcegi.santigrat(d.vucut())), d.kademe(), d.kademe().durum(), sayi(d.islaklik()),
                 sayi(d.hissedilen()), sayi(d.mekan()), sayi(d.egilim()), mc.getFps(), SicaklikHud.sonDx, SicaklikHud.sonDy,
                 sayi(SicaklikHud.sonParlama), sayi(SicaklikHud.sonNabiz), SicaklikHud.sonSevron, SicaklikHud.sonMetin,
                 SicaklikHud.sonIkonlar, SicaklikHud.sonUcgen, SicaklikHud.sonTick, mc.options.getCameraType(),
-                IstemciSicaklik.kendiParcacikSayisi() - sahneParcacik);
+                IstemciSicaklik.kendiParcacikSayisi() - sahneParcacik, SicaklikHud.sonHapX, SicaklikHud.sonHapY,
+                mc.getWindow().getGuiScale(),
+                String.format(Locale.ROOT, "%06x", HudCizimi.sayiRengi(d.kademe().durum()) & 0xFFFFFF));
     }
 
     private static String sayi(double d) {

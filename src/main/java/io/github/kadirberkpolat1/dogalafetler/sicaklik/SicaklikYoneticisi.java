@@ -276,6 +276,7 @@ public final class SicaklikYoneticisi {
         Vec3 bakis = oyuncu.getLookAngle();
         Vec3 agiz = oyuncu.getEyePosition().add(bakis.scale(0.35)).add(0, -0.12, 0);
         int damlaSayisi = 1 + (int) (islaklik * 3);
+        int terSayisi = durum == SicaklikDurumu.YANMA ? 6 : 4;
         for (ServerPlayer izleyen : level.players()) {
             if (izleyen == oyuncu) {
                 continue;
@@ -286,7 +287,7 @@ public final class SicaklikYoneticisi {
             }
             if (ter) {
                 level.sendParticles(izleyen, SicaklikParcaciklari.TER_DAMLASI.get(), false, oyuncu.getX(),
-                        oyuncu.getY() + oyuncu.getBbHeight() * 0.8, oyuncu.getZ(), 3, 0.3, 0.2, 0.3, 0);
+                        oyuncu.getY() + oyuncu.getBbHeight() * 0.8, oyuncu.getZ(), terSayisi, 0.35, 0.2, 0.35, 0);
             }
             if (damla) {
                 level.sendParticles(izleyen, ParticleTypes.FALLING_WATER, false, oyuncu.getX(),

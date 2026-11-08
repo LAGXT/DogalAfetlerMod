@@ -57,6 +57,9 @@ public final class SicaklikHud {
     static String sonMetin = "";
     static String sonIkonlar = "";
     static int sonUcgen;
+    /** Son çizilen hapın sol üst köşesi (GUI pikseli; görsel kanıt ölçümü). */
+    static int sonHapX;
+    static int sonHapY;
 
     private SicaklikHud() {
     }
@@ -170,9 +173,12 @@ public final class SicaklikHud {
         }
     }
 
+    /** Hap, nabız ve parlama katmanları, en üstte koyu konturlu açık renk sayı (her durumda okunur, S3-10). */
     private static void hap(GuiGraphics g, Font font, int x, int y, float vucut, SicaklikDurumu durum, float nabiz,
             float parlama) {
         int hx = x + HudCizimi.HAP_X;
+        sonHapX = hx;
+        sonHapY = y;
         parca(g, hx, y, HudCizimi.hapSirasi(durum) * HAP_ADIM, HAP_V, HudCizimi.HAP_G, HudCizimi.YUKSEKLIK);
         int renk = HudCizimi.renk(durum);
         if (nabiz > 0f) {
@@ -180,20 +186,26 @@ public final class SicaklikHud {
             parca(g, hx, y, BEYAZ_HAP_U, HAP_V, HudCizimi.HAP_G, HudCizimi.YUKSEKLIK);
             g.setColor(1f, 1f, 1f, 1f);
         }
+        if (parlama > 0f) {
+            g.setColor(1f, 1f, 1f, parlama);
+            parca(g, hx, y, BEYAZ_HAP_U, HAP_V, HudCizimi.HAP_G, HudCizimi.YUKSEKLIK);
+            g.setColor(1f, 1f, 1f, 1f);
+        }
         if (SicaklikIstemciAyarlari.sayiGoster()) {
             String metin = HudCizimi.sayiMetni(vucut);
-            g.drawString(font, metin, hx + (HudCizimi.HAP_G - font.width(metin)) / 2 + 1, y + 2, renk, true);
+            int mx = hx + (HudCizimi.HAP_G - font.width(metin)) / 2 + 1;
+            int my = y + 2;
+            g.drawString(font, metin, mx - 1, my, HudCizimi.KONTUR, false);
+            g.drawString(font, metin, mx + 1, my, HudCizimi.KONTUR, false);
+            g.drawString(font, metin, mx, my - 1, HudCizimi.KONTUR, false);
+            g.drawString(font, metin, mx, my + 1, HudCizimi.KONTUR, false);
+            g.drawString(font, metin, mx, my, HudCizimi.sayiRengi(durum), false);
             sonMetin = metin;
         } else {
             HudCizimi.Ikon ikon = HudCizimi.durumIkonu(durum);
             parca(g, hx + (HudCizimi.HAP_G - HudCizimi.IKON) / 2, y + 1, ikon == null ? NORMAL_IKON_U : ikon.u, IKON_V,
                     HudCizimi.IKON, HudCizimi.IKON);
             sonMetin = "";
-        }
-        if (parlama > 0f) {
-            g.setColor(1f, 1f, 1f, parlama);
-            parca(g, hx, y, BEYAZ_HAP_U, HAP_V, HudCizimi.HAP_G, HudCizimi.YUKSEKLIK);
-            g.setColor(1f, 1f, 1f, 1f);
         }
     }
 

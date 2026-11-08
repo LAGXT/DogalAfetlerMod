@@ -30,6 +30,8 @@ import io.github.kadirberkpolat1.dogalafetler.sicaklik.ZirhEkleri;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Kademe;
 import io.github.kadirberkpolat1.dogalafetler.yiyecek.YiyecekKayitlari;
 import io.github.kadirberkpolat1.dogalafetler.yiyecek.YiyecekYendiEvent;
+import io.github.kadirberkpolat1.dogalafetler.yiyecek.mantik.YiyecekTablosu;
+import io.github.kadirberkpolat1.dogalafetler.yiyecek.mantik.Yon;
 import io.netty.channel.embedded.EmbeddedChannel;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -986,6 +988,40 @@ public final class BasarimOyunTestleri {
             MinecraftForge.EVENT_BUS.unregister(dinleyici);
             kural.set(onceki, server);
             cikar(y, List.of(o));
+        }
+        y.succeed();
+    }
+
+    /**
+     * Sıcaklık-3'ün yeni ısıtan yiyecek ve içecekleri #19 "Çorba İçer Isınır" için sıcak yiyecek sayılır: ısıtan her tablo
+     * yiyeceği sıcak yiyecek etiketinde, serinletenler değil. Etiket, yiyeceğin ısınma etkisi görülmese de (etki
+     * kapalı) tanınır: donarken Tarhana Çorbası içip nötre dönen başarımı alır, Ayran içen almaz.
+     */
+    @GameTest(template = "bos", batch = "basarim_corba_yeni")
+    public static void yeniSicakYiyeceklerCorbaBasarimindaTaninir(GameTestHelper y) {
+        for (YiyecekTablosu.Kayit k : YiyecekTablosu.KAYITLAR) {
+            boolean etikette = new ItemStack(YiyecekKayitlari.esya(k.ad())).is(BasarimKimlikleri.SICAK_YIYECEK);
+            dogrula(y, etikette == (k.tanim().yon() == Yon.ISINMA),
+                    k.ad() + " (" + k.tanim().yon() + ") sıcak yiyecek etiketinde: " + etikette);
+        }
+        MinecraftServer server = y.getLevel().getServer();
+        GameRules.BooleanValue kural = server.getGameRules().getRule(Kurallar.SICAKLIK_SISTEMI);
+        boolean onceki = kural.get();
+        kural.set(true, server);
+        ServerPlayer tarhana = oyuncu(y, "corba-tarhana", 0);
+        ServerPlayer ayran = oyuncu(y, "corba-ayran", 2);
+        try {
+            ye(tarhana, -80, new ItemStack(YiyecekKayitlari.esya("tarhana_corbasi")), 0, 0, 0);
+            ye(ayran, -80, new ItemStack(YiyecekKayitlari.esya("ayran")), 0, 0, 0);
+            for (ServerPlayer o : List.of(tarhana, ayran)) {
+                VucutSicakligi.ayarla(o, 0);
+                BasarimOlaylari.saniyelikDenetim(o);
+            }
+            dogrula(y, kazandi(y, tarhana, Basarimlar.CORBA_ICER_ISINIR), "donarken Tarhana Çorbası + nötr");
+            dogrula(y, !kazandi(y, ayran, Basarimlar.CORBA_ICER_ISINIR), "serinleten Ayran sayılmaz");
+        } finally {
+            kural.set(onceki, server);
+            cikar(y, List.of(tarhana, ayran));
         }
         y.succeed();
     }

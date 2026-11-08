@@ -28,7 +28,7 @@ import net.minecraftforge.fml.common.Mod;
  * parlaması için saklanır. Çıkışta sıfırlanır.
  * <p>
  * Oyuncunun kendi parçacıkları (sunucu bunları oyuncunun kendisine göndermez, S-08 rev.) yalnız kamera birinci şahıs
- * değilken üretilir: üşüme ve donmada ~50 tick'te bir nefes (3–5 buhar bulutçuğu; dünya donması sürerken üretilmez, onun
+ * değilken üretilir: üşüme ve donmada ~50 tick'te bir nefes (4–6 buhar bulutçuğu; dünya donması sürerken üretilmez, onun
  * nefesi zaten çizilir), bunalma ve yanmada ter damlası, ıslakken düşen su damlası, hasarlı kademede alev ya da kar tanesi.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
@@ -36,7 +36,7 @@ public final class IstemciSicaklik {
     private static final float YAKLASMA = 0.25f;
     /** Hasarlı kademe alev/kar tanesi aralığı (tick): sunucunun varsayılan güncelleme aralığı. */
     private static final int PARCACIK_ARALIGI = 20;
-    /** Nefes döngüsü (tick); her nefeste 2 tick arayla 3–5 bulutçuk. */
+    /** Nefes döngüsü (tick); her nefeste 2 tick arayla 4–6 bulutçuk. */
     static final int NEFES_DONGUSU = 50;
 
     private static SicaklikDurumPaketi durum = SicaklikDurumPaketi.KAPALI;
@@ -166,7 +166,7 @@ public final class IstemciSicaklik {
         RandomSource r = o.getRandom();
         if ((sd == SicaklikDurumu.USUME || sd == SicaklikDurumu.DONMA) && !dunyaDonuyor(mc)) {
             if (tick % NEFES_DONGUSU == 0) {
-                nefesKalan = 3 + r.nextInt(3);
+                nefesKalan = 4 + r.nextInt(3);
             }
         } else {
             nefesKalan = 0;
@@ -181,7 +181,7 @@ public final class IstemciSicaklik {
             return;
         }
         if (sd == SicaklikDurumu.BUNALMA || sd == SicaklikDurumu.YANMA) {
-            float olasilik = sd == SicaklikDurumu.YANMA ? 0.16f : 0.07f;
+            float olasilik = sd == SicaklikDurumu.YANMA ? 0.3f : 0.15f;
             if (r.nextFloat() < olasilik) {
                 ter(mc, o, r);
             }
@@ -207,10 +207,10 @@ public final class IstemciSicaklik {
         sonNefes = tick;
     }
 
-    /** Baş ve omuz hizasından, gövdenin hafif dışına. */
+    /** Baş ve omuz hizasından, gövde silüetinin hemen dışına (3. şahısta model damlayı örtmesin). */
     private static void ter(Minecraft mc, LocalPlayer o, RandomSource r) {
         double aci = r.nextDouble() * Math.PI * 2;
-        double yaricap = 0.22 + r.nextDouble() * 0.12;
+        double yaricap = 0.3 + r.nextDouble() * 0.12;
         mc.level.addParticle(SicaklikParcaciklari.TER_DAMLASI.get(), o.getX() + Math.cos(aci) * yaricap,
                 o.getY() + 1.25 + r.nextDouble() * 0.5, o.getZ() + Math.sin(aci) * yaricap, Math.cos(aci) * 0.01, 0,
                 Math.sin(aci) * 0.01);
