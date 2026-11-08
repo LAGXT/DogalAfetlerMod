@@ -230,7 +230,7 @@ yazım `flat`; Minecraft ikisini de `minecraft:flat`'e çözer).
 
 ### İnceleme düzeltmeleri (inceleme-cekirdek P1/P2, şef kararları)
 
-**K-C25 Dönem süreçleri `core.DonemSureci` (B1, madde 11).** Afet yuvası dışında süren süreçler arayüzle kaydolur
+**K-C25 Dönem süreçleri `core.DonemSureci` (B1, madde 11).** **Rev. (K-E62 AS-8):** "afet yuvası" artık tek afet değil, başlama sıralı liste (`DunyaDonemi.aktifAfetler()`); komutla farklı türler aynı anda sürer, aynı tür iki kez başlamaz, doğal seçim yalnız liste boşken. Afet yuvası dışında süren süreçler arayüzle kaydolur
 (`AfetYoneticisi.donemSureciKaydet`, mod kurucusunda; kimlik benzersiz). `/dogalafet stop` aktif afet yokken süren
 bütün süreçleri durdurur ve hangilerini durdurduğunu yazar; `afetTuru`'nun gamerule'ü ya da `dogalAfetlerAcik` kapanınca
 aynı yol saniyede bir çalışır (`kurallariDenetle`); `durum` süren süreçleri listeler; `asama ileri` aktif afet yokken
@@ -2430,7 +2430,7 @@ deseni): atlatılan türler, balık toplamı, ünvan, kutup sayacı, deniz ölü
 sunucuda okunur, istemciye gitmez, &lt; 200 bayttır, oyuncu dosyasıyla kaydedilir; ölümde ve End dönüşünde `Clone` ile kopyalanır.
 Kısa ömürlü durum (yıldızlı gece sayacı, çorba takibi, yangın saniyesi tekilliği) bellekte, çıkışta silinir.
 
-**A-04 "Sağ çıkan" türetimi.** `SagCikanTuretimi`: doğal olmayan bitişte boş; olaydaki `sagCikanlar ∩ etkilenenler`;
+**A-04 "Sağ çıkan" türetimi.** `SagCikanTuretimi`: doğal olmayan bitişte boş (**rev. K-E62 AS-13:** `AfetBittiEvent.basarimSayilir()` DOGAL ya da KOMUT; KURAL, IPTAL, HATA sayılmaz; SARTNAME N26); olaydaki `sagCikanlar ∩ etkilenenler`;
 `basarim.etkiAlaniPayi` (vars. 0) > 0 ise başarım kendisi de izler: AKTIF aşamada saniyede bir etki alanı + pay içindeki oyuncu
 izine `alanda`, afet sürerken ölünce `oldu` yazılır; bitişte `alanda ∧ ¬oldu ∧ çevrim içi` olanlar da sağ çıkandır. Madde 12'deki
 "afet yarıçapında, config'den ayarlanabilir" yarıçapın kendisi afetin seviye tablosundadır (Faz 4); pay başarıma özgü ek alandır.
@@ -5976,7 +5976,7 @@ satırı yazar; AS-5 `/dogalafet siklik` okur, `/dogalafet siklik <0..1000>` ayn
 11.4, yeni KOM.18 ve N25. Kanıt: JUnit `AfetZamanlayicisiTest` (`beklemeOlcekleSikligaBoler`,
 `onKatSiklikBaslangicBeklemesiniOndaBireIndirir`, `gerceklesenAfetSayisiSikliklaOrantili`), `BeklemeDurumuTest` (`siklikBeklemeyiBoler`,
 `siklikDegisinceKalanOlceklenir`), `SonrakiAfetTahminiTest` (5 vaka); GameTest `siklikKomutuBeklemeyiOlcekleriKaliciTahminKisalir`
-(batch `cekirdek_siklik`; dalda `gametest:Komut|Cekirdek @be725cf0ad39` 20/20). Ağ protokolü değişmez (yeni paket yok). **Bilinen sınır (AS-6, `fe0b99e`):** %1000 gerçekleşen afet sayısında ≈ ×5 verir, ×10 değil: afetin kendi süresi sıklıkla kısalmaz ve yuvayı tutar.
+(batch `cekirdek_siklik`; dalda `gametest:Komut|Cekirdek @be725cf0ad39` 20/20). Ağ protokolü değişmez (yeni paket yok). **Bilinen sınır (AS-6, `fe0b99e`):** %1000 gerçekleşen afet sayısında ≈ ×5 verir, ×10 değil: afetin kendi süresi sıklıkla kısalmaz ve yuvayı tutar. **Tur 2 (`is/afet-siklik` `7fa414f`, entegrasyon `88e43f3`):** (a) K-C2 rev. 2 varsayılanları: başlangıç 6 000, genel 6 000 × şiddet uzaması, altı sık afetin tür beklemesi 24 000 (ay/güneş değişmedi); `cekirdek.zamanlayici.ilkAfetGarantiTick` 24 000 (AS-12: hiç afet olmamış dünyada süre ÷ sıklık dolunca seçim olasılığı 1; 0 kapalı); eski varsayılanlar `cekirdek.ayarSurumu` 1 göçüyle (`core.mantik.CekirdekAyarGocu`, K-E61 kalıbı). (b) **Komutla çoklu afet** (kullanıcı kararı: "en fazla 1" kalktı; şef varsayımı: aynı tür iki kez başlatılamaz, `ZATEN_AKTIF`): `DunyaDonemi` başlama sıralı liste (`aktifAfetler()`, `aktifAfet()` = en erken, `aktifAfet(tur)`; NBT `aktifAfetler`, eski tek etiket okunur); doğal seçim yalnız liste boşken; siren önceliği ay > güneş > diğer (`SirenTuru.oncelik`, AS-9; düşük öncelikli siren çalınmaz); `stop [afet]`, `asama ileri [afet|süreç]`; radar/sismograf oyuncunun gördüğü en yakın afet (AS-10). Çekirdek §A sözleşmesi değişti (K-C25 rev.). (c) **Başarım komutla da sayılır** (AS-13; A-04 rev., SARTNAME N26). (d) `AfetDurumPaketi` "yok" paketi türü taşır (tel biçimi değişti): protokol 8 listesinde, entegratör tek sefer artırır. **Bilinen sınırlar:** AS-14 komutla başlayan kasırga/asit oyuncuyu etki alanına almadıysa başarım yok (afet-fizik-2 ile kapanacak); ana makinede TPS ölçülmedi (`cekirdek_sunucu` pc2 20,00). Kanıt defter `7fa414f`: `test @ec9ade7bf8bb`, `gametest:Komut|Cekirdek|Basarim @3958f1dbfa47`, `cekirdek_sunucu @97427cfb3aef`.
 
 **K-E63 Her tarifin tarif kitabı kilidi var (kullanıcı şikâyeti: "tarif kitabında radar/sismograf yok"; şef kararı, 2026-11-08;
 dal `is/tarif-2` `7dbe2a8`, entegrasyon `is/entegrasyon-7`).** Kök neden: Hava Radarı, Sismograf, Gelişmiş/Hassas sürümleri,
@@ -6158,7 +6158,9 @@ P2-9 `5-matris` kabulünde. Kapanış eşlemesi (K-E50) her maddenin sonunda:
 | çekirdek | `cekirdek.zamanlayici.genelBeklemeTick` | 12 000 | tick (10 dk, yarım gün) | madde 4 en az bekleme: afetten sonra toparlanma payı; K-E62: ÷ `afetSikligi` (%200 → yarısı) |
 | çekirdek | `cekirdek.zamanlayici.siddetBeklemeCarpani` | 0,25 | oran | madde 10 "biraz uzasın": S3 ×1,25, S4 ×1,5, S5 ve seviyesiz ×1,75 |
 | çekirdek | `cekirdek.zamanlayici.ertelemeTick` | 6 000 | tick (5 dk) | N14: uygun yer yoksa türün yeniden denenmesi; oyuncular bu sürede yer değiştirir |
-| çekirdek | `cekirdek.zamanlayici.baslangicBeklemeTick` | 24 000 | tick (1 gün) | yeni dünyada ilk gün afetsiz; barınak kurulabilsin; K-E62: ÷ `afetSikligi` |
+| çekirdek | `cekirdek.zamanlayici.baslangicBeklemeTick` | 24 000 | tick (1 gün) | yeni dünyada ilk gün afetsiz; barınak kurulabilsin; K-E62: ÷ `afetSikligi`; tur 2: varsayılan 6 000 (eski 24 000, `cekirdek.ayarSurumu` göçü) |
+| çekirdek | `cekirdek.zamanlayici.ilkAfetGarantiTick` (yeni) | 24 000 | tick (÷ sıklık; 0 kapalı) | K-E62 AS-12: ilk gün en az bir afet |
+| çekirdek | `cekirdek.ayarSurumu` (yeni) | 1 | sürüm | K-E61 göçü (AS-11) |
 | çekirdek (NBT) | `DunyaDonemi.uygulananSiklik` (yeni) | 1,0 | çarpan (`afetSikligi`/100; 0 kaydedilmez) | K-E62 AS-2: süren beklemelerin hangi sıklıkla hesaplandığı; yoksa 1,0 = eski kayıt ölçeksiz, yeniden açılışta çift ölçekleme yok |
 | çekirdek (komut) | `/dogalafet siklik [yüzde]` (yeni) | — | yüzde (0–1000, Brigadier) | K-E62 AS-5: `afetSikligi` gamerule'ünü okur/yazar; sonraki afet tahmini (ortalama + %90 aralık, `SonrakiAfetTahmini`) |
 | çekirdek | `cekirdek.afetler.{kasirga,tsunami,deprem,asit_yagmuru,sinkhole,orman_yangini}.agirlik` | 100 | ağırlık | madde 4 "görece sık, birbirine yakın" |
