@@ -319,7 +319,7 @@ public final class TsunamiAfeti extends Afet {
             }
             if (SanalSu.itmeHesapla(p, itme) != null) {
                 suruklenenler.add(p.getUUID());
-                MinecraftForge.EVENT_BUS.post(new BasarimIpucuEvent(p, Ipucu.SURUKLENDI));
+                MinecraftForge.EVENT_BUS.post(new BasarimIpucuEvent(p, Ipucu.SURUKLENDI, this));
                 DogalAfetler.LOGGER.info("Tsunami: {} dalgada sürükleniyor (SURUKLENDI)", p.getGameProfile().getName());
             }
         }

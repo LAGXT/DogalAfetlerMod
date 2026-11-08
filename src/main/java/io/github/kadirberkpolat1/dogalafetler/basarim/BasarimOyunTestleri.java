@@ -177,7 +177,8 @@ public final class BasarimOyunTestleri {
     }
 
     private static void ipucu(ServerPlayer o, Ipucu ipucu) {
-        MinecraftForge.EVENT_BUS.post(new BasarimIpucuEvent(o, ipucu));
+        MinecraftForge.EVENT_BUS.post(new BasarimIpucuEvent(o, ipucu,
+                AfetYoneticisi.al(o.server).aktifAfet().orElseThrow()));
     }
 
     @GameTest(template = "bos", batch = "basarim_siren")
@@ -239,6 +240,55 @@ public final class BasarimOyunTestleri {
                     "kural ile kesilen afet sayılmamalı");
         } finally {
             cikar(y, b == null ? List.of(a) : List.of(a, b));
+        }
+        y.succeed();
+    }
+
+    /**
+     * AS-15 (inceleme As9, şef kararı): siren aşamasında (AKTIF'e girmeden) stop, {@code sifirla} ve güneş sürecini geri alan
+     * stop başarımda sayılmaz; süreci geri almayan stop sayılır.
+     */
+    @GameTest(template = "bos", batch = "basarim_sayilmaz")
+    public static void sifirlaSirendeStopVeGeriAlinanGunesSayilmaz(GameTestHelper y) {
+        ServerPlayer a = oyuncu(y, "siren-stop", 0);
+        List<ServerPlayer> oyuncular = new ArrayList<>(List.of(a));
+        ServerLevel level = y.getLevel();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(level.getServer());
+        yonetici.durdur();
+        try (AfetKaydi.GeciciKayit kayit = AfetKaydi.geciciKaydet(AfetTuru.KASIRGA,
+                () -> new OyunTestiAfeti(AfetTuru.KASIRGA, YARICAP, 100))) {
+            BlockPos merkez = y.absolutePos(BlockPos.ZERO);
+            dogrula(y, yonetici.elleBaslat(AfetTuru.KASIRGA, 2, a, level, merkez) == AfetYoneticisi.BaslatmaSonucu.BASLADI,
+                    "kasırga başlamadı");
+            yonetici.asamaIleri();
+            yonetici.durdur();
+            dogrula(y, !kazandi(y, a, Basarimlar.ILK_RUZGAR), "AKTIF'e girmeden stop edilen afet sayılmaz");
+
+            dogrula(y, yonetici.elleBaslat(AfetTuru.KASIRGA, 2, a, level, merkez) == AfetYoneticisi.BaslatmaSonucu.BASLADI,
+                    "ikinci kasırga başlamadı");
+            yonetici.asamaIleri();
+            yonetici.asamaIleri();
+            dogrula(y, yonetici.aktifAfet().orElseThrow().asama() == AfetAsamasi.AKTIF, "AKTIF'e geçmedi");
+            yonetici.sifirla();
+            dogrula(y, yonetici.aktifAfet().isEmpty(), "sifirla afeti durdurmadı");
+            dogrula(y, !kazandi(y, a, Basarimlar.ILK_RUZGAR) && BasarimVerisi.atlatilanlar(a).boyut() == 0,
+                    "sifirla ile biten afet sayılmaz");
+
+            ServerPlayer geriAlinan = oyuncu(y, "gunes-geri", 0);
+            ServerPlayer tamam = oyuncu(y, "gunes-tamam", 0);
+            oyuncular.add(geriAlinan);
+            oyuncular.add(tamam);
+            Set<UUID> g = Set.of(geriAlinan.getUUID());
+            BasarimOlaylari.afetBitti(new AfetBittiEvent(AfetTuru.GUNES_PATLAMASI, 0, merkez, Level.OVERWORLD, g, g,
+                    -6_000_000L, -5_999_999L, BitisNedeni.KOMUT, true, true));
+            dogrula(y, !kazandi(y, geriAlinan, Basarimlar.GUNESI_ATLATTIM), "süreci geri alınan güneş stop'u sayılmaz");
+            Set<UUID> t = Set.of(tamam.getUUID());
+            BasarimOlaylari.afetBitti(new AfetBittiEvent(AfetTuru.GUNES_PATLAMASI, 0, merkez, Level.OVERWORLD, t, t,
+                    -5_000_000L, -4_999_999L, BitisNedeni.KOMUT, true, false));
+            dogrula(y, kazandi(y, tamam, Basarimlar.GUNESI_ATLATTIM), "süreci geri almayan stop sayılır");
+        } finally {
+            yonetici.durdur();
+            cikar(y, oyuncular);
         }
         y.succeed();
     }

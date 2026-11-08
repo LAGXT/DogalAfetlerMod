@@ -208,7 +208,7 @@ public final class OrmanYangini extends Afet {
             }
             AABB yakin = new AABB(oyuncu.blockPosition()).inflate(OrmanKurallari.YANGIN_YAKINLIGI);
             if (YanginYoneticisi.aktifSayi(level, yakin) > 0) {
-                MinecraftForge.EVENT_BUS.post(new BasarimIpucuEvent(oyuncu, Ipucu.YANGIN_ALANINDA));
+                MinecraftForge.EVENT_BUS.post(new BasarimIpucuEvent(oyuncu, Ipucu.YANGIN_ALANINDA, this));
             }
         }
     }

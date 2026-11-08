@@ -1,6 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.core;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.AfetNumarasi;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.BeklemeDurumu;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.CarpanListesi;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.GeciciCarpan;
@@ -69,6 +70,8 @@ public final class DunyaDonemi extends SavedData {
     private final List<CompoundTag> bekleyenAfetler = new ArrayList<>();
     /** İlk afet garantisinin sayıldığı saat (yeni dünyada 0, {@link #sifirla()} anda; AS-12). */
     private long ilkAfetTabani;
+    /** Sıradaki en küçük afet numarası ({@link AfetNumarasi}, AS-16); {@link #sifirla()} dokunmaz. */
+    private long sonrakiAfetNo;
 
     private boolean senkronGerekli = true;
     private boolean acilSenkron = true;
@@ -405,6 +408,14 @@ public final class DunyaDonemi extends SavedData {
         return sonuc;
     }
 
+    /** Yeni afetin numarası (AS-16): saate eşit ya da büyük, dünyada kesin artan; {@code AfetBaglami.baslangicSaati} olur. */
+    long yeniAfetNo() {
+        long no = AfetNumarasi.ver(saat, sonrakiAfetNo);
+        sonrakiAfetNo = AfetNumarasi.sonraki(no);
+        setDirty();
+        return no;
+    }
+
     /** İlk afet garantisinin sayıldığı saat (AS-12). */
     public long ilkAfetTabani() {
         return ilkAfetTabani;
@@ -598,6 +609,7 @@ public final class DunyaDonemi extends SavedData {
         etiket.putLong("saat", saat);
         etiket.put("ekVeri", ekVeri.copy());
         etiket.putLong("ilkAfetTabani", ilkAfetTabani);
+        etiket.putLong("sonrakiAfetNo", sonrakiAfetNo);
         List<CompoundTag> afetler = new ArrayList<>();
         for (Afet afet : canliAfetler) {
             try {
@@ -671,6 +683,8 @@ public final class DunyaDonemi extends SavedData {
         donem.saat = Math.max(0, etiket.getLong("saat"));
         donem.ekVeri.merge(etiket.getCompound("ekVeri"));
         donem.ilkAfetTabani = Math.max(0, etiket.getLong("ilkAfetTabani"));
+        donem.sonrakiAfetNo = etiket.contains("sonrakiAfetNo") ? etiket.getLong("sonrakiAfetNo")
+                : AfetNumarasi.eskiKayittan(donem.saat);
         donem.bekleyenAfetler.addAll(AfetKayitListesi.oku(etiket));
         donem.kayittanOkundu = true;
         return donem;

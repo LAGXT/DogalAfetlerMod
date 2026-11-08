@@ -185,7 +185,7 @@
   "commands.dogalafetler.siklik.degisti": "Afet sıklığı artık %%%s (x%s); yeni ve süren beklemeler buna göre ölçeklenir.",
   "commands.dogalafetler.siklik.sinir": "afetSikligi %s, 0–1000 aralığının dışında; %%%s kullanılır.",
   "commands.dogalafetler.siklik.sonraki": "Sonraki afet: ~%s gün (aralık %s–%s gün, %%90); sıklık %%%s (x%s)",
-  "commands.dogalafetler.siklik.sonraki_aktif": "Sonraki afet: aktif afet bitince: ~%s gün; sıklık %%%s (x%s)",
+  "commands.dogalafetler.siklik.sonraki_aktif": "Sonraki afet: bütün aktif afetler bitince ~%s gün; sıklık %%%s (x%s)",
   "commands.dogalafetler.siklik.sonraki_sifir": "Sonraki afet: afetler kapalı (sıklık %%0)",
   "commands.dogalafetler.siklik.sonraki_sistem_kapali": "Sonraki afet: afet sistemi kapalı (dogalAfetlerAcik)",
   "commands.dogalafetler.siklik.sonraki_yok": "Sonraki afet: yok (sıklık %%%s, uygun afet yok)",

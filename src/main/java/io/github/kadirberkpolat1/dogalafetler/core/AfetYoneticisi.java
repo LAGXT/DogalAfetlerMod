@@ -420,9 +420,13 @@ public final class AfetYoneticisi {
 
     /** Süren bütün afetleri temizce durdurur ({@code /dogalafet stop}); afet yoksa {@code false}. */
     public boolean durdur() {
+        return hepsiniSonlandir(BitisNedeni.KOMUT);
+    }
+
+    private boolean hepsiniSonlandir(BitisNedeni neden) {
         List<Afet> afetler = aktifAfetler();
         for (Afet afet : afetler) {
-            sonlandir(afet, server.getLevel(afet.baglam().boyut()), BitisNedeni.KOMUT, true);
+            sonlandir(afet, server.getLevel(afet.baglam().boyut()), neden, true);
         }
         return !afetler.isEmpty();
     }
@@ -587,9 +591,12 @@ public final class AfetYoneticisi {
         DogalAfetler.LOGGER.info("Afet ve dönem zamanlayıcıları x{}", zamanOlcegi.carpan());
     }
 
-    /** {@code /dogalafet sifirla}: aktif afet ve dönem süreçleri durur, dönem ilk hâline ve hız 1'e döner. */
+    /**
+     * {@code /dogalafet sifirla}: aktif afetler temizce iptal edilir (başarımda sayılmaz, AS-15), dönem süreçleri durur, dönem
+     * ilk hâline ve hız 1'e döner.
+     */
     public void sifirla() {
-        durdur();
+        hepsiniSonlandir(BitisNedeni.IPTAL);
         donemSurecleriniDurdur();
         zamanOlcegi.sifirla();
         sonKontrolSaati = Long.MIN_VALUE;
@@ -840,7 +847,7 @@ public final class AfetYoneticisi {
         DunyaDonemi donem = donem();
         long erken = ayar.erkenBildirimTick();
         long pencere = OnUyariPenceresi.sure(ayar.onUyariEnAzTick(), ayar.onUyariEnCokTick(), rastgele);
-        AfetBaglami baglam = new AfetBaglami(afet.tur(), seviye, merkez, level.dimension(), hedef, donem.saat(),
+        AfetBaglami baglam = new AfetBaglami(afet.tur(), seviye, merkez, level.dimension(), hedef, donem.yeniAfetNo(),
                 erken + pencere, erken, elle);
         try {
             afet.baslat(level, baglam);
@@ -1087,6 +1094,7 @@ public final class AfetYoneticisi {
         }
         DunyaDonemi donem = donem();
         long saat = donem.saat();
+        boolean aktifeGirdi = afet.asama() == AfetAsamasi.AKTIF || afet.asama() == AfetAsamasi.BITIS;
         sirenDurdur(afet);
         if (level != null) {
             try {
@@ -1120,22 +1128,26 @@ public final class AfetYoneticisi {
             }
             donem.setDirty();
         }
-        if (afet.tur() == AfetTuru.GUNES_PATLAMASI && neden != BitisNedeni.DOGAL) {
-            tamamlanmamisGunesSureciniGeriAl(neden.name().toLowerCase(Locale.ROOT));
-        }
+        boolean surecGeriAlindi = afet.tur() == AfetTuru.GUNES_PATLAMASI && neden != BitisNedeni.DOGAL
+                && tamamlanmamisGunesSureciniGeriAl(neden.name().toLowerCase(Locale.ROOT));
         DogalAfetler.LOGGER.info("Afet bitti: {} seviye {} neden {} etkilenen {} sağ çıkan {}", afet.tur().kimlik(),
                 baglam.seviye(), neden, etkilenenler.size(), sagCikanlar.size());
         MinecraftForge.EVENT_BUS.post(new AfetBittiEvent(afet.tur(), baglam.seviye(), baglam.merkez(), baglam.boyut(),
-                etkilenenler, sagCikanlar, baglam.baslangicSaati(), saat, neden));
+                etkilenenler, sagCikanlar, baglam.baslangicSaati(), saat, neden, aktifeGirdi, surecGeriAlindi));
     }
 
-    /** Madde 11, K-C26: güneş patlamasının 5 günlük büyümesi tamamlanmamış süreçtir; durdurulunca güneş normale döner. */
-    private void tamamlanmamisGunesSureciniGeriAl(String neden) {
+    /**
+     * Madde 11, K-C26: güneş patlamasının 5 günlük büyümesi tamamlanmamış süreçtir; durdurulunca güneş normale döner.
+     * Geri aldıysa true.
+     */
+    private boolean tamamlanmamisGunesSureciniGeriAl(String neden) {
         DunyaDonemi donem = donem();
-        if (donem.gunesEvresi() == GunesEvresi.BUYUYEN) {
-            donem.gunesEvresiAyarla(GunesEvresi.NORMAL);
-            DogalAfetler.LOGGER.info("Güneş patlaması tamamlanmadan durdu ({}): güneş evresi NORMAL'e döndü", neden);
+        if (donem.gunesEvresi() != GunesEvresi.BUYUYEN) {
+            return false;
         }
+        donem.gunesEvresiAyarla(GunesEvresi.NORMAL);
+        DogalAfetler.LOGGER.info("Güneş patlaması tamamlanmadan durdu ({}): güneş evresi NORMAL'e döndü", neden);
+        return true;
     }
 
     private boolean aktifMi(DonemSureci surec, ServerLevel ust) {

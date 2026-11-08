@@ -220,7 +220,7 @@ public final class AsitYagmuru extends Afet {
             }
             float miktar = AsitKurallari.hasarMiktari(oyuncu.getHealth(), hasar, AsitAyarlari.minimumCan());
             if (miktar > 0 && oyuncu.hurt(AsitKayitlari.hasar(level), miktar)) {
-                MinecraftForge.EVENT_BUS.post(new BasarimIpucuEvent(oyuncu, Ipucu.HASAR_ALDI));
+                MinecraftForge.EVENT_BUS.post(new BasarimIpucuEvent(oyuncu, Ipucu.HASAR_ALDI, this));
             }
         }
     }
