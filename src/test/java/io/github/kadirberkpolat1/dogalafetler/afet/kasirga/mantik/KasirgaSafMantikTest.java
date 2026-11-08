@@ -281,4 +281,20 @@ class KasirgaSafMantikTest {
             }
         }
     }
+
+    /** Denetim P2-3: tavan yalnız çekimin eklediğini sınırlar; elytra ya da havai fişekle zaten hızlı olan yavaşlatılmaz. */
+    @Test
+    void kirpmaOncekiHiziAzaltmaz() {
+        double[] elytra = Cekim.kirp(new double[] {2.1, 0.2, 0}, new double[] {2.0, 0.2, 0});
+        assertEquals(2.0, Math.hypot(elytra[0], elytra[2]), 1e-9, "çekim hızlı varlığı daha da hızlandırmaz ama yavaşlatmaz");
+        double[] roket = Cekim.kirp(new double[] {0, 1.6, 0}, new double[] {0, 1.5, 0});
+        assertEquals(1.5, roket[1], 1e-9);
+        double[] dusus = Cekim.kirp(new double[] {0, -4.5, 0}, new double[] {0, -4.2, 0});
+        assertEquals(-4.2, dusus[1], 1e-9);
+        double[] yavas = Cekim.kirp(new double[] {1.0, 0.95, 1.0}, new double[] {0.3, 0, 0.3});
+        assertEquals(Cekim.EN_COK_YATAY, Math.hypot(yavas[0], yavas[2]), 1e-9, "yavaş varlıkta tavan aynen");
+        assertEquals(Cekim.EN_COK_DIKEY, yavas[1], 1e-9);
+        double[] yavaslayan = Cekim.kirp(new double[] {1.5, 0, 0}, new double[] {2.0, 0, 0});
+        assertEquals(1.5, yavaslayan[0], 1e-9, "çekim hızlı varlığı frenleyebilir");
+    }
 }

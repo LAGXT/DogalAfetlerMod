@@ -48,7 +48,8 @@ import net.minecraftforge.registries.ForgeRegistries;
  * varken, Kv2-2); yakın ve iç kare; {@code stop} sonrası istemci varlık sayımı ve aynı noktada afetsiz taban FPS; S1 S5
  * izinin {@link #S1_UZAKLIK} blok yanındaki taze zeminde, aynı vitrin kamerasından (kaldırılan ve görsel enkaz varken),
  * olgun evresi ilerletilmeden hız 1'de doğal süresinde biter (Kv3-2); ip evresi, doğal bitiş ve S1 yoluna bakan iz karesi.
- * Vitrinden sonra kasırga sisinin dışından ({@link #UZAK}) taban karesi ve kontrolü (renk ölçümü, K-17).
+ * Vitrinden sonra kasırga sisinin dışından ({@link #UZAK_KENAR}) taban karesi ve kontrolü (renk ölçümü, K-17; vitrin ve uzak
+ * taban kamerası {@link #tabanKamerasi}).
  *
  * <p>Kareler ve ölçümler {@link GorselOtomasyon} ile: kare istekten sonra en az {@link #KARE_CIZIM} kare çizilmiş ve FPS en
  * az {@value GorselOtomasyon#AKICI_FPS} iken alınır (A-34; gizli workspace'te bayat framebuffer), beklerken adımlar durur.
@@ -108,8 +109,12 @@ public final class KasirgaOtomasyonu {
     private static final Kamera YAKIN = new Kamera(22, 4, -20);
     /** Kaldırılan oyuncu noktası (K0-33 "≤ 5 blok"): etek ve huninin içi. */
     private static final Kamera IC = new Kamera(5, 3, -25);
-    /** Huni kenarı 64 bloktan uzakta (kasırga sisi yok); taban rengi ölçümü (K-17). */
-    private static final Kamera UZAK = new Kamera(90, 10, -6);
+    /**
+     * K-17 taban karesi: eteğin kameraya en yakın taban noktası görüntü merkezinin bu kadar derece altında ({@link #tabanKamerasi}).
+     */
+    private static final double TABAN_SATIRI_ACISI = 28;
+    /** Uzak taban karesi kamerasının huni kenarına uzaklığı: kasırga sisi (64 blok) dışında, yaklaşan S5'in 45 tick'i paylı. */
+    private static final double UZAK_KENAR = 80;
     /** S5 hunisinin tamamı (144 blok, AF3-05 güç–boy orantısı): 70° dikey görüşte zeminden tepeye. */
     private static final Kamera TAM_BOY = new Kamera(150, 24, -10);
 
@@ -207,6 +212,36 @@ public final class KasirgaOtomasyonu {
             DogalAfetler.LOGGER.info(ON + "kamera {} blok, kasırga {} evre {} ({}), uçan blok {}, kaldırılan {}", kam.mesafe(),
                     BlockPos.containing(m).toShortString(), k.durum().evre(), String.format(Locale.ROOT, "%.2f",
                             k.durum().ilerleme()), k.ucanBlokSayisi(), k.toplamKaldirilan());
+        });
+    }
+
+    /**
+     * K-17 taban rengi kamerası (denetim P1-3): S5 boyutundan türetilir ve araziden bağımsızdır. Kasırganın hareket yönünde
+     * {@code mesafe} blok önde, kasırga zemininin etek yüksekliğinin %80'i üstünde (kamera zemini daha yüksekse onun 2 blok
+     * üstünde); eğim, eteğin kameraya en yakın taban noktasını görüntünün {@value #TABAN_SATIRI_ACISI}° altına (dikey 70°
+     * görüşte alt üçte birin içi, satır ~%88) koyacak kadar hesaplanır. Sabit yükseklik ve eğimle toz, kamera zemini kasırga
+     * zemininden farklıyken (S5 tepede, denetim koşusu y 101) alt üçte birin dışına çıkıyor, maske yağmur ve gökyüzünü ölçüyordu.
+     */
+    private static void tabanKamerasi(IntegratedServer server, double mesafe) {
+        sunucuda(server, level -> {
+            Kasirga k = kasirga(server);
+            if (k == null) {
+                return;
+            }
+            KasirgaSeviyesi s = k.seviyeBilgisi();
+            Vec3 m = k.konum();
+            double cx = m.x + Math.cos(k.yon()) * mesafe;
+            double cz = m.z + Math.sin(k.yon()) * mesafe;
+            int zemin = level.getHeight(Heightmap.Types.MOTION_BLOCKING, Mth.floor(cx), Mth.floor(cz));
+            double y = Math.max(zemin + 2, m.y + 0.8 * s.enkazYuksekligi());
+            double tabana = Math.toDegrees(Math.atan2(y - m.y, Math.max(1, mesafe - s.etekYaricapi())));
+            float egim = (float) (tabana - TABAN_SATIRI_ACISI);
+            float yaw = (float) Math.toDegrees(Math.atan2(-(m.x - cx), m.z - cz));
+            oyuncu(server).teleportTo(level, cx, y, cz, yaw, egim);
+            DogalAfetler.LOGGER.info(ON + "taban kamerası {} blok, yükseklik +{} (zemin {}, kasırga zemini {}), eğim {}°, "
+                    + "kasırga {} evre {}", Math.round(mesafe), String.format(Locale.ROOT, "%.1f", y - m.y), zemin,
+                    String.format(Locale.ROOT, "%.1f", m.y), String.format(Locale.ROOT, "%.1f", egim),
+                    BlockPos.containing(m).toShortString(), k.durum().evre());
         });
     }
 
@@ -437,7 +472,7 @@ public final class KasirgaOtomasyonu {
         adim("aktif kamerası", 60, () -> kamera(server, new Kamera(60, 10, -10).olcekli(S5_KARE_OLCEGI)));
         adim("aktif doğuş karesi", 40, () -> kare("aktif_dogus"));
         adim("olgun", 20, () -> ilerletEger(server, k -> k.durum().evre() == KasirgaEvresi.DOGUS));
-        adim("vitrin kamerası", 100, () -> kamera(server, VITRIN.olcekli(S5_KARE_OLCEGI)));
+        adim("vitrin kamerası", 100, () -> tabanKamerasi(server, VITRIN.mesafe() * S5_KARE_OLCEGI));
         adim("vitrin karesi", 30, () -> kare("s5_vitrin"));
         adim("kontrol", 5, () -> yalnizTozGizle(true));
         adim("kontrol karesi", 10, () -> kare("s5_vitrin_kontrol"));
@@ -445,7 +480,7 @@ public final class KasirgaOtomasyonu {
         adim("vitrin karesi b", 60, () -> kare("s5_vitrin_b"));
         adim("tam boy kamerası", 10, () -> kamera(server, TAM_BOY));
         adim("tam boy karesi", 30, () -> kare("s5_tam_boy"));
-        adim("uzak taban kamerası", 10, () -> kamera(server, UZAK.olcekli(S5_KARE_OLCEGI)));
+        adim("uzak taban kamerası", 10, () -> tabanKamerasi(server, KasirgaSeviyesi.icin(5).tabanYaricapi() + UZAK_KENAR));
         adim("uzak taban karesi", 30, () -> kare("s5_taban_uzak"));
         adim("uzak kontrol", 5, () -> yalnizTozGizle(true));
         adim("uzak kontrol karesi", 10, () -> kare("s5_taban_uzak_kontrol"));

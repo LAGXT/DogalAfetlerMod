@@ -15,6 +15,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.EtkiAlani;
 import io.github.kadirberkpolat1.dogalafetler.core.OyunTestiTemizligi;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
 import io.github.kadirberkpolat1.dogalafetler.uyari.OrtamSesi;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -25,8 +26,10 @@ import net.minecraft.gametest.framework.AfterBatch;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.animal.Pig;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -41,6 +44,7 @@ import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.fml.util.ObfuscationReflectionHelper;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
 
@@ -88,6 +92,11 @@ public final class KasirgaOyunTestleri {
 
     @AfterBatch(batch = "kasirga_cekim_bolgesi")
     public static void cekimBolgesiSonrasi(ServerLevel level) {
+        OyunTestiTemizligi.batchSonu(level);
+    }
+
+    @AfterBatch(batch = "kasirga_ucma")
+    public static void ucmaSonrasi(ServerLevel level) {
         OyunTestiTemizligi.batchSonu(level);
     }
 
@@ -512,6 +521,57 @@ public final class KasirgaOyunTestleri {
             } finally {
                 domuz.discard();
                 y.getLevel().getServer().getPlayerList().remove(oyuncu);
+                bitir(y, onceki);
+            }
+            y.succeed();
+        });
+    }
+
+    /**
+     * Denetim P1-2 (AF3-08): uçma izni kapalı sunucuda ({@code allow-flight=false}) kasırga çekirdeğinde kaldırılan hayatta
+     * kalma oyuncusu vanilla "uçma" denetimiyle (yerden yüksekte 80 tick, {@code multiplayer.disconnect.flying}) atılmaz.
+     * Sahte oyuncunun bağlantısı sunucunun bağlantı listesinde olmadığı için bağlantı tick'i burada elle çağrılır; hareket
+     * paketi gelmediği için havada yüzme bayrağını ({@code clientIsFloating}) vanilla'nın paket işleyicisi gibi test koyar.
+     * Oyuncu 130 tick boyunca çekirdekte (S3, merkez, kasırga zemininden 3 blok yukarıda) tutulur.
+     */
+    @GameTest(template = SAHNE, batch = "kasirga_ucma", timeoutTicks = 260)
+    public static void kaldirilanOyuncuUcmaDenetimiyleAtilmaz(GameTestHelper y) {
+        zemin(y, false);
+        boolean onceki = blokHasari(y, false);
+        MinecraftServer server = y.getLevel().getServer();
+        boolean ucmaIzni = server.isFlightAllowed();
+        server.setFlightAllowed(false);
+        BlockPos m = y.absolutePos(MERKEZ);
+        ServerPlayer oyuncu = CekirdekOyunTestleri.sahteOyuncu(y, new GameProfile(UUID.randomUUID(), "kasirga-ucma"),
+                m.getX() + 0.5, m.getY() + 3, m.getZ() + 0.5);
+        oyuncu.setGameMode(GameType.SURVIVAL);
+        oyuncu.setInvulnerable(true);
+        baslat(y, 3, false, KasirgaEvresi.OLGUN);
+        Field yuzuyor = ObfuscationReflectionHelper.findField(ServerGamePacketListenerImpl.class, "f_9736_");
+        Field yerdenYuksek = ObfuscationReflectionHelper.findField(ServerGamePacketListenerImpl.class, "f_9737_");
+        int[] enCok = {0};
+        y.onEachTick(() -> {
+            if (oyuncu.hasDisconnected() || !oyuncu.connection.isAcceptingMessages()) {
+                return;
+            }
+            try {
+                yuzuyor.setBoolean(oyuncu.connection, true);
+                oyuncu.connection.tick();
+                enCok[0] = Math.max(enCok[0], yerdenYuksek.getInt(oyuncu.connection));
+            } catch (IllegalAccessException hata) {
+                throw new IllegalStateException(hata);
+            }
+        });
+        y.runAfterDelay(130, () -> {
+            boolean atildi = oyuncu.hasDisconnected() || !oyuncu.connection.isAcceptingMessages();
+            try {
+                dogrula(y, !atildi, "kaldırılan oyuncu uçma denetimiyle atıldı (sayaç en çok " + enCok[0] + ")");
+                dogrula(y, enCok[0] <= 2, "uçma sayacı kasırga çekirdeğinde birikti: " + enCok[0]);
+            } finally {
+                server.setFlightAllowed(ucmaIzni);
+                if (!oyuncu.hasDisconnected()) {
+                    server.getPlayerList().remove(oyuncu);
+                }
                 bitir(y, onceki);
             }
             y.succeed();

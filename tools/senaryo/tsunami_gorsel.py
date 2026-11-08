@@ -159,11 +159,11 @@ def fps_tablosu(metin, log):
 
 def serpinti_ozeti(metin, log):
     """Serpinti ve köpük kabulü: her `KARE` satırında `serpinti_dogan` (son KARE'den beri doğan dalga serpintisi parçacığı),
-    `kopuk_nokta` (karenin köpük noktası) ve bunların son konumuna göre `serpinti_havada` (görünen su üstünden
-    `SerpintiKarari.HAVA_PAYI` = 0,5 bloktan yüksekte ya da altında su yok), `serpinti_blok_icinde` (blok çarpışma şeklinin içinde),
-    `serpinti_cizimsiz_su` (yakın su ağı noktayı kapsıyor ama orada su çizilmiyor); sınıflama istemcide
-    (`SerpintiNoktasi.olcut`). Kabul: üç toplamın hepsi 0 (pay Java'daki HAVA_PAYI'nda, burada sayılar tam). Sonuç: geçti
-    (bool) ya da satır yoksa None."""
+    `kopuk_nokta` (karenin köpük noktası) ve bunların son konumuna göre `serpinti_havada` (SuRenderer'ın o karede çizdiği su
+    üstünden `SerpintiKarari.HAVA_PAYI` = 0,5 bloktan yüksekte), `serpinti_blok_icinde` (blok çarpışma şeklinin içinde),
+    `serpinti_cizimsiz_su` (noktada hiçbir ağ su çizmiyor: yakın ağ boş ya da gecikmiş dahil); sınıflama istemcide, kararın
+    girdisiyle değil `SuRenderer.cizilenUst` ile (`SerpintiNoktasi.olcut`). Kabul: üç toplamın hepsi 0 (pay Java'daki
+    HAVA_PAYI'nda, burada sayılar tam). Sonuç: geçti (bool) ya da satır yoksa None."""
     anahtar = ("havada", "blok_icinde", "cizimsiz_su")
     toplam = dict.fromkeys(anahtar, 0)
     dogan = kopuk = kare = 0

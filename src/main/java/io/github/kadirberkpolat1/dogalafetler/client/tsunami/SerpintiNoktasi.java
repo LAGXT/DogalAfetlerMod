@@ -3,7 +3,6 @@ package io.github.kadirberkpolat1.dogalafetler.client.tsunami;
 import io.github.kadirberkpolat1.dogalafetler.client.core.GorselOtomasyon;
 import io.github.kadirberkpolat1.dogalafetler.client.su.SuGizleme;
 import io.github.kadirberkpolat1.dogalafetler.client.su.SuRenderer;
-import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
 import java.util.Arrays;
 import java.util.Locale;
 import net.minecraft.client.Minecraft;
@@ -17,9 +16,9 @@ import net.minecraft.world.phys.Vec3;
 
 /**
  * Dalga serpintisi ({@code IstemciSu.serpinti}) ve köpüğünün ({@link TsunamiKopugu}) doğuş noktasının dünya sorgusu (karar
- * {@link SerpintiKarari}'nda) ve otomasyon ölçümü. Nokta başına en çok bir yakın tampon okuması (kapsamıyorsa sanal su
- * seviyesi), bir yükseklik haritası ve bir blok okuması (TS-16 rev. 3 bütçesi); su yoksa harita ve blok okunmaz. İstemci tick'i
- * ve render (aynı thread).
+ * {@link SerpintiKarari}'nda) ve otomasyon ölçümü. Nokta başına en çok bir çizilen ağ okuması (yakın tampon ya da uzak LOD
+ * karosu), bir yükseklik haritası ve bir blok okuması (TS-16 rev. 3 bütçesi); çizilen su yoksa harita ve blok okunmaz.
+ * İstemci tick'i ve render (aynı thread).
  */
 public final class SerpintiNoktasi {
     private static final BlockPos.MutableBlockPos P = new BlockPos.MutableBlockPos();
@@ -40,16 +39,16 @@ public final class SerpintiNoktasi {
     }
 
     /**
-     * {@code (x, z)}'de görünen su üstünün {@code kalkis} blok üstü (parçacığın ya da köpüğün doğduğu Y);
-     * {@link SerpintiKarari#karar} doğmaz diyorsa NaN: görünen su yok, nokta blok içinde, çatı altında ya da havada.
+     * {@code (x, z)}'de bu karede çizilen su üstünün {@code kalkis} blok üstü (parçacığın ya da köpüğün doğduğu Y);
+     * {@link SerpintiKarari#karar} doğmaz diyorsa NaN: çizilen su yok (yakın ağ boş ya da gecikmiş dahil), nokta blok içinde,
+     * çatı altında ya da havada.
      */
     public static double dogusYuksekligi(ClientLevel l, double x, double z, double kalkis) {
         int bx = Mth.floor(x);
         int bz = Mth.floor(z);
         boolean kapsanan = SuRenderer.yakinKapsar(bx, bz);
-        double cizilen = kapsanan ? SuRenderer.yakinSuUstu(bx, bz) : Double.NaN;
-        double seviye = kapsanan ? Double.NaN : SanalSu.suSeviyesi(l, bx, bz);
-        double ust = SerpintiKarari.yuzey(kapsanan, cizilen, seviye);
+        double ust = SerpintiKarari.yuzey(kapsanan, kapsanan ? SuRenderer.yakinSuUstu(bx, bz) : Double.NaN,
+                kapsanan ? Double.NaN : SuRenderer.uzakSuUstu(bx, bz));
         if (Double.isNaN(ust)) {
             return Double.NaN;
         }
@@ -57,7 +56,7 @@ public final class SerpintiNoktasi {
         int tepe = l.getHeight(Heightmap.Types.MOTION_BLOCKING, bx, bz);
         P.set(bx, Mth.floor(y), bz);
         boolean kati = !l.getBlockState(P).getCollisionShape(l, P).isEmpty();
-        return SerpintiKarari.karar(y, cizilen, kapsanan, seviye, tepe, kati) == SerpintiKarari.Sonuc.DOGAR ? y : Double.NaN;
+        return SerpintiKarari.karar(y, ust, tepe, kati) == SerpintiKarari.Sonuc.DOGAR ? y : Double.NaN;
     }
 
     /**
@@ -104,13 +103,13 @@ public final class SerpintiNoktasi {
     }
 
     /**
-     * Otomasyon kabul ölçütü (KARE satırı), doğuran karardan ayrı yoldan, noktanın son konumuna bakar:
+     * Otomasyon kabul ölçütü (KARE satırı), doğuran kararın girdisiyle değil noktanın son konumunda SuRenderer'ın bu karede
+     * herhangi bir ağla gerçekten çizdiği su üstüyle ({@link SuRenderer#cizilenUst}) ve bloğun tam çarpışma kutularıyla:
      * {@code serpinti_dogan} son KARE satırından bu yana doğan serpinti parçacığı, {@code kopuk_nokta} son çizilen karenin
      * köpük noktası (tepe ve ön yüz örnekleri; bore gerçek suya da oturduğu için sayılmaz); serpinti ve köpük toplamı olarak
-     * {@code serpinti_havada} (görünen su üstünden {@link SerpintiKarari#HAVA_PAYI}'ndan yüksekte ya da altında su yok),
-     * {@code serpinti_blok_icinde} (bir bloğun çarpışma şeklinin içinde), {@code serpinti_cizimsiz_su} (yakın tampon kapsıyor
-     * ama orada su çizilmiyor). Kabul: üçü de 0.
-     * Serpinti sayıları sıfırlanır.
+     * {@code serpinti_havada} (çizilen su üstünden {@link SerpintiKarari#HAVA_PAYI}'ndan yüksekte), {@code serpinti_blok_icinde}
+     * (bir bloğun çarpışma şeklinin içinde), {@code serpinti_cizimsiz_su} (noktada hiçbir ağ su çizmiyor: yakın ağ boş ya da
+     * gecikmiş, kuru sütun; analitik ya da sanal su seviyesi sorulmaz). Kabul: üçü de 0. Serpinti sayıları sıfırlanır.
      */
     static String olcut() {
         int[] say = SERPINTI.clone();
@@ -136,11 +135,7 @@ public final class SerpintiNoktasi {
                 return BLOK;
             }
         }
-        if (SuRenderer.yakinKapsar(bx, bz)) {
-            double ust = SuRenderer.yakinSuUstu(bx, bz);
-            return Double.isNaN(ust) ? CIZIMSIZ : y - ust > SerpintiKarari.HAVA_PAYI ? HAVADA : IYI;
-        }
-        double ust = SanalSu.suSeviyesi(l, bx, bz);
-        return Double.isNaN(ust) || y - ust > SerpintiKarari.HAVA_PAYI ? HAVADA : IYI;
+        double ust = SuRenderer.cizilenUst(bx, bz);
+        return Double.isNaN(ust) ? CIZIMSIZ : y - ust > SerpintiKarari.HAVA_PAYI ? HAVADA : IYI;
     }
 }

@@ -19,6 +19,7 @@ import io.github.kadirberkpolat1.dogalafetler.uyari.HacimEgrisi;
 import io.github.kadirberkpolat1.dogalafetler.uyari.OrtamSesi;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -29,6 +30,7 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -39,7 +41,6 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LightningBolt;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -48,6 +49,7 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.fml.util.ObfuscationReflectionHelper;
 
 /**
  * Kasırga afeti (bölüm A, madde 10; tasarım notu {@code docs/tasarim/kasirga.md}). Durum (konum, yön, rota, AKTIF'te geçen
@@ -78,6 +80,15 @@ public final class Kasirga extends Afet {
     private static final double TAM_TUR = Math.PI * 2;
     /** K-E42: ara hedef satırı yalnız görsel otomasyonda ({@code -Potomasyon}); üretimde ve GameTest'te yazılmaz. */
     private static final boolean OTOMASYON = !System.getProperty("dogalafetler.otomasyon", "").isEmpty();
+    /**
+     * Vanilla "uçma" denetiminin sayacı ({@code ServerGamePacketListenerImpl.aboveGroundTickCount}, SRG {@code f_9737_}) ve
+     * sürülen aracın eşi ({@code aboveGroundVehicleTickCount}, {@code f_9739_}): uçma izni kapalı sunucuda havada yüzen oyuncu
+     * 80 tick sonra atılır. Olay yok; Forge yansıması (projede {@code BuzBalikciligi} kalıbı), mixin ya da access transformer
+     * gerekmez (AF3-08).
+     */
+    private static final Field UCMA_SAYACI = ObfuscationReflectionHelper.findField(ServerGamePacketListenerImpl.class, "f_9737_");
+    private static final Field ARAC_UCMA_SAYACI = ObfuscationReflectionHelper.findField(ServerGamePacketListenerImpl.class,
+            "f_9739_");
 
     private Vec3 konum;
     private double yon;
@@ -867,10 +878,11 @@ public final class Kasirga extends Afet {
     }
 
     /**
-     * Çekim, kaldırma ve çekirdek hasarı ({@link KasirgaCekimi}): çekim yarıçapındaki mob, eşya ve araçların hızı burada
-     * değişir. Oyuncunun hareketinin sahibi kendi istemcisidir ve çekimi orada uygulanır (AF3-01): sunucu oyuncunun hızını
-     * ezmez (END tick'inde {@code getX() - xo} her zaman 0'dır, eski hız tahmini çekimi biriktirmiyordu), yalnız kaldırma
-     * etkiliyken sunucudaki düşme mesafesini sıfırlar (düşme hasarı sunucuda hesaplanır). Hasar saniyede bir, huni tabanda.
+     * Çekim, kaldırma ve çekirdek hasarı ({@link KasirgaCekimi}): çekim yarıçapındaki mob, eşya ve sahipsiz araçların hızı burada
+     * değişir. Oyuncunun ve sürdüğü aracın hareketinin sahibi oyuncunun istemcisidir, çekim orada uygulanır (AF3-01): sunucu
+     * onların hızını ezmez (END tick'inde {@code getX() - xo} her zaman 0'dır, eski hız tahmini çekimi biriktirmiyordu). Kaldırma
+     * etkiliyken sunucu yalnız düşme mesafesini (düşme hasarı sunucuda) ve oyuncunun uçma sayacını sıfırlar (AF3-08: huni oyuncuyu
+     * tavanda asılı tutar; kaldırma bölgesinden çıkan oyuncuda vanilla denetimi aynen sürer). Hasar saniyede bir, huni tabanda.
      */
     private void varliklariCek(ServerLevel level) {
         if (KasirgaEvresi.guc(durum) <= 0) {
@@ -886,9 +898,12 @@ public final class Kasirga extends Afet {
         double hasar = s.cekirdekHasari() * KasirgaEvresi.guc(durum);
         for (Entity e : level.getEntities((Entity) null, kutu, KasirgaCekimi::cekilebilir)) {
             double[] ivme = KasirgaCekimi.ivme(e, kaynak);
-            if (e instanceof Player) {
+            if (KasirgaCekimi.istemciYonetir(e)) {
                 if (ivme[1] > 0) {
                     e.resetFallDistance();
+                    if ((e instanceof ServerPlayer p ? p : e.getControllingPassenger()) instanceof ServerPlayer surucu) {
+                        ucmaDenetiminiSifirla(surucu);
+                    }
                 }
             } else if (KasirgaCekimi.uygula(e, ivme)) {
                 e.hasImpulse = true;
@@ -898,6 +913,19 @@ public final class Kasirga extends Afet {
                     < s.hasarYaricapi() && h < s.yukseklik() * 0.5) {
                 canli.hurt(KasirgaKayitlari.hasar(level), (float) Math.max(0.5, hasar));
             }
+        }
+    }
+
+    /** Kaldırma etkiliyken oyuncunun (ve sürdüğü aracın) uçma sayacı sıfırlanır; bağlantısı olmayan oyuncu (çıkış anı) atlanır. */
+    private static void ucmaDenetiminiSifirla(ServerPlayer oyuncu) {
+        if (oyuncu.connection == null) {
+            return;
+        }
+        try {
+            UCMA_SAYACI.setInt(oyuncu.connection, 0);
+            ARAC_UCMA_SAYACI.setInt(oyuncu.connection, 0);
+        } catch (IllegalAccessException hata) {
+            throw new IllegalStateException("uçma sayacına erişilemedi", hata);
         }
     }
 

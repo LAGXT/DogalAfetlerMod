@@ -101,12 +101,22 @@ public final class Cekim {
 
     /** Hızı tavanlara kırpar (yerinde). */
     public static double[] kirp(double[] hiz) {
+        return kirp(hiz, new double[3]);
+    }
+
+    /**
+     * Çekim eklenmiş hızı tavanlara kırpar (yerinde), ama çekimden önceki hızın ({@code onceki}) büyüklüğünden aşağı değil:
+     * tavanın üstünde süzülen (elytra, havai fişek) ya da itilen varlık çekim yarıçapına girince yavaşlatılmaz, çekim yalnız onu
+     * daha da hızlandıramaz (denetim P2-3).
+     */
+    public static double[] kirp(double[] hiz, double[] onceki) {
+        double tavan = Math.max(EN_COK_YATAY, Math.sqrt(onceki[0] * onceki[0] + onceki[2] * onceki[2]));
         double yatay = Math.sqrt(hiz[0] * hiz[0] + hiz[2] * hiz[2]);
-        if (yatay > EN_COK_YATAY) {
-            hiz[0] *= EN_COK_YATAY / yatay;
-            hiz[2] *= EN_COK_YATAY / yatay;
+        if (yatay > tavan) {
+            hiz[0] *= tavan / yatay;
+            hiz[2] *= tavan / yatay;
         }
-        hiz[1] = Math.max(-3.9, Math.min(EN_COK_DIKEY, hiz[1]));
+        hiz[1] = Math.max(Math.min(-3.9, onceki[1]), Math.min(Math.max(EN_COK_DIKEY, onceki[1]), hiz[1]));
         return hiz;
     }
 }

@@ -117,8 +117,8 @@ public final class IstemciSu {
     /**
      * Dalga tepesi sıçrantısı (SU-28): tepe hattı boyunca beyaz serpinti bulutu (dalga yönünde savrulur), sıçrama damlaları
      * ve cephenin ön yüzünden düşen su; yalnız oyuncuya 96 blok yakın tepe noktaları, kalite çarpanıyla. Her parçacık son
-     * konumunda (rastgele saçılma dahil) görünen suyun üstünde doğar ({@link SerpintiNoktasi#dogusYuksekligi}: çizilen yakın
-     * ağ, onun dışında sanal su seviyesi; blok içinde, çatı altında ve ağın henüz çizmediği dalgada doğmaz). Analitik dalga
+     * konumunda (rastgele saçılma dahil) bu karede çizilen suyun üstünde doğar ({@link SerpintiNoktasi#dogusYuksekligi}: yakın
+     * ağ, onun kapsamadığı yerde uzak LOD karosu; blok içinde, çatı altında ve ağın henüz çizmediği dalgada doğmaz). Analitik dalga
      * yalnız tepe hattının yerini verir, yüksekliği değil: yüzeyi düz zemin varsayar, bloğu ve çizilen ağı bilmez.
      */
     private static void serpinti(Minecraft mc, ClientLevel l, double t) {

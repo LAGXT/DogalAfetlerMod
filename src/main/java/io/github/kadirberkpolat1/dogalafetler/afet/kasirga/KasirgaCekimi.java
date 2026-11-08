@@ -37,6 +37,15 @@ public final class KasirgaCekimi {
         return !(e instanceof Player p) || !p.isCreative() && !p.getAbilities().flying;
     }
 
+    /**
+     * Hareketinin sahibi bir oyuncunun istemcisi: oyuncunun kendisi ya da oyuncunun sürdüğü araç (tekne, at). Bunların çekimini
+     * istemci uygular ({@code client.kasirga.KasirgaOyuncuCekimi}); sunucunun hızı istemcinin bir sonraki hareket paketiyle
+     * ezilirdi (AF3-01, denetim P2-4).
+     */
+    public static boolean istemciYonetir(Entity e) {
+        return e instanceof Player || e.getControllingPassenger() instanceof Player;
+    }
+
     /** Varlığa bu tick eklenecek hız {vx, vy, vz}; {@code vy > 0} kaldırmanın etkidiği anlamına gelir. */
     public static double[] ivme(Entity e, Kaynak k) {
         KasirgaSeviyesi s = k.seviye();
@@ -62,8 +71,10 @@ public final class KasirgaCekimi {
     }
 
     /**
-     * {@code ivme}'yi varlığın hızına ekler ve tavanlara kırpar; kaldırma etkiliyken düşme mesafesi sıfırlanır (huni
-     * varlığı taşırken alçaltması düşme sayılmaz; kaldırma bitince vanilla düşme hasarı işler). Sonuç sıfırsa dokunmaz.
+     * {@code ivme}'yi varlığın hızına ekler ve tavanlara kırpar ({@link Cekim#kirp(double[], double[])}: tavan yalnız çekimin
+     * eklediğini sınırlar, zaten daha hızlı olan elytra ya da itilen varlığı yavaşlatmaz); kaldırma etkiliyken düşme mesafesi
+     * sıfırlanır (huni varlığı taşırken alçaltması düşme sayılmaz; kaldırma bitince vanilla düşme hasarı işler). Sonuç
+     * sıfırsa dokunmaz.
      *
      * @return hız değişti mi
      */
@@ -72,7 +83,7 @@ public final class KasirgaCekimi {
             return false;
         }
         Vec3 v = e.getDeltaMovement();
-        double[] yeni = Cekim.kirp(new double[] {v.x + ivme[0], v.y + ivme[1], v.z + ivme[2]});
+        double[] yeni = Cekim.kirp(new double[] {v.x + ivme[0], v.y + ivme[1], v.z + ivme[2]}, new double[] {v.x, v.y, v.z});
         e.setDeltaMovement(yeni[0], yeni[1], yeni[2]);
         if (ivme[1] > 0) {
             e.resetFallDistance();

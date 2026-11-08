@@ -37,8 +37,8 @@ import org.joml.Matrix4f;
  * Tsunami dalgasının köpük katmanı (tasarım notu §2 "Köpük"): ortak su renderer'ının üstüne, tsunami sürerken her dalganın
  * cephesi boyunca üç şerit çizilir: tepe boyunca şerit, ön yüzden aşağı akan kesik köpük çizgileri ve cephe tabanında yuvarlanan
  * bore; üçü de {@code su_kopuk} dokulu (Ts2-1), parlaklık ve alfa yanal öbeklerle değişir. Cephenin yeri analitik dalgadan
- * ({@link Dalga#cephe}), yüksekliği görünen sudan alınır ({@link SerpintiNoktasi#dogusYuksekligi}: çizilen yakın ağ, onun
- * dışında sanal su seviyesi); su çizilmeyen, blok içinde ya da çatı altında kalan noktada köpük yok. Parçacık değil geometri
+ * ({@link Dalga#cephe}), yüksekliği bu karede çizilen sudan alınır ({@link SerpintiNoktasi#dogusYuksekligi}: yakın ağ, onun
+ * kapsamadığı yerde uzak LOD karosu); su çizilmeyen, blok içinde ya da çatı altında kalan noktada köpük yok. Parçacık değil geometri
  * olduğu için maliyeti cephe uzunluğuyla doğrusaldır (sütun başına karede bir sorgu). Kalite (N13): Düşük'te yalnız tepe
  * şeridi, 2 blok adım; diğerlerinde üç şerit, 1 blok adım (kameradan 64 blok ötede 2). Renk gün ışığıyla ölçeklenir.
  */
