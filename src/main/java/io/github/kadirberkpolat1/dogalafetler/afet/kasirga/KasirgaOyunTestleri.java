@@ -465,16 +465,17 @@ public final class KasirgaOyunTestleri {
     }
 
     /**
-     * Tur 3 (AF3-01, AF3-02): çekim bölgesindeki mob (S2, merkezden 14 blok; yapay zekâsız, hasarsız) çekirdeğe çekilir ve
-     * çekirdekten dışarı savrulmaz. Aynı bölgedeki hayatta kalma oyuncusunun hızına sunucu dokunmaz: oyuncunun çekimi
-     * kendi istemcisinde uygulanır (sahte oyuncunun istemcisi yok, yatay hızı sıfır kalır; eski kod iki tick'te bir yazardı).
+     * Tur 3 (AF3-01, AF3-02): çekim bölgesindeki mob (S2, merkezden 14 blok) çekirdeğe çekilir ve çekirdekten dışarı
+     * savrulmaz. Domuz hasarsızdır (çekirdek hasarıyla panikleyip koşmasın); yapay zekâsı açık kalır, çünkü NoAI mob
+     * ({@code isEffectiveAi} false) hiç {@code travel} etmez ve hızı onu taşımaz. Aynı bölgedeki hayatta kalma oyuncusunun hızına
+     * sunucu dokunmaz: oyuncunun çekimi kendi istemcisinde uygulanır (sahte oyuncunun istemcisi yok, yatay hızı sıfır kalır;
+     * eski kod iki tick'te bir yazardı).
      */
     @GameTest(template = SAHNE, batch = "kasirga_cekim_bolgesi", timeoutTicks = 200)
     public static void cekimBolgesindekiMobCekirdegeCekilirSavrulmaz(GameTestHelper y) {
         zemin(y, false);
         boolean onceki = blokHasari(y, false);
         Pig domuz = y.spawn(EntityType.PIG, new BlockPos(30, 2, 16));
-        domuz.setNoAi(true);
         domuz.setInvulnerable(true);
         BlockPos m = y.absolutePos(MERKEZ);
         ServerPlayer oyuncu = CekirdekOyunTestleri.sahteOyuncu(y, new GameProfile(UUID.randomUUID(), "kasirga-cekim"),
