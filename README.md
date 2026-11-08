@@ -548,8 +548,6 @@ Gökyüzü: güneş evreleri, süpernova kabuğu, nebula, kızıl cüce, pulsar 
 | `kara_delik_akis.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `kara_delik_jet.png` | 64x512 | 3,9 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `kara_delik_jet.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
-| `karadelik_3b_disk.png` | 1024x128 | 42,3 KB | `tools/assets/karadelik_3b_dokulari.py` |
-| `karadelik_3b_disk.png.mcmeta` | — | 0,1 KB | `tools/assets/karadelik_3b_dokulari.py` |
 | `karadelik_3b_disk_sicak.png` | 1024x128 | 31,9 KB | `tools/assets/karadelik_3b_dokulari.py` |
 | `karadelik_3b_disk_sicak.png.mcmeta` | — | 0,1 KB | `tools/assets/karadelik_3b_dokulari.py` |
 | `karadelik_3b_halka.png` | 16x64 | 0,2 KB | `tools/assets/karadelik_3b_dokulari.py` |
@@ -602,8 +600,6 @@ Gökyüzü: güneş evreleri, süpernova kabuğu, nebula, kızıl cüce, pulsar 
 | `pulsar_cekirdek.png.mcmeta` | — | 0,1 KB | `tools/assets/pulsar_gok_dokulari.py` |
 | `pulsar_hale.png` | 256x256 | 17,5 KB | `tools/assets/pulsar_gok_dokulari.py` |
 | `pulsar_hale.png.mcmeta` | — | 0,1 KB | `tools/assets/pulsar_gok_dokulari.py` |
-| `pulsar_isin.png` | 512x64 | 2,0 KB | `tools/assets/gokyuzu_dokulari.py` |
-| `pulsar_isin.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `pulsar_isin_keskin.png` | 512x32 | 1,5 KB | `tools/assets/pulsar_gok_dokulari.py` |
 | `pulsar_isin_keskin.png.mcmeta` | — | 0,1 KB | `tools/assets/pulsar_gok_dokulari.py` |
 | `pulsar_korona.png` | 512x512 | 61,1 KB | `tools/assets/pulsar_gok_dokulari.py` |

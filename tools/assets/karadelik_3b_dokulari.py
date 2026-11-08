@@ -4,14 +4,14 @@
 Çalıştırma (worktree kökünden):
     KOK/.venv/bin/python tools/assets/karadelik_3b_dokulari.py
 
-Çıktı: src/main/resources/assets/dogalafetler/textures/environment/gokyuzu/karadelik_3b_{disk,tup,halka,yildiz,
+Çıktı: src/main/resources/assets/dogalafetler/textures/environment/gokyuzu/karadelik_3b_{tup,halka,yildiz,
 disk_sicak,parilti}.png (+ .png.mcmeta). Tohum ayrı (20261109; tur 4 düzeltmesinin dokuları 20261110): eski dokuların
 baytları değişmez. RGB rengi, alfa yoğunluğu taşır; hepsi toplamalı çizilir (parlama silüetinde disk dokusu koyu
 renkle normal karışımla da kullanılır).
 
-- disk: u = azimut (dikişsiz, UV kaydırılır: akış), v = 0 iç kenar (beyaz-sıcak) → 1 dış kenar (koyu turuncu), sarmal
-  iplikler. Merceklenmiş arka yarının yayları aynı dokuyu UV haritasıyla kullanır (ayrı yay dokusu yok).
-- disk_sicak: diskin tur 4 düzeltmesi (oyunda bu çizilir): aynı düzen, iç kenar beyaz (1; 0,97; 0,9), orta sıcak
+- disk_sicak: akresyon diski (oyunda çizilen; eski `karadelik_3b_disk` kullanılmadığı için entegrasyonda kalktı): u = azimut
+  (dikişsiz, UV kaydırılır: akış), v = 0 iç kenar → 1 dış kenar, sarmal iplikler; merceklenmiş arka yarının yayları aynı
+  dokuyu UV haritasıyla kullanır, iç kenar beyaz (1; 0,97; 0,9), orta sıcak
   (1; 0,75; 0,45), dış turuncu (0,9; 0,4; 0,15); alfa içte 1 (toplamalı karışımda doyar), dışta ~0,55.
 - parilti: disk boyunca yumuşak parlama (bloom) şeridi; u azimut (dikişsiz), v enine yumuşak profil, kenarlarda 0.
 - tup: spagetti tüpü; u boyuna (dikişsiz, kayar), v çevre (dikişsiz).
@@ -48,25 +48,6 @@ def renk_rampasi(v, duraklar):
     konum = np.array([d[0] for d in duraklar], np.float32)
     rgb = np.stack([renk(d[1]) for d in duraklar])
     return np.stack([np.interp(v, konum, rgb[:, k]) for k in range(3)], axis=-1).astype(np.float32)
-
-
-def disk(rng, w=1024, h=128):
-    """Akresyon diski akış dokusu: iç kenar beyaz-sıcak, dış kenar koyu turuncu; sarmal iplikler (satır başına sabit
-    kayma u'da dikişsizliği bozmaz)."""
-    x, y = izgara(w, h)
-    v = (y + 1) * 0.5
-    iplik = sirtli(w, h, 10, 40, 3, rng, periyodik_x=True)
-    ince = sirtli(w, h, 24, 96, 2, rng, periyodik_x=True)
-    kayma = (np.arange(h) * 0.35 * w / h).astype(np.int32)
-    for j in range(h):
-        iplik[j] = np.roll(iplik[j], kayma[j])
-        ince[j] = np.roll(ince[j], 2 * kayma[j])
-    rgb = renk_rampasi(v, [(0.0, "#FFFAF2"), (0.18, "#FFEAC4"), (0.42, "#FFC27A"), (0.7, "#F0802E"),
-                           (1.0, "#8A2E0A")])
-    profil = 0.3 + 0.7 * (1 - v) ** 1.3
-    a = profil * (0.42 + 0.4 * yumusak_basamak(0.25, 0.85, iplik) + 0.18 * ince)
-    a *= yumusak_basamak(0.0, 0.06, v) * yumusak_basamak(1.0, 0.8, v)
-    kaydet("karadelik_3b_disk", rgb, np.clip(a, 0, 1), clamp=False)
 
 
 def tup(rng, w=256, h=64):
@@ -130,7 +111,9 @@ def parilti(rng, w=256, h=64):
 def main() -> None:
     print(f"Hedef: {HEDEF}")
     rng = np.random.default_rng(20261109)
-    disk(rng)
+    # Kalkan ilk disk dokusunun gürültü çekişleri: tüpün baytları değişmesin (N19).
+    sirtli(1024, 128, 10, 40, 3, rng, periyodik_x=True)
+    sirtli(1024, 128, 24, 96, 2, rng, periyodik_x=True)
     tup(rng)
     halka()
     yildiz()
