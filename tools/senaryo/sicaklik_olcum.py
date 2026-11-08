@@ -7,8 +7,8 @@ Kullanım: python3 tools/senaryo/sicaklik_olcum.py <kanıt/>   (sicaklik_gorsel.
           karesine göre: ortalama CIELAB ΔE (görünür renk farkı), ΔE > 10 olan piksel oranı, ortalama RGB farkı ve
           kızıllık (R - (G+B)/2) ile beyazlık (en küçük kanal) değişimi. Birinci şahıs kareleri `normal` ile, üçüncü
           şahıs kareleri aynı kamera açısındaki buharsız kontrol kare ile karşılaştırılır: `<durum>_<zemin>` için
-          `normal_<zemin>` (ör. `usume_gok` → `normal_gok`); eski adlı `usume`, `bunalma` için `normal_3p`. Kontrolü
-          olmayan (`ter_*`) kare karşılaştırılmaz.
+          `normal_<zemin>` (ör. `usume_gok` → `normal_gok`); eski adlı `usume` için `normal_3p`. Ter sahneleri (`bunalma`,
+          `ter_*`) düşen damlayı bekleyip başı başka pozda yakaladığı için karşılaştırılmaz.
   ter     ter dokusunun tam paleti (lacivert kontür 10,30,84 ve buz beyazı gövde 196,240,255, ±12): ikisini de içeren
           bağlı bileşen (6–800 piksel) bir damla; sayı ve her damlanın çevresindeki zemine WCAG karşıtlığı (kontür ya
           da gövdeden yüksek olanı).
@@ -16,10 +16,13 @@ Kullanım: python3 tools/senaryo/sicaklik_olcum.py <kanıt/>   (sicaklik_gorsel.
           0,1·Y sağı/solu, 0,08·Y üstü ile 0,12·Y altı) kontrol kareye göre beyaza doğru tek tip karışım: her kanalda
           α = (kare − kontrol) / (255 − kontrol), en az iki geçerli kanal (255 − kontrol > 30) ve kanallar arası fark
           < 0,15; sonuç açık renk (L* ≥ 40; modelin koyu piksellerindeki poz/ışık oynaması sayılmaz); ter damlasının
-          lacivert kontürünün 4 piksel çevresi (beyaz parlaması) dışarıda. α ≥ 0,15 piksel sayısı ile bu piksellerde
-          α ortalama / p90 / en çok. Beyaz zemin (kar; kontrol L* ≥ 85) beyazlaşmayı ölçmeye yer bırakmaz: orada buharı
-          gri kenarı seçtirir, bu yüzden ayrıca açık zeminde kontrole göre ΔE > 10 olan piksel sayısı ve ortalama ΔE.
-          Buharsız kare (`bunalma_*`) negatif kontroldur: ≈ 0 çıkmalı.
+          lacivert kontürünün 4 piksel çevresi (beyaz parlaması) dışarıda; kontrol karede 0,02·Y yarıçap içinde aynı renk
+          (kanal farkı ≤ 4) varsa piksel kaymış dokudur (model biraz farklı pozda), sayılmaz. α ≥ 0,15 piksel sayısı ile
+          bu piksellerde α ortalama / p90 / en çok. Beyaz zemin (kar; kontrol L* ≥ 85) beyazlaşmayı ölçmeye yer bırakmaz:
+          orada buharı gri kenarı seçtirir, bu yüzden ayrıca açık zeminde kontrole göre ΔE > 10 olan (kaymış doku hariç)
+          piksel sayısı ve ortalama ΔE. Yalnız kontrolle aynı yolla çekilen kareler (buhar ve düz 3. şahıs HUD sahneleri)
+          ölçülür: ter sahneleri düşen damlayı beklediği için başı başka pozda yakalar, başın başka yüzü beyazlaşma gibi
+          görünür. Buharsız `bunalma_<zemin>` (düz 3. şahıs HUD karesi) negatif kontroldur: ≈ 0 çıkmalı.
   hap     HUD hapının içinde sayı pikselleri (log'daki sayı rengine yakın) ile hap içi zemininin WCAG karşıtlığı ve
           zeminin ortanca rengi. Kare satırında hap konumu yoksa (S3-10 öncesi koşu) yerleşimden hesaplanır ve sayı
           durum rengindedir.
@@ -35,7 +38,9 @@ from PIL import Image
 KARE = re.compile(r"SICAKLIK_OTOMASYON kare (sicaklik_\w+)\.png \((.*)\)\s*$")
 KONTUR = (18, 14, 12)
 TER_KONTUR, TER_GOVDE = (10, 30, 84), (196, 240, 255)
-ESKI_3P = ("usume", "bunalma")
+# Kontrolüyle aynı yolla çekilen eski adlı 3. şahıs karesi; ter sahneleri (`bunalma`, `ter_*`) karşılaştırılmaz.
+ESKI_3P = ("usume",)
+TER_SAHNELERI = ("bunalma",)
 # S3-10 öncesi hap sayısı durum rengindeydi (HudCizimi.renk).
 ESKI_SAYI_RENGI = {"NORMAL": "e8e6de", "USUME": "a6ddf8", "DONMA": "5eaeff", "BUNALMA": "ffb54a", "YANMA": "ff5a36"}
 # HudCizimi: bant genişliği 182, hap sol kenarı 74, hap 34x11; bantın tepesi ekranın altından 47 GUI pikseli.
@@ -145,6 +150,23 @@ def agiz_penceresi(h, w):
     return slice(int(h / 2 - 0.08 * h), int(h / 2 + 0.12 * h)), slice(int(w / 2 - 0.1 * h), int(w / 2 + 0.1 * h))
 
 
+def kaymis_doku(k, ref, p):
+    """Penceredeki her piksel için: kontrol karede 0,02·Y yarıçap içinde aynı renk (kanal farkı ≤ 4) var mı."""
+    h, w = ref.shape[:2]
+    rad = max(4, round(0.02 * h))
+    y0, y1, x0, x1 = p[0].start, p[0].stop, p[1].start, p[1].stop
+    genis = ref[max(0, y0 - rad):min(h, y1 + rad), max(0, x0 - rad):min(w, x1 + rad)]
+    oy, ox = y0 - max(0, y0 - rad), x0 - max(0, x0 - rad)
+    var = np.zeros(k.shape[:2], bool)
+    for dy in range(-rad, rad + 1):
+        for dx in range(-rad, rad + 1):
+            ys, xs = oy + dy, ox + dx
+            if ys < 0 or xs < 0 or ys + k.shape[0] > genis.shape[0] or xs + k.shape[1] > genis.shape[1]:
+                continue
+            var |= np.abs(k - genis[ys:ys + k.shape[0], xs:xs + k.shape[1]]).max(axis=2) <= 4
+    return var
+
+
 def buhar(kare, ref):
     """Ağız penceresinde kontrole göre beyaza tek tip karışım: (piksel, α ort, α p90, α en çok) ve açık zeminde (kontrol
     L* ≥ 85) ΔE > 10 olan (piksel, ΔE ort)."""
@@ -165,9 +187,10 @@ def buhar(kare, ref):
         ter_cevresi = t
     lk, lr = lab(k), lab(r)
     acik = lk[..., 0] >= 40
-    buharli = (gecerli.sum(axis=2) >= 2) & (fark < 0.15) & (ort >= 0.15) & acik & ~ter_cevresi
+    kaymis = kaymis_doku(k, ref, p)
+    buharli = (gecerli.sum(axis=2) >= 2) & (fark < 0.15) & (ort >= 0.15) & acik & ~ter_cevresi & ~kaymis
     de = np.linalg.norm(lk - lr, axis=-1)
-    beyaz_zeminde = (lr[..., 0] >= 85) & (de > 10) & ~ter_cevresi
+    beyaz_zeminde = (lr[..., 0] >= 85) & (de > 10) & ~ter_cevresi & ~kaymis
     kar = (int(beyaz_zeminde.sum()), float(de[beyaz_zeminde].mean()) if beyaz_zeminde.any() else 0.0)
     if not buharli.any():
         return 0, 0.0, 0.0, 0.0, kar
@@ -178,6 +201,8 @@ def buhar(kare, ref):
 def kontrol_adi(ad, birinci, kareler):
     if birinci:
         return "normal"
+    if ad in TER_SAHNELERI or ad.startswith("ter_"):
+        return None
     zemin = ad.rsplit("_", 1)[1] if "_" in ad else None
     if zemin and f"normal_{zemin}" in kareler:
         return f"normal_{zemin}"

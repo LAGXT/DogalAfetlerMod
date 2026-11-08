@@ -375,13 +375,14 @@ def islak_ikonu():
     return img
 
 
-BUHAR_KENAR = (118, 128, 150)
-BUHAR_IC = (250, 252, 255)
+BUHAR_KENAR = (92, 102, 128)
+BUHAR_IC = (226, 234, 246)
 
 
 def buhar_karesi(i):
-    """16x16 nefes bulutçuğu (S3-11): dört yumuşak topak; iç yoğun ve beyaz, kenar gri ve en az 0,6 opak (beyaz gökte
-    ve karda bulutu gri kenar seçtirir). Kare ilerledikçe yayılır ve seyrelir (son iki kare ömrün sönüm yarısında görünür)."""
+    """16x16 nefes bulutçuğu (S3-11): dört yumuşak topak; iç yoğun, açık mavimsi gri (karda da beyaz zeminden ayrılır),
+    geniş koyu gri kenar en az 0,6 opak (beyaz gökte ve karda bulutu kenar seçtirir). Kare ilerledikçe yayılır ve
+    seyrelir (son iki kare ömrün sönüm yarısında görünür)."""
     n = 16
     rng = np.random.default_rng(300 + i)
     yy, xx = np.mgrid[0:n, 0:n].astype(np.float64) + 0.5
@@ -395,7 +396,7 @@ def buhar_karesi(i):
     ic = yogunluk > esik
     derin = np.clip((yogunluk - esik) / (1 - esik), 0, 1)
     alfa = np.where(ic, np.clip(0.6 + 0.4 * derin, 0, 1) * (1.0 - 0.12 * i), 0)
-    t = np.clip((yogunluk - esik) / 0.2, 0, 1)[..., None]
+    t = np.clip((yogunluk - esik) / 0.3, 0, 1)[..., None]
     renk = np.array(BUHAR_KENAR) * (1 - t) + np.array(BUHAR_IC) * t
     img = np.zeros((n, n, 4), dtype=np.uint8)
     img[..., :3] = np.round(renk).astype(np.uint8)
