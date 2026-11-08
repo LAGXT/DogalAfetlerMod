@@ -6010,7 +6010,7 @@ birincil `aktifAfet()` okumaları AS-8 gereği kaldı). Kanıt (dal): defter `te
 filtresiz kapı güncelleme turu 2 sonunda. **Bilinen sınırlar:** çekirdek `alan.global()` afetin sirenini ve durum paketini her
 boyuttaki oyunculara gönderir: Nether/End'deki oyuncu asit sirenini duyar, çizim ve hasar almaz; eski dünyada ilk açılışta
 `Incorrect key asit_yagmuru.kaymaHizi` WARN bir kez; asit ekran vinyeti değerlendirici modelce görülmedi; ana makinede FPS
-ölçülmedi; çoklu afette radar seçim sırasını (bölgesel önce) sınayan GameTest yok.
+ölçülmedi. Radar seçim sırası GameTest ile sınandı: `EsyaOyunTestleri.cokluAfetteRadarBolgeseliOnceKureselleriBaslamaSirasiylaGosterir` (batch `esya_radar_coklu`; yalnız asit "her yer", asitten sonra başlayan deprem gösterilir, asit + güneş arasında önce başlayan, ikisinin üstüne deprem; asit etki alanı her yer olan taklit) `20903d0`, kuyruk `1108-045740832-56`, defter `gametest:Radar|Cekirdek @c7887b40968c` 19/19.
 
 ## Açık noktalar (Faz 2b)
 
