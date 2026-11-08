@@ -6094,9 +6094,18 @@ soluk dokular (doygunluk ≤ 0,3); Pg3 KURAL duraklamasında yutma koreografisi 
 kademede ayrı karede (`karadelik_ultra`): 2 736 + 3 016 = 5 752 ≤ 6 000; Pg5 kalıntı nebulası kararı saf
 `GokyuzuEgrileri.kalintiGecisi`/`oncekiYol` (eski güneşe dönüşte kalıntı belirmez); otomasyon vanilla bulutları kapatır (yalnız
 `-Potomasyon`). Görsel koşu 8 (ana makine): `karadelik_mercek` Doppler oranı 2,24 (ölçüt ≥ 2,0), disk doygunluğu 0,156,
-benzerlik 3,00; `karadelik_spagetti` korku 3,00. **Bilinen sınırlar:** pc2 kare koşularında FPS 15–19 (K-E29 b, bilgi; ana makine
-koşu 6 en düşük 29); PL-41 dört karesi değerlendirici model ölçütünün (PL-39, ≥ 3) altında kaldı (görsel koşu 7, 3 örnek: parlama
-2,00, karanlık 2,33, buzul 2,00, doğuş 2,00; kontrol kareleri gerilemedi: `pulsar_buyuk` 3,33, `karadelik_mercek` 3,00); yeni deneme
+benzerlik 3,00; `karadelik_spagetti` korku 3,00. **İnceleme 3, PL-43 (`0c36023`, entegrasyon `01fd1fe`; yalnız `KaraDelik3B` ve tasarım notu):** Ph1 disk köşesinin parlaklığı
+Doppler çarpanı (≤ 1) × besleme eğrisi × (1 + 0,8·morluk); Pg2'nin 3,5 kazancı kalktı, kırpma yalnız Doppler çarpanında (önceki
+`min(1, a·3,5·(1 + 0,8·mor))` yutmanın 12–80. sn'sinde hep 1 veriyor, besleme eğrisini ve PL-41'in mor kalıntı ×1,8'ini etkisiz
+kılıyordu); 1'i aşan pay ayrı toplamalı kalıntı geçişinde. Ph2 merceklenmiş yaylarda Doppler yalnız yanal bantta: köşenin
+merceklenmiş görüntüsünün gölge merkezinden yatay uzaklığı ≥ 1 gölge yarıçapında diskin Doppler'i, ≤ 0,5'te orta sütun (üst yay
+0,9, altı 1,0), arası yumuşak (iki ara deneme oranı bozdu: cos²φ 1,61, disk düzleminden seçim 1,76). Görsel koşu 11: `karadelik_mercek`
+oran 2,04 (ölçüt ≥ 2,0), doygunluk 0,153, orta sütun tepesi 0,81 / 0,87 (referans 0,90 / 0,99); kontrol `pulsar_buyuk` 3,67,
+spagetti korku 3,00. Şef kararı: `karadelik_parlama` karesinin ana ölçütü okunurluk (parlama anında korku uygun ölçüt değil;
+okunurluk 3,00, korku 1,67–2,00 bilgi): bilinen sınır listesinden çıktı. **Bilinen sınırlar:** pc2 kare koşularında FPS 15–19
+(K-E29 b, bilgi; ana makine koşu 6 en düşük 29); üç kare değerlendirici model ölçütünün (PL-39, ≥ 3) altında: `karadelik_karanlik`
+(korku 2,00, koşu 11; koşu 7: 2,33), `gunessiz_buz` (2,00) ve `kizil_cuce_dogus` (2,00; koşu 7, 3 örnek); referansla çift
+karşılaştırma (koşu 11'e karşı koşu 7: mercek 0/6, spagetti 0/6, karanlık 3/6) oran ölçütüyle çelişiyor, seçim şefte; yeni deneme
 yok, kullanıcı oyunda karar verir; yutma parlaması (1,5 sn tepe) `pulsarTitresim`'le ölçeklenmez. Kanıt K-E65'teki kapılar (son: filtresiz 274/274, `f172807`).
 
 ## Açık noktalar (Faz 2b)
