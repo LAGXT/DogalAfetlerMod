@@ -305,9 +305,15 @@ public final class PulsarBlokOyunTestleri {
         });
     }
 
+    private static boolean donusuyor(GameTestHelper y, BlockPos konum) {
+        BlockState s = y.getBlockState(konum);
+        return s.hasProperty(KomurlesmisKutukBlogu.DONUSUYOR) && s.getValue(KomurlesmisKutukBlogu.DONUSUYOR);
+    }
+
     /**
-     * Suya değen kütük 2–4 dakikalık planlanmış tick kurar (su sonradan gelse de, kütük suyun yanına konsa da); tick'te
-     * su hâlâ bitişikse kömür bloğu, su kaldırıldıysa kütük kalır. Su taş cebinde: akmaz, kaldırılınca iz bırakmaz.
+     * Suya değen kütük 2–4 dakikalık planlanmış tick kurar ve {@code donusuyor} olur (su sonradan gelse de, kütük suyun
+     * yanına konsa da; duman yalnız bu sürede); tick'te su hâlâ bitişikse kömür bloğu, su kaldırılınca dönüşüm iptal
+     * ({@code donusuyor} false) ve tick'te kütük kalır. Su taş cebinde: akmaz, kaldırılınca iz bırakmaz.
      */
     @GameTest(template = ALAN, batch = ODUN)
     public static void kutukSuyaDeginceTicktenSonraKomurBloguOlur(GameTestHelper y) {
@@ -322,28 +328,33 @@ public final class PulsarBlokOyunTestleri {
         }
         BlockPos a = p(2, 1, 2);
         y.setBlock(a, yatay);
-        y.assertTrue(!level.getBlockTicks().hasScheduledTick(y.absolutePos(a), kutuk), "susuz kütükte tick planlandı");
+        y.assertTrue(!level.getBlockTicks().hasScheduledTick(y.absolutePos(a), kutuk) && !donusuyor(y, a),
+                "susuz kütükte dönüşüm başladı: " + y.getBlockState(a));
         y.setBlock(p(3, 1, 2), Blocks.WATER);
-        y.assertTrue(level.getBlockTicks().hasScheduledTick(y.absolutePos(a), kutuk), "su gelince tick planlanmadı");
+        y.assertTrue(level.getBlockTicks().hasScheduledTick(y.absolutePos(a), kutuk) && donusuyor(y, a),
+                "su gelince tick ve donusuyor bekleniyordu: " + y.getBlockState(a));
         BlockPos b = p(2, 1, 6);
         y.setBlock(p(3, 1, 6), Blocks.WATER);
         y.setBlock(b, yatay);
-        y.assertTrue(level.getBlockTicks().hasScheduledTick(y.absolutePos(b), kutuk), "suyun yanına konunca planlanmadı");
-        y.assertTrue(KomurlesmisKutukBlogu.suyaDegiyor(level, y.absolutePos(a)), "su bitişik görünmeli");
+        y.assertTrue(level.getBlockTicks().hasScheduledTick(y.absolutePos(b), kutuk) && donusuyor(y, b),
+                "suyun yanına konunca tick ve donusuyor bekleniyordu: " + y.getBlockState(b));
+        y.assertTrue(y.getBlockState(b).getValue(RotatedPillarBlock.AXIS) == Direction.Axis.X, "eksen korunmalı");
 
         y.getBlockState(a).tick(level, y.absolutePos(a), level.random);
         y.assertTrue(y.getBlockState(a).is(Blocks.COAL_BLOCK), "suda tick sonrası kömür bloğu: " + y.getBlockState(a));
 
         y.setBlock(p(3, 1, 6), Blocks.STONE);
-        y.assertTrue(!KomurlesmisKutukBlogu.suyaDegiyor(level, y.absolutePos(b)), "su kaldırıldı");
+        y.assertTrue(!KomurlesmisKutukBlogu.suyaDegiyor(level, y.absolutePos(b)) && !donusuyor(y, b),
+                "su kaldırılınca dönüşüm iptal olmalı: " + y.getBlockState(b));
         y.getBlockState(b).tick(level, y.absolutePos(b), level.random);
         y.assertTrue(y.getBlockState(b).equals(yatay), "su kalktıysa kütük kalmalı (eksen korunur): " + y.getBlockState(b));
         y.succeed();
     }
 
     /**
-     * Pulsar kavurması su kıyısındaki meşe kütüğü yerinde kömürleştirir: tick planlanmaz, yanındaki su dışı komşu
-     * değişimi de planlamaz; su kaldırılıp yeniden konunca (su kütüğe gelince) planlanır.
+     * Pulsar kavurması su kıyısındaki meşe kütüğü yerinde kömürleştirir: tick planlanmaz, {@code donusuyor} false (duman
+     * yok), yanındaki su dışı komşu değişimi de başlatmaz; su kaldırılıp yeniden konunca (su kütüğe gelince) tick ve
+     * {@code donusuyor} true, tick'te kömür bloğu.
      */
     @GameTest(template = ALAN, batch = ODUN)
     public static void kavurmaKutuguSuKiyisindaKendiligindenDonmez(GameTestHelper y) {
@@ -360,12 +371,17 @@ public final class PulsarBlokOyunTestleri {
         y.assertTrue(KavurmaKuyrugu.donustur(level, m, 1f, 0.5) == 1, "kavurma kütüğü dönüştürmedi");
         y.assertTrue(y.getBlockState(k).is(kutuk) && KomurlesmisKutukBlogu.suyaDegiyor(level, m),
                 "su kıyısında kömürleşmiş kütük bekleniyordu: " + y.getBlockState(k));
-        y.assertTrue(!level.getBlockTicks().hasScheduledTick(m, kutuk), "kavurma dönüşümü tick planladı");
+        y.assertTrue(!level.getBlockTicks().hasScheduledTick(m, kutuk) && !donusuyor(y, k),
+                "kavurma dönüşümü dönüşüm başlattı: " + y.getBlockState(k));
         y.setBlock(p(2, 1, 5), Blocks.COARSE_DIRT);
-        y.assertTrue(!level.getBlockTicks().hasScheduledTick(m, kutuk), "su dışı komşu değişimi tick planladı");
+        y.assertTrue(!level.getBlockTicks().hasScheduledTick(m, kutuk) && !donusuyor(y, k),
+                "su dışı komşu değişimi dönüşüm başlattı");
         y.setBlock(p(3, 1, 4), Blocks.STONE);
         y.setBlock(p(3, 1, 4), Blocks.WATER);
-        y.assertTrue(level.getBlockTicks().hasScheduledTick(m, kutuk), "su yeniden gelince tick planlanmadı");
+        y.assertTrue(level.getBlockTicks().hasScheduledTick(m, kutuk) && donusuyor(y, k),
+                "su yeniden gelince tick ve donusuyor bekleniyordu: " + y.getBlockState(k));
+        y.getBlockState(k).tick(level, m, level.random);
+        y.assertTrue(y.getBlockState(k).is(Blocks.COAL_BLOCK), "tick sonrası kömür bloğu: " + y.getBlockState(k));
         y.succeed();
     }
 }
