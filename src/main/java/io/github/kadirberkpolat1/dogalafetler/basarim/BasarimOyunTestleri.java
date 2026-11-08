@@ -224,20 +224,21 @@ public final class BasarimOyunTestleri {
     @GameTest(template = "bos", batch = "basarim_stop")
     public static void komutlaBaslayipStopIleBitenAfetSagCikmaSayilir(GameTestHelper y) {
         ServerPlayer a = oyuncu(y, "stop-a", 0);
-        ServerPlayer b = oyuncu(y, "kural-b", 0);
+        ServerPlayer b = null;
         try {
             kasirga(y, 5, a, true, () -> { });
             dogrula(y, kazandi(y, a, Basarimlar.KOK), "siren duyuldu");
             dogrula(y, kazandi(y, a, Basarimlar.ILK_RUZGAR) && kazandi(y, a, Basarimlar.FELAKET_USTASI),
                     "komutla başlayıp stop ile biten S5 kasırga İlk Rüzgâr ve Felaket Ustası vermeli");
             dogrula(y, BasarimVerisi.atlatilanlar(a).iceriyor(AfetTuru.KASIRGA), "stop atlatılanlara yazılmalı");
+            b = oyuncu(y, "kural-b", 0);
             Set<UUID> kim = Set.of(b.getUUID());
             BasarimOlaylari.afetBitti(new AfetBittiEvent(AfetTuru.DEPREM, 2, b.blockPosition(), Level.OVERWORLD, kim, kim,
                     -7_000_000L, -6_999_999L, BitisNedeni.KURAL));
             dogrula(y, !kazandi(y, b, Basarimlar.SALLANAN_ZEMIN) && BasarimVerisi.atlatilanlar(b).boyut() == 0,
                     "kural ile kesilen afet sayılmamalı");
         } finally {
-            cikar(y, List.of(a, b));
+            cikar(y, b == null ? List.of(a) : List.of(a, b));
         }
         y.succeed();
     }
