@@ -44,5 +44,8 @@ public final class HavaRadari extends Item {
     @Override
     public void appendHoverText(ItemStack yigin, @Nullable Level level, List<Component> satirlar, TooltipFlag bayrak) {
         satirlar.add(Component.translatable(getDescriptionId() + ".ipucu").withStyle(ChatFormatting.GRAY));
+        if (gelismis) {
+            satirlar.add(Component.translatable(getDescriptionId() + ".tarif").withStyle(ChatFormatting.DARK_PURPLE));
+        }
     }
 }

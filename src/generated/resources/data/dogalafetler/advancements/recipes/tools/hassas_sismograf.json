@@ -1,0 +1,55 @@
+{
+  "parent": "minecraft:recipes/root",
+  "conditions": [
+    {
+      "type": "forge:not",
+      "value": {
+        "type": "forge:tag_empty",
+        "tag": "dogalafetler:kozmik_cekirdek"
+      }
+    }
+  ],
+  "criteria": {
+    "has_kozmik_cekirdek": {
+      "conditions": {
+        "items": [
+          {
+            "tag": "dogalafetler:kozmik_cekirdek"
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    },
+    "has_sismograf": {
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "dogalafetler:sismograf"
+            ]
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    },
+    "has_the_recipe": {
+      "conditions": {
+        "recipe": "dogalafetler:hassas_sismograf"
+      },
+      "trigger": "minecraft:recipe_unlocked"
+    }
+  },
+  "requirements": [
+    [
+      "has_sismograf",
+      "has_kozmik_cekirdek",
+      "has_the_recipe"
+    ]
+  ],
+  "rewards": {
+    "recipes": [
+      "dogalafetler:hassas_sismograf"
+    ]
+  },
+  "sends_telemetry_event": false
+}

@@ -15,15 +15,16 @@ deniz, aysız gökyüzü, kızıl cüce güneş) dünyada kalıcıdır.
 3. [Derlemek (Windows ve Linux)](#derlemek-windows-ve-linux)
 4. [Afetler](#afetler)
 5. [Ortak sistemler](#ortak-sistemler)
-6. [Komutlar](#komutlar)
-7. [Gamerule'lar](#gamerulelar)
-8. [Config dosyaları ve önemli ayarlar](#config-dosyaları-ve-önemli-ayarlar)
-9. [Başarımlar](#başarımlar)
-10. [Cold Sweat ile birlikte kullanmak](#cold-sweat-ile-birlikte-kullanmak)
-11. [Ses ve doku dosyaları](#ses-ve-doku-dosyaları)
-12. [Bilinen sınırlar](#bilinen-sınırlar)
-13. [Belgeler](#belgeler)
-14. [Lisans](#lisans)
+6. [Eşyalar](#eşyalar)
+7. [Komutlar](#komutlar)
+8. [Gamerule'lar](#gamerulelar)
+9. [Config dosyaları ve önemli ayarlar](#config-dosyaları-ve-önemli-ayarlar)
+10. [Başarımlar](#başarımlar)
+11. [Cold Sweat ile birlikte kullanmak](#cold-sweat-ile-birlikte-kullanmak)
+12. [Ses ve doku dosyaları](#ses-ve-doku-dosyaları)
+13. [Bilinen sınırlar](#bilinen-sınırlar)
+14. [Belgeler](#belgeler)
+15. [Lisans](#lisans)
 
 ## Kurulum (Windows'ta oynamak)
 
@@ -124,6 +125,22 @@ Güneş patlaması ve ay çarpması yalnız dünya yeterince yaşlanınca seçil
 - **Buz altı balıkçılığı:** donmuş dünyada eğilip kazma/balta ile sağ tıklayınca buzda delik açılır, delik birkaç dakikada
   yeniden donar. Delikten beş yeni soğuk su balığı (Buz Alabalığı, Buz Kefali, Derin Soğuk Somonu, Donmuş Ringa, Kutup Morinası)
   ve nadiren hazine çıkar; Kutup Balığı Çorbası bunlardan yapılır.
+
+## Eşyalar
+
+Hava Radarı ve Sismograf vanilla çalışma masasında yapılır. İkisi de tarif kitabında (çalışma masasındaki yeşil kitap, kılıç ve
+kazma simgeli sekme) dünyaya ilk girişte görünür; JEI gerekmez. Gelişmiş sürümler kitapta Hava Radarı, Sismograf ya da
+Kozmik Çekirdek envantere girince açılır. Kozmik Çekirdek meteor kraterlerinde çok nadir çıkar, eşyanın açıklaması da bunu söyler.
+
+| Eşya | Tarif (3×3, üst / orta / alt sıra) | Malzemeler |
+|---|---|---|
+| Hava Radarı | Demir · Cam · Demir / Kızıltaş · Pusula · Kızıltaş / Demir · Bakır · Demir | 4 demir külçesi, 1 cam, 2 kızıltaş, 1 pusula, 1 bakır külçesi |
+| Sismograf | Demir · Kağıt · Demir / Çubuk · Kızıltaş · Çubuk / Taş · Bakır · Taş | 2 demir külçesi, 1 kağıt, 2 çubuk, 1 kızıltaş, 2 taş, 1 bakır külçesi |
+| Gelişmiş Hava Radarı | şekilsiz | 1 Hava Radarı + 1 Kozmik Çekirdek |
+| Hassas Sismograf | şekilsiz | 1 Sismograf + 1 Kozmik Çekirdek |
+
+"Demir" demir külçesi, "Bakır" bakır külçesi, "Taş" düz taştır (kırık taş olmaz). Gelişmiş tarifler Kozmik Çekirdek etiketi
+(`#dogalafetler:kozmik_cekirdek`) boşken yüklenmez; etiketi boşaltan bir veri paketi yoksa her zaman yüklüdür.
 
 ## Komutlar
 

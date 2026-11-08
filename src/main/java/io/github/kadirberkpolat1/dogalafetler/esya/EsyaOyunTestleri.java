@@ -24,6 +24,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
+import net.minecraft.advancements.Advancement;
+import net.minecraft.advancements.CriteriaTriggers;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -419,6 +421,89 @@ public final class EsyaOyunTestleri {
         }
         DogalAfetler.LOGGER.info("Eşya GameTest: gelişmiş tarifler yüklü, {} ile craft edildi", cekirdek);
         yardimci.succeed();
+    }
+
+    /** Temel iki tarif koşulsuz yüklü ve çalışma masasında (3x3 tezgah + {@code RecipeManager.getRecipeFor}) ürünü verir. */
+    @GameTest(template = "bos", batch = "esya_tarif")
+    public static void temelTariflerCalismaMasasindaUrunVerir(GameTestHelper yardimci) {
+        ServerPlayer oyuncu = CekirdekOyunTestleri.sahteOyuncu(yardimci, 0.5, 2, 0.5);
+        try {
+            calismaMasasi(yardimci, oyuncu, EsyaKayitlari.TARIF_HAVA_RADARI, EsyaKayitlari.HAVA_RADARI.get(), Items.IRON_INGOT,
+                    Items.GLASS, Items.IRON_INGOT, Items.REDSTONE, Items.COMPASS, Items.REDSTONE, Items.IRON_INGOT,
+                    Items.COPPER_INGOT, Items.IRON_INGOT);
+            calismaMasasi(yardimci, oyuncu, EsyaKayitlari.TARIF_SISMOGRAF, EsyaKayitlari.SISMOGRAF.get(), Items.IRON_INGOT,
+                    Items.PAPER, Items.IRON_INGOT, Items.STICK, Items.REDSTONE, Items.STICK, Items.STONE, Items.COPPER_INGOT,
+                    Items.STONE);
+        } finally {
+            yardimci.getLevel().getServer().getPlayerList().remove(oyuncu);
+        }
+        yardimci.succeed();
+    }
+
+    /**
+     * JEI'siz oyuncu tarifi yalnız vanilla tarif kitabında görür: temel tarifler oyuncunun ilk tick'inde ({@code minecraft:tick})
+     * ya da demir külçesi envantere girince kitaba girer. Gelişmişler başta kapalıdır, temel eşya envantere girince açılır.
+     */
+    @GameTest(template = "bos", batch = "esya_tarif")
+    public static void tarifKitabiTemelleriOyunBasindaGelismisleriTemelEsyaylaAcar(GameTestHelper yardimci) {
+        MinecraftServer server = yardimci.getLevel().getServer();
+        List<ResourceLocation> temeller = List.of(EsyaKayitlari.TARIF_HAVA_RADARI, EsyaKayitlari.TARIF_SISMOGRAF);
+        List<ResourceLocation> gelismisler = List.of(EsyaKayitlari.TARIF_GELISMIS_HAVA_RADARI,
+                EsyaKayitlari.TARIF_HASSAS_SISMOGRAF);
+        ServerPlayer yeni = CekirdekOyunTestleri.sahteOyuncu(yardimci, 0.5, 2, 0.5);
+        ServerPlayer demirli = CekirdekOyunTestleri.sahteOyuncu(yardimci, 1.5, 2, 0.5);
+        try {
+            for (ResourceLocation tarif : temeller) {
+                yardimci.assertTrue(!kitapta(yardimci, server, yeni, tarif), "tick'ten önce kitapta: " + tarif);
+            }
+            // ServerPlayer.doTick her tick'te bunu çağırır.
+            CriteriaTriggers.TICK.trigger(yeni);
+            for (ResourceLocation tarif : temeller) {
+                yardimci.assertTrue(kitapta(yardimci, server, yeni, tarif), "ilk tick'te kitapta değil: " + tarif);
+            }
+            for (ResourceLocation tarif : gelismisler) {
+                yardimci.assertTrue(!kitapta(yardimci, server, yeni, tarif), "temel eşyasız kitapta: " + tarif);
+            }
+            envantereKoy(demirli, Items.IRON_INGOT);
+            for (ResourceLocation tarif : temeller) {
+                yardimci.assertTrue(kitapta(yardimci, server, demirli, tarif), "demir külçesiyle kitapta değil: " + tarif);
+            }
+            envantereKoy(demirli, EsyaKayitlari.HAVA_RADARI.get(), EsyaKayitlari.SISMOGRAF.get());
+            for (ResourceLocation tarif : gelismisler) {
+                yardimci.assertTrue(kitapta(yardimci, server, demirli, tarif), "temel eşyayla kitapta değil: " + tarif);
+            }
+        } finally {
+            server.getPlayerList().remove(yeni);
+            server.getPlayerList().remove(demirli);
+        }
+        DogalAfetler.LOGGER.info("Eşya GameTest: temel tarifler ilk tick'te, gelişmişler temel eşyayla tarif kitabında");
+        yardimci.succeed();
+    }
+
+    private static void calismaMasasi(GameTestHelper yardimci, ServerPlayer oyuncu, ResourceLocation kimlik, Item sonuc,
+            Item... dokuz) {
+        ServerLevel level = yardimci.getLevel();
+        TransientCraftingContainer tezgah = tezgah(oyuncu, dokuz);
+        Optional<CraftingRecipe> eslesen = level.getRecipeManager().getRecipeFor(RecipeType.CRAFTING, tezgah, level);
+        yardimci.assertTrue(eslesen.isPresent() && eslesen.get().getId().equals(kimlik), "çalışma masası bulmadı: " + kimlik);
+        yardimci.assertTrue(eslesen.get().assemble(tezgah, level.registryAccess()).is(sonuc), "ürün yanlış: " + kimlik);
+    }
+
+    /** Tarif kitabı başarımı ({@code recipes/tools/<tarif>}) tamam ve tarif oyuncunun kitabında. */
+    private static boolean kitapta(GameTestHelper yardimci, MinecraftServer server, ServerPlayer oyuncu,
+            ResourceLocation tarif) {
+        Advancement kilit = server.getAdvancements().getAdvancement(tarif.withPrefix("recipes/tools/"));
+        yardimci.assertTrue(kilit != null, "tarif kitabı başarımı yok: " + tarif);
+        boolean acik = oyuncu.getAdvancements().getOrStartProgress(kilit).isDone();
+        yardimci.assertTrue(acik == oyuncu.getRecipeBook().contains(tarif), "başarım ve tarif kitabı uyuşmuyor: " + tarif);
+        return acik;
+    }
+
+    private static void envantereKoy(ServerPlayer oyuncu, Item... esyalar) {
+        for (Item esya : esyalar) {
+            oyuncu.getInventory().add(new ItemStack(esya));
+        }
+        oyuncu.inventoryMenu.broadcastChanges();
     }
 
     private static void hucreler(GameTestHelper yardimci, Ingredient[] desen, String ad, Item... beklenen) {

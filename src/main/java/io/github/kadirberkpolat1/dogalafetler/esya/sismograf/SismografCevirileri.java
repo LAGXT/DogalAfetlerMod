@@ -18,6 +18,9 @@ public final class SismografCevirileri {
         y.ekle("item.dogalafetler.hassas_sismograf", "Precision Seismograph", "Hassas Sismograf");
         y.ekle("item.dogalafetler.hassas_sismograf.ipucu", "Detects earlier, locates the epicentre precisely and reads the level.",
                 "Daha erken algılar, merkezi daha doğru gösterir ve seviyeyi belirtir.");
+        y.ekle("item.dogalafetler.hassas_sismograf.tarif",
+                "Needs a Seismograph and a Cosmic Core first (found very rarely in meteor craters).",
+                "Önce Sismograf ve Kozmik Çekirdek gerekir (meteor kraterlerinde çok nadir çıkar).");
         y.ekle(ON + "oncu", "Foreshock detected", "Öncü sarsıntı algılandı");
         y.ekle(ON + "ana", "Main shock", "Ana sarsıntı");
         y.ekle(ON + "yuzde", "%s%%", "%%%s");
