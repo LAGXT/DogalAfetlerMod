@@ -348,11 +348,14 @@ Sesler (mono Ogg Vorbis, 48 kHz). Ölçü: entegre ses yüksekliği / gerçek te
 | `gunes_supernova_basinc.ogg` | -25.0 LUFS / -9.3 dBTP / 8.0 sn | 38,3 KB | `tools/assets/gunes_sesleri.py` |
 | `gunes_supernova_kristal.ogg` | -29.9 LUFS / -18.2 dBTP / 20.0 sn | 151,7 KB | `tools/assets/gunes_sesleri.py` |
 | `karadelik_yutma.ogg` | -22.9 LUFS / -13.0 dBTP / 8.0 sn | 40,0 KB | `tools/assets/ses_uret.py` |
+| `karadelik_yutma_yankili.ogg` | -23.0 LUFS / -10.0 dBTP / 8.0 sn | 45,1 KB | `tools/assets/ses_uret.py` |
 | `kasirga_ruzgar.ogg` | -26.1 LUFS / -9.9 dBTP / 12.0 sn | 87,4 KB | `tools/assets/ses_uret.py` |
 | `kasirga_ugultu.ogg` | -25.9 LUFS / -9.6 dBTP / 16.0 sn | 99,9 KB | `tools/assets/ses_uret.py` |
 | `meteor_patlama.ogg` | -23.0 LUFS / -6.5 dBTP / 7.0 sn | 49,3 KB | `tools/assets/ses_uret.py` |
 | `meteor_ucus.ogg` | -26.0 LUFS / -12.0 dBTP / 8.0 sn | 51,3 KB | `tools/assets/ses_uret.py` |
 | `ortam_test.ogg` | -26.0 LUFS / -11.0 dBTP / 12.0 sn | 74,0 KB | `tools/assets/ses_uret.py` |
+| `pulsar_vurus.ogg` | -26.0 LUFS / -13.7 dBTP / 8.0 sn | 79,7 KB | `tools/assets/ses_uret.py` |
+| `pulsar_vurus_yankili.ogg` | -26.0 LUFS / -14.8 dBTP / 8.0 sn | 67,1 KB | `tools/assets/ses_uret.py` |
 | `sinkhole_cokus.ogg` | -22.0 LUFS / -7.4 dBTP / 6.0 sn | 41,8 KB | `tools/assets/deprem_ses.py` |
 | `siren_gunes.ogg` | -20.9 LUFS / -9.3 dBTP / 20.0 sn | 120,7 KB | `tools/assets/ses_uret.py` |
 | `siren_standart.ogg` | -20.0 LUFS / -12.9 dBTP / 10.0 sn | 66,9 KB | `tools/assets/ses_uret.py` |
@@ -515,6 +518,14 @@ Gökyüzü: güneş evreleri, süpernova kabuğu, nebula, kızıl cüce, pulsar 
 | `kara_delik_akis.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `kara_delik_jet.png` | 64x512 | 3,9 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `kara_delik_jet.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
+| `karadelik_3b_disk.png` | 1024x128 | 42,3 KB | `tools/assets/karadelik_3b_dokulari.py` |
+| `karadelik_3b_disk.png.mcmeta` | — | 0,1 KB | `tools/assets/karadelik_3b_dokulari.py` |
+| `karadelik_3b_halka.png` | 16x64 | 0,2 KB | `tools/assets/karadelik_3b_dokulari.py` |
+| `karadelik_3b_halka.png.mcmeta` | — | 0,1 KB | `tools/assets/karadelik_3b_dokulari.py` |
+| `karadelik_3b_tup.png` | 256x64 | 8,3 KB | `tools/assets/karadelik_3b_dokulari.py` |
+| `karadelik_3b_tup.png.mcmeta` | — | 0,1 KB | `tools/assets/karadelik_3b_dokulari.py` |
+| `karadelik_3b_yildiz.png` | 32x32 | 0,5 KB | `tools/assets/karadelik_3b_dokulari.py` |
+| `karadelik_3b_yildiz.png.mcmeta` | — | 0,1 KB | `tools/assets/karadelik_3b_dokulari.py` |
 | `karadelik_buyuk_256.png` | 256x256 | 31,3 KB | `tools/assets/pulsar_gok_dokulari.py` |
 | `karadelik_buyuk_256.png.mcmeta` | — | 0,1 KB | `tools/assets/pulsar_gok_dokulari.py` |
 | `karadelik_buyuk_512.png` | 512x512 | 77,0 KB | `tools/assets/pulsar_gok_dokulari.py` |
@@ -543,6 +554,14 @@ Gökyüzü: güneş evreleri, süpernova kabuğu, nebula, kızıl cüce, pulsar 
 | `nebula_mavi_256.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `nebula_mavi_512.png` | 512x512 | 117,0 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `nebula_mavi_512.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
+| `pulsar3b_alan.png` | 256x32 | 2,4 KB | `tools/assets/pulsar_3b_dokulari.py` |
+| `pulsar3b_alan.png.mcmeta` | — | 0,1 KB | `tools/assets/pulsar_3b_dokulari.py` |
+| `pulsar3b_hale_katman.png` | 256x256 | 19,5 KB | `tools/assets/pulsar_3b_dokulari.py` |
+| `pulsar3b_hale_katman.png.mcmeta` | — | 0,1 KB | `tools/assets/pulsar_3b_dokulari.py` |
+| `pulsar3b_koni.png` | 512x64 | 6,6 KB | `tools/assets/pulsar_3b_dokulari.py` |
+| `pulsar3b_koni.png.mcmeta` | — | 0,1 KB | `tools/assets/pulsar_3b_dokulari.py` |
+| `pulsar3b_parcacik.png` | 64x64 | 2,2 KB | `tools/assets/pulsar_3b_dokulari.py` |
+| `pulsar3b_parcacik.png.mcmeta` | — | 0,1 KB | `tools/assets/pulsar_3b_dokulari.py` |
 | `pulsar_cekirdek.png` | 256x256 | 20,0 KB | `tools/assets/pulsar_gok_dokulari.py` |
 | `pulsar_cekirdek.png.mcmeta` | — | 0,1 KB | `tools/assets/pulsar_gok_dokulari.py` |
 | `pulsar_hale.png` | 256x256 | 17,5 KB | `tools/assets/pulsar_gok_dokulari.py` |
