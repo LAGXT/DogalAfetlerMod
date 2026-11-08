@@ -267,8 +267,7 @@ public final class TsunamiYagmuru {
         if (kapali) {
             return false;
         }
-        return IstemciAfetDurumu.aktif().filter(p -> p.tur() == AfetTuru.TSUNAMI
-                && (p.asama() == AfetAsamasi.AKTIF || p.asama() == AfetAsamasi.BITIS) && p.ozel().getBoolean("yagmur"))
+        return IstemciAfetDurumu.aktif(AfetTuru.TSUNAMI).filter(p -> (p.asama() == AfetAsamasi.AKTIF || p.asama() == AfetAsamasi.BITIS) && p.ozel().getBoolean("yagmur"))
                 .map(TsunamiYagmuru::oku).isPresent();
     }
 
@@ -626,7 +625,7 @@ public final class TsunamiYagmuru {
     public static void kamera(ViewportEvent.ComputeCameraAngles e) {
         SanalSuDunyasi d = SanalSu.istemci;
         Minecraft mc = Minecraft.getInstance();
-        if (d == null || d.dalgalar().isEmpty() || mc.player == null || IstemciAfetDurumu.aktif().isEmpty()) {
+        if (d == null || d.dalgalar().isEmpty() || mc.player == null || IstemciAfetDurumu.aktif(AfetTuru.TSUNAMI).isEmpty()) {
             return;
         }
         double t = SanalSu.istemciSaati.getAsDouble() + e.getPartialTick();

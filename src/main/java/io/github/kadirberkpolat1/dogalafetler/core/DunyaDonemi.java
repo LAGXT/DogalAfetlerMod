@@ -27,7 +27,7 @@ import net.minecraftforge.common.MinecraftForge;
 
 /**
  * Dünya dönemi: tek SavedData ({@value #VERI_ADI}, üst dünyanın veri deposunda, boyuttan bağımsız; GOREV §4, madde 3, 9,
- * 11, 16). Gökyüzü (ay, güneş evresi), donma, buharlaşma, deniz seviyesi, geçici çarpanlar, aktif afet, son afetler geçmişi,
+ * 11, 16). Gökyüzü (ay, güneş evresi), donma, buharlaşma, deniz seviyesi, geçici çarpanlar, süren afetler, son afetler geçmişi,
  * bekleme sayaçları, oyun günü ofseti ve uyku birikimi, dönem süreçlerinin durdurma kayıtları ve ölçekli afet saati burada
  * durur. Her alanın okuyucusu vardır; dönem alanlarını sahibi olan alt sistem setter'larla değiştirir: setter
  * {@code setDirty} yapar, {@link DonemDegistiEvent} yayınlar ve istemci senkronunu işaretler. Gamerule kapatılınca
@@ -64,8 +64,11 @@ public final class DunyaDonemi extends SavedData {
     private final Map<String, DonemSureci.DurdurmaNedeni> surecDurdurmalari = new TreeMap<>();
     private boolean kayittanOkundu;
 
-    private Afet canliAfet;
-    private CompoundTag bekleyenAfet;
+    /** Süren afetler, başlama sırasıyla (AS-8: komutla birden çok, aynı türden en çok bir). */
+    private final List<Afet> canliAfetler = new ArrayList<>();
+    private final List<CompoundTag> bekleyenAfetler = new ArrayList<>();
+    /** İlk afet garantisinin sayıldığı saat (yeni dünyada 0, {@link #sifirla()} anda; AS-12). */
+    private long ilkAfetTabani;
 
     private boolean senkronGerekli = true;
     private boolean acilSenkron = true;
@@ -356,22 +359,55 @@ public final class DunyaDonemi extends SavedData {
 
     // ---------------------------------------------------------------- aktif afet
 
-    /** Süren afet (ON_UYARI dahil). */
-    public Optional<Afet> aktifAfet() {
-        return Optional.ofNullable(canliAfet);
+    /** Süren afetler (ON_UYARI dahil), başlama sırasıyla. */
+    public List<Afet> aktifAfetler() {
+        return List.copyOf(canliAfetler);
     }
 
-    void aktifAfetAyarla(Afet afet) {
-        canliAfet = afet;
-        bekleyenAfet = null;
+    /** Birincil afet: sürenlerin en erken başlayanı (tek afet varken o). */
+    public Optional<Afet> aktifAfet() {
+        return canliAfetler.isEmpty() ? Optional.empty() : Optional.of(canliAfetler.get(0));
+    }
+
+    /** Bu türden süren afet (aynı türden en çok bir tane olur). */
+    public Optional<Afet> aktifAfet(AfetTuru tur) {
+        for (Afet afet : canliAfetler) {
+            if (afet.tur() == tur) {
+                return Optional.of(afet);
+            }
+        }
+        return Optional.empty();
+    }
+
+    boolean afetVarMi(Afet afet) {
+        for (Afet a : canliAfetler) {
+            if (a == afet) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void afetEkle(Afet afet) {
+        canliAfetler.add(afet);
         setDirty();
     }
 
-    /** Kayıttan okunmuş ama henüz yöneticiye verilmemiş aktif afet NBT'sini alır ve bırakır. */
-    CompoundTag bekleyenAfetiAl() {
-        CompoundTag sonuc = bekleyenAfet;
-        bekleyenAfet = null;
+    void afetCikar(Afet afet) {
+        canliAfetler.removeIf(a -> a == afet);
+        setDirty();
+    }
+
+    /** Kayıttan okunmuş ama henüz yöneticiye verilmemiş afet NBT'lerini alır ve bırakır. */
+    List<CompoundTag> bekleyenAfetleriAl() {
+        List<CompoundTag> sonuc = List.copyOf(bekleyenAfetler);
+        bekleyenAfetler.clear();
         return sonuc;
+    }
+
+    /** İlk afet garantisinin sayıldığı saat (AS-12). */
+    public long ilkAfetTabani() {
+        return ilkAfetTabani;
     }
 
     // ---------------------------------------------------------------- alt sistem ek verisi
@@ -436,6 +472,7 @@ public final class DunyaDonemi extends SavedData {
         carpanlar.sifirla();
         bekleme.sifirla();
         sonAfetler.clear();
+        ilkAfetTabani = saat;
         sonHedef = null;
         sonSeviye = 0;
         gunOfseti = 0;
@@ -494,9 +531,19 @@ public final class DunyaDonemi extends SavedData {
                 saat, gunOfseti, uykuBirikimi, ayVar, gunesEvresi.kimlik(), evreIlerlemesi, donmaIlerlemesi, cozulmeDonemi,
                 buharlasmaDerinligi, deniz.mevcutArtis(), deniz.hedefArtis(), deniz.kalici(), carpanlar.liste().size(),
                 sonAfetler.size(), bekleme.genelKalan(saat), sonSeviye,
-                canliAfet != null ? canliAfet.tur().kimlik() + "/" + canliAfet.asama().kimlik()
-                        : bekleyenAfet != null ? bekleyenAfet.getString("tur") + "/bekliyor" : "yok",
+                aktifOzeti(),
                 surecDurdurmalari.size(), ayOlaySaati, uygulananSiklik);
+    }
+
+    private String aktifOzeti() {
+        List<String> parcalar = new ArrayList<>();
+        for (Afet afet : canliAfetler) {
+            parcalar.add(afet.tur().kimlik() + "/" + afet.asama().kimlik());
+        }
+        for (CompoundTag kayit : bekleyenAfetler) {
+            parcalar.add(kayit.getString("tur") + "/bekliyor");
+        }
+        return parcalar.isEmpty() ? "yok" : String.join(",", parcalar);
     }
 
     // ---------------------------------------------------------------- NBT
@@ -550,16 +597,18 @@ public final class DunyaDonemi extends SavedData {
         etiket.put("surecDurdurmalari", durdurmalar);
         etiket.putLong("saat", saat);
         etiket.put("ekVeri", ekVeri.copy());
-        if (canliAfet != null) {
+        etiket.putLong("ilkAfetTabani", ilkAfetTabani);
+        List<CompoundTag> afetler = new ArrayList<>();
+        for (Afet afet : canliAfetler) {
             try {
-                etiket.put("aktifAfet", canliAfet.durumYaz(new CompoundTag()));
+                afetler.add(afet.durumYaz(new CompoundTag()));
             } catch (RuntimeException hata) {
-                DogalAfetler.LOGGER.error("Aktif afet ({}) kaydedilemedi; dönem afetsiz kaydediliyor",
-                        canliAfet.tur().kimlik(), hata);
+                DogalAfetler.LOGGER.error("Aktif afet ({}) kaydedilemedi; dönem o afetsiz kaydediliyor",
+                        afet.tur().kimlik(), hata);
             }
-        } else if (bekleyenAfet != null) {
-            etiket.put("aktifAfet", bekleyenAfet.copy());
         }
+        afetler.addAll(bekleyenAfetler);
+        AfetKayitListesi.yaz(etiket, afetler);
         return etiket;
     }
 
@@ -621,9 +670,8 @@ public final class DunyaDonemi extends SavedData {
         }
         donem.saat = Math.max(0, etiket.getLong("saat"));
         donem.ekVeri.merge(etiket.getCompound("ekVeri"));
-        if (etiket.contains("aktifAfet", Tag.TAG_COMPOUND)) {
-            donem.bekleyenAfet = etiket.getCompound("aktifAfet").copy();
-        }
+        donem.ilkAfetTabani = Math.max(0, etiket.getLong("ilkAfetTabani"));
+        donem.bekleyenAfetler.addAll(AfetKayitListesi.oku(etiket));
         donem.kayittanOkundu = true;
         return donem;
     }

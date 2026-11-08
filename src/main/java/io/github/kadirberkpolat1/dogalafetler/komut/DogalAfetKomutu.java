@@ -58,6 +58,17 @@ public final class DogalAfetKomutu {
                 yonetici.durdurulmusDonemSurecleri().keySet().stream()).map(DonemSureci::kimlik), kurucu);
     };
 
+    /** Süren afetlerin adları ({@code stop <afet>}, AS-8). */
+    private static final SuggestionProvider<CommandSourceStack> SUREN_AFETLER = (baglam, kurucu) ->
+            SharedSuggestionProvider.suggest(AfetYoneticisi.al(baglam.getSource().getServer()).aktifAfetler().stream()
+                    .map(afet -> afet.tur().kimlik()), kurucu);
+
+    /** {@code asama ileri [afet|süreç]}: süren afetler ve dönem süreçleri (AS-8, K-C48). */
+    private static final SuggestionProvider<CommandSourceStack> ASAMA_HEDEFLERI = (baglam, kurucu) -> {
+        SUREN_AFETLER.getSuggestions(baglam, kurucu);
+        return SUREC_ADLARI.getSuggestions(baglam, kurucu);
+    };
+
     private DogalAfetKomutu() {
     }
 
@@ -77,7 +88,9 @@ public final class DogalAfetKomutu {
                                         .executes(b -> CekirdekKomutlari.start(b,
                                                 IntegerArgumentType.getInteger(b, "seviye"),
                                                 EntityArgument.getPlayer(b, "oyuncu")))))));
-        kok.then(Commands.literal(STOP).executes(CekirdekKomutlari::stop));
+        kok.then(Commands.literal(STOP).executes(b -> CekirdekKomutlari.stop(b, Optional.empty()))
+                .then(Commands.argument("afet", StringArgumentType.word()).suggests(SUREN_AFETLER)
+                        .executes(b -> CekirdekKomutlari.stop(b, Optional.of(StringArgumentType.getString(b, "afet"))))));
         kok.then(Commands.literal(GUN)
                 .then(Commands.argument("sayi", IntegerArgumentType.integer(0, 10_000_000))
                         .executes(CekirdekKomutlari::gun)));
@@ -91,7 +104,7 @@ public final class DogalAfetKomutu {
         kok.then(Commands.literal(SIFIRLA).executes(CekirdekKomutlari::sifirla));
         kok.then(Commands.literal(ASAMA).then(Commands.literal(ILERI)
                 .executes(b -> CekirdekKomutlari.asamaIleri(b, Optional.empty()))
-                .then(Commands.argument("surec", StringArgumentType.word()).suggests(SUREC_ADLARI)
+                .then(Commands.argument("surec", StringArgumentType.word()).suggests(ASAMA_HEDEFLERI)
                         .executes(b -> CekirdekKomutlari.asamaIleri(b,
                                 Optional.of(StringArgumentType.getString(b, "surec")))))));
         KomutKaydi.baglaTumunu(kok, olay.getBuildContext(), CEKIRDEK_ALT_KOMUTLARI);

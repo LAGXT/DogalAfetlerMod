@@ -109,7 +109,8 @@ public final class BasarimOlaylari {
 
     /**
      * Afet bittiğinde sağ çıkanlar: afet başarımları (tür, seviye, o afetteki koşullar), "Hepsini Atlattım" kümesi ve
-     * "Birlikte Hayatta". Doğal olmayan bitişte (stop, kural, iptal, hata) hiçbiri sayılmaz.
+     * "Birlikte Hayatta". Komutla başlayan ve stop ile durdurulan afet de sayılır; kural, iptal ve hata bitişinde hiçbiri
+     * sayılmaz ({@link AfetBittiEvent#basarimSayilir()}, AS-13).
      */
     @SubscribeEvent
     public static void afetBitti(AfetBittiEvent olay) {
@@ -136,7 +137,7 @@ public final class BasarimOlaylari {
                 }
             }
         }
-        Set<UUID> sagCikanlar = SagCikanTuretimi.sagCikanlar(olay.dogalBitti(), olay.etkilenenler(), olay.sagCikanlar(),
+        Set<UUID> sagCikanlar = SagCikanTuretimi.sagCikanlar(olay.basarimSayilir(), olay.etkilenenler(), olay.sagCikanlar(),
                 payliAlanda, payliOlenler, cevrimici);
         Set<Ipucu> olayli = BasarimIpucuEvent.YAYINCILAR.olayli(olay.tur());
         for (UUID kimlik : sagCikanlar) {
@@ -166,7 +167,7 @@ public final class BasarimOlaylari {
     @SubscribeEvent
     public static void ipucuGeldi(BasarimIpucuEvent olay) {
         ServerPlayer oyuncu = olay.oyuncu();
-        aktifAsamadakiAfet(oyuncu.server).ifPresent(afet -> {
+        aktifAsamadakiAfet(oyuncu).ifPresent(afet -> {
             switch (BasarimIpucuEvent.YAYINCILAR.olayGeldi(afet.tur(), olay.ipucu())) {
                 case KABUL -> isaretle(oyuncu, afet, olay.ipucu(), true);
                 case UYAR_YOK_SAY -> DogalAfetler.LOGGER.warn("[basarim] {} ipucu olayı {} afetinden geldi ama tür "
@@ -181,7 +182,7 @@ public final class BasarimOlaylari {
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void hasarAldi(LivingDamageEvent olay) {
         if (olay.getEntity() instanceof ServerPlayer oyuncu && olay.getAmount() > 0) {
-            aktifAsamadakiAfet(oyuncu.server)
+            aktifAsamadakiAfet(oyuncu)
                     .filter(afet -> yedekAcik(afet, Ipucu.HASAR_ALDI) && alanda(oyuncu, afet))
                     .ifPresent(afet -> isaretle(oyuncu, afet, Ipucu.HASAR_ALDI, false));
         }
@@ -193,13 +194,13 @@ public final class BasarimOlaylari {
             return;
         }
         MinecraftServer server = oyuncu.server;
-        AfetYoneticisi.al(server).aktifAfet().ifPresent(afet -> {
+        for (Afet afet : AfetYoneticisi.al(server).aktifAfetler()) {
             AfetIzi iz = BasarimVerisi.afetIzi(oyuncu);
             if (iz.no() == afetNo(afet) && !iz.oldu) {
                 iz.oldu = true;
                 BasarimVerisi.afetIziYaz(oyuncu, iz);
             }
-        });
+        }
         KutupSayaci kutup = BasarimVerisi.kutup(oyuncu);
         kutup.olum();
         BasarimVerisi.kutupYaz(oyuncu, kutup);
@@ -232,7 +233,7 @@ public final class BasarimOlaylari {
         if (!oyuncu.isAlive()) {
             return;
         }
-        Optional<Afet> aktif = aktifAsamadakiAfet(oyuncu.server);
+        Optional<Afet> aktif = aktifAsamadakiAfet(oyuncu);
         if (aktif.isEmpty()) {
             return;
         }
@@ -276,7 +277,7 @@ public final class BasarimOlaylari {
     }
 
     private static void afetIziniGuncelle(ServerPlayer oyuncu) {
-        Optional<Afet> aktif = aktifAsamadakiAfet(oyuncu.server);
+        Optional<Afet> aktif = aktifAsamadakiAfet(oyuncu);
         if (aktif.isEmpty() || !oyuncu.isAlive() || oyuncu.isSpectator() || !alanda(oyuncu, aktif.get())) {
             return;
         }
@@ -554,8 +555,24 @@ public final class BasarimOlaylari {
 
     // ---------------------------------------------------------------- yardımcılar
 
-    private static Optional<Afet> aktifAsamadakiAfet(MinecraftServer server) {
-        return AfetYoneticisi.al(server).aktifAfet().filter(afet -> afet.asama() == AfetAsamasi.AKTIF);
+    /**
+     * Oyuncu için AKTIF aşamadaki afet: birden çok sürüyorsa (AS-8) oyuncunun alanında olduğu ilki, hiçbirinin alanında
+     * değilse AKTIF olanların ilki. Oyuncunun izi tek afete bağlıdır ({@link AfetIzi}).
+     */
+    private static Optional<Afet> aktifAsamadakiAfet(ServerPlayer oyuncu) {
+        Afet ilk = null;
+        for (Afet afet : AfetYoneticisi.al(oyuncu.server).aktifAfetler()) {
+            if (afet.asama() != AfetAsamasi.AKTIF) {
+                continue;
+            }
+            if (alanda(oyuncu, afet)) {
+                return Optional.of(afet);
+            }
+            if (ilk == null) {
+                ilk = afet;
+            }
+        }
+        return Optional.ofNullable(ilk);
     }
 
     /** Afet numarası: başlangıç saati ({@code AfetBittiEvent.baslangicSaati()} ile aynı). */

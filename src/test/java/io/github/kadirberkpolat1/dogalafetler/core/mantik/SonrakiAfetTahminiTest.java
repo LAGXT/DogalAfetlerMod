@@ -67,6 +67,22 @@ class SonrakiAfetTahminiTest {
         assertEquals(0, tahmin.enErken());
     }
 
+    /** AS-12: garanti anı en geç sınırdır; ortalama kısalır. Garanti beklemeden önceyse seçim ilk çıkışta olur. */
+    @Test
+    void ilkAfetGarantisiEnGecSinirdir() {
+        Set<AfetTuru> hepsi = EnumSet.allOf(AfetTuru.class);
+        SonrakiAfetTahmini serbest = SonrakiAfetTahmini.hesapla(A, 0, new BeklemeDurumu(), hepsi, tur -> 1, 1).orElseThrow();
+        SonrakiAfetTahmini garantili = SonrakiAfetTahmini.hesapla(A, 0, new BeklemeDurumu(), hepsi, tur -> 1, 1, 24_000)
+                .orElseThrow();
+        assertTrue(serbest.enGec() > 24_000, "garantisiz %90 sınırı bir günden uzun: " + serbest);
+        assertEquals(24_000, garantili.enGec());
+        assertTrue(garantili.ortalama() < serbest.ortalama() && garantili.ortalama() > garantili.enErken(), garantili.toString());
+        SonrakiAfetTahmini erken = SonrakiAfetTahmini.hesapla(A, 0, new BeklemeDurumu(), hepsi, tur -> 1, 1, 100)
+                .orElseThrow();
+        assertEquals(A.baslangicBeklemeTick(), erken.enGec());
+        assertEquals(A.baslangicBeklemeTick(), erken.ortalama());
+    }
+
     /** Tahmin zamanlayıcının kendisiyle tutarlı: aynı kurallarla sınanan seçimlerin ortalaması tahmine yakın. */
     @Test
     void tahminZamanlayiciylaTutarli() {
@@ -75,7 +91,8 @@ class SonrakiAfetTahminiTest {
         bekleme.afetBitti(AfetTuru.DEPREM, 3, 0, A, 10);
         long baslangic = 500;
         SonrakiAfetTahmini tahmin = tahmin(A, baslangic, bekleme, hepsi, 10);
-        assertEquals(A.baslangicBeklemeTick() / 10 - baslangic, tahmin.enErken(), "başlangıç beklemesi (2400) belirler");
+        assertEquals(Math.max(A.baslangicBeklemeTick() / 10 - baslangic, bekleme.genelKalan(baslangic)), tahmin.enErken(),
+                "başlangıç ya da genel beklemenin geç biteni belirler");
         SplittableRandom rastgele = new SplittableRandom(7);
         double toplam = 0;
         int deneme = 4_000;

@@ -217,17 +217,28 @@ public final class BasarimOyunTestleri {
         y.succeed();
     }
 
+    /**
+     * AS-13 (kullanıcı isteği 2026-11-08): komutla başlatılan ({@code elleBaslat} = {@code /dogalafet start}) ve stop ile
+     * durdurulan afette alandaki oyuncu sağ çıkmış sayılır; kural ile kesilen afet sayılmaz.
+     */
     @GameTest(template = "bos", batch = "basarim_stop")
-    public static void stopIleBitenAfetSagCikmaSayilmaz(GameTestHelper y) {
+    public static void komutlaBaslayipStopIleBitenAfetSagCikmaSayilir(GameTestHelper y) {
         ServerPlayer a = oyuncu(y, "stop-a", 0);
+        ServerPlayer b = null;
         try {
             kasirga(y, 5, a, true, () -> { });
             dogrula(y, kazandi(y, a, Basarimlar.KOK), "siren duyuldu");
-            dogrula(y, !kazandi(y, a, Basarimlar.ILK_RUZGAR) && !kazandi(y, a, Basarimlar.FELAKET_USTASI),
-                    "stop ile biten afet (dogalBitti false) sayılmaz");
-            dogrula(y, BasarimVerisi.atlatilanlar(a).boyut() == 0, "stop atlatılanlara yazılmaz");
+            dogrula(y, kazandi(y, a, Basarimlar.ILK_RUZGAR) && kazandi(y, a, Basarimlar.FELAKET_USTASI),
+                    "komutla başlayıp stop ile biten S5 kasırga İlk Rüzgâr ve Felaket Ustası vermeli");
+            dogrula(y, BasarimVerisi.atlatilanlar(a).iceriyor(AfetTuru.KASIRGA), "stop atlatılanlara yazılmalı");
+            b = oyuncu(y, "kural-b", 0);
+            Set<UUID> kim = Set.of(b.getUUID());
+            BasarimOlaylari.afetBitti(new AfetBittiEvent(AfetTuru.DEPREM, 2, b.blockPosition(), Level.OVERWORLD, kim, kim,
+                    -7_000_000L, -6_999_999L, BitisNedeni.KURAL));
+            dogrula(y, !kazandi(y, b, Basarimlar.SALLANAN_ZEMIN) && BasarimVerisi.atlatilanlar(b).boyut() == 0,
+                    "kural ile kesilen afet sayılmamalı");
         } finally {
-            cikar(y, List.of(a));
+            cikar(y, b == null ? List.of(a) : List.of(a, b));
         }
         y.succeed();
     }
@@ -601,11 +612,11 @@ public final class BasarimOyunTestleri {
             }
             AfetTuru son = turler[turler.length - 1];
             dogrula(y, !kazandi(y, a, Basarimlar.HEPSINI_ATLATTIM), "7 tür yetmez");
-            bitti(a, son, son.seviyeli() ? 1 : 0, no--, BitisNedeni.KOMUT);
+            bitti(a, son, son.seviyeli() ? 1 : 0, no--, BitisNedeni.KURAL);
             dogrula(y, !kazandi(y, a, Basarimlar.HEPSINI_ATLATTIM) && !gorunur(y, a, Basarimlar.HEPSINI_ATLATTIM),
-                    "stop ile biten 8. tür sayılmaz; gizli kalır");
-            bitti(a, son, son.seviyeli() ? 1 : 0, no--, BitisNedeni.DOGAL);
-            dogrula(y, kazandi(y, a, Basarimlar.HEPSINI_ATLATTIM), "sekiz tür Hepsini Atlattım verir");
+                    "kural ile kesilen 8. tür sayılmaz; gizli kalır");
+            bitti(a, son, son.seviyeli() ? 1 : 0, no--, BitisNedeni.KOMUT);
+            dogrula(y, kazandi(y, a, Basarimlar.HEPSINI_ATLATTIM), "stop ile biten 8. türle sekiz tür Hepsini Atlattım verir");
             dogrula(y, gorunur(y, a, Basarimlar.HEPSINI_ATLATTIM), "açılınca görünür");
             dogrula(y, BasarimVerisi.unvan(a).orElse(null) == Unvan.HER_SEYI_ATLATAN, "meydan okuma ünvanı");
             dogrula(y, kazandi(y, a, Basarimlar.GUNESI_ATLATTIM) && kazandi(y, a, Basarimlar.AY_DUSTU)

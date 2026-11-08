@@ -6,7 +6,7 @@ import java.util.UUID;
 
 /**
  * Madde 12 "sağ çıkmak": afetin etki alanındayken afet bitene kadar ölmemek. Çekirdek {@code AfetBittiEvent} ile etkilenen ve
- * sağ çıkanları verir (çekirdek §A5); başarımlar yalnız doğal bitişi sayar. {@code basarim.etkiAlaniPayi} sıfırdan
+ * sağ çıkanları verir (çekirdek §A5); başarımlar doğal bitişi ve stop'u sayar (AS-13). {@code basarim.etkiAlaniPayi} sıfırdan
  * büyükse etki alanının o kadar dışında kalan oyuncuları başarım kendisi izler ({@link AfetIzi}); onlar da ölmemiş ve
  * bitince çevrim içiyse sağ çıkandır.
  */
@@ -15,17 +15,17 @@ public final class SagCikanTuretimi {
     }
 
     /**
-     * @param dogalBitti   {@code AfetBittiEvent.dogalBitti()}; değilse (stop, kural, iptal, hata) kimse sağ çıkmaz
+     * @param sayilir      {@code AfetBittiEvent.basarimSayilir()}; değilse (kural, iptal, hata) kimse sağ çıkmaz
      * @param etkilenenler olaydaki etkilenenler
      * @param sagCikanlar  olaydaki sağ çıkanlar (etkilenenlerle kesiştirilir)
      * @param payliAlanda  etki alanı payı içinde AKTIF aşamada bulunmuş oyuncular
      * @param payliOlenler bunlardan afet sürerken ölenler
      * @param cevrimici    bitişte çevrim içi oyuncular
      */
-    public static Set<UUID> sagCikanlar(boolean dogalBitti, Set<UUID> etkilenenler, Set<UUID> sagCikanlar,
+    public static Set<UUID> sagCikanlar(boolean sayilir, Set<UUID> etkilenenler, Set<UUID> sagCikanlar,
             Set<UUID> payliAlanda, Set<UUID> payliOlenler, Set<UUID> cevrimici) {
         Set<UUID> sonuc = new LinkedHashSet<>();
-        if (!dogalBitti) {
+        if (!sayilir) {
             return sonuc;
         }
         for (UUID kimlik : sagCikanlar) {

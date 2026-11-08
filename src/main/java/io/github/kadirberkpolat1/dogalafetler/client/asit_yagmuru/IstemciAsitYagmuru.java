@@ -176,8 +176,7 @@ public final class IstemciAsitYagmuru {
 
     /** Paketten durumu okur, 1 Hz arasında yumuşatır; bu boyutta asit yağmuru yoksa sıfırlar. */
     private static boolean durumuOku(ClientLevel level) {
-        Optional<AfetDurumPaketi> paket = IstemciAfetDurumu.aktif().filter(p -> p.tur() == AfetTuru.ASIT_YAGMURU
-                && p.boyut().equals(level.dimension().location())
+        Optional<AfetDurumPaketi> paket = IstemciAfetDurumu.aktif(AfetTuru.ASIT_YAGMURU).filter(p -> p.boyut().equals(level.dimension().location())
                 && (p.asama() == AfetAsamasi.SIREN || p.asama() == AfetAsamasi.AKTIF));
         if (paket.isEmpty()) {
             if (aktif) {

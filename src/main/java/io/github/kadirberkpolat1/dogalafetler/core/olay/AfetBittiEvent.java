@@ -12,7 +12,7 @@ import net.minecraftforge.eventbus.api.Event;
 /**
  * Afet bitti (GOREV §4 "afet bitiş olayı"). {@code etkilenenler}: AKTIF aşamada etki alanına en az bir kez girmiş oyuncular;
  * {@code sagCikanlar}: bunlardan afet bitene kadar ölmeyen ve bitişte çevrim içi olanlar (madde 12 "sağ çıkmak").
- * Zamanlar ölçekli afet saatidir. Başarımlar yalnız {@link #dogalBitti()} olanları saymalıdır.
+ * Zamanlar ölçekli afet saatidir. Başarımlar yalnız {@link #basarimSayilir()} olanları sayar (AS-13).
  */
 public class AfetBittiEvent extends Event {
     private final AfetTuru tur;
@@ -77,5 +77,13 @@ public class AfetBittiEvent extends Event {
 
     public boolean dogalBitti() {
         return neden == BitisNedeni.DOGAL;
+    }
+
+    /**
+     * AS-13 (kullanıcı kararı, 2026-11-08): kendiliğinden biten afet ve {@code /dogalafet stop} ile durdurulan afet
+     * başarımda sayılır; kural ile kesilen, ön-uyarıda iptal edilen ve hata veren sayılmaz. Komutla başlatma da sayılır.
+     */
+    public boolean basarimSayilir() {
+        return neden == BitisNedeni.DOGAL || neden == BitisNedeni.KOMUT;
     }
 }

@@ -280,6 +280,42 @@ class AfetZamanlayicisiTest {
         assertEquals(0, sonuc.toplam());
     }
 
+    /** K-C2 rev. 2 (AS-11): kullanıcı ilk afeti ilk oyun gününde görsün. */
+    @Test
+    void varsayilanBeklemelerIlkGunIcinKisa() {
+        ZamanlayiciAyarlari a = ZamanlayiciAyarlari.VARSAYILAN;
+        assertEquals(6_000, a.baslangicBeklemeTick());
+        assertEquals(6_000, a.genelBeklemeTick());
+        assertEquals(24_000, a.ilkAfetGarantiTick());
+        for (AfetTuru tur : SIK_ALTI) {
+            assertEquals(24_000, a.turBekleme(tur), tur.kimlik());
+        }
+        assertEquals(240_000, a.turBekleme(AfetTuru.AY_CARPMASI));
+        assertEquals(480_000, a.turBekleme(AfetTuru.GUNES_PATLAMASI));
+    }
+
+    /** AS-12: garanti olay olasılığını 1 yapar ama beklemeleri ve uygunluğu korur. */
+    @Test
+    void garantiOlasiligiBirYaparBeklemeyiKorur() {
+        ZamanlayiciAyarlari ayarlar = ZamanlayiciAyarlari.VARSAYILAN.gunlukOranIle(1e-9);
+        SplittableRandom rastgele = new SplittableRandom(6);
+        Set<AfetTuru> hepsi = EnumSet.allOf(AfetTuru.class);
+        long saat = ayarlar.baslangicBeklemeTick();
+        for (int i = 0; i < 200; i++) {
+            assertTrue(AfetZamanlayicisi.sec(ayarlar, new AfetZamanlayicisi.Girdi(false, saat, 20, new BeklemeDurumu(), hepsi,
+                    tur -> 1, 1, false, true), rastgele).isPresent(), "garanti seçim yapmalı");
+        }
+        assertTrue(AfetZamanlayicisi.sec(ayarlar, new AfetZamanlayicisi.Girdi(false, saat, 20, new BeklemeDurumu(), hepsi,
+                tur -> 1, 1, false, false), rastgele).isEmpty(), "garantisiz çok düşük oranda seçim olmamalı");
+        assertTrue(AfetZamanlayicisi.sec(ayarlar, new AfetZamanlayicisi.Girdi(false, saat - 1, 20, new BeklemeDurumu(),
+                hepsi, tur -> 1, 1, false, true), rastgele).isEmpty(), "garanti başlangıç beklemesini aşmamalı");
+        assertTrue(AfetZamanlayicisi.sec(ayarlar, new AfetZamanlayicisi.Girdi(true, saat, 20, new BeklemeDurumu(), hepsi,
+                tur -> 1, 1, false, true), rastgele).isEmpty(), "afet sürerken garanti seçim yapmamalı");
+        AfetZamanlayicisi.Girdi g = new AfetZamanlayicisi.Girdi(false, saat, 20, new BeklemeDurumu(), hepsi, tur -> 1, 1,
+                false, true);
+        assertTrue(g.ile(EnumSet.of(AfetTuru.DEPREM), false).garanti(), "ile() garantiyi korumalı");
+    }
+
     @Test
     void beklemeOlcekleSikligaBoler() {
         assertEquals(1_200, AfetZamanlayicisi.beklemeOlcekle(12_000, 10));

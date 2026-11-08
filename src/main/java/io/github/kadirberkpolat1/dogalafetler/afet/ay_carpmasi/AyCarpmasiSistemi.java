@@ -37,7 +37,7 @@ public final class AyCarpmasiSistemi {
         if (donem.ayDurumu() != AyDurumu.YAKLASIYOR) {
             return;
         }
-        boolean ayAfeti = AfetYoneticisi.al(olay.getServer()).aktifAfet().filter(AyCarpmasi.class::isInstance).isPresent();
+        boolean ayAfeti = AfetYoneticisi.al(olay.getServer()).aktifAfet(AfetTuru.AY_CARPMASI).filter(AyCarpmasi.class::isInstance).isPresent();
         if (!ayAfeti) {
             donem.ayDurumuAyarla(AyDurumu.VAR, AyDurumu.OLAY_YOK);
             DogalAfetler.LOGGER.warn("Ay YAKLASIYOR ama aktif ay çarpması yok (kayıt okunamadı?); ay VAR'a döndü");

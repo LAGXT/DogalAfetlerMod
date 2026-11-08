@@ -121,7 +121,7 @@ public final class GokyuzuKomutlari {
             kaynak.sendFailure(Component.translatable(ZATEN));
             return 0;
         }
-        if (yonetici.aktifAfet().filter(a -> a.tur() == AfetTuru.GUNES_PATLAMASI).isPresent()) {
+        if (yonetici.aktifAfet(AfetTuru.GUNES_PATLAMASI).isPresent()) {
             kaynak.sendFailure(Component.translatable(AFET_SURUYOR));
             return 0;
         }
@@ -142,7 +142,7 @@ public final class GokyuzuKomutlari {
             kaynak.sendFailure(Component.translatable(PULSAR_ZATEN));
             return 0;
         }
-        if (yonetici.aktifAfet().filter(a -> a.tur() == AfetTuru.GUNES_PATLAMASI).isPresent()) {
+        if (yonetici.aktifAfet(AfetTuru.GUNES_PATLAMASI).isPresent()) {
             kaynak.sendFailure(Component.translatable(AFET_SURUYOR));
             return 0;
         }

@@ -86,20 +86,27 @@ public final class SismografSunucu {
         boolean hassas = sismograf.hassas();
         float titreme = SismografAyarlari.titreme();
         AfetYoneticisi yonetici = AfetYoneticisi.al(oyuncu.server);
-        Optional<Afet> secili = yonetici.aktifAfet();
-        if (secili.isEmpty() || !Gorunurluk.sismikTur(secili.get().tur())) {
-            return SismografPaketi.sakin(hassas, titreme);
+        Afet afet = null;
+        EtkiAlani alan = null;
+        double enYakin = Double.POSITIVE_INFINITY;
+        for (Afet aday : yonetici.aktifAfetler()) {
+            if (!Gorunurluk.sismikTur(aday.tur())) {
+                continue;
+            }
+            Optional<EtkiAlani> okunan = yonetici.etkiAlani(aday);
+            if (okunan.isEmpty()) {
+                continue;
+            }
+            boolean ayniBoyut = oyuncu.level().dimension().equals(aday.baglam().boyut());
+            double mesafe = YonMesafe.mesafe(oyuncu.getX(), oyuncu.getZ(), okunan.get().x(), okunan.get().z());
+            if (mesafe < enYakin && Gorunurluk.sismograf(aday.tur(), aday.asama(), aday.normalOnUyariBasladi(), hassas,
+                    ayniBoyut, mesafe, SismografAyarlari.menzil(hassas))) {
+                afet = aday;
+                alan = okunan.get();
+                enYakin = mesafe;
+            }
         }
-        Afet afet = secili.get();
-        Optional<EtkiAlani> okunan = yonetici.etkiAlani(afet);
-        if (okunan.isEmpty()) {
-            return SismografPaketi.sakin(hassas, titreme);
-        }
-        EtkiAlani alan = okunan.get();
-        boolean ayniBoyut = oyuncu.level().dimension().equals(afet.baglam().boyut());
-        double mesafe = YonMesafe.mesafe(oyuncu.getX(), oyuncu.getZ(), alan.x(), alan.z());
-        if (!Gorunurluk.sismograf(afet.tur(), afet.asama(), afet.normalOnUyariBasladi(), hassas, ayniBoyut, mesafe,
-                SismografAyarlari.menzil(hassas))) {
+        if (afet == null) {
             return SismografPaketi.sakin(hassas, titreme);
         }
         double ilerleme = afet.asama() == AfetAsamasi.ON_UYARI

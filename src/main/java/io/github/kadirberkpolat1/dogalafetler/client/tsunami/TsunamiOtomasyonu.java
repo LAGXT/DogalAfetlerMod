@@ -541,7 +541,7 @@ public final class TsunamiOtomasyonu {
      */
     private static long[] yikimSayaci(Minecraft mc) {
         var sunucu = mc.getSingleplayerServer();
-        return sunucu == null ? null : AfetYoneticisi.al(sunucu).aktifAfet().filter(TsunamiAfeti.class::isInstance)
+        return sunucu == null ? null : AfetYoneticisi.al(sunucu).aktifAfet(AfetTuru.TSUNAMI).filter(TsunamiAfeti.class::isInstance)
                 .map(a -> ((TsunamiAfeti) a).yikimSayaci()).orElse(null);
     }
 
@@ -759,7 +759,7 @@ public final class TsunamiOtomasyonu {
      * yerleştirilmez, {@code AVCI GECERSIZ} yazılır (betik koşuyu geçersiz sayar).
      */
     private static void avciAdimi(Minecraft mc, String ne) {
-        AfetDurumPaketi p = IstemciAfetDurumu.aktif().filter(d -> d.tur() == AfetTuru.TSUNAMI).orElse(null);
+        AfetDurumPaketi p = IstemciAfetDurumu.aktif(AfetTuru.TSUNAMI).orElse(null);
         if ("durum".equals(ne)) {
             log("AVCI durum can={} mod={} konum=({} {} {}) afet={}", String.format(Locale.ROOT, "%.1f", mc.player.getHealth()),
                     mc.gameMode == null ? "?" : mc.gameMode.getPlayerMode(), String.format(Locale.ROOT, "%.1f", mc.player.getX()),
@@ -829,7 +829,7 @@ public final class TsunamiOtomasyonu {
             kopukKamerasi(mc);
             return;
         }
-        CompoundTag o = IstemciAfetDurumu.aktif().filter(d -> d.tur() == AfetTuru.TSUNAMI).map(AfetDurumPaketi::ozel)
+        CompoundTag o = IstemciAfetDurumu.aktif(AfetTuru.TSUNAMI).map(AfetDurumPaketi::ozel)
                 .orElse(null);
         if (o == null || !o.contains("kx")) {
             log("KAMERA {} tsunami verisi yok; kamera değişmedi", ne);
@@ -858,7 +858,7 @@ public final class TsunamiOtomasyonu {
      * dalga; dalga yoksa kıyı tabanı + 4) 1,5 blok üstünde, en az zemin + 1,8.
      */
     private static void kopukKamerasi(Minecraft mc) {
-        CompoundTag o = IstemciAfetDurumu.aktif().filter(d -> d.tur() == AfetTuru.TSUNAMI).map(AfetDurumPaketi::ozel)
+        CompoundTag o = IstemciAfetDurumu.aktif(AfetTuru.TSUNAMI).map(AfetDurumPaketi::ozel)
                 .orElse(null);
         if (o == null || !o.contains("kx")) {
             log("KAMERA kopuk tsunami verisi yok; kamera değişmedi");
