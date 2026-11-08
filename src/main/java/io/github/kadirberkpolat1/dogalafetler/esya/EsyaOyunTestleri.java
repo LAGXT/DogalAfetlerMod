@@ -483,18 +483,17 @@ public final class EsyaOyunTestleri {
     }
 
     /**
-     * Yüklü her {@code dogalafetler} tarifinin tarif kitabı başarımı ({@code dogalafetler:recipes/<sekme>/<tarif>}) var; yoksa tarif
-     * kitabında hiç görünmez. Özel tarifler ({@code isSpecial}, zırh ekleri) vanilla kitapta zaten görünmez, muaf. Meteor tarifleri
+     * Yüklü her {@code dogalafetler} tarifi bir tarif kitabı başarımının ({@code dogalafetler:recipes/**}) ödül listesinde
+     * ({@code rewards.recipes}); yoksa tarif kitabında hiç görünmez. Özel tarifler ({@code isSpecial}, zırh ekleri) vanilla kitapta zaten görünmez, muaf. Meteor tarifleri
      * girdi meteor eşyası envantere girince açılır.
      */
     @GameTest(template = "bos", batch = "esya_tarif")
     public static void herTarifinKitapKilidiVarMeteorTarifleriGirdiyleAcilir(GameTestHelper yardimci) {
         MinecraftServer server = yardimci.getLevel().getServer();
-        Set<String> kilitler = new HashSet<>();
+        Set<ResourceLocation> kilitler = new HashSet<>();
         for (Advancement a : server.getAdvancements().getAllAdvancements()) {
             if (DogalAfetler.MOD_ID.equals(a.getId().getNamespace()) && a.getId().getPath().startsWith("recipes/")) {
-                String yol = a.getId().getPath();
-                kilitler.add(yol.substring(yol.lastIndexOf('/') + 1));
+                kilitler.addAll(Arrays.asList(a.getRewards().getRecipes()));
             }
         }
         List<String> kilitsiz = new ArrayList<>();
@@ -506,7 +505,7 @@ public final class EsyaOyunTestleri {
             }
             if (tarif.isSpecial()) {
                 ozel.add(tarif.getId().getPath());
-            } else if (!kilitler.contains(tarif.getId().getPath())) {
+            } else if (!kilitler.contains(tarif.getId())) {
                 kilitsiz.add(tarif.getId().getPath());
             } else {
                 sayi++;
