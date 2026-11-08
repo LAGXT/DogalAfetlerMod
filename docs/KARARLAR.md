@@ -463,7 +463,13 @@ başına iş: 11³ blok taraması (~1 300 `getBlockState`, oyuncunun yüklü çe
 söner (ısı çarpması sönmez); vanilla donma (`setTicksFrozen`) tam donunca kendi hasarını ekler. Bunun yerine
 `dogalafetler:donma`/`asiri_isinma` hasarı, aralık eşikte 6 sn'den uçta 2 sn'ye kısalır (yarım kalp); alev/kar tanesi
 parçacıkları görsel işaret verir. Aşırı ısınma `is_fire` etiketlidir: Ateşe Direnç iksiri korur (Cold Sweat ile aynı oyuncu
-beklentisi). Zırh hasarı azaltmaz (`bypasses_armor`), geri tepme yok.
+beklentisi). Zırh hasarı azaltmaz (`bypasses_armor`), geri tepme yok. **Rev. (K-E66, pulsar-2 PL-44 `8300c75`): kendi ekranına
+parçacık gitmez.** Alev (4 `FLAME`) ve kar (6 `SNOWFLAKE`) parçacıkları yalnız aynı boyuttaki diğer oyunculara gider
+(`SicaklikYoneticisi.etkileriUygula`, `ServerLevel.sendParticles(alıcı, …)`, vanilla 32 blok sınırı): gözün 0,6 blok altında
+doğan 8×8 sprite birinci şahısta 32–75 px'lik bloklu turuncu/beyaz leke oluyordu (pulsar `karadelik_spagetti` karesinde koşu
+11'de 30 149 px; hayatta kalma oyuncusu pulsarda ve buzulda aynı lekeyi görürdü). Oyuncunun kendisi sıcaklığı HUD, vinyet ve
+hasarla okur (S-10, S-11). Kanıt: dal GameTest 144/144 (`.vibe/kanit/pulsar-2/gametest-8.log`), görsel koşu 13'te kara delik
+karelerinde leke 0 px; entegrasyonda filtresiz kapı (K-E66).
 
 **S-09 Yavaşlama hareket hızı değiştiricisi.** `MOVEMENT_SPEED` üzerinde sabit UUID'li geçici `MULTIPLY_TOTAL` değiştirici; soğuk
 eşiğinden (−30) ölçek ucuna %0→%50. Slowness efekti kullanılmadı (ikon/parçacık görünür, süt ile silinir, süre yönetimi ister).
@@ -6102,11 +6108,21 @@ merceklenmiş görüntüsünün gölge merkezinden yatay uzaklığı ≥ 1 gölg
 0,9, altı 1,0), arası yumuşak (iki ara deneme oranı bozdu: cos²φ 1,61, disk düzleminden seçim 1,76). Görsel koşu 11: `karadelik_mercek`
 oran 2,04 (ölçüt ≥ 2,0), doygunluk 0,153, orta sütun tepesi 0,81 / 0,87 (referans 0,90 / 0,99); kontrol `pulsar_buyuk` 3,67,
 spagetti korku 3,00. Şef kararı: `karadelik_parlama` karesinin ana ölçütü okunurluk (parlama anında korku uygun ölçüt değil;
-okunurluk 3,00, korku 1,67–2,00 bilgi): bilinen sınır listesinden çıktı. **Bilinen sınırlar:** pc2 kare koşularında FPS 15–19
-(K-E29 b, bilgi; ana makine koşu 6 en düşük 29); üç kare değerlendirici model ölçütünün (PL-39, ≥ 3) altında: `karadelik_karanlik`
-(korku 2,00, koşu 11; koşu 7: 2,33), `gunessiz_buz` (2,00) ve `kizil_cuce_dogus` (2,00; koşu 7, 3 örnek); referansla çift
-karşılaştırma (koşu 11'e karşı koşu 7: mercek 0/6, spagetti 0/6, karanlık 3/6) oran ölçütüyle çelişiyor, seçim şefte; yeni deneme
-yok, kullanıcı oyunda karar verir; yutma parlaması (1,5 sn tepe) `pulsarTitresim`'le ölçeklenmez. Kanıt K-E65'teki kapılar (son: filtresiz 274/274, `f172807`).
+okunurluk 3,00, korku 1,67–2,00 bilgi): bilinen sınır listesinden çıktı. **İnceleme 3 son tur, PL-44 (`931cdd0`, entegrasyon
+`6f1d35b`; şef kararı: Ph2 ölçütü referansa bağlı):** "oran ≥ 2,0" yanlış hedefti, kullanıcı referansa benzerlik istedi; yeni ölçüt
+`karadelik_mercek` sol/sağ oranı referansın ±0,2 bandında (referans 1,61 → 1,45–1,80), doygunluk ≤ 0,3, orta sütun tepesi üst
+≥ 0,85 / alt ≥ 0,9, gölge tam siyah. Merceklenmiş yaylarda (arka yarı, ikinci görüntü) Doppler 0,7 derinlikte
+(`KaraDelik3B.YAY_DOPPLER`: `1 + 0,7·(Doppler − 1)`, uzaklaşan uç ×0,51; ön yarıda tam Doppler; PL-43'ün görüntü konumundan bant
+seçimi kalır); Doppler'siz yaylar (`8300c75`) oranı 1,15'e indirmişti. Orta sütun: üst yay 1,0, alttaki ön yarı ve ikinci
+görüntü 1,12 (`TEPE_ALT`; 1'i aşan pay kalıntı geçişinde, Doppler çarpanı ≤ 1). Görsel koşu 13 (ana makine): oran 1,60,
+doygunluk 0,161, orta sütun tepesi 0,89 / 0,95, gölgenin üst yarısı L 0, karanlık kalıntı parlak pikseli 10 758 (≥ koşu 7'nin
+10 042); mercek okunurluk 3,00 / benzerlik 3,00, spagetti korku 3,00, kontrol `pulsar_buyuk` 3,00; bütün PL-44 ölçütleri tuttu.
+Spagetti karesindeki turuncu leke pulsar değil sıcaklık parçacığıydı: hasarlı sıcaklık kademesinde oyuncunun kendisine giden
+`FLAME`/`SNOWFLAKE` (S-08 rev.: kendi ekranına parçacık gitmez; `sicaklik/` değişti, kapı filtresiz). **Bilinen sınırlar:**
+pc2 kare koşularında FPS 15–19 (K-E29 b, bilgi; ana makine koşu 6 en düşük 29); üç kare değerlendirici model ölçütünün (PL-39,
+≥ 3) altında: `karadelik_karanlik` (korku 2,67, koşu 13), `gunessiz_buz` (2,00) ve `kizil_cuce_dogus` (2,00; koşu 7, 3 örnek);
+referansla çift karşılaştırma bilgi (koşu 13'e karşı koşu 7: mercek 0/6, spagetti 2/6, karanlık 4/6); yeni deneme yok, kullanıcı
+oyunda karar verir; yutma parlaması (1,5 sn tepe) `pulsarTitresim`'le ölçeklenmez. Kanıt: son kapı `6f1d35b` (pulsar-2 `931cdd0` birleşmesi; kuyruktan, ana makine, pc2 erişilemez): `runData` `1108-090907967-0c` fark yok (written 0), `compileJava` `1108-090908059-41` BUILD SUCCESSFUL (runData derlemişti, UP-TO-DATE), JUnit 722/0 `1108-090908147-ad` (`test @3a937c0661cd`), filtresiz GameTest 274/274 `1108-090908235-9d` (`FILTRE=yok`, `gametest @fa53fbfa8f77`, protokol 8, en büyük batch 7; iki `/ERROR]` kasıtlı deprem testleri), N19 245/245 fark 0; pano `pano-7.txt`.
 
 ## Açık noktalar (Faz 2b)
 
@@ -6407,7 +6423,9 @@ P2-9 `5-matris` kabulünde. Kapanış eşlemesi (K-E50) her maddenin sonunda:
 | gökyüzü (sabit) | kavurma yarıçapı / lav paydası / en yakın oyuncu; `PulsarKavurma` 3 günde isabet / tavan | 96 blok / 1/400 / 24 blok; 16 / sütun, 64 deneme/merkez/tick | — | K-E66 PL-12, PL-37 |
 | gökyüzü (sabit) | `GokCapasi` uzaklık / τ; `KaraDelikYutmaEgrileri.SON_CAP` | 800 blok / 60 sn (pulsar), 120 sn (kara delik); 2° (90. sn; 72. sn 8,2°) | — | K-E66 PL-27, PL-31 |
 | gökyüzü (sabit) | `KaraDelikYutmaEgrileri.ORTU_TEPE` / `ORTU_TABAN` | %50 / %15 (0,3 sn tepe, 1,2 sn iniş) | — | K-E66 PL-27 |
-| gökyüzü (sabit) | `KaraDelik3B` disk kazancı / Doppler yaklaşan, uzaklaşan | 3,5 (Doppler'den önce, 1'de kırpılır) / 1, ×0,3 | — | K-E66 PL-42 Pg2: referans oranı; ölçülen 2,24 |
+| gökyüzü (sabit) | `KaraDelik3B` disk köşesi: Doppler yaklaşan, uzaklaşan | 1, ×0,3 (yalnız Doppler çarpanı kırpılır, ≤ 1; besleme eğrisi × (1 + 0,8·morluk), 1'i aşan pay kalıntı geçişinde) | — | K-E66 PL-42 Pg2, PL-43 Ph1 (Pg2'nin 3,5 kazancı kalktı) |
+| gökyüzü (sabit) | `KaraDelik3B.YAY_DOPPLER` | 0,7 | 0–1 | K-E66 PL-44: merceklenmiş yaylarda Doppler derinliği (ön yarıda 1); oran referans 1,61'in ±0,2 bandında, ölçülen 1,60 |
+| gökyüzü (sabit) | `KaraDelik3B.TEPE_ALT` (alttaki orta sütun; üstteki yay 1) | 1,12 | — | K-E66 PL-44 (PL-43: 0,9 / 1,0); ölçülen tepe 0,89 / 0,95 |
 | gökyüzü (sabit) | kırağı vinyeti (`KIRAGI_ILK`, `KIRAGI_TAM`) | %45 / %100 | — | K-E66 PL-27, PL-41 |
 | gökyüzü (sabit) | buzul sisi (görüş, başlangıç); tipi (`TIPI_KAR_KATI`, `TIPI_RUZGAR_KATI`); tipi rüzgârı düzeyi | ×0,45 / ×0,1; ×4 / ×6; 0,55 | — | K-E66 PL-27, PL-41 |
 | gökyüzü (sabit) | ufuk koru alfası, kalıntı ek kazancı; doğuş şişkinliği, koyu şafak gücü | 0,85 / 0,8; 1,5 / 0,85 (ilerleme 0,15–0,9) | — | K-E66 PL-41 |
