@@ -181,6 +181,42 @@ class SiraTest(unittest.TestCase):
         sira.dizin("ana", "kosan")
         surdur([sira_kosucu.Kosucu("ana", 2)], [pc2_dolu])
 
+    def test_pc2_erisilemezse_yuvalari_kapali_oto_ana_pc2_isi_bekler(self):
+        """K-E60 rev. 2: sahte ssh başarısız (çıkış 255) → pc2 yuvaları kapalı, oto işi ana'ya, pc2 işi ölmeden bekler;
+        ssh geçince pc2 kendiliğinden açılır ve bekleyen iş koşar."""
+        sahte = Path(tempfile.mkdtemp(dir=GECICI))
+        ssh = sahte / "ssh"
+        ssh.write_text('#!/bin/sh\necho "ssh: connect to host 192.0.2.1 port 22: No route to host" >&2\nexit 255\n')
+        ssh.chmod(0o755)
+        eski_yol = os.environ["PATH"]
+        os.environ["PATH"] = f"{sahte}:{eski_yol}"
+        try:
+            sira_kosucu.Kosucu("pc2", 2).pc2_oku()
+            self.assertIn("No route to host", sira.pc2_erisim_hatasi())
+            kok = proje()
+            mesajlar = []
+            sabit = sira.ekle("pc2", [str(kok / "tools/senaryo/uzak.sh"), "sleep", "0"], cwd=kok,
+                              cikti=lambda m, **_k: mesajlar.append(m))
+            self.assertTrue(any("pc2 erişilemiyor" in m for m in mesajlar), mesajlar)
+            oto = is_yaz("oto", ["sleep", "2"], cwd=proje())
+            kosucular, yer = self.dagit([sabit, oto])
+            self.assertEqual(yer, [None, "ana"], "pc2 kapalıyken oto işi ana'ya, pc2 işi beklemede")
+            self.assertEqual(sira.bul(sabit)[:2], ("pc2", "bekleyen"))
+            pano = sira.pano_metni()
+            self.assertIn("pc2 erişilemiyor (No route to host)", pano)
+            self.assertIn("Yuva: ana 1/2 · pc2 0/0 · oto bekleyen 0", pano)
+            self.assertIn("bekliyor (1.; pc2 erişilemiyor)", pano)
+            ssh.write_text("#!/bin/sh\ncat >/dev/null\necho @@\n")
+            kosucular[0].pc2_oku()
+            self.assertIsNone(sira.pc2_erisim_hatasi())
+            self.assertNotIn("erişilemiyor", sira.pano_metni())
+            surdur(kosucular, [sabit, oto])
+        finally:
+            os.environ["PATH"] = eski_yol
+        self.assertEqual((kayit(sabit)["makine"], kayit(oto)["makine"]), ("pc2", "ana"))
+        for kimlik in (sabit, oto):
+            self.assertEqual(sira.bekle(kimlik, 5, cikti=lambda *_a, **_k: None), 0)
+
     def test_eski_pc2_isi_tasinir_kimlik_sabit(self):
         kimlik = is_yaz("pc2", ["tools/senaryo/gradle_kapisi.sh", f"{GECICI}/test.log", "test"])
         yol = sira.dizin("pc2", "bekleyen") / f"{kimlik}.json"
