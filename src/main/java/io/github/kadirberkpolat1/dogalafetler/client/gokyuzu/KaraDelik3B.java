@@ -54,6 +54,8 @@ public final class KaraDelik3B {
      * toplam en çok 2). 1280×720 / FOV 30 mercek karesinde merkez kırpıntının ~%5'i doyar, uzaklaşan yan turuncu kalır.
      */
     private static final float KAZANC = 3.5f;
+    /** Yutumdan sonraki mor kalıntının ek kazancı: parlaklık × (1 + bu × morluk). */
+    private static final float KALINTI_EK = 0.8f;
     /** Merceklenmiş ikinci yayın (gölgenin altında) ana görüntüye göre parlaklığı. */
     private static final float IKINCI_YAY = 0.85f;
     /** Parlama kopyası: dikey kalınlık katı, alfası, radyal genişleme (iç ve dış yarıçap çarpanı). */
@@ -63,8 +65,8 @@ public final class KaraDelik3B {
     private static final float PARILTI_DIS = 1.12f;
     private static final float[] TUP_PULSAR = {0.76f, 0.86f, 1f};
     private static final float[] TUP_DISK = {1f, 0.8f, 0.56f};
-    /** Parlamada kara delik silüetinin rengi (PL-27). */
-    private static final float[] SILUET = {0.07f, 0.03f, 0.12f};
+    /** Parlamada kara delik silüetinin rengi (PL-27, PL-41: örtü altında bile koyu okunsun). */
+    private static final float[] SILUET = {0.015f, 0.006f, 0.03f};
     /** Parlama halesinin yarı boyu (kameradan {@value GokCapasi#SIGDIRMA} birimde; ~40°). */
     private static final float PARLAMA_HALE = 76.5f;
     /** Pulsar çekirdeğinin açısal yarıçapı (çekirdek 10°): tüpün başındaki kalınlık buna göre. */
@@ -548,7 +550,8 @@ public final class KaraDelik3B {
                     tamam = parilti ? pariltiKosesi(r, (ic + dis) * 0.5f, fi, ikincil, KOSE[q])
                             : diskKosesi(r, fi, ikincil, KOSE[q]);
                     float parlak = siluet != null ? a
-                            : a * yay * KAZANC * KaraDelikMercek.doppler(KaraDelikMercek.yaklasmaCos(fi, egim));
+                            : a * yay * KAZANC * (1f + KALINTI_EK * mor)
+                                    * KaraDelikMercek.doppler(KaraDelikMercek.yaklasmaCos(fi, egim));
                     KOSE_ALFA[q] = switch (gecis) {
                         case GECIS_DOYMA -> Math.max(0f, parlak - 1f);
                         case GECIS_PARILTI -> PARILTI_ALFA * Math.min(1f, parlak);
@@ -664,8 +667,8 @@ public final class KaraDelik3B {
     }
 
     /**
-     * Parlamanın altında koyu silüet (normal karışım, PL-27): iki kutup jeti, disk ve gölge, foton halkası ve dıştaki
-     * Einstein halkası (disk yarıçapının {@link KaraDelikMercek#YILDIZ_EINSTEIN} katı).
+     * Parlamanın altında koyu silüet (normal karışım, PL-27, PL-41 tam opak): iki kutup jeti, disk ve gölge, foton halkası ve
+     * dıştaki Einstein halkası (disk yarıçapının {@link KaraDelikMercek#YILDIZ_EINSTEIN} katı).
      */
     private static void siluet(Matrix4f m, float akis, float a) {
         if (a <= 0.003f) {
@@ -673,12 +676,12 @@ public final class KaraDelik3B {
         }
         float dis = KaraDelikMercek.DISK_DIS_RS * rs;
         normal();
-        levha(m, JET, dis * 0.22f, dis * 3.7f, SILUET[0], SILUET[1], SILUET[2], 0.85f * a);
-        diskGecisi(m, TUMU, 0.95f * a, akis, 0f, SILUET, GECIS_ANA);
-        golge(m, SILUET[0], SILUET[1], SILUET[2], 0.95f * a);
-        halka(m, KaraDelikMercek.FOTON_RS, 0.25f, SILUET[0], SILUET[1], SILUET[2], 0.9f * a);
+        levha(m, JET, dis * 0.22f, dis * 3.7f, SILUET[0], SILUET[1], SILUET[2], a);
+        diskGecisi(m, TUMU, a, akis, 0f, SILUET, GECIS_ANA);
+        golge(m, SILUET[0], SILUET[1], SILUET[2], a);
+        halka(m, KaraDelikMercek.FOTON_RS, 0.25f, SILUET[0], SILUET[1], SILUET[2], a);
         halka(m, KaraDelikMercek.YILDIZ_EINSTEIN * KaraDelikMercek.DISK_DIS_RS, 0.6f, SILUET[0], SILUET[1], SILUET[2],
-                0.8f * a);
+                a);
         toplamali();
     }
 

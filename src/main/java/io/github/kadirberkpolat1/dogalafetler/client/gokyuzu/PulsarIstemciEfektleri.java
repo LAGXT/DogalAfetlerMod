@@ -60,14 +60,16 @@ public final class PulsarIstemciEfektleri {
     private static final float[] PARLAMA_RENGI = {0.95f, 0.9f, 1f};
     /** Kenarlardan içeri büyüyen buz kristalleri (sıcaklık ekran efektinin dokusu; yeni doku yok). */
     private static final ResourceLocation KIRAGI = DogalAfetler.konum("textures/misc/sicaklik_buz.png");
-    /** Kırağı vinyetinin donma %100'deki gücü (pulsar yolundaki buzul). */
-    static final float KIRAGI_TAM = 0.9f;
+    /** Kırağı vinyetinin donma %100'deki gücü (pulsar yolundaki buzul; PL-41 tam). */
+    static final float KIRAGI_TAM = 1f;
     /** Buzul tipisinde görüş mesafesi ve sis başlangıcı çarpanları (yakın, beyaz sis). */
     private static final float BUZUL_SIS_UZAK = 0.45f;
     private static final float BUZUL_SIS_YAKIN = 0.1f;
     /** Ufuk şeridinin rengi: pulsarda sıcak serap, yutumdan sonra külün korları. */
     private static final float[] ISI_RENGI = {1f, 0.5f, 0.25f};
     private static final float[] KOR_RENGI = {1f, 0.2f, 0.06f};
+    /** Yutumdan sonra ufuk korlarının en çok alfası (PL-41: karanlık karede seçilsin). */
+    private static final float KOR_ALFA = 0.85f;
 
     private PulsarIstemciEfektleri() {
     }
@@ -175,7 +177,7 @@ public final class PulsarIstemciEfektleri {
             alfa = 0.35f * guc(pt) * (0.6f + 0.4f * gun) * (1f - 0.6f * level.getRainLevel(pt));
             renk = ISI_RENGI;
         } else if (evre == GunesEvresi.KARADELIK_YUTMA) {
-            alfa = 0.5f * KaraDelikYutmaEgrileri.korUfku(IstemciGokyuzu.gorunum(pt).saniye());
+            alfa = KOR_ALFA * KaraDelikYutmaEgrileri.korUfku(IstemciGokyuzu.gorunum(pt).saniye());
             renk = KOR_RENGI;
         } else {
             return;

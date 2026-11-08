@@ -40,9 +40,18 @@ final class GokyuzuRenkleri {
     private static final int KD_SIYAH_SIS = 0x020104;
     private static final int KD_PARLAMA_GOK = 0xE8DAFF;
     private static final int KD_PARLAMA_SIS = 0xD8C8FF;
-    /** Pulsar yolundaki buzul kıyamet: koyu çelik mavisi gök, yakın beyaz tipi sisi (PL-27). */
-    private static final int BUZUL_GOK = 0x1E2A38;
-    private static final int BUZUL_SIS = 0xC4CCD6;
+    /** Pulsar yolundaki buzul kıyamet: koyu çelik mavisi gök, yakın gri-beyaz tipi sisi (PL-27; PL-41 daha koyu). */
+    private static final int BUZUL_GOK = 0x0C141E;
+    private static final int BUZUL_SIS = 0xA4AEBC;
+    /**
+     * Pulsar yolundaki kızıl cüce doğuşunun koyu şafağı (PL-41): doğan yıldız karanlık gökte okunsun; ilerleme
+     * {@value #SAFAK_BAS}–{@value #SAFAK_SON} arasında söner, ilerleme 1'de (eski güneşe dönüş) etkisi yok.
+     */
+    private static final int KC_SAFAK_GOK = 0x2A0C0A;
+    private static final int KC_SAFAK_SIS = 0x3A140E;
+    private static final float SAFAK_GUC = 0.85f;
+    private static final float SAFAK_BAS = 0.15f;
+    private static final float SAFAK_SON = 0.9f;
     private static final float[] PULSAR_ISIK_TAM = {1.1f, 1.3f, 0.72f, 0.5f};
     private static final float[] KD_ISIK_MOR = {0.6f, 0.9f, 0.7f, 1.2f};
     private static final float[] GUNESSIZ_ISIK = {0.35f, 0.75f, 0.85f, 1.15f};
@@ -78,7 +87,8 @@ final class GokyuzuRenkleri {
             }
             case SUPERNOVA -> GokyuzuEgrileri.karistir(SN_KARANLIK_GOK, SN_PARLAK_GOK, supernovaAydinlatma(p, saniye, gun));
             case GUNESSIZ -> GokyuzuEgrileri.rgb(yol ? BUZUL_GOK : GUNESSIZ_GOK);
-            case KIZIL_CUCE -> GokyuzuEgrileri.karistir(v, GokyuzuEgrileri.karistir(KC_GECE_GOK, KC_GUNDUZ_GOK, gun), kc);
+            case KIZIL_CUCE -> safak(GokyuzuEgrileri.karistir(v,
+                    GokyuzuEgrileri.karistir(KC_GECE_GOK, KC_GUNDUZ_GOK, gun), kc), KC_SAFAK_GOK, p, yol);
             case PULSAR -> pulsarRengi(PULSAR_GECE_GOK, PULSAR_GUNDUZ_GOK, GUNESSIZ_GOK, p, gun);
             case KARADELIK_YUTMA -> yutmaRengi(pulsarRengi(PULSAR_GECE_GOK, PULSAR_GUNDUZ_GOK, GUNESSIZ_GOK, 1f, gun),
                     KD_MOR_GOK, KD_SIYAH_GOK, KD_PARLAMA_GOK, saniye);
@@ -89,6 +99,15 @@ final class GokyuzuRenkleri {
     private static float[] pulsarRengi(int gece, int gunduz, int karanlik, float p, float gun) {
         float[] pus = GokyuzuEgrileri.karistir(gece, gunduz, gun);
         return GokyuzuEgrileri.karistir(GokyuzuEgrileri.rgb(karanlik), pus, 0.35f + 0.65f * PulsarEgrileri.yogunluk(p));
+    }
+
+    /** Pulsar yolundaki doğuşta göğü ve sisi koyu şafağa çeker; normal yolda dokunmaz. */
+    private static float[] safak(float[] renk, int safak, float p, boolean yol) {
+        if (!yol) {
+            return renk;
+        }
+        float k = SAFAK_GUC * (1f - GokyuzuEgrileri.yumusak(SAFAK_BAS, SAFAK_SON, p));
+        return GokyuzuEgrileri.karistir(renk, GokyuzuEgrileri.rgb(safak), k);
     }
 
     /** Yutma: pulsar pusundan koyu mora (yaklaşma), simsiyaha (yutum), parlamada mor-beyaz. */
@@ -109,7 +128,8 @@ final class GokyuzuRenkleri {
             }
             case SUPERNOVA -> GokyuzuEgrileri.karistir(SN_KARANLIK_SIS, SN_PARLAK_SIS, supernovaAydinlatma(p, saniye, gun));
             case GUNESSIZ -> GokyuzuEgrileri.rgb(yol ? BUZUL_SIS : GUNESSIZ_SIS);
-            case KIZIL_CUCE -> GokyuzuEgrileri.karistir(v, GokyuzuEgrileri.karistir(KC_GECE_SIS, KC_GUNDUZ_SIS, gun), kc);
+            case KIZIL_CUCE -> safak(GokyuzuEgrileri.karistir(v,
+                    GokyuzuEgrileri.karistir(KC_GECE_SIS, KC_GUNDUZ_SIS, gun), kc), KC_SAFAK_SIS, p, yol);
             case PULSAR -> pulsarRengi(PULSAR_GECE_SIS, PULSAR_GUNDUZ_SIS, GUNESSIZ_SIS, p, gun);
             case KARADELIK_YUTMA -> yutmaRengi(pulsarRengi(PULSAR_GECE_SIS, PULSAR_GUNDUZ_SIS, GUNESSIZ_SIS, 1f, gun),
                     KD_MOR_SIS, KD_SIYAH_SIS, KD_PARLAMA_SIS, saniye);
