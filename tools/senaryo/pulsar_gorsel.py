@@ -8,15 +8,16 @@ Kanıt klasörü verilmezse KOK/.vibe/kanit/pulsar-2/gorsel-4 (tur 4).
 Tek oyunculu Quick Play dünyası `run/saves/pulsar` her koşuda KOK/run/saves/test'ten (seed 20261105, allowCommands=1) taze
 kopyalanır; istemci `-Potomasyon=pulsar` ile açılır ve `client.gokyuzu.PulsarOtomasyonu` adımlarını yürütür (büyük
 pulsar, iki ardışık titreşim karesi, 0,5 sn içinde 6 karelik titreşim serisi, blok hasarı açık 3 eşdeğer günlük kavurma
-sonrası cehennem + meteor izi, 5x5 hava kuyusunda ses derinliği ölçümü, pulsar gecesi, ~30° yandan 3B paralaks karesi,
-kara delik yutmasının beş anı tam evre saniyesinde (mercek karesi FOV 30), güneşsiz buzul, kızıl cüce doğuşu, eski
-güneşin dönüşü). Her kare satırı FPS, TPS, mspt, evre, evre saniyesi, kül yağışı, uçan meteor, 3B dörtgen sayısı
-(Pulsar3B + KaraDelik3B), kavurmanın eşdeğer günü, titreşim ofseti, çekirdek merkez pikseli ve FOV'u taşır; betik
-bunları `kareler-<no>.tsv`'ye, `PULSAR_SES` satırlarını `ses.tsv`'ye, `PULSAR_TITRESIM` satırlarını `titresim.tsv`'ye
-yazar ve denetler: her karenin evresi (kara delik kareleri `karadelik_yutma`, kızıl cüce ilerlemesi >= 0,3, cehennemde
-kül yağışı > 0, uçan meteor >= 1 ve eşdeğer gün >= 3, mercek FOV 30), ses ölçümleri (açık gök kuyusunda y 64 ya da
-yüzey+1 / 48 / 16 / -20 ve üstü kapalı tünel), titreşim serisi (6 kare, 500 ms içinde, her karede çekirdek pikseli).
-K-E29: ana makinede her kare FPS >= 20; pc2'de FPS geçersizdir, yalnız bilgi olarak yazılır.
+sonrası cehennem + meteor izi, 7x7 hava kuyusunda ses derinliği ölçümü, pulsar gecesi, ~30° yandan 3B paralaks karesi,
+kara delik yutmasının beş anı tam evre saniyesinde (mercek karesi FOV 30) ve Ultra kademede bir dörtgen ölçümü karesi,
+güneşsiz buzul, kızıl cüce doğuşu, eski güneşin dönüşü). Her kare satırı FPS, TPS, mspt, evre, evre saniyesi, kül
+yağışı, uçan meteor, 3B dörtgen sayısı (Pulsar3B + KaraDelik3B), kavurmanın eşdeğer günü, titreşim ofseti, çekirdek
+merkez pikseli, FOV'u ve efekt kademesini taşır; betik bunları `kareler-<no>.tsv`'ye, `PULSAR_SES` satırlarını
+`ses.tsv`'ye, `PULSAR_TITRESIM` satırlarını `titresim.tsv`'ye yazar ve denetler: her karenin evresi (kara delik kareleri
+`karadelik_yutma`, kızıl cüce ilerlemesi >= 0,3, cehennemde
+kül yağışı > 0, uçan meteor >= 1 ve eşdeğer gün >= 3, mercek FOV 30, ölçüm karesi ULTRA), ses ölçümleri (açık gök
+kuyusunda y 64 ya da yüzey+1 / 48 / 16 / -20 ve üstü kapalı tünel), titreşim serisi (6 kare, 500 ms içinde, her karede
+çekirdek pikseli). K-E29: ana makinede her kare FPS >= 20; pc2'de FPS geçersizdir, yalnız bilgi olarak yazılır.
 
 Protokol (runclient_kilit.py ortak yolu): (a) açılış yalnız Hyprland exec kuralıyla ([workspace 93 silent;
 no_initial_focus; no_focus on; focus_on_activate off]); (b) JVM'de HL_EXEC_RULE_TOKEN yoksa öldürülür; (c) pencere
@@ -60,22 +61,22 @@ MERCEK_FOV = 30
 SES_Y = [48, 16, -20]
 BEKLENEN = ["pulsar_buyuk", "pulsar_titresim_a", "pulsar_titresim_b", *(f"{SERI}_{i}" for i in range(SERI_KARE)),
             "pulsar_cehennem", "pulsar_gece", "pulsar_3b_yan", "karadelik_yaklasma", "karadelik_mercek",
-            "karadelik_spagetti", "karadelik_parlama", "karadelik_karanlik", "gunessiz_buz", "kizil_cuce_dogus",
-            "gunes_dondu"]
+            "karadelik_spagetti", "karadelik_ultra", "karadelik_parlama", "karadelik_karanlik", "gunessiz_buz",
+            "kizil_cuce_dogus", "gunes_dondu"]
 EVRE = {"pulsar_buyuk": "pulsar", "pulsar_titresim_a": "pulsar", "pulsar_titresim_b": "pulsar",
         **{f"{SERI}_{i}": "pulsar" for i in range(SERI_KARE)}, "pulsar_cehennem": "pulsar", "pulsar_gece": "pulsar",
         "pulsar_3b_yan": "pulsar", "karadelik_yaklasma": "karadelik_yutma", "karadelik_mercek": "karadelik_yutma",
-        "karadelik_spagetti": "karadelik_yutma", "karadelik_parlama": "karadelik_yutma",
-        "karadelik_karanlik": "karadelik_yutma", "gunessiz_buz": "gunessiz", "kizil_cuce_dogus": "kizil_cuce",
-        "gunes_dondu": "normal"}
+        "karadelik_spagetti": "karadelik_yutma", "karadelik_ultra": "karadelik_yutma",
+        "karadelik_parlama": "karadelik_yutma", "karadelik_karanlik": "karadelik_yutma", "gunessiz_buz": "gunessiz",
+        "kizil_cuce_dogus": "kizil_cuce", "gunes_dondu": "normal"}
 KARE_SATIRI = re.compile(rf"{ISARET} kare {ONEK}(\w+)\.png \(FPS (\d+), TPS ([\d.?]+), mspt ([\d.?]+), evre (\w+), "
                          r"ilerleme ([\d.]+), evre sn ([\d.]+), sabit sn ([\d.-]+), kül yağışı (\d+), uçan meteor (\d+), "
                          r"parçacık (\d+), dönüş yolu (\w+), blok hasarı (\w+), güneş döndü (\w+), "
                          r"dortgen=(\d+) \(pulsar (\d+) \+ kara delik (\d+)\), eşdeğer gün ([^,]+), "
-                         r"ofset ([-\d.]+) ([-\d.]+), çekirdek px ([-\d.]+) ([-\d.]+), FOV (\d+)")
+                         r"ofset ([-\d.]+) ([-\d.]+), çekirdek px ([-\d.]+) ([-\d.]+), FOV (\d+), kalite (\w+)")
 SUTUNLAR = ["kare", "FPS", "TPS", "mspt", "evre", "ilerleme", "evre_sn", "sabit_sn", "kul_yagisi", "ucan_meteor",
             "parcacik", "donus_yolu", "blok_hasari", "gunes_dondu", "dortgen", "dortgen_pulsar", "dortgen_karadelik",
-            "esdeger_gun", "ofset_x", "ofset_y", "px_x", "px_y", "FOV"]
+            "esdeger_gun", "ofset_x", "ofset_y", "px_x", "px_y", "FOV", "kalite"]
 SES_SATIRI = re.compile(r"PULSAR_SES (kapali )?y=([-\d.]+) k=([\d.]+) kuru=([\d.]+) yankı=([\d.]+) gök=([\d.]+) "
                         r"hedef=(-?\d+)")
 SES_SUTUNLARI = ["olcum", "y", "k", "kuru", "yanki", "gok", "hedef"]
@@ -175,6 +176,8 @@ def kare_denetimi(satirlar):
             yanlis.append(f"{kare}: eşdeğer gün {s['esdeger_gun']} < {CEHENNEM_GUN:g}")
         if kare == "karadelik_mercek" and int(s["FOV"]) != MERCEK_FOV:
             yanlis.append(f"{kare}: FOV {s['FOV']} (beklenen {MERCEK_FOV})")
+        if kare == "karadelik_ultra" and s["kalite"] != "ULTRA":
+            yanlis.append(f"{kare}: kalite {s['kalite']} (beklenen ULTRA)")
         if kare in ("gunessiz_buz", "kizil_cuce_dogus") and s["donus_yolu"] != "true":
             yanlis.append(f"{kare}: dönüş yolu {s['donus_yolu']} (pulsar yolu bekleniyordu)")
         if int(s["FPS"]) < FPS_ESIGI:

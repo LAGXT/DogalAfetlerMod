@@ -4,6 +4,8 @@ import com.mojang.datafixers.util.Pair;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.client.core.GorselOtomasyon;
 import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciDonem;
+import io.github.kadirberkpolat1.dogalafetler.config.EfektKalitesi;
+import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
@@ -21,6 +23,7 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import net.minecraft.client.Camera;
+import net.minecraft.client.CloudStatus;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.server.IntegratedServer;
@@ -92,6 +95,11 @@ public final class PulsarOtomasyonu {
     private static final float MERCEK_SN = 35f;
     private static final int MERCEK_FOV = 30;
     private static final float SPAGETTI_SN = 40f;
+    /**
+     * Dörtgen ölçümü (Pg4) Ultra kademede, yutmanın en kalabalık anında: parlama başladı, pulsar ve spagetti tüpü henüz
+     * sönmedi, silüet çiziliyor.
+     */
+    private static final float ULTRA_SN = PulsarZinciri.YUTMA_PARLAMA_SN + 0.6f;
     /**
      * Parlama karesi örtünün tabanında ({@link KaraDelikYutmaEgrileri#ORTU_TABAN}) ama parlama henüz tamken (tepe sonu,
      * {@link KaraDelikYutmaEgrileri#PARLAMA_TEPE_SN} sn): silüet tam opak, üstündeki örtü en ince (PL-41).
@@ -269,6 +277,10 @@ public final class PulsarOtomasyonu {
             Adim.yeni("spagettileşme", s -> {
             }, () -> evre(GunesEvresi.KARADELIK_YUTMA) && evreSaniyesi() >= SPAGETTI_SN, "karadelik_spagetti", 1000)
                     .kadrajli(Kadraj.YUTMA_ORTA).sabitSaniyede(SPAGETTI_SN),
+            Adim.yeni("dörtgen ölçümü Ultra (yutma " + ULTRA_SN + " sn)", s -> {
+            }, () -> evre(GunesEvresi.KARADELIK_YUTMA) && evreSaniyesi() >= ULTRA_SN, "karadelik_ultra", 1600)
+                    .kadrajli(Kadraj.YUTMA_ORTA).sabitSaniyede(ULTRA_SN)
+                    .istemcide(() -> kalite(EfektKalitesi.ULTRA)).bitince(() -> kalite(null)),
             Adim.yeni("yutma parlaması", s -> {
             }, () -> evre(GunesEvresi.KARADELIK_YUTMA) && evreSaniyesi() >= PARLAMA_SN, "karadelik_parlama", 1600)
                     .kadrajli(Kadraj.YUTMA_ORTA).sabitSaniyede(PARLAMA_SN),
@@ -488,7 +500,7 @@ public final class PulsarOtomasyonu {
         DogalAfetler.LOGGER.info(ON + "kare {} (FPS {}, TPS {}, mspt {}, evre {}, ilerleme {}, evre sn {}, sabit sn {}, "
                         + "kül yağışı {}, uçan meteor {}, parçacık {}, dönüş yolu {}, blok hasarı {}, güneş döndü {}, "
                         + "dortgen={} (pulsar {} + kara delik {}), eşdeğer gün {}, ofset {} {}, çekirdek px {} {}, FOV {}, "
-                        + "kapı beklemesi {} sn)", k.dosya(), k.fps(),
+                        + "kalite {}, kapı beklemesi {} sn)", k.dosya(), k.fps(),
                 server == null ? "?" : String.format(Locale.ROOT, "%.1f", tps(server)),
                 server == null ? "?" : String.format(Locale.ROOT, "%.1f", server.getAverageTickTime()), d.gunesEvresi().kimlik(),
                 String.format(Locale.ROOT, "%.3f", d.evreIlerlemesi()), String.format(Locale.ROOT, "%.1f", evreSaniyesi()),
@@ -497,7 +509,8 @@ public final class PulsarOtomasyonu {
                 pulsarDortgen + karaDelikDortgen, pulsarDortgen, karaDelikDortgen,
                 String.format(Locale.ROOT, "%.2f", esdegerGun), ofset == null ? "-" : sayi(ofset[0], 3),
                 ofset == null ? "-" : sayi(ofset[1], 3), px == null ? "-" : sayi(px[0], 1), px == null ? "-" : sayi(px[1], 1),
-                mc.options.fov().get(), String.format(Locale.ROOT, "%.1f", k.beklemeSn()));
+                mc.options.fov().get(), IstemciAyarlari.efektKalitesi(),
+                String.format(Locale.ROOT, "%.1f", k.beklemeSn()));
     }
 
     private static void sonraki() {
@@ -546,14 +559,23 @@ public final class PulsarOtomasyonu {
     }
 
     /**
-     * Çalışma anında ({@code options.txt}'ye yazılmaz) FOV efekti 0 ve kamera sallanması kapalı: uçan yaratıcı oyuncunun
-     * FOV çarpanı ve sallanma, çekirdek pikselinin {@code fov} ayarından izdüşümünü bozmasın.
+     * Çalışma anında ({@code options.txt}'ye yazılmaz) FOV efekti 0, kamera sallanması ve bulutlar kapalı: uçan yaratıcı
+     * oyuncunun FOV çarpanı ve sallanma, çekirdek pikselinin {@code fov} ayarından izdüşümünü bozmasın; vanilla bulutları
+     * dünya tick'ine bağlı konumda güneşin önüne gelip gök karelerini değiştirmesin.
      */
     private static void kameraAyari(Minecraft mc) {
         eskiFov = mc.options.fov().get();
         mc.options.fovEffectScale().set(0.0);
         mc.options.bobView().set(false);
-        DogalAfetler.LOGGER.info(ON + "kamera ayarı: FOV {}, FOV efekti 0, sallanma kapalı", eskiFov);
+        mc.options.cloudStatus().set(CloudStatus.OFF);
+        DogalAfetler.LOGGER.info(ON + "kamera ayarı: FOV {}, FOV efekti 0, sallanma ve bulutlar kapalı", eskiFov);
+    }
+
+    /** Efekt kademesini yalnız çalışma anında zorlar ({@code null}: kullanıcının ayarı). */
+    private static void kalite(EfektKalitesi k) {
+        IstemciAyarlari.otomasyonKalitesi(k);
+        DogalAfetler.LOGGER.info(ON + "KALITE istenen={} etkin={}", k == null ? "kullanıcı" : k,
+                IstemciAyarlari.efektKalitesi());
     }
 
     private static void fov(int derece) {
