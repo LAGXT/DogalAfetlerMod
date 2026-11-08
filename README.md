@@ -520,8 +520,12 @@ Gökyüzü: güneş evreleri, süpernova kabuğu, nebula, kızıl cüce, pulsar 
 | `kara_delik_jet.png.mcmeta` | — | 0,1 KB | `tools/assets/gokyuzu_dokulari.py` |
 | `karadelik_3b_disk.png` | 1024x128 | 42,3 KB | `tools/assets/karadelik_3b_dokulari.py` |
 | `karadelik_3b_disk.png.mcmeta` | — | 0,1 KB | `tools/assets/karadelik_3b_dokulari.py` |
+| `karadelik_3b_disk_sicak.png` | 1024x128 | 31,9 KB | `tools/assets/karadelik_3b_dokulari.py` |
+| `karadelik_3b_disk_sicak.png.mcmeta` | — | 0,1 KB | `tools/assets/karadelik_3b_dokulari.py` |
 | `karadelik_3b_halka.png` | 16x64 | 0,2 KB | `tools/assets/karadelik_3b_dokulari.py` |
 | `karadelik_3b_halka.png.mcmeta` | — | 0,1 KB | `tools/assets/karadelik_3b_dokulari.py` |
+| `karadelik_3b_parilti.png` | 256x64 | 1,8 KB | `tools/assets/karadelik_3b_dokulari.py` |
+| `karadelik_3b_parilti.png.mcmeta` | — | 0,1 KB | `tools/assets/karadelik_3b_dokulari.py` |
 | `karadelik_3b_tup.png` | 256x64 | 8,3 KB | `tools/assets/karadelik_3b_dokulari.py` |
 | `karadelik_3b_tup.png.mcmeta` | — | 0,1 KB | `tools/assets/karadelik_3b_dokulari.py` |
 | `karadelik_3b_yildiz.png` | 32x32 | 0,5 KB | `tools/assets/karadelik_3b_dokulari.py` |
@@ -562,6 +566,8 @@ Gökyüzü: güneş evreleri, süpernova kabuğu, nebula, kızıl cüce, pulsar 
 | `pulsar3b_koni.png.mcmeta` | — | 0,1 KB | `tools/assets/pulsar_3b_dokulari.py` |
 | `pulsar3b_parcacik.png` | 64x64 | 2,2 KB | `tools/assets/pulsar_3b_dokulari.py` |
 | `pulsar3b_parcacik.png.mcmeta` | — | 0,1 KB | `tools/assets/pulsar_3b_dokulari.py` |
+| `pulsar3b_yuzey.png` | 256x256 | 58,7 KB | `tools/assets/pulsar_3b_dokulari.py` |
+| `pulsar3b_yuzey.png.mcmeta` | — | 0,1 KB | `tools/assets/pulsar_3b_dokulari.py` |
 | `pulsar_cekirdek.png` | 256x256 | 20,0 KB | `tools/assets/pulsar_gok_dokulari.py` |
 | `pulsar_cekirdek.png.mcmeta` | — | 0,1 KB | `tools/assets/pulsar_gok_dokulari.py` |
 | `pulsar_hale.png` | 256x256 | 17,5 KB | `tools/assets/pulsar_gok_dokulari.py` |
