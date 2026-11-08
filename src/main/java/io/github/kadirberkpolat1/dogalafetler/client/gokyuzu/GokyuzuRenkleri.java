@@ -182,29 +182,14 @@ final class GokyuzuRenkleri {
         return !(g.ayVar() && (g.evre() == GunesEvresi.NORMAL || g.evre() == GunesEvresi.BUYUYEN));
     }
 
-    private static float tekKalinti(GunesEvresi evre, float p, float saniye, boolean yol) {
-        return switch (evre) {
-            case SUPERNOVA -> GokyuzuEgrileri.kalintiBelirme(p);
-            case GUNESSIZ -> yol ? 0f : 1f;
-            case KIZIL_CUCE -> yol ? 0f : 0.85f;
-            case PULSAR -> 0.85f;
-            case KARADELIK_YUTMA -> 0.85f * KaraDelikYutmaEgrileri.kalinti(saniye);
-            default -> 0f;
-        };
-    }
-
     static float kalintiAlfa(IstemciGokyuzu.Gorunum g) {
-        float yeni = tekKalinti(g.evre(), g.ilerleme(), g.saniye(), g.pulsarYolu());
-        return g.onceki() == null || g.gecis() >= 1f ? yeni
-                : Mth.lerp(g.gecis(), tekKalinti(g.onceki(), 1f, 1e6f, oncekiYol(g)), yeni);
+        return GokyuzuEgrileri.kalintiGecisi(g.evre(), g.ilerleme(), g.saniye(), g.pulsarYolu(), g.onceki(), oncekiYol(g),
+                g.gecis());
     }
 
-    /**
-     * Önceki evre pulsar yolunda mıydı: paketin dönüş yolu bayrağı NORMAL'e dönünce kalkar, o geçişte önceki KIZIL_CUCE'yi
-     * {@code gunesDondu} bildirir (yoksa 20 sn kalıntı nebulası ve sönük pulsar noktası belirirdi).
-     */
+    /** Önceki evre pulsar yolunda mıydı ({@link GokyuzuEgrileri#oncekiYol}). */
     private static boolean oncekiYol(IstemciGokyuzu.Gorunum g) {
-        return g.pulsarYolu() || IstemciDonem.durum().gunesDondu();
+        return GokyuzuEgrileri.oncekiYol(g.pulsarYolu(), IstemciDonem.durum().gunesDondu());
     }
 
     private static float[] tekIsik(GunesEvresi evre, float p, float saniye) {
