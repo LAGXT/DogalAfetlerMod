@@ -162,12 +162,14 @@ public final class BasarimOlaylari {
     /**
      * Faz 4 afetinin ipucu (§A.3): türü o ipucunun kayıtlı yayıncısıysa oyuncunun izine olay kaynağı olarak yazılır.
      * Kayıtsız kaynaktan gelen olay yok sayılır ve tür + ipucu başına bir kez uyarılır: o türde tek kaynak yedek
-     * denetimdir (A-35). Yalnız AKTIF aşamada.
+     * denetimdir (A-35). Yalnız AKTIF aşamada ve yalnız olayın kaynak afetine yazılır (AS-17: aynı anda küresel bir afet
+     * AKTIF olsa da bölgesel afetin ipucu kaybolmaz).
      */
     @SubscribeEvent
     public static void ipucuGeldi(BasarimIpucuEvent olay) {
         ServerPlayer oyuncu = olay.oyuncu();
-        aktifAsamadakiAfet(oyuncu).ifPresent(afet -> {
+        AfetYoneticisi.al(oyuncu.server).aktifAfet(olay.kaynakTur())
+                .filter(afet -> afetNo(afet) == olay.kaynakNo() && afet.asama() == AfetAsamasi.AKTIF).ifPresent(afet -> {
             switch (BasarimIpucuEvent.YAYINCILAR.olayGeldi(afet.tur(), olay.ipucu())) {
                 case KABUL -> isaretle(oyuncu, afet, olay.ipucu(), true);
                 case UYAR_YOK_SAY -> DogalAfetler.LOGGER.warn("[basarim] {} ipucu olayı {} afetinden geldi ama tür "
@@ -556,23 +558,30 @@ public final class BasarimOlaylari {
     // ---------------------------------------------------------------- yardımcılar
 
     /**
-     * Oyuncu için AKTIF aşamadaki afet: birden çok sürüyorsa (AS-8) oyuncunun alanında olduğu ilki, hiçbirinin alanında
-     * değilse AKTIF olanların ilki. Oyuncunun izi tek afete bağlıdır ({@link AfetIzi}).
+     * Oyuncu için AKTIF aşamadaki afet: birden çok sürüyorsa (AS-8) oyuncunun alanında olduğu ilk bölgesel afet, yoksa
+     * alanında olduğu ilk küresel afet (ay, güneş: herkes alanda sayılır; AS-17), hiçbirinin alanında değilse AKTIF olanların
+     * ilki. Oyuncunun izi tek afete bağlıdır ({@link AfetIzi}): küresel + bölgesel afette iz bölgesel afettedir.
      */
     private static Optional<Afet> aktifAsamadakiAfet(ServerPlayer oyuncu) {
+        Afet kuresel = null;
         Afet ilk = null;
         for (Afet afet : AfetYoneticisi.al(oyuncu.server).aktifAfetler()) {
             if (afet.asama() != AfetAsamasi.AKTIF) {
                 continue;
             }
             if (alanda(oyuncu, afet)) {
-                return Optional.of(afet);
+                if (!afet.tur().sunucuGeneli()) {
+                    return Optional.of(afet);
+                }
+                if (kuresel == null) {
+                    kuresel = afet;
+                }
             }
             if (ilk == null) {
                 ilk = afet;
             }
         }
-        return Optional.ofNullable(ilk);
+        return Optional.ofNullable(kuresel != null ? kuresel : ilk);
     }
 
     /** Afet numarası: başlangıç saati ({@code AfetBittiEvent.baslangicSaati()} ile aynı). */

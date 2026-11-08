@@ -15,6 +15,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.olay.SirenIstegiEvent;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import io.github.kadirberkpolat1.dogalafetler.network.AfetDurumPaketi;
 import io.github.kadirberkpolat1.dogalafetler.network.AgKanali;
+import io.github.kadirberkpolat1.dogalafetler.uyari.SirenKarari;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.embedded.EmbeddedChannel;
 import java.io.File;
@@ -344,6 +345,8 @@ public final class CekirdekOyunTestleri {
             }
             Afet d = yonetici.aktifAfet(AfetTuru.DEPREM).orElseThrow();
             Afet k = yonetici.aktifAfet(AfetTuru.KASIRGA).orElseThrow();
+            yardimci.assertTrue(d.baglam().baslangicSaati() != k.baglam().baslangicSaati(),
+                    "aynı tick'te başlayan iki afet farklı afetNo almalı (AS-16)");
             yardimci.assertTrue(d.asama() == AfetAsamasi.AKTIF && k.asama() == AfetAsamasi.AKTIF && d.seviye() == 2,
                     "iki farklı afet aynı anda AKTIF olmalı: " + d.asama() + " / " + k.asama());
             yardimci.assertTrue(yonetici.secimYap(true).isEmpty(), "afet sürerken doğal seçim yapılmamalı");
@@ -403,6 +406,53 @@ public final class CekirdekOyunTestleri {
             yonetici.asamaIleri(AfetTuru.DEPREM);
             yardimci.assertTrue(istekler.stream().noneMatch(e -> e.afetTuru() == AfetTuru.KASIRGA),
                     "eşit öncelikte sonra başlayan kasırganın sireni gitmemeli: " + istekler.size());
+        } finally {
+            MinecraftForge.EVENT_BUS.unregister(dinleyici);
+            yonetici.durdur();
+            server.getPlayerList().remove(oyuncu);
+        }
+        yardimci.succeed();
+    }
+
+    /**
+     * AS-16 (inceleme As7): aynı tick'te başlayan kasırga ve ay çarpması farklı afetNo alır; ikisinin de siren isteği gider ve
+     * istemci kararı yüksek öncelikli ay sirenini "zaten çalıyor" diye atlamaz; sayaç dönem kaydında kalır.
+     */
+    @GameTest(template = "bos", batch = "cekirdek_coklu_siren")
+    public static void ayniTicktekiIkiAfetFarkliNoVeIkiSiren(GameTestHelper yardimci) {
+        ServerLevel level = yardimci.getLevel();
+        MinecraftServer server = level.getServer();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(server);
+        yonetici.durdur();
+        BlockPos konum = yardimci.absolutePos(BlockPos.ZERO);
+        ServerPlayer oyuncu = sahteOyuncu(yardimci, konum.getX() + 0.5, konum.getY(), konum.getZ() + 0.5);
+        List<SirenIstegiEvent> istekler = new ArrayList<>();
+        Consumer<SirenIstegiEvent> dinleyici = istekler::add;
+        MinecraftForge.EVENT_BUS.addListener(EventPriority.NORMAL, false, SirenIstegiEvent.class, dinleyici);
+        try (AfetKaydi.GeciciKayit kasirga = AfetKaydi.geciciKaydet(AfetTuru.KASIRGA,
+                () -> new OyunTestiAfeti(AfetTuru.KASIRGA, 8, 100));
+                AfetKaydi.GeciciKayit ay = AfetKaydi.geciciKaydet(AfetTuru.AY_CARPMASI,
+                        () -> new OyunTestiAfeti(AfetTuru.AY_CARPMASI, 8, 100))) {
+            long saat = yonetici.donem().saat();
+            yardimci.assertTrue(yonetici.elleBaslat(AfetTuru.KASIRGA, 1, oyuncu, level, konum)
+                    == AfetYoneticisi.BaslatmaSonucu.BASLADI, "kasırga başlamadı");
+            yardimci.assertTrue(yonetici.elleBaslat(AfetTuru.AY_CARPMASI, null, null, level, konum)
+                    == AfetYoneticisi.BaslatmaSonucu.BASLADI, "ay çarpması başlamadı");
+            yardimci.assertTrue(yonetici.donem().saat() == saat, "iki başlatma aynı tick'te olmalı");
+            long kasirgaNo = yonetici.aktifAfet(AfetTuru.KASIRGA).orElseThrow().baglam().baslangicSaati();
+            long ayNo = yonetici.aktifAfet(AfetTuru.AY_CARPMASI).orElseThrow().baglam().baslangicSaati();
+            yardimci.assertTrue(kasirgaNo != ayNo && kasirgaNo >= saat && ayNo >= saat,
+                    "farklı afetNo bekleniyordu: " + kasirgaNo + " / " + ayNo + " (saat " + saat + ")");
+            yonetici.asamaIleri(AfetTuru.KASIRGA);
+            yonetici.asamaIleri(AfetTuru.AY_CARPMASI);
+            yardimci.assertTrue(istekler.stream().anyMatch(e -> e.afetTuru() == AfetTuru.KASIRGA && e.oyuncular().contains(oyuncu))
+                    && istekler.stream().anyMatch(e -> e.afetTuru() == AfetTuru.AY_CARPMASI
+                            && e.oyuncular().contains(oyuncu)), "iki siren isteği de oyuncuya gitmeli: " + istekler.size());
+            yardimci.assertTrue(SirenKarari.istek(true, false, kasirgaNo, ayNo) == SirenKarari.KES_VE_BASLAT,
+                    "istemci ay sirenini kasırga sireni çalarken kabul etmeli");
+            DunyaDonemi geri = DunyaDonemi.yukle(yonetici.donem().save(new CompoundTag()));
+            long sonraki = geri.yeniAfetNo();
+            yardimci.assertTrue(sonraki > Math.max(kasirgaNo, ayNo) + 1, "sayaç kayıtta kalmalı: " + sonraki);
         } finally {
             MinecraftForge.EVENT_BUS.unregister(dinleyici);
             yonetici.durdur();

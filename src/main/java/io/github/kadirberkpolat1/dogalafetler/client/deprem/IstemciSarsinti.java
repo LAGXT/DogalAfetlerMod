@@ -118,9 +118,15 @@ public final class IstemciSarsinti {
         return ArtciSarsintisi.oyuncuGenligi(a.tepe(), a.gecen() + kismi, a.sure(), d, a.menzil()) * a.fade();
     }
 
-    /** Sarsıntıyı veren afet: deprem, yoksa sinkhole (ikisi birden sürebilir, AS-8). */
+    /** Sarsıntıyı veren afet (ikisi birden sürebilir, AS-8): AKTIF olan, ikisi de AKTIF ya da değilse deprem. */
     private static Optional<AfetDurumPaketi> sarsintiDurumu() {
-        return IstemciAfetDurumu.aktif(AfetTuru.DEPREM).or(() -> IstemciAfetDurumu.aktif(AfetTuru.SINKHOLE));
+        Optional<AfetDurumPaketi> deprem = IstemciAfetDurumu.aktif(AfetTuru.DEPREM);
+        Optional<AfetDurumPaketi> sinkhole = IstemciAfetDurumu.aktif(AfetTuru.SINKHOLE);
+        if (sinkhole.filter(p -> p.asama() == AfetAsamasi.AKTIF).isPresent()
+                && deprem.filter(p -> p.asama() == AfetAsamasi.AKTIF).isEmpty()) {
+            return sinkhole;
+        }
+        return deprem.or(() -> sinkhole);
     }
 
     private static void paketGeldi(AfetDurumPaketi p) {

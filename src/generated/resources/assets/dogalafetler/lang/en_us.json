@@ -185,7 +185,7 @@
   "commands.dogalafetler.siklik.degisti": "Disaster frequency is now %s%% (x%s); new and running cooldowns scale with it.",
   "commands.dogalafetler.siklik.sinir": "afetSikligi %s is outside 0–1000; %s%% is used.",
   "commands.dogalafetler.siklik.sonraki": "Next disaster: ~%s days (range %s–%s days, 90%%); frequency %s%% (x%s)",
-  "commands.dogalafetler.siklik.sonraki_aktif": "Next disaster: when the active one ends: ~%s days; frequency %s%% (x%s)",
+  "commands.dogalafetler.siklik.sonraki_aktif": "Next disaster: ~%s days after all active disasters end; frequency %s%% (x%s)",
   "commands.dogalafetler.siklik.sonraki_sifir": "Next disaster: disasters are off (frequency 0%%)",
   "commands.dogalafetler.siklik.sonraki_sistem_kapali": "Next disaster: the disaster system is off (dogalAfetlerAcik)",
   "commands.dogalafetler.siklik.sonraki_yok": "Next disaster: none (frequency %s%%, no eligible disaster)",
