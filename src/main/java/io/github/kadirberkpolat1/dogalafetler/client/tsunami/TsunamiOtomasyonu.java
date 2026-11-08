@@ -156,37 +156,6 @@ public final class TsunamiOtomasyonu {
     }
 
     /**
-     * Bir tsunami koşusu: vitrin yeniden kurulur, kamera evlerin arasından denize bakar ({@code vitrin kamera tepe}), afet
-     * AKTIF'e ilerletilir. Ts7: çekilme (S5'te ufuk da) kıyının arkasından yüksekten denize bakan kameradan, S1'in ufuk ve
-     * vitrin kareleri alçak kameradan ({@link #kamera}); ölçümler ve sonraki kareler afetsiz tabanla aynı tepe kamerasından.
-     * AKTIF'ten sonraki kare anları senkron evreden ({@code e:}, {@link TsunamiKareAnlari}; AF3-15): çekilme %42'sinde, ufuk
-     * cephenin kıyıya kalan yolu açıklığın %86'sıyken, vitrin %22'siyken, çarpma cephe kıyıyı geçtikten 60 tick, karada
-     * 160 tick sonra. Eski zamanlamada (çekilme 18 sn, dalga 10 sn'de doğar, kıyıya ~28 sn) bunlar eski sabit anlara (8, 13,
-     * 24, 31, 36 sn) denk gelir; kısa zamanlamada (çekilme 8 sn, dalga +2 sn, kıyı +10 sn) aynı evreler.
-     */
-    private static List<String> tsunami(int seviye, String on) {
-        // Komut geri bildirimi ön-uyarı karesinin sohbetine düşmesin diye o kareye dek kapalı.
-        List<String> a = new ArrayList<>(List.of("k:dogalafet su vitrin", "b:300", "k:time set 10500",
-                "k:dogalafet su vitrin kamera tepe", "b:200", "f:" + on + "-afetsiz", "s:" + on + "-once",
-                "k:gamerule sendCommandFeedback false", "k:dogalafet start tsunami " + seviye, "b:50", "k:gamemode creative",
-                "k:item replace entity @s weapon.mainhand with dogalafetler:gelismis_hava_radari", "b:8", "g:1",
-                "s:" + on + "-onuyari", "g:0", "k:item replace entity @s weapon.mainhand with air", "v:tepe",
-                "k:gamerule sendCommandFeedback true", "k:dogalafet asama ileri", "b:60", "s:" + on + "-siren",
-                "k:dogalafet asama ileri", "e:cekilme=0.42", "v:deniz", "b:10", "s:" + on + "-cekilme"));
-        if (seviye == 1) {
-            a.addAll(List.of("e:kalan=0.86", "v:alcak", "b:10", "s:" + on + "-ufuk", "v:tepe", "b:9",
-                    olc(on + "-yaklasma", on + "-afetsiz"), "e:kalan=0.22", "v:alcak", "b:10", "s:" + on + "-vitrin", "v:tepe",
-                    "e:kiyi=60"));
-        } else {
-            a.addAll(List.of("e:kalan=0.86", "s:" + on + "-ufuk", "v:tepe", "b:9", olc(on + "-yaklasma", on + "-afetsiz"),
-                    "e:kalan=0.22", "s:" + on + "-vitrin", "e:kiyi=60"));
-        }
-        a.addAll(List.of("s:" + on + "-carpma", "e:kiyi=160", "s:" + on + "-karada", olc(on + "-karada", on + "-afetsiz"),
-                "k:dogalafet stop", "b:100", "s:" + on + "-sonra", "k:dogalafet su temizle", "b:40"));
-        return a;
-    }
-
-    /**
      * Ts2-1 kabul karesi (şef kararı; Ts7 kameralarına dokunmaz, ayrı S5 koşusu): dalga kıyıya yaklaşırken köpük yakından
      * ve alçaktan, göz dalga tepesinin 1,5 blok üstünde 10° aşağı, cepheye 8–12 blok ({@code v:kopuk}, {@code w:}); aynı anın Yüksek ve Düşük eşi
      * (Düşük'te yalnız tepe şeridi, N13). İlk {@code v:kopuk} dalga yokken taban + 4'e, dalga doğunca ikincisi tepeye konar.
@@ -198,11 +167,6 @@ public final class TsunamiOtomasyonu {
                 "k:dogalafet asama ileri", "k:gamemode spectator", "b:5", "v:kopuk", "w:14", "v:kopuk", "w:11",
                 "s:" + on + "-yakin", "q:DUSUK", "b:2", "s:" + on + "-yakin-dusuk", "q:-", "k:gamerule sendCommandFeedback true",
                 "k:dogalafet stop", "b:100", "k:dogalafet su temizle", "b:40");
-    }
-
-    /** Tabanlı {@code f:} adımı: {@code taban} aynı kameranın afetsiz ölçümü ({@code OLCUM ... taban=}, K-E29 (b)). */
-    private static String olc(String ad, String taban) {
-        return "f:" + ad + " " + taban;
     }
 
     /**
@@ -219,8 +183,9 @@ public final class TsunamiOtomasyonu {
                 "k:dogalafet su vitrin kamera tepe", "b:200", "f:" + ad + "-afetsiz"));
         a.addAll(ayar);
         a.addAll(List.of("k:dogalafet start tsunami 5", "b:20", "k:dogalafet asama ileri", "b:20",
-                "k:dogalafet asama ileri", "e:kiyi=60", olc(ad + "-karada", ad + "-sonra"), "s:" + ad + "-karada",
-                "p:" + ad + "-karada", "k:dogalafet stop", "b:200", "f:" + ad + "-sonra", "k:dogalafet su temizle", "b:40"));
+                "k:dogalafet asama ileri", "e:kiyi=60", TsunamiKareAnlari.olc(ad + "-karada", ad + "-sonra"),
+                "s:" + ad + "-karada", "p:" + ad + "-karada", "k:dogalafet stop", "b:200", "f:" + ad + "-sonra",
+                "k:dogalafet su temizle", "b:40"));
         a.addAll(geri);
         return a;
     }
@@ -255,10 +220,10 @@ public final class TsunamiOtomasyonu {
         List<String> a = new ArrayList<>(List.of("k:gamerule doDaylightCycle false", "k:weather clear 100000",
                 "k:gamerule doMobSpawning false", "k:dogalafet denizseviyesi 0", "b:40"));
         if (hepsi || BOLUM.contains("s5")) {
-            a.addAll(tsunami(5, "tsunami-s5"));
+            a.addAll(TsunamiKareAnlari.tsunamiAdimlari(5, "tsunami-s5"));
         }
         if (hepsi || BOLUM.contains("s1")) {
-            a.addAll(tsunami(1, "tsunami-s1"));
+            a.addAll(TsunamiKareAnlari.tsunamiAdimlari(1, "tsunami-s1"));
         }
         if (hepsi || BOLUM.contains("kopuk")) {
             a.addAll(kopukYakin());
@@ -598,7 +563,7 @@ public final class TsunamiOtomasyonu {
         }
         if (olcum != null) {
             sicramaTick(mc);
-            if (++olcumTick >= 100) {
+            if (++olcumTick >= TsunamiKareAnlari.OLCUM_TICK) {
                 GorselOtomasyon.Olcum o = GorselOtomasyon.olcumBitir();
                 log("FPS {} ortanca_kare_ms={} fps_ortanca={} cpu_kare_ms={} en_uzun_kare_ms={} kare={} yuk=[{}] sunucu_mspt={} "
                         + "tps={} gradle=[toplam={} yabanci={}] su={} yagmur={} bolum=[{}] parcacik={} varlik={} kopuk={} "
