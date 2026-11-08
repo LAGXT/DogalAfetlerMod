@@ -48,8 +48,9 @@ import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.GameType;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.common.ForgeHooks;
 import net.minecraftforge.event.server.ServerStartedEvent;
@@ -630,7 +631,7 @@ public final class SicaklikOyunTestleri {
 
     /**
      * S3-05: kömürleşmiş kütük ve tahta kısık ama pozitif ısı kaynağıdır (varsayılan kaynak listesi; tahta blok-3'ten,
-     * entegrasyon 8): aynı konumda katkı tahta < kütük < fırın.
+     * entegrasyon 8): aynı konumda katkı tahta < kütük < yanan fırın (LIT özelliği olan kaynak yalnız yanarken sayılır).
      */
     @GameTest(template = "bos", batch = "sicaklik_durum")
     public static void komurlesmisKutukVeTahtaDusukIsiVerir(GameTestHelper y) {
@@ -641,8 +642,9 @@ public final class SicaklikOyunTestleri {
             y.setBlock(konum, Blocks.AIR);
             double once = SicaklikYoneticisi.analiz(o).mekan().katki(Katki.KAYNAKLAR);
             double[] fark = new double[3];
-            Block[] bloklar = {PulsarKayitlari.KOMURLESMIS_KUTUK.get(), PulsarKayitlari.KOMURLESMIS_TAHTA.get(),
-                    Blocks.FURNACE};
+            BlockState[] bloklar = {PulsarKayitlari.KOMURLESMIS_KUTUK.get().defaultBlockState(),
+                    PulsarKayitlari.KOMURLESMIS_TAHTA.get().defaultBlockState(),
+                    Blocks.FURNACE.defaultBlockState().setValue(BlockStateProperties.LIT, true)};
             for (int i = 0; i < bloklar.length; i++) {
                 y.setBlock(konum, bloklar[i]);
                 fark[i] = SicaklikYoneticisi.analiz(o).mekan().katki(Katki.KAYNAKLAR) - once;
@@ -651,7 +653,7 @@ public final class SicaklikOyunTestleri {
             String ozet = "kütük " + fark[0] + ", tahta " + fark[1] + ", fırın " + fark[2];
             dogrula(y, fark[0] > 0.1 && fark[0] < 2, "kömürleşmiş kütük düşük pozitif katkı: " + ozet);
             dogrula(y, fark[1] > 0.1 && fark[1] < fark[0], "kömürleşmiş tahta kütükten kısık pozitif katkı: " + ozet);
-            dogrula(y, fark[2] > fark[0], "kömürleşmiş odun fırından kısık: " + ozet);
+            dogrula(y, fark[2] > fark[0], "kömürleşmiş odun yanan fırından kısık: " + ozet);
             y.succeed();
         } finally {
             cikar(y, List.of(o));
