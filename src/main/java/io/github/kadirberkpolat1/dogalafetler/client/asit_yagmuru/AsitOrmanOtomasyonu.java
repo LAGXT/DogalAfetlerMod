@@ -582,6 +582,8 @@ public final class AsitOrmanOtomasyonu {
         o.setGameMode(GameType.CREATIVE);
         o.getAbilities().flying = false;
         o.onUpdateAbilities();
+        // Yüklü olmayan chunk'ta yükseklik dünyanın tabanını dönerdi: çöl doğuştan uzak olabilir.
+        level.getChunk(m.getX() >> 4, m.getZ() >> 4);
         int ust = level.getHeight(Heightmap.Types.MOTION_BLOCKING, m.getX(), m.getZ());
         o.teleportTo(level, m.getX() + 0.5, ust, m.getZ() + 0.5, -90F, 8F);
         uzakMerkez = new BlockPos(m.getX() + UZAK_MESAFE, ust, m.getZ());
