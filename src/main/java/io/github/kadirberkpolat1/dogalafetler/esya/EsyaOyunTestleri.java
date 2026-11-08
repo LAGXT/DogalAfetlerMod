@@ -7,6 +7,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.AfetKaydi;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
 import io.github.kadirberkpolat1.dogalafetler.core.CekirdekOyunTestleri;
+import io.github.kadirberkpolat1.dogalafetler.core.EtkiAlani;
 import io.github.kadirberkpolat1.dogalafetler.core.GunesEvresi;
 import io.github.kadirberkpolat1.dogalafetler.core.OyunTestiAfeti;
 import io.github.kadirberkpolat1.dogalafetler.esya.mantik.RadarGorunumu;
@@ -252,6 +253,94 @@ public final class EsyaOyunTestleri {
             yardimci.assertTrue(s.gorunum() == RadarGorunumu.ANOMALI && s.tur() == AfetTuru.GUNES_PATLAMASI
                     && s.asama() == AfetAsamasi.SIREN && s.kalanSn() > 0 && s.kalanSn() <= 60, "anomali paketi: " + s);
         });
+    }
+
+    /**
+     * Çoklu afette radarın seçimi (K-E64, entegrasyon 7 `RadarSunucu` çözümü): görünen bölgesel afet küresel afetten önce
+     * gelir (sonra başlasa da), küreseller arasında önce başlayan. Asit, etki alanı her yer olan taklittir (gerçek asidin hava ve
+     * aşınması radar seçimini etkilemez; gerçek asidin "her yer" paketi `AsitOyunTestleri`'nde); güneş patlaması SIREN'de anomali.
+     */
+    @GameTest(template = "bos", batch = "esya_radar_coklu", timeoutTicks = 100)
+    public static void cokluAfetteRadarBolgeseliOnceKureselleriBaslamaSirasiylaGosterir(GameTestHelper yardimci) {
+        ServerLevel level = yardimci.getLevel();
+        MinecraftServer server = level.getServer();
+        AfetYoneticisi yonetici = AfetYoneticisi.al(server);
+        yonetici.durdur();
+        yonetici.donem().gunesEvresiAyarla(GunesEvresi.NORMAL);
+        BlockPos merkez = yardimci.absolutePos(BlockPos.ZERO);
+        ServerPlayer radarli = CekirdekOyunTestleri.sahteOyuncu(yardimci, merkez.getX() + 0.5, merkez.getY(),
+                merkez.getZ() + 30.5);
+        radarVer(radarli, false);
+        try (AfetKaydi.GeciciKayit asit = AfetKaydi.geciciKaydet(AfetTuru.ASIT_YAGMURU,
+                () -> new OyunTestiAfeti(AfetTuru.ASIT_YAGMURU, 16, 100) {
+                    @Override
+                    public EtkiAlani etkiAlani() {
+                        return EtkiAlani.herYer();
+                    }
+                });
+                AfetKaydi.GeciciKayit deprem = AfetKaydi.geciciKaydet(AfetTuru.DEPREM,
+                        () -> new OyunTestiAfeti(AfetTuru.DEPREM, 16, 100));
+                AfetKaydi.GeciciKayit gunes = AfetKaydi.geciciKaydet(AfetTuru.GUNES_PATLAMASI,
+                        () -> new OyunTestiAfeti(AfetTuru.GUNES_PATLAMASI, 16, 100))) {
+            Afet a = cokluBaslat(yardimci, yonetici, AfetTuru.ASIT_YAGMURU, radarli, merkez);
+            normalPencereyeTek(yardimci, a);
+            RadarPaketi p = RadarSunucu.durum(radarli);
+            yardimci.assertTrue(p.gorunum() == RadarGorunumu.AFET && p.tur() == AfetTuru.ASIT_YAGMURU && p.herYer()
+                    && Float.isNaN(p.hareketYonu()), "yalnız asit: 'her yer' olmalı: " + p);
+
+            Afet d = cokluBaslat(yardimci, yonetici, AfetTuru.DEPREM, radarli, merkez);
+            normalPencereyeTek(yardimci, d);
+            p = RadarSunucu.durum(radarli);
+            yardimci.assertTrue(p.gorunum() == RadarGorunumu.AFET && p.tur() == AfetTuru.DEPREM && !p.herYer()
+                    && p.merkezX() == d.baglam().merkez().getX() && p.merkezZ() == d.baglam().merkez().getZ(),
+                    "asit + deprem: sonra başlayan bölgesel deprem gösterilmeli: " + p);
+            yardimci.assertTrue(yonetici.durdur(AfetTuru.DEPREM), "deprem durmadı");
+            p = RadarSunucu.durum(radarli);
+            yardimci.assertTrue(p.tur() == AfetTuru.ASIT_YAGMURU && p.herYer(), "deprem durunca asit dönmeli: " + p);
+
+            Afet g = cokluBaslat(yardimci, yonetici, AfetTuru.GUNES_PATLAMASI, radarli, merkez);
+            yardimci.assertTrue(yonetici.asamaIleri(AfetTuru.GUNES_PATLAMASI) && g.asama() == AfetAsamasi.SIREN,
+                    "güneş SIREN'e geçmedi");
+            p = RadarSunucu.durum(radarli);
+            yardimci.assertTrue(p.gorunum() == RadarGorunumu.AFET && p.tur() == AfetTuru.ASIT_YAGMURU && p.herYer(),
+                    "asit önce başladı, güneş sonra: asit gösterilmeli: " + p);
+
+            yonetici.durdur();
+            yonetici.donem().gunesEvresiAyarla(GunesEvresi.NORMAL);
+            g = cokluBaslat(yardimci, yonetici, AfetTuru.GUNES_PATLAMASI, radarli, merkez);
+            yardimci.assertTrue(yonetici.asamaIleri(AfetTuru.GUNES_PATLAMASI) && g.asama() == AfetAsamasi.SIREN,
+                    "güneş SIREN'e geçmedi (2)");
+            a = cokluBaslat(yardimci, yonetici, AfetTuru.ASIT_YAGMURU, radarli, merkez);
+            normalPencereyeTek(yardimci, a);
+            p = RadarSunucu.durum(radarli);
+            yardimci.assertTrue(p.gorunum() == RadarGorunumu.ANOMALI && p.tur() == AfetTuru.GUNES_PATLAMASI,
+                    "güneş önce başladı, asit sonra: güneş anomalisi gösterilmeli: " + p);
+
+            d = cokluBaslat(yardimci, yonetici, AfetTuru.DEPREM, radarli, merkez);
+            normalPencereyeTek(yardimci, d);
+            p = RadarSunucu.durum(radarli);
+            yardimci.assertTrue(p.gorunum() == RadarGorunumu.AFET && p.tur() == AfetTuru.DEPREM,
+                    "güneş + asit + deprem: bölgesel deprem gösterilmeli: " + p);
+        } finally {
+            yonetici.durdur();
+            yonetici.donem().gunesEvresiAyarla(GunesEvresi.NORMAL);
+            server.getPlayerList().remove(radarli);
+        }
+        yardimci.succeed();
+    }
+
+    private static Afet cokluBaslat(GameTestHelper yardimci, AfetYoneticisi yonetici, AfetTuru tur, ServerPlayer hedef,
+            BlockPos merkez) {
+        yardimci.assertTrue(yonetici.elleBaslat(tur, tur.seviyeli() ? 1 : null, hedef, yardimci.getLevel(), merkez)
+                == AfetYoneticisi.BaslatmaSonucu.BASLADI, "afet başlamadı: " + tur.kimlik());
+        return yonetici.aktifAfet(tur).orElseThrow();
+    }
+
+    /** Bir afeti normal ön-uyarı penceresine ilerletir (afetin kendi tick'i; aşama ON_UYARI'da kalır). */
+    private static void normalPencereyeTek(GameTestHelper yardimci, Afet afet) {
+        afet.tick(yardimci.getLevel(), (int) afet.baglam().erkenBildirimSuresi());
+        yardimci.assertTrue(afet.asama() == AfetAsamasi.ON_UYARI && afet.normalOnUyariBasladi(),
+                "normal ON_UYARI penceresine geçilmedi: " + afet.tur().kimlik());
     }
 
     /**
