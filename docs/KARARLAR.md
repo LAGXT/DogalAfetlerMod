@@ -6051,7 +6051,8 @@ filtresiz kapı güncelleme turu 2 sonunda. **Tur 2 (`9a179ff`, entegrasyon `98f
 tel biçimi değişiklikleri tek artışta: (1) `cekirdek/afet_durumu` (`AfetDurumPaketi`, afet-siklik AS-8): tür `aktif` bayrağından önce
 yazılır ve `yok(tur)` paketinde de taşınır (istemci yalnız o türü siler); (2) `cekirdek/donem` (`DonemPaketi`, pulsar-2 §A3): evre
 `writeEnum` sıra numarasıyla, yeni `GunesEvresi.KARADELIK_YUTMA` sıra 6 (enum sonunda; eski istemci `readEnum`'da çözemez), son
-alan VarInt `bayraklar` (`BAYRAK_DONUS_YOLU` 1, `BAYRAK_BLOK_HASARI` 2, `BAYRAK_GUNES_DONDU` 4); (3) yeni `gokyuzu/yutma` paketi
+alan VarInt `bayraklar` (`BAYRAK_DONUS_YOLU` 1, `BAYRAK_BLOK_HASARI` 2, `BAYRAK_GUNES_DONDU` 4, `BAYRAK_DURAKLATILDI` 8; sonuncusu
+pulsar-2 PL-42 Pg3 `ad6df79`, aynı VarInt içinde yeni bit, tel biçimi ve protokol 8 değişmez); (3) yeni `gokyuzu/yutma` paketi
 (`PulsarSesleri`, alansız): ada göre sıralı kimlikler kayar (`meteor/sarsinti` 4 → 5 …). `RadarPaketi.HER_YER` (afet-fizik-2) merkez
 işaretidir, tel biçimi aynı; tarif-2 paket değiştirmedi. Uyumsuz istemci el sıkışmada reddedilir. Tek dokunulan yer
 `network.AgKanali.PROTOKOL_SURUMU`; README, SARTNAME ve TEST-RAPORU'nda protokol numarası geçmez. Kanıt (`8c8c497`, kuyruktan, ana makine; pc2 06:00'dan beri erişilemez): `runData` `1108-060053791-1c` BUILD SUCCESSFUL (`yeni_safak.json` ve dil satırları `3837d3c`), `compileJava` `1108-060538709-49` (runData derlemişti, UP-TO-DATE), JUnit 720/0 `1108-060538824-4a` (`test @a9525110bf20`), GameTest `TEST_FILTRE='Pulsar|Gokyuzu|Cekirdek|Komut|Basarim|Meteor'` 101/101 `1108-060538937-39` (`@4575c27178fe`; "13 ağ paketi kaydedildi (protokol 8)", `gokyuzu/yutma` 4, `meteor/sarsinti` 5; göç GameTest'i üç bölümü tek geçişte göç ettirir; en büyük batch 5), N19 245/245 fark 0. Filtresiz kapı pulsar-2 tur 5 HEAD'iyle.
@@ -6083,10 +6084,20 @@ zinciri ve takma adlar: ikisi de kaldı), `AfetYoneticisi` import (ikisi de), `C
 `PulsarSureci` iki parametreli `BasarimIpucuEvent(oyuncu, Ipucu.YENI_SAFAK)` (afet-siklik AS-17 sonrası yok) → A-38 Yeni Şafak
 başarımı (`e01ed41`, N29). Protokol "8" K-E65 (`b9db98b`). Config göçü tek kalıp K-E61 rev. (`2b3d5c8`). Kullanılmayan
 `pulsar_isin.png` ve `karadelik_3b_disk.png` (+ `.mcmeta`) silindi, üretim betiklerinden çıktı (`51ba3cf`; PL-25'in "yerinde kaldı"sı
-kalktı; `karadelik_3b_dokulari.py` tüpün tohum sırasını korur, N19). SARTNAME N29 (Yeni Şafak), N30 (güneşin dönüşü yalnız pulsar
-yolu, fotosensitivite). **Bilinen sınırlar:** pc2 kare koşularında FPS 15–19 (K-E29 b, bilgi; ana makine koşu 6 en düşük 29);
-değerlendirici model puanı 3'ün altında kalan kareler (yutma sonu, buzul, doğuş; PL-39, PL-41) için yeni deneme yok, tur 5 görsel
-sonucu gelince buraya yazılır ve kullanıcı oyunda karar verir; yutma parlaması (1,5 sn tepe) `pulsarTitresim`'le ölçeklenmez. Kanıt K-E65'teki kapı.
+kalktı; `karadelik_3b_dokulari.py` tüpün tohum sırasını korur, N19); PL-42'den sonra `karadelik_3b_disk_sicak.png` ve
+`karadelik_3b_parilti.png` (+ `.mcmeta`) da silindi (`8f45ddf`; oyun `_disk_soluk`/`_parilti_soluk` çizer, kendi tohumları 20261112). SARTNAME N29 (Yeni Şafak), N30 (güneşin dönüşü yalnız pulsar
+yolu, fotosensitivite). **Tur 5 ve inceleme 2 (`cbb5d98`, entegrasyon `8f45ddf`):** PL-41 dört karenin son görsel turu (koyu opak parlama silüeti, karanlık
+karesi 65. sn ve mor kalıntı + ufuk korları, buzulda göl + tipi ×4 + koyu gök + tam kırağı, doğuşta koyu şafak + şişkinlik ×2,5);
+PL-42 Pg2 disk kazancı Doppler'den önce ve kırpılmış (min(1, a · 3,5) · Doppler; yaklaşan 1, uzaklaşan ×0,3; doyma geçişi kalktı),
+soluk dokular (doygunluk ≤ 0,3); Pg3 KURAL duraklamasında yutma koreografisi donar (`DonemPaketi.BAYRAK_DURAKLATILDI` 8,
+`PulsarSureci.durdur` ilerlemeyi durma saniyesine yazar, istemci `PulsarZinciri.duraklamaSaniyesi`); Pg4 dörtgen ölçümü Ultra
+kademede ayrı karede (`karadelik_ultra`): 2 736 + 3 016 = 5 752 ≤ 6 000; Pg5 kalıntı nebulası kararı saf
+`GokyuzuEgrileri.kalintiGecisi`/`oncekiYol` (eski güneşe dönüşte kalıntı belirmez); otomasyon vanilla bulutları kapatır (yalnız
+`-Potomasyon`). Görsel koşu 8 (ana makine): `karadelik_mercek` Doppler oranı 2,24 (ölçüt ≥ 2,0), disk doygunluğu 0,156,
+benzerlik 3,00; `karadelik_spagetti` korku 3,00. **Bilinen sınırlar:** pc2 kare koşularında FPS 15–19 (K-E29 b, bilgi; ana makine
+koşu 6 en düşük 29); PL-41 dört karesi değerlendirici model ölçütünün (PL-39, ≥ 3) altında kaldı (görsel koşu 7, 3 örnek: parlama
+2,00, karanlık 2,33, buzul 2,00, doğuş 2,00; kontrol kareleri gerilemedi: `pulsar_buyuk` 3,33, `karadelik_mercek` 3,00); yeni deneme
+yok, kullanıcı oyunda karar verir; yutma parlaması (1,5 sn tepe) `pulsarTitresim`'le ölçeklenmez. Kanıt K-E65'teki kapı.
 
 ## Açık noktalar (Faz 2b)
 
@@ -6385,7 +6396,13 @@ P2-9 `5-matris` kabulünde. Kapanış eşlemesi (K-E50) her maddenin sonunda:
 | gökyüzü (sabit) | `PulsarZinciri.YUTMA_SN` / `YUTMA_PARLAMA_SN`; `YUTMA_PENCERESI_BAS/SON` | 90 / 55 sn; [3000, 7200) | ölçekli sn; gün saati | K-E66 PL-5, PL-7 |
 | gökyüzü (sabit) | `PulsarStrob.VURUS_HZ` / `STROB_HZ` / `EN_DUSUK`; `PulsarTitresimi` hızlı frekans | 10,875 / 4,5 Hz / 0,45; 16 Hz (Düşük 8) | — | K-E66 PL-6, PL-28, PL-29, PL-33 |
 | gökyüzü (sabit) | kavurma yarıçapı / lav paydası / en yakın oyuncu; `PulsarKavurma` 3 günde isabet / tavan | 96 blok / 1/400 / 24 blok; 16 / sütun, 64 deneme/merkez/tick | — | K-E66 PL-12, PL-37 |
-| gökyüzü (sabit) | `GokCapasi` uzaklık / τ; `KaraDelikYutmaEgrileri.SON_CAP` | 800 blok / 60 sn (pulsar), 120 sn (kara delik); 2° | — | K-E66 PL-27, PL-31 |
+| gökyüzü (sabit) | `GokCapasi` uzaklık / τ; `KaraDelikYutmaEgrileri.SON_CAP` | 800 blok / 60 sn (pulsar), 120 sn (kara delik); 2° (90. sn; 72. sn 8,2°) | — | K-E66 PL-27, PL-31 |
+| gökyüzü (sabit) | `KaraDelikYutmaEgrileri.ORTU_TEPE` / `ORTU_TABAN` | %50 / %15 (0,3 sn tepe, 1,2 sn iniş) | — | K-E66 PL-27 |
+| gökyüzü (sabit) | `KaraDelik3B` disk kazancı / Doppler yaklaşan, uzaklaşan | 3,5 (Doppler'den önce, 1'de kırpılır) / 1, ×0,3 | — | K-E66 PL-42 Pg2: referans oranı; ölçülen 2,24 |
+| gökyüzü (sabit) | kırağı vinyeti (`KIRAGI_ILK`, `KIRAGI_TAM`) | %45 / %100 | — | K-E66 PL-27, PL-41 |
+| gökyüzü (sabit) | buzul sisi (görüş, başlangıç); tipi (`TIPI_KAR_KATI`, `TIPI_RUZGAR_KATI`); tipi rüzgârı düzeyi | ×0,45 / ×0,1; ×4 / ×6; 0,55 | — | K-E66 PL-27, PL-41 |
+| gökyüzü (sabit) | ufuk koru alfası, kalıntı ek kazancı; doğuş şişkinliği, koyu şafak gücü | 0,85 / 0,8; 1,5 / 0,85 (ilerleme 0,15–0,9) | — | K-E66 PL-41 |
+| gökyüzü (sabit) | `SesSonumu` derinlik adımı, yankılı tavan | −%25 / 16 blok, 0,35 | — | K-E66 PL-34 |
 | gökyüzü | `gokyuzu.pulsarKavrulmaOlasiligi` (SERVER) | 0,6 | olasılık (0–1) | güneş patlaması kavrulmasının (0,5) biraz üstü |
 | gökyüzü (sabit) | pulsar dönüşü | — (kalktı; eski 4 sn/tur) | — | G2-7 yerine K-E66 strob ve titreşim |
 | yangın | `yangin.tickButcesi` (SERVER) | 64 | hücre/tick | tasarım §5; hücre 10 tick'te bir işlendiğinden 640 hücre tam hızda döner, ötesi yakınlık sırasıyla yavaşlar; işleniş başına ~5 blok okuma + 3 deneme |
