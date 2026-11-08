@@ -13,6 +13,7 @@ import io.github.kadirberkpolat1.dogalafetler.esya.mantik.GostergeYerlesimi;
 import io.github.kadirberkpolat1.dogalafetler.esya.mantik.RadarGorunumu;
 import io.github.kadirberkpolat1.dogalafetler.esya.mantik.SureBicimi;
 import io.github.kadirberkpolat1.dogalafetler.esya.mantik.YonMesafe;
+import io.github.kadirberkpolat1.dogalafetler.komut.CekirdekKomutlari;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -34,7 +35,8 @@ import net.minecraftforge.fml.common.Mod;
  * Hava Radarı göstergesi (madde 13a; N6'nın istisnası: yalnız radar elde tutulurken). Küçük bir CRT paneli: solda saniyede
  * bir tur atan taramalı radar kapı (afet merkezi bakış yönüne göre bir nokta olarak), sağda afetin adı, yön oku ve mesafe,
  * varış ya da kalan süre. Güneş patlaması ve ay çarpması sirenden sonra mor bir "gökyüzü anomalisi" ve geri sayım olarak
- * görünür (N7). Gelişmiş radar mor-mavi çerçevelidir ve altına kısa satırlarla şiddet seviyesi + hareket oku/hız ve son 5
+ * görünür (N7). Her yerde süren bölgesel afet (asit yağmuru) yön oku ve mesafe yerine "her yer" yazar, nokta kabın
+ * ortasındadır (AF2-06). Gelişmiş radar mor-mavi çerçevelidir ve altına kısa satırlarla şiddet seviyesi + hareket oku/hız ve son 5
  * afeti ("Kasırga S2 3dk") ekler; yükseklik {@link GostergeYerlesimi#panelYuksekligi} ile sınırlıdır (R-18). Bütün panel tek
  * {@code drawManaged} toplu çizimidir (R-19). Yer CLIENT config'tedir; alt köşelerde hotbar, kalpler, sıcaklık barı ve
  * sismograf action bar'ıyla, sağ üstte efekt ikonlarıyla çakışmaz ({@link GostergeYerlesimi}; yükseklikler Forge'un
@@ -120,7 +122,11 @@ public final class RadarGostergesi {
         double goreli = 0;
         double mesafe = 0;
         List<Satir> ust = new ArrayList<>();
-        if (d.gorunum() == RadarGorunumu.AFET) {
+        if (d.gorunum() == RadarGorunumu.AFET && d.herYer()) {
+            ust.add(Satir.duz(Component.translatable(d.tur().ceviriAnahtari()), YAZI));
+            ust.add(Satir.duz(Component.translatable(CekirdekKomutlari.HER_YER), YAZI));
+            ust.add(Satir.duz(sure(d), SOLUK));
+        } else if (d.gorunum() == RadarGorunumu.AFET) {
             double mx = d.merkezX() + 0.5;
             double mz = d.merkezZ() + 0.5;
             mesafe = YonMesafe.mesafe(oyuncu.getX(), oyuncu.getZ(), mx, mz);

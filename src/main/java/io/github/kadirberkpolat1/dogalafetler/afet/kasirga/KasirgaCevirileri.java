@@ -15,9 +15,9 @@ final class KasirgaCevirileri {
         y.ekle("death.attack.dogalafetler.kasirga.player", "%1$s was swept away by a tornado while fighting %2$s",
                 "%1$s, %2$s ile dövüşürken kasırgaya kapıldı");
         y.ekle(KasirgaKomutlari.BILGI, "Tornado: stage %s, phase %s (%s), level %s, centre %s, heading %s°, flying blocks %s/%s, "
-                + "lifted %s; entities in world: tornado=%s, flying_block=%s",
+                + "lifted %s; entities in world: tornado=%s, flying_block=%s; pos (%s, %s), waypoint (%s, %s) #%s",
                 "Kasırga: aşama %s, evre %s (%s), seviye %s, merkez %s, yön %s°, uçan blok %s/%s, kaldırılan %s; "
-                        + "dünyadaki varlıklar: kasirga=%s, ucan_blok=%s");
+                        + "dünyadaki varlıklar: kasirga=%s, ucan_blok=%s; konum (%s, %s), ara hedef (%s, %s) #%s");
         y.ekle(KasirgaKomutlari.YOK, "No active tornado; entities in world: tornado=%s, flying_block=%s",
                 "Aktif kasırga yok; dünyadaki varlıklar: kasirga=%s, ucan_blok=%s");
         KasirgaKayitlari.cevirileriYaz(y);

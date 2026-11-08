@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
 """Kasırganın görsel kanıtı (K0-21 rev. 2 ekran protokolü, kilit (k); GOREV §6 #6, #10).
 
-Kullanım (worktree kökünden): python3 tools/senaryo/kasirga_gorsel.py
+Kullanım (worktree kökünden): python3 tools/senaryo/kasirga_gorsel.py [<kanıt>] [rota]
+  pc2: tools/senaryo/pc2_istemci.sh <kanıt/> kasirga_gorsel.py rota (kanıt verilmezse KOK/.vibe/kanit/kasirga-rota/; tüm
+  adımların varsayılanı KOK/.vibe/kanit/kasirga/).
+
+`rota` kipi (AF2-20, kasırga kimseyi izlemez): `-PotomasyonBolum=rota`; oyuncu doğuş noktasında yerde durur, S3 kasırga onu
+hedef alır, olgun evrede 30 sn arayla `kasirga_rota_1..3` kareleri oyuncunun gözünden kasırgaya bakılarak alınır. Betik
+istemci log'undan kare satırlarını (merkez, oyuncu, yatay uzaklık, ara hedef) ve `rota: uzaklık d1/d2/d3, ara hedef N` özetini
+protokol.log'a yazar; üç kare, özet ve sıfır girdi yoksa koşu geçersiz. S5 merkez ve taban rengi denetimleri bu kipte yok.
 
 Tek oyunculu Quick Play dünyası `run/saves/kasirga` her koşuda KOK/run/saves/test'ten (seed 20261105, allowCommands=1) taze
 kopyalanır; istemci `-Potomasyon=kasirga` ile açılır ve `client.kasirga.KasirgaOtomasyonu` adımlarını yürütür (ön-uyarı radarı,
@@ -42,7 +49,10 @@ import runclient_kilit  # noqa: E402
 WS = 91
 W = Path(__file__).resolve().parents[2]
 KOK = W.parents[1] if W.parent.name == ".worktrees" else W
-KANIT = KOK / ".vibe/kanit/kasirga"
+_ARGUMANLAR = sys.argv[1:]
+KIP = "rota" if "rota" in _ARGUMANLAR else "hepsi"
+_KANIT = next((a for a in _ARGUMANLAR if a != "rota"), None)
+KANIT = Path(_KANIT).resolve() if _KANIT else KOK / (".vibe/kanit/kasirga-rota" if KIP == "rota" else ".vibe/kanit/kasirga")
 KARELER = KANIT / "kareler"
 JAVA_HOME = "/home/lagxt/.jdks/jdk-17.0.21+9"
 ISARET = "KASIRGA_OTOMASYON"
@@ -55,6 +65,8 @@ SUSUZ_YARICAP = 24
 DOGUS_HALKASI = (53.5, 107.0)
 DENEME = int(os.environ.get("KASIRGA_DENEME", "5"))
 MERKEZ = re.compile(r"\[kasirga\] başladı: seviye 5 merkez (-?\d+), (-?\d+), (-?\d+)")
+ROTA_KARE = re.compile(r"KASIRGA_OTOMASYON rota kare (\d+): .*")
+ROTA_OZET = re.compile(r"KASIRGA_OTOMASYON (rota: uzaklık -?\d+/-?\d+/-?\d+, ara hedef \d+)")
 
 
 def log(*a):
@@ -221,7 +233,8 @@ def hazirla(hedef):
     if hedef_dunya.exists():
         shutil.rmtree(hedef_dunya)
     shutil.copytree(KOK / "run/saves/test", hedef_dunya, ignore=shutil.ignore_patterns("session.lock"))
-    dogus_yaz(hedef_dunya / "level.dat", hedef[0], hedef[2], hedef[1])
+    if hedef is not None:
+        dogus_yaz(hedef_dunya / "level.dat", hedef[0], hedef[2], hedef[1])
     yol = run / "options.txt"
     satirlar = yol.read_text().splitlines() if yol.exists() else []
     satirlar = [s for s in satirlar if not s.startswith(("tutorialStep:", "pauseOnLostFocus:", "renderDistance:",
@@ -299,6 +312,7 @@ def kosu(hedef, harita):
                      f"export JAVA_HOME='{JAVA_HOME}'\n"
                      f"exec python3 tools/senaryo/runclient_kilit.py kos '{W}' --bekle 1800 -- "
                      "timeout 3000 ./gradlew runClient --offline --no-daemon --console=plain -PquickPlay=kasirga -Potomasyon=kasirga "
+                     + ("-PotomasyonBolum=rota " if KIP == "rota" else "") +
                      f"> '{istemci_log}' 2>&1\n")
     sahip_adres = runclient_kilit.istemci_baslat(betik, WS, log)
     baslangic = time.time()
@@ -320,7 +334,7 @@ def kosu(hedef, harita):
     bekci = runclient_kilit.KapanisBekcisi(W, pid, (W / "run/logs/latest.log", istemci_log),
                                            f"{ISARET} kapanıyor; girdi sayıları", log)
     while not bekci.bitti_mi():
-        if merkez is None and (W / "run/logs/latest.log").exists():
+        if KIP == "hepsi" and merkez is None and (W / "run/logs/latest.log").exists():
             bulunan = MERKEZ.search((W / "run/logs/latest.log").read_text(errors="replace"))
             if bulunan:
                 merkez = tuple(int(v) for v in bulunan.groups())
@@ -347,6 +361,8 @@ def kosu(hedef, harita):
     latest = W / "run/logs/latest.log"
     if latest.exists():
         shutil.copy2(latest, KANIT / f"latest-{no}.log")
+    if KIP == "rota":
+        return rota_sonucu(no, istemci_log, alarm)
     if merkez is None:
         log(f"koşu {no} GEÇERSİZ: S5 merkezi log'da yok")
         return 1
@@ -368,10 +384,35 @@ def kosu(hedef, harita):
     return 0 if sifir and not alarm and renk else 1
 
 
+def rota_sonucu(no, istemci_log, alarm):
+    """Rota kipi: kare satırları ve özet log'dan protokole; üç kare dosyası, özet ve sıfır girdi gerekir."""
+    kaynak = KANIT / f"latest-{no}.log"
+    metin = kaynak.read_text(errors="replace") if kaynak.exists() else ""
+    for satir in ROTA_KARE.finditer(metin):
+        log(satir.group(0).split("KASIRGA_OTOMASYON ", 1)[1])
+    ozet = ROTA_OZET.search(metin)
+    log(ozet.group(1) if ozet else "rota özeti yok")
+    kareler = [KARELER / f"kasirga_rota_{i}-{no}.png" for i in (1, 2, 3)]
+    eksik = [k.name for k in kareler if not k.exists()]
+    if eksik:
+        log(f"koşu {no} GEÇERSİZ: eksik kare {', '.join(eksik)}")
+    sayim = girdi_sayilari(istemci_log)
+    if sayim is None:
+        log(f"koşu {no} GEÇERSİZ: girdi sayıları satırı yok")
+        return 1
+    kaynak, satir_no, sayilar = sayim
+    sifir = runclient_kilit.girdi_ozeti(sayilar == "tuş=0 fare=0 tekerlek=0",
+                                        f"koşu {no} girdi sayıları: {sayilar} ({kaynak.name}:{satir_no})", log)
+    return 0 if sifir and not alarm and ozet and not eksik else 1
+
+
 def main():
+    if KIP == "rota":
+        # Rota kipi dünyanın kendi doğuş noktasını kullanır; S5 merkez seçimi (numpy, arazi haritası) gerekmez.
+        return kosu(None, None)
     harita = arazi(KOK / "run/saves/test")
     x, z, y, pay = hedef_sec(harita)
-    log(f"K-E45: doğuş noktası ({x}, {y}, {z}); halkada uygun merkez payı %{100 * pay:.0f}, en çok {DENEME} deneme")
+    log(f"K-E45: doğuş noktası ({x}, {y}, {z}); halkada uygun merkez payı %{100 * pay:.0f}, en çok {DENEME} deneme, kip {KIP}")
     for deneme in range(1, DENEME + 1):
         sonuc = kosu((x, z, y), harita)
         if sonuc != "tekrar":

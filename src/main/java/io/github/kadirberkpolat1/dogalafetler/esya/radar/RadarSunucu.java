@@ -107,8 +107,11 @@ public final class RadarSunucu {
         return Optional.empty();
     }
 
-    /** Oyuncunun radarının gösterdiği afet: görünen afetlerin en yakını (AS-10; eşitlikte önce başlayan). */
-    private record Secim(Afet afet, EtkiAlani alan, boolean global, RadarGorunumu gorunum, double mesafe) {
+    /**
+     * Oyuncunun radarının gösterdiği afet: görünen bölgesel afetlerin en yakını, yoksa önce başlayan küresel afet (AS-10;
+     * başarım izinin AS-17 kuralıyla aynı: bölgesel afet küresele tercih edilir).
+     */
+    private record Secim(Afet afet, EtkiAlani alan, boolean global, boolean herYer, RadarGorunumu gorunum, double mesafe) {
     }
 
     /** Oyuncunun radarının göreceği durum (göndermez). */
@@ -128,12 +131,19 @@ public final class RadarSunucu {
                 continue;
             }
             EtkiAlani a = okunan.get();
-            boolean g = a.global() || aday.tur().sunucuGeneli();
+            // N7 gökyüzü anomalisi yalnız sunucu geneli afette (güneş, ay). Her yerde süren bölgesel afet (asit, AF2-06)
+            // bölgesel görünürlük kuralıyla (ön-uyarının gizli başı saklı, aynı boyut) mesafesiz "her yer" olarak görünür.
+            boolean gokyuzu = aday.tur().sunucuGeneli();
+            boolean g = a.global() || gokyuzu;
             boolean ayniBoyut = oyuncu.level().dimension().equals(aday.baglam().boyut());
             double m = g ? 0 : YonMesafe.mesafe(oyuncu.getX(), oyuncu.getZ(), a.x(), a.z());
-            RadarGorunumu gr = Gorunurluk.radar(aday.asama(), aday.normalOnUyariBasladi(), g, ayniBoyut, m, menzil);
-            if (gr != RadarGorunumu.GIZLI && (secim == null || m < secim.mesafe())) {
-                secim = new Secim(aday, a, g, gr, m);
+            RadarGorunumu gr = Gorunurluk.radar(aday.asama(), aday.normalOnUyariBasladi(), gokyuzu, ayniBoyut, m, menzil);
+            if (gr == RadarGorunumu.GIZLI) {
+                continue;
+            }
+            boolean dahaIyi = secim == null || (secim.global() && !g) || (secim.global() == g && m < secim.mesafe());
+            if (dahaIyi) {
+                secim = new Secim(aday, a, g, g && !gokyuzu, gr, m);
             }
         }
         if (secim == null) {
@@ -142,13 +152,22 @@ public final class RadarSunucu {
         Afet afet = secim.afet();
         EtkiAlani alan = secim.alan();
         boolean global = secim.global();
+        boolean herYer = secim.herYer();
         RadarGorunumu gorunum = secim.gorunum();
         long kalanSn = SureBicimi.saniye(yonetici.zamanOlcegi().gercekTick(yonetici.kalanOku(afet)));
-        int x = global ? 0 : (int) Math.floor(alan.x());
-        int z = global ? 0 : (int) Math.floor(alan.z());
+        int x = herYer ? RadarPaketi.HER_YER : global ? 0 : (int) Math.floor(alan.x());
+        int z = herYer ? RadarPaketi.HER_YER : global ? 0 : (int) Math.floor(alan.z());
         float yon = Float.NaN;
         float hiz = 0;
-        if (gelismis && !global && IZ.yon().isPresent() && izAfeti(yonetici).orElse(null) == afet) {
+        boolean izBunun = izAfeti(yonetici).orElse(null) == afet;
+        Optional<double[]> araHedef = afet.yolHedefi()
+                .filter(h -> YonMesafe.mesafe(alan.x(), alan.z(), h[0], h[1]) >= 1.0);
+        if (gelismis && !global && araHedef.isPresent()) {
+            // Yol tahmini: afetin yöneldiği ara hedef (kasırga rotası), izden daha erken döner.
+            double[] h = araHedef.get();
+            yon = Math.round(YonMesafe.pusulaAcisi(alan.x(), alan.z(), h[0], h[1]) / 5.0) * 5f % 360f;
+            hiz = izBunun ? Math.round(IZ.hiz() * 2) / 2f : 0;
+        } else if (gelismis && !global && IZ.yon().isPresent() && izBunun) {
             OptionalDouble iz = IZ.yon();
             yon = Math.round(iz.getAsDouble() / 5.0) * 5f % 360f;
             hiz = Math.round(IZ.hiz() * 2) / 2f;

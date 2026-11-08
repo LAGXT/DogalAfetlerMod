@@ -4,7 +4,8 @@ import java.util.List;
 
 /**
  * Asit yağmurunun saf kuralları (bölüm E, madde 10, tasarım notu §6): seviye tablosu, yoğunluk eğrisi, öldürmeyen hasar,
- * aşındırma hızı ve blok sınıfının dönüşümü. Minecraft sınıflarına dokunmaz.
+ * aşındırma hızı, oyuncu çevresindeki örnekleme bütçesi, vanilla yağmurunun tutulması ve blok sınıfının dönüşümü.
+ * Minecraft sınıflarına dokunmaz.
  */
 public final class AsitKurallari {
     /** AKTIF başında yağmurun tam yoğunluğa çıktığı süre (10 sn). */
@@ -18,14 +19,17 @@ public final class AsitKurallari {
     /** Çatlak örtüsünün en kısa ve en uzun süresi (3–5 sn, tasarım §2 "Aşınma"). */
     public static final int CATLAK_EN_AZ = 60;
     public static final int CATLAK_EN_COK = 100;
-    /** İstemcide yağmurun alan kenarında söndüğü genişlik ve sisin uzandığı oran (tasarım §2: 16 blok, 1,5R). */
-    public static final double KENAR = 16;
-    public static final double SIS_ORANI = 1.5;
+    /** Yağmur süresi bunun altına inince vanilla yağmuru yeniden {@link #YAGMUR_SURESI_TICK} kadar açılır (AF2-02). */
+    public static final int YAGMUR_YENILEME_TICK = 200;
+    public static final int YAGMUR_SURESI_TICK = 1200;
 
     private AsitKurallari() {
     }
 
-    /** Bir seviyenin değerleri; süreler tick. Maruziyet hasarı seviyeden bağımsızdır ({@code hasarSaniye}). */
+    /**
+     * Bir seviyenin değerleri; süreler tick. {@code yaricap}: yağmur her yerde yağar, aşınma her oyuncunun bu yarıçapı içinden
+     * örneklenir (AF2-05). Maruziyet hasarı seviyeden bağımsızdır ({@code hasarSaniye}).
+     */
     public record Seviye(int yaricap, int sureTick, double asindirmaSaniye, boolean tasAsinir) {
     }
 
@@ -120,17 +124,48 @@ public final class AsitKurallari {
     }
 
     /**
-     * Dönüşüm birikimi: saniyede {@code hiz} blok × yoğunluk × TPS kısması; birikim 1'i geçince bir aday kuyruğa girer.
-     * Tavan 2: örneklenen sütunlarda aday bulunmayan tick'lerde hız sonradan patlamaz.
+     * Dönüşüm birikimi: saniyede {@code hiz} blok × oyuncu sayısı × yoğunluk × TPS kısması (her oyuncunun çevresi aynı hızla
+     * aşınır, AF2-05); birikim 1'i geçince bir aday kuyruğa girer. Tavan oyuncu başına 2: örneklenen sütunlarda aday bulunmayan
+     * tick'lerde hız sonradan patlamaz.
      */
-    public static double birikimEkle(double birikim, double hiz, double yogunluk, double kisma, int adim) {
-        return Math.min(2.0, birikim + hiz / 20.0 * clamp(yogunluk) * Math.max(0, kisma) * Math.max(0, adim));
+    public static double birikimEkle(double birikim, double hiz, int oyuncu, double yogunluk, double kisma, int adim) {
+        int n = Math.max(1, oyuncu);
+        return Math.min(2.0 * n, birikim + hiz * n / 20.0 * clamp(yogunluk) * Math.max(0, kisma) * Math.max(0, adim));
     }
 
-    /** Tick başına örneklenen yüzey sütunu: hıza göre 3–16 (tasarım §5), TPS kısmasıyla azalır, en az 1. */
+    /** Bir oyuncunun çevresinde tick başına örneklenen yüzey sütunu: hıza göre 3–16 (tasarım §5), TPS kısmasıyla azalır, en az 1. */
     public static int ornekSayisi(double hiz, double kisma) {
         double taban = 3 + (Math.max(2, Math.min(16, hiz)) - 2) * 13.0 / 14.0;
         return Math.max(1, (int) Math.round(taban * Math.max(0, Math.min(1, kisma))));
+    }
+
+    /**
+     * Tick'in örnekleme bütçesi: oyuncu başına {@link #ornekSayisi}, toplamı {@code blokButcesi} × TPS kısmasıyla sınırlı (en az 1);
+     * oyuncu yoksa 0 (aşınma yalnız oyuncuların çevresindeki yüklü chunk'larda, AF2-05).
+     */
+    public static int ornekButcesi(double hiz, double kisma, int oyuncu, int blokButcesi) {
+        if (oyuncu <= 0 || blokButcesi <= 0) {
+            return 0;
+        }
+        int tavan = Math.max(1, (int) Math.round(blokButcesi * Math.max(0, Math.min(1, kisma))));
+        return Math.min(tavan, ornekSayisi(hiz, kisma) * oyuncu);
+    }
+
+    /**
+     * Vanilla havası asidin yağmurunu kesmiş mi (AF2-02): yağmıyorsa, gök gürültüsü başladıysa (asidin "zehirli sessizliği",
+     * tasarım §4) ya da açık hava sayacı kurulduysa ({@code /weather clear}).
+     */
+    public static boolean yagmurKesildi(boolean yagiyor, boolean gokGurultusu, int acikSure) {
+        return !yagiyor || gokGurultusu || acikSure > 0;
+    }
+
+    /**
+     * AKTIF asit yağmurunda vanilla yağmuru yeniden açılmalı mı: kesildiyse ({@link #yagmurKesildi}) ya da yağmur süresi
+     * {@link #YAGMUR_YENILEME_TICK}'in altına indiyse. Vanilla'nın yağmuru kesmesi ve {@code /weather} bu yüzden bir tick'te geri
+     * alınır.
+     */
+    public static boolean yagmurYenilenmeli(boolean yagiyor, boolean gokGurultusu, int yagmurSuresi, int acikSure) {
+        return yagmurKesildi(yagiyor, gokGurultusu, acikSure) || yagmurSuresi < YAGMUR_YENILEME_TICK;
     }
 
     /** Çatlak örtüsü aşaması 0–9 ({@code destroyBlockProgress}). */
@@ -139,22 +174,6 @@ public final class AsitKurallari {
             return 9;
         }
         return (int) Math.max(0, Math.min(9, gecen * 10 / sure));
-    }
-
-    /** Yağmurun alan içindeki ağırlığı: kenara 16 blok kala söner, alan dışında 0. */
-    public static double alanAgirligi(double mesafe, double yaricap) {
-        return yumusak((yaricap - mesafe) / Math.min(KENAR, Math.max(1, yaricap)));
-    }
-
-    /** Sarı-yeşil sisin ağırlığı: alan içinde 1, 1,5R'de 0. */
-    public static double sisAgirligi(double mesafe, double yaricap) {
-        double r = Math.max(1, yaricap);
-        return yumusak((SIS_ORANI * r - mesafe) / ((SIS_ORANI - 1) * r));
-    }
-
-    private static double yumusak(double t) {
-        double u = clamp(t);
-        return u * u * (3 - 2 * u);
     }
 
     private static double clamp(double t) {

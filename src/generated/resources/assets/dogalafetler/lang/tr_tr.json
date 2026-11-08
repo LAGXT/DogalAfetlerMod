@@ -130,7 +130,7 @@
   "commands.dogalafetler.her_yer": "her yer",
   "commands.dogalafetler.hiz.ayarlandi": "Afet ve dönem zamanlayıcıları x%s hızında.",
   "commands.dogalafetler.kalici": "kalıcı",
-  "commands.dogalafetler.kasirga.bilgi": "Kasırga: aşama %s, evre %s (%s), seviye %s, merkez %s, yön %s°, uçan blok %s/%s, kaldırılan %s; dünyadaki varlıklar: kasirga=%s, ucan_blok=%s",
+  "commands.dogalafetler.kasirga.bilgi": "Kasırga: aşama %s, evre %s (%s), seviye %s, merkez %s, yön %s°, uçan blok %s/%s, kaldırılan %s; dünyadaki varlıklar: kasirga=%s, ucan_blok=%s; konum (%s, %s), ara hedef (%s, %s) #%s",
   "commands.dogalafetler.kasirga.yok": "Aktif kasırga yok; dünyadaki varlıklar: kasirga=%s, ucan_blok=%s",
   "commands.dogalafetler.kizilcuce.afet_suruyor": "Güneş patlaması sürüyor; önce /dogalafet stop.",
   "commands.dogalafetler.kizilcuce.basladi": "Kızıl cüce doğuyor.",

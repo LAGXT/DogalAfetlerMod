@@ -117,3 +117,24 @@ Sorun: K-04 rastgele sütunun yalnız en üst bloğunu alıyordu; uçan blok tav
 - **Sütun taraması:** en üstten aşağı S1-2 1, S3 3, S4 4, S5 6 blok. En üstte eski kural (sertlik, zemin yalnız S4-5); altında yaprak ve bitki S3+, kütük S4+, ahşap yapı (tahta, ahşap merdiven/basamak/çit/çit kapısı/kapak) S5; zemin ve diğerleri hiç. Kaldırılamayan ilk blokta durur, sığınağın altı kazılmaz.
 - **Ağaç devrilir (S4-5):** taramada dikey kütüğe varılınca gövdenin kesintisiz kütükleri tepeden başlayarak kalkar (tick başına en çok S4 8, S5 12 kütük × evre payı × kısma; tavan doluyken yatırılan kütük parça bütçesinden düşer, beş katlı gövde iki ziyarette devrilir). Tavanda yer varsa uçar, yoksa siklonik teğet rüzgâr yönüne gövde dibinin ±2 bloğundaki zemine yatay konur (devrik kütük; tepedeki kütük en uzağa); yer yoksa parçalanır.
 - **Parça ve eşya:** K-04 ile aynı (tavan doluyken denemenin ¼'ü, S5 5; eşya 1/16); tick başına değişen blok ve eşya K-04'ü aşmaz. Seviyeyle artan parça payı (S5 8) dedicated S5'te ortalama tick'i 4,3 ms'den 7,4 ms'ye çıkardığı için geri alındı. Tavan (40) değişmedi.
+
+## afet-fizik-2 (2026-11-08): kasırga kimseyi izlemez
+
+Kullanıcı isteği: "Tornado birini sürekli takip etmesin, bazen rastgele yerlerde dolaşsın, kullanıcıyı takip etmesin." §6'daki
+"hedefin başlangıç konumuna doğru ±35° sapmalı yürüyüş, 12 bloğuna girince ana yönü donar" kuralı kalktı. Kararlar
+`.vibe/kararlar/afet-fizik-2.md` (AF2-20…AF2-24); saf mantık `KasirgaRotasi` (JUnit).
+
+- **Doğuş aynı (K-03):** hedef oyuncunun `[0,5·(R+56), R+56]` blok uzağında; hedef yalnız doğuş noktasını verir, ilk bacak
+  hedeften uzaklaşan yöndür.
+- **Rastgele yürüyüş:** 10–20 sn'de bir (ölçekli) yeni ara hedef: %70 önceki bacağın yönü ±60°, 48–128 blok ötede; %30 rastgele
+  bir oyuncunun 32–96 blok çevresinde sabit bir nokta (oyuncu yürüse de nokta güncellenmez, kilitlenme yok). Hiçbir ara hedef
+  bir oyuncuya 32 bloktan yakın değildir. Ara hedefe 12 blok kala yenisi erken seçilir. Hız, 1,5°/tick dönüş ve 2 sn'de bir
+  ±35° sapma aynı; sapma artık ara hedefin yönü çevresindedir.
+- **Sınırlar:** rota başlangıcından 512 bloktan uzağa gitmez (sınırı aşan aday başlangıca doğru döner); yüklü alandan (oyuncu
+  çevresi ya da forceload, entity-ticking) çıkacak adımda durur ve yeni yön seçer. Yüklü alanın dışında doğan kasırga
+  (düşük simülasyon mesafesi) K-01'deki gibi soyut ilerleyip içeri girer.
+- **Radar:** Gelişmiş Hava Radarı'nın hareket oku ara hedefi gösterir (yön değişimi izden önce görünür).
+- **Kayıt:** rota (başlangıç, tohum, seçim sayacı, ara hedef, kalan süre) kasırganın NBT'sinde; kayıttan dönüşte aynı ara
+  hedeflerle sürer.
+- **Çekim ve yıkım aynen (AF-20…24):** oyuncu kasırgaya yaklaşırsa çekilir; kasırga yalnız artık ona doğru gelmez.
+- **Su hortumu:** kasırganın deniz üstünde ayrı davranışı yoktur (korunacak bir şey olmadı).

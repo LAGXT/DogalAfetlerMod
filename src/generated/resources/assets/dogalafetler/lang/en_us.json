@@ -130,7 +130,7 @@
   "commands.dogalafetler.her_yer": "everywhere",
   "commands.dogalafetler.hiz.ayarlandi": "Disaster and era timers run at x%s.",
   "commands.dogalafetler.kalici": "permanent",
-  "commands.dogalafetler.kasirga.bilgi": "Tornado: stage %s, phase %s (%s), level %s, centre %s, heading %s°, flying blocks %s/%s, lifted %s; entities in world: tornado=%s, flying_block=%s",
+  "commands.dogalafetler.kasirga.bilgi": "Tornado: stage %s, phase %s (%s), level %s, centre %s, heading %s°, flying blocks %s/%s, lifted %s; entities in world: tornado=%s, flying_block=%s; pos (%s, %s), waypoint (%s, %s) #%s",
   "commands.dogalafetler.kasirga.yok": "No active tornado; entities in world: tornado=%s, flying_block=%s",
   "commands.dogalafetler.kizilcuce.afet_suruyor": "A solar flare is active; use /dogalafet stop first.",
   "commands.dogalafetler.kizilcuce.basladi": "The red dwarf is rising.",

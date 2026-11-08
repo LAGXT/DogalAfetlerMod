@@ -87,11 +87,11 @@ sonraki bekleme biraz uzar.
 
 | Afet | Komut adı | Seviye | Kısaca |
 |---|---|---|---|
-| Kasırga | `kasirga` | 1–5 | Dönen huni, toz/enkaz bulutu; blokları, mobları ve oyuncuları havaya çeker, yolunda iz bırakır, ilerleyip dağılır. |
+| Kasırga | `kasirga` | 1–5 | Dönen huni, toz/enkaz bulutu; blokları, mobları ve oyuncuları havaya çeker, yolunda iz bırakır, ilerleyip dağılır. Bir oyuncunun yakınında doğar ama kimseyi izlemez: 10–20 saniyede bir yeni rastgele bir yöne döner (bazen bir oyuncunun 32–96 blok yakınına, üstüne değil), doğduğu yerden 512 bloktan uzağa gitmez ve yüklü alanın içinde kalır. |
 | Tsunami | `tsunami` | 1–5 | Yalnız geniş deniz kıyısında başlar. Önce sular çekilir, sonra dalga karaya ilerler: oyuncuları ve mobları sürükler, önce cam ve yaprakları, sonra ahşabı (yüksek seviyede taş yapıları) yıkar, dalganın girdiği mağaraları geçici olarak doldurur. Su, modun kendi çizdiği "sanal su"dur; haritaya gerçek su bloğu dökülmez. |
 | Deprem | `deprem` | 1–5 | Haritayı yaran fay hattı; yaprak ve ahşap gibi sağlam olmayan bloklar yıkılıp düşer, sağlam bloklar daha az etkilenir. Ekran sarsıntısı mesafeyle azalır; seviye 3 ve üstünde artçı sarsıntılar olur. |
 | Sinkhole | `sinkhole` | 1–5 | Çatlama ve titremeden sonra dairesel çöküş; bloklar çukura dolar. |
-| Asit yağmuru | `asit_yagmuru` | 1–5 | Yeşilimsi yağış ve dumanlanma; sert olmayan blokları yavaş yavaş aşındırır, açıktaki oyuncuya orta düzeyde hasar verir; çatı altı korur. |
+| Asit yağmuru | `asit_yagmuru` | 1–5 | Bütün dünyada normal yağmur gibi yağar (vanilla yağmur da açılır, bitince önceki hava geri gelir; çölde ve karlı biyomda da asit yağar). Yeşilimsi yağış ve dumanlanma; her oyuncunun çevresindeki sert olmayan blokları yavaş yavaş aşındırır, başı açık her oyuncuya saniyede yarım kalp hasar verir (2 kalbin altına indirmez); çatı altı korur. Radarda "her yer" görünür. |
 | Orman yangını | `orman_yangini` | 1–5 | Ortak yangın sistemiyle yanıcı olan her şeye yayılır, yağmurda söner; yakınındaki ortam ısınır. |
 | Güneş patlaması | `gunes_patlamasi` | yok | En nadir afet, tek seferlik. Uzun siren; güneş büyür, meteorlar yağar, dünya 5 gün boyunca kavrulur, sonunda **süpernova**. Ardından güneşsiz dönem, dünyanın donması ve **kızıl cüce** güneşin doğuşu gelir (aşağıda "Dünya dönemleri"). |
 | Ay çarpması | `ay_carpmasi` | yok | Güneş patlamasından biraz daha sık, tek seferlik. Ay yaklaşır ve çarpar (ekran ve harita sallanır), 1–2 dakika ay parçaları yağar, gökte enkaz halkası kalır. 10 dakika sonra deniz seviyesi kalıcı olarak yükselmeye başlar ve tsunamiler bir süre daha sık olur. Ay bir daha oluşmaz. |
@@ -242,7 +242,7 @@ hücresi). Sunucu TPS'i düşünce bu bütçeler kendiliğinden kısılır.
 | Tsunami | `tsunami.yikimCarpani` (1,0), `tsunami.yikimBolumTick` (1) | `yikimEsyaOrani` (0,3), `ayCekilmeCarpani` (1,5) |
 | Deprem | `deprem.blokButcesi` (seviye başına 32 … 128 blok/tick) | `yikimYaricapi` (16 … 100 blok) |
 | Sinkhole | `sinkhole.blokButcesi` (400 blok/tick) | |
-| Asit yağmuru | `asit_yagmuru.eszamanliAsindirma` (64 blok) | `kaymaHizi` (0,3 blok/sn) |
+| Asit yağmuru | `asit_yagmuru.blokButcesi` (32 sütun/tick, oyuncuların çevresinden), `asit_yagmuru.eszamanliAsindirma` (64 blok) | `asindirmaBlokSaniye` (oyuncu başına 2 … 16 blok/sn), `yaricap` (aşınmanın oyuncu çevresi, 32 … 128 blok) |
 | Orman yangını / ortak yangın | `yangin.yayilmaHizCarpani` (1,0; 0 yayılmayı kapatır), `yangin.tickButcesi` (64 hücre/tick) | `yangin.aktifTavan` (1500 hücre), `orman_yangini.yanikIziButcesi` (8) |
 | Ay çarpması | `ay_carpmasi.sarsintiYogunlugu` (0,30) | |
 | Meteorlar | `meteor.kraterBlokButcesi` (512 blok işlemi/tick) | `meteor.kucukYanginYogunlugu` / `buyukYanginYogunlugu` |

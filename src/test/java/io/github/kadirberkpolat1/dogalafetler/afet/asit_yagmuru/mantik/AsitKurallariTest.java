@@ -112,16 +112,24 @@ class AsitKurallariTest {
         double birikim = 0;
         int donusen = 0;
         for (int tick = 0; tick < 20 * 60; tick++) {
-            birikim = AsitKurallari.birikimEkle(birikim, 7.0, 1.0, 1.0, 1);
+            birikim = AsitKurallari.birikimEkle(birikim, 7.0, 1, 1.0, 1.0, 1);
             while (birikim >= 1) {
                 birikim -= 1;
                 donusen++;
             }
         }
         assertEquals(7 * 60, donusen, 1, "S3: dakikada 420 blok");
-        assertEquals(2.0, AsitKurallari.birikimEkle(1.9, 16, 1, 1, 1000), "birikim tavanı 2");
-        assertEquals(0.0, AsitKurallari.birikimEkle(0, 16, 1, 0.5, 0), "duraklatılmış saat ilerletmez");
-        assertEquals(0.4, AsitKurallari.birikimEkle(0, 16, 1, 0.5, 1), 1e-9, "TPS kısması yarıya indirir");
+        assertEquals(2.0, AsitKurallari.birikimEkle(1.9, 16, 1, 1, 1, 1000), "birikim tavanı 2");
+        assertEquals(0.0, AsitKurallari.birikimEkle(0, 16, 1, 1, 0.5, 0), "duraklatılmış saat ilerletmez");
+        assertEquals(0.4, AsitKurallari.birikimEkle(0, 16, 1, 1, 0.5, 1), 1e-9, "TPS kısması yarıya indirir");
+    }
+
+    /** AF2-05: her oyuncunun çevresi aynı hızla aşınır; tavan oyuncu başına 2, oyuncusuz dünyada tek oyuncu sayılır. */
+    @Test
+    void asinmaHiziOyuncuSayisiylaOlceklenir() {
+        assertEquals(1.6, AsitKurallari.birikimEkle(0, 16, 2, 1, 1, 1), 1e-9, "iki oyuncu: tick başına 2 × 0,8");
+        assertEquals(6.0, AsitKurallari.birikimEkle(5.9, 16, 3, 1, 1, 1000), "üç oyuncuda tavan 6");
+        assertEquals(0.8, AsitKurallari.birikimEkle(0, 16, 0, 1, 1, 1), 1e-9, "oyuncu 0 → tek oyuncu hızı");
     }
 
     @Test
@@ -130,6 +138,32 @@ class AsitKurallariTest {
         assertEquals(16, AsitKurallari.ornekSayisi(16, 1));
         assertEquals(8, AsitKurallari.ornekSayisi(16, 0.5));
         assertEquals(1, AsitKurallari.ornekSayisi(2, 0.25));
+    }
+
+    /** AF2-05: örnekleme oyuncu başına, toplamı {@code blokButcesi} × TPS kısması ile sınırlı; oyuncusuz dünyada 0. */
+    @Test
+    void ornekButcesiOyuncuBasinaVeTavanli() {
+        assertEquals(0, AsitKurallari.ornekButcesi(16, 1, 0, 32), "oyuncu yoksa örnek yok");
+        assertEquals(16, AsitKurallari.ornekButcesi(16, 1, 1, 32));
+        assertEquals(32, AsitKurallari.ornekButcesi(16, 1, 10, 32), "on oyuncu: bütçe tavanı");
+        assertEquals(9, AsitKurallari.ornekButcesi(2, 1, 3, 32), "S1 üç oyuncu: 3 × 3");
+        assertEquals(8, AsitKurallari.ornekButcesi(16, 0.25, 10, 32), "TPS kısması bütçeyi çeyreğe indirir");
+        assertEquals(1, AsitKurallari.ornekButcesi(16, 0, 10, 32), "en az 1");
+        assertEquals(0, AsitKurallari.ornekButcesi(16, 1, 4, 0), "bütçe 0: aşınma kapalı");
+    }
+
+    /** AF2-02: vanilla yağmuru kesilince, gök gürültüsü başlayınca ya da süresi azalınca yeniden açılır. */
+    @Test
+    void vanillaYagmuruAsitBoyuncaTutulur() {
+        assertFalse(AsitKurallari.yagmurYenilenmeli(true, false, 1000, 0), "yağıyor, süre bol");
+        assertTrue(AsitKurallari.yagmurYenilenmeli(false, false, 1000, 0), "vanilla yağmuru kesti");
+        assertTrue(AsitKurallari.yagmurYenilenmeli(true, true, 1000, 0), "gök gürültüsü yok");
+        assertTrue(AsitKurallari.yagmurYenilenmeli(true, false, 1000, 6000), "/weather clear sayacı kurdu");
+        assertTrue(AsitKurallari.yagmurYenilenmeli(true, false, AsitKurallari.YAGMUR_YENILEME_TICK - 1, 0), "süre bitiyor");
+        assertFalse(AsitKurallari.yagmurYenilenmeli(true, false, AsitKurallari.YAGMUR_YENILEME_TICK, 0));
+        assertFalse(AsitKurallari.yagmurKesildi(true, false, 0), "süre tazelemesi kesilme sayılmaz");
+        assertTrue(AsitKurallari.yagmurKesildi(true, false, 6000), "/weather clear kesmedir");
+        assertTrue(AsitKurallari.yagmurKesildi(false, false, 0));
     }
 
     @Test
@@ -146,17 +180,6 @@ class AsitKurallariTest {
         assertEquals(5, AsitKurallari.catlakAsamasi(40, 80));
         assertEquals(9, AsitKurallari.catlakAsamasi(79, 80));
         assertEquals(9, AsitKurallari.catlakAsamasi(500, 80));
-    }
-
-    @Test
-    void alanVeSisAgirligiKenardaYumusakSoner() {
-        assertEquals(1, AsitKurallari.alanAgirligi(0, 64), 1e-9);
-        assertEquals(1, AsitKurallari.alanAgirligi(48, 64), 1e-9);
-        assertEquals(0.5, AsitKurallari.alanAgirligi(56, 64), 1e-9);
-        assertEquals(0, AsitKurallari.alanAgirligi(64, 64), 1e-9);
-        assertEquals(1, AsitKurallari.sisAgirligi(64, 64), 1e-9);
-        assertEquals(0.5, AsitKurallari.sisAgirligi(80, 64), 1e-9);
-        assertEquals(0, AsitKurallari.sisAgirligi(96, 64), 1e-9);
     }
 
     @Test

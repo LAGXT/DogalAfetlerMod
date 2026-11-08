@@ -57,10 +57,21 @@ import net.minecraftforge.registries.ForgeRegistries;
  * Siren başından {@code stop}'a kadar ve S1'de (olgun evrenin doğal akışı dışında) zamanlayıcı {@link #YAVAS} hızında
  * döner: kasırga her tick hareket eder ve çizilir, yalnız evre süreleri uzar (bekleme ölçüm sırasında olgun evreyi
  * tüketmesin). Klavye, fare ve tekerlek girdileri kapanışa kadar sayılır.
+ *
+ * <p>{@code -Ddogalafetler.otomasyon.bolum=rota} (AF2-20, kasırga kimseyi izlemez): oyuncu doğuş noktasında yerde durur, S3
+ * kasırga normal komutla onu hedef alır (doğuş 40-80 blok), olgun evreye geçilir ve hız 1'de {@link #ROTA_ARALIK} tick arayla
+ * üç kare ({@code kasirga_rota_1..3}) oyuncunun gözünden kasırgaya bakılarak alınır; her kare için kasırga merkezi, oyuncu,
+ * yatay uzaklık ve ara hedef, sonda {@code rota: uzaklık d1/d2/d3, ara hedef N} satırı.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class KasirgaOtomasyonu {
     private static final boolean AKTIF = "kasirga".equals(System.getProperty("dogalafetler.otomasyon", ""));
+    private static final boolean ROTA = "rota".equals(System.getProperty("dogalafetler.otomasyon.bolum", ""));
+    /** Rota kareleri arası (tick, hız 1'de 30 sn). */
+    private static final int ROTA_ARALIK = 600;
+    private static final int ROTA_KARE = 3;
+    /** Rota karelerinin eğimi (derece; eksi yukarı): oyuncunun gözünden kasırganın gövdesi kadrajda. */
+    private static final float ROTA_EGIM = -5;
     private static final String ON = "KASIRGA_OTOMASYON ";
     private static final ResourceLocation RADAR = DogalAfetler.konum("gelismis_hava_radari");
     private static final int KARE_CIZIM = 20;
@@ -110,6 +121,8 @@ public final class KasirgaOtomasyonu {
     private static Vec3 s5Son;
     private static double[] s1Son;
     private static long[] yukBas;
+    /** Rota karelerindeki yatay uzaklıklar; yalnız sunucu thread'i yazar ve okur. */
+    private static final double[] ROTA_UZAKLIK = new double[ROTA_KARE];
 
     private KasirgaOtomasyonu() {
     }
@@ -297,6 +310,67 @@ public final class KasirgaOtomasyonu {
             if (k != null && kosul.test(k)) {
                 AfetYoneticisi.al(server).asamaIleri();
             }
+        });
+    }
+
+    /** Oyuncu yerinde kalır, kasırganın merkezine bakar ({@link #ROTA_EGIM}); kare satırı sunucu thread'inde yazılır. */
+    private static void rotaBak(IntegratedServer server, int no) {
+        sunucuda(server, level -> {
+            Kasirga k = kasirga(server);
+            ServerPlayer o = oyuncu(server);
+            if (k == null) {
+                DogalAfetler.LOGGER.warn(ON + "rota kare {}: aktif kasırga yok", no);
+                return;
+            }
+            Vec3 m = k.konum();
+            float yaw = (float) Math.toDegrees(Math.atan2(-(m.x - o.getX()), m.z - o.getZ()));
+            o.teleportTo(level, o.getX(), o.getY(), o.getZ(), yaw, ROTA_EGIM);
+            double uzaklik = Math.hypot(m.x - o.getX(), m.z - o.getZ());
+            ROTA_UZAKLIK[no - 1] = uzaklik;
+            double[] ara = k.araHedef();
+            DogalAfetler.LOGGER.info(ON + "rota kare {}: kasırga merkezi {}, oyuncu {}, yatay uzaklık {}, ara hedef ({}, {}) #{}, "
+                    + "evre {}", no, BlockPos.containing(m).toShortString(), o.blockPosition().toShortString(),
+                    Math.round(uzaklik), ara == null ? "-" : Math.round(ara[0]), ara == null ? "-" : Math.round(ara[1]),
+                    k.araHedefNo(), k.durum().evre());
+        });
+    }
+
+    private static void rotaSenaryosu(Minecraft mc, IntegratedServer server) {
+        adim("hazırlık", 0, () -> {
+            GorselOtomasyon.cizimAyari();
+            for (String k : new String[] {"gamerule sendCommandFeedback false", "gamerule doDaylightCycle false",
+                "gamerule doWeatherCycle false", "gamerule doMobSpawning false", "time set 6000", "weather clear"}) {
+                komut(server, k);
+            }
+            sunucuda(server, level -> {
+                ServerPlayer o = oyuncu(server);
+                o.setGameMode(GameType.CREATIVE);
+                BlockPos d = level.getSharedSpawnPos();
+                int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING, d.getX(), d.getZ());
+                o.teleportTo(level, d.getX() + 0.5, y, d.getZ() + 0.5, 0, 0);
+            });
+            mc.options.hideGui = true;
+        });
+        adim("S3 başlat", 100, () -> komut(server, "dogalafet start kasirga 3 " + mc.player.getGameProfile().getName()));
+        adim("siren", 20, () -> ilerletEger(server, k -> k.asama() == AfetAsamasi.ON_UYARI));
+        adim("aktif", 20, () -> ilerletEger(server, k -> k.asama() == AfetAsamasi.SIREN));
+        adim("olgun", 20, () -> ilerletEger(server, k -> k.durum().evre() == KasirgaEvresi.DOGUS));
+        akiciBekle("rota");
+        for (int i = 1; i <= ROTA_KARE; i++) {
+            int no = i;
+            adim("rota kamera " + no, no == 1 ? 40 : ROTA_ARALIK - 10, () -> rotaBak(server, no));
+            adim("rota karesi " + no, 10, () -> kare("rota_" + no));
+        }
+        adim("rota özeti", 20, () -> sunucuda(server, level -> {
+            Kasirga k = kasirga(server);
+            DogalAfetler.LOGGER.info(ON + "rota: uzaklık {}/{}/{}, ara hedef {}", Math.round(ROTA_UZAKLIK[0]),
+                    Math.round(ROTA_UZAKLIK[1]), Math.round(ROTA_UZAKLIK[2]), k == null ? 0 : k.araHedefNo());
+        }));
+        adim("stop", 20, () -> komut(server, "dogalafet stop"));
+        adim("kapanış", 60, () -> {
+            GorselOtomasyon.kareOzetiYaz("kasirga");
+            DogalAfetler.LOGGER.info(ON + "kapanıyor; girdi sayıları: tuş={} fare={} tekerlek={}", tus, fare, teker);
+            mc.stop();
         });
     }
 
@@ -504,8 +578,13 @@ public final class KasirgaOtomasyonu {
         }
         if (sira < 0) {
             if (++sayac >= 100) {
-                DogalAfetler.LOGGER.info(ON + "başlıyor: oyuncu {}", mc.player.getGameProfile().getName());
-                senaryo(mc, server);
+                DogalAfetler.LOGGER.info(ON + "başlıyor: oyuncu {}, bölüm {}", mc.player.getGameProfile().getName(),
+                        ROTA ? "rota" : "hepsi");
+                if (ROTA) {
+                    rotaSenaryosu(mc, server);
+                } else {
+                    senaryo(mc, server);
+                }
                 sira = 0;
                 sayac = 0;
             }

@@ -2,13 +2,13 @@ package io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik;
 
 /**
  * Kasırganın doğuş noktası ve yürüyüşü (tasarım notu §6 "Yönelim"). Kasırga hedefin {@link #dogusMesafesi} kadar uzağında
- * doğar ve hedefe doğru, her {@link #SAPMA_ARALIGI_TICK} tick'te yeniden çekilen ±35° sapmayla yürür; hedefin
- * {@link #GECIS_YARICAPI} bloğuna girince ana yönü donar ve hedefin üstünden geçip uzaklaşır. Açılar radyan, x doğu, z güney.
+ * doğar; hedef yalnız doğuş noktasını verir, yürüyüş {@link KasirgaRotasi}'nın ara hedeflerine doğrudur: her
+ * {@link #SAPMA_ARALIGI_TICK} tick'te ara hedefin yönü çevresinde ±35° sapmalı yeni bir yön çekilir ve kasırga ona tick başına
+ * en çok {@link #DONUS_HIZI} kadar döner. Açılar radyan, x doğu, z güney.
  */
 public final class Yonelim {
     public static final double SAPMA = Math.toRadians(35);
     public static final int SAPMA_ARALIGI_TICK = 40;
-    public static final double GECIS_YARICAPI = 12;
     /** Yön değişimi tick başına en çok bu kadar (radyan): kasırga keskin dönmez. */
     public static final double DONUS_HIZI = Math.toRadians(1.5);
 
@@ -30,7 +30,7 @@ public final class Yonelim {
         return new double[] {Math.cos(aci) * d, Math.sin(aci) * d};
     }
 
-    /** Noktadan hedefe yön. */
+    /** Noktadan hedefe (ara hedefe) yön. */
     public static double yon(double x, double z, double hedefX, double hedefZ) {
         return Math.atan2(hedefZ - z, hedefX - x);
     }

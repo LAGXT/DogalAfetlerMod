@@ -3,6 +3,7 @@ package io.github.kadirberkpolat1.dogalafetler.afet.kasirga;
 import com.mojang.authlib.GameProfile;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.KasirgaEvresi;
+import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.KasirgaRotasi;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.KasirgaSeviyesi;
 import io.github.kadirberkpolat1.dogalafetler.basarim.BasarimKimlikleri;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.Basarimlar;
@@ -14,6 +15,8 @@ import io.github.kadirberkpolat1.dogalafetler.core.EtkiAlani;
 import io.github.kadirberkpolat1.dogalafetler.core.OyunTestiTemizligi;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
 import io.github.kadirberkpolat1.dogalafetler.uyari.OrtamSesi;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import net.minecraft.advancements.Advancement;
 import net.minecraft.core.BlockPos;
@@ -27,6 +30,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.animal.Pig;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -52,6 +56,12 @@ import net.minecraftforge.gametest.PrefixGameTestTemplate;
 public final class KasirgaOyunTestleri {
     private static final String SAHNE = "kasirga_sahne";
     private static final BlockPos MERKEZ = new BlockPos(16, 3, 16);
+    /** {@code rotaOyuncuyaKilitlenmez}: oyuncunun çevresinde bu kadar blok (chunk'a yuvarlanır) test boyunca forceload. */
+    private static final int ROTA_YUKLU = 64;
+    /** Rota testinin forceload ettikleri; test sonunda ya da batch sonunda bırakılır. */
+    private static final List<ChunkPos> ZORLANAN = new ArrayList<>();
+    /** {@code rotaOyuncuyaKilitlenmez}: kasırganın yürüdüğü tick (~10 sn). */
+    private static final int ROTA_TICK = 200;
 
     private KasirgaOyunTestleri() {
     }
@@ -104,6 +114,24 @@ public final class KasirgaOyunTestleri {
     @AfterBatch(batch = "kasirga_hafif")
     public static void hafifSonrasi(ServerLevel level) {
         OyunTestiTemizligi.batchSonu(level);
+    }
+
+    @AfterBatch(batch = "kasirga_rota")
+    public static void rotaSonrasi(ServerLevel level) {
+        chunklariBirak(level);
+        OyunTestiTemizligi.batchSonu(level);
+    }
+
+    @AfterBatch(batch = "kasirga_rota_kayit")
+    public static void rotaKayitSonrasi(ServerLevel level) {
+        OyunTestiTemizligi.batchSonu(level);
+    }
+
+    private static void chunklariBirak(ServerLevel level) {
+        for (ChunkPos c : ZORLANAN) {
+            level.setChunkForced(c.x, c.z, false);
+        }
+        ZORLANAN.clear();
     }
 
     private static void dogrula(GameTestHelper y, boolean kosul, String mesaj) {
@@ -187,9 +215,14 @@ public final class KasirgaOyunTestleri {
 
     /** Seviye {@code seviye} kasırgayı başlatır, sahnenin ortasına taşır ve AKTIF'in {@code evre} evresine getirir. */
     private static Kasirga baslat(GameTestHelper y, int seviye, boolean hareket, KasirgaEvresi evre) {
+        return baslat(y, seviye, hareket, evre, null);
+    }
+
+    /** {@code hedef} null değilse kasırga onu hedef alarak başlar (doğuş noktası), sonra yine sahnenin ortasına taşınır. */
+    private static Kasirga baslat(GameTestHelper y, int seviye, boolean hareket, KasirgaEvresi evre, ServerPlayer hedef) {
         AfetYoneticisi yonetici = yonetici(y);
         yonetici.durdur();
-        AfetYoneticisi.BaslatmaSonucu sonuc = yonetici.elleBaslat(AfetTuru.KASIRGA, seviye, null, y.getLevel(),
+        AfetYoneticisi.BaslatmaSonucu sonuc = yonetici.elleBaslat(AfetTuru.KASIRGA, seviye, hedef, y.getLevel(),
                 y.absolutePos(MERKEZ));
         dogrula(y, sonuc == AfetYoneticisi.BaslatmaSonucu.BASLADI, "kasırga başlamadı: " + sonuc);
         if (!(yonetici.aktifAfet().orElse(null) instanceof Kasirga kasirga)) {
@@ -498,6 +531,123 @@ public final class KasirgaOyunTestleri {
                 EtkiAlani a = okunan.etkiAlani();
                 dogrula(y, Math.abs(a.x() - kasirga.konum().x) < 1e-6 && Math.abs(a.z() - kasirga.konum().z) < 1e-6,
                         "okunan etki alanı güncel merkezde değil");
+            } finally {
+                bitir(y, onceki);
+            }
+            y.succeed();
+        });
+    }
+
+    /**
+     * AF2-20: kasırga oyuncuyu izlemez. Oyuncu çevresi ±{@value #ROTA_YUKLU} blok forceload edilir; chunk'lar entity-ticking
+     * olunca oyuncuyu hedef alan S1 kasırga başlar, oyuncunun 40 blok doğusuna konur ve {@value #ROTA_TICK} tick hareketli
+     * yürür. Her tick: ara hedef oyuncuya en az {@link KasirgaRotasi#OYUNCUYA_EN_AZ} blok uzakta, kasırga yalnız entity-ticking
+     * konuma ilerler; sonda en az bir ara hedef seçilmiş ve kasırga yürümüş olmalı. Oyuncu yaratıcı kipte (çekilmez).
+     */
+    @GameTest(template = SAHNE, batch = "kasirga_rota", timeoutTicks = 800)
+    public static void rotaOyuncuyaKilitlenmez(GameTestHelper y) {
+        zemin(y, false);
+        boolean onceki = blokHasari(y, false);
+        ServerLevel level = y.getLevel();
+        BlockPos m = y.absolutePos(MERKEZ);
+        ServerPlayer oyuncu = CekirdekOyunTestleri.sahteOyuncu(y, new GameProfile(UUID.randomUUID(), "kasirga-rota"),
+                m.getX() + 0.5, m.getY(), m.getZ() + 0.5);
+        oyuncu.setGameMode(GameType.CREATIVE);
+        List<ChunkPos> alan = new ArrayList<>();
+        for (int cx = (m.getX() - ROTA_YUKLU) >> 4; cx <= (m.getX() + ROTA_YUKLU) >> 4; cx++) {
+            for (int cz = (m.getZ() - ROTA_YUKLU) >> 4; cz <= (m.getZ() + ROTA_YUKLU) >> 4; cz++) {
+                alan.add(new ChunkPos(cx, cz));
+                if (level.setChunkForced(cx, cz, true)) {
+                    ZORLANAN.add(new ChunkPos(cx, cz));
+                }
+            }
+        }
+        Kasirga[] kasirga = {null};
+        Vec3[] son = {null};
+        double[] yol = {0};
+        int[] gecen = {0};
+        boolean[] bitti = {false};
+        y.onEachTick(() -> {
+            if (bitti[0]) {
+                return;
+            }
+            if (kasirga[0] == null) {
+                for (ChunkPos c : alan) {
+                    if (!level.isPositionEntityTicking(new BlockPos(c.getMinBlockX(), m.getY(), c.getMinBlockZ()))) {
+                        return;
+                    }
+                }
+                kasirga[0] = baslat(y, 1, true, KasirgaEvresi.OLGUN, oyuncu);
+                kasirga[0].konumAyarla(Vec3.atBottomCenterOf(m.east(40)));
+                son[0] = kasirga[0].konum();
+                return;
+            }
+            Kasirga k = kasirga[0];
+            try {
+                double[] ara = k.araHedef();
+                if (k.araHedefNo() > 0 && ara != null) {
+                    double d = Math.hypot(ara[0] - oyuncu.getX(), ara[1] - oyuncu.getZ());
+                    dogrula(y, d >= KasirgaRotasi.OYUNCUYA_EN_AZ, "ara hedef #" + k.araHedefNo() + " oyuncuya " + Math.round(d)
+                            + " blok: (" + Math.round(ara[0]) + ", " + Math.round(ara[1]) + ")");
+                }
+                Vec3 konum = k.konum();
+                if (!konum.equals(son[0])) {
+                    yol[0] += Math.hypot(konum.x - son[0].x, konum.z - son[0].z);
+                    dogrula(y, level.isPositionEntityTicking(BlockPos.containing(konum)),
+                            "kasırga entity-ticking olmayan konuma ilerledi: " + BlockPos.containing(konum).toShortString());
+                    son[0] = konum;
+                }
+                if (++gecen[0] < ROTA_TICK) {
+                    return;
+                }
+                bitti[0] = true;
+                dogrula(y, k.araHedefNo() >= 1, "ara hedef seçilmedi");
+                dogrula(y, yol[0] >= 3, "kasırga yürümedi: " + yol[0]);
+            } catch (RuntimeException hata) {
+                bitti[0] = true;
+                throw hata;
+            } finally {
+                if (bitti[0]) {
+                    level.getServer().getPlayerList().remove(oyuncu);
+                    bitir(y, onceki);
+                    chunklariBirak(level);
+                }
+            }
+            y.succeed();
+        });
+    }
+
+    /**
+     * AF2-20 kayıttan devam: hareketli kasırganın NBT'si ({@code ozel.rota}) yeni bir {@link Kasirga}'ya okununca ara hedef, tohum,
+     * seçim sayacı ve zamanlayıcı aynı; aynı girdilerle bir sonraki seçim de aynı ara hedefi verir.
+     */
+    @GameTest(template = SAHNE, batch = "kasirga_rota_kayit", timeoutTicks = 100)
+    public static void rotaKayittanDevamEder(GameTestHelper y) {
+        zemin(y, false);
+        boolean onceki = blokHasari(y, false);
+        Kasirga kasirga = baslat(y, 2, true, KasirgaEvresi.OLGUN);
+        y.runAfterDelay(20, () -> {
+            try {
+                KasirgaRotasi rota = kasirga.rota();
+                dogrula(y, rota != null && rota.sayac() >= 1, "rota ya da ara hedef yok");
+                CompoundTag kayit = kasirga.durumYaz(new CompoundTag());
+                dogrula(y, kayit.getCompound("ozel").contains("rota"), "NBT'de rota yok");
+                Kasirga okunan = new Kasirga();
+                okunan.durumOku(kayit);
+                KasirgaRotasi geri = okunan.rota();
+                dogrula(y, geri != null && geri.yaz().equals(rota.yaz()), "rota durumu korunmadı: " + rota.yaz() + " / "
+                        + (geri == null ? null : geri.yaz()));
+                dogrula(y, okunan.araHedefNo() == kasirga.araHedefNo() && geri.tohum() == rota.tohum(),
+                        "ara hedef no ya da tohum korunmadı");
+                double[] a = kasirga.araHedef();
+                double[] b = okunan.araHedef();
+                dogrula(y, a[0] == b[0] && a[1] == b[1], "ara hedef korunmadı");
+                List<double[]> oyuncular = List.of(new double[] {a[0] + 50, a[1]});
+                Vec3 k = kasirga.konum();
+                KasirgaRotasi.Secim s1 = KasirgaRotasi.oku(rota.yaz()).yeniAraHedef(k.x, k.z, oyuncular, (x, z) -> true);
+                KasirgaRotasi.Secim s2 = KasirgaRotasi.oku(geri.yaz()).yeniAraHedef(k.x, k.z, oyuncular, (x, z) -> true);
+                dogrula(y, s1.equals(s2), "sonraki seçim farklı: " + s1 + " / " + s2);
+                dogrula(y, s1.no() == rota.sayac() + 1, "sonraki seçim numarası " + s1.no());
             } finally {
                 bitir(y, onceki);
             }

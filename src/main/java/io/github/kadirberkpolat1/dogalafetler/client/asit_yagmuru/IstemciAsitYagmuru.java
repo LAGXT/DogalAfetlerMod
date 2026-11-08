@@ -35,11 +35,13 @@ import net.minecraftforge.fml.common.Mod;
 
 /**
  * Asit yağmurunun istemci durumu ve tick efektleri (tasarım notu §2, §4, §5). Durum çekirdeğin {@code AfetDurumPaketi}'nden
- * okunur (merkez, yarıçap, aşama, seviye; {@code ozel.y} yoğunluk, {@code ozel.a} aşınan bloklar) ve 1 Hz paket arasında
- * yumuşatılır; görünen yoğunluk seviyeyle ölçeklenir (S1 seyrek çise, S5 sağanak).
- * SIREN'de bulut tavanı ve sis toplanır, AKTIF'te yağmur ({@link AsitYagmuruCizici}), sıçrama, cızlama dumancığı, yüzey
- * buharı ve vanilla yağmur sesi gelir. Parçacıklar vanilla'nın 32 blok kesimini atlayarak ({@code force}) eklenir; sayıyı
- * efekt kalitesi ve vanilla parçacık ayarı sınırlar.
+ * okunur (aşama, seviye; {@code ozel.y} yoğunluk, {@code ozel.a} aşınan bloklar) ve 1 Hz paket arasında yumuşatılır; görünen
+ * yoğunluk seviyeyle ölçeklenir (S1 seyrek çise, S5 sağanak). Yağmur afetin boyutunun her yerinde yağar (AF2-01): alan
+ * kenarı ve sis yarıçapı yoktur, çöl ve kar biyomunda da asit yağar. SIREN'de bulut tavanı ve sis toplanır, AKTIF'te yağmur
+ * ({@link AsitYagmuruCizici}), sıçrama, cızlama dumancığı, yüzey buharı ve vanilla yağmur sesi gelir. Sunucu aynı anda
+ * vanilla yağmurunu açtığından vanilla yağmur çizimi AKTIF boyunca ve bitişte sunucu yağmuru sönene dek istemcide bastırılır
+ * ({@code ClientLevel.setRainLevel(0)}, donma istemcisinin kar kipiyle aynı yol); maviyle asit üst üste binmez. Parçacıklar
+ * vanilla'nın 32 blok kesimini atlayarak ({@code force}) eklenir; sayıyı efekt kalitesi ve vanilla parçacık ayarı sınırlar.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class IstemciAsitYagmuru {
@@ -50,20 +52,23 @@ public final class IstemciAsitYagmuru {
     private static final double BULUT_MENZILI = 96;
     private static final double ASINMA_MENZILI = 48;
     private static final int SIREN_TICK = 200;
+    /** Asit bittikten sonra vanilla yağmurun bastırılmaya devam ettiği süre: sunucu yağmuru 0,01/tick ile söner. */
+    private static final int SONUM_TICK = 100;
 
     private static boolean aktif;
-    private static double x;
-    private static double z;
-    private static double yaricap;
     private static double yogunluk;
     /** Sunucunun gönderdiği yumuşatılmamış yoğunluk (AKTIF değilse 0): maruziyet sunucuyla aynı anda başlayıp biter. */
     private static double hamYogunluk;
+    /** Paket AKTIF aşamada: sunucu vanilla yağmurunu açmıştır (ham yoğunluk ilk saniyede henüz 0 olabilir). */
+    private static boolean yagiyor;
     private static double bulut;
     private static long[] asinan = new long[0];
     private static long afetNo;
     private static EfektKalitesi kaliteZorlamasi;
     private static int sesSayaci;
     private static float oncekiCan = -1;
+    /** Vanilla yağmurun daha kaç tick bastırılacağı (AKTIF boyunca dolu, bitişte {@link #SONUM_TICK}'ten geri sayar). */
+    private static int bastirmaKalan;
 
     private IstemciAsitYagmuru() {
     }
@@ -75,11 +80,6 @@ public final class IstemciAsitYagmuru {
 
     static boolean aktif() {
         return aktif;
-    }
-
-    /** Yağmurun bu XZ'deki alan ağırlığı 0–1 (kenarda 16 blokta söner). */
-    static double alanAgirligi(double px, double pz) {
-        return aktif ? AsitKurallari.alanAgirligi(Math.hypot(px - x, pz - z), yaricap) : 0;
     }
 
     static Kademe kademe() {
@@ -100,6 +100,7 @@ public final class IstemciAsitYagmuru {
         aktif = false;
         yogunluk = 0;
         hamYogunluk = 0;
+        yagiyor = false;
         bulut = 0;
         asinan = new long[0];
         AsitParcacigi.BULUTLAR.clear();
@@ -109,6 +110,7 @@ public final class IstemciAsitYagmuru {
     @SubscribeEvent
     public static void cikis(ClientPlayerNetworkEvent.LoggingOut olay) {
         sifirla();
+        bastirmaKalan = 0;
     }
 
     @SubscribeEvent
@@ -128,7 +130,9 @@ public final class IstemciAsitYagmuru {
             return;
         }
         AsitParcacigi.BULUTLAR.removeIf(p -> !p.isAlive());
-        if (!durumuOku(level)) {
+        boolean durum = durumuOku(level);
+        vanillaYagmuru(level);
+        if (!durum) {
             AsitEkranEfekti.maruzGuncelle(false);
             return;
         }
@@ -140,7 +144,7 @@ public final class IstemciAsitYagmuru {
         double ayar = VANILLA_AYAR_CARPANI[mc.options.particles().get().getId()];
         RandomSource r = level.random;
         bulutTavani(level, goz, k, ayar, r);
-        if (yogunluk > 0.01 && AsitKurallari.sisAgirligi(Math.hypot(goz.x - x, goz.z - z), yaricap) > 0) {
+        if (yogunluk > 0.01) {
             damlalar(level, goz, k, ayar, r);
             buhar(level, goz, k, ayar, r);
             sesler(level, goz, r);
@@ -153,15 +157,32 @@ public final class IstemciAsitYagmuru {
     }
 
     /**
-     * Sunucudaki hasar denetimiyle aynı koşul: AKTIF yağmur (ham yoğunluk > 0), hayatta, yaratıcı ve izleyici değil, alanın
-     * içinde ve başın üstü gökyüzüne açık.
+     * Sunucudaki hasar denetimiyle aynı koşul: AKTIF yağmur (ham yoğunluk > 0), hayatta, yaratıcı ve izleyici değil ve başın
+     * üstü gökyüzüne açık; yağmur her yerde yağdığından konum koşulu yok (AF2-03).
      * Ekran efekti ve oyuncunun üstündeki cızlama bu sürece görünür.
      */
     static boolean maruzMu(ClientLevel level, LocalPlayer oyuncu) {
         return oyuncu != null && aktif && hamYogunluk > 0 && !oyuncu.isSpectator() && !oyuncu.isCreative()
-                && oyuncu.isAlive()
-                && Math.hypot(oyuncu.getX() - x, oyuncu.getZ() - z) <= yaricap
-                && acikta(level, oyuncu.getX(), oyuncu.getEyeY(), oyuncu.getZ());
+                && oyuncu.isAlive() && acikta(level, oyuncu.getX(), oyuncu.getEyeY(), oyuncu.getZ());
+    }
+
+    /**
+     * Asit AKTIF iken ve bittikten sonra {@link #SONUM_TICK} boyunca vanilla yağmur çizilmez (sunucunun açtığı yağmur 0,01/tick
+     * ile sönerken mavi yağmur görünmesin). Paketler tick'ten önce işlendiğinden her tick sonunda sıfırlamak çizimi bastırır;
+     * bırakılırken dünyada gerçekten yağmur varsa (önceki hava yağmurluydu) yağmur düzeyi geri gelir.
+     */
+    private static void vanillaYagmuru(ClientLevel level) {
+        if (aktif && yagiyor) {
+            bastirmaKalan = SONUM_TICK;
+        }
+        if (bastirmaKalan <= 0) {
+            return;
+        }
+        bastirmaKalan--;
+        level.setRainLevel(0f);
+        if (bastirmaKalan == 0 && level.getLevelData().isRaining()) {
+            level.setRainLevel(1f);
+        }
     }
 
     /** Maruz oyuncunun başı ve omuzlarından seyrek cızlama dumanı (üçüncü kişi kamerada okunur). */
@@ -185,19 +206,13 @@ public final class IstemciAsitYagmuru {
             return false;
         }
         AfetDurumPaketi p = paket.get();
-        double hedefX = p.merkez().getX() + 0.5;
-        double hedefZ = p.merkez().getZ() + 0.5;
         if (!aktif || p.afetNo() != afetNo) {
-            x = hedefX;
-            z = hedefZ;
             afetNo = p.afetNo();
             aktif = true;
         }
-        x += (hedefX - x) * 0.05;
-        z += (hedefZ - z) * 0.05;
-        yaricap = p.yaricap();
         double carpan = AsitKurallari.gorselCarpan(p.seviye());
-        hamYogunluk = p.asama() == AfetAsamasi.AKTIF ? p.ozel().getFloat("y") : 0;
+        yagiyor = p.asama() == AfetAsamasi.AKTIF;
+        hamYogunluk = yagiyor ? p.ozel().getFloat("y") : 0;
         double hedefYogunluk = hamYogunluk * carpan;
         double sirenIlerleme = p.asama() == AfetAsamasi.SIREN && p.kalanTick() >= 0
                 ? 1.0 - Math.min(1.0, p.kalanTick() / (double) SIREN_TICK) : 1.0;
@@ -209,7 +224,7 @@ public final class IstemciAsitYagmuru {
         return true;
     }
 
-    /** Alanın üstünde, bulut yüksekliğinde (kameraya en çok 60 blok yukarıda) rüzgârla sürüklenen koyu bulut tavanı. */
+    /** Bulut yüksekliğinde (kameraya en çok 60 blok yukarıda) rüzgârla sürüklenen koyu bulut tavanı; her yerde. */
     private static void bulutTavani(ClientLevel level, Vec3 goz, Kademe k, double ayar, RandomSource r) {
         int tavan = (int) Math.round(k.bulut * bulut * ayar);
         if (AsitParcacigi.BULUTLAR.size() >= tavan || r.nextDouble() > 0.35) {
@@ -221,9 +236,6 @@ public final class IstemciAsitYagmuru {
         double uzaklik = Math.sqrt(r.nextDouble()) * BULUT_MENZILI;
         double px = goz.x + Math.cos(aci) * uzaklik;
         double pz = goz.z + Math.sin(aci) * uzaklik;
-        if (AsitKurallari.sisAgirligi(Math.hypot(px - x, pz - z), yaricap) < r.nextDouble()) {
-            return;
-        }
         double[] ruzgar = YanginMantigi.gununRuzgari(level.getGameTime() / 24000L);
         ekle(level, AsitKayitlari.BULUT.get(), px, y + r.nextGaussian() * 3, pz, ruzgar[0] * 0.03, 0, ruzgar[1] * 0.03);
     }
@@ -236,9 +248,6 @@ public final class IstemciAsitYagmuru {
         for (int i = 0; i < sayi; i++) {
             double px = goz.x + (r.nextDouble() * 2 - 1) * menzil;
             double pz = goz.z + (r.nextDouble() * 2 - 1) * menzil;
-            if (alanAgirligi(px, pz) < r.nextDouble()) {
-                continue;
-            }
             int h = level.getHeight(Heightmap.Types.MOTION_BLOCKING, Mth.floor(px), Mth.floor(pz));
             if (Math.abs(h - goz.y) > 24) {
                 continue;
@@ -260,9 +269,6 @@ public final class IstemciAsitYagmuru {
         }
         double px = goz.x + (r.nextDouble() * 2 - 1) * k.buharYaricapi;
         double pz = goz.z + (r.nextDouble() * 2 - 1) * k.buharYaricapi;
-        if (alanAgirligi(px, pz) < r.nextDouble()) {
-            return;
-        }
         int h = level.getHeight(Heightmap.Types.MOTION_BLOCKING, Mth.floor(px), Mth.floor(pz));
         double[] ruzgar = YanginMantigi.gununRuzgari(level.getGameTime() / 24000L);
         ekle(level, AsitKayitlari.BUHAR.get(), px, h + 0.3, pz, ruzgar[0] * 0.01, 0.004, ruzgar[1] * 0.01);
@@ -293,9 +299,6 @@ public final class IstemciAsitYagmuru {
         sesSayaci = 3 + r.nextInt(3);
         double px = goz.x + r.nextInt(21) - 10;
         double pz = goz.z + r.nextInt(21) - 10;
-        if (alanAgirligi(px, pz) <= 0) {
-            return;
-        }
         int h = level.getHeight(Heightmap.Types.MOTION_BLOCKING, Mth.floor(px), Mth.floor(pz));
         if (h > goz.y + 1 && !acikta(level, goz.x, goz.y, goz.z)) {
             level.playLocalSound(px, h, pz, SoundEvents.WEATHER_RAIN_ABOVE, SoundSource.WEATHER, (float) (0.1 * yogunluk),
@@ -331,10 +334,10 @@ public final class IstemciAsitYagmuru {
         level.addParticle(tur, true, px, py, pz, vx, vy, vz);
     }
 
-    /** Sarı-yeşil sis: alan içinde tam, 1,5R'de sıfır; gündüz ve gece rengi güneş açısıyla karışır. */
+    /** Sarı-yeşil sis her yerde, bulut tavanıyla birlikte toplanır; gündüz ve gece rengi güneş açısıyla karışır. */
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void sisRengi(ViewportEvent.ComputeFogColor olay) {
-        double w = sisGucu(olay.getCamera());
+        double w = sisGucu();
         if (w <= 0) {
             return;
         }
@@ -350,7 +353,7 @@ public final class IstemciAsitYagmuru {
     /** Yağmur perdesi: görüş mesafesi yoğunlukla %40'a kadar kısalır (Forge değişikliği yalnız iptal edilen olayda uygular). */
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void sis(ViewportEvent.RenderFog olay) {
-        double w = sisGucu(olay.getCamera());
+        double w = sisGucu();
         if (w <= 0 || olay.isCanceled()) {
             return;
         }
@@ -360,12 +363,11 @@ public final class IstemciAsitYagmuru {
         olay.setCanceled(true);
     }
 
-    private static double sisGucu(Camera kamera) {
+    private static double sisGucu() {
         if (!aktif || Minecraft.getInstance().level == null) {
             return 0;
         }
-        Vec3 goz = kamera.getPosition();
-        return AsitKurallari.sisAgirligi(Math.hypot(goz.x - x, goz.z - z), yaricap) * Mth.clamp(bulut, 0, 1);
+        return Mth.clamp(bulut, 0, 1);
     }
 
     /** Tasarım §5 tablosu: yağmur yarıçapı, sıçrama/tick, cızlama olasılığı, bulut tavanı, yüzey buharı yarıçapı. */
