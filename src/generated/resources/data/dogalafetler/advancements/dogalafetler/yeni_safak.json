@@ -1,0 +1,33 @@
+{
+  "parent": "dogalafetler:dogalafetler/supernova_tanigi",
+  "criteria": {
+    "olcut": {
+      "conditions": {},
+      "trigger": "dogalafetler:yeni_safak"
+    }
+  },
+  "display": {
+    "announce_to_chat": false,
+    "description": {
+      "translate": "advancements.dogalafetler.yeni_safak.description"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:clock"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.yeni_safak.title"
+    }
+  },
+  "requirements": [
+    [
+      "olcut"
+    ]
+  ],
+  "rewards": {
+    "experience": 15
+  },
+  "sends_telemetry_event": true
+}
