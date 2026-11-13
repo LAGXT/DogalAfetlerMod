@@ -104,7 +104,8 @@ public final class DonmaVeriSaglayicilari {
                             Blocks.CUT_RED_SANDSTONE, Blocks.QUARTZ_BLOCK, Blocks.SMOOTH_QUARTZ, Blocks.TERRACOTTA);
             // Pulsar külü kar altında kalır (PL-5): kül bloğu doğal zemin, kömürleşmiş kütük yapı gibi geç karlanır.
             tag(DonmaIsleyici.KAR_ZEMINI).add(PulsarKayitlari.KUL_BLOGU.get());
-            tag(DonmaIsleyici.YAPI_KAR_ZEMINI).add(PulsarKayitlari.KOMURLESMIS_KUTUK.get());
+            tag(DonmaIsleyici.YAPI_KAR_ZEMINI).add(PulsarKayitlari.KOMURLESMIS_KUTUK.get(),
+                    PulsarKayitlari.SOYULMUS_KOMURLESMIS_KUTUK.get());
         }
     }
 

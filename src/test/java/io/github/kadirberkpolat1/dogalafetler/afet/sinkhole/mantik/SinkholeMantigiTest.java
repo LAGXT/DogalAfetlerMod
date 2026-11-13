@@ -41,7 +41,7 @@ class SinkholeMantigiTest {
             assertEquals(s.catlamaTick() + SinkholeSeviyesi.SARKMA_TICK + s.cokusTick() + SinkholeSeviyesi.DURULMA_TICK,
                     s.aktifTick());
         }
-        assertEquals(34, SinkholeSeviyesi.varsayilan(5).cap());
+        assertEquals(48, SinkholeSeviyesi.varsayilan(5).cap());
         assertEquals(6, SinkholeSeviyesi.varsayilan(1).cap());
     }
 }

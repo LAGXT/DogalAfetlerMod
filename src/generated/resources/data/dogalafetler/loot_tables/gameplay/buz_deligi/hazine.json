@@ -16,6 +16,48 @@
               "function": "minecraft:enchant_randomly"
             }
           ],
+          "name": "minecraft:book",
+          "weight": 18
+        },
+        {
+          "type": "minecraft:item",
+          "functions": [
+            {
+              "add": false,
+              "enchantments": {
+                "dogalafetler:yineleme": 1.0
+              },
+              "function": "minecraft:set_enchantments"
+            }
+          ],
+          "name": "minecraft:book",
+          "weight": 4
+        },
+        {
+          "type": "minecraft:item",
+          "functions": [
+            {
+              "add": false,
+              "enchantments": {
+                "dogalafetler:yineleme": 2.0
+              },
+              "function": "minecraft:set_enchantments"
+            }
+          ],
+          "name": "minecraft:book",
+          "weight": 2
+        },
+        {
+          "type": "minecraft:item",
+          "functions": [
+            {
+              "add": false,
+              "enchantments": {
+                "dogalafetler:yineleme": 3.0
+              },
+              "function": "minecraft:set_enchantments"
+            }
+          ],
           "name": "minecraft:book"
         }
       ],

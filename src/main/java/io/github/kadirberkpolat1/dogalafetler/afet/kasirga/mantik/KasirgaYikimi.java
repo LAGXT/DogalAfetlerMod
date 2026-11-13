@@ -12,11 +12,11 @@ public final class KasirgaYikimi {
     /** Yıkım (sütun seçimi) yarıçapı / çekim yarıçapı: K-04'ün %60'ı, taban enkaz eteğinin yarıçapına eşit. */
     public static final double YIKIM_ORANI = 0.6;
 
-    private static final int[] DERINLIK = {1, 1, 3, 4, 6};
+    private static final int[] DERINLIK = {1, 1, 3, 5, 8};
     private static final double[] CEKIRDEK_OLASILIGI = {0.6, 0.75, 0.9, 1, 1};
-    private static final double[] KENAR_OLASILIGI = {0.15, 0.2, 0.25, 0.3, 0.35};
-    private static final double[] DENEME_KATI = {1, 1, 1.5, 2, 2.5};
-    private static final int[] KUTUK_TICK = {0, 0, 0, 8, 12};
+    private static final double[] KENAR_OLASILIGI = {0.15, 0.2, 0.25, 0.3, 0.45};
+    private static final double[] DENEME_KATI = {1, 1, 1.5, 2, 3.2};
+    private static final int[] KUTUK_TICK = {0, 0, 0, 8, 16};
 
     /** Sütundaki blok sınıfı (etiketlerden; N12). */
     public enum Sinif {

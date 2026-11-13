@@ -55,6 +55,20 @@ public enum KasirgaEvresi {
         return new Durum(DAGILMA, Math.min(1, (double) t / DAGILMA_TICK));
     }
 
+    /** Tepeden fırlatma, AKTIF aşamanın bu payından (ömrün son %13'ü) başlar ve {@link #FIRLATMA_RAMPA} payında tam değere varır. */
+    public static final double FIRLATMA_BASLANGIC = 0.87;
+    public static final double FIRLATMA_RAMPA = 0.05;
+
+    /**
+     * Fırlatma rampası 0-1: AKTIF aşamanın {@code gecen} tick'i, toplam süresinin {@link #FIRLATMA_BASLANGIC} payından önce 0,
+     * sonra {@link #FIRLATMA_RAMPA} payında doğrusal artar, afet bitene dek 1'dir. Kasırga yok olmaya yaklaşırken huninin
+     * tepesindeki varlıklar bu rampayla fırlatılır ({@link Cekim}).
+     */
+    public static double firlatma(long gecen, long olgunTick) {
+        double oran = (double) Math.max(0, gecen) / toplamAktif(olgunTick);
+        return Math.min(1, Math.max(0, (oran - FIRLATMA_BASLANGIC) / FIRLATMA_RAMPA));
+    }
+
     /** Sıra numarasından (ağ, NBT) güvenli çözüm. */
     public static KasirgaEvresi sirayla(int sira) {
         KasirgaEvresi[] hepsi = values();

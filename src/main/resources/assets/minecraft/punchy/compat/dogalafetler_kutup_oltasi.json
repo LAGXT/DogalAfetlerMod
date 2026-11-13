@@ -1,0 +1,19 @@
+{
+  "itemSpecific": {
+    "dogalafetler:kutup_oltasi": {
+      "kind": "FISHING_ROD",
+      "armKind": "FISHING_ROD",
+      "customAnimation": [
+        {
+          "type": "fishingrod",
+          "throw": "kutup_oltasi_firlat",
+          "pull": "kutup_oltasi_cek"
+        },
+        {
+          "type": "attack",
+          "var_1": "attack_1"
+        }
+      ]
+    }
+  }
+}

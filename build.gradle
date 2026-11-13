@@ -18,10 +18,10 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
 println "Java: ${System.getProperty 'java.version'}, JVM: ${System.getProperty 'java.vm.version'} (${System.getProperty 'java.vendor'}), Arch: ${System.getProperty 'os.arch'}"
 
-// Uyumluluk modları: -Puyum=e4mc | coldsweat | ikisi (varsayılan: yok).
+// Uyumluluk modları: -Puyum=e4mc | coldsweat | ikisi | iris (varsayılan: yok).
 def uyum = (project.findProperty('uyum') ?: 'yok').toString()
-if (!(uyum in ['yok', 'e4mc', 'coldsweat', 'ikisi'])) {
-    throw new GradleException("Geçersiz -Puyum=${uyum}; geçerli değerler: yok, e4mc, coldsweat, ikisi")
+if (!(uyum in ['yok', 'e4mc', 'coldsweat', 'ikisi', 'iris'])) {
+    throw new GradleException("Geçersiz -Puyum=${uyum}; geçerli değerler: yok, e4mc, coldsweat, ikisi, iris")
 }
 
 minecraft {
@@ -109,10 +109,21 @@ mixin {
     add sourceSets.main, "${mod_id}.refmap.json"
     config "${mod_id}.su.mixins.json"
     config "${mod_id}.client.su.mixins.json"
+    config "${mod_id}.uyum.mixins.json"
 }
 
 // runData çıktıları derlemeye dahil edilir.
 sourceSets.main.resources { srcDir 'src/generated/resources' }
+
+// Uyum API taslakları (JEI, Jade): bu modların API jar'ı çevrimdışı Gradle önbelleğinde yok, bu yüzden derleme zamanında yalnız
+// kullanılan imzaları taşıyan taslaklar (src/uyumApi/java) ana kaynak kümesinin derleme sınıf yoluna eklenir. Taslaklar jar'a girmez ve
+// çalışma sınıf yoluna da konmaz: gerçek sınıflar çalışma anında JEI/Jade jar'ından gelir (mod yoksa eklenti sınıfları hiç yüklenmez).
+// Taslak imzaları JEI 15.20 (1.20.1) ve Jade 11.13 (1.20.1) jar'larıyla doğrulanmıştır.
+sourceSets {
+    uyumApi
+}
+sourceSets.uyumApi.compileClasspath = sourceSets.main.compileClasspath
+sourceSets.main.compileClasspath += sourceSets.uyumApi.output
 
 repositories {
     // Modrinth deposu yalnız maven.modrinth grubunu sunar. exclusiveContent kullanılmaz: fg.deobf aynı gruptaki
@@ -135,6 +146,11 @@ dependencies {
     }
     if (uyum == 'coldsweat' || uyum == 'ikisi') {
         runtimeOnly fg.deobf("maven.modrinth:cold-sweat:${coldsweat_surum}")
+    }
+    // Gölgelendirici uyumu (K-E83): Embeddium + Oculus ile geçici geliştirme ortamı (-Puyum=iris), gölgelendirici paketi run/shaderpacks'ten.
+    if (uyum == 'iris') {
+        runtimeOnly fg.deobf("maven.modrinth:embeddium:${embeddium_surum}")
+        runtimeOnly fg.deobf("maven.modrinth:oculus:${oculus_surum}")
     }
     // Sıcaklık sisteminin Cold Sweat köprüsü (N8): API yalnız derlemede; mods.toml'da isteğe bağlı bağımlılık.
     compileOnly fg.deobf("maven.modrinth:cold-sweat:${coldsweat_surum}")
@@ -219,6 +235,7 @@ tasks.named('processResources', ProcessResources).configure {
             loader_version_range: loader_version_range,
             mod_id: mod_id, mod_name: mod_name, mod_license: mod_license, mod_version: mod_version,
             mod_authors: mod_authors, mod_description: mod_description,
+            mod_display_url: mod_display_url, mod_issue_url: mod_issue_url,
     ]
     inputs.properties replaceProperties
 

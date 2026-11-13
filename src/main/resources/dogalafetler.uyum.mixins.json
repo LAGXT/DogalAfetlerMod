@@ -1,0 +1,10 @@
+{
+  "required": false,
+  "minVersion": "0.8",
+  "package": "io.github.kadirberkpolat1.dogalafetler.client.uyum.mixin",
+  "plugin": "io.github.kadirberkpolat1.dogalafetler.client.uyum.PunchyMixinEklentisi",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "dogalafetler.refmap.json",
+  "client": ["GameRendererElMixin", "FishingLineAttachmentMixin", "EmbeddiumSivilariMixin"],
+  "injectors": {"defaultRequire": 0}
+}

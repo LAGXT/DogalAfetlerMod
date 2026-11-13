@@ -23,7 +23,7 @@ public final class Termostat {
 
     static void cevirileriYaz(CeviriYazici y) {
         y.ekle(TERMOSTATLI.ceviriAnahtari(), "Thermostatic", "Termostatlı");
-        y.ekle(PLAKA_ACIKLAMASI, "Craft with an armor piece: gently pulls body temperature toward neutral",
-                "Bir zırh parçasıyla birleştir: vücut sıcaklığını hafifçe nötre çeker");
+        y.ekle(PLAKA_ACIKLAMASI, "Craft with an armor piece: pulls body temperature toward neutral and warms you in the cold",
+                "Bir zırh parçasıyla birleştir: vücut sıcaklığını nötre çeker, soğukta ortamı ısıtır");
     }
 }

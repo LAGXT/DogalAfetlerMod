@@ -29,8 +29,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * tek atamayla yayınlanır; okuyucular o ana kadar eski sonucu görür.
  */
 public final class DenizAlani {
-    /** Sistemin desteklediği en büyük artış (config üst sınırının üst sınırı); taşkın bu kadar yükseğe bakar. */
-    public static final int EN_COK_ARTIS = 8;
+    /**
+     * Sistemin desteklediği en büyük artış (config üst sınırının üst sınırı); taşkın bu kadar yükseğe bakar. K-E81: sel S5
+     * 12 blok yükselsin diye 8'den 16'ya çıktı; kalıcı deniz yükselmesinin kendi config üst sınırı (en çok 8) değişmedi.
+     */
+    public static final int EN_COK_ARTIS = 16;
 
     /** Bir chunk'ın 256 sütununu ({@code indeks = lx + lz * 16}) doldurur; chunk yüklü değilse {@code false}. */
     @FunctionalInterface

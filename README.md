@@ -1,4 +1,4 @@
-# Doğal Afetler
+# LAGXT & TRSEEK's Natural Disasters Mod
 
 Minecraft 1.20.1 (Forge) için gerçekçi doğal afetler, vücut sıcaklığı sistemi ve dünya dönemleri modu. Kasırga, tsunami,
 deprem, sinkhole, asit yağmuru, orman yangını, güneş patlaması ve ay çarpması; afetlerin bıraktığı izler (donan dünya, yükselen
@@ -6,7 +6,7 @@ deniz, aysız gökyüzü, kızıl cüce güneş) dünyada kalıcıdır.
 
 - Sürüm: **0.1.0** · Minecraft **1.20.1** · Forge **47.4.28** ve üstü (47.x)
 - Jar: `dogalafetler-0.1.0.jar` · Mod kimliği: `dogalafetler`
-- Yazar: Kadir Berk Polat · Lisans: MIT
+- Yazarlar: [LAGXT](https://github.com/LAGXT) ve TRSEEK · Lisans: MIT
 
 ## İçindekiler
 
@@ -23,8 +23,9 @@ deniz, aysız gökyüzü, kızıl cüce güneş) dünyada kalıcıdır.
 11. [Cold Sweat ile birlikte kullanmak](#cold-sweat-ile-birlikte-kullanmak)
 12. [Ses ve doku dosyaları](#ses-ve-doku-dosyaları)
 13. [Bilinen sınırlar](#bilinen-sınırlar)
-14. [Belgeler](#belgeler)
-15. [Lisans](#lisans)
+14. [Geri bildirim](#geri-bildirim)
+15. [Belgeler](#belgeler)
+16. [Lisans](#lisans)
 
 ## Kurulum (Windows'ta oynamak)
 
@@ -72,7 +73,13 @@ gradlew.bat build
 | `gradlew runData` | Dil dosyaları, tarifler, başarımlar, loot tabloları, `sounds.json` ve parçacık tanımlarını `src/generated/resources/` altına üretir |
 | `gradlew runClient` / `runServer` | Geliştirme istemcisi / sunucusu |
 
-İsteğe bağlı uyumluluk modlarıyla geliştirme istemcisi: `gradlew runClient -Puyum=coldsweat` (ya da `e4mc`, `ikisi`).
+İsteğe bağlı uyumluluk modlarıyla geliştirme istemcisi: `gradlew runClient -Puyum=coldsweat` (ya da `e4mc`, `ikisi`, `iris`). `iris`, Embeddium 0.3.31 + Oculus 1.8.0 yükler;
+gölgelendirici paketi `run/shaderpacks/`'ten gelir. `AY_IRIS=1 python3 tools/senaryo/ay_carpmasi_gorsel.py` ay çarpması senaryosunu paketle birlikte koşar.
+
+**Gölgelendirici (Oculus/Iris) ve Embeddium:** mod bu modlar yüklükken de açılır ve çalışır. Modun kendi gökyüzü (güneş patlaması, pulsar, ay
+çarpması) paketin güneş yolu eğimini (`sunPathRotation`) uygular, bu yüzden güneş, ay ve yıldızlar paketin ışığıyla aynı yerde durur; yaklaşan
+ay, olay başladığı anda vanilla ayın bulunduğu yerden gelir. Embeddium kendi sıvı çizicisini kullandığından, tsunami öncesi çekilmenin
+gerçek suyu gizlemesi için ayrı bir kanca vardır (yalnız Embeddium yüklükken uygulanır).
 
 ## Afetler
 
@@ -98,6 +105,7 @@ sonraki bekleme biraz uzar.
 | Orman yangını | `orman_yangini` | 1–5 | Ortak yangın sistemiyle yanıcı olan her şeye yayılır, yağmurda söner; yakınındaki ortam ısınır. |
 | Güneş patlaması | `gunes_patlamasi` | yok | En nadir afet, tek seferlik. Uzun siren; güneş büyür, meteorlar yağar, dünya 5 gün boyunca kavrulur, sonunda **süpernova**. Ardından güneşsiz dönem, dünyanın donması ve **kızıl cüce** güneşin doğuşu gelir (aşağıda "Dünya dönemleri"). |
 | Ay çarpması | `ay_carpmasi` | yok | Güneş patlamasından biraz daha sık, tek seferlik. Ay yaklaşır ve çarpar (ekran ve harita sallanır), 1–2 dakika ay parçaları yağar, gökte enkaz halkası kalır. 10 dakika sonra deniz seviyesi kalıcı olarak yükselmeye başlar ve tsunamiler bir süre daha sık olur. Ay bir daha oluşmaz. |
+| Sel | `sel` | 1–5 | Deniz, nehir ve göl yüzeyi hızla yükselir (seviyeye göre 5 … 12 blok; su 20–40 saniyede tepeye çıkar), suyla bağlı alçak yerleri sular altında bırakır: oyuncular yüzer, ıslanır ve **sel suyunda vanilla suya göre 2,5 kat hızlı boğulur**; yüksek arazi kuru kalır. Su ilk saniyelerde kalkmaya başlar, birkaç dakika tepede kalır ve geri çekilir. **İsı yayan bloklar (lav, ateş, kamp ateşi, yanan fırın, meşale…) çevrelerindeki sel suyunu buharlaştırır**; denizin kendi seviyesi buharlaşmaz. Yağmur, fırtına, tsunami (sürerken ve bittikten sonra) ve ay çarpması selin seçilme şansını artırır; yakında su yoksa seçilmez. Su, tsunami gibi modun sanal suyudur; haritaya gerçek su bloku konmaz. |
 
 Güneş patlaması ve ay çarpması yalnız dünya yeterince yaşlanınca seçilir (varsayılan: güneş için 40., ay için 25. oyun günü;
 ölçüt config'ten oyuncuların gelişimine çevrilebilir).
@@ -160,6 +168,17 @@ Kozmik Çekirdek envantere girince açılır. Kozmik Çekirdek meteor kraterleri
 | Buz Kovası | şekilsiz | 1 kova + 1 buz |
 | 4 Kömürleşmiş Tahta | şekilsiz | 1 Kömürleşmiş Kütük |
 | Kül Bloğu | şekilsiz | 8 Kül Katmanı (Kül Bloğu tek başına 8 Kül Katmanına geri döner) |
+| Afet Defteri | şekilsiz | 1 Kitap + 1 Tüy + 1 Mürekkep Kesesi + 1 Pusula |
+
+**Afet Defteri** (`journal` paketi): sağ tıkla ya da `/dogalafet defter` ile açılır. Oyuna ilk girişte verilmez, tarifle yapılır
+(tarif kitabına Hava Radarı gibi oyunun başında girer). İstatistikler eşyada değil oyuncudadır (defter kaybolsa ya da yenisi yapılsa
+kalır) ve ölümde silinmez. Ekran dört sekmeli, iki sayfalık bir kitaptır: **Genel** (hayatta kalınan gün, en uzun yaşam, ölüm
+sayısı, kat edilen mesafe, en yüksek seviyeli afet, tsunami dalgaları, en soğuk/en sıcak vücut sıcaklığı, toplanan Meteorit Parçası ve
+Kozmik Çekirdek, açılan buz deliği), **Afetler** (tür başına atlatılan/karşılaşılan afet, seviyeye göre sayılar, ilk karşılaşma günü ve
+tarihi, son 5 afet), **Balık/Eşya** (olta ile tutulan balık ve eşyalar) ve **Rehber** (afet seviyeleri, her afet için ne yapılmalı,
+sıcaklık rehberi). Afet sayıları yalnız doğal ya da komutla biten ve oyuncunun etki alanına girdiği afetlerde artar (başarım
+sayımıyla aynı kural); mesafe, ölüm ve olta tutuş sayıları vanilla istatistiklerinden okunur. Veri sunucudan istemciye yalnız
+defter açılırken tek pakette (`defter/veri`) gelir; periyodik yayın yoktur.
 
 "Demir" demir külçesi, "Bakır" bakır külçesi, "Taş" düz taştır (kırık taş olmaz). Meteorit Külçesi kitapta Meteorit
 Parçası, Termostat Plakası Meteorit Külçesi envantere girince açılır. Zırh ekleri vanilla deri zırh boyası gibi özel tariftir:
@@ -173,7 +192,8 @@ tıkla Kül Bloğu verir.
 
 ## Komutlar
 
-Bütün komutlar `/dogalafet` altındadır ve **yalnız OP** (yetki seviyesi 2) kullanabilir. Afet adları: `kasirga`, `tsunami`,
+Bütün komutlar `/dogalafet` altındadır ve **yalnız OP** (yetki seviyesi 2) kullanabilir; tek istisna `/dogalafet defter`'dir (her oyuncu
+kullanabilir). Afet adları: `kasirga`, `tsunami`,
 `deprem`, `gunes_patlamasi`, `asit_yagmuru`, `sinkhole`, `orman_yangini`, `ay_carpmasi`.
 
 | Komut | Ne yapar |
@@ -181,6 +201,7 @@ Bütün komutlar `/dogalafet` altındadır ve **yalnız OP** (yetki seviyesi 2) 
 | `/dogalafet start <afet> [seviye] [oyuncu]` | Afeti hemen başlatır (beklemeyi, gamerule'ü ve gün saati penceresini atlar). Farklı türden afetler aynı anda sürebilir; aynı türden ikincisi "zaten sürüyor" diye reddedilir. Doğal afetler oyun günüyle 1–3 eşzamanlı seçilir; komutla başlatılan afet doğal takvimi durdurmaz ve art arda 4/5 kuralına sayılmaz. `afetMaksSiddet`'in üstündeki seviye uygulanır ve çıktıda söylenir. Doğal güneş patlaması yalnız sabah (gün saati 0–6000), ay çarpması yalnız gece (13000–23000) patlar; komutla başlatma bu pencereye bakmaz. |
 | `/dogalafet stop [afet]` | Afet adı verilmezse süren bütün afetleri, verilirse yalnız o afeti temizce durdurur; afet yoksa süren dünya dönemi süreçlerini durdurur. Stop ile biten afette alandaki oyuncular sağ çıkmış sayılır (başarımlar gelir). |
 | `/dogalafet` | Kullanabildiğiniz alt komutların listesi. |
+| `/dogalafet defter` | Afet Defteri'ni açar (OP gerektirmez, yalnız oyuncular). |
 | `/dogalafet durum` | Aktif afetler, aşama, seviye, kalan süre, beklemeler, sonraki afet tahmini, çarpanlar, deniz seviyesi, ay/güneş, donma, buharlaşma ve süren dönem süreçlerinin aşaması (pulsar zincirinde kalan gün). |
 | `/dogalafet sicaklik set <oyuncu> <°C>` | Oyuncunun vücut sıcaklığını ayarlar (32–42 °C). |
 | `/dogalafet sicaklik islaklik <oyuncu> <0-100>` | Oyuncunun ıslaklığını ayarlar (%). |
@@ -219,7 +240,7 @@ Hepsi `/gamerule <ad> [değer]` ile okunur/değiştirilir (tab tamamlamalı) ve 
 | Gamerule | Tür | Varsayılan | Ne yapar |
 |---|---|---|---|
 | `dogalAfetlerAcik` | boolean | `true` | Bütün afet sistemini açar/kapatır. |
-| `kasirgaAfeti`, `tsunamiAfeti`, `depremAfeti`, `asitYagmuruAfeti`, `sinkholeAfeti`, `ormanYanginiAfeti`, `gunesPatlamasiAfeti`, `ayCarpmasiAfeti` | boolean | `true` | Afetleri tek tek açar/kapatır. |
+| `kasirgaAfeti`, `tsunamiAfeti`, `depremAfeti`, `asitYagmuruAfeti`, `sinkholeAfeti`, `ormanYanginiAfeti`, `gunesPatlamasiAfeti`, `ayCarpmasiAfeti`, `selAfeti` | boolean | `true` | Afetleri tek tek açar/kapatır. |
 | `afetSikligi` | int | `100` | Afet sıklığı yüzdesi (50 = yarı, 200 = iki katı; 0–1000, üstü 1000 sayılır). Oranın yanında ilk gün beklemesi ve afetler arası beklemeler de bu çarpana bölünür; değişince OP'lere sonraki afet tahmini yazılır. `/dogalafet siklik` aynı değeri ayarlar. |
 | `afetMaksSiddet` | int | `5` | Oluşabilecek en yüksek seviye (1–5). |
 | `afetBlokHasari` | boolean | `true` | Kapalıyken afetler blok yıkmaz, yakmaz, dondurmaz, çözmez; oyuncu ve mob hasarı sürer. |
@@ -272,6 +293,7 @@ hücresi). Sunucu TPS'i düşünce bu bütçeler kendiliğinden kısılır.
 | Asit yağmuru | `asit_yagmuru.blokButcesi` (32 sütun/tick, oyuncuların çevresinden), `asit_yagmuru.eszamanliAsindirma` (64 blok) | `asindirmaBlokSaniye` (oyuncu başına 2 … 16 blok/sn), `yaricap` (aşınmanın oyuncu çevresi, 32 … 128 blok) |
 | Orman yangını / ortak yangın | `yangin.yayilmaHizCarpani` (1,0; 0 yayılmayı kapatır), `yangin.tickButcesi` (64 hücre/tick) | `yangin.aktifTavan` (1500 hücre), `orman_yangini.yanikIziButcesi` (8) |
 | Ay çarpması | `ay_carpmasi.sarsintiYogunlugu` (0,30) | |
+| Sel | `sel.artisBlok` (5 … 12 blok, S1…S5) | `yukselmeSaniye` (20 … 40 sn), `zirveSaniye`, `inmeSaniye`, `bogulmaCarpani` (2,5: sel suyunda boğulma hızının vanilla suya oranı, 1 = vanilla); `tetikleyiciler.*` (yağmur 2,5×, fırtına 3,5×, süren tsunami 4×, tsunami sonrası 6×, ay çarpması sonrası 10×); `buharlasma.*` (ısı kaynaklarının sel suyunu söndürmesi: `acik`, `enAzGuc`, `yaricapCarpani`). Eski varsayılanda (2 … 7,5 blok, 45 … 105 sn) kalan yükselme ve süre listeleri açılışta yenilenir (`sel.ayarSurumu`, yedekli) |
 | Meteorlar | `meteor.kraterBlokButcesi` (512 blok işlemi/tick) | `meteor.kucukYanginYogunlugu` / `buyukYanginYogunlugu` |
 | Donma | `donma.donmaSuresi` (6 MC günü) | `donma.buharlasmaEnCok` (6 blok) |
 
@@ -719,7 +741,6 @@ Sıcaklık göstergesi (HUD).
 
 | Dosya | Boyut / ölçü | Dosya boyutu | Üreten betik |
 |---|---|---|---|
-| `hud.png` | 256x64 | 2,0 KB | `tools/assets/sicaklik_dokulari.py` |
 | `termometre.png` | 512x256 | 3,6 KB | `tools/assets/sicaklik_menu_dokulari.py` |
 
 #### `assets/dogalafetler/textures/gui/advancements/backgrounds/`
@@ -782,6 +803,16 @@ Başarım sekmesi arka planı.
   tepedeyken kuzeye ya da güneye bakıp yukarı bakılırsa iki ışın ekranda dikey görünür. Tek oyuncuda tsunami ve asit yağmuru aynı
   anda gelmez (alanları hep çakışır).
 
+## Geri bildirim
+
+Hata ya da öneri için [GitHub Issues](https://github.com/LAGXT/DogalAfetlerMod/issues) kullanın; hata bildirimi şablonu
+gerekli bilgileri sorar. Hata bildirirken şunları ekleyin:
+
+- Minecraft, Forge ve mod sürümü
+- Ne yapıyordunuz, hangi afet sürüyordu
+- `logs/latest.log` (dosyayı [mclo.gs](https://mclo.gs)'e yükleyip bağlantıyı yapıştırın; çökmede `crash-reports/` içindeki dosya)
+- Yüklü diğer modlar ve gölgelendirici paketi
+
 ## Belgeler
 
 - [`docs/SARTNAME.md`](docs/SARTNAME.md): şartname; [`docs/SARTNAME-IZLEME.md`](docs/SARTNAME-IZLEME.md): her maddenin uygulayan
@@ -791,4 +822,4 @@ Başarım sekmesi arka planı.
 
 ## Lisans
 
-[MIT](LICENSE) © 2026 Kadir Berk Polat. Üretilen sesler ve dokular projenin parçasıdır ve aynı lisansla dağıtılır.
+[MIT](LICENSE) © 2026 [LAGXT](https://github.com/LAGXT) ve TRSEEK. Üretilen sesler ve dokular projenin parçasıdır ve aynı lisansla dağıtılır.

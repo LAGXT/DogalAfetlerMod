@@ -1,6 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.basarim;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.afet.tsunami.TsunamiSeviyesi;
 import io.github.kadirberkpolat1.dogalafetler.balikcilik.BalikTutulduEvent;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.AfetIzi;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.AfetKumesi;
@@ -26,6 +27,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.olay.AfetBittiEvent;
 import io.github.kadirberkpolat1.dogalafetler.core.olay.DonemDegistiEvent;
 import io.github.kadirberkpolat1.dogalafetler.core.olay.SirenIstegiEvent;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.Gokyuzu;
+import io.github.kadirberkpolat1.dogalafetler.meteor.MeteorZirhi;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.SicaklikAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.VucutSicakligi;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.ZirhEkleri;
@@ -50,6 +52,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameRules;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.phys.AABB;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingDamageEvent;
@@ -80,6 +83,20 @@ public final class BasarimOlaylari {
     static final float CUKUR_DUSUSU = 4.0f;
     /** Orman yangını: oyuncunun bu kadar blok yakınında yanan hücre varsa "yangın alanında" (afet ipucu yoksa). */
     static final double YANGIN_YAKINLIGI = 8.0;
+    /** K-E74 "Sallanan Kule": deprem sürerken yerde ve çevresindeki en alçak zeminden en az bu kadar blok yüksekte kesintisiz saniye. */
+    static final int KULE_SANIYE = 5;
+    /** Kule ölçümü: oyuncudan dört yönde bu kadar blok uzakta zemin yüksekliği örneklenir (yüklü chunk'ta). */
+    static final int KULE_MESAFE = 6;
+    static final int KULE_FARKI = 12;
+    /** K-E74 "Çifte Bela": iki AKTIF afetin alanında kesintisiz saniye. */
+    static final int CIFTE_SANIYE = 30;
+    /** K-E74 "Yüksek Zemin": zemin, tsunami dalga yüksekliğinin (deniz seviyesinden) bu kadar blok üstünde. */
+    static final double TSUNAMI_YUKSEK_PAYI = 2.0;
+    private static final int SANIYE_TICK = 20;
+    /** Bir Minecraft günü (tick). */
+    private static final long GUN_TICK = 24000L;
+    private static final int[] KULE_X = {1, -1, 0, 0};
+    private static final int[] KULE_Z = {0, 0, 1, -1};
     private static final float DONMA_TAM = DunyaDonemi.DONMA_EN_COK - 0.001f;
     private static final Map<UUID, Gecici> GECICI = new HashMap<>();
     private static final double[] ITME = new double[2];
@@ -89,7 +106,21 @@ public final class BasarimOlaylari {
     private static final class Gecici {
         private final ArdisikSayac yildizli = new ArdisikSayac();
         private final CorbaTakibi corba = new CorbaTakibi();
+        private final ArdisikSayac kule = new ArdisikSayac();
+        private final ArdisikSayac cifte = new ArdisikSayac();
         private boolean yemeBasindaDonuyor;
+        /** Süren tsunamide dalga tepesinden yüksek zeminde bulundu; tsunami bitince sağ çıkan "Yüksek Zemin" alır. */
+        private boolean tsunamiYuksekte;
+        /** Kasırga havaya kaldırdı; kasırga bitince sağ çıkan "Bir Tur Attım" alır. */
+        private boolean kasirgaKaldirdi;
+
+        private void olumdeSifirla() {
+            yildizli.sifirla();
+            kule.sifirla();
+            cifte.sifirla();
+            tsunamiYuksekte = false;
+            kasirgaKaldirdi = false;
+        }
     }
 
     private BasarimOlaylari() {
@@ -158,7 +189,10 @@ public final class BasarimOlaylari {
                 BasarimOlcutleri.HEPSINI_ATLATTI.tetikle(oyuncu);
             }
             BasarimOlcutleri.BIRLIKTE_HAYATTA.tetikle(oyuncu, sagCikanlar.size());
+            BasarimOlcutleri.SERI_HAYATTA.tetikle(oyuncu, BasarimVerisi.seriArtir(oyuncu));
+            ozelAfetSonucu(oyuncu, olay.tur());
         }
+        bayraklariTemizle(olay.tur());
     }
 
     /**
@@ -208,7 +242,8 @@ public final class BasarimOlaylari {
         KutupSayaci kutup = BasarimVerisi.kutup(oyuncu);
         kutup.olum();
         BasarimVerisi.kutupYaz(oyuncu, kutup);
-        gecici(oyuncu).yildizli.sifirla();
+        gecici(oyuncu).olumdeSifirla();
+        BasarimVerisi.hayatSayaclariniSifirla(oyuncu);
         DenizSeviyesi deniz = DunyaDonemi.al(server).deniz();
         if (DenizTakibi.yukseliyorMu(deniz.hedefArtis(), deniz.mevcutArtis())) {
             BasarimVerisi.denizOlumYaz(oyuncu, deniz.baslangicSaati());
@@ -278,6 +313,104 @@ public final class BasarimOlaylari {
             BasarimOlcutleri.YUNLU_PARCA.tetikle(oyuncu, yunlu);
         }
         corbaDenetimi(oyuncu, gecici);
+        ozelDenetim(oyuncu, gecici, canli);
+    }
+
+    /**
+     * K-E74 (saniyede bir): hayatta kalma süresi ("On Gün On Gece"), meteor zırhı, deprem kulesi, tsunamide yüksek zemin ve
+     * iki afetin alanında kalma ("Çifte Bela"). Afet taraması yalnız AKTIF afet varken iş yapar; chunk yükseklikleri yalnız
+     * depremde ve yerdeyken okunur.
+     */
+    private static void ozelDenetim(ServerPlayer oyuncu, Gecici gecici, boolean canli) {
+        if (canli) {
+            long tick = BasarimVerisi.hayatTick(oyuncu) + SANIYE_TICK;
+            BasarimVerisi.hayatTickYaz(oyuncu, tick);
+            BasarimOlcutleri.HAYATTA_GUN.tetikle(oyuncu, (double) tick / GUN_TICK);
+            for (ItemStack parca : oyuncu.getArmorSlots()) {
+                if (meteorZirhiMi(parca)) {
+                    OzelBasarim.ver(oyuncu, OzelBasarim.GOKTEN_ZIRH);
+                    break;
+                }
+            }
+        }
+        boolean depremde = false;
+        int alandakiAfet = 0;
+        if (canli && !oyuncu.isSpectator()) {
+            for (Afet afet : AfetYoneticisi.al(oyuncu.server).aktifAfetler()) {
+                if (afet.asama() != AfetAsamasi.AKTIF || !alanda(oyuncu, afet)) {
+                    continue;
+                }
+                alandakiAfet++;
+                if (afet.tur() == AfetTuru.DEPREM) {
+                    depremde = true;
+                } else if (afet.tur() == AfetTuru.TSUNAMI && !gecici.tsunamiYuksekte && oyuncu.onGround()
+                        && oyuncu.getY() >= oyuncu.level().getSeaLevel()
+                                + TsunamiSeviyesi.al(afet.seviye()).yukseklik() + TSUNAMI_YUKSEK_PAYI) {
+                    gecici.tsunamiYuksekte = true;
+                }
+            }
+        }
+        boolean kulede = depremde && oyuncu.onGround() && !oyuncu.getAbilities().flying && yuksekYerdeMi(oyuncu);
+        if (gecici.kule.adim(kulede) >= KULE_SANIYE) {
+            OzelBasarim.ver(oyuncu, OzelBasarim.SALLANAN_KULE);
+        }
+        if (gecici.cifte.adim(alandakiAfet >= 2) >= CIFTE_SANIYE) {
+            OzelBasarim.ver(oyuncu, OzelBasarim.CIFTE_BELA);
+        }
+    }
+
+    /** Oyuncu, dört yönde {@link #KULE_MESAFE} blok ötedeki en alçak zeminden en az {@link #KULE_FARKI} blok yüksekte mi (yüklü olmayan chunk: hayır). */
+    private static boolean yuksekYerdeMi(ServerPlayer oyuncu) {
+        if (!(oyuncu.level() instanceof ServerLevel level)) {
+            return false;
+        }
+        int x = oyuncu.getBlockX();
+        int z = oyuncu.getBlockZ();
+        int enAlcak = Integer.MAX_VALUE;
+        for (int i = 0; i < KULE_X.length; i++) {
+            int px = x + KULE_X[i] * KULE_MESAFE;
+            int pz = z + KULE_Z[i] * KULE_MESAFE;
+            if (!level.hasChunk(px >> 4, pz >> 4)) {
+                return false;
+            }
+            enAlcak = Math.min(enAlcak, level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, px, pz));
+        }
+        return oyuncu.getY() - enAlcak >= KULE_FARKI;
+    }
+
+    /** Meteorit ya da Kozmik zirh eki taşıyan zırh parçası mi ("Gökten Dövme"). */
+    private static boolean meteorZirhiMi(ItemStack yigin) {
+        return ZirhEkleri.zirhMi(yigin) && (ZirhEkleri.varMi(yigin, MeteorZirhi.METEORITLI)
+                || ZirhEkleri.varMi(yigin, MeteorZirhi.KOZMIK));
+    }
+
+    /** Tsunami ya da kasırga bitti: oyuncunun özel bayrağı varsa özel başarımı verir (yalnız sağ çıkanlar çağırır). */
+    private static void ozelAfetSonucu(ServerPlayer oyuncu, AfetTuru tur) {
+        Gecici gecici = gecici(oyuncu);
+        if (tur == AfetTuru.TSUNAMI && gecici.tsunamiYuksekte) {
+            OzelBasarim.ver(oyuncu, OzelBasarim.YUKSEK_ZEMIN);
+        } else if (tur == AfetTuru.KASIRGA && gecici.kasirgaKaldirdi) {
+            OzelBasarim.ver(oyuncu, OzelBasarim.GOZUN_ICINDE);
+        }
+    }
+
+    /** Biten türün bayrakları herkes için silinir (sağ çıkmayanların eski bayrağı sonraki afete taşınmasın). */
+    private static void bayraklariTemizle(AfetTuru tur) {
+        for (Gecici gecici : GECICI.values()) {
+            if (tur == AfetTuru.TSUNAMI) {
+                gecici.tsunamiYuksekte = false;
+            } else if (tur == AfetTuru.KASIRGA) {
+                gecici.kasirgaKaldirdi = false;
+            }
+        }
+    }
+
+    /**
+     * Kasırga bu oyuncuyu havaya kaldırıyor (kasırga lift sürerken her tick çağırır; yalnız bir bayrak yazar). Kasırga biterse
+     * sağ çıkan oyuncu "Bir Tur Attım" kazanır.
+     */
+    public static void kasirgaKaldirdi(ServerPlayer oyuncu) {
+        gecici(oyuncu).kasirgaKaldirdi = true;
     }
 
     private static void afetIziniGuncelle(ServerPlayer oyuncu) {
@@ -379,6 +512,14 @@ public final class BasarimOlaylari {
     public static void esyaUretildi(PlayerEvent.ItemCraftedEvent olay) {
         if (olay.getEntity() instanceof ServerPlayer oyuncu) {
             esyaUretildi(oyuncu, BasarimKimlikleri.esya(olay.getCrafting()));
+        }
+    }
+
+    /** K-E74 "Gökten Dövme": zırh eki tarifiyle meteor zırhı üretildi (giyilince de saniyelik denetim verir). */
+    @SubscribeEvent
+    public static void zirhEkiUretildi(PlayerEvent.ItemCraftedEvent olay) {
+        if (olay.getEntity() instanceof ServerPlayer oyuncu && meteorZirhiMi(olay.getCrafting())) {
+            OzelBasarim.ver(oyuncu, OzelBasarim.GOKTEN_ZIRH);
         }
     }
 

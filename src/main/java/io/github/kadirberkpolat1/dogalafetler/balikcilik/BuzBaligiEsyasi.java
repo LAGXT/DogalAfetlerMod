@@ -26,13 +26,21 @@ import net.minecraftforge.registries.ForgeRegistries;
 public final class BuzBaligiEsyasi extends Item {
     /** Pişmiş Donmuş Ringa'nın büyük ısınma süresi (sn); yiyecek config'inde karşılığı yok (balıkçılık §E). */
     public static final int RINGA_SANIYE = 120;
+    /** Özel kutup balıklarının çiğ serinlik süresi (sn); yiyecek config'inde karşılığı yok (RINGA_SANIYE gibi). */
+    public static final int OZEL_CIG_SANIYE = 120;
 
     /** Sıcaklık etkisi sınıfı. */
     public enum Tur {
         CIG("tooltip.dogalafetler.buz_baligi.cig", ChatFormatting.AQUA, YiyecekAPI::cigBalik),
         PISMIS("tooltip.dogalafetler.buz_baligi.pismis", ChatFormatting.GOLD, YiyecekAPI::pismisBalik),
         PISMIS_RINGA("tooltip.dogalafetler.buz_baligi.pismis_ringa", ChatFormatting.RED,
-                kimlik -> new YiyecekTanimi(kimlik, Yon.ISINMA, Buyukluk.BUYUK, RINGA_SANIYE, false));
+                kimlik -> new YiyecekTanimi(kimlik, Yon.ISINMA, Buyukluk.BUYUK, RINGA_SANIYE, false)),
+        /** Özel kutup balığı (çiğ): orta serinlik. */
+        CIG_ORTA("tooltip.dogalafetler.buz_baligi.cig_orta", ChatFormatting.AQUA,
+                kimlik -> new YiyecekTanimi(kimlik, Yon.SERINLIK, Buyukluk.ORTA, OZEL_CIG_SANIYE, false)),
+        /** Aurora Balığı (çiğ): büyük serinlik. */
+        CIG_BUYUK("tooltip.dogalafetler.buz_baligi.cig_buyuk", ChatFormatting.AQUA,
+                kimlik -> new YiyecekTanimi(kimlik, Yon.SERINLIK, Buyukluk.BUYUK, OZEL_CIG_SANIYE, false));
 
         private final String ipucu;
         private final ChatFormatting renk;

@@ -36,6 +36,9 @@ KANIT = KOK / ".vibe/kanit/ay-carpmasi"
 KARELER = KANIT / "kareler"
 JAVA_HOME = "/home/lagxt/.jdks/jdk-17.0.21+9"
 ISARET = "AY_OTOMASYON"
+# AY_IRIS=1: Oculus + DogalAfetlerShader açıkken aynı senaryo (K-E83); çalışma klasörü aynı, log'larda -Puyum=iris görünür.
+IRIS = os.environ.get("AY_IRIS") == "1"
+SHADER_KAYNAK = Path("/home/lagxt/LagOS/DogalAfetlerShader/shaders")
 KANIT.mkdir(parents=True, exist_ok=True)
 KARELER.mkdir(exist_ok=True)
 GUNLUK = open(KANIT / "protokol.log", "a", encoding="utf-8")
@@ -92,6 +95,15 @@ def hazirla():
     if hedef.exists():
         shutil.rmtree(hedef)
     shutil.copytree(KOK / "run/saves/test", hedef, ignore=shutil.ignore_patterns("session.lock"))
+    if IRIS:
+        # K-E83: Embeddium + Oculus (-Puyum=iris) ve modun gölgelendirici paketi; paket Oculus ayarıyla açık gelir.
+        paket = run / "shaderpacks/DogalAfetlerShader"
+        if paket.exists():
+            shutil.rmtree(paket)
+        shutil.copytree(SHADER_KAYNAK, paket / "shaders")
+        (run / "config").mkdir(exist_ok=True)
+        (run / "config/oculus.properties").write_text(
+            "shaderPack=DogalAfetlerShader\nenableShaders=true\ncolorSpace=SRGB\ndisableUpdateMessage=true\n")
     yol = run / "options.txt"
     satirlar = yol.read_text().splitlines() if yol.exists() else []
     satirlar = [s for s in satirlar if not s.startswith(("tutorialStep:", "pauseOnLostFocus:", "renderDistance:",
@@ -128,6 +140,7 @@ def main():
                      f"export JAVA_HOME='{JAVA_HOME}'\n"
                      f"exec python3 tools/senaryo/runclient_kilit.py kos '{W}' --bekle 1800 -- "
                      "timeout 3000 ./gradlew runClient --offline --no-daemon --console=plain -PquickPlay=ay_carpmasi -Potomasyon=ay_carpmasi "
+                     f"{'-Puyum=iris ' if IRIS else ''}"
                      f"> '{istemci_log}' 2>&1\n")
     sahip_adres = runclient_kilit.istemci_baslat(betik, WS, log)
     baslangic = time.time()

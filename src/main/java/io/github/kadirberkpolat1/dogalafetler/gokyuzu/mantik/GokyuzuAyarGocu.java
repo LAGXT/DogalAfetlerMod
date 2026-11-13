@@ -13,12 +13,17 @@ import java.util.function.Function;
  */
 public final class GokyuzuAyarGocu {
     public static final String SURUM_YOLU = "gokyuzu.ayarSurumu";
-    public static final int GUNCEL = 1;
+    public static final int GUNCEL = 2;
 
-    /** Sürüme göre sıralı. 1: pulsar-2 (ısınma 1 gün, yangın dakikada 24). */
+    /**
+     * Sürüme göre sıralı. 1: pulsar-2 (ısınma 1 gün, yangın dakikada 24). 2: K-E72 (güneş patlaması zinciri kısalır: süpernova
+     * 1,5 günden 1 güne, kızıl cüce kapısı 7 günden 3 güne).
+     */
     public static final List<SurumluGocPlani.Adim> ADIMLAR = List.of(
             adim(1, "gokyuzu.pulsarIsinmaGun", 1.0, 2.0),
-            adim(1, "gokyuzu.pulsarYanginDakikaBasina", 24.0, 20.0));
+            adim(1, "gokyuzu.pulsarYanginDakikaBasina", 24.0, 20.0),
+            adim(2, "gokyuzu.supernovaSuresiGun", 1.0, 1.5),
+            adim(2, "gokyuzu.kizilCuceGecikmeGun", 3.0, 7.0));
 
     public static final SurumluGocPlani PLAN = new SurumluGocPlani(SURUM_YOLU, GUNCEL, ADIMLAR);
 

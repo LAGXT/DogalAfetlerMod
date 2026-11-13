@@ -23,9 +23,8 @@ Kullanım: python3 tools/senaryo/sicaklik_olcum.py <kanıt/>   (sicaklik_gorsel.
           piksel sayısı ve ortalama ΔE. Yalnız kontrolle aynı yolla çekilen kareler (buhar ve düz 3. şahıs HUD sahneleri)
           ölçülür: ter sahneleri düşen damlayı beklediği için başı başka pozda yakalar, başın başka yüzü beyazlaşma gibi
           görünür. Buharsız `bunalma_<zemin>` (düz 3. şahıs HUD karesi) negatif kontroldur: ≈ 0 çıkmalı.
-  hap     HUD hapının içinde sayı pikselleri (log'daki sayı rengine yakın) ile hap içi zemininin WCAG karşıtlığı ve
-          zeminin ortanca rengi. Kare satırında hap konumu yoksa (S3-10 öncesi koşu) yerleşimden hesaplanır ve sayı
-          durum rengindedir.
+  hap     (sayiGoster açıkken) kafanın üstündeki küçük °C sayısının pikselleri (log'daki sayı rengine yakın) ile
+          çevresindeki zeminin WCAG karşıtlığı ve zeminin ortanca rengi.
 """
 import re
 import sys
@@ -36,15 +35,10 @@ import numpy as np
 from PIL import Image
 
 KARE = re.compile(r"SICAKLIK_OTOMASYON kare (sicaklik_\w+)\.png \((.*)\)\s*$")
-KONTUR = (18, 14, 12)
 TER_KONTUR, TER_GOVDE = (10, 30, 84), (196, 240, 255)
 # Kontrolüyle aynı yolla çekilen eski adlı 3. şahıs karesi; ter sahneleri (`bunalma`, `ter_*`) karşılaştırılmaz.
 ESKI_3P = ("usume",)
 TER_SAHNELERI = ("bunalma",)
-# S3-10 öncesi hap sayısı durum rengindeydi (HudCizimi.renk).
-ESKI_SAYI_RENGI = {"NORMAL": "e8e6de", "USUME": "a6ddf8", "DONMA": "5eaeff", "BUNALMA": "ffb54a", "YANMA": "ff5a36"}
-# HudCizimi: bant genişliği 182, hap sol kenarı 74, hap 34x11; bantın tepesi ekranın altından 47 GUI pikseli.
-GENISLIK, HAP_X, HAP_G, HAP_Y, ALTTAN = 182, 74, 34, 11, 47
 
 
 def kare_satirlari(kanit):
@@ -210,23 +204,19 @@ def kontrol_adi(ad, birinci, kareler):
 
 
 def hap(kare, satir):
+    """K-E74: sayı (sayiGoster açıkken) kafanın üstünde 0,75 ölçekli; log'daki `hap x= y=` kafanın sol üstü. Sayı yazısı
+    kafanın 10..3 piksel üstünde, göstergenin ortasında (kafa genişliği + her yana 2 piksel) durur."""
     olcek = alan(satir, r"ölçek=([\d.]+)", float)
     hx, hy = alan(satir, r"hap x=(-?\d+)", int), alan(satir, r"hap x=-?\d+ y=(-?\d+)", int)
     renk = alan(satir, r"sayı rengi=([0-9a-f]{6})")
-    h, w = kare.shape[:2]
-    if hx is None:
-        olcek = olcek or 4.0
-        gw, gh = int(w / olcek), int(h / olcek)
-        hx = (gw - GENISLIK) // 2 + HAP_X + (alan(satir, r"dx=(-?\d+)", int) or 0)
-        hy = gh - ALTTAN + (alan(satir, r"dy=(-?\d+)", int) or 0)
-        renk = ESKI_SAYI_RENGI[alan(satir, r"durum (\w+)")]
+    if hx is None or olcek is None or not re.search(r"metin='[^']+'", satir):
+        return None
     s = int(olcek)
-    ic = kare[(hy + 1) * s:(hy + HAP_Y - 1) * s, (hx + 2) * s:(hx + HAP_G - 2) * s]
+    ic = kare[max(0, (hy - 11) * s):max(0, (hy - 2) * s), max(0, (hx - 2) * s):(hx + 18) * s]
     hedef = np.array([int(renk[i:i + 2], 16) for i in (0, 2, 4)], np.float64)
     sayi = np.abs(ic - hedef).max(axis=2) <= 40
-    kontur = np.abs(ic - np.array(KONTUR)).max(axis=2) <= 30
-    zemin = ~sayi & ~kontur
-    if not sayi.any():
+    zemin = ~sayi
+    if not sayi.any() or not zemin.any():
         return None
     taban = np.median(ic[zemin], axis=0)
     return sayi.sum(), karsitlik(np.median(ic[sayi], axis=0), taban), "%02x%02x%02x" % tuple(int(c) for c in taban)
@@ -265,8 +255,8 @@ def main():
                                 f"en çok {enc:.2f}; açık zeminde ΔE>10 {kar[0]} piksel ΔE ort {kar[1]:.1f}")
         if ad != "menu":
             sonuc = hap(kare, satir)
-            parcalar.append("hap sayısı bulunamadı" if sonuc is None
-                            else f"hap sayısı {sonuc[0]} piksel, zemine karşıtlık {sonuc[1]:.2f}:1 (hap içi #{sonuc[2]})")
+            parcalar.append("kafa üstü sayısı yok (sayiGoster kapalı ya da bulunamadı)" if sonuc is None
+                            else f"kafa üstü sayısı {sonuc[0]} piksel, zemine karşıtlık {sonuc[1]:.2f}:1 (zemin #{sonuc[2]})")
         cikti.append(" | ".join(parcalar))
     metin = "\n".join(cikti) + "\n"
     (kanit / "olcum.txt").write_text(metin, encoding="utf-8")

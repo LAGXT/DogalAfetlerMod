@@ -25,6 +25,7 @@ public final class Kurallar {
     public static final GameRules.Key<GameRules.BooleanValue> ORMAN_YANGINI_AFETI = mantiksal("ormanYanginiAfeti", true);
     public static final GameRules.Key<GameRules.BooleanValue> GUNES_PATLAMASI_AFETI = mantiksal("gunesPatlamasiAfeti", true);
     public static final GameRules.Key<GameRules.BooleanValue> AY_CARPMASI_AFETI = mantiksal("ayCarpmasiAfeti", true);
+    public static final GameRules.Key<GameRules.BooleanValue> SEL_AFETI = mantiksal("selAfeti", true);
     public static final GameRules.Key<GameRules.IntegerValue> AFET_SIKLIGI = tamsayi("afetSikligi", KuralSinirlari.SIKLIK_VARSAYILAN);
     public static final GameRules.Key<GameRules.IntegerValue> AFET_MAKS_SIDDET = tamsayi("afetMaksSiddet", AfetTuru.EN_YUKSEK_SEVIYE);
     public static final GameRules.Key<GameRules.BooleanValue> AFET_BLOK_HASARI = mantiksal("afetBlokHasari", true);
@@ -42,13 +43,14 @@ public final class Kurallar {
         harita.put(AfetTuru.ORMAN_YANGINI, ORMAN_YANGINI_AFETI);
         harita.put(AfetTuru.GUNES_PATLAMASI, GUNES_PATLAMASI_AFETI);
         harita.put(AfetTuru.AY_CARPMASI, AY_CARPMASI_AFETI);
+        harita.put(AfetTuru.SEL, SEL_AFETI);
         AFET_KURALLARI = Collections.unmodifiableMap(harita);
     }
 
     /** Madde 11 sırasıyla bütün mantıksal kurallar. */
     public static final List<GameRules.Key<GameRules.BooleanValue>> MANTIKSAL_KURALLAR = List.of(
             DOGAL_AFETLER_ACIK, KASIRGA_AFETI, TSUNAMI_AFETI, DEPREM_AFETI, ASIT_YAGMURU_AFETI, SINKHOLE_AFETI,
-            ORMAN_YANGINI_AFETI, GUNES_PATLAMASI_AFETI, AY_CARPMASI_AFETI, AFET_BLOK_HASARI, SICAKLIK_SISTEMI);
+            ORMAN_YANGINI_AFETI, GUNES_PATLAMASI_AFETI, AY_CARPMASI_AFETI, SEL_AFETI, AFET_BLOK_HASARI, SICAKLIK_SISTEMI);
 
     /** Madde 11 sırasıyla bütün tamsayı kurallar. */
     public static final List<GameRules.Key<GameRules.IntegerValue>> TAMSAYI_KURALLAR = List.of(
@@ -120,6 +122,8 @@ public final class Kurallar {
         kural(y, AY_CARPMASI_AFETI, "Moon impact", "Ay çarpması",
                 "Allows the moon impact to be chosen. Turning it off stops an unfinished process; reached eras stay.",
                 "Ay çarpmasının seçilmesine izin verir. Kapatılınca bitmemiş süreç durur; ulaşılmış dönemler kalır.");
+        kural(y, SEL_AFETI, "Floods", "Seller",
+                "Allows floods to be chosen.", "Selin seçilmesine izin verir.");
         kural(y, AFET_SIKLIGI, "Disaster frequency (%)", "Afet sıklığı (%)",
                 "100 = normal, 50 = half, 200 = double (0-1000); waits scale too. Effect: /dogalafet siklik",
                 "100 = normal, 50 = yarı, 200 = iki katı (0-1000); beklemeler de ölçeklenir. Etkisi: /dogalafet siklik");

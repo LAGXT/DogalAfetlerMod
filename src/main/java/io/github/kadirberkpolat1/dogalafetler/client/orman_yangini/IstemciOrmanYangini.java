@@ -3,6 +3,7 @@ package io.github.kadirberkpolat1.dogalafetler.client.orman_yangini;
 import com.mojang.blaze3d.systems.RenderSystem;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.afet.orman_yangini.mantik.OrmanKurallari;
+import io.github.kadirberkpolat1.dogalafetler.client.core.EkranEfektKapisi;
 import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciAfetDurumu;
 import io.github.kadirberkpolat1.dogalafetler.config.EfektKalitesi;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
@@ -107,7 +108,8 @@ public final class IstemciOrmanYangini {
     }
 
     private static boolean isiAcik() {
-        return isi > 0.01 && (kademe() == EfektKalitesi.YUKSEK || kademe() == EfektKalitesi.ULTRA);
+        return isi > 0.01 && (kademe() == EfektKalitesi.YUKSEK || kademe() == EfektKalitesi.ULTRA)
+                && EkranEfektKapisi.isiIzinli();
     }
 
     @SubscribeEvent(priority = EventPriority.LOW)

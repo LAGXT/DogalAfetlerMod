@@ -4,6 +4,7 @@ import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
@@ -19,15 +20,17 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.EntityArgument;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 /**
- * {@code /dogalafet} kök komutu. Yalnız OP (yetki seviyesi 2) kullanabilir (madde 3, KOMUTLAR). Çekirdeğin alt komutları
- * burada kurulur; diğer alt komutlar sahipleri tarafından {@link KomutKaydi#ekle} ile gelir. Alt komutsuz {@code /dogalafet}
- * kullanım listesini verir.
+ * {@code /dogalafet} kök komutu. Kökün kendisi oyunculara açıktır ({@link #kokKullanilabilir}); çekirdeğin her alt komutu ve
+ * {@link KomutKaydi#ekle} ile gelenler yalnız OP (yetki seviyesi 2) kullanabilir (madde 3, KOMUTLAR); OP gerektirmeyen tek yol
+ * {@link KomutKaydi#ekleAcik}'tir (ör. {@code defter}). Alt komutsuz {@code /dogalafet} OP'ye kullanım listesini verir.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID)
 public final class DogalAfetKomutu {
@@ -82,10 +85,10 @@ public final class DogalAfetKomutu {
     @SubscribeEvent
     public static void komutlariKaydet(RegisterCommandsEvent olay) {
         LiteralArgumentBuilder<CommandSourceStack> kok = Commands.literal(KOK)
-                .requires(kaynak -> kaynak.hasPermission(YETKI_SEVIYESI))
-                .executes(CekirdekKomutlari::yardim);
-        kok.then(Commands.literal(DURUM).executes(CekirdekKomutlari::durum));
-        kok.then(Commands.literal(START)
+                .requires(DogalAfetKomutu::kokKullanilabilir)
+                .executes(DogalAfetKomutu::kokYardim);
+        kok.then(op(Commands.literal(DURUM)).executes(CekirdekKomutlari::durum));
+        kok.then(op(Commands.literal(START))
                 .then(Commands.argument("afet", StringArgumentType.word()).suggests(AFET_ADLARI)
                         .executes(b -> CekirdekKomutlari.start(b, null, null))
                         .then(Commands.argument("seviye", IntegerArgumentType.integer(AfetTuru.EN_DUSUK_SEVIYE,
@@ -95,26 +98,45 @@ public final class DogalAfetKomutu {
                                         .executes(b -> CekirdekKomutlari.start(b,
                                                 IntegerArgumentType.getInteger(b, "seviye"),
                                                 EntityArgument.getPlayer(b, "oyuncu")))))));
-        kok.then(Commands.literal(STOP).executes(b -> CekirdekKomutlari.stop(b, Optional.empty()))
+        kok.then(op(Commands.literal(STOP)).executes(b -> CekirdekKomutlari.stop(b, Optional.empty()))
                 .then(Commands.argument("afet", StringArgumentType.word()).suggests(SUREN_AFETLER)
                         .executes(b -> CekirdekKomutlari.stop(b, Optional.of(StringArgumentType.getString(b, "afet"))))));
-        kok.then(Commands.literal(GUN)
+        kok.then(op(Commands.literal(GUN))
                 .then(Commands.argument("sayi", IntegerArgumentType.integer(0, 10_000_000))
                         .executes(CekirdekKomutlari::gun)));
-        kok.then(Commands.literal(HIZ)
+        kok.then(op(Commands.literal(HIZ))
                 .then(Commands.argument("carpan", DoubleArgumentType.doubleArg(ZamanOlcegi.EN_AZ, ZamanOlcegi.EN_COK))
                         .executes(CekirdekKomutlari::hiz)));
-        kok.then(Commands.literal(SIKLIK).executes(b -> CekirdekKomutlari.siklik(b, null))
+        kok.then(op(Commands.literal(SIKLIK)).executes(b -> CekirdekKomutlari.siklik(b, null))
                 .then(Commands.argument("yuzde", IntegerArgumentType.integer(KuralSinirlari.SIKLIK_EN_AZ,
                         KuralSinirlari.SIKLIK_EN_COK))
                         .executes(b -> CekirdekKomutlari.siklik(b, IntegerArgumentType.getInteger(b, "yuzde")))));
-        kok.then(Commands.literal(SIFIRLA).executes(CekirdekKomutlari::sifirla));
-        kok.then(Commands.literal(ASAMA).then(Commands.literal(ILERI)
+        kok.then(op(Commands.literal(SIFIRLA)).executes(CekirdekKomutlari::sifirla));
+        kok.then(op(Commands.literal(ASAMA)).then(Commands.literal(ILERI)
                 .executes(b -> CekirdekKomutlari.asamaIleri(b, Optional.empty()))
                 .then(Commands.argument("surec", StringArgumentType.word()).suggests(ASAMA_HEDEFLERI)
                         .executes(b -> CekirdekKomutlari.asamaIleri(b,
                                 Optional.of(StringArgumentType.getString(b, "surec")))))));
         KomutKaydi.baglaTumunu(kok, olay.getBuildContext(), CEKIRDEK_ALT_KOMUTLARI);
         olay.getDispatcher().register(kok);
+    }
+
+    /** Kökün görünürlüğü: OP ya da oyuncu (oyuncuya yalnız {@link KomutKaydi#ekleAcik} komutları açık kalır). */
+    public static boolean kokKullanilabilir(CommandSourceStack kaynak) {
+        return kaynak.hasPermission(YETKI_SEVIYESI) || kaynak.getEntity() instanceof ServerPlayer;
+    }
+
+    /** Alt komuta OP yetkisi koyar. */
+    private static LiteralArgumentBuilder<CommandSourceStack> op(LiteralArgumentBuilder<CommandSourceStack> altKomut) {
+        return altKomut.requires(kaynak -> kaynak.hasPermission(YETKI_SEVIYESI));
+    }
+
+    /** Alt komutsuz {@code /dogalafet}: OP'ye kullanım listesi; oyuncu için Brigadier'ın "bilinmeyen komut" yanıtı. */
+    private static int kokYardim(CommandContext<CommandSourceStack> baglam) {
+        if (!baglam.getSource().hasPermission(YETKI_SEVIYESI)) {
+            baglam.getSource().sendFailure(Component.translatable("command.unknown.command"));
+            return 0;
+        }
+        return CekirdekKomutlari.yardim(baglam);
     }
 }

@@ -6,10 +6,10 @@ package io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik;
  * yükseklik, çekim yarıçapı, etek yüksekliği güç 1 boyutunun {@code guc} katıdır; yıkım yarıçapı, etek, duvar bulutu,
  * kaldırma tavanı ve uçan blok yüksekliği bunlardan türer. Huninin biçimi (yükseklik / çap) bu yüzden her seviyede aynıdır.
  *
- * @param guc            seviye gücü: boyutların ve çekim kuvvetinin ortak katsayısı (S1 1 → S5 4,8)
+ * @param guc            seviye gücü: boyutların ve çekim kuvvetinin ortak katsayısı (S1 1 → S5 6)
  * @param tepeCapi       huni gövdesinin tepe çapı; yoğuşma hunisi yukarı doğru genişler
- * @param enkazYuksekligi taban enkaz eteğinin yüksekliği (S1 3,5 → S5 16,8)
- * @param altBoslukOrani görünen huninin yerden başladığı yükseklik / huni yüksekliği (S1 yere tam değmez)
+ * @param enkazYuksekligi taban enkaz eteğinin yüksekliği (S1 3,5 → S5 21)
+ * @param altBoslukOrani görünen huninin yerden başladığı yükseklik / huni yüksekliği (her seviyede 0: huni yere yapışık, yerden kesilmez)
  * @param zeminKazar     toprak/kum/taş zemin bloklarını da kaldırır (yalnız S4-5: EF4-5 zemini sıyırır)
  */
 public record KasirgaSeviyesi(int seviye, double guc, double tabanCapi, double tepeCapi, double yukseklik, double hiz,
@@ -20,19 +20,19 @@ public record KasirgaSeviyesi(int seviye, double guc, double tabanCapi, double t
     static final double TABAN_CAPI = 10;
     static final double TEPE_CAPI = 16;
     static final double YUKSEKLIK = 30;
-    static final double CEKIM_YARICAPI = 15;
+    static final double CEKIM_YARICAPI = 18;
     static final double ENKAZ_YUKSEKLIGI = 3.5;
     /** Kaldırma tavanı / huni yüksekliği: config'in S5 varsayılanı {@value #S5_KALDIRMA_TAVANI} blok bundan gelir. */
     static final double KALDIRMA_ORANI = 0.25;
-    /** {@code kasirga.kaldirmaTavani} varsayılanı: boyut çarpanı 1'de S5 hunisinin yüksekliğinin dörtte biri (144 · 0,25). */
-    public static final double S5_KALDIRMA_TAVANI = 36;
+    /** {@code kasirga.kaldirmaTavani} varsayılanı: boyut çarpanı 1'de S5 hunisinin yüksekliğinin dörtte biri (180 · 0,25). */
+    public static final double S5_KALDIRMA_TAVANI = 45;
 
     private static final KasirgaSeviyesi[] TABLO = {
-        satir(1, 1.0, 2.0, 60, 2, 0.6, 1.0, 0.12, false),
-        satir(2, 1.6, 2.6, 90, 4, 2.0, 1.5, 0.06, false),
+        satir(1, 1.0, 2.0, 60, 2, 0.6, 1.0, 0, false),
+        satir(2, 1.6, 2.6, 90, 4, 2.0, 1.5, 0, false),
         satir(3, 2.4, 3.2, 120, 8, 3.0, 2.0, 0, false),
         satir(4, 3.4, 3.8, 150, 16, 4.0, 3.0, 0, true),
-        satir(5, 4.8, 4.4, 180, 32, 6.0, 6.0, 0, true),
+        satir(5, 6.0, 4.4, 180, 32, 6.0, 8.0, 0, true),
     };
 
     private static KasirgaSeviyesi satir(int seviye, double guc, double hiz, int aktifSureSn, int blokKaldirmaTick,
@@ -64,7 +64,7 @@ public record KasirgaSeviyesi(int seviye, double guc, double tabanCapi, double t
 
     /**
      * Kaldırılan varlığın kasırga zemininden en çok yükseldiği yükseklik: {@code s5Tavani} (config, boyut 1'de S5) huni
-     * yüksekliğiyle orantılı (boyut çarpanı dahil). Varsayılanla S1 7,5 · S3 18 · S5 36 blok.
+     * yüksekliğiyle orantılı (boyut çarpanı dahil). Varsayılanla S1 7,5 · S3 18 · S5 45 blok.
      */
     public double kaldirmaTavani(double s5Tavani) {
         return s5Tavani * yukseklik / (YUKSEKLIK * TABLO[TABLO.length - 1].guc);

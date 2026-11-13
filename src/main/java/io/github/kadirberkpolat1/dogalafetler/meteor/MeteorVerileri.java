@@ -5,6 +5,7 @@ import com.google.gson.JsonObject;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.esya.MeteorEsyaKayitlari;
 import io.github.kadirberkpolat1.dogalafetler.esya.termostat.Termostat;
+import io.github.kadirberkpolat1.dogalafetler.sicaklik.ZirhEkleri;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -74,6 +75,8 @@ public final class MeteorVerileri implements DataProvider {
             zirh.addProperty("ek", Termostat.TERMOSTATLI.anahtar());
             zirh.add("malzeme", malzeme("item", "dogalafetler:termostat_plakasi"));
             isler.add(DataProvider.saveStable(onbellek, zirh, veri.resolve("recipes/termostatli_zirh.json")));
+            isler.add(zirhEkiTarifi(onbellek, veri, MeteorZirhi.METEORITLI, "meteorit_parcasi", "meteoritli_zirh"));
+            isler.add(zirhEkiTarifi(onbellek, veri, MeteorZirhi.KOZMIK, "kozmik_cekirdek", "kozmik_zirh"));
             JsonObject etiket = new JsonObject();
             etiket.addProperty("replace", false);
             JsonArray degerler = new JsonArray();
@@ -99,6 +102,17 @@ public final class MeteorVerileri implements DataProvider {
                         InventoryChangeTrigger.TriggerInstance.hasItems(MeteorEsyaKayitlari.METEORIT_KULCESI.get()))
                 .save(liste::add, DogalAfetler.konum("termostat_plakasi"));
         return liste;
+    }
+
+    /** {@code dogalafetler:zirh_eki} tarifi: tezgahta zırh + {@code malzeme} eşyası = {@code ek} eki (Termostatlı zırhla aynı tür). */
+    private static CompletableFuture<?> zirhEkiTarifi(CachedOutput onbellek, Path veri, ZirhEkleri.Ek ek, String malzeme,
+            String dosya) {
+        JsonObject tarif = new JsonObject();
+        tarif.addProperty("type", DogalAfetler.MOD_ID + ":zirh_eki");
+        tarif.addProperty("category", "equipment");
+        tarif.addProperty("ek", ek.anahtar());
+        tarif.add("malzeme", malzeme("item", DogalAfetler.MOD_ID + ":" + malzeme));
+        return DataProvider.saveStable(onbellek, tarif, veri.resolve("recipes/" + dosya + ".json"));
     }
 
     private static JsonObject malzeme(String tur, String kimlik) {

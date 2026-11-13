@@ -1,6 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.core;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.afet.sel.SelSistemi;
 import io.github.kadirberkpolat1.dogalafetler.config.CekirdekAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.AfetYogunlugu;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.AfetZamanlayicisi;
@@ -92,6 +93,9 @@ public final class AfetYoneticisi {
         HEDEF_YOK,
         HATA
     }
+
+    /** Doğal başlatmada halkadan denenen en çok merkez noktası (afet {@code yerUygunMu} reddederse sonraki nokta). */
+    private static final int MERKEZ_DENEMESI = 5;
 
     private static final List<DonemSureci> DONEM_SURECLERI = new CopyOnWriteArrayList<>();
     private static AfetYoneticisi ornek;
@@ -353,6 +357,9 @@ public final class AfetYoneticisi {
      */
     double secimCarpani(AfetTuru tur) {
         double carpan = donem().carpan(tur);
+        if (tur == AfetTuru.SEL) {
+            carpan *= SelSistemi.secimCarpani(this, server);
+        }
         if (GunSaatiPenceresi.dogalPatlama(tur).isEmpty() || !(carpan > 0)) {
             return carpan;
         }
@@ -461,18 +468,31 @@ public final class AfetYoneticisi {
             return sunucuGeneliBaslat(tur, true);
         }
         if (hedef != null) {
-            return oyuncuyaBaslat(tur, etkinSeviye, hedef, true);
+            return oyuncuyaBaslat(tur, etkinSeviye, hedef, true, false);
         }
         List<ServerPlayer> adaylar = hedefAdaylari(CekirdekAyarlari.al());
         for (UUID kimlik : HedefSecici.sirala(adayListesi(adaylar), donem().sonHedef().orElse(null), rastgele)) {
             ServerPlayer oyuncu = server.getPlayerList().getPlayer(kimlik);
             BaslatmaSonucu sonuc = oyuncu == null ? BaslatmaSonucu.YER_UYGUN_DEGIL
-                    : oyuncuyaBaslat(tur, etkinSeviye, oyuncu, true);
+                    : oyuncuyaBaslat(tur, etkinSeviye, oyuncu, true, false);
             if (sonuc != BaslatmaSonucu.YER_UYGUN_DEGIL) {
                 return sonuc;
             }
         }
         return konumaBaslat(tur, etkinSeviye, konumLevel, konum);
+    }
+
+    /**
+     * Alt sistem tetikleyicisi (ör. deprem → tsunami): bölgesel afeti verilen noktada, komutla başlatılmış gibi (elle) başlatır;
+     * hedef oyuncu aranmaz, doğal takvimi, doğal sayacı ve son seviye kuralını etkilemez. Aynı türden süren afet varsa
+     * {@link BaslatmaSonucu#ZATEN_AKTIF}; yer afetin {@code yerUygunMu}'suna uymazsa {@link BaslatmaSonucu#YER_UYGUN_DEGIL}.
+     * Seviye {@code [EN_DUSUK_SEVIYE, EN_YUKSEK_SEVIYE]} aralığına kırpılır.
+     */
+    public BaslatmaSonucu konumdanBaslat(AfetTuru tur, int seviye, ServerLevel level, BlockPos konum) {
+        if (tur.sunucuGeneli()) {
+            throw new IllegalArgumentException(tur.kimlik() + " bölgesel değil");
+        }
+        return konumaBaslat(tur, Math.max(AfetTuru.EN_DUSUK_SEVIYE, Math.min(AfetTuru.EN_YUKSEK_SEVIYE, seviye)), level, konum);
     }
 
     /**
@@ -488,13 +508,14 @@ public final class AfetYoneticisi {
 
     /**
      * Yalnız GameTest: bölgesel türü doğal seçimin başlattığı gibi (elle değil) oyuncuda başlatır; eşzamanlı doğal afet
-     * kuralları ve alan çakışması (K-E67) ancak böyle sınanır.
+     * kuralları ve alan çakışması (K-E67) ancak böyle sınanır. Merkez halkası uygulanmaz: başlangıç noktası oyuncunun
+     * bulunduğu bloktur (testler oyuncuların konumuyla alan çakışmasını kurar).
      */
     BaslatmaSonucu dogalBaslat(AfetTuru tur, int seviye, ServerPlayer hedef) {
         if (tur.sunucuGeneli()) {
             throw new IllegalArgumentException(tur.kimlik() + " bölgesel değil");
         }
-        return oyuncuyaBaslat(tur, seviye, hedef, false);
+        return oyuncuyaBaslat(tur, seviye, hedef, false, false);
     }
 
     /** Süren bütün afetleri temizce durdurur ({@code /dogalafet stop}); afet yoksa {@code false}. */
@@ -774,7 +795,7 @@ public final class AfetYoneticisi {
                 return deneme(sunucuGeneliBaslat(tur, false));
             }
             ServerPlayer oyuncu = server.getPlayerList().getPlayer(hedef);
-            return oyuncu == null ? SecimTuru.Deneme.YER_YOK : deneme(oyuncuyaBaslat(tur, seviye, oyuncu, false));
+            return oyuncu == null ? SecimTuru.Deneme.YER_YOK : deneme(oyuncuyaBaslat(tur, seviye, oyuncu, false, true));
         });
         sonuc.ifPresent(tur -> {
             for (AfetTuru ertelenen : tur.ertelenenler()) {
@@ -896,20 +917,36 @@ public final class AfetYoneticisi {
         return konumdaBaslat(tur, seviye, level, konum, null, true);
     }
 
-    private BaslatmaSonucu oyuncuyaBaslat(AfetTuru tur, int seviye, ServerPlayer hedef, boolean elle) {
+    /**
+     * Bölgesel afeti hedef oyuncuda başlatır. {@code halkada}: merkez başlangıç noktası oyuncunun SEÇİM ANINDAKİ (taze) konumundan
+     * {@link io.github.kadirberkpolat1.dogalafetler.core.mantik.MerkezHalkasi} içinde (varsayılan 3–10 chunk) rastgele
+     * yönde seçilir; afet {@code yerUygunMu} reddederse halkadan {@value #MERKEZ_DENEMESI} noktaya kadar yenisi denenir.
+     * Merkez başladıktan sonra sabittir (afet oyuncuyu izlemez; hareketli afet kendi içinde dolaşır). {@code halkada=false}
+     * (komut): başlangıç noktası oyuncunun bulunduğu blok, tek deneme.
+     */
+    private BaslatmaSonucu oyuncuyaBaslat(AfetTuru tur, int seviye, ServerPlayer hedef, boolean elle, boolean halkada) {
         if (yuvaDolu(tur, elle)) {
             return BaslatmaSonucu.ZATEN_AKTIF;
         }
         ServerLevel level = hedef.serverLevel();
         Afet afet;
-        BlockPos merkez;
+        BlockPos merkez = null;
         try {
             afet = AfetKaydi.olustur(tur).orElse(null);
             if (afet == null) {
                 return BaslatmaSonucu.KAYITLI_DEGIL;
             }
-            merkez = afet.merkezSec(level, hedef, seviye, level.getRandom());
-            if (!afet.yerUygunMu(level, merkez, seviye)) {
+            int deneme = halkada ? MERKEZ_DENEMESI : 1;
+            for (int i = 0; i < deneme && merkez == null; i++) {
+                BlockPos nokta = halkada
+                        ? AfetMerkezi.halkaNoktasi(level, hedef, CekirdekAyarlari.al().merkezHalkasi(), rastgele)
+                        : hedef.blockPosition();
+                BlockPos aday = afet.merkezSec(level, hedef, seviye, nokta, level.getRandom());
+                if (afet.yerUygunMu(level, aday, seviye)) {
+                    merkez = aday;
+                }
+            }
+            if (merkez == null) {
                 return BaslatmaSonucu.YER_UYGUN_DEGIL;
             }
         } catch (RuntimeException hata) {

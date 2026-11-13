@@ -1,0 +1,35 @@
+{
+  "parent": "dogalafetler:dogalafetler/buz_balikcisi",
+  "criteria": {
+    "ozel": {
+      "conditions": {
+        "anahtar": "yineleme_ikiz"
+      },
+      "trigger": "dogalafetler:ozel_basarim"
+    }
+  },
+  "display": {
+    "announce_to_chat": false,
+    "description": {
+      "translate": "advancements.dogalafetler.yineleme_ikiz.description"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:salmon"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.yineleme_ikiz.title"
+    }
+  },
+  "requirements": [
+    [
+      "ozel"
+    ]
+  ],
+  "rewards": {
+    "experience": 15
+  },
+  "sends_telemetry_event": true
+}

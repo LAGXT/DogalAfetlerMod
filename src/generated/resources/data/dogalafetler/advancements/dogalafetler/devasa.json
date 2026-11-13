@@ -1,0 +1,35 @@
+{
+  "parent": "dogalafetler:dogalafetler/supernova_tanigi",
+  "criteria": {
+    "ozel": {
+      "conditions": {
+        "anahtar": "devasa"
+      },
+      "trigger": "dogalafetler:ozel_basarim"
+    }
+  },
+  "display": {
+    "announce_to_chat": false,
+    "description": {
+      "translate": "advancements.dogalafetler.devasa.description"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:ender_eye"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.devasa.title"
+    }
+  },
+  "requirements": [
+    [
+      "ozel"
+    ]
+  ],
+  "rewards": {
+    "experience": 15
+  },
+  "sends_telemetry_event": true
+}

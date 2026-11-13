@@ -22,12 +22,12 @@ public record SinkholeSeviyesi(int seviye, int cap, int derinlik, int catlamaTic
     public static final int SARKMA_TICK = 60;
     public static final int DURULMA_TICK = 280;
 
-    private static final int[] CAP = {6, 10, 16, 24, 34};
-    private static final int[] DERINLIK = {6, 10, 16, 24, 32};
-    private static final int[] CATLAMA_SN = {4, 4, 5, 6, 7};
-    private static final int[] COKUS_SN = {3, 4, 6, 8, 10};
-    private static final int[] BASAMAK = {1, 1, 2, 2, 3};
-    private static final float[] HASAR = {0, 0, 4, 6, 8};
+    private static final int[] CAP = {6, 10, 16, 28, 48};
+    private static final int[] DERINLIK = {6, 10, 16, 28, 46};
+    private static final int[] CATLAMA_SN = {4, 4, 5, 6, 8};
+    private static final int[] COKUS_SN = {3, 4, 6, 9, 13};
+    private static final int[] BASAMAK = {1, 1, 2, 3, 4};
+    private static final float[] HASAR = {0, 0, 4, 7, 12};
 
     public static SinkholeSeviyesi varsayilan(int seviye) {
         int i = Math.max(1, Math.min(5, seviye)) - 1;
@@ -54,7 +54,7 @@ public record SinkholeSeviyesi(int seviye, int cap, int derinlik, int catlamaTic
             case CATLAMA -> catlamaTick;
             case SARKMA -> SARKMA_TICK;
             case COKUS -> cekirdekTick();
-            case GERI_CEKILME -> halkaTick() * Math.max(0, basamak - 1);
+            case GERI_CEKILME -> basamak <= 1 ? 0 : cokusTick - cekirdekTick();
             default -> DURULMA_TICK;
         };
     }

@@ -1,0 +1,35 @@
+{
+  "parent": "dogalafetler:dogalafetler/root",
+  "criteria": {
+    "ozel": {
+      "conditions": {
+        "anahtar": "cifte_bela"
+      },
+      "trigger": "dogalafetler:ozel_basarim"
+    }
+  },
+  "display": {
+    "announce_to_chat": false,
+    "description": {
+      "translate": "advancements.dogalafetler.cifte_bela.description"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:tnt"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.cifte_bela.title"
+    }
+  },
+  "requirements": [
+    [
+      "ozel"
+    ]
+  ],
+  "rewards": {
+    "experience": 15
+  },
+  "sends_telemetry_event": true
+}

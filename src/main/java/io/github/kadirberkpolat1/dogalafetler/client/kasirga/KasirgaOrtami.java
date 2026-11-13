@@ -5,7 +5,9 @@ import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.KasirgaAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.KasirgaVarligi;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.KasirgaEvresi;
 import net.minecraft.client.Camera;
+import net.minecraft.client.renderer.FogRenderer;
 import net.minecraft.client.Minecraft;
+import net.minecraft.world.level.material.FogType;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
@@ -69,9 +71,15 @@ public final class KasirgaOrtami {
         }
     }
 
-    /** Forge iptal edilmeyen {@code RenderFog}'daki mesafe değişikliğini uygulamaz (spike SK-04). */
+    /**
+     * Forge iptal edilmeyen {@code RenderFog}'daki mesafe değişikliğini uygulamaz (spike SK-04). Yalnız kara sisi ve sıvı dışında
+     * (K-E86): eskiden her mod (gök sisi dahil) iptal edilip ölçekleniyordu; diğer afet sisleri de aynı korumayı kullanır.
+     */
     @SubscribeEvent
     public static void sis(ViewportEvent.RenderFog olay) {
+        if (olay.getMode() != FogRenderer.FogMode.FOG_TERRAIN || olay.getCamera().getFluidInCamera() != FogType.NONE) {
+            return;
+        }
         float f = sisEtkisi(olay.getCamera());
         if (f > 0) {
             olay.scaleFarPlaneDistance(1 - 0.4f * f);

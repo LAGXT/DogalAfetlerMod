@@ -349,7 +349,8 @@ def kara_delik_jet(w=64, h=512):
     cizgi = np.exp(-(x / 0.12) ** 2) * yumusak_basamak(0.06, 0.16, ay) * np.exp(-np.maximum(ay - 0.16, 0) / 0.45)
     dugum = sum(0.6 * np.exp(-((ay - k) / 0.025) ** 2) * np.exp(-(x / 0.18) ** 2) for k in (0.3, 0.52, 0.78))
     a = (cizgi + dugum * np.exp(-ay / 0.6)) * yumusak_basamak(1.0, 0.85, ay)
-    kaydet("kara_delik_jet", np.ones((h, w, 3), np.float32) * renk("#D4E2FF")[None, None, :], np.clip(a, 0, 1))
+    # K-E84: gama ışını jetleri sarı (eski açık mavi #D4E2FF).
+    kaydet("kara_delik_jet", np.ones((h, w, 3), np.float32) * renk("#FFE58A")[None, None, :], np.clip(a, 0, 1))
 
 
 def main() -> None:

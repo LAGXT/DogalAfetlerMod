@@ -6,6 +6,7 @@ import io.github.kadirberkpolat1.dogalafetler.basarim.olcut.AfetOlcutu;
 import io.github.kadirberkpolat1.dogalafetler.basarim.olcut.BasitOlcut;
 import io.github.kadirberkpolat1.dogalafetler.basarim.olcut.EsikOlcutu;
 import io.github.kadirberkpolat1.dogalafetler.basarim.olcut.EsyaOlcutu;
+import io.github.kadirberkpolat1.dogalafetler.basarim.olcut.OzelOlcut;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -47,10 +48,17 @@ public final class BasarimOlcutleri {
     public static final EsikOlcutu BIRLIKTE_HAYATTA = new EsikOlcutu("birlikte_hayatta", "min", false);
     public static final BasitOlcut HEPSINI_ATLATTI = new BasitOlcut("hepsini_atlatti");
     public static final BasitOlcut YENI_SAFAK = new BasitOlcut("yeni_safak");
+    /** K-E74: başka alt sistemlerin {@code OzelBasarim.ver} ile verdiği başarımlar (anahtar = başarım yolu). */
+    public static final OzelOlcut OZEL = new OzelOlcut("ozel_basarim");
+    /** K-E74 "Üç Üst Üste": ölmeden art arda sağ çıkılan afet sayısı. */
+    public static final EsikOlcutu SERI_HAYATTA = new EsikOlcutu("seri_hayatta", "min", false);
+    /** K-E74 "On Gün On Gece": ölmeden geçen Minecraft günü (24000 tick'lik çevrim içi süre). */
+    public static final EsikOlcutu HAYATTA_GUN = new EsikOlcutu("hayatta_gun", "gun", false);
 
     private static final List<CriterionTrigger<?>> HEPSI = List.of(SIREN_DUYULDU, AFETTEN_SAG_CIKTI, SUPERNOVA_GORUNDU,
             YILDIZLI_GECE, DONMA_ILERLEMESI, KUTUP_SIGINAGI, DENIZ_YUKSELDI, ESYA_URETILDI, TUY_UPGRADE,
-            YUNLU_PARCA, CORBA_ICER_ISINIR, BALIK_TUTULDU, BIRLIKTE_HAYATTA, HEPSINI_ATLATTI, YENI_SAFAK);
+            YUNLU_PARCA, CORBA_ICER_ISINIR, BALIK_TUTULDU, BIRLIKTE_HAYATTA, HEPSINI_ATLATTI, YENI_SAFAK, OZEL,
+            SERI_HAYATTA, HAYATTA_GUN);
 
     private BasarimOlcutleri() {
     }
@@ -102,6 +110,13 @@ public final class BasarimOlcutleri {
             case HEPSINI_ATLATTIM -> tek(HEPSINI_ATLATTI.ornek());
             case BIRLIKTE_HAYATTA -> tek(BIRLIKTE_HAYATTA.ornek(3));
             case YENI_SAFAK -> tek(YENI_SAFAK.ornek());
+            case DOKUNULMAZ -> tek(AFETTEN_SAG_CIKTI.ornek(null, 4, SagCikmaKosulu.HASARSIZ));
+            case UC_UST_USTE -> tek(SERI_HAYATTA.ornek(3));
+            case ON_GUN_ON_GECE -> tek(HAYATTA_GUN.ornek(10));
+            case KUTUP_HAZINESI -> tek("topla", envanterdeHerhangi(BasarimKimlikleri.KRISTAL_LEVREK,
+                    BasarimKimlikleri.KUTUP_YILANBALIGI, BasarimKimlikleri.AURORA_BALIGI));
+            case AURORA_AVCISI -> tek("topla", envanterdeHerhangi(BasarimKimlikleri.AURORA_BALIGI));
+            default -> tek("ozel", OZEL.ornek(ozelAnahtar(basarim)));
         };
     }
 
@@ -111,6 +126,14 @@ public final class BasarimOlcutleri {
 
     private static Map<String, CriterionTriggerInstance> tek(String ad, CriterionTriggerInstance ornek) {
         return Map.of(ad, ornek);
+    }
+
+    /** {@code OzelBasarim.ver} ile verilen başarımın anahtarı (= yol); özel olmayan başarımda tanımsız durum. */
+    private static String ozelAnahtar(Basarimlar basarim) {
+        if (!basarim.ozelMi()) {
+            throw new IllegalStateException("Başarımın ölçütü tanımlı değil: " + basarim.yol());
+        }
+        return basarim.yol();
     }
 
     private static Map<String, CriterionTriggerInstance> uretYaDaYaratici(ResourceLocation esya) {
@@ -131,5 +154,20 @@ public final class BasarimOlcutleri {
                         .subPredicate(PlayerPredicate.Builder.player().setGameType(oyunKipi).build()).build());
         return new InventoryChangeTrigger.TriggerInstance(oyuncu, MinMaxBounds.Ints.ANY, MinMaxBounds.Ints.ANY,
                 MinMaxBounds.Ints.ANY, new ItemPredicate[] {ItemPredicate.Builder.item().of(esya).build()});
+    }
+
+    /** Listelenen eşyalardan herhangi biri envantere girdi (tek {@code inventory_changed} ölçütü). Eşyalar datagen anında kayıtlı olmalı. */
+    private static CriterionTriggerInstance envanterdeHerhangi(ResourceLocation... kimlikler) {
+        Item[] esyalar = new Item[kimlikler.length];
+        for (int i = 0; i < kimlikler.length; i++) {
+            Item esya = ForgeRegistries.ITEMS.getValue(kimlikler[i]);
+            if (esya == null || esya == Items.AIR) {
+                throw new IllegalStateException("Başarım eşyası kayıtlı değil: " + kimlikler[i]);
+            }
+            esyalar[i] = esya;
+        }
+        return new InventoryChangeTrigger.TriggerInstance(ContextAwarePredicate.ANY, MinMaxBounds.Ints.ANY,
+                MinMaxBounds.Ints.ANY, MinMaxBounds.Ints.ANY,
+                new ItemPredicate[] {ItemPredicate.Builder.item().of(esyalar).build()});
     }
 }

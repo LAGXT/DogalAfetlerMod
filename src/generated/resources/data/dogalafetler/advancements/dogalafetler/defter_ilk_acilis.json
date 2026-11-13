@@ -1,0 +1,35 @@
+{
+  "parent": "dogalafetler:dogalafetler/root",
+  "criteria": {
+    "ozel": {
+      "conditions": {
+        "anahtar": "defter_ilk_acilis"
+      },
+      "trigger": "dogalafetler:ozel_basarim"
+    }
+  },
+  "display": {
+    "announce_to_chat": false,
+    "description": {
+      "translate": "advancements.dogalafetler.defter_ilk_acilis.description"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:book"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.defter_ilk_acilis.title"
+    }
+  },
+  "requirements": [
+    [
+      "ozel"
+    ]
+  ],
+  "rewards": {
+    "experience": 15
+  },
+  "sends_telemetry_event": true
+}

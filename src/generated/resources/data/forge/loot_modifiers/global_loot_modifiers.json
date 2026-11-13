@@ -1,6 +1,9 @@
 {
   "entries": [
-    "dogalafetler:buz_deligi_balikcilik"
+    "dogalafetler:buz_deligi_balikcilik",
+    "dogalafetler:deniz_balikciligi_yineleme",
+    "dogalafetler:deniz_balikciligi_ozel",
+    "dogalafetler:deniz_balikciligi_esya"
   ],
   "replace": false
 }

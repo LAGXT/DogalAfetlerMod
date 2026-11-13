@@ -10,11 +10,11 @@ import io.github.kadirberkpolat1.dogalafetler.afet.ortak.mantik.BlokRolu;
 public record TsunamiSeviyesi(int seviye, double yukseklik, double hizBlokSn, double karaGiris, double genislik,
         double cekilme, double ivme, double hasar, float sertlik) {
     private static final TsunamiSeviyesi[] TABLO = {
-        new TsunamiSeviyesi(1, 4, 4, 30, 60, 10, 0.04, 0.5, 1.0f),
+        new TsunamiSeviyesi(1, 4, 4, 30, 60, 10, 0.04, 0.5, 0.5f),
         new TsunamiSeviyesi(2, 7, 5, 60, 100, 15, 0.06, 1.0, 2.0f),
         new TsunamiSeviyesi(3, 10, 6, 100, 140, 20, 0.08, 1.5, 3.0f),
-        new TsunamiSeviyesi(4, 14, 7, 150, 200, 30, 0.10, 2.0, 3.5f),
-        new TsunamiSeviyesi(5, 20, 8, 220, 260, 40, 0.12, 3.0, 4.0f),
+        new TsunamiSeviyesi(4, 16, 7, 150, 200, 30, 0.11, 2.5, 5.0f),
+        new TsunamiSeviyesi(5, 26, 8, 220, 260, 40, 0.16, 5.0, 49.0f),
     };
 
     /** Dalganın doğuştan kıyıya varışı (sn). */
@@ -72,9 +72,9 @@ public record TsunamiSeviyesi(int seviye, double yukseklik, double hizBlokSn, do
         };
     }
 
-    /** Tick başına yıkılan en çok blok (TPS kısmasından önce): S1 16 … S5 48. */
+    /** Tick başına yıkılan en çok blok (TPS kısmasından önce): S1 16 … S4 48, S5 64. */
     public int yikimButcesi() {
-        return 8 + 8 * seviye;
+        return 8 + 8 * seviye + (seviye >= 4 ? 8 * (seviye - 3) : 0);
     }
 
     /** Tsunaminin doldurabileceği en çok mağara cebi. */

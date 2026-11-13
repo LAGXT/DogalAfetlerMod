@@ -1,0 +1,48 @@
+{
+  "type": "minecraft:fishing",
+  "pools": [
+    {
+      "bonus_rolls": 0.0,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "functions": [
+            {
+              "add": false,
+              "count": {
+                "type": "minecraft:uniform",
+                "max": 2.0,
+                "min": 1.0
+              },
+              "function": "minecraft:set_count"
+            }
+          ],
+          "name": "dogalafetler:sogutma_parcasi",
+          "weight": 7
+        },
+        {
+          "type": "minecraft:item",
+          "functions": [
+            {
+              "add": false,
+              "count": {
+                "type": "minecraft:uniform",
+                "max": 3.0,
+                "min": 1.0
+              },
+              "function": "minecraft:set_count"
+            }
+          ],
+          "name": "dogalafetler:tuz_kristali",
+          "weight": 3
+        },
+        {
+          "type": "minecraft:item",
+          "name": "dogalafetler:buzlu_inci"
+        }
+      ],
+      "rolls": 1.0
+    }
+  ],
+  "random_sequence": "dogalafetler:gameplay/deniz/esya"
+}

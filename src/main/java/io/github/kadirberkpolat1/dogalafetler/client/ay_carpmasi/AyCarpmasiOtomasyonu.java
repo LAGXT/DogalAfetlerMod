@@ -3,7 +3,9 @@ package io.github.kadirberkpolat1.dogalafetler.client.ay_carpmasi;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.afet.ay_carpmasi.AyCarpmasiAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.afet.ay_carpmasi.mantik.AyEgrileri;
+import io.github.kadirberkpolat1.dogalafetler.afet.ay_carpmasi.mantik.AyYonu;
 import io.github.kadirberkpolat1.dogalafetler.client.core.GorselOtomasyon;
+import io.github.kadirberkpolat1.dogalafetler.client.uyum.IrisUyumu;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetYoneticisi;
 import io.github.kadirberkpolat1.dogalafetler.core.AyDurumu;
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
@@ -27,7 +29,7 @@ import net.minecraftforge.fml.common.Mod;
 /**
  * Görsel kanıt otomasyonu (K0-21 rev. 2). Yalnız {@code -Ddogalafetler.otomasyon=ay_carpmasi} ile tek oyunculu dünyada
  * çalışır; üretimde etkisizdir. Gece, seyirci kamera doğuş noktasının {@value #KAMERA_YUKSEKLIGI} blok üstünde (ağaçlar
- * ve arazi ufku kapatmaz) yaklaşma yönüne (doğu-güneydoğu) bakar. Sıra: tepeye bakan önce karesi; vitrin açısından
+ * ve arazi ufku kapatmaz) yaklaşma yönüne (olayın başladığı anda vanilla ayın bulunduğu yer) bakar. Sıra: tepeye bakan önce karesi; vitrin açısından
  * afetsiz FPS tabanı ({@code s5_ay_taban}); ön-uyarı (değişiklik yok); siren boyunca ufkun 12° üstüne bakarak büyüyen ve
  * parçalanan ay; son saniyeler ağır çekimde (sunucu tick'inde 20. sn'den hız 0,1 = {@code /dogalafet hiz} alt sınırı) vitrin
  * açısından (ufkun 4° üstü: ay, parlama ve patlama aynı kadrajda); 3 boyutlu patlama 0,3 / 1 / 2 sn, 3. sn'de kamera
@@ -47,7 +49,12 @@ public final class AyCarpmasiOtomasyonu {
     private static final String OTOMASYON = "ay_carpmasi";
     private static final boolean AKTIF = OTOMASYON.equals(System.getProperty("dogalafetler.otomasyon", ""));
     private static final String ON = "AY_OTOMASYON ";
-    private static final float BAKIS_YAW = -90f + AyEgrileri.AZIMUT_DERECE;
+    /**
+     * Sahne saati: vanilla ay doğuda ufkun ~35° üstünde (gün zamanı 14880; gün döngüsü kapalı). Yaklaşma yönü ayın bu andaki yeridir
+     * (K-E83); kamera onun azimutuna bakar. Gölgelendirici paketi açıkken paketin güneş yolu eğimi azimutu kaydırır.
+     */
+    private static final int BASLANGIC_ZAMANI = 14880;
+    private static volatile float bakisYaw = -90f + AyEgrileri.AZIMUT_DERECE;
     private static final int KAMERA_YUKSEKLIGI = 40;
     /** Minecraft pitch'inde yukarı negatiftir. */
     private static final float VITRIN_PITCH = -4f;
@@ -177,6 +184,8 @@ public final class AyCarpmasiOtomasyonu {
             case 0 -> {
                 if (sunucuHazir && sayac >= 200) {
                     mc.options.hideGui = true;
+                    bakisYaw = -90f + AyYonu.baslangic(mc.level.getTimeOfDay(1f), IrisUyumu.gokEgimiDerece()).azimutDerece();
+                    DogalAfetler.LOGGER.info(ON + "yaklaşma yönü (vanilla ay): yaw {}", bakisYaw);
                     kare("00_once");
                     sonraki();
                 }
@@ -311,7 +320,7 @@ public final class AyCarpmasiOtomasyonu {
     /** Sunucu thread'inde: kurallar, gece, doğuş noktasının üstünde tepeye bakan seyirci kamera. */
     private static void hazirla(IntegratedServer server) {
         for (String k : new String[] {"gamerule sendCommandFeedback false", "gamerule doDaylightCycle false",
-                "gamerule doWeatherCycle false", "gamerule doMobSpawning false", "time set 18000", "weather clear",
+                "gamerule doWeatherCycle false", "gamerule doMobSpawning false", "time set " + BASLANGIC_ZAMANI, "weather clear",
                 "dogalafet sifirla"}) {
             server.getCommands().performPrefixedCommand(server.createCommandSourceStack(), k);
         }
@@ -322,14 +331,14 @@ public final class AyCarpmasiOtomasyonu {
         ServerPlayer oyuncu = server.getPlayerList().getPlayers().get(0);
         oyuncu.setGameMode(GameType.SPECTATOR);
         bak(server, TEPE_PITCH);
-        DogalAfetler.LOGGER.info(ON + "kamera {} (doğuş {}), yaw {}, vitrin pitch {}", kamera.toShortString(),
-                dogus.toShortString(), BAKIS_YAW, VITRIN_PITCH);
+        DogalAfetler.LOGGER.info(ON + "kamera {} (doğus {}), yaw {}, vitrin pitch {}", kamera.toShortString(),
+                dogus.toShortString(), bakisYaw, VITRIN_PITCH);
         sunucuHazir = true;
     }
 
     private static void bak(MinecraftServer server, float pitch) {
         ServerPlayer oyuncu = server.getPlayerList().getPlayers().get(0);
-        oyuncu.teleportTo(server.overworld(), kamera.getX() + 0.5, kamera.getY() + yukseltme, kamera.getZ() + 0.5, BAKIS_YAW,
+        oyuncu.teleportTo(server.overworld(), kamera.getX() + 0.5, kamera.getY() + yukseltme, kamera.getZ() + 0.5, bakisYaw,
                 pitch);
     }
 

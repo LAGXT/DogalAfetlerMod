@@ -1,0 +1,8 @@
+{
+  "type": "dogalafetler:zirh_eki",
+  "category": "equipment",
+  "ek": "meteoritli",
+  "malzeme": {
+    "item": "dogalafetler:meteorit_parcasi"
+  }
+}

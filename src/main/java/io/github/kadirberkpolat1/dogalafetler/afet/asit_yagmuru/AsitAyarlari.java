@@ -1,5 +1,6 @@
 package io.github.kadirberkpolat1.dogalafetler.afet.asit_yagmuru;
 
+import io.github.kadirberkpolat1.dogalafetler.afet.asit_yagmuru.mantik.AsitAyarGocu;
 import io.github.kadirberkpolat1.dogalafetler.afet.asit_yagmuru.mantik.AsitKurallari;
 import io.github.kadirberkpolat1.dogalafetler.config.AyarKaydi;
 import java.util.ArrayList;
@@ -15,6 +16,7 @@ public final class AsitAyarlari {
     }
 
     static void kaydet() {
+        AyarKaydi.sunucuGocu(AsitAyarGocu.PLAN);
         sunucu = AyarKaydi.sunucuBolumu("asit_yagmuru", "Asit yağmuru (bölüm E, madde 10)", Sunucu::new);
     }
 
@@ -75,6 +77,9 @@ public final class AsitAyarlari {
         private final ForgeConfigSpec.IntValue blokButcesi;
 
         private Sunucu(ForgeConfigSpec.Builder k) {
+            k.comment("Config göçünün sürümü (K-E61): dosya bundan eskiyse açılışta eski varsayılanında kalan asit seviye listeleri "
+                    + "yeni varsayılana çekilir, elle değiştirilenlere dokunulmaz. Elle değiştirmeyin.")
+                    .defineInRange("ayarSurumu", AsitAyarGocu.GUNCEL, 0, Integer.MAX_VALUE);
             AsitKurallari.Tablo v = AsitKurallari.Tablo.VARSAYILAN;
             yaricap = liste(k, "yaricap", "Yağmur bütün dünyada yağar; aşınma her oyuncunun bu yarıçapı içinden örneklenir (blok).",
                     v.yaricap(), 4, 256);
@@ -82,13 +87,13 @@ public final class AsitAyarlari {
             asindirma = liste(k, "asindirmaBlokSaniye", "Tam yoğunlukta her oyuncunun çevresinde saniyede aşınan en çok blok.",
                     v.asindirma(), 0, 256);
             hasarSaniye = k.comment("Gökyüzüne açık oyuncunun maruz kaldığı her saniye aldığı hasar (can puanı; 1 = yarım"
-                    + " kalp). Seviyeden bağımsız; çatı altında 0.").defineInRange("hasarSaniye", 1.0, 0.0, 20.0);
+                    + " kalp). S1–S3 bu değer, S4 ×1,25, S5 ×2 (AsitKurallari.hasarCarpani); çatı altında 0.").defineInRange("hasarSaniye", 1.0, 0.0, 20.0);
             tasSeviyesi = k.comment("Kırıktaş ve taş tuğlanın aşınmaya başladığı seviye (6: hiç).")
                     .defineInRange("tasSeviyesi", v.tasSeviyesi(), 1, 6);
             minimumCan = k.comment("Asit hasarı canı bunun altına indirmez (madde 10: Seviye 5'te bile öldürücü değil).")
                     .defineInRange("asitMinimumCan", 4.0, 0.0, 20.0);
             eszamanliAsindirma = k.comment("Aynı anda çatlak örtüsü taşıyan (aşınmakta olan) en çok blok; S5 hızı × ortalama çatlak süresi (4 sn).")
-                    .defineInRange("eszamanliAsindirma", 64, 1, 256);
+                    .defineInRange("eszamanliAsindirma", AsitAyarGocu.ESZAMANLI, 1, 256);
             blokButcesi = k.comment("Tick başına oyuncuların çevresindeki yüklü chunk'lardan örneklenen en çok yüzey sütunu"
                     + " (oyuncu başına 3–16, toplamı bu sayı × TPS kısması; 0: aşınma yok).")
                     .defineInRange("blokButcesi", 32, 0, 512);

@@ -1,6 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.afet.deprem;
 
 import io.github.kadirberkpolat1.dogalafetler.afet.deprem.mantik.ArtciPlani;
+import io.github.kadirberkpolat1.dogalafetler.afet.deprem.mantik.DepremAyarGocu;
 import io.github.kadirberkpolat1.dogalafetler.afet.deprem.mantik.DepremSeviyesi;
 import io.github.kadirberkpolat1.dogalafetler.config.AyarKaydi;
 import java.util.List;
@@ -32,17 +33,20 @@ public final class DepremAyarlari {
     private static volatile Integer testEnAltY;
 
     private DepremAyarlari(ForgeConfigSpec.Builder k) {
-        uzunluk = tamsayilar(k, "yarikUzunlugu", "Yarık uzunluğu (blok), S1…S5", 24, 48, 96, 160, 256);
-        genislik = tamsayilar(k, "yarikGenisligi", "Merkezdeki yarık genişliği (blok), S1…S5", 1, 2, 3, 4, 6);
+        k.comment("Config göçünün sürümü (K-E61): dosya bundan eskiyse açılışta eski varsayılanında kalan deprem seviye listeleri "
+                + "yeni varsayılana çekilir, elle değiştirilenlere dokunulmaz. Elle değiştirmeyin.")
+                .defineInRange("ayarSurumu", DepremAyarGocu.GUNCEL, 0, Integer.MAX_VALUE);
+        uzunluk = tamsayilar(k, "yarikUzunlugu", "Yarık uzunluğu (blok), S1…S5", 24, 48, 96, 200, 400);
+        genislik = tamsayilar(k, "yarikGenisligi", "Merkezdeki yarık genişliği (blok), S1…S5", 1, 2, 3, 5, 9);
         derinlik = tamsayilar(k, "yarikDerinligi", "Merkezdeki yarık derinliği (yüzeyden blok; en alt Y -50), S1…S5", 4, 8,
-                14, 22, 32);
-        sureSaniye = tamsayilar(k, "sarsintiSuresi", "Sarsıntı süresi (saniye), S1…S5", 8, 15, 25, 40, 60);
+                14, 26, 44);
+        sureSaniye = tamsayilar(k, "sarsintiSuresi", "Sarsıntı süresi (saniye), S1…S5", 8, 15, 25, 45, 90);
         kameraGenligi = ondaliklar(k, "kameraGenligi", "Yakındaki oyuncunun ekran titremesi (derece), S1…S5", 0.3, 0.8,
-                1.5, 2.5, 4.0);
+                1.5, 2.8, 4.6);
         yikimYaricapi = tamsayilar(k, "yikimYaricapi", "Sağlam olmayan blokların yıkıldığı yarıçap (blok), S1…S5", 16, 32,
-                48, 72, 100);
+                48, 84, 160);
         hasar = ondaliklar(k, "yakinHasar", "Yarığa 8 blok içindeki canlılara 2 sn'de bir hasar (can puanı), S1…S5", 0.0,
-                0.0, 0.0, 1.0, 2.0);
+                0.0, 0.0, 1.5, 4.0);
         blokButcesi = tamsayilar(k, "blokButcesi", "Tick başına en çok blok değişimi (TPS düşünce yarıya/çeyreğe iner), S1…S5",
                 32, 48, 64, 96, 128);
         dusenBlokTavani = k.comment("Aynı anda havadaki düşen blok (FallingBlockEntity) tavanı; aşılınca blok kaldırılır")
@@ -50,7 +54,7 @@ public final class DepremAyarlari {
         enAltY = k.comment("Deprem yarığının ve sinkhole çukurunun inebileceği en alt Y (ana kaya ve deepslate tabanı korunur)")
                 .defineInRange("enAltY", -50, -64, 320);
         artciSayisi = tamsayilar(k, "artciSayisi", "Ana sarsıntıdan sonraki artçı sarsıntı sayısı (blok yıkmaz), S1…S5", 0, 0,
-                1, 2, 3);
+                1, 3, 5);
         artciEnAzAralik = k.comment("Bir artçının bir öncekinin (ya da ana sarsıntının) bitişinden en erken başlaması (saniye)")
                 .defineInRange("artciEnAzAralik", 20, 1, 600);
         artciEnCokAralik = k.comment("Bir artçının bir öncekinin (ya da ana sarsıntının) bitişinden en geç başlaması (saniye)")
@@ -63,6 +67,7 @@ public final class DepremAyarlari {
 
     public static void kaydet() {
         bolum = AyarKaydi.sunucuBolumu("deprem", "Deprem (bölüm C, madde 10)", DepremAyarlari::new);
+        AyarKaydi.sunucuGocu(DepremAyarGocu.PLAN);
     }
 
     public static DepremSeviyesi seviye(int seviye) {

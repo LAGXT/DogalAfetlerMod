@@ -13,11 +13,16 @@ import java.util.function.Function;
  */
 public final class GunesPatlamasiAyarGocu {
     public static final String SURUM_YOLU = "gunes_patlamasi.ayarSurumu";
-    public static final int GUNCEL = 1;
+    public static final int GUNCEL = 2;
 
-    /** Sürüme göre sıralı. 1: K-E67 (siren 25 sn; öncü yağmur AKTIF'ten önceki son 30 sn). */
+    /**
+     * Sürüme göre sıralı. 1: K-E67 (siren 25 sn; öncü yağmur AKTIF'ten önceki son 30 sn). 2: K-E72 (AKTIF 5 günden 1 güne;
+     * kavrulma başlangıcı 3 günden 0,4 güne, yoksa yeni sürenin dışında kalıp hiç çalışmazdı).
+     */
     public static final List<SurumluGocPlani.Adim> ADIMLAR = List.of(
-            adim(1, "gunes_patlamasi.meteorYagmuruOncuSaniye", 5, 90));
+            adim(1, "gunes_patlamasi.meteorYagmuruOncuSaniye", 5, 90),
+            adim(2, "gunes_patlamasi.aktifSureGun", 1.0, 5.0),
+            adim(2, "gunes_patlamasi.kavrulmaBaslangicGun", 0.4, 3.0));
 
     public static final SurumluGocPlani PLAN = new SurumluGocPlani(SURUM_YOLU, GUNCEL, ADIMLAR);
 

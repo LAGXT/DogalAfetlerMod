@@ -16,10 +16,18 @@ public final class AyEgrileri {
     public static final float CATLAK_BELIRME_SN = 2.5f;
     /** Son yaklaşma: ay ufka iner, alt kenarı atmosferde kızarır (son 4 sn). */
     public static final float SON_YAKLASMA_SN = 21f;
-    /** Yaklaşma yönü: +X'ten (doğu) +Z'ye (güney) doğru derece; dünyada sabit, herkes aynı yönde görür. */
+    /**
+     * Yedek yaklaşma yönü: +X'ten (doğu) +Z'ye (güney) doğru derece. Gerçek yön, olayın başladığı anda vanilla ayın bulunduğu
+     * yerden alınır ({@link AyYonu}); bu değer yalnız o bilinmiyorsa (ve eski sabit yönlü {@link #egim(float)} için) kullanılır.
+     */
     public static final float AZIMUT_DERECE = 20f;
     public static final float YAKLASMA_EGIMI = 35f;
     public static final float SON_EGIM = 4f;
+    /** Son yaklaşmada ayın en çok ineceği derece (özgün yol: 35° → 4°). */
+    public static final float EN_COK_DUSUS = YAKLASMA_EGIMI - SON_EGIM;
+    /** Ayın gökteki başlangıç yüksekliğinin sınırları: ufka çok yakın ya da tam tepe (yön belirsiz) olmasın. */
+    public static final float EN_AZ_BASLANGIC_EGIMI = 6f;
+    public static final float EN_COK_BASLANGIC_EGIMI = 89f;
     public static final float EN_BUYUK_OLCEK = 14f;
 
     public static final float PARLAMA_SN = 0.5f;
@@ -64,9 +72,31 @@ public final class AyEgrileri {
         return 1f + (EN_BUYUK_OLCEK - 1f) * t * t * t;
     }
 
-    /** Ayın ufuktan yüksekliği (derece): son yaklaşmaya kadar 35°, son 4 sn'de 4°'ye iner. */
+    /**
+     * Ayın ufuktan yüksekliği (derece), gökte {@code baslangic} yüksekliğinden başlayan ay için: son yaklaşmaya kadar o
+     * yükseklikte durur, son 4 sn'de {@link #sonEgim} yüksekliğine iner (K-E83: ay, olayın başladığı anda vanilla ayın
+     * bulunduğu yerden gelir).
+     */
+    public static float egim(float sn, float baslangic) {
+        return baslangic + (sonEgim(baslangic) - baslangic) * yumusak((sn - SON_YAKLASMA_SN) / (YAKLASMA_SN - SON_YAKLASMA_SN));
+    }
+
+    /** Gökte {@link #YAKLASMA_EGIMI} yüksekliğinden başlayan (özgün, sabit yönlü) ay: 35°, son 4 sn'de 4°'ye iner. */
     public static float egim(float sn) {
-        return YAKLASMA_EGIMI + (SON_EGIM - YAKLASMA_EGIMI) * yumusak((sn - SON_YAKLASMA_SN) / (YAKLASMA_SN - SON_YAKLASMA_SN));
+        return egim(sn, YAKLASMA_EGIMI);
+    }
+
+    /**
+     * Ayın çarpma anındaki yüksekliği: en çok {@link #EN_COK_DUSUS} derece iner ve {@link #SON_EGIM}'in altına düşmez. Tepeden
+     * (dimdik üstümüzden) gelen ay bu yüzden yüksekte, tepeye yakın patlar.
+     */
+    public static float sonEgim(float baslangic) {
+        return Math.max(SON_EGIM, baslangic - EN_COK_DUSUS);
+    }
+
+    /** Patlamanın merkezinin yüksekliği: ayın çarpma yüksekliğinin {@code PATLAMA_EGIMI - SON_EGIM} (5°) üstü. */
+    public static float patlamaEgimi(float baslangic) {
+        return sonEgim(baslangic) + (PATLAMA_EGIMI - SON_EGIM);
     }
 
     /** Üç aşamalı çatlak katmanının alfası ({@code asama} 1–3): 8; 13,5 ve 19. sn'de 2,5 sn'de belirir. */

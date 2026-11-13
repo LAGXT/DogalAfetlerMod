@@ -1,0 +1,38 @@
+{
+  "parent": "dogalafetler:dogalafetler/yanmadan_ciktim",
+  "criteria": {
+    "ozel": {
+      "conditions": {
+        "anahtar": "cayir_cayir"
+      },
+      "trigger": "dogalafetler:ozel_basarim"
+    }
+  },
+  "display": {
+    "announce_to_chat": false,
+    "description": {
+      "translate": "advancements.dogalafetler.cayir_cayir.description"
+    },
+    "frame": "goal",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:charcoal"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.cayir_cayir.title"
+    }
+  },
+  "requirements": [
+    [
+      "ozel"
+    ]
+  ],
+  "rewards": {
+    "experience": 40,
+    "loot": [
+      "dogalafetler:rewards/hedef"
+    ]
+  },
+  "sends_telemetry_event": true
+}

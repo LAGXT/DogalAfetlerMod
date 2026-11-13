@@ -2,6 +2,7 @@ package io.github.kadirberkpolat1.dogalafetler.client.sicaklik;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.client.core.EkranEfektKapisi;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.SicaklikDurumPaketi;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.SicaklikIstemciAyarlari;
 import net.minecraft.client.gui.GuiGraphics;
@@ -37,7 +38,7 @@ public final class SicaklikEkranEfektleri {
     }
 
     private static void ciz(ForgeGui gui, GuiGraphics g, float partialTick, int w, int h) {
-        if (!IstemciSicaklik.acik() || !SicaklikIstemciAyarlari.ekranEfektleri()) {
+        if (!IstemciSicaklik.acik() || !SicaklikIstemciAyarlari.ekranEfektleri() || !EkranEfektKapisi.izinli()) {
             return;
         }
         SicaklikDurumPaketi d = IstemciSicaklik.durum();
@@ -80,7 +81,7 @@ public final class SicaklikEkranEfektleri {
 
         @SubscribeEvent
         public static void kamera(ViewportEvent.ComputeCameraAngles olay) {
-            if (!IstemciSicaklik.acik() || !SicaklikIstemciAyarlari.kameraTitremesi()) {
+            if (!IstemciSicaklik.acik() || !SicaklikIstemciAyarlari.kameraTitremesi() || !EkranEfektKapisi.izinli()) {
                 return;
             }
             SicaklikDurumPaketi d = IstemciSicaklik.durum();

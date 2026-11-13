@@ -27,6 +27,11 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.decoration.ArmorStand;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -37,8 +42,9 @@ import net.minecraftforge.common.MinecraftForge;
  * dünya) her yerinde normal yağmur gibi yağar (AF2-01): etki alanı {@link EtkiAlani#herYer()}; siren, durum paketi ve
  * "etkilenen" yalnız afetin boyutundaki oyunculara (her boyut yalnız sunucu geneli afette, güneş/ay; AF2-08). Sunucu
  * vanilla yağmurunu açıp tutar ve bitişte önceki havayı geri yükler ({@link AsitHavasi}). Yağmur 10 sn'de yoğunlaşır, son
- * 15 sn'de seyrelir; sürdükçe başı gökyüzüne açık her oyuncu saniyede {@code hasarSaniye} hasar alır (seviyeden bağımsız;
- * can {@code asitMinimumCan} altına inmez; çatı altı hiç hasar yok). Her oyuncunun çevresindeki yüklü chunk'larda gökyüzünü
+ * 15 sn'de seyrelir; sürdükçe başı gökyüzüne açık her oyuncu saniyede {@code hasarSaniye} × seviye çarpanı hasar alır (S4 ×1,25, S5 ×2;
+ * can {@code asitMinimumCan} altına inmez; çatı altı hiç hasar yok). Oyuncu dışı yüklü canlılar (mob, hayvan, köylü) da aynı
+ * koşulla saniyede bir hasar alır ({@link #canlilariDenetle}). Her oyuncunun çevresindeki yüklü chunk'larda gökyüzünü
  * gören yüzey blokları bütçeyle örneklenir, önce 3–5 sn çatlak örtüsü taşır, sonra dönüşür ({@code afetBlokHasari=false}
  * iken hiç aşınma yok). Hedef oyuncu yalnız komut uyumluluğu için kalır, etkisi yoktur. Yağmur, sis ve dumanlar istemcide
  * {@code client.asit_yagmuru} tarafından bu afetin durum paketinden her biyomda (çöl ve kar dahil) çizilir; afet ses çalmaz,
@@ -53,6 +59,10 @@ public final class AsitYagmuru extends Afet {
     /** Örneklerin yarısının seçildiği oyuncu çevresi (blok): değişim görenin önünde olur. */
     private static final double YAKIN_ORNEK = 24;
     private static final int ISTEMCI_ASINMA_TAVANI = 32;
+    /** Oyuncu olmayan canlıların hasar saniyesi: her canlı {@code HASAR_ADIMI * MOB_DILIMI} tick'te (1 sn) bir denetim karşısına çıkar. */
+    private static final int MOB_DILIMI = AsitKurallari.SANIYE_TICK / HASAR_ADIMI;
+    /** Bir hasar denetiminde oyuncu dışı en çok bu kadar canlıya hasar verilir (tick bütçesi; kalanı sonraki saniyeye kalır). */
+    private static final int MOB_HASAR_TAVANI = 96;
 
     private double birikim;
     private int sonrakiKimlik;
@@ -222,7 +232,7 @@ public final class AsitYagmuru extends Afet {
      * ipucu (Çatı Altı'nı bozar). Maruziyet {@code adim} ölçekli tick kadar birikir ({@link AsitKurallari#maruziyet}).
      */
     private void oyunculariDenetle(ServerLevel level, int adim) {
-        float hasar = AsitAyarlari.hasarSaniye();
+        float hasar = AsitAyarlari.hasarSaniye() * (float) AsitKurallari.hasarCarpani(seviye());
         for (ServerPlayer oyuncu : level.players()) {
             if (!maruzMu(level, oyuncu)) {
                 continue;
@@ -237,6 +247,49 @@ public final class AsitYagmuru extends Afet {
                 MinecraftForge.EVENT_BUS.post(new BasarimIpucuEvent(oyuncu, Ipucu.HASAR_ALDI, this));
             }
         }
+        canlilariDenetle(level, hasar);
+    }
+
+    /**
+     * Oyuncu dışı yüklü canlılar (mob, hayvan, köylü) da aynı kuralla hasar alır: başının üstü gökyüne açık, suyun altında
+     * değil, ölmemiş, yenilmez değil ve hasar türüne bağışık değil ({@code hurt} reddederse saygı gösterilir); zembelli çerçeve
+     * (zırh sehpası) hariç. Durum tutulmaz: canlının kimliği ve oyun saatiyle saniyede tam bir denetime düşer ({@link #MOB_DILIMI}), her
+     * denetimde en çok {@link #MOB_HASAR_TAVANI} canlıya hasar verilir. Yalnız yüklü varlıklar taranır (chunk yüklenmez). Can,
+     * oyuncudaki gibi {@code asitMinimumCan} altına (en fazla azami canın yarısı) indirilmez.
+     */
+    private void canlilariDenetle(ServerLevel level, float hasar) {
+        long dilim = level.getGameTime() / HASAR_ADIMI;
+        float taban = AsitAyarlari.minimumCan();
+        // Önce aday toplanır, sonra hasar verilir: ölen canlının düşürdüğü eşya varlık listesini tarama sırasında değiştirmesin.
+        List<LivingEntity> adaylar = new ArrayList<>();
+        for (Entity varlik : level.getAllEntities()) {
+            if (adaylar.size() >= MOB_HASAR_TAVANI) {
+                break;
+            }
+            if (varlik instanceof LivingEntity canli && !(varlik instanceof Player) && !(varlik instanceof ArmorStand)
+                    && Math.floorMod(dilim + varlik.getId(), MOB_DILIMI) == 0 && canliMaruzMu(level, canli)) {
+                adaylar.add(canli);
+            }
+        }
+        if (adaylar.isEmpty()) {
+            return;
+        }
+        DamageSource kaynak = AsitKayitlari.hasar(level);
+        for (LivingEntity canli : adaylar) {
+            float miktar = AsitKurallari.hasarMiktari(canli.getHealth(), hasar, Math.min(taban, canli.getMaxHealth() / 2f));
+            if (miktar > 0) {
+                canli.hurt(kaynak, miktar);
+            }
+        }
+    }
+
+    /** Oyuncu dışı canlının asit hasarı koşulu ({@link #maruzMu} ile aynı gökyüzü kuralı). */
+    static boolean canliMaruzMu(ServerLevel level, LivingEntity canli) {
+        if (!canli.isAlive() || canli.isInvulnerable() || canli.isUnderWater() || !level.isLoaded(canli.blockPosition())) {
+            return false;
+        }
+        int harita = level.getHeight(Heightmap.Types.MOTION_BLOCKING, canli.getBlockX(), canli.getBlockZ());
+        return AsitKurallari.acikta(harita, canli.getEyeY());
     }
 
     /**

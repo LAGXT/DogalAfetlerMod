@@ -6,6 +6,7 @@ import io.github.kadirberkpolat1.dogalafetler.basarim.BasarimIpucuEvent;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.Ipucu;
 import io.github.kadirberkpolat1.dogalafetler.core.Afet;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetAsamasi;
+import io.github.kadirberkpolat1.dogalafetler.core.AfetMerkezi;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.EtkiAlani;
 import io.github.kadirberkpolat1.dogalafetler.core.TpsOlcer;
@@ -72,8 +73,12 @@ public final class OrmanYangini extends Afet {
     }
 
     @Override
-    public BlockPos merkezSec(ServerLevel level, ServerPlayer hedef, int seviye, RandomSource rastgele) {
-        return OrmanYeri.sec(level, hedef.blockPosition(), rastgele);
+    public BlockPos merkezSec(ServerLevel level, ServerPlayer hedef, int seviye, BlockPos merkezNoktasi,
+            RandomSource rastgele) {
+        if (AfetMerkezi.komutNoktasi(hedef, merkezNoktasi)) {
+            return OrmanYeri.sec(level, merkezNoktasi, rastgele);
+        }
+        return OrmanYeri.sec(level, merkezNoktasi, rastgele, 0, 24);
     }
 
     @Override

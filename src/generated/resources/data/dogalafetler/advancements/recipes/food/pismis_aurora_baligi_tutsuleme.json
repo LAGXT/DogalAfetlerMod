@@ -1,0 +1,35 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_aurora_baligi": {
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "dogalafetler:aurora_baligi"
+            ]
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    },
+    "has_the_recipe": {
+      "conditions": {
+        "recipe": "dogalafetler:pismis_aurora_baligi_tutsuleme"
+      },
+      "trigger": "minecraft:recipe_unlocked"
+    }
+  },
+  "requirements": [
+    [
+      "has_aurora_baligi",
+      "has_the_recipe"
+    ]
+  ],
+  "rewards": {
+    "recipes": [
+      "dogalafetler:pismis_aurora_baligi_tutsuleme"
+    ]
+  },
+  "sends_telemetry_event": false
+}

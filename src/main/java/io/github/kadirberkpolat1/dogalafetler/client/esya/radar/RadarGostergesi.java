@@ -3,7 +3,6 @@ package io.github.kadirberkpolat1.dogalafetler.client.esya.radar;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
-import io.github.kadirberkpolat1.dogalafetler.client.esya.sismograf.IstemciSismograf;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetAsamasi;
 import io.github.kadirberkpolat1.dogalafetler.esya.radar.HavaRadari;
 import io.github.kadirberkpolat1.dogalafetler.esya.radar.RadarCevirileri;
@@ -39,8 +38,8 @@ import net.minecraftforge.fml.common.Mod;
  * ortasındadır (AF2-06). Gelişmiş radar mor-mavi çerçevelidir ve altına kısa satırlarla şiddet seviyesi + hareket oku/hız ve son 5
  * afeti ("Kasırga S2 3dk") ekler; yükseklik {@link GostergeYerlesimi#panelYuksekligi} ile sınırlıdır (R-18). Bütün panel tek
  * {@code drawManaged} toplu çizimidir (R-19). Yer CLIENT config'tedir; alt köşelerde hotbar, kalpler, sıcaklık barı ve
- * sismograf action bar'ıyla, sağ üstte efekt ikonlarıyla çakışmaz ({@link GostergeYerlesimi}; yükseklikler Forge'un
- * {@code leftHeight/rightHeight}'ından, katman bunlar dolduktan sonra çizilir).
+ * sismograf action bar'ıyla, sağ üstte efekt ikonlarıyla çakışmaz ({@link GostergeYerlesimi}). Konum afet türüne ve panel
+ * metnine bağlı değildir: sabit yerleşim genişliği ve sabit alt bölgelerle hesaplanır.
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
 public final class RadarGostergesi {
@@ -51,6 +50,8 @@ public final class RadarGostergesi {
     private static final int ALT_SATIR = GostergeYerlesimi.ALT_SATIR;
     /** Tarama açısı (derece/tick): 20 tick'te bir tur. */
     private static final double TARAMA_HIZI = 18.0;
+    /** Dikey yerleşim (hotbar, durum sütunu, action bar çakışması) hesabının panel metninden bağımsız sabit genişliği (GUI pikseli). */
+    private static final int YERLESIM_GENISLIGI = 170;
 
     private static final int ZEMIN = 0xD80A140D;
     private static final int KAP_ZEMIN = 0xFF04120A;
@@ -74,6 +75,8 @@ public final class RadarGostergesi {
     static int sonEkranG;
     static int sonEkranY;
     static GostergeYerlesimi.Alt sonAlt = GostergeYerlesimi.VARSAYILAN;
+    /** Oturumda görülen en geniş panel (GUI pikseli); panel genişliği bunun altına inmez. */
+    private static int kararliGenislik;
     /** Log'a yazılan son panel boyutu (yükseklik ya da ekran değişince bir satır). */
     private static long sonLoglanan = -1;
 
@@ -152,6 +155,9 @@ public final class RadarGostergesi {
         for (AltSatir satir : alt) {
             pw = Math.max(pw, IC + satir.genislik(font) + IC + 2);
         }
+        // Panel genişliği oturum boyunca yalnız büyür: geçiş (sakin, afet, anomali) satırları genişliği küçültmez, sol kenar oynamaz.
+        pw = Math.max(pw, kararliGenislik);
+        kararliGenislik = pw;
         int ph = GostergeYerlesimi.panelYuksekligi(alt.size());
         boolean yararli = false;
         boolean zararli = false;
@@ -161,11 +167,16 @@ public final class RadarGostergesi {
                 zararli |= !etki.getEffect().isBeneficial();
             }
         }
-        GostergeYerlesimi.Alt altBolge = GostergeYerlesimi.forgeAlt(gui.leftHeight, gui.rightHeight,
-                IstemciSismograf.actionBarGenisligi(font));
-        GostergeYerlesimi.Konum k = GostergeYerlesimi.konum(w, h, pw, ph, RadarIstemciAyarlari.kose(),
-                RadarIstemciAyarlari.xOfset(), RadarIstemciAyarlari.yOfset(), altBolge,
-                GostergeYerlesimi.efektAlti(yararli, zararli));
+        // Konum afet türüne, panel metnine ve geçici HUD durumuna (action bar, su altı hava barları) göre DEĞİŞMEZ: dikey yer
+        // ve hotbar/durum sütunu çakışması sabit bir yerleşim genişliği ve sabit alt bölgelerle hesaplanır; yalnız köşe
+        // kenarı gerçek genişliğe göre hizalanır (sağ köşelerde sağ kenar, sol köşelerde sol kenar sabit).
+        GostergeYerlesimi.Alt altBolge = GostergeYerlesimi.VARSAYILAN;
+        int efektAlti = GostergeYerlesimi.efektAlti(yararli, zararli);
+        GostergeYerlesimi.Konum gercek = GostergeYerlesimi.konum(w, h, pw, ph, RadarIstemciAyarlari.kose(),
+                RadarIstemciAyarlari.xOfset(), RadarIstemciAyarlari.yOfset(), altBolge, efektAlti);
+        GostergeYerlesimi.Konum dikey = GostergeYerlesimi.konum(w, h, Math.max(YERLESIM_GENISLIGI, pw), ph,
+                RadarIstemciAyarlari.kose(), RadarIstemciAyarlari.xOfset(), RadarIstemciAyarlari.yOfset(), altBolge, efektAlti);
+        GostergeYerlesimi.Konum k = new GostergeYerlesimi.Konum(gercek.x(), dikey.y());
         sonX = k.x();
         sonY = k.y();
         sonG = pw;

@@ -110,8 +110,8 @@ public final class KasirgaOtomasyonu {
     private static final Kamera IC = new Kamera(5, 3, -25);
     /** Huni kenarı 64 bloktan uzakta (kasırga sisi yok); taban rengi ölçümü (K-17). */
     private static final Kamera UZAK = new Kamera(90, 10, -6);
-    /** S5 hunisinin tamamı (144 blok, AF3-05 güç–boy orantısı): 70° dikey görüşte zeminden tepeye. */
-    private static final Kamera TAM_BOY = new Kamera(150, 24, -10);
+    /** S5 hunisinin tamamı (180 blok, AF3-05 güç–boy orantısı): 70° dikey görüşte zeminden tepeye. */
+    private static final Kamera TAM_BOY = new Kamera(190, 30, -10);
 
     /** {@code bekle} tick sonra (ve istenen kare alınmışsa) {@code kosul} doğruysa {@code is} çalışır; {@code enCok} tick sonra zorla. */
     private record Adim(String ad, int bekle, BooleanSupplier kosul, int enCok, Runnable is) {

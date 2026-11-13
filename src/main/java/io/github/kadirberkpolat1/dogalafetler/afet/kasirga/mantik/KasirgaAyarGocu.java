@@ -13,11 +13,15 @@ import java.util.function.Function;
  */
 public final class KasirgaAyarGocu {
     public static final String SURUM_YOLU = "kasirga.ayarSurumu";
-    public static final int GUNCEL = 1;
+    public static final int GUNCEL = 2;
 
-    /** Sürüme göre sıralı. 1: afet-fizik-3 (kaldırma tavanı S5 huni yüksekliğinin dörtte biri, AF3-05). */
+    /**
+     * Sürüme göre sıralı. 1: afet-fizik-3 (kaldırma tavanı S5 huni yüksekliğinin dörtte biri, AF3-05). 2: S5 büyüdü (güç 4,8 → 6,
+     * huni 144 → 180 blok): tavan 36 → 45, 25 ve 36'dan gelen dosya zincirle 45'e ulaşır.
+     */
     public static final List<SurumluGocPlani.Adim> ADIMLAR = List.of(
-            adim(1, "kasirga.kaldirmaTavani", KasirgaSeviyesi.S5_KALDIRMA_TAVANI, 25.0));
+            adim(1, "kasirga.kaldirmaTavani", 36.0, 25.0),
+            adim(2, "kasirga.kaldirmaTavani", KasirgaSeviyesi.S5_KALDIRMA_TAVANI, 36.0));
 
     public static final SurumluGocPlani PLAN = new SurumluGocPlani(SURUM_YOLU, GUNCEL, ADIMLAR);
 

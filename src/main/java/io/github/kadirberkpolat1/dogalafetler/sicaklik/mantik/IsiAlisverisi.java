@@ -5,8 +5,11 @@ package io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik;
  * Ortam (hissedilen) °C'si {@code E = (T − T_konfor) · birimPerDerece} ile vücut birimine çevrilir. Model (Newton soğuması + metabolik ısı):
  *
  * <pre>
- * B' = k · w / (1 + I) · [(E − B) + U · (a · (1 + I) − 1)]
+ * B' = k · g(E − B) · w / (1 + I) · [(E − B) + U · (a · (1 + I) − 1)],  g(d) = 1 + |d| / hizlanmaOlcegi
  * </pre>
+ *
+ * {@code g}, fark büyüdükçe hızı doğrusal-üstü artıran kazançtır (denge noktasını değiştirmez): uç ortamda vücut
+ * ~30–60 sn'de belirgin değişir, fark kapanırken yavaşlar.
  *
  * {@code k} eşitlenme hızı, {@code w} ıslaklık iletkenliği (S3-02: {@code suda ? suIletkenlik : 1 + (islakIletkenlik − 1)·W}), {@code I} toplam yalıtım, {@code U} konfor ortamında metabolik
  * ısının karşılığı, {@code a} etkinlik. Fark büyükse değişim hızlı, küçükse yavaştır; yalıtım hızı böler ve dengeyi sıcağa
@@ -38,11 +41,18 @@ public final class IsiAlisverisi {
      * @param birimPerDerece    1 °C ortam farkının vücut birimi karşılığı
      * @param metabolikIsi      U: konfor ortamında metabolik ısının vücut birimi karşılığı
      * @param asiriSogukEsigi   bu °C ve altında yalıtım yalnız yavaşlatır
+     * @param hizlanmaOlcegi    {@code g(d) = 1 + |d|/ölçek}: vücut-ortam farkı (vücut birimi) bu kadar olduğunda hız 2 katına
+     *                          çıkar (fark büyüdükçe hızlanır; küçük ölçek sert, büyük ölçek doğrusala yakın)
      */
     public record Ayarlar(double esitlenmeHizi, double konforSicakligi, double birimPerDerece, double metabolikIsi,
             double durmaEtkinligi, double yurumeEtkinligi, double kosmaEtkinligi, double islakIletkenlik,
-            double suIletkenlik, double asiriSogukEsigi) {
-        public static final Ayarlar VARSAYILAN = new Ayarlar(0.006, 18, 2.0, 38, 0.8, 1.0, 1.4, 1.5, 3.0, -25);
+            double suIletkenlik, double asiriSogukEsigi, double hizlanmaOlcegi) {
+        public static final Ayarlar VARSAYILAN = new Ayarlar(0.02, 18, 2.0, 38, 0.8, 1.0, 1.4, 1.5, 3.0, -25, 100);
+
+        /** Fark büyüdükçe artan hız kazancı: {@code 1 + |fark| / hizlanmaOlcegi}. */
+        public double hizlanma(double fark) {
+            return 1 + Math.abs(fark) / hizlanmaOlcegi;
+        }
 
         /** Ortam °C'sinin vücut birimi karşılığı. */
         public double esdeger(double ortamC) {
@@ -68,7 +78,7 @@ public final class IsiAlisverisi {
         double e = a.esdeger(g.ortam());
         double b = g.vucut();
         double etkinlik = a.etkinlik(g.etkinlik());
-        double k = a.esitlenmeHizi() * a.iletkenlik(g.islaklik(), g.suda());
+        double k = a.esitlenmeHizi() * a.iletkenlik(g.islaklik(), g.suda()) * a.hizlanma(e - b);
         double u = a.metabolikIsi();
         double kuru = Yalitim.kuruToplam(g.yalitim(), y);
         int yun = g.yalitim().yunluParca();

@@ -3,6 +3,7 @@ package io.github.kadirberkpolat1.dogalafetler.balikcilik;
 import io.github.kadirberkpolat1.dogalafetler.balikcilik.mantik.DelikOmru;
 import io.github.kadirberkpolat1.dogalafetler.donma.ChunkDonmaVerisi;
 import io.github.kadirberkpolat1.dogalafetler.donma.DonmaBloklari;
+import io.github.kadirberkpolat1.dogalafetler.journal.Defter;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
@@ -59,6 +60,7 @@ public final class BuzDeligiAcma {
         level.setBlock(konum, BalikcilikKayitlari.BUZ_DELIGI.get().defaultBlockState()
                 .setValue(BuzDeligiBlogu.INCE, buz.is(DonmaBloklari.INCE_BUZ.get()))
                 .setValue(BuzDeligiBlogu.DONMA, donmaBuzuMu(level, konum)), Block.UPDATE_ALL);
+        Defter.buzDeligiAcildi(oyuncu);
         alet.hurtAndBreak(BalikcilikAyarlari.aletHasari(), oyuncu, o -> o.broadcastBreakEvent(olay.getHand()));
         oyuncu.awardStat(Stats.ITEM_USED.get(alet.getItem()));
         double x = konum.getX() + 0.5;

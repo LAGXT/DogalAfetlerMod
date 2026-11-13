@@ -73,6 +73,20 @@ class MeteorAyarGocuTest {
         assertTrue(MeteorAyarGocu.plan(0, Map.of("meteor.varlikTavani", 448)::get).isEmpty(), "yeni varsayılan kalır");
     }
 
+    /** K-E74 (sürüm 3): büyük meteor eşyası şansları eski varsayılanda kalmışsa yeniye çekilir, elle değer korunur. */
+    @Test
+    void buyukMeteorEsyaSanslariEskiVarsayilandaysaYukselir() {
+        Map<String, Number> plan = MeteorAyarGocu.plan(2,
+                Map.of("meteor.buyukParcaSansi", 0.05, "meteor.cekirdekSansi", 0.003)::get);
+        assertEquals(0.10, plan.get("meteor.buyukParcaSansi"));
+        assertEquals(0.008, plan.get("meteor.cekirdekSansi"));
+        Map<String, Number> elle = MeteorAyarGocu.plan(2,
+                Map.of("meteor.buyukParcaSansi", 0.20, "meteor.cekirdekSansi", 0.003)::get);
+        assertFalse(elle.containsKey("meteor.buyukParcaSansi"));
+        assertEquals(0.008, elle.get("meteor.cekirdekSansi"));
+        assertTrue(MeteorAyarGocu.plan(3, Map.of("meteor.buyukParcaSansi", 0.05)::get).isEmpty(), "güncel sürüme dokunulmaz");
+    }
+
     @Test
     void guncelSurumeDokunulmaz() {
         assertTrue(MeteorAyarGocu.plan(MeteorAyarGocu.GUNCEL, mainDosyasi()::get).isEmpty());

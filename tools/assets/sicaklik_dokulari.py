@@ -1,13 +1,6 @@
 """Sıcaklık sisteminin dokularını üretir (madde 7c, 7d; S3-07; docs/tasarim/sicaklik.md).
 
 Çıktılar (src/main/resources/assets/dogalafetler/textures/):
-  gui/sicaklik/hud.png        256x64  HUD atlası (client/sicaklik/SicaklikHud, HudCizimi):
-                                      (0,0) soğuk tüp 74x5, (0,5) dolgusu (hap kenarında buz -> dışta koyu mavi);
-                                      (80,0) sıcak tüp 74x5, (80,5) dolgusu (hap kenarında turuncu -> dışta koyu kırmızı);
-                                      v=16 haplar 34x11 (u = 36 * sıra: normal, üşüme, donma, bunalma, yanma; 180 beyaz);
-                                      v=32 ikonlar 9x9 (0 boş damla, 9 dolu damla, 18 üşüme, 27 donma, 36 bunalma,
-                                      45 yanma, 54 normal termometre); v=48 şevron 5x4 (0 aşağı, 6 yukarı), (12,48) boş
-                                      üçgen 5x3
   misc/sicaklik_buz.png       256x256 buz kenarı (alfa): kenarlardan içeri dallanan buz kristalleri + kırağı
   misc/sicaklik_bunalma.png   256x256 buz kenarının kırmızı karşılığı (aynı kenar maskesi): süzülen ter izleri + ısı lekeleri
   misc/sicaklik_sicak.png     256x256 sıcak hava vinyeti; dikey yönde kesintisiz (efekt onu yukarı kaydırır)
@@ -28,84 +21,10 @@ KOK = Path(__file__).resolve().parents[2]
 DOKU = KOK / "src/main/resources/assets/dogalafetler/textures"
 
 SEFFAF = (0, 0, 0, 0)
-# HudCizimi.renk ile aynı sıra ve renk: normal, üşüme, donma, bunalma, yanma.
-DURUM_RENK = [(232, 230, 222), (166, 221, 248), (94, 174, 255), (255, 181, 74), (255, 90, 54)]
-# Tüp dolgusu: konum 0 = hapın kenarı (nötre yakın), 1 = ölçek ucu (±100).
-SOGUK_DURAK = [(0.0, (200, 240, 255)), (0.35, (122, 198, 246)), (0.7, (52, 118, 214)), (1.0, (28, 48, 140))]
-SICAK_DURAK = [(0.0, (255, 224, 132)), (0.35, (248, 168, 64)), (0.7, (230, 92, 40)), (1.0, (146, 22, 20))]
-CERCEVE = (16, 17, 22, 235)
-CAM = (34, 40, 54, 165)
-CAM_UST = (58, 66, 84, 165)
-
-
-def gecis(duraklar, f):
-    for (a, ca), (b, cb) in zip(duraklar, duraklar[1:]):
-        if f <= b:
-            t = (f - a) / (b - a)
-            return tuple(round(ca[i] + (cb[i] - ca[i]) * t) for i in range(3))
-    return duraklar[-1][1]
-
-
-def olcekle(c, k):
-    return tuple(max(0, min(255, round(v * k))) for v in c)
 
 
 def karistir(c, d, t):
     return tuple(round(c[i] + (d[i] - c[i]) * t) for i in range(3))
-
-
-def tup(px, u0, sol_dis):
-    """74x5 boş cam tüp; dış ucu yuvarlatılmış, hap tarafı düz."""
-    for x in range(74):
-        for y in range(5):
-            kenar = x in (0, 73) or y in (0, 4)
-            px[u0 + x, y] = CERCEVE if kenar else (CAM_UST if y == 1 else CAM)
-    dis = 0 if sol_dis else 73
-    px[u0 + dis, 0] = SEFFAF
-    px[u0 + dis, 4] = SEFFAF
-
-
-def dolgu(px, u0, sol_dis, duraklar):
-    """Tüpün içi (72x3, v=6..8): renk hap kenarından dışa doğru koyulaşır; üst satır parlak, alt satır gölgeli."""
-    for i in range(72):
-        c = gecis(duraklar, i / 71)
-        x = u0 + (72 - i if sol_dis else 1 + i)
-        px[x, 6] = olcekle(c, 1.2) + (255,)
-        px[x, 7] = c + (255,)
-        px[x, 8] = olcekle(c, 0.8) + (255,)
-
-
-def hap_icinde(x, y):
-    girinti = 2 if y in (0, 10) else 1 if y in (1, 9) else 0
-    return 0 <= y < 11 and girinti <= x < 34 - girinti
-
-
-def hap_kenari(x, y):
-    return hap_icinde(x, y) and not all(hap_icinde(x + a, y + b) for a, b in ((1, 0), (-1, 0), (0, 1), (0, -1)))
-
-
-def hap(px, u0, renk):
-    """Koyu cam hap, durum renginde çerçeve; iç hafifçe durum rengine boyalı, tepeye doğru açılır."""
-    taban = karistir((20, 22, 28), renk, 0.16)
-    for y in range(11):
-        ic = olcekle(taban, 1.25 - 0.05 * y)
-        if y == 1:
-            ic = karistir(ic, (255, 255, 255), 0.14)
-        for x in range(34):
-            if hap_kenari(x, y):
-                px[u0 + x, 16 + y] = (olcekle(renk, 0.8) if y >= 6 else renk) + (255,)
-            elif hap_icinde(x, y):
-                px[u0 + x, 16 + y] = ic + (228,)
-
-
-def beyaz_hap(px, u0):
-    """Parlama/nabız katmanı: çerçeve tam, iç yarı saydam (sayı okunur kalsın)."""
-    for y in range(11):
-        for x in range(34):
-            if hap_kenari(x, y):
-                px[u0 + x, 16 + y] = (255, 255, 255, 255)
-            elif hap_icinde(x, y):
-                px[u0 + x, 16 + y] = (255, 255, 255, 110)
 
 
 def piksel_sanati(px, u0, v0, satirlar, palet):
@@ -113,102 +32,6 @@ def piksel_sanati(px, u0, v0, satirlar, palet):
         for x, k in enumerate(satir):
             if k != " ":
                 px[u0 + x, v0 + y] = palet[k]
-
-
-DAMLA = ["    o    ",
-         "   o_o   ",
-         "  o___o  ",
-         " o_____o ",
-         "o_h_____o",
-         "o_h_____o",
-         "o_______o",
-         " o_____o ",
-         "  ooooo  "]
-IKONLAR = {
-    0: (DAMLA, {"o": (29, 90, 140, 255), "_": (110, 170, 225, 70), "h": (110, 170, 225, 70)}),
-    9: (DAMLA, {"o": (29, 90, 140, 255), "_": (70, 150, 255, 255), "h": (210, 238, 255, 255)}),
-    18: (["         ",
-          "  ooo    ",
-          " o...oo  ",
-          "o......o ",
-          "o..h....o",
-          " o......o",
-          "  oooooo ",
-          "    .  . ",
-          "  .      "],
-         {"o": (84, 146, 198, 255), ".": (226, 243, 255, 255), "h": (255, 255, 255, 255)}),
-    27: (["    o    ",
-          " d  o  d ",
-          "  d o d  ",
-          "   ooo   ",
-          "ooooWoooo",
-          "   ooo   ",
-          "  d o d  ",
-          " d  o  d ",
-          "    o    "],
-         {"o": (130, 200, 255, 255), "d": (70, 140, 230, 255), "W": (255, 255, 255, 255)}),
-    36: (["    o   w",
-          "   o_o w ",
-          "  o___o w",
-          " o_____o ",
-          "o_h_____o",
-          "o_h_____o",
-          "o_______o",
-          " o_____o ",
-          "  ooooo  "],
-         {"o": (150, 78, 12, 255), "_": (255, 180, 70, 255), "h": (255, 236, 170, 255),
-          "w": (255, 214, 120, 200)}),
-    45: (["    r    ",
-          "   rr    ",
-          "   rOr r ",
-          "  rOOr rr",
-          " rOOYOrOr",
-          " rOYYYOOr",
-          "rOYYWYYOr",
-          " rOYYYOr ",
-          "  rrrrr  "],
-         {"r": (170, 30, 10, 255), "O": (255, 110, 30, 255), "Y": (255, 200, 60, 255),
-          "W": (255, 250, 210, 255)}),
-    54: (["   ooo   ",
-          "   o.o   ",
-          "   o.o   ",
-          "   oRo   ",
-          "   oRo   ",
-          "  oRRRo  ",
-          " oRRhRRo ",
-          " oRRRRRo ",
-          "  ooooo  "],
-         {"o": (60, 62, 72, 255), ".": (236, 236, 242, 255), "R": (232, 64, 52, 255), "h": (255, 170, 160, 255)}),
-}
-SEVRON_ASAGI = ["B   B",
-                "BB BB",
-                " BDB ",
-                "  D  "]
-SEVRON_YUKARI = ["  L  ",
-                 " LOL ",
-                 "OO OO",
-                 "O   O"]
-UCGEN = ["  w  ",
-         " w w ",
-         "wwwww"]
-
-
-def hud_dokusu():
-    img = Image.new("RGBA", (256, 64), SEFFAF)
-    px = img.load()
-    tup(px, 0, True)
-    dolgu(px, 0, True, SOGUK_DURAK)
-    tup(px, 80, False)
-    dolgu(px, 80, False, SICAK_DURAK)
-    for i, renk in enumerate(DURUM_RENK):
-        hap(px, i * 36, renk)
-    beyaz_hap(px, 180)
-    for u, (satirlar, palet) in IKONLAR.items():
-        piksel_sanati(px, u, 32, satirlar, palet)
-    piksel_sanati(px, 0, 48, SEVRON_ASAGI, {"B": (124, 198, 255, 255), "D": (64, 134, 224, 255)})
-    piksel_sanati(px, 6, 48, SEVRON_YUKARI, {"O": (255, 168, 64, 255), "L": (255, 222, 140, 255)})
-    piksel_sanati(px, 12, 48, UCGEN, {"w": (245, 245, 245, 235)})
-    return img
 
 
 def dal(d, rnd, x, y, aci, uzunluk, kalinlik, derinlik):
@@ -459,7 +282,6 @@ def kaydet(img, yol):
 
 
 if __name__ == "__main__":
-    kaydet(hud_dokusu(), "gui/sicaklik/hud.png")
     kaydet(buz_dokusu(), "misc/sicaklik_buz.png")
     kaydet(bunalma_dokusu(), "misc/sicaklik_bunalma.png")
     kaydet(sicak_dokusu(), "misc/sicaklik_sicak.png")

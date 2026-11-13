@@ -35,16 +35,19 @@ public final class KasirgaOyuncuCekimi {
             return;
         }
         double[] toplam = new double[3];
+        double firlatma = 0;
         for (KasirgaVarligi kasirga : IstemciKasirga.KASIRGALAR.values()) {
             if (kasirga.level() != oyuncu.level()) {
                 continue;
             }
-            double[] ivme = KasirgaCekimi.ivme(hedef, kasirga.cekimKaynagi());
+            KasirgaCekimi.Kaynak kaynak = kasirga.cekimKaynagi();
+            double[] ivme = KasirgaCekimi.ivme(hedef, kaynak);
+            firlatma = Math.max(firlatma, kaynak.firlatma());
             toplam[0] += ivme[0];
             toplam[1] += ivme[1];
             toplam[2] += ivme[2];
         }
-        KasirgaCekimi.uygula(hedef, toplam);
+        KasirgaCekimi.uygula(hedef, toplam, firlatma);
     }
 
     /**

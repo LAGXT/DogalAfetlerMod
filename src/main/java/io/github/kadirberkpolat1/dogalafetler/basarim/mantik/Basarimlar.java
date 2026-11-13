@@ -1,12 +1,15 @@
 package io.github.kadirberkpolat1.dogalafetler.basarim.mantik;
 
+import java.util.EnumSet;
 import java.util.Optional;
+import java.util.Set;
 
 /**
- * "Doğal Afetler" başarım sekmesi: kök "Felaket Başlıyor", madde 12 listesindeki 26 başarım ve N29'daki "Yeni Şafak" (27),
- * şartnamedeki numara, tür ve gizlilikle birebir. Advancement kimliği {@code dogalafetler:dogalafetler/<yol>}. Datagen (JSON, dil dosyaları) ve
- * testler bu listeyi okur. Ebeveyn her zaman önce tanımlıdır; ağaç sekmenin yerleşimidir, ön koşul değildir
- * (vanilla: çocuk ebeveynden önce kazanılabilir). Mod eşyası ikonları ({@code dogalafetler:}) datagen anında kayıtlı
+ * "Doğal Afetler" başarım sekmesi: kök "Felaket Başlıyor", madde 12 listesindeki 26 başarım, N29'daki "Yeni Şafak" (27) ve
+ * K-E74'ün 18 yeni başarımı (28–45: gökyüzü, kütük, tsunami ve yaratıcı başarımlar; toplam kök + 45 = 46). Madde 12 ve N29
+ * başarımları şartnamedeki numara, tür ve gizlilikle birebirdir. Advancement kimliği {@code dogalafetler:dogalafetler/<yol>}.
+ * Datagen (JSON, dil dosyaları) ve testler bu listeyi okur. Ebeveyn her zaman önce tanımlıdır; ağaç sekmenin yerleşimidir, ön koşul
+ * değildir (vanilla: çocuk ebeveynden önce kazanılabilir). Mod eşyası ikonları ({@code dogalafetler:}) datagen anında kayıtlı
  * değilse vanilla yedeği kullanılır.
  */
 public enum Basarimlar {
@@ -151,7 +154,104 @@ public enum Basarimlar {
             "minecraft:clock", null,
             "New Dawn", "Yeni Şafak",
             "Live to see the old sun return at the end of the pulsar chain",
-            "Pulsar zincirinin sonunda eski güneşin geri dönüşünü yaşa");
+            "Pulsar zincirinin sonunda eski güneşin geri dönüşünü yaşa"),
+    // ---- K-E74: gökyüzü, kütük ve tsunami dilimlerinin başarımları (OzelBasarim.ver ile verilir)
+    DEVASA(28, "devasa", BasarimTuru.GOREV, SUPERNOVA_TANIGI, false, null,
+            "minecraft:ender_eye", null,
+            "Colossal...", "Devasa...",
+            "Stare at the supermassive black hole for 5 seconds",
+            "Devasa kara deliğe 5 saniye boyunca bak"),
+    ASTRONOM(29, "astronom", BasarimTuru.MEYDAN_OKUMA, YILDIZLI_GECE, true, Unvan.ASTRONOM,
+            "minecraft:recovery_compass", null,
+            "Astronomer", "Astronom",
+            "Look at every planet in the sky for at least 3 seconds each",
+            "Gökyüzündeki her gezegene en az 3 saniye bak"),
+    CAYIR_CAYIR(30, "cayir_cayir", BasarimTuru.HEDEF, YANMADAN_CIKTIM, false, null,
+            "minecraft:charcoal", null,
+            "Scorching", "Cayır Cayır",
+            "Let a charred log reach its maximum heat",
+            "Kömürleşmiş bir kütüğün azami ısıya ulaşmasını sağla"),
+    SIFON(31, "sifon", BasarimTuru.GOREV, DALGA_AVCISI, false, null,
+            "minecraft:water_bucket", null,
+            "Siphon", "Sifon",
+            "Seal off tsunami water flowing into a cave or hole by placing a block in it",
+            "Mağaraya ya da deliğe akan tsunami suyunun yolunu blokla kapat"),
+    // ---- K-E74: yaratıcı başarımlar
+    DOKUNULMAZ(32, "dokunulmaz", BasarimTuru.HEDEF, FIRTINAYA_MEYDAN_OKU, false, null,
+            "minecraft:shield", null,
+            "Untouchable", "Dokunulmaz",
+            "Survive a level 4 or stronger disaster without taking any damage",
+            "Seviye 4 ya da üzeri bir afetten hiç hasar almadan sağ çık"),
+    UC_UST_USTE(33, "uc_ust_uste", BasarimTuru.HEDEF, FIRTINAYA_MEYDAN_OKU, false, null,
+            "minecraft:golden_apple", null,
+            "Hat Trick", "Üç Üst Üste",
+            "Survive 3 disasters in a row without dying",
+            "Ölmeden art arda 3 afetten sağ çık"),
+    ON_GUN_ON_GECE(34, "on_gun_on_gece", BasarimTuru.HEDEF, KOK, false, null,
+            "minecraft:daylight_detector", null,
+            "Ten Days, Ten Nights", "On Gün On Gece",
+            "Stay alive for 10 Minecraft days without dying",
+            "Ölmeden 10 Minecraft günü hayatta kal"),
+    SALLANAN_KULE(35, "sallanan_kule", BasarimTuru.GOREV, SALLANAN_ZEMIN, false, null,
+            "minecraft:scaffolding", null,
+            "Shaky Tower", "Sallanan Kule",
+            "Stand on high ground for 5 seconds while an earthquake is shaking",
+            "Deprem sürerken yüksek bir yerde 5 saniye dur"),
+    YUKSEK_ZEMIN(36, "yuksek_zemin", BasarimTuru.GOREV, DALGA_AVCISI, false, null,
+            "minecraft:stone_stairs", null,
+            "Higher Ground", "Yüksek Zemin",
+            "Survive a tsunami from ground higher than the wave crest",
+            "Bir tsunamiden dalga tepesinden yüksek zeminde durarak sağ çık"),
+    GOZUN_ICINDE(37, "gozun_icinde", BasarimTuru.GOREV, ILK_RUZGAR, false, null,
+            "minecraft:phantom_membrane", null,
+            "Taken for a Spin", "Bir Tur Attım",
+            "Get lifted up by a tornado and survive it",
+            "Kasırga seni havaya kaldırsın ve onu sağ atlat"),
+    GOKTEN_ZIRH(38, "gokten_zirh", BasarimTuru.GOREV, GOKTEN_GELEN_MISAFIR, false, null,
+            "minecraft:netherite_chestplate", null,
+            "Sky-Forged", "Gökten Dövme",
+            "Upgrade an armor piece with a Meteorite Fragment or a Cosmic Core",
+            "Bir zırh parçasını Meteorit Parçası ya da Kozmik Çekirdek ile güçlendir"),
+    KUTUP_HAZINESI(39, "kutup_hazinesi", BasarimTuru.GOREV, BUZ_BALIKCISI, false, null,
+            "dogalafetler:kristal_levrek", "minecraft:salmon",
+            "Rare Catch", "Nadir Av",
+            "Catch your first special polar fish with the Polar Fishing Rod",
+            "Kutup Oltası ile ilk özel kutup balığını tut"),
+    AURORA_AVCISI(40, "aurora_avcisi", BasarimTuru.HEDEF, KUTUP_HAZINESI, false, null,
+            "dogalafetler:aurora_baligi", "minecraft:tropical_fish",
+            "Aurora Hunter", "Aurora Avcısı",
+            "Catch an Aurora Fish",
+            "Bir Aurora Balığı tut"),
+    INCE_BUZ_KIRICI(41, "ince_buz_kirici", BasarimTuru.GOREV, BUZUL_CAGI, false, null,
+            "minecraft:ice", null,
+            "Ice Breaker", "Buz Kırıcı",
+            "Break thin ice",
+            "İnce buzu kır"),
+    YINELEME_IKIZ(42, "yineleme_ikiz", BasarimTuru.GOREV, BUZ_BALIKCISI, false, null,
+            "minecraft:salmon", null,
+            "Twin Catch", "İkiz Tutuş",
+            "Reel in a doubled catch with a rod enchanted with Repeat (Yineleme)",
+            "Yineleme büyülü oltayla katlanan bir tutuş çek"),
+    DEFTER_ILK_ACILIS(43, "defter_ilk_acilis", BasarimTuru.GOREV, KOK, false, null,
+            "minecraft:book", null,
+            "First Page", "İlk Sayfa",
+            "Open the Disaster Journal for the first time",
+            "Afet Defteri'ni ilk kez aç"),
+    KOLYE_SERIN(44, "kolye_serin", BasarimTuru.GOREV, YUNLU_KAHRAMAN, false, null,
+            "dogalafetler:serin_kolye", "minecraft:heart_of_the_sea",
+            "Keep Cool", "Serin Tut",
+            "Wear a Cool Necklace",
+            "Bir Serin Kolye tak"),
+    CIFTE_BELA(45, "cifte_bela", BasarimTuru.GOREV, KOK, false, null,
+            "minecraft:tnt", null,
+            "Double Trouble", "Çifte Bela",
+            "Stay inside the zones of two disasters at once for 30 seconds",
+            "İki afetin etki alanında aynı anda 30 saniye kal");
+
+    /** {@code OzelBasarim.ver} ile verilen başarımlar: ölçüt {@code ozel_basarim}, anahtar = {@link #yol()}. */
+    private static final Set<Basarimlar> OZEL = EnumSet.of(DEVASA, ASTRONOM, CAYIR_CAYIR, SIFON, GOZUN_ICINDE,
+            GOKTEN_ZIRH, INCE_BUZ_KIRICI, YINELEME_IKIZ, DEFTER_ILK_ACILIS, KOLYE_SERIN, SALLANAN_KULE, YUKSEK_ZEMIN,
+            CIFTE_BELA);
 
     private final int no;
     private final String yol;
@@ -257,6 +357,24 @@ public enum Basarimlar {
         String ad = yol.startsWith("dogalafetler/") ? yol.substring("dogalafetler/".length()) : yol;
         for (Basarimlar b : values()) {
             if (b.yol.equals(ad)) {
+                return Optional.of(b);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /** Başarım {@code OzelBasarim.ver} ile mi veriliyor (ölçüt {@code ozel_basarim}, anahtar = {@link #yol()}). */
+    public boolean ozelMi() {
+        return OZEL.contains(this);
+    }
+
+    /** {@code OzelBasarim.ver} anahtarından başarım; anahtar bilinmiyorsa ya da o başarım özel değilse boş. */
+    public static Optional<Basarimlar> ozelAnahtardan(String anahtar) {
+        if (anahtar == null) {
+            return Optional.empty();
+        }
+        for (Basarimlar b : OZEL) {
+            if (b.yol.equals(anahtar)) {
                 return Optional.of(b);
             }
         }

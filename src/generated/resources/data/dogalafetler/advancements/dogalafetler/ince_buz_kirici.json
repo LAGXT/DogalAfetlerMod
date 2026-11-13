@@ -1,0 +1,35 @@
+{
+  "parent": "dogalafetler:dogalafetler/buzul_cagi",
+  "criteria": {
+    "ozel": {
+      "conditions": {
+        "anahtar": "ince_buz_kirici"
+      },
+      "trigger": "dogalafetler:ozel_basarim"
+    }
+  },
+  "display": {
+    "announce_to_chat": false,
+    "description": {
+      "translate": "advancements.dogalafetler.ince_buz_kirici.description"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:ice"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.ince_buz_kirici.title"
+    }
+  },
+  "requirements": [
+    [
+      "ozel"
+    ]
+  ],
+  "rewards": {
+    "experience": 15
+  },
+  "sends_telemetry_event": true
+}

@@ -21,7 +21,7 @@ class LootAgirliklariTest {
         assertTrue(a.oran(Kategori.COP, 0) < 0.10, "çöp vanilla'dan (%10) düşük");
         assertTrue(a.oran(Kategori.HAZINE, 0) <= 0.02, "hazine çok nadir");
         double balik = a.oran(Kategori.YAYGIN, 0) + a.oran(Kategori.ORTA, 0) + a.oran(Kategori.NADIR, 0);
-        assertTrue(balik >= 0.9, "ödül iyi: balık en az %90");
+        assertTrue(balik >= 0.75, "ödül iyi: balık en az %75 (kalanı eşya, çöp, hazine)");
     }
 
     @Test
@@ -42,7 +42,8 @@ class LootAgirliklariTest {
     @Test
     void uclarDogruKategoriyiVerir() {
         assertEquals(Kategori.YAYGIN, a.sec(0.0, 0));
-        assertEquals(Kategori.HAZINE, a.sec(0.999_999, 0));
+        assertEquals(Kategori.ESYA, a.sec(0.999_999, 0), "özel kategori olmadan son dilim eşya");
+        assertEquals(Kategori.OZEL, a.sec(0.999_999, 0, true), "Kutup Oltası'yla son dilim özel balık");
     }
 
     @Test
@@ -55,20 +56,28 @@ class LootAgirliklariTest {
 
     @Test
     void varsayilanOranlarTamDegerler() {
-        assertEquals(0.56, a.oran(Kategori.YAYGIN, 0), 1e-12);
-        assertEquals(0.28, a.oran(Kategori.ORTA, 0), 1e-12);
-        assertEquals(0.08, a.oran(Kategori.NADIR, 0), 1e-12);
-        assertEquals(0.07, a.oran(Kategori.COP, 0), 1e-12);
-        assertEquals(0.01, a.oran(Kategori.HAZINE, 0), 1e-12);
-        // Şans 3: çöp 7 − 6 = 1, hazine 1 + 3 = 4, toplam 97.
-        assertEquals(1 / 97.0, a.oran(Kategori.COP, 3), 1e-12);
-        assertEquals(4 / 97.0, a.oran(Kategori.HAZINE, 3), 1e-12);
+        // Kutup Oltası'sız toplam 118 (özel kategori havuzda değil).
+        assertEquals(56 / 118.0, a.oran(Kategori.YAYGIN, 0), 1e-12);
+        assertEquals(28 / 118.0, a.oran(Kategori.ORTA, 0), 1e-12);
+        assertEquals(8 / 118.0, a.oran(Kategori.NADIR, 0), 1e-12);
+        assertEquals(7 / 118.0, a.oran(Kategori.COP, 0), 1e-12);
+        assertEquals(1 / 118.0, a.oran(Kategori.HAZINE, 0), 1e-12);
+        assertEquals(18 / 118.0, a.oran(Kategori.ESYA, 0), 1e-12);
+        assertEquals(0.0, a.oran(Kategori.OZEL, 0), 1e-12);
+        // Kutup Oltası'yla özel ağırlık 14 eklenir (toplam 132).
+        assertEquals(14 / 132.0, a.oran(Kategori.OZEL, 0, true), 1e-12);
+        assertEquals(56 / 132.0, a.oran(Kategori.YAYGIN, 0, true), 1e-12);
+        // Şans 3: çöp 7 − 6 = 1, hazine 1 + 3 = 4, toplam 115.
+        assertEquals(1 / 115.0, a.oran(Kategori.COP, 3), 1e-12);
+        assertEquals(4 / 115.0, a.oran(Kategori.HAZINE, 3), 1e-12);
     }
 
     @Test
     void hepsiSifirsaReddedilir() {
-        assertThrows(IllegalArgumentException.class, () -> new LootAgirliklari(0, 0, 0, 0, 0, 2, 1));
-        assertThrows(IllegalArgumentException.class, () -> new LootAgirliklari(-1, 1, 1, 1, 1, 2, 1));
+        assertThrows(IllegalArgumentException.class, () -> new LootAgirliklari(0, 0, 0, 0, 0, 0, 0, 2, 1));
+        assertThrows(IllegalArgumentException.class, () -> new LootAgirliklari(-1, 1, 1, 1, 1, 1, 1, 2, 1));
+        // Özel ağırlık tek başına toplamı pozitif yapmaz (yalnız Kutup Oltası'yla havuza girer).
+        assertThrows(IllegalArgumentException.class, () -> new LootAgirliklari(0, 0, 0, 0, 0, 0, 5, 2, 1));
     }
 
     @Test

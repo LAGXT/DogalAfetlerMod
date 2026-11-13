@@ -41,7 +41,7 @@ public final class TsunamiAyarlari {
         cekilmeSn = k.comment("Suyun çekilmesinin tamamlandığı süre (sn).").defineInRange("cekilmeSn", VARSAYILAN_CEKILME_SN, 1.0, 120.0);
         ayCekilmeCarpani = k.comment("Bölüm H: ay çarpması sonrası tsunami çarpanı sürerken çekilme derinliği ve mesafesi çarpanı.")
                 .defineInRange("ayCekilmeCarpani", 1.5, 1.0, 3.0);
-        yikimCarpani = k.comment("Tick başına yıkım bütçesi çarpanı (S1 16 … S5 48 blok; ayrıca TPS kısmasıyla çarpılır).")
+        yikimCarpani = k.comment("Tick başına yıkım bütçesi çarpanı (S1 16 … S4 48, S5 64 blok; ayrıca TPS kısmasıyla çarpılır).")
                 .defineInRange("yikimCarpani", 1.0, 0.1, 4.0);
         yikimBolumTick = k.comment("Tick başına yıkımın başlattığı en çok birim (chunk sütunu ya da 16x16x16 bölüm; üst sınır, "
                 + "bağlayıcı olan yikimCarpani blok jetonudur; TPS kısmasıyla çarpılır; efekt kalitesinden bağımsız).")

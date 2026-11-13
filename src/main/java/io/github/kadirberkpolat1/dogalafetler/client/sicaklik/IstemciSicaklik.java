@@ -12,7 +12,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.particles.ParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
@@ -23,10 +22,11 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 /**
- * Sunucudan gelen sıcaklık durumunun istemci önbelleği (§A6). Paketler saniyede bir gelir; HUD ve efektler ani sıçramasın
- * diye gösterilen vücut, hissedilen eşdeğeri, hissedilen °C ve ıslaklık her istemci tick'inde hedefe yumuşakça yaklaşır ve
- * kare arasında {@code partialTick} ile ara değerlenir. Durum (üşüme, donma, bunalma, yanma) değiştiği tick HUD
- * parlaması için saklanır. Çıkışta sıfırlanır.
+ * Sunucudan gelen sıcaklık durumunun istemci önbelleği (§A6). Paketler en çok saniyede bir gelir; HUD ve efektler ani
+ * sıçramasın ve geriden de gelmesin diye gösterilen vücut, hissedilen eşdeğeri, hissedilen °C ve ıslaklık {@link AkanDeger}
+ * ile paketin değerine ve eğilimine göre ileri tahminli hedefe her istemci tick'inde yaklaşır, kare arasında
+ * {@code partialTick} ile ara değerlenir (K-E74: eski sabit hedef ekranı bir paket aralığı geriden getiriyordu). Durum
+ * (üşüme, donma, bunalma, yanma) değiştiği tick HUD parlaması için saklanır. Çıkışta sıfırlanır.
  * <p>
  * Oyuncunun kendi parçacıkları (sunucu bunları oyuncunun kendisine göndermez, S-08 rev.) yalnız kamera birinci şahıs
  * değilken üretilir: üşüme ve donmada ~2,5 sn'de bir nefes bulutu ({@code NefesBuhari.Ritim}; dünya donması sürerken
@@ -35,19 +35,16 @@ import net.minecraftforge.fml.common.Mod;
  */
 @Mod.EventBusSubscriber(modid = DogalAfetler.MOD_ID, value = Dist.CLIENT)
 public final class IstemciSicaklik {
-    private static final float YAKLASMA = 0.25f;
+    /** Gösterilen değerin hedefe tick başına yaklaşma oranı (~3 tick'te %70): ekran sunucudan fark edilir geri kalmaz. */
+    private static final float YAKLASMA = 0.35f;
     /** Hasarlı kademe alev/kar tanesi aralığı (tick): sunucunun varsayılan güncelleme aralığı. */
     private static final int PARCACIK_ARALIGI = 20;
 
     private static SicaklikDurumPaketi durum = SicaklikDurumPaketi.KAPALI;
-    private static float oncekiVucut;
-    private static float vucut;
-    private static float oncekiOrtam;
-    private static float ortam;
-    private static float oncekiHissedilen;
-    private static float hissedilen;
-    private static float oncekiIslaklik;
-    private static float islaklik;
+    private static final AkanDeger VUCUT = new AkanDeger(6f);
+    private static final AkanDeger ORTAM = new AkanDeger(6f);
+    private static final AkanDeger HISSEDILEN = new AkanDeger(3.5f);
+    private static final AkanDeger ISLAKLIK = new AkanDeger(0f);
     private static boolean ilk = true;
     private static long tick;
     private static SicaklikDurumu sonDurum = SicaklikDurumu.NORMAL;
@@ -73,11 +70,17 @@ public final class IstemciSicaklik {
         sonDurum = yeni;
         durum = paket;
         if (ilk || !paket.acik()) {
-            vucut = oncekiVucut = paket.vucut();
-            ortam = oncekiOrtam = paket.ortamBirim();
-            hissedilen = oncekiHissedilen = paket.hissedilen();
-            islaklik = oncekiIslaklik = paket.islaklik();
+            VUCUT.sifirla(paket.vucut(), tick);
+            ORTAM.sifirla(paket.ortamBirim(), tick);
+            HISSEDILEN.sifirla(paket.hissedilen(), tick);
+            ISLAKLIK.sifirla(paket.islaklik(), tick);
             ilk = !paket.acik();
+        } else {
+            // Eğilim sn başına birim; sunucunun kendi hızı vücut için en doğru ileri tahmindir.
+            VUCUT.paket(paket.vucut(), tick, paket.egilim() / 20f);
+            ORTAM.paket(paket.ortamBirim(), tick);
+            HISSEDILEN.paket(paket.hissedilen(), tick);
+            ISLAKLIK.paket(paket.islaklik(), tick, 0f);
         }
     }
 
@@ -94,24 +97,24 @@ public final class IstemciSicaklik {
         return durum.kademe().durum();
     }
 
-    /** Gösterilen (yumuşatılmış) vücut sıcaklığı, vücut birimi. */
+    /** Gösterilen (yumuşatılmış, eğilimle ileri tahminli) vücut sıcaklığı, vücut birimi. */
     public static float vucut(float partialTick) {
-        return Mth.lerp(partialTick, oncekiVucut, vucut);
+        return VUCUT.goster(partialTick);
     }
 
-    /** Hissedilen sıcaklığın vücut birimi karşılığı (HUD üçgeni). */
+    /** Hissedilen sıcaklığın vücut birimi karşılığı (HUD iğnesi). */
     public static float ortam(float partialTick) {
-        return Mth.lerp(partialTick, oncekiOrtam, ortam);
+        return ORTAM.goster(partialTick);
     }
 
     /** Hissedilen sıcaklık, °C. */
     public static float hissedilen(float partialTick) {
-        return Mth.lerp(partialTick, oncekiHissedilen, hissedilen);
+        return HISSEDILEN.goster(partialTick);
     }
 
     /** Islaklık 0–1. */
     public static float islaklik(float partialTick) {
-        return Mth.lerp(partialTick, oncekiIslaklik, islaklik);
+        return ISLAKLIK.goster(partialTick);
     }
 
     /** Durumun son değiştiği istemci tick'i; hiç değişmediyse -1. */
@@ -153,14 +156,10 @@ public final class IstemciSicaklik {
             return;
         }
         tick++;
-        oncekiVucut = vucut;
-        oncekiOrtam = ortam;
-        oncekiHissedilen = hissedilen;
-        oncekiIslaklik = islaklik;
-        vucut += (durum.vucut() - vucut) * YAKLASMA;
-        ortam += (durum.ortamBirim() - ortam) * YAKLASMA;
-        hissedilen += (durum.hissedilen() - hissedilen) * YAKLASMA;
-        islaklik += (durum.islaklik() - islaklik) * YAKLASMA;
+        VUCUT.adim(tick, YAKLASMA);
+        ORTAM.adim(tick, YAKLASMA);
+        HISSEDILEN.adim(tick, YAKLASMA);
+        ISLAKLIK.adim(tick, YAKLASMA);
         kendiParcaciklari(Minecraft.getInstance());
     }
 
@@ -242,8 +241,10 @@ public final class IstemciSicaklik {
     public static void cikis(ClientPlayerNetworkEvent.LoggingOut olay) {
         durum = SicaklikDurumPaketi.KAPALI;
         ilk = true;
-        vucut = oncekiVucut = ortam = oncekiOrtam = 0;
-        hissedilen = oncekiHissedilen = islaklik = oncekiIslaklik = 0;
+        VUCUT.sifirla(0f, tick);
+        ORTAM.sifirla(0f, tick);
+        HISSEDILEN.sifirla(0f, tick);
+        ISLAKLIK.sifirla(0f, tick);
         sonDurum = SicaklikDurumu.NORMAL;
         degisimTick = -1;
         NEFES.sifirla();

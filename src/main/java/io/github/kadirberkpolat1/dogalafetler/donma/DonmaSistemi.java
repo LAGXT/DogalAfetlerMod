@@ -51,6 +51,9 @@ public final class DonmaSistemi {
         forge.addListener(DonmaZamanlayici::tick);
         forge.addListener(DonmaSistemi::sunucuTick);
         forge.addListener(DonmaSistemi::donemDegisti);
+        forge.addListener(InceBuzKirilmasi::sunucuBasliyor);
+        forge.addListener(InceBuzKirilmasi::ziplama);
+        forge.addListener(InceBuzKirilmasi::sunucuTick);
         donmaSureci = new DonmaSureci();
         buharlasmaSureci = new BuharlasmaSureci();
         AfetYoneticisi.donemSureciKaydet(donmaSureci);

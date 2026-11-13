@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 
 class AfetKumesiTest {
     @Test
-    void sekizTurunHepsiGerekir() {
+    void dokuzTurunHepsiGerekir() {
         AfetKumesi kume = new AfetKumesi();
         AfetTuru[] turler = AfetTuru.values();
         for (int i = 0; i < turler.length - 1; i++) {
@@ -20,7 +20,7 @@ class AfetKumesiTest {
         assertFalse(kume.ekle(turler[0]), "aynı tür ikinci kez eklenmez");
         assertTrue(kume.ekle(turler[turler.length - 1]));
         assertTrue(kume.tamamMi());
-        assertEquals(8, kume.boyut());
+        assertEquals(9, kume.boyut());
     }
 
     @Test

@@ -15,6 +15,7 @@ import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.renderer.FogRenderer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.particles.ParticleOptions;
@@ -23,6 +24,7 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.material.FogType;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import net.minecraftforge.api.distmarker.Dist;
@@ -54,6 +56,7 @@ public final class IstemciAsitYagmuru {
     private static final int SIREN_TICK = 200;
     /** Asit bittikten sonra vanilla yağmurun bastırılmaya devam ettiği süre: sunucu yağmuru 0,01/tick ile söner. */
     private static final int SONUM_TICK = 100;
+    private static final float GERI_ACMA_ADIMI = 0.05f;
 
     private static boolean aktif;
     private static double yogunluk;
@@ -69,6 +72,8 @@ public final class IstemciAsitYagmuru {
     private static float oncekiCan = -1;
     /** Vanilla yağmurun daha kaç tick bastırılacağı (AKTIF boyunca dolu, bitişte {@link #SONUM_TICK}'ten geri sayar). */
     private static int bastirmaKalan;
+    /** Bastırma bitti, vanilla havanın düzeyi yumuşakça geri açılıyor ({@link #havayiGeriAc}). */
+    private static boolean geriDonus;
 
     private IstemciAsitYagmuru() {
     }
@@ -111,15 +116,21 @@ public final class IstemciAsitYagmuru {
     public static void cikis(ClientPlayerNetworkEvent.LoggingOut olay) {
         sifirla();
         bastirmaKalan = 0;
+        geriDonus = false;
     }
 
     @SubscribeEvent
     public static void tick(TickEvent.ClientTickEvent olay) {
-        if (olay.phase != TickEvent.Phase.END) {
-            return;
-        }
         Minecraft mc = Minecraft.getInstance();
         ClientLevel level = mc.level;
+        if (olay.phase == TickEvent.Phase.START) {
+            // Paketler tick'ten önce işlendi: sunucunun yağmur/gök gürültüsü düzeyi, dünya tick'i gökyüzü karartmasını
+            // (updateSkyBrightness) hesaplamadan önce sıfırlanır; karartma sunucu düzeyiyle sıçramaz.
+            if (level != null && !mc.isPaused()) {
+                vanillaHavayiBastir(level);
+            }
+            return;
+        }
         if (level == null) {
             if (aktif) {
                 sifirla();
@@ -175,13 +186,45 @@ public final class IstemciAsitYagmuru {
         if (aktif && yagiyor) {
             bastirmaKalan = SONUM_TICK;
         }
-        if (bastirmaKalan <= 0) {
+        if (bastirmaKalan > 0) {
+            bastirmaKalan--;
+            vanillaHavayiBastir(level);
+            if (bastirmaKalan == 0) {
+                geriDonus = true;
+            }
             return;
         }
-        bastirmaKalan--;
-        level.setRainLevel(0f);
-        if (bastirmaKalan == 0 && level.getLevelData().isRaining()) {
-            level.setRainLevel(1f);
+        if (geriDonus) {
+            havayiGeriAc(level);
+        }
+    }
+
+    /** Bastırma süresince vanilla yağmur ve gök gürültüsü düzeyi 0'da tutulur (gökyüzü, bulut ve ışık haritası kararmaz). */
+    private static void vanillaHavayiBastir(ClientLevel level) {
+        if (bastirmaKalan > 0 || aktif && yagiyor) {
+            level.setRainLevel(0f);
+            level.setThunderLevel(0f);
+        }
+    }
+
+    /**
+     * Bastırma bitince sunucu hâlâ yağmur ya da gök gürültüsü verisi taşıyorsa düzey tek adımda 1'e sıçramaz; saniyede 1
+     * hızla (0,05/tick) tek yönlü yükselir. Sunucu o sırada düzey paketi yollarsa o değer alınır, hiçbir zaman geri düşmez.
+     */
+    private static void havayiGeriAc(ClientLevel level) {
+        boolean bitti = true;
+        float yagmur = level.getRainLevel(1f);
+        if (level.getLevelData().isRaining() && yagmur < 1f) {
+            level.setRainLevel(Math.min(1f, yagmur + GERI_ACMA_ADIMI));
+            bitti = false;
+        }
+        float gok = level.getThunderLevel(1f);
+        if (level.getLevelData().isThundering() && gok < 1f) {
+            level.setThunderLevel(Math.min(1f, gok + GERI_ACMA_ADIMI));
+            bitti = false;
+        }
+        if (bitti) {
+            geriDonus = false;
         }
     }
 
@@ -338,23 +381,25 @@ public final class IstemciAsitYagmuru {
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void sisRengi(ViewportEvent.ComputeFogColor olay) {
         double w = sisGucu();
-        if (w <= 0) {
+        ClientLevel level = Minecraft.getInstance().level;
+        if (w <= 0 || level == null || olay.getCamera().getFluidInCamera() != FogType.NONE) {
             return;
         }
-        ClientLevel level = Minecraft.getInstance().level;
         float aci = level.getTimeOfDay((float) olay.getPartialTick());
         float gun = Mth.clamp(Mth.cos(aci * Mth.TWO_PI) * 2.0F + 0.5F, 0.0F, 1.0F);
         float k = (float) (0.8 * w);
-        olay.setRed(Mth.lerp(k, olay.getRed(), Mth.lerp(gun, GECE[0], GUNDUZ[0])));
-        olay.setGreen(Mth.lerp(k, olay.getGreen(), Mth.lerp(gun, GECE[1], GUNDUZ[1])));
-        olay.setBlue(Mth.lerp(k, olay.getBlue(), Mth.lerp(gun, GECE[2], GUNDUZ[2])));
+        // Kanallar 0–1 aralığında kalır; sis rengi vanilla tondan hedef tona tek yönlü (w ile) karışır.
+        olay.setRed(Mth.clamp(Mth.lerp(k, olay.getRed(), Mth.lerp(gun, GECE[0], GUNDUZ[0])), 0f, 1f));
+        olay.setGreen(Mth.clamp(Mth.lerp(k, olay.getGreen(), Mth.lerp(gun, GECE[1], GUNDUZ[1])), 0f, 1f));
+        olay.setBlue(Mth.clamp(Mth.lerp(k, olay.getBlue(), Mth.lerp(gun, GECE[2], GUNDUZ[2])), 0f, 1f));
     }
 
     /** Yağmur perdesi: görüş mesafesi yoğunlukla %40'a kadar kısalır (Forge değişikliği yalnız iptal edilen olayda uygular). */
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void sis(ViewportEvent.RenderFog olay) {
         double w = sisGucu();
-        if (w <= 0 || olay.isCanceled()) {
+        if (w <= 0 || olay.isCanceled() || olay.getMode() != FogRenderer.FogMode.FOG_TERRAIN
+                || olay.getCamera().getFluidInCamera() != FogType.NONE) {
             return;
         }
         float kisalma = (float) (0.4 * w);

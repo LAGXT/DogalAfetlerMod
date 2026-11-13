@@ -13,6 +13,7 @@ import io.github.kadirberkpolat1.dogalafetler.donma.mantik.KisKaynagi;
 import io.github.kadirberkpolat1.dogalafetler.donma.mantik.YetismeButcesi;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongIterator;
 import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
@@ -21,6 +22,7 @@ import java.util.Locale;
 import java.util.Random;
 import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.FullChunkStatus;
 import net.minecraft.server.level.ServerChunkCache;
@@ -49,6 +51,9 @@ import net.minecraftforge.event.server.ServerStartedEvent;
  * <li>Yalnız bilet seviyesi en az {@code BLOCK_TICKING} olan ve 8 komşusu yüklü chunk'lar işlenir ({@link #islenebilir}):
  * kenar sütunundaki şekil güncellemesi komşuyu senkron yüklemez; simülasyon mesafesi dışında ama görüş mesafesindeki
  * chunk'lar da donar (D5). {@code afetBlokHasari} kapalıyken kuyruk durur; açılınca kaldığı yerden sürer.</li>
+ * <li>Buharlaşma sürerken ({@code etkin derinlik > 0}) oyuncunun {@value #TARAMA_YARICAP} chunk çevresindeki yüklü chunk'lar
+ * {@value #TARAMA_ARALIGI} tick'te bir yeniden denetlenir: derinlik değişmese de sonradan gelen su (dalga, akış, oyuncu,
+ * geri dolan çekilme) kurur; efekt çıkan su gerçekten azalır. Aynı tick bütçesi ve süre tavanı geçerlidir.</li>
  * <li>{@code /dogalafet sifirla} sonrası (yeni döngü) chunk bitlerini korur ve bizim kar/buzumuzu 0'a çözer (D4).</li>
  * </ul>
  */
@@ -75,6 +80,15 @@ public final class DonmaZamanlayici {
     private static long sonDongu = Long.MIN_VALUE;
     private static long oncekiAsimNs;
     private static volatile boolean kuyrukBos = true;
+    /** Buharlaşma yeniden denetim aralığı (tick) ve oyuncudan en uzak denetlenen chunk (Chebyshev). */
+    static final int TARAMA_ARALIGI = 200;
+    static final int TARAMA_YARICAP = 12;
+    /** Derinlik değişmese de buharlaşma için yeniden işlenecek chunk'lar ({@link #BEKLEYEN}'in alt kümesi). */
+    private static final LongOpenHashSet TARA = new LongOpenHashSet();
+    /** Dönem verisinde ({@code donma}) buharlaşma başlarkenki sanal deniz yükselmesi; döngü bitince silinir. */
+    private static final String SANAL_BASI = "buharSanalBasi";
+    /** Derinlik 0 iken her tick izlenen sanal deniz yükselmesi; {@code NaN}: izlenmedi (sunucu yeni açıldı). */
+    private static float sonSanal = Float.NaN;
 
     private static long tamamlananAdim;
     private static long hedefeUlasan;
@@ -132,12 +146,14 @@ public final class DonmaZamanlayici {
         YUKLU.clear();
         BEKLEYEN.clear();
         ISLER.clear();
+        TARA.clear();
         sira = new long[0];
         siraKirli = true;
         kapsam = null;
         sonG = -1;
         sonBuhar = -1;
         sonDongu = Long.MIN_VALUE;
+        sonSanal = Float.NaN;
         oncekiAsimNs = 0;
         esikKumesi = null;
         istatistikSifirla();
@@ -168,6 +184,7 @@ public final class DonmaZamanlayici {
             YUKLU.remove(anahtar);
             BEKLEYEN.remove(anahtar);
             ISLER.remove(anahtar);
+            TARA.remove(anahtar);
         }
     }
 
@@ -237,6 +254,9 @@ public final class DonmaZamanlayici {
             hepsiniKuyrugaAl();
         }
         int tick = server.getTickCount();
+        if (buhar > 0 && tick % TARAMA_ARALIGI == 0) {
+            taramaIste(level);
+        }
         if (tick % 20 == 0) {
             siraKirli = true;
         }
@@ -278,7 +298,59 @@ public final class DonmaZamanlayici {
     }
 
     static int etkinBuhar(MinecraftServer server, DunyaDonemi donem) {
-        return BuharlasmaHedefi.etkinDerinlik(donem.buharlasmaDerinligi(), DisKancalar.al().buharlasmaPayi(server));
+        return BuharlasmaHedefi.etkinDerinlik(donem.buharlasmaDerinligi(), buharPayi(server, donem));
+    }
+
+    /**
+     * Gerçek suyun buharlaşmadan önce sanal deniz yükselmesine bırakacağı pay (N10). Pay yalnız buharlaşma başlarken sanal
+     * yükselme varsa geçerlidir: {@code DenizYukselmesiSureci}'nin taban değeri bir kez yazılıp kalır; sanal yükselme çoktan
+     * tükenmişken (ikinci güneş patlaması, pulsar) eski taban gerçek suyu hiç ya da geç kurutuyordu. Başlangıçtaki yükselme
+     * derinlik 0 iken her tick izlenir ve döngü başında dönem verisine yazılır (eski kayıtta izleme yoksa kanca değeri).
+     */
+    private static double buharPayi(MinecraftServer server, DunyaDonemi donem) {
+        CompoundTag ek = donem.ekVeri(KisBolgesi.ALT_SISTEM);
+        if (donem.buharlasmaDerinligi() <= 0f) {
+            sonSanal = donem.deniz().mevcutArtis();
+            if (ek.contains(SANAL_BASI)) {
+                ek.remove(SANAL_BASI);
+                donem.ekVeriDegisti(KisBolgesi.ALT_SISTEM);
+            }
+            return 0.0;
+        }
+        if (!ek.contains(SANAL_BASI)) {
+            ek.putFloat(SANAL_BASI, Float.isNaN(sonSanal) ? (float) DisKancalar.al().buharlasmaPayi(server) : sonSanal);
+            donem.ekVeriDegisti(KisBolgesi.ALT_SISTEM);
+        }
+        return ek.getFloat(SANAL_BASI) > 0f ? DisKancalar.al().buharlasmaPayi(server) : 0.0;
+    }
+
+    /** Buharlaşma sürerken oyuncuya yakın yüklü chunk'ları yeniden denetime alır (kuyruk bütçesiyle işlenir). */
+    private static void taramaIste(ServerLevel level) {
+        List<ServerPlayer> oyuncular = level.players();
+        if (oyuncular.isEmpty()) {
+            return;
+        }
+        int[] px = new int[oyuncular.size()];
+        int[] pz = new int[oyuncular.size()];
+        for (int i = 0; i < px.length; i++) {
+            ChunkPos p = oyuncular.get(i).chunkPosition();
+            px[i] = p.x;
+            pz[i] = p.z;
+        }
+        LongIterator it = YUKLU.iterator();
+        while (it.hasNext()) {
+            long anahtar = it.nextLong();
+            int cx = ChunkPos.getX(anahtar);
+            int cz = ChunkPos.getZ(anahtar);
+            for (int i = 0; i < px.length; i++) {
+                if (Math.abs(cx - px[i]) <= TARAMA_YARICAP && Math.abs(cz - pz[i]) <= TARAMA_YARICAP) {
+                    TARA.add(anahtar);
+                    BEKLEYEN.add(anahtar);
+                    siraKirli = true;
+                    break;
+                }
+            }
+        }
     }
 
     static long dongu(DunyaDonemi donem) {
@@ -347,7 +419,8 @@ public final class DonmaZamanlayici {
                     durum.donguyeAktar(dongu);
                     chunk.setUnsaved(true);
                 }
-                if (durum.sonG() == g && durum.cozulme() == cozulme && durum.sonBuhar() == buhar && !durum.yarimVar()) {
+                if (durum.sonG() == g && durum.cozulme() == cozulme && durum.sonBuhar() == buhar && !durum.yarimVar()
+                        && !TARA.contains(anahtar)) {
                     BEKLEYEN.remove(anahtar);
                     siraBasi++;
                     continue;
@@ -360,10 +433,12 @@ public final class DonmaZamanlayici {
                 int eskiG = yarim ? durum.yarimG() : durum.sonG();
                 boolean eskiCozulme = yarim ? durum.yarimCozulme() : durum.cozulme();
                 int bitisG = DonmaHedefi.siradakiSeviye(eskiG, g, adim);
-                boolean buharIsle = durum.sonBuhar() != buhar;
+                boolean buharFarki = durum.sonBuhar() != buhar;
+                boolean tara = TARA.remove(anahtar);
+                boolean buharIsle = buharFarki || tara;
                 boolean atlama = !buharIsle
                         && DonmaHedefi.atlamaSerbest(durum.sonYon(), eskiG, eskiCozulme, bitisG, cozulme, yarim);
-                int sonrakiYon = yarim || buharIsle ? 0
+                int sonrakiYon = yarim || buharFarki ? 0
                         : eskiG == bitisG && eskiCozulme == cozulme ? durum.sonYon()
                                 : DonmaHedefi.adimYonu(eskiG, eskiCozulme, bitisG, cozulme);
                 DonmaIsleyici.Gecis gecis = new DonmaIsleyici.Gecis(eskiG, eskiCozulme, bitisG, cozulme, buhar, buharIsle,

@@ -47,7 +47,7 @@ public final class TsunamiKopugu {
     /** Tepe: yüzey bu {@code s} aralığında en yüksek ({@code Dalga} ön yüzü 2,5 blok). */
     private static final double TEPE_ON = 1.4;
     private static final double TEPE_ORTA = TEPE_ON + 1.1;
-    private static final double TEPE_ARKA = 4.5;
+    private static final double TEPE_ARKA = 5.5;
     /** Ön yüz çizgilerinin alt ucu ({@code s}). */
     private static final double CIZGI_ALT = 0.35;
     /** Köpük dokusu (animasyonlu, blok atlası). */
@@ -155,13 +155,13 @@ public final class TsunamiKopugu {
     }
 
     private static int dalga(BufferBuilder b, Matrix4f m, Dalga w, double t, Vec3 kam, boolean dusuk, float isik) {
-        double c = w.cephe(t);
         double px = -w.yonZ();
         double pz = w.yonX();
         double yarim = w.genislik() / 2 - 1;
         int n = 0;
         double u = -yarim;
         while (u < yarim) {
+            double c = w.cephe(t, u);
             double mx = w.x0() + w.yonX() * c + px * u;
             double mz = w.z0() + w.yonZ() * c + pz * u;
             double uzak = Math.hypot(mx - kam.x, mz - kam.z);
@@ -194,9 +194,9 @@ public final class TsunamiKopugu {
         if (dusuk) {
             return 1;
         }
-        // Ön yüz çizgileri: yanal konuma bağlı sabit desenle kesik (her ~3 bloktan biri boş), aşağı doğru söner.
+        // Ön yüz çizgileri: yanal konuma bağlı sabit desenle seyrek kesik (her ~5 bloktan biri boş), aşağı doğru söner.
         double desen = Math.sin(u0 * 1.7 + Math.floor(t / 6) * 0.9) * Math.sin(u0 * 0.43 + 1.3);
-        if (desen > -0.35) {
+        if (desen > -0.6) {
             float a = (float) Math.min(1, 1.3 * (0.55 + 0.3 * desen));
             onYuz(b, m, w, t, c, u0, u1, ta, tb, kam, k0, k1, a * (float) (0.5 + 0.5 * gurultu(u0, t, 8)),
                     a * (float) (0.5 + 0.5 * gurultu(u1, t, 8)));

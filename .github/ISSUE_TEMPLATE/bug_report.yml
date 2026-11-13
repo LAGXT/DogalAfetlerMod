@@ -1,0 +1,44 @@
+name: Bug report / Hata bildirimi
+description: Report a bug / Bir hatayı bildirin
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened? / Ne oldu?
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce / Nasıl tekrarlanır?
+      description: Which disaster was active, what were you doing? If you used a command, include it.
+    validations:
+      required: true
+  - type: input
+    id: mod_version
+    attributes:
+      label: Mod version / Mod sürümü
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: forge_version
+    attributes:
+      label: Minecraft and Forge version
+      placeholder: "1.20.1, Forge 47.4.28"
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: Upload logs/latest.log (or the crash report) to https://mclo.gs and paste the link here.
+    validations:
+      required: true
+  - type: textarea
+    id: mods
+    attributes:
+      label: Other mods and shader pack / Diğer modlar ve gölgelendirici paketi
+      description: Optional, but helps a lot.

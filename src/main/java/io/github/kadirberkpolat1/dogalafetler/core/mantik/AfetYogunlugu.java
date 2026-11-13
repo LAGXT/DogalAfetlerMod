@@ -9,9 +9,12 @@ package io.github.kadirberkpolat1.dogalafetler.core.mantik;
  * oluğan gücü korunur. Deterministiktir, saf Java.
  */
 public final class AfetYogunlugu {
-    /** Yük bunu aşmadança seviye dağılımı değişmez (doğal dalgalanma payı). */
-    public static final double ESIK = 1.5;
-    public static final double EN_COK_ZAYIFLATMA = 8.0;
+    /**
+     * Yük bunu aşmadıkça seviye dağılımı değişmez (K-E72: eski 1,5 ve en çok 8, hızlı {@code afetSikligi}'nda S4-S5'i
+     * neredeyse siliyordu; şimdi 4 ve en çok 2: S5 en fazla ×¼, S4 en fazla ×0,35'e iner).
+     */
+    public static final double ESIK = 4.0;
+    public static final double EN_COK_ZAYIFLATMA = 2.0;
     /** Hedef ortalama aralık (tick): gün ≤ 1'de 8 dk, gün 10'da 5 dk, gün ≥ 30'da 3 dk; arası doğrusal. */
     public static final long ARALIK_GUN_1 = 9_600L;
     public static final long ARALIK_GUN_10 = 6_000L;

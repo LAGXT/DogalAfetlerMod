@@ -34,14 +34,17 @@ class KasirgaAyarGocuTest {
         Map<String, Object> d = eskiDosya();
         d.put("kasirga.kaldirmaTavani", 40.0);
         assertTrue(KasirgaAyarGocu.plan(0, d::get).isEmpty());
-        assertTrue(KasirgaAyarGocu.plan(0, Map.of("kasirga.kaldirmaTavani", 36.0)::get).isEmpty(), "yeni varsayılan kalır");
+        assertTrue(KasirgaAyarGocu.plan(0, Map.of("kasirga.kaldirmaTavani", KasirgaSeviyesi.S5_KALDIRMA_TAVANI)::get).isEmpty(),
+                "yeni varsayılan kalır");
+        assertEquals(Map.of("kasirga.kaldirmaTavani", KasirgaSeviyesi.S5_KALDIRMA_TAVANI),
+                KasirgaAyarGocu.plan(1, Map.of("kasirga.kaldirmaTavani", 36.0)::get), "S5 büyümesi: 36 → 45");
     }
 
     @Test
     void eksikAnahtaraVeGuncelSurumeDokunulmaz() {
         assertTrue(KasirgaAyarGocu.plan(0, Map.<String, Object>of()::get).isEmpty(), "Forge eksik anahtarı kendisi doldurur");
         assertTrue(KasirgaAyarGocu.plan(KasirgaAyarGocu.GUNCEL, eskiDosya()::get).isEmpty());
-        assertEquals(36.0, KasirgaAyarGocu.plan(0, Map.of("kasirga.kaldirmaTavani", 25)::get).get("kasirga.kaldirmaTavani"),
+        assertEquals(45.0, KasirgaAyarGocu.plan(0, Map.of("kasirga.kaldirmaTavani", 25)::get).get("kasirga.kaldirmaTavani"),
                 "sayı türü önemsiz");
     }
 

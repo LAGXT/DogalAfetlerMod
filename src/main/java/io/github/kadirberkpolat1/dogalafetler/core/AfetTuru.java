@@ -4,7 +4,8 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * Şartnamedeki sekiz afet (N18'deki komut adlarıyla). Yeni afet eklenmez (şartname girişi).
+ * Afet türleri (N18'deki komut adlarıyla): şartnamedeki sekiz afet ve sonradan eklenen sel (K-E80, kullanıcı isteği). Yeni tür
+ * sıraya sonradan eklenir; sıra kayıt ve paketlerde kullanıldığından mevcut türlerin sırası değişmez.
  * Saf Java'dır; Minecraft sınıflarına dokunmaz.
  */
 public enum AfetTuru {
@@ -15,7 +16,8 @@ public enum AfetTuru {
     ASIT_YAGMURU("asit_yagmuru", true, "Acid Rain", "Asit Yağmuru"),
     SINKHOLE("sinkhole", true, "Sinkhole", "Sinkhole"),
     ORMAN_YANGINI("orman_yangini", true, "Wildfire", "Orman Yangını"),
-    AY_CARPMASI("ay_carpmasi", false, "Moon Impact", "Ay Çarpması");
+    AY_CARPMASI("ay_carpmasi", false, "Moon Impact", "Ay Çarpması"),
+    SEL("sel", true, "Flood", "Sel");
 
     /** Madde 10: seviyeli afetlerin en hafif seviyesi (Hafif). */
     public static final int EN_DUSUK_SEVIYE = 1;

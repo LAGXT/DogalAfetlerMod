@@ -543,8 +543,9 @@ public final class CekirdekOyunTestleri {
         DunyaDonemi yeni = DunyaDonemi.yukle(etiket.copy());
         yardimci.assertTrue(yeni.sonSeviye() == 5, "sürüm 2 kaydı korunur: " + yeni.sonSeviye());
         SeviyeDurumu kural = SeviyeDurumu.hesapla(ayar, 100, 100, 5, SiddetSecici.yuksek(yeni.sonSeviye()), 1.0);
-        yardimci.assertTrue(kural.olasilik(4) == 0 && kural.olasilik(5) == 0
-                && kural.neden(5).equals(Optional.of(SiddetSecici.KapaliNeden.ART_ARDA)), "doğal 5 sonrası art arda kuralı");
+        SeviyeDurumu serbest = SeviyeDurumu.hesapla(ayar, 100, 100, 5, false, 1.0);
+        yardimci.assertTrue(kural.olasilik(5) > 0 && kural.olasilik(5) < serbest.olasilik(5)
+                && kural.olasilik(4) < serbest.olasilik(4), "doğal 5 sonrası art arda seyreltmesi");
 
         CompoundTag eski = etiket.copy();
         eski.putInt("surum", 1);
@@ -558,12 +559,13 @@ public final class CekirdekOyunTestleri {
         yardimci.succeed();
     }
 
-    /** Merkezi hedef oyuncudan x ekseninde {@code dx} blok uzakta seçen test afeti (yarıçap 8). */
+    /** Merkezi başlangıç noktasından (bu testlerde hedef oyuncunun bloğu) x ekseninde {@code dx} blok uzakta seçen test afeti (yarıçap 8). */
     private static OyunTestiAfeti ofsetliAfet(AfetTuru tur, int dx) {
         return new OyunTestiAfeti(tur, 8, 6000) {
             @Override
-            public BlockPos merkezSec(ServerLevel level, ServerPlayer hedef, int seviye, RandomSource rastgele) {
-                return hedef.blockPosition().offset(dx, 0, 0);
+            public BlockPos merkezSec(ServerLevel level, ServerPlayer hedef, int seviye, BlockPos merkezNoktasi,
+                    RandomSource rastgele) {
+                return merkezNoktasi.offset(dx, 0, 0);
             }
         };
     }

@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column",
+  "textures": {
+    "end": "dogalafetler:block/soyulmus_komurlesmis_kutuk_top",
+    "side": "dogalafetler:block/soyulmus_komurlesmis_kutuk"
+  }
+}

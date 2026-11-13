@@ -15,23 +15,25 @@ public final class SicaklikIstemciAyarlari {
     private final ForgeConfigSpec.IntValue hudYOfset;
     private final ForgeConfigSpec.BooleanValue sayiGoster;
     private final ForgeConfigSpec.BooleanValue hissedilenGoster;
-    private final ForgeConfigSpec.BooleanValue durumIkonlari;
+    private final ForgeConfigSpec.BooleanValue kafaEfektleri;
     private final ForgeConfigSpec.BooleanValue animasyonlar;
     private final ForgeConfigSpec.BooleanValue ekranEfektleri;
     private final ForgeConfigSpec.BooleanValue kameraTitremesi;
 
     private SicaklikIstemciAyarlari(ForgeConfigSpec.Builder k) {
-        hudGorunur = k.comment("Sıcaklık bantı (XP barının üstünde) görünsün mü.").define("hudGorunur", true);
-        hudXOfset = k.comment("Bantın yatay kaydırması (piksel, GUI ölçeğiyle).").defineInRange("hudXOfset", 0, -1000, 1000);
-        hudYOfset = k.comment("Bantın dikey kaydırması (piksel; negatif yukarı). Kalpler ve açlık barı bantın üstünde kalır.")
+        hudGorunur = k.comment("Kafa ikonlu sıcaklık göstergesi (can ve açlık barlarının ortasında) görünsün mü.")
+                .define("hudGorunur", true);
+        hudXOfset = k.comment("Göstergenin yatay kaydırması (piksel, GUI ölçeğiyle).")
+                .defineInRange("hudXOfset", 0, -1000, 1000);
+        hudYOfset = k.comment("Göstergenin dikey kaydırması (piksel; negatif yukarı). Can ve açlık barları hiçbir zaman kaydırılmaz.")
                 .defineInRange("hudYOfset", 0, -1000, 1000);
-        sayiGoster = k.comment("Bantın ortasındaki hapta vücut sıcaklığı °C olarak yazılsın mı (kapalıysa durum ikonu).")
-                .define("sayiGoster", true);
-        hissedilenGoster = k.comment("Hissedilen sıcaklık: tüpün altındaki içi boş üçgen ve bantın sağındaki °C.")
+        sayiGoster = k.comment("Kafanın üstünde vücut sıcaklığı °C olarak küçük yazıyla yazılsın mı (varsayılan kapalı: gösterge minimal).")
+                .define("sayiGoster", false);
+        hissedilenGoster = k.comment("Hissedilen sıcaklık: şeridi kesen ince beyaz iğne (denge noktası).")
                 .define("hissedilenGoster", true);
-        durumIkonlari = k.comment("Bantın solundaki etkin durum ikonları (ıslak, üşüme, donma, bunalma, yanma).")
-                .define("durumIkonlari", true);
-        animasyonlar = k.comment("HUD animasyonları: titreme, nabız, durum değişim parlaması, kayan eğilim oku, damlama.")
+        kafaEfektleri = k.comment("Kafa efektleri: ter damlası, alev ve duman, ağızdan buhar, buz kristalleri.")
+                .define("kafaEfektleri", true);
+        animasyonlar = k.comment("Gösterge animasyonları: titreme ve donma sarsıntısı, nabız, durum değişim parlaması, efekt hareketi.")
                 .define("animasyonlar", true);
         ekranEfektleri = k.comment("Buz kenarı, kırmızı ter kenarı ve sıcak hava dalgası ekran efektleri.")
                 .define("ekranEfektleri", true);
@@ -63,8 +65,8 @@ public final class SicaklikIstemciAyarlari {
         return bolum.get().hissedilenGoster.get();
     }
 
-    public static boolean durumIkonlari() {
-        return bolum.get().durumIkonlari.get();
+    public static boolean kafaEfektleri() {
+        return bolum.get().kafaEfektleri.get();
     }
 
     public static boolean animasyonlar() {

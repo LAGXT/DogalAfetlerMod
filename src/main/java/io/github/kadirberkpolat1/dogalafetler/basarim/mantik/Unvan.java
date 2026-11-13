@@ -11,7 +11,8 @@ public enum Unvan {
     KUTUP_SAKINI("kutup_sakini", "Polar Dweller", "Kutup Sakini"),
     KOZMIK_KASIF("kozmik_kasif", "Cosmic Explorer", "Kozmik Kâşif"),
     FELAKET_USTASI("felaket_ustasi", "Master of Disaster", "Felaket Ustası"),
-    HER_SEYI_ATLATAN("her_seyi_atlatan", "Survivor of All", "Her Şeyi Atlatan");
+    HER_SEYI_ATLATAN("her_seyi_atlatan", "Survivor of All", "Her Şeyi Atlatan"),
+    ASTRONOM("astronom", "Astronomer", "Astronom");
 
     private final String kimlik;
     private final String ingilizceAd;

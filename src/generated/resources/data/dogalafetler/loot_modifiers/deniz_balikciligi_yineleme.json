@@ -1,0 +1,11 @@
+{
+  "type": "dogalafetler:deniz_balikciligi",
+  "conditions": [
+    {
+      "condition": "forge:loot_table_id",
+      "loot_table_id": "minecraft:gameplay/fishing"
+    }
+  ],
+  "olasilik": 0.005,
+  "tablo": "dogalafetler:gameplay/deniz/yineleme"
+}

@@ -3,7 +3,8 @@ package io.github.kadirberkpolat1.dogalafetler.meteor.mantik;
 /**
  * Yağmur meteorlarının ödül sınırı (şef kararı, inceleme-meteor-2-2 Mt10; {@code .vibe/kararlar/meteor-2.md} MT2-20): ödül yalnız
  * büyük bantta ve kaynak (afet) başına, oyuncu başına en çok {@code tavan} eşya. Zar ({@link OdulZari}) önce atılır, bu sınır
- * sonucu kısar; iki eşya tavana sığmazsa Kozmik Çekirdek kalır.
+ * sonucu kısar: tavana sığmayan fazla parçalar önce atılır; Kozmik Çekirdek en son kısılır (ilk sığan eşyadır). K-E74: tavan
+ * (varsayılan 8) değişmez, yalnız her büyük meteorun eşyası artar.
  */
 public final class OdulTavani {
     private OdulTavani() {
@@ -14,13 +15,11 @@ public final class OdulTavani {
         if (!buyuk || zar.bos() || verilen >= tavan) {
             return OdulZari.Sonuc.YOK;
         }
-        if (zar.parca() && zar.cekirdek() && verilen + 2 > tavan) {
-            return new OdulZari.Sonuc(false, true);
+        int kalan = tavan - verilen;
+        int parca = Math.min(zar.parcaAdedi(), kalan - (zar.cekirdek() ? 1 : 0));
+        if (parca == zar.parcaAdedi()) {
+            return zar;
         }
-        return zar;
-    }
-
-    public static int adet(OdulZari.Sonuc s) {
-        return (s.parca() ? 1 : 0) + (s.cekirdek() ? 1 : 0);
+        return new OdulZari.Sonuc(parca >= 1, zar.cekirdek(), Math.max(0, parca - 1));
     }
 }

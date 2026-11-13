@@ -74,7 +74,8 @@ import net.minecraftforge.gametest.PrefixGameTestTemplate;
 import net.minecraftforge.registries.ForgeRegistries;
 
 /**
- * Başarımların oyun içi testleri (GOREV §6 #16; 28 başarımın her biri en az bir testte kazanılır, tablo rapor §6 #16):
+ * Başarımların oyun içi testleri (GOREV §6 #16; madde 12 ve N29'daki 27 başarımın her biri en az bir testte kazanılır, tablo rapor §6 #16;
+ * K-E74'ün özel anahtarlı başarımları {@code ozelBasarimVerOzelAnahtarlariKazandirir} testinde):
  * gerçek afet yaşam döngüsü ({@link OyunTestiAfeti}, geçici kayıt; sunucu geneli güneş ve ay dahil), sahte oyuncular ve
  * datagen'le üretilmiş advancement'lar. Faz 4 afetinin iç davranışına bağlı koşullar (#2, #4, #5, #6) afetin
  * yayınlayacağı {@link BasarimIpucuEvent} testten yayınlanarak sınanır. Her test kendi oyuncularını açar; tek afet
@@ -750,7 +751,7 @@ public final class BasarimOyunTestleri {
             String ad = a.getDisplayName().getString();
             dogrula(y, ad.equals("komut-a"), "ad öneksiz: " + ad);
             int bilgi = komut(server, "dogalafet basarim bilgi");
-            dogrula(y, bilgi == Basarimlar.values().length, "28 başarım yüklü: " + bilgi);
+            dogrula(y, bilgi == Basarimlar.values().length, "tüm başarımlar yüklü: " + bilgi);
         } finally {
             cikar(y, List.of(a));
         }
@@ -1121,6 +1122,34 @@ public final class BasarimOyunTestleri {
             dogrula(y, !kazandi(y, b, Basarimlar.DELIKTEN_DONUS), "kayıtlı yayıncı olay vermediyse kimse almaz");
         } finally {
             cikar(y, List.of(a, b));
+        }
+        y.succeed();
+    }
+
+    /**
+     * K-E74: {@code OzelBasarim.ver} her özel anahtarı bir kez kazandırır; tekrar, bilinmeyen ve özel olmayan anahtar sessizce
+     * yok sayılır. Astronom gizlidir (açılana dek sekmede görünmez) ve ünvan verir.
+     */
+    @GameTest(template = "bos", batch = "basarim_genel_2")
+    public static void ozelBasarimVerOzelAnahtarlariKazandirir(GameTestHelper y) {
+        ServerPlayer a = oyuncu(y, "ozel-a", 0);
+        try {
+            dogrula(y, advancement(y, Basarimlar.ASTRONOM).getDisplay().isHidden(), "Astronom gizli başarım");
+            for (Basarimlar b : Basarimlar.values()) {
+                if (!b.ozelMi()) {
+                    continue;
+                }
+                dogrula(y, !kazandi(y, a, b), "başta açık değil: " + b.yol());
+                OzelBasarim.ver(a, b.yol());
+                dogrula(y, kazandi(y, a, b), "OzelBasarim.ver kazandırır: " + b.yol());
+                OzelBasarim.ver(a, b.yol());
+            }
+            OzelBasarim.ver(a, "bilinmeyen_anahtar");
+            OzelBasarim.ver(a, Basarimlar.KOK.yol());
+            dogrula(y, !kazandi(y, a, Basarimlar.KOK), "özel olmayan anahtar bir şey vermez");
+            dogrula(y, BasarimVerisi.unvan(a).orElse(null) == Unvan.ASTRONOM, "Astronom ünvan verir");
+        } finally {
+            cikar(y, List.of(a));
         }
         y.succeed();
     }

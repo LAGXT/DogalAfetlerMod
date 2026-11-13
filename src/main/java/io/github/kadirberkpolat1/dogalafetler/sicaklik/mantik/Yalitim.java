@@ -3,8 +3,8 @@ package io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik;
 /**
  * Zırh yalıtımı (madde 7e, N3, N4). Toplam yalıtım dört zırh parçasının toplamıdır: giyilen her zırh parçası az, her yünlü
  * parça orta, her Tüy Upgrade'i küçük bir pay ekler. Yün ayrıca soğuma yönündeki hızı parça başına {@code yunSogumaOrani}
- * keser; aşırı soğukta bu kesinti {@code asiriSogukYunVerimi} ile küçülür ve donma yalnız yavaşlar. Termostat (madde 13c)
- * yalıtımı değiştirmez, vücudu nötre çeker; çekim uç ortamlarda azalır ama sıfıra inmez.
+ * keser; her Tüy Upgrade'i belirgin pay (0,10; zırh 0,05) ekler. Aşırı soğukta bu kesinti {@code asiriSogukYunVerimi} ile
+ * küçülür ve donma yalnız yavaşlar. Termostat (madde 13c) yalıtımı değiştirmez, vücudu nötre çeker; çekim uç ortamlarda azalır ama sıfıra inmez.
  */
 public final class Yalitim {
     private Yalitim() {
@@ -48,7 +48,7 @@ public final class Yalitim {
     public record Ayarlar(double zirhBasina, double yunBasina, double tuyBasina, double yunSogumaOrani,
             double asiriSogukYunVerimi, double termostatCekimi, double termostatIlimliSinir, double termostatUcSinir,
             double termostatTaban) {
-        public static final Ayarlar VARSAYILAN = new Ayarlar(0.05, 0.25, 0.04, 0.25, 0.75, 0.04, 40, 120, 0.25);
+        public static final Ayarlar VARSAYILAN = new Ayarlar(0.05, 0.25, 0.10, 0.25, 0.75, 0.04, 40, 120, 0.25);
 
         public Ayarlar {
             if (termostatUcSinir <= termostatIlimliSinir) {

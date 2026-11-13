@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "key": {
+    "/": {
+      "item": "minecraft:stick"
+    },
+    "K": {
+      "item": "dogalafetler:sogutma_kulcesi"
+    },
+    "M": {
+      "item": "dogalafetler:meteorit_parcasi"
+    },
+    "S": {
+      "item": "minecraft:string"
+    }
+  },
+  "pattern": [
+    "  K",
+    " /S",
+    "/ M"
+  ],
+  "result": {
+    "item": "dogalafetler:kutup_oltasi"
+  },
+  "show_notification": true
+}

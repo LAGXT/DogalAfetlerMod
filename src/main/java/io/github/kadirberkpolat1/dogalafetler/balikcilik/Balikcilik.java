@@ -4,9 +4,11 @@ import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.balikcilik.mantik.LootAgirliklari.Kategori;
 import io.github.kadirberkpolat1.dogalafetler.balikcilik.veri.BalikcilikVeriSaglayicilari;
 import io.github.kadirberkpolat1.dogalafetler.veri.DataGenerators;
+import io.github.kadirberkpolat1.dogalafetler.esya.sogutma.Sogutma;
 import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.tags.ItemTags;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.storage.loot.LootDataManager;
@@ -41,8 +43,12 @@ public final class Balikcilik {
         for (BalikcilikKayitlari.Balik b : BalikcilikKayitlari.Balik.values()) {
             DataGenerators.vanillaEsyaEtiketiEkle(ItemTags.FISHES, b::cig, b::pismis);
         }
+        for (BalikcilikKayitlari.OzelBalik b : BalikcilikKayitlari.OzelBalik.values()) {
+            DataGenerators.vanillaEsyaEtiketiEkle(ItemTags.FISHES, b::cig, b::pismis);
+        }
         // Lambda: sağlayıcı sınıfı (istemci model üreticilerine bağlı) yalnız datagen'de yüklenir (K-E9).
         DataGenerators.saglayiciEkle(olay -> BalikcilikVeriSaglayicilari.ekle(olay));
+        Sogutma.kaydet(modBus);
     }
 
     /** Açılışta balıkçılık tablolarının yüklendiği denetlenir ve tek satır log yazılır (dedicated kanıtı). */
@@ -55,6 +61,12 @@ public final class Balikcilik {
         for (Kategori k : Kategori.values()) {
             if (veri.getLootTable(BuzDeligiLootDegistirici.kategoriTablosu(k)) == LootTable.EMPTY) {
                 eksik.add(BuzDeligiLootDegistirici.kategoriTablosu(k).toString());
+            }
+        }
+        for (ResourceLocation tablo : new ResourceLocation[] {DenizLootDegistirici.ESYA_TABLOSU, DenizLootDegistirici.OZEL_TABLOSU,
+                DenizLootDegistirici.YINELEME_TABLOSU}) {
+            if (veri.getLootTable(tablo) == LootTable.EMPTY) {
+                eksik.add(tablo.toString());
             }
         }
         if (eksik.isEmpty()) {
@@ -71,9 +83,17 @@ public final class Balikcilik {
                 olay.accept(b.cig());
                 olay.accept(b.pismis());
             }
+            for (BalikcilikKayitlari.OzelBalik b : BalikcilikKayitlari.OzelBalik.values()) {
+                olay.accept(b.cig());
+                olay.accept(b.pismis());
+            }
         } else if (olay.getTabKey() == CreativeModeTabs.INGREDIENTS) {
             Item parca = BalikcilikKayitlari.BUZ_PARCASI.get();
             olay.accept(parca);
+            olay.accept(BalikcilikKayitlari.BUZLU_INCI.get());
+            olay.accept(BalikcilikKayitlari.TUZ_KRISTALI.get());
+        } else if (olay.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
+            olay.accept(BalikcilikKayitlari.KUTUP_OLTASI.get());
         }
     }
 }

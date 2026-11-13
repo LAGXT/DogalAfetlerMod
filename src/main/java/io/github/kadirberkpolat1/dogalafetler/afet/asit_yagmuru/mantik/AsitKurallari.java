@@ -28,15 +28,15 @@ public final class AsitKurallari {
 
     /**
      * Bir seviyenin değerleri; süreler tick. {@code yaricap}: yağmur her yerde yağar, aşınma her oyuncunun bu yarıçapı içinden
-     * örneklenir (AF2-05). Maruziyet hasarı seviyeden bağımsızdır ({@code hasarSaniye}).
+     * örneklenir (AF2-05). Maruziyet hasarı {@code hasarSaniye} × {@link #hasarCarpani} (S4 ×1,25, S5 ×2).
      */
     public record Seviye(int yaricap, int sureTick, double asindirmaSaniye, boolean tasAsinir) {
     }
 
     /** Seviye 1–5 tablosu (config listeleri); {@code tasSeviyesi} kırıktaş ve taş tuğlanın aşınmaya başladığı seviye. */
     public record Tablo(List<Integer> yaricap, List<Integer> sureSaniye, List<Double> asindirma, int tasSeviyesi) {
-        public static final Tablo VARSAYILAN = new Tablo(List.of(32, 48, 64, 96, 128), List.of(60, 90, 120, 180, 240),
-                List.of(2.0, 4.0, 7.0, 11.0, 16.0), 3);
+        public static final Tablo VARSAYILAN = new Tablo(List.of(32, 48, 64, 120, 192), List.of(60, 90, 120, 210, 300),
+                List.of(2.0, 4.0, 7.0, 14.0, 26.0), 3);
 
         public Seviye seviye(int seviye) {
             int s = Math.max(1, Math.min(5, seviye));
@@ -99,6 +99,15 @@ public final class AsitKurallari {
     public static double gorselCarpan(int seviye) {
         int s = Math.max(1, Math.min(5, seviye));
         return s == 1 ? 0.25 : 0.4 + 0.15 * (s - 1);
+    }
+
+    /**
+     * Seviyenin hasar çarpanı ({@code hasarSaniye} ile çarpılır): S1–S3 1, S4 1,25, S5 2 (S5'te yakıcı sağanığı; can yine
+     * {@code asitMinimumCan} altına inmez).
+     */
+    public static double hasarCarpani(int seviye) {
+        int s = Math.max(1, Math.min(5, seviye));
+        return s == 5 ? 2.0 : s == 4 ? 1.25 : 1.0;
     }
 
     /** Öldürmeme garantisi: hasar canı {@code enAzCan}'ın altına indirmez; 0 dönerse hasar verilmez. */

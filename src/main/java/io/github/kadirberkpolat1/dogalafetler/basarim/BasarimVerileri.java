@@ -37,7 +37,7 @@ import net.minecraftforge.data.event.GatherDataEvent;
 import net.minecraftforge.registries.ForgeRegistries;
 
 /**
- * Başarım veri paketi dosyaları (datagen, GOREV §3): sekmenin 28 advancement JSON'u
+ * Başarım veri paketi dosyaları (datagen, GOREV §3): sekmenin 46 advancement JSON'u (kök + 45; K-E74'te 18 yeni başarım)
  * ({@code data/dogalafetler/advancements/dogalafetler/*.json}), "hedef" ödül tablosu ({@code rewards/hedef}) ve #19'un
  * sıcak yiyecek etiketi ({@code basarim/sicak_yiyecek}, isteğe bağlı girdiler). JSON vanilla kurucularıyla
  * ({@code Advancement.Builder}, {@code LootTable}) üretilir. Tek {@code DataProvider}: vanilla

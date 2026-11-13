@@ -11,6 +11,9 @@ public final class GunesPatlamasiAyarlari {
      * artık 5–8 sn olduğundan eski 90 sn penceresi ön-uyarının tamamını kaplıyordu.
      */
     public static final int VARSAYILAN_ONCU_SANIYE = 5;
+    /** K-E72: AKTIF süresi (eski 5 gün); süre ile kavrulma başlangıcı birlikte kısaltıldı, kavrulma aktif sürenin içinde kalır. */
+    public static final double VARSAYILAN_AKTIF_SURE_GUN = 1.0;
+    public static final double VARSAYILAN_KAVRULMA_BASLANGIC_GUN = 0.4;
 
     private static AyarKaydi.Bolum<GunesPatlamasiAyarlari> bolum;
 
@@ -32,8 +35,8 @@ public final class GunesPatlamasiAyarlari {
         k.comment("Config göçünün sürümü (K-E61): dosya bundan eskiyse açılışta eski varsayılanında kalan güneş patlaması "
                 + "değerleri yeni varsayılana çekilir, elle değiştirilenlere dokunulmaz. Elle değiştirmeyin.")
                 .defineInRange("ayarSurumu", GunesPatlamasiAyarGocu.GUNCEL, 0, Integer.MAX_VALUE);
-        aktifSureGun = k.comment("Meteor ve kavrulma sürecinin uzunluğu, Minecraft günü (bölüm D: 5 gün); sonunda süpernova.")
-                .defineInRange("aktifSureGun", 5.0, 1.0, 10.0);
+        aktifSureGun = k.comment("Meteor ve kavrulma sürecinin uzunluğu, Minecraft günü (K-E72: eski 5 gün); sonunda süpernova.")
+                .defineInRange("aktifSureGun", VARSAYILAN_AKTIF_SURE_GUN, 1.0, 10.0);
         meteorBaslangic = k.comment("İlk gün oyuncu başına dakikadaki meteor (1,5 = 40 sn'de bir).")
                 .defineInRange("meteorBaslangicDakikaBasina", 1.5, 0.0, 30.0);
         meteorSon = k.comment("Sürecin sonunda oyuncu başına dakikadaki meteor (5 = 12 sn'de bir); arası doğrusal.")
@@ -56,8 +59,9 @@ public final class GunesPatlamasiAyarlari {
         meteorYagmuruDakikaBasina = k.comment("Meteor yağmurunda oyuncu başına dakikadaki meteor (180 = 3/sn); uçan meteor "
                 + "tavanı (meteor.varlikTavani) ve krater bütçesi geçerli kalır, tavan doluyken atılamayan meteor düşmez.")
                 .defineInRange("meteorYagmuruDakikaBasina", 180.0, 0.0, 300.0);
-        kavrulmaBaslangicGun = k.comment("Çimenin kaba toprağa dönmeye başladığı gün (afetBlokHasari kapalıyken hiç).")
-                .defineInRange("kavrulmaBaslangicGun", 3.0, 0.0, 10.0);
+        kavrulmaBaslangicGun = k.comment("Çimenin kaba toprağa dönmeye başladığı gün, aktif sürenin içinde olmalıdır",
+                "(afetBlokHasari kapalıyken hiç).")
+                .defineInRange("kavrulmaBaslangicGun", VARSAYILAN_KAVRULMA_BASLANGIC_GUN, 0.0, 10.0);
         kavrulmaOlasiligi = k.comment("Sürecin sonunda oyuncu başına her tick'teki kavrulma denemesinin olasılığı (doğrusal artış).")
                 .defineInRange("kavrulmaOlasiligi", 0.5, 0.0, 1.0);
         kavrulmaYaricap = k.comment("Kavrulmanın oyuncu çevresindeki yarıçapı, blok.")

@@ -9,6 +9,7 @@ import io.github.kadirberkpolat1.dogalafetler.donma.DonmaAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.donma.DonmaParcaciklari;
 import io.github.kadirberkpolat1.dogalafetler.donma.mantik.DonmaEsikleri;
 import io.github.kadirberkpolat1.dogalafetler.network.DonemPaketi;
+import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
@@ -163,6 +164,11 @@ public final class DonmaIstemciEfektleri {
         }
     }
 
+    /**
+     * Su yüzeyinden buhar. Görünen yüzey sanal deniz yükselmesinin yüzeyi olabilir (buharlaşma önce onu tüketir, N10): buhar
+     * gerçek bloktan değil görünen yüzeyden çıkar; sanal su tükenince gerçek su azalır (sunucu ilk bloğu derinlik eşiğini
+     * geçince kurutur).
+     */
     private static void buhar(ClientLevel level, LocalPlayer o, RandomSource r, double c) {
         BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
         for (int i = sayi(r, 6.0 * c); i > 0; i--) {
@@ -171,7 +177,9 @@ public final class DonmaIstemciEfektleri {
             int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z) - 1;
             BlockState s = level.getBlockState(p.set(x, y, z));
             if (s.is(Blocks.WATER) && s.getFluidState().isSource() && level.getBlockState(p.set(x, y + 1, z)).isAir()) {
-                level.addParticle(ParticleTypes.CLOUD, x + r.nextDouble(), y + 1.05, z + r.nextDouble(),
+                double sanal = SanalSu.suSeviyesi(level, x, z);
+                double yuzey = Double.isNaN(sanal) ? y + 1.05 : Math.max(y + 1.05, sanal + 0.05);
+                level.addParticle(ParticleTypes.CLOUD, x + r.nextDouble(), yuzey, z + r.nextDouble(),
                         (r.nextDouble() - 0.5) * 0.01, 0.015 + r.nextDouble() * 0.02, (r.nextDouble() - 0.5) * 0.01);
             }
         }

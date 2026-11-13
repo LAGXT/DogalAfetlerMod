@@ -2,6 +2,7 @@ package io.github.kadirberkpolat1.dogalafetler.afet.ay_carpmasi;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.afet.ay_carpmasi.mantik.AyEgrileri;
+import io.github.kadirberkpolat1.dogalafetler.afet.sel.SelSistemi;
 import io.github.kadirberkpolat1.dogalafetler.core.Afet;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetAsamasi;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
@@ -90,6 +91,7 @@ public final class AyCarpmasi extends Afet {
         DunyaDonemi donem = DunyaDonemi.al(level);
         donem.ayDurumuAyarla(AyDurumu.YOK, donem.saat());
         AfetYoneticisi.al(server).ayCarpmasiTsunamiCarpaniniEkle();
+        SelSistemi.ayCarpmasiOldu(server);
         // Parlama anında tam sessizlik: yaklaşma katmanları hemen kesilir, güm 1,5 sn sonra gelir.
         OrtamSesi.durdur(server, YAKLASMA_KATMANI, 4);
         OrtamSesi.durdur(server, CITIRTI_KATMANI, 4);

@@ -1,0 +1,8 @@
+{
+  "type": "dogalafetler:zirh_eki",
+  "category": "equipment",
+  "ek": "sogutmali",
+  "malzeme": {
+    "item": "dogalafetler:sogutma_plakasi"
+  }
+}

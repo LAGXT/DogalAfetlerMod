@@ -89,13 +89,58 @@ class CekirdekAyarGocuTest {
         assertTrue(CekirdekAyarGocu.plan(CekirdekAyarGocu.GUNCEL, dosya::get).isEmpty());
     }
 
+    /**
+     * K-E72: sürüm 2 dosyası (K-E67 varsayılanları) seviye 4-5, nadirlik, gün çarpanı ve nadir ağırlıklarıyla (zincirle sürüm 4'ün) yeni
+     * varsayılana çekilir.
+     */
     @Test
-    void tabloSurumSirasindaVeGuncelSurumIki() {
-        assertEquals(2, CekirdekAyarGocu.GUNCEL);
+    void surumIkiDunyasindaKE72VarsayilanlariUygulanir() {
+        Map<String, Object> dosya = new HashMap<>();
+        dosya.put("cekirdek.siddet.seviye3Gunu", 4);
+        dosya.put("cekirdek.siddet.seviye4Gunu", 9);
+        dosya.put("cekirdek.siddet.seviye5Gunu", 16);
+        dosya.put("cekirdek.siddet.nadirlikBaslangic", 0.5);
+        dosya.put("cekirdek.siddet.nadirlikSon", 0.8);
+        dosya.put("cekirdek.siddet.nadirlikGecisGunu", 60.0);
+        dosya.put("cekirdek.zamanlayici.siklikArtisCarpani", 8.0);
+        dosya.put("cekirdek.zamanlayici.siklikArtisGunu", 45.0);
+        dosya.put("cekirdek.afetler.ay_carpmasi.agirlik", 32);
+        dosya.put("cekirdek.afetler.gunes_patlamasi.agirlik", 40);
+        Map<String, Number> plan = CekirdekAyarGocu.plan(2, dosya::get);
+        assertEquals(S.seviye4Gunu(), plan.get("cekirdek.siddet.seviye4Gunu"));
+        assertEquals(S.seviye5Gunu(), plan.get("cekirdek.siddet.seviye5Gunu"));
+        assertEquals(S.nadirlikSon(), plan.get("cekirdek.siddet.nadirlikSon"));
+        assertEquals(Z.siklikArtisCarpani(), plan.get("cekirdek.zamanlayici.siklikArtisCarpani"));
+        assertEquals(Z.agirlik(AfetTuru.AY_CARPMASI), plan.get("cekirdek.afetler.ay_carpmasi.agirlik"));
+        assertFalse(plan.containsKey("cekirdek.afetler.gunes_patlamasi.agirlik"), "elle değişen 40 kalmalı");
+        assertEquals(9, plan.size(), plan.keySet().toString());
+    }
+
+    @Test
+    void tabloSurumSirasindaVeGuncelSurumDort() {
+        assertEquals(4, CekirdekAyarGocu.GUNCEL);
         int onceki = 1;
         for (SurumluGocPlani.Adim a : CekirdekAyarGocu.ADIMLAR) {
             assertTrue(a.surum() >= onceki && a.surum() <= CekirdekAyarGocu.GUNCEL, a.toString());
             onceki = a.surum();
         }
+        // Sürüm 3 dünyası (K-E72 varsayılanları): sürüm 4'ün nadirlik, günlük oran ve nadir ağırlık değerlerine çekilir.
+        Map<String, Object> s3 = new HashMap<>();
+        s3.put("cekirdek.siddet.nadirlikBaslangic", 0.7);
+        s3.put("cekirdek.siddet.nadirlikSon", 1.5);
+        s3.put("cekirdek.siddet.nadirlikGecisGunu", 150.0);
+        s3.put("cekirdek.zamanlayici.gunlukAfetOrani", 5.0);
+        s3.put("cekirdek.afetler.ay_carpmasi.agirlik", 50);
+        s3.put("cekirdek.afetler.gunes_patlamasi.agirlik", 35);
+        Map<String, Number> plan = CekirdekAyarGocu.plan(3, s3::get);
+        assertEquals(S.nadirlikBaslangic(), plan.get("cekirdek.siddet.nadirlikBaslangic"));
+        assertEquals(S.nadirlikSon(), plan.get("cekirdek.siddet.nadirlikSon"));
+        assertEquals(S.nadirlikGecisGunu(), plan.get("cekirdek.siddet.nadirlikGecisGunu"));
+        assertEquals(Z.gunlukAfetOrani(), plan.get("cekirdek.zamanlayici.gunlukAfetOrani"));
+        assertEquals(Z.agirlik(AfetTuru.AY_CARPMASI), plan.get("cekirdek.afetler.ay_carpmasi.agirlik"));
+        assertEquals(Z.agirlik(AfetTuru.GUNES_PATLAMASI), plan.get("cekirdek.afetler.gunes_patlamasi.agirlik"));
+        assertEquals(6, plan.size(), plan.keySet().toString());
+        Map<String, Object> elle = Map.of("cekirdek.afetler.ay_carpmasi.agirlik", 70, "cekirdek.siddet.nadirlikSon", 1.2);
+        assertTrue(CekirdekAyarGocu.plan(3, elle::get).isEmpty(), "elle değiştirilen değerlere dokunulmaz");
     }
 }

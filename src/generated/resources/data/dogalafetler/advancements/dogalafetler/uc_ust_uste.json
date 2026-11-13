@@ -1,0 +1,38 @@
+{
+  "parent": "dogalafetler:dogalafetler/firtinaya_meydan_oku",
+  "criteria": {
+    "olcut": {
+      "conditions": {
+        "min": 3
+      },
+      "trigger": "dogalafetler:seri_hayatta"
+    }
+  },
+  "display": {
+    "announce_to_chat": false,
+    "description": {
+      "translate": "advancements.dogalafetler.uc_ust_uste.description"
+    },
+    "frame": "goal",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:golden_apple"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.uc_ust_uste.title"
+    }
+  },
+  "requirements": [
+    [
+      "olcut"
+    ]
+  ],
+  "rewards": {
+    "experience": 40,
+    "loot": [
+      "dogalafetler:rewards/hedef"
+    ]
+  },
+  "sends_telemetry_event": true
+}

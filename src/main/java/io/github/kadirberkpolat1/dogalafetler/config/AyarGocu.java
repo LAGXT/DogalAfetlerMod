@@ -62,7 +62,7 @@ final class AyarGocu {
             }
             for (Map.Entry<String, List<String>> e : k.listePlani(surum, icerik::get).entrySet()) {
                 degisen.add(e.getKey() + " eski varsayılan liste → yeni varsayılan (" + e.getValue().size() + " satır)");
-                icerik.set(e.getKey(), new ArrayList<>(e.getValue()));
+                icerik.set(e.getKey(), listeDegeri(icerik.get(e.getKey()), e.getValue()));
             }
             icerik.set(k.surumYolu(), k.guncel());
             ozet.add(k.surumYolu() + " " + surum + " → " + k.guncel()
@@ -93,6 +93,27 @@ final class AyarGocu {
                 }
             }
         }
+    }
+
+    /**
+     * Yeni varsayılan listenin dosyaya yazılacak hâli: dosyadaki eski liste yalnız sayılardan oluşuyorsa öğeler sayı olarak yazılır
+     * (ondalık noktası olanlar {@code Double}, diğerleri {@code Integer}/{@code Long}); yoksa dizgi listesi olarak. Böylece sayı
+     * listeleri Forge'un tür denetiminden geçmeye devam eder.
+     */
+    static List<Object> listeDegeri(Object eski, List<String> yeni) {
+        boolean sayisal = eski instanceof List<?> l && !l.isEmpty() && l.stream().allMatch(Number.class::isInstance);
+        List<Object> sonuc = new ArrayList<>(yeni.size());
+        for (String s : yeni) {
+            if (!sayisal) {
+                sonuc.add(s);
+            } else if (s.contains(".") || s.contains("e") || s.contains("E")) {
+                sonuc.add(Double.valueOf(s));
+            } else {
+                long n = Long.parseLong(s);
+                sonuc.add(n >= Integer.MIN_VALUE && n <= Integer.MAX_VALUE ? (Object) Integer.valueOf((int) n) : (Object) Long.valueOf(n));
+            }
+        }
+        return sonuc;
     }
 
     /** {@code <dosya>.bak-ayarSurumu<surum>}; varsa üzerine yazılmaz, {@code -2}, {@code -3}, … eklenir. */

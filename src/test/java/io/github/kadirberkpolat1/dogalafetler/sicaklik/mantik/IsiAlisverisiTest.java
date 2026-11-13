@@ -52,7 +52,7 @@ class IsiAlisverisiTest {
         double yaklasinca = Math.abs(egilim(-50, -30, CIPLAK));
         assertTrue(yaklasinca < basta / 2, basta + " / " + yaklasinca);
         double birSaniye = benzet(0, -30, Etkinlik.YURUME, KURU, CIPLAK, 1);
-        assertTrue(birSaniye < 0 && birSaniye > -2, "anında eşitlenmemeli: " + birSaniye);
+        assertTrue(birSaniye < 0 && birSaniye > -8, "anında eşitlenmemeli: " + birSaniye);
     }
 
     @Test
@@ -163,7 +163,7 @@ class IsiAlisverisiTest {
         assertEquals(Kademe.YANIYOR, Esikler.VARSAYILAN.kademe(ilik), "ılık ortamda: " + ilik);
         double ciplakIlik = benzet(0, 22, Etkinlik.YURUME, KURU, CIPLAK, 3600);
         assertEquals(Kademe.NOTR, Esikler.VARSAYILAN.kademe(ciplakIlik), "çıplak ılık: " + ciplakIlik);
-        Yalitim.Girdi orta = new Yalitim.Girdi(4, 0, 4 * 8, 0);
+        Yalitim.Girdi orta = new Yalitim.Girdi(4, 0, 4 * 3, 0);
         double soguk = benzet(0, NORMAL_SOGUK, Etkinlik.YURUME, KURU, orta, 3600);
         assertEquals(Kademe.NOTR, Esikler.VARSAYILAN.kademe(soguk), "soğukta tüylü: " + soguk);
     }

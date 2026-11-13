@@ -20,9 +20,9 @@ public record IcYikimSeviyesi(int seviye, double olcek, double dekorOlasiligi, d
     public static final int SUTUN_DERINLIGI = 24;
 
     private static final double[] OLCEK = {0, 0.5, 0.75, 1.0, 1.75};
-    private static final double[] DEKOR = {0, 0.3, 0.5, 0.7, 0.9};
-    private static final double[] YAPRAK = {0, 0, 0.25, 0.4, 0.6};
-    private static final double[] TAVAN = {0, 0, 0, 0.5, 0.8};
+    private static final double[] DEKOR = {0, 0.3, 0.5, 0.75, 0.95};
+    private static final double[] YAPRAK = {0, 0, 0.25, 0.5, 0.85};
+    private static final double[] TAVAN = {0, 0, 0, 0.6, 0.95};
     private static final float[] SERTLIK = {0, 0, 0, 0.8f, 1.0f};
 
     public static IcYikimSeviyesi seviye(int seviye) {

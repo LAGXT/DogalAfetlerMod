@@ -2,6 +2,7 @@ package io.github.kadirberkpolat1.dogalafetler.donma;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.config.AyarKaydi;
+import io.github.kadirberkpolat1.dogalafetler.donma.mantik.DonmaAyarGocu;
 import io.github.kadirberkpolat1.dogalafetler.donma.mantik.DonmaEsikleri;
 import io.github.kadirberkpolat1.dogalafetler.donma.mantik.KisAlani;
 import io.github.kadirberkpolat1.dogalafetler.donma.mantik.YetismeButcesi;
@@ -27,6 +28,7 @@ public final class DonmaAyarlari {
     public static void kaydet() {
         sunucu = AyarKaydi.sunucuBolumu("donma", "Dünya donması, çözülme ve buharlaşma (madde 9, N9, N10)", Sunucu::new);
         istemci = AyarKaydi.istemciBolumu("donma", "Dünya donması efektleri (madde 9)", Istemci::new);
+        AyarKaydi.sunucuGocu(DonmaAyarGocu.PLAN);
     }
 
     private static Sunucu s() {
@@ -191,8 +193,11 @@ public final class DonmaAyarlari {
         final ForgeConfigSpec.DoubleValue buharlasmaSuresi;
 
         Sunucu(ForgeConfigSpec.Builder k) {
-            donmaSuresi = k.comment("Süpernova sonrası donmanın %0'dan %100'e süresi (Minecraft günü; madde 9 'birkaç gün').")
-                    .defineInRange("donmaSuresi", 6.0, 0.05, 365.0);
+            k.comment("Config göçünün sürümü (K-E61): dosya bundan eskiyse açılışta eski varsayılanında kalan donma değerleri yeni "
+                    + "varsayılana çekilir, elle değiştirilenlere dokunulmaz. Elle değiştirmeyin.")
+                    .defineInRange("ayarSurumu", DonmaAyarGocu.GUNCEL, 0, Integer.MAX_VALUE);
+            donmaSuresi = k.comment("Süpernova sonrası donmanın %0'dan %100'e süresi (Minecraft günü; K-E72: eski 6 gün).")
+                    .defineInRange("donmaSuresi", DonmaAyarGocu.YENI_DONMA_SURESI, 0.05, 365.0);
             cozulmeSuresi = k.comment("Kızıl cüce çözülmesinin %100'den tabana süresi (Minecraft günü; madde 9 varsayılan 10).")
                     .defineInRange("cozulmeSuresi", 10.0, 0.05, 365.0);
             cozulmeTabani = k.comment("Çözülmenin indiği taban ilerleme (%; madde 9 varsayılan 40). Dünya tamamen erimez.")

@@ -18,6 +18,7 @@ public final class Meteor {
         MeteorSesleri.kaydet(modBus);
         MeteorEsyaKayitlari.kaydet(modBus);
         Termostat.kaydet();
+        MeteorZirhi.kaydet();
         AgKanali.kaydet(k -> k.sunucudanIstemciye("meteor/sarsinti", MeteorSarsintiPaketi.class, MeteorSarsintiPaketi::yaz,
                 MeteorSarsintiPaketi::oku, MeteorSarsintiPaketi::isle));
         KomutKaydi.ekle(MeteorKomutlari.komut());

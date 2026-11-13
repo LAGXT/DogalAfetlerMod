@@ -25,7 +25,7 @@ class OrmanKurallariTest {
             onceki = v;
         }
         assertEquals(new Seviye(3, 0.0, 2400), Tablo.VARSAYILAN.seviye(1));
-        assertEquals(new Seviye(24, 1.0, 9600), Tablo.VARSAYILAN.seviye(5));
+        assertEquals(new Seviye(40, 1.0, 14400), Tablo.VARSAYILAN.seviye(5));
         assertEquals(Tablo.VARSAYILAN.seviye(5), Tablo.VARSAYILAN.seviye(7));
     }
 

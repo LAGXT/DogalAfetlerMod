@@ -25,21 +25,24 @@ class SeviyeDurumuTest {
 
     @Test
     void sifirOlanSeviyeninNedeniVerilir() {
-        SeviyeDurumu erken = SeviyeDurumu.hesapla(A, 5, 5, 5, false, 1.0);
+        SeviyeDurumu erken = SeviyeDurumu.hesapla(A, 3, 3, 5, false, 1.0);
         assertEquals(0.0, erken.olasilik(4));
         assertEquals(Optional.of(SiddetSecici.KapaliNeden.GUN), erken.neden(4));
         assertEquals(Optional.of(SiddetSecici.KapaliNeden.GUN), erken.neden(5));
         assertEquals(Optional.empty(), erken.neden(3));
 
+        SeviyeDurumu serbest = SeviyeDurumu.hesapla(A, 100, 100, 5, false, 1.0);
         SeviyeDurumu artArda = SeviyeDurumu.hesapla(A, 100, 100, 5, true, 1.0);
-        assertEquals(Optional.of(SiddetSecici.KapaliNeden.ART_ARDA), artArda.neden(4));
-        assertEquals(Optional.of(SiddetSecici.KapaliNeden.ART_ARDA), artArda.neden(5));
+        assertEquals(Optional.empty(), artArda.neden(4), "art arda 4-5 yasak değil, seyreltilir");
+        assertEquals(Optional.empty(), artArda.neden(5));
+        assertTrue(artArda.olasilik(4) > 0 && artArda.olasilik(4) < serbest.olasilik(4));
+        assertTrue(artArda.olasilik(5) > 0 && artArda.olasilik(5) < serbest.olasilik(5));
 
         SeviyeDurumu maks = SeviyeDurumu.hesapla(A, 100, 100, 3, false, 1.0);
         assertEquals(Optional.of(SiddetSecici.KapaliNeden.MAKS), maks.neden(4));
         assertEquals(3, maks.maks());
 
-        SeviyeDurumu gelisim = SeviyeDurumu.hesapla(A.gelisimIle(true, 2.0), 100, 6, 5, false, 1.0);
+        SeviyeDurumu gelisim = SeviyeDurumu.hesapla(A.gelisimIle(true, 2.0), 100, 3, 5, false, 1.0);
         assertEquals(Optional.of(SiddetSecici.KapaliNeden.GELISIM), gelisim.neden(4));
     }
 

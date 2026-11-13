@@ -73,7 +73,7 @@ public final class YanginYoneticisi {
     private static final int OZET_HUCRE_TAVANI = 48;
     private static final int BUHAR_TAVANI = 32;
     private static final double OYUNCUSUZ_MESAFE_KARE = 1.0e6;
-    private static final int EN_BUYUK_ALAN_YARICAPI = 24;
+    private static final int EN_BUYUK_ALAN_YARICAPI = 48;
 
     private static final Map<ResourceKey<Level>, YanginVerisi> VERILER = new ConcurrentHashMap<>();
     private static volatile DoubleSupplier kismaKaynagi = TpsOlcer::kismaCarpani;

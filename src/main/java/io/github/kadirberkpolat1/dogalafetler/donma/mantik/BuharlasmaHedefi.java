@@ -17,9 +17,15 @@ public final class BuharlasmaHedefi {
         return (float) Math.min(enCok, derinlik + enCok * adim / (sureGun * DonmaIlerlemesi.GUN_TICK));
     }
 
-    /** Gerçek suya uygulanan tam blok derinliği. */
+    /** Derinlik bu eşiği aşınca ilk blok kurur (istemci buharı da bu eşikten çıkar; efekt çıkan su gerçekten azalır). */
+    public static final double ESIK = 0.01;
+
+    /**
+     * Gerçek suya uygulanan tam blok derinliği: kısmi derinlik yukarı yuvarlanır ({@code ESIK} üstü ilk blok), böylece buhar
+     * çıkar çıkmaz ilk blok kurur; derinlik {@code enCok} (tam sayı) olunca en çok o kadar blok kalkar.
+     */
     public static int etkinDerinlik(float derinlik, double sanalPay) {
-        return (int) Math.floor(Math.max(0.0, derinlik - Math.max(0.0, sanalPay)));
+        return (int) Math.ceil(Math.max(0.0, derinlik - Math.max(0.0, sanalPay)) - ESIK);
     }
 
     /** {@code orijinalSuDerinligi} blokluk su sütununun üstten kaç bloğu kurumuş olmalı. */

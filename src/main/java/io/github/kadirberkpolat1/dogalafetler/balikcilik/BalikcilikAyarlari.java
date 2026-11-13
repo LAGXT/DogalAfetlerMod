@@ -1,5 +1,6 @@
 package io.github.kadirberkpolat1.dogalafetler.balikcilik;
 
+import io.github.kadirberkpolat1.dogalafetler.balikcilik.mantik.BalikcilikAyarGocu;
 import io.github.kadirberkpolat1.dogalafetler.balikcilik.mantik.DelikOmru;
 import io.github.kadirberkpolat1.dogalafetler.balikcilik.mantik.HareketsizlikSogumasi;
 import io.github.kadirberkpolat1.dogalafetler.balikcilik.mantik.IsirmaSuresi;
@@ -9,7 +10,8 @@ import net.minecraftforge.common.ForgeConfigSpec;
 
 /**
  * {@code balikcilik} SERVER config bölümü (madde 15, N17; varsayılanlar ve gerekçeleri {@code .vibe/kararlar/balikcilik.md}
- * §C). Ters girilmiş aralıklar (en az &gt; en çok) okunurken sıraya sokulur.
+ * §C). Ters girilmiş aralıklar (en az &gt; en çok) okunurken sıraya sokulur. Eski varsayılanlar
+ * {@link BalikcilikAyarGocu} ile yenisine çekilir (K-E61).
  */
 public final class BalikcilikAyarlari {
     private static AyarKaydi.Bolum<BalikcilikAyarlari> bolum;
@@ -24,17 +26,22 @@ public final class BalikcilikAyarlari {
     private final ForgeConfigSpec.IntValue isirmaEnCokSn;
     private final ForgeConfigSpec.IntValue lureKisaltmaSn;
     private final ForgeConfigSpec.IntValue isirmaTabanSn;
+    private final ForgeConfigSpec.DoubleValue kutupHizCarpani;
     private final ForgeConfigSpec.IntValue agirlikYaygin;
     private final ForgeConfigSpec.IntValue agirlikOrta;
     private final ForgeConfigSpec.IntValue agirlikNadir;
     private final ForgeConfigSpec.IntValue agirlikCop;
     private final ForgeConfigSpec.IntValue agirlikHazine;
+    private final ForgeConfigSpec.IntValue agirlikEsya;
+    private final ForgeConfigSpec.IntValue agirlikOzel;
     private final ForgeConfigSpec.IntValue sansCopAzalmasi;
     private final ForgeConfigSpec.IntValue sansHazineArtisi;
     private final ForgeConfigSpec.DoubleValue sogutmaEnCokC;
     private final ForgeConfigSpec.IntValue sogutmaTamSureSn;
 
     private BalikcilikAyarlari(ForgeConfigSpec.Builder k) {
+        k.comment("Config sürümü (göç için; elle değiştirmeyin).")
+                .defineInRange("ayarSurumu", BalikcilikAyarGocu.GUNCEL, 0, Integer.MAX_VALUE);
         aktiflikEsigi = k.comment("Buz deliği açılabilmesi için en az global donma ilerlemesi (%). Kızıl cüce döneminde donmuş",
                 "su yüzeylerinde eşik aranmaz (madde 15).").defineInRange("aktiflikEsigi", 30, 0, 100);
         delikOmruEnAzSn = k.comment("Deliğin yeniden donana kadarki en kısa ömrü (sn).")
@@ -47,12 +54,18 @@ public final class BalikcilikAyarlari {
                 .defineInRange("chunkBasinaDelik", 4, 0, 64);
         aletHasari = k.comment("Delik açan kazma/baltanın kaybettiği dayanıklılık (madde 15: 5).")
                 .defineInRange("aletHasari", 5, 0, 100);
-        isirmaEnAzSn = k.comment("Lure'suz en kısa ısırma süresi (sn; madde 15: 30–60).")
-                .defineInRange("isirmaEnAzSn", 30, 1, 600);
-        isirmaEnCokSn = k.comment("Lure'suz en uzun ısırma süresi (sn).").defineInRange("isirmaEnCokSn", 60, 1, 600);
-        lureKisaltmaSn = k.comment("Lure seviyesi başına kısaltma (sn; vanilla 5).").defineInRange("lureKisaltmaSn", 5, 0, 60);
-        isirmaTabanSn = k.comment("Lure ile inilebilecek en kısa ısırma süresi (sn).")
+        isirmaEnAzSn = k.comment("Normal olta (buz deliği ve açık deniz) Lure'suz en kısa ısırma süresi (sn): en yaygın şeyin süresinin alt sınırı.",
+                "Buz deliğinde süre çıkacak şeyin nadirliğine göre aralığın diliminden seçilir: yaygın %0–20, orta %20–60, nadir %60–100;",
+                "açık denizde tüm aralıktan. Kutup Oltası bu değerleri kutupHizCarpani ile küçültür.")
+                .defineInRange("isirmaEnAzSn", 10, 1, 600);
+        isirmaEnCokSn = k.comment("Normal olta Lure'suz en uzun ısırma süresi (sn): en nadir şeyin süresinin üst sınırı.")
+                .defineInRange("isirmaEnCokSn", 60, 1, 600);
+        lureKisaltmaSn = k.comment("Normal olta Lure seviyesi başına kısaltma (sn).").defineInRange("lureKisaltmaSn", 6, 0, 60);
+        isirmaTabanSn = k.comment("Normal oltada Lure ile inilebilecek en kısa ısırma süresi (sn).")
                 .defineInRange("isirmaTabanSn", 10, 3, 600);
+        kutupHizCarpani = k.comment("Kutup Oltası'nın ısırma süresi çarpanı: normal olta aralığı, Lure kısaltması ve taban bu oranla",
+                "küçülür (0,5 = 2 kat hızlı: varsayılan 5–30 sn). 1,0 = normal olta ile aynı.")
+                .defineInRange("kutupHizCarpani", 0.5, 0.1, 1.0);
         agirlikYaygin = k.comment("Kategori ağırlıkları (oran = ağırlık / toplam). Yaygın: Buz Alabalığı, Kutup Morinası.")
                 .defineInRange("agirlikYaygin", LootAgirliklari.VARSAYILAN.yaygin(), 0, 1000);
         agirlikOrta = k.comment("Orta: Derin Soğuk Somonu, Buz Kefali.")
@@ -61,6 +74,11 @@ public final class BalikcilikAyarlari {
         agirlikCop = k.comment("Çöp: Buz Parçası, Kar Topu.").defineInRange("agirlikCop", LootAgirliklari.VARSAYILAN.cop(), 0, 1000);
         agirlikHazine = k.comment("Hazine: büyülü kitap (Frost Walker / Lure / Luck of the Sea). Meteor ödülü hiç çıkmaz.")
                 .defineInRange("agirlikHazine", LootAgirliklari.VARSAYILAN.hazine(), 0, 1000);
+        agirlikEsya = k.comment("Eşya: Soğutma Parçası, Tuz Kristali, Buzlu İnci (her olta ile).")
+                .defineInRange("agirlikEsya", LootAgirliklari.VARSAYILAN.esya(), 0, 1000);
+        agirlikOzel = k.comment("Özel kutup balıkları (Kristal Levrek, Kutup Yılanbalığı, Aurora Balığı): yalnız Kutup Oltası'yla",
+                "atılınca havuza eklenir; başka olta ile bu ağırlık yok sayılır.")
+                .defineInRange("agirlikOzel", LootAgirliklari.VARSAYILAN.ozel(), 0, 1000);
         sansCopAzalmasi = k.comment("Şans (Luck of the Sea, şans efekti) seviyesi başına çöp ağırlığı azalması.")
                 .defineInRange("sansCopAzalmasi", LootAgirliklari.VARSAYILAN.sansCopAzalmasi(), 0, 100);
         sansHazineArtisi = k.comment("Şans seviyesi başına hazine ağırlığı artışı.")
@@ -72,6 +90,7 @@ public final class BalikcilikAyarlari {
     }
 
     public static void kaydet() {
+        AyarKaydi.sunucuGocu(BalikcilikAyarGocu.PLAN);
         bolum = AyarKaydi.sunucuBolumu("balikcilik", "Buz altı balıkçılık (madde 15)", BalikcilikAyarlari::new);
     }
 
@@ -98,6 +117,7 @@ public final class BalikcilikAyarlari {
         return s().aletHasari.get();
     }
 
+    /** Normal oltanın ısırma süresi ayarları (buz deliği ve açık deniz). */
     public static IsirmaSuresi.Ayarlar isirma() {
         BalikcilikAyarlari c = s();
         int a = c.isirmaEnAzSn.get() * 20;
@@ -106,12 +126,19 @@ public final class BalikcilikAyarlari {
                 c.isirmaTabanSn.get() * 20);
     }
 
+    /** {@code kutup} ise Kutup Oltası'nın ({@code kutupHizCarpani} ile küçülmüş), değilse normal oltanın ısırma ayarları. */
+    public static IsirmaSuresi.Ayarlar isirma(boolean kutup) {
+        IsirmaSuresi.Ayarlar normal = isirma();
+        return kutup ? IsirmaSuresi.olcekle(normal, s().kutupHizCarpani.get()) : normal;
+    }
+
     /** Kategori ağırlıkları; config yüklenmediyse ya da hepsi 0 ise varsayılan. */
     public static LootAgirliklari lootAgirliklari() {
         try {
             BalikcilikAyarlari c = s();
             return new LootAgirliklari(c.agirlikYaygin.get(), c.agirlikOrta.get(), c.agirlikNadir.get(), c.agirlikCop.get(),
-                    c.agirlikHazine.get(), c.sansCopAzalmasi.get(), c.sansHazineArtisi.get());
+                    c.agirlikHazine.get(), c.agirlikEsya.get(), c.agirlikOzel.get(), c.sansCopAzalmasi.get(),
+                    c.sansHazineArtisi.get());
         } catch (IllegalStateException | IllegalArgumentException yok) {
             return LootAgirliklari.VARSAYILAN;
         }

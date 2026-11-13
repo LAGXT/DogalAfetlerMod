@@ -1,0 +1,35 @@
+{
+  "parent": "dogalafetler:dogalafetler/dalga_avcisi",
+  "criteria": {
+    "ozel": {
+      "conditions": {
+        "anahtar": "sifon"
+      },
+      "trigger": "dogalafetler:ozel_basarim"
+    }
+  },
+  "display": {
+    "announce_to_chat": false,
+    "description": {
+      "translate": "advancements.dogalafetler.sifon.description"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:water_bucket"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.sifon.title"
+    }
+  },
+  "requirements": [
+    [
+      "ozel"
+    ]
+  ],
+  "rewards": {
+    "experience": 15
+  },
+  "sends_telemetry_event": true
+}

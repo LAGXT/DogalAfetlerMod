@@ -50,8 +50,8 @@ class KasirgaYikimiTest {
         assertEquals(1, KasirgaYikimi.derinlik(1));
         assertEquals(1, KasirgaYikimi.derinlik(2));
         assertEquals(3, KasirgaYikimi.derinlik(3));
-        assertEquals(4, KasirgaYikimi.derinlik(4));
-        assertEquals(6, KasirgaYikimi.derinlik(5));
+        assertEquals(5, KasirgaYikimi.derinlik(4));
+        assertEquals(8, KasirgaYikimi.derinlik(5));
         for (int l = 2; l <= 5; l++) {
             assertTrue(KasirgaYikimi.derinlik(l) >= KasirgaYikimi.derinlik(l - 1));
         }
@@ -115,9 +115,9 @@ class KasirgaYikimiTest {
         KasirgaYikimi.Butce s1 = KasirgaYikimi.butce(1, KasirgaSeviyesi.icin(1).blokKaldirmaTick(), 1, 1);
         KasirgaYikimi.Butce s5 = KasirgaYikimi.butce(5, KasirgaSeviyesi.icin(5).blokKaldirmaTick(), 1, 1);
         assertEquals(new KasirgaYikimi.Butce(2, 1, 0, 1.0 / 16), s1, "S1 K-04 ile aynı");
-        assertEquals(80, s5.deneme(), "S5 32 blok/tick × 2,5");
+        assertEquals(102, s5.deneme(), "S5 32 blok/tick × 3,2");
         assertEquals(8, s5.parca(), "S5 parça tavanı K-04 ile aynı (¼)");
-        assertEquals(12, s5.kutuk());
+        assertEquals(16, s5.kutuk());
         assertEquals(1.0 / 16, s5.esyaPayi(), E);
         assertSame(KasirgaYikimi.Butce.YOK, KasirgaYikimi.butce(3, 8, 0, 1), "evre payı 0: yıkım yok");
         assertSame(KasirgaYikimi.Butce.YOK, KasirgaYikimi.butce(3, 0, 1, 1), "blokCarpani 0: yıkım yok");

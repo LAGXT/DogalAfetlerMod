@@ -8,6 +8,7 @@ import io.github.kadirberkpolat1.dogalafetler.afet.gunes_patlamasi.GunesPatlamas
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.KasirgaSistemi;
 import io.github.kadirberkpolat1.dogalafetler.afet.orman_yangini.OrmanSistemi;
 import io.github.kadirberkpolat1.dogalafetler.afet.ortak.AfetBloklari;
+import io.github.kadirberkpolat1.dogalafetler.afet.sel.SelSistemi;
 import io.github.kadirberkpolat1.dogalafetler.afet.sinkhole.SinkholeSistemi;
 import io.github.kadirberkpolat1.dogalafetler.afet.tsunami.Tsunami;
 import io.github.kadirberkpolat1.dogalafetler.balikcilik.Balikcilik;
@@ -22,14 +23,17 @@ import io.github.kadirberkpolat1.dogalafetler.donma.DonmaSistemi;
 import io.github.kadirberkpolat1.dogalafetler.esya.EsyaKayitlari;
 import io.github.kadirberkpolat1.dogalafetler.esya.ModSekmesi;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.GokyuzuSistemi;
+import io.github.kadirberkpolat1.dogalafetler.journal.Defter;
 import io.github.kadirberkpolat1.dogalafetler.komut.CekirdekKomutlari;
 import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import io.github.kadirberkpolat1.dogalafetler.meteor.Meteor;
 import io.github.kadirberkpolat1.dogalafetler.network.AgKanali;
+import io.github.kadirberkpolat1.dogalafetler.rehber.Rehber;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.Sicaklik;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
 import io.github.kadirberkpolat1.dogalafetler.su.SuAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.uyari.Uyari;
+import io.github.kadirberkpolat1.dogalafetler.uyum.Uyum;
 import io.github.kadirberkpolat1.dogalafetler.veri.DataGenerators;
 import io.github.kadirberkpolat1.dogalafetler.yangin.YanginSistemi;
 import io.github.kadirberkpolat1.dogalafetler.yiyecek.Yiyecek;
@@ -69,6 +73,7 @@ public final class DogalAfetler {
         OrmanSistemi.kaydet();
         KasirgaSistemi.kaydet(modBus);
         Tsunami.kaydet(modBus);
+        SelSistemi.kaydet();
         AfetBloklari.kaydet();
         OyunTestiAfeti.ozelliktenKaydet();
         SuAyarlari.kaydet();
@@ -84,6 +89,9 @@ public final class DogalAfetler {
         Meteor.kaydet(modBus);
         Balikcilik.kaydet(modBus);
         Basarim.kaydet(modBus);
+        Defter.kaydet(modBus);
+        Rehber.kaydet();
+        Uyum.kaydet();
         Kancalar.bagla();
 
         DataGenerators.ceviriEkle(CekirdekCevirileri::yaz);

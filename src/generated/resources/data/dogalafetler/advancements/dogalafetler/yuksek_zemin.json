@@ -1,0 +1,35 @@
+{
+  "parent": "dogalafetler:dogalafetler/dalga_avcisi",
+  "criteria": {
+    "ozel": {
+      "conditions": {
+        "anahtar": "yuksek_zemin"
+      },
+      "trigger": "dogalafetler:ozel_basarim"
+    }
+  },
+  "display": {
+    "announce_to_chat": false,
+    "description": {
+      "translate": "advancements.dogalafetler.yuksek_zemin.description"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:stone_stairs"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.yuksek_zemin.title"
+    }
+  },
+  "requirements": [
+    [
+      "ozel"
+    ]
+  ],
+  "rewards": {
+    "experience": 15
+  },
+  "sends_telemetry_event": true
+}

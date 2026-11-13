@@ -216,7 +216,7 @@ class DepremMantigiTest {
         double s3 = ArtciSarsintisi.genlik(DepremSeviyesi.varsayilan(3).kameraGenligi(), 0.15);
         double s5 = ArtciSarsintisi.genlik(DepremSeviyesi.varsayilan(5).kameraGenligi(), 0.15);
         assertEquals(0.225, s3, 1e-12);
-        assertEquals(0.6, s5, 1e-12);
+        assertEquals(0.69, s5, 1e-12);
         assertEquals(s3, ArtciSarsintisi.genlikOku(ArtciSarsintisi.hacim(s3)), 1e-6, "eğri tepesinden geri okunur");
         assertEquals(s5, ArtciSarsintisi.genlikOku(ArtciSarsintisi.hacim(s5)), 1e-6);
         assertTrue(ArtciSarsintisi.hacim(s5) > ArtciSarsintisi.hacim(s3), "büyük depremin artçısı daha gür");

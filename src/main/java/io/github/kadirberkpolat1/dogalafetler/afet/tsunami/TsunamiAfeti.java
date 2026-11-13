@@ -13,7 +13,9 @@ import io.github.kadirberkpolat1.dogalafetler.kural.Kurallar;
 import io.github.kadirberkpolat1.dogalafetler.su.Cekilme;
 import io.github.kadirberkpolat1.dogalafetler.su.Dalga;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
+import io.github.kadirberkpolat1.dogalafetler.su.Seritler;
 import io.github.kadirberkpolat1.dogalafetler.su.SuAyarlari;
+import io.github.kadirberkpolat1.dogalafetler.su.SuKalicilik;
 import io.github.kadirberkpolat1.dogalafetler.uyari.HacimEgrisi;
 import io.github.kadirberkpolat1.dogalafetler.uyari.OrtamSesi;
 import java.util.ArrayList;
@@ -73,6 +75,8 @@ public final class TsunamiAfeti extends Afet {
     private final List<BlockPos> magaraDenemeleri = new ArrayList<>();
     private final Set<UUID> suruklenenler = new HashSet<>();
     private final TsunamiYikimi yikim = new TsunamiYikimi();
+    /** Cephe şeritleri: engele çarpan şerit durur, dolanan alçak kalır, karada yükseklik mesafeyle azalır (K-E76). */
+    private Seritler seritler = Seritler.YOK;
     private final double[] itme = new double[2];
     private boolean yuklemeDenetimi;
 
@@ -172,6 +176,7 @@ public final class TsunamiAfeti extends Afet {
         cekilme = SanalSu.cekilmeBaslat(level, new Cekilme(geometri.x(-mesafe / 2, 0), geometri.z(-mesafe / 2, 0),
                 Math.max(mesafe * 1.5, genislik() * 0.3), sv.cekilmeDerinligi(cekilmeCarpani), simdi,
                 Math.round(a.cekilmeSn.get() * 20)));
+        seritler = TsunamiSeritleri.hesapla(level, geometri, genislik(), aciklik(), karaGiris(), taban, sv.yukseklik(), sv);
         long gecikme = olcek != null ? olcek.gecikme() : Math.round(a.dalgaGecikmeSn.get() * 20);
         b1 = simdi + gecikme;
         h1 = sv.yukseklik() * TsunamiSeviyesi.siglasma(1);
@@ -187,7 +192,7 @@ public final class TsunamiAfeti extends Afet {
         TsunamiSeviyesi sv = sv();
         double uzunluk = olcek != null ? olcek.uzunluk() : sv.uzunluk();
         return new Dalga(geometri.x(-aciklik(), 0), geometri.z(-aciklik(), 0), geometri.yonX(), geometri.yonZ(), baslangic,
-                sv.hizTick(), yukseklik, genislik(), uzunluk, taban, menzil(), sv.ivme(), sv.hasar());
+                sv.hizTick(), yukseklik, genislik(), uzunluk, taban, menzil(), sv.ivme(), sv.hasar(), seritler);
     }
 
     /** Cephenin kıyı çizgisine göre konumu (artı: karada); dalga henüz doğmadıysa -∞. */
@@ -268,7 +273,7 @@ public final class TsunamiAfeti extends Afet {
         int ust = (int) Math.ceil(taban + Math.max(h1, h2)) + 1;
         while (yikimSatir + 0.7 <= hedef) {
             yikimSatir += 0.7;
-            yikim.satirEkle(geometri, yikimSatir, genislik(), ust);
+            yikim.satirEkle(geometri, yikimSatir, genislik(), ust, seritler, aciklik(), menzil());
         }
         TsunamiAyarlari a = TsunamiAyarlari.al();
         double kisma = TpsOlcer.kismaCarpani();
@@ -522,6 +527,11 @@ public final class TsunamiAfeti extends Afet {
         t.putDouble("yikim", yikimSatir);
         t.putBoolean("vurdu", vurdu);
         t.putIntArray("magaralar", magaralar);
+        if (!seritler.yok()) {
+            CompoundTag s = new CompoundTag();
+            SuKalicilik.seritlerYaz(s, seritler);
+            t.put("seritler", s);
+        }
     }
 
     @Override
@@ -552,6 +562,7 @@ public final class TsunamiAfeti extends Afet {
         for (int id : t.getIntArray("magaralar")) {
             magaralar.add(id);
         }
+        seritler = t.contains("seritler") ? SuKalicilik.seritlerOku(t.getCompound("seritler")) : Seritler.YOK;
     }
 
     // ---------------------------------------------------------------- test okumaları

@@ -39,6 +39,8 @@ public class KasirgaVarligi extends Entity {
             EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Float> TAVAN = SynchedEntityData.defineId(KasirgaVarligi.class,
             EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<Float> FIRLATMA = SynchedEntityData.defineId(KasirgaVarligi.class,
+            EntityDataSerializers.FLOAT);
 
     public static final int SENKRON_ARALIGI = 5;
 
@@ -64,12 +66,13 @@ public class KasirgaVarligi extends Entity {
     }
 
     /** Sahibin her tick'teki yazımı; evre ilerlemesi yalnız evre değişince ve 4 Hz'de kirlenir (ağ). */
-    void guncelle(KasirgaEvresi.Durum durum, float yon) {
+    void guncelle(KasirgaEvresi.Durum durum, float yon, float firlatma) {
         boolean evreDegisti = durum.evre().ordinal() != entityData.get(EVRE);
         if (evreDegisti || tickCount % SENKRON_ARALIGI == 0) {
             entityData.set(EVRE, durum.evre().ordinal());
             entityData.set(EVRE_ILERLEME, (float) durum.ilerleme());
             entityData.set(YON, yon);
+            entityData.set(FIRLATMA, firlatma);
         }
     }
 
@@ -82,6 +85,7 @@ public class KasirgaVarligi extends Entity {
         entityData.define(OLCEK, 1f);
         entityData.define(CEKIM, 1f);
         entityData.define(TAVAN, 0f);
+        entityData.define(FIRLATMA, 0f);
     }
 
     public int seviye() {
@@ -112,10 +116,15 @@ public class KasirgaVarligi extends Entity {
         return entityData.get(YON);
     }
 
-    /** Çekim girdisi: konum, boyutlar, evre gücü × sunucunun {@code cekimCarpani} ve kaldırma tavanı. */
+    /**
+     * Çekim girdisi: konum, boyutlar, kaldırma tavanı; çekim çarpanı evre gücü ile fırlatma rampasının büyüğü × sunucunun
+     * {@code cekimCarpani}'dır (kasırga yok olurken çekim fırlatma bitene dek tam kalır).
+     */
     public KasirgaCekimi.Kaynak cekimKaynagi() {
-        double carpan = KasirgaEvresi.guc(new KasirgaEvresi.Durum(evre(), evreIlerleme())) * entityData.get(CEKIM);
-        return new KasirgaCekimi.Kaynak(position(), seviyeBilgisi(), carpan, entityData.get(TAVAN));
+        double firlatma = entityData.get(FIRLATMA);
+        double guc = Math.max(KasirgaEvresi.guc(new KasirgaEvresi.Durum(evre(), evreIlerleme())), firlatma);
+        double cekim = entityData.get(CEKIM);
+        return new KasirgaCekimi.Kaynak(position(), seviyeBilgisi(), guc * cekim, entityData.get(TAVAN), firlatma * cekim);
     }
 
     @Override

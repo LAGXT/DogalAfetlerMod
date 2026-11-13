@@ -10,6 +10,7 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.afet.ay_carpmasi.AyCarpmasiAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.afet.ay_carpmasi.mantik.AyEgrileri;
+import io.github.kadirberkpolat1.dogalafetler.afet.ay_carpmasi.mantik.AyYonu;
 import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciDonem;
 import io.github.kadirberkpolat1.dogalafetler.config.EfektKalitesi;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
@@ -83,6 +84,8 @@ public final class AyCarpmasiGokyuzu {
     private static long patlamaOlayi = Long.MIN_VALUE;
     private static final List<Kayan> KAYANLAR = new ArrayList<>();
     private static int istemciTick;
+    /** Bu karede yaklaşan ayın gökteki başlangıç yönü ({@link IstemciAy#baslangicYonu}); yalnız render thread'i. */
+    private static AyYonu.Baslangic baslangic = new AyYonu.Baslangic(AyEgrileri.AZIMUT_DERECE, AyEgrileri.YAKLASMA_EGIMI);
 
     private AyCarpmasiGokyuzu() {
     }
@@ -123,11 +126,17 @@ public final class AyCarpmasiGokyuzu {
         kurulanKalite = k;
     }
 
-    /** Ufuktan {@code egim} derece yükseklikte, dünyada sabit yaklaşma azimutunda birim yön ({@code +X} doğu). */
-    static Vector3f yon(float egim, float azimutEki) {
+    /** Ufuktan {@code egim} derece yükseklikte, +X'ten (doğu) +Z'ye (güney) {@code azimutDerece} doğrultusunda birim yön. */
+    static Vector3f yon(float egim, float azimutDerece) {
         float e = (float) Math.toRadians(egim);
-        float a = (float) Math.toRadians(AyEgrileri.AZIMUT_DERECE + azimutEki);
+        float a = (float) Math.toRadians(azimutDerece);
         return new Vector3f(Mth.cos(e) * Mth.cos(a), Mth.sin(e), Mth.cos(e) * Mth.sin(a));
+    }
+
+    /** {@code y}'ye ve yukarıya dik birim "sağ" vektörü; {@code y} dimdik yukarı/aşağıysa doğu ekseni (sıfıra bölme olmaz). */
+    private static Vector3f sag(Vector3f y) {
+        Vector3f s = new Vector3f(y).cross(0f, 1f, 0f);
+        return s.lengthSquared() < 1e-8f ? new Vector3f(1f, 0f, 0f) : s.normalize();
     }
 
     /**
@@ -140,6 +149,7 @@ public final class AyCarpmasiGokyuzu {
             return;
         }
         hazirla();
+        baslangic = IstemciAy.baslangicYonu(level, pt);
         FogRenderer.setupNoFog();
         RenderSystem.enableBlend();
         float a = Math.max(0.35f, yagmursuz);
@@ -162,8 +172,8 @@ public final class AyCarpmasiGokyuzu {
     // ------------------------------------------------------------------ yaklaşma (siren, 0–AyEgrileri.YAKLASMA_SN)
 
     private static void yaklasma(Matrix4f m, float s, float a, float oyunSn) {
-        Vector3f yon = yon(AyEgrileri.egim(s), 0f);
-        Vector3f sag = new Vector3f(yon).cross(0f, 1f, 0f).normalize();
+        Vector3f yon = yon(AyEgrileri.egim(s, baslangic.egimDerece()), baslangic.azimutDerece());
+        Vector3f sag = sag(yon);
         Vector3f ust = new Vector3f(sag).cross(yon).normalize();
         float yari = AY_YARI * AyEgrileri.olcek(s);
         float yay = AyEgrileri.parcaYayilmasi(s);
@@ -187,8 +197,8 @@ public final class AyCarpmasiGokyuzu {
         parcalariCiz(m, yon, teget, dik, yari, yay, kiz, s, a, true);
         // Atmosfere giren alt kenar ufku alttan turuncuya boyar.
         toplamali();
-        Vector3f ufuk = yon(0f, 0f);
-        Vector3f usag = new Vector3f(ufuk).cross(0f, 1f, 0f).normalize();
+        Vector3f ufuk = yon(0f, baslangic.azimutDerece());
+        Vector3f usag = sag(ufuk);
         Vector3f uust = new Vector3f(usag).cross(ufuk).normalize();
         kuad(m, HARE, ufuk, usag, uust, 70f + 50f * kiz, 1f, 0.45f, 0.18f, a * 0.6f * kiz);
     }
@@ -206,7 +216,7 @@ public final class AyCarpmasiGokyuzu {
             float uzaklik = p.konum() * yari / 100f * (0.6f + 2.6f * yay);
             float sapma = p.sapma() * yari / 100f * 0.22f * (0.3f + yay);
             Vector3f y = new Vector3f(yon).add(new Vector3f(teget).mul(uzaklik)).add(new Vector3f(dik).mul(sapma)).normalize();
-            Vector3f sag = new Vector3f(y).cross(0f, 1f, 0f).normalize();
+            Vector3f sag = sag(y);
             Vector3f ust = new Vector3f(sag).cross(y).normalize();
             float boy = p.boy() * yari * (0.6f + 0.6f * yay);
             float donus = (float) Math.toRadians(p.donus() + p.hiz() * s);
@@ -274,7 +284,8 @@ public final class AyCarpmasiGokyuzu {
         Vec3 goz = Minecraft.getInstance().gameRenderer.getMainCamera().getPosition();
         long olay = IstemciDonem.durum().ayOlaySaati();
         if (patlamaMerkezi == null || patlamaOlayi != olay) {
-            Vector3f y = yon(AyEgrileri.PATLAMA_EGIMI, 0f).mul(AyEgrileri.PATLAMA_UZAKLIK);
+            Vector3f y = yon(AyEgrileri.patlamaEgimi(baslangic.egimDerece()), baslangic.azimutDerece())
+                    .mul(AyEgrileri.PATLAMA_UZAKLIK);
             patlamaMerkezi = goz.add(y.x, y.y, y.z);
             patlamaOlayi = olay;
             DogalAfetler.LOGGER.info("[ay_carpmasi] patlama merkezi {} (kamera {}), ömür {} sn", patlamaMerkezi, goz,
@@ -485,6 +496,7 @@ public final class AyCarpmasiGokyuzu {
         KAYANLAR.clear();
         patlamaMerkezi = null;
         patlamaOlayi = Long.MIN_VALUE;
+        IstemciAy.yonuSifirla();
     }
 
     static int kayanSayisi() {

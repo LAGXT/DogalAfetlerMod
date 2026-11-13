@@ -20,7 +20,8 @@ public final class GunesZinciri {
     /** Sunucu config'inden gelen zincir ayarları. */
     public record Ayarlar(double supernovaSuresiGun, double kizilCuceGecikmeGun, long dogusSuresiTick,
             double kalintiGenislemeGun) {
-        public static final Ayarlar VARSAYILAN = new Ayarlar(1.5, 7.0, 6_000L, 30.0);
+        /** K-E72: süpernova 1 gün, kapı donma %100'den 3 gün sonra (en az); eski 1,5 ve 7 gün. */
+        public static final Ayarlar VARSAYILAN = new Ayarlar(1.0, EN_AZ_GECIKME_GUN, 6_000L, 30.0);
 
         public Ayarlar {
             if (!(supernovaSuresiGun >= 1.0 && supernovaSuresiGun <= 2.0)) {

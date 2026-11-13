@@ -1,8 +1,10 @@
 package io.github.kadirberkpolat1.dogalafetler.su;
 
 import io.github.kadirberkpolat1.dogalafetler.network.AgKanali;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Executor;
@@ -118,6 +120,11 @@ public final class SanalSu {
     /** Seviyenin şimdiki saati (sunucuda afet saati, istemcide tahmini). */
     public static double saat(Level l) {
         return l.isClientSide() ? istemciSaati.getAsDouble() : sunucuSaati;
+    }
+
+    /** Sunucunun bu tick'teki ölçekli afet saati (seviye erişimi olmayan sunucu kodu için). */
+    public static long suankiSunucuSaati() {
+        return sunucuSaati;
     }
 
     /** Seviyenin sanal suyu; hiç su yoksa {@code null}. */
@@ -276,6 +283,47 @@ public final class SanalSu {
         return vardi;
     }
 
+    // ---------------------------------------------------------------- sel (taşkın) ve ısı bölgeleri
+
+    /**
+     * Sel suyunu başlatır ve boyuttaki oyunculara gönderir; kimliği döner. Yükselme {@link SelSuyu#baslangic()} saatinden itibaren
+     * parametrik hesaplanır; bitince {@code SanalSuSunucu} kendiliğinden kaldırır.
+     */
+    public static int selBaslat(ServerLevel l, SelSuyu s) {
+        int id = ++sonKimlik;
+        boyut(l).dunya.selEkle(id, s);
+        yayinla(l);
+        return id;
+    }
+
+    public static boolean selBitir(ServerLevel l, int id) {
+        Boyut b = BOYUTLAR.get(l.dimension());
+        boolean vardi = b != null && b.dunya.selKaldir(id);
+        if (vardi) {
+            yayinla(l);
+        }
+        return vardi;
+    }
+
+    /** Sel henüz sürüyor mu (kimlik kaydından geri gelmiş olabilir). */
+    public static boolean selVarMi(ServerLevel l, int id) {
+        Boyut b = BOYUTLAR.get(l.dimension());
+        return b != null && b.dunya.seller().containsKey(id);
+    }
+
+    /**
+     * Sel suyunu buharlaştıran ısı kaynağı bölgelerini ayarlar; liste değişmediyse paket gönderilmez. Değiştiyse {@code true}.
+     */
+    public static boolean isiBolgeleriAyarla(ServerLevel l, List<IsiBolgesi> yeni) {
+        Boyut b = BOYUTLAR.get(l.dimension());
+        if (b == null || Arrays.equals(b.dunya.isiDizisi(), yeni.toArray(new IsiBolgesi[0]))) {
+            return false;
+        }
+        b.dunya.isiBolgeleriAyarla(yeni);
+        yayinla(l);
+        return true;
+    }
+
     // ---------------------------------------------------------------- mağara suyu (bölüm B)
 
     /**
@@ -361,6 +409,12 @@ public final class SanalSu {
     public static boolean gozSudaMi(Entity e) {
         SanalSuDunyasi d = dunya(e.level());
         return d != null && !Double.isNaN(d.ustu(e.getX(), e.getEyeY() - 0.11111111, e.getZ(), saat(e.level())));
+    }
+
+    /** Varlığın gözü sel suyunun içinde mi (boğulma hızlanır, K-E81); sunucu thread'i. */
+    public static boolean gozSelSuyundaMi(Entity e) {
+        SanalSuDunyasi d = dunya(e.level());
+        return d != null && d.selSuyundaMi(e.getX(), e.getEyeY() - 0.11111111, e.getZ(), saat(e.level()));
     }
 
     /**

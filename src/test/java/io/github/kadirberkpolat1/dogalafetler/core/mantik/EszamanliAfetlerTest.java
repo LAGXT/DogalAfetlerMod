@@ -58,7 +58,7 @@ class EszamanliAfetlerTest {
         assertFalse(depremVarken.contains(AfetTuru.AY_CARPMASI) || depremVarken.contains(AfetTuru.GUNES_PATLAMASI),
                 "afet sürerken sunucu geneli seçilmez");
         assertTrue(depremVarken.contains(AfetTuru.KASIRGA));
-        assertEquals(5, depremVarken.size(), "kalan beş bölgesel tür");
+        assertEquals(6, depremVarken.size(), "kalan altı bölgesel tür");
     }
 
     @Test
@@ -89,7 +89,7 @@ class EszamanliAfetlerTest {
         assertEquals(AfetZamanlayicisi.turOrani(A, AfetTuru.DEPREM, 1, 1) * c,
                 AfetZamanlayicisi.turOrani(A, AfetTuru.DEPREM, 1, 1, c), 1e-12);
         assertEquals(AfetZamanlayicisi.turOrani(A, AfetTuru.AY_CARPMASI, 1, 1) * Math.pow(c, AfetZamanlayicisi.DONEM_GUN_USSU),
-                AfetZamanlayicisi.turOrani(A, AfetTuru.AY_CARPMASI, 1, 1, c), 1e-12, "dönem olayı çarpanın dördüncü kökü");
+                AfetZamanlayicisi.turOrani(A, AfetTuru.AY_CARPMASI, 1, 1, c), 1e-12, "dönem olayı çarpanın karekökü");
         BeklemeDurumu bekleme = new BeklemeDurumu();
         bekleme.afetBitti(AfetTuru.SINKHOLE, 1, 0, A, 1.0, 4.0);
         assertEquals(Math.round(A.genelBeklemeTick() / 4.0), bekleme.genelKalan(0));

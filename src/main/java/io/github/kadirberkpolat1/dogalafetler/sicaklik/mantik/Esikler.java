@@ -5,7 +5,8 @@ package io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik;
  * ({@code soguk}), sonra buz kenarı ({@code cokSoguk}), sonra donma hasarı ({@code donmaHasari}); sıcakta önce titreme
  * ({@code sicak}, {@code cokSicak}), sonra aşırı ısınma hasarı ({@code yanmaHasari}). Hasar aralığı (tick) eşikten
  * ölçek ucuna doğrusal kısalır. Dört durum (S3-04): {@code soguk} üşüme (36 °C), {@code cokSoguk} donma (35 °C),
- * {@code sicak} bunalma (38 °C), {@code cokSicak} yanma (39,5 °C); bunalma ve yanma ek açlık tüketir.
+ * {@code sicak} bunalma (38 °C), {@code cokSicak} yanma (39,5 °C); bunalma ve yanma ek açlık tüketir
+ * (vanilla Açlık I'in 0,1/sn'sinin 1,5 ve 3 katı: doygunluk barı önce erir, ardından açlık çubuğu gözle görülür düşer).
  *
  * @param notrBant          HUD'daki nötr bantın yarı genişliği (yalnız görünüm)
  * @param enCokYavaslama    ölçek ucundaki hareket hızı kesintisi (0–1)
@@ -15,8 +16,8 @@ package io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik;
 public record Esikler(double notrBant, double soguk, double cokSoguk, double donmaHasari, double sicak,
         double cokSicak, double yanmaHasari, double enCokYavaslama, int donmaAralikBasi, int donmaAralikSonu,
         int yanmaAralikBasi, int yanmaAralikSonu, double bunalmaAclik, double yanmaAclik) {
-    public static final Esikler VARSAYILAN = new Esikler(10, -20, -40, -70, 20, 50, 70, 0.5, 120, 40, 120, 40, 0.04,
-            0.08);
+    public static final Esikler VARSAYILAN = new Esikler(10, -20, -40, -70, 20, 50, 70, 0.5, 120, 40, 120, 40, 0.15,
+            0.30);
 
     public Esikler {
         if (!(donmaHasari <= cokSoguk && cokSoguk <= soguk && soguk < 0 && 0 < sicak && sicak <= cokSicak

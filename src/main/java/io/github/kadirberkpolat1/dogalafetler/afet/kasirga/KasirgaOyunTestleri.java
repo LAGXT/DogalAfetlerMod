@@ -335,6 +335,7 @@ public final class KasirgaOyunTestleri {
     @GameTest(template = SAHNE, batch = "kasirga_isleme", timeoutTicks = 40)
     public static void isleyemeyenKonumdakiUcanBlokYereKonur(GameTestHelper y) {
         ServerLevel level = y.getLevel();
+        zemin(y, false);
         boolean onceki = blokHasari(y, true);
         Kasirga kasirga = baslat(y, 2, false, KasirgaEvresi.DOGUS);
         BlockPos uzak = y.absolutePos(MERKEZ).offset(4096, 0, 4096);

@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {
+      "item": "dogalafetler:sogutma_kulcesi"
+    },
+    {
+      "item": "minecraft:packed_ice"
+    },
+    {
+      "tag": "forge:gems/lapis"
+    },
+    {
+      "tag": "forge:ingots/iron"
+    }
+  ],
+  "result": {
+    "item": "dogalafetler:sogutma_plakasi"
+  }
+}

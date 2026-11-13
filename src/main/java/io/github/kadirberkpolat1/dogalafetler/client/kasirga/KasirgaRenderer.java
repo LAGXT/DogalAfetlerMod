@@ -1,5 +1,6 @@
 package io.github.kadirberkpolat1.dogalafetler.client.kasirga;
 
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.KasirgaAyarlari;
@@ -10,6 +11,7 @@ import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.KasirgaEvresi;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.KasirgaKaliteButcesi;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.KasirgaSeviyesi;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.RankineProfili;
+import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.UzaklikSolmasi;
 import io.github.kadirberkpolat1.dogalafetler.client.kasirga.IstemciKasirga.GorselEnkaz;
 import java.util.Iterator;
 import java.util.List;
@@ -64,6 +66,8 @@ final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
     private static int sonGirdap;
 
     private float ekranOrani = EKRAN_ORANI;
+    /** Bu karedeki vanilla sis bitişi (blok); bulut alfası bundan uzaklaşınca solar (K-E86), sis rengi uygulanmaz. */
+    private float sisBitisi;
     private final BlockRenderDispatcher bloklar;
 
     private float[] noktaX = new float[0];
@@ -130,6 +134,7 @@ final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
         kamZ = (float) (kamera.z - ez);
         double mesafe = Math.hypot(kamX, kamZ);
         sonMesafe = mesafe;
+        sisBitisi = RenderSystem.getShaderFogEnd();
         Quaternionf yonelim = entityRenderDispatcher.cameraOrientation();
         Vector3f sag = yonelim.transform(new Vector3f(1, 0, 0));
         Vector3f ust = yonelim.transform(new Vector3f(0, 1, 0));
@@ -307,7 +312,8 @@ final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
                 float dz = z - kamZ;
                 float uzunluk = (float) Math.sqrt(dx * dx + dy * dy + dz * dz) + 1e-4f;
                 float fresnel = Math.abs(c * dx + sn * dz) / uzunluk;
-                noktaA[n] = (float) (alfa * dikey * (0.35 + 0.65 * Math.pow(fresnel, 0.5)));
+                noktaA[n] = (float) (alfa * dikey * (0.35 + 0.65 * Math.pow(fresnel, 0.5)))
+                        * UzaklikSolmasi.carpan(uzunluk, sisBitisi);
                 noktaU[n] = (float) ((double) i / dilim * uTekrar + uHalka);
                 noktaNx[n] = c;
                 noktaNz[n] = sn;
@@ -371,7 +377,8 @@ final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
                 float dz = z - kamZ;
                 float uzunluk = (float) Math.sqrt(dx * dx + dy * dy + dz * dz) + 1e-4f;
                 float fresnel = Math.abs(c * dx + sn * dz) / uzunluk;
-                noktaA[n] = (float) (alfa * dikeyAlfa * (0.7 + 0.3 * Math.sqrt(fresnel)));
+                noktaA[n] = (float) (alfa * dikeyAlfa * (0.7 + 0.3 * Math.sqrt(fresnel)))
+                        * UzaklikSolmasi.carpan(uzunluk, sisBitisi);
                 noktaU[n] = (float) ((double) i / dilim * 2 + uKay);
                 noktaNx[n] = c;
                 noktaNz[n] = sn;
@@ -539,7 +546,9 @@ final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
         float dx = x - kamX;
         float dy = y - kamY;
         float dz = z - kamZ;
-        float sinir = ekranOrani * (float) Math.sqrt(dx * dx + dy * dy + dz * dz) + 0.3f;
+        float uzak = (float) Math.sqrt(dx * dx + dy * dy + dz * dz);
+        a *= UzaklikSolmasi.carpan(uzak, sisBitisi);
+        float sinir = ekranOrani * uzak + 0.3f;
         float bo = Math.min(boyut, sinir);
         float c = Mth.cos(donus);
         float s = Mth.sin(donus);

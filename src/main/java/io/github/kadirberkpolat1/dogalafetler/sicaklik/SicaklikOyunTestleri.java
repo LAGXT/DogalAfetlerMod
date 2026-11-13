@@ -194,6 +194,25 @@ public final class SicaklikOyunTestleri {
         }
     }
 
+    /**
+     * Dört yünlü zırh parçası, parça başına 30 tüy: yüksek yalıtımda vücut ortama değil metabolik ısıya göre dengelenir, bu yüzden
+     * uç vücut değerleri hasar testlerinde ortam sıcaklığından bağımsız kalır (hızlı ısı alışverişi hasar kademesinden çıkarmaz).
+     */
+    private static void yalitimliGiydir(ServerPlayer o) {
+        for (EquipmentSlot yuva : List.of(EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS,
+                EquipmentSlot.FEET)) {
+            ItemStack parca = new ItemStack(switch (yuva) {
+                case HEAD -> Items.LEATHER_HELMET;
+                case CHEST -> Items.LEATHER_CHESTPLATE;
+                case LEGS -> Items.LEATHER_LEGGINGS;
+                default -> Items.LEATHER_BOOTS;
+            });
+            ZirhEkleri.koy(parca, ZirhEkleri.YUNLU);
+            ZirhEkleri.tuyAyarla(parca, 30);
+            o.setItemSlot(yuva, parca);
+        }
+    }
+
     /** Tezgaha yığınları koyup zırh eki tarifinin sonucunu verir (eşleşme yoksa boş). */
     private static ItemStack tarifSonucu(ServerLevel level, ServerPlayer o, ItemStack... yiginlar) {
         TransientCraftingContainer tezgah = new TransientCraftingContainer(new CraftingMenu(0, o.getInventory()), 3, 3);
@@ -330,6 +349,7 @@ public final class SicaklikOyunTestleri {
         try {
             for (ServerPlayer o : List.of(donan, yanan, korunan)) {
                 hasarAlabilir(o);
+                yalitimliGiydir(o);
             }
             korunan.addEffect(new MobEffectInstance(MobEffects.FIRE_RESISTANCE, 1200));
             VucutSicakligi.yaz(donan, -95);
@@ -651,7 +671,7 @@ public final class SicaklikOyunTestleri {
                 y.setBlock(konum, Blocks.AIR);
             }
             String ozet = "kütük " + fark[0] + ", tahta " + fark[1] + ", fırın " + fark[2];
-            dogrula(y, fark[0] > 0.1 && fark[0] < 2, "kömürleşmiş kütük düşük pozitif katkı: " + ozet);
+            dogrula(y, fark[0] > 0.1 && fark[0] < fark[2], "kömürleşmiş kütük (ılık, varsayılan kademe) pozitif ve yanan fırından kısık katkı: " + ozet);
             dogrula(y, fark[1] > 0.1 && fark[1] < fark[0], "kömürleşmiş tahta kütükten kısık pozitif katkı: " + ozet);
             dogrula(y, fark[2] > fark[0], "kömürleşmiş odun yanan fırından kısık: " + ozet);
             y.succeed();
@@ -679,8 +699,9 @@ public final class SicaklikOyunTestleri {
                 hasarAlabilir(hepsi.get(i));
                 once[i] = hepsi.get(i).getFoodData().getExhaustionLevel();
             }
+            // 1 sn: hızlı ısı alışverişinde kademeler ortam ne olursa olsun bu sürede değişmez.
             for (ServerPlayer o : hepsi) {
-                SicaklikYoneticisi.guncelle(o, 100);
+                SicaklikYoneticisi.guncelle(o, 20);
             }
             dogrula(y, e.kademe(VucutSicakligi.al(usuyen)).durum() == SicaklikDurumu.USUME, "üşümede kalmalı");
             dogrula(y, e.kademe(VucutSicakligi.al(bunalan)).durum() == SicaklikDurumu.BUNALMA, "bunalmada kalmalı");
@@ -692,7 +713,7 @@ public final class SicaklikOyunTestleri {
             double bunalmaAclik = bunalan.getFoodData().getExhaustionLevel() - once[1];
             double yanmaAclik = yanan.getFoodData().getExhaustionLevel() - once[2];
             dogrula(y, Math.abs(usumeAclik) < 1e-6, "üşüme açlık tüketmemeli: " + usumeAclik);
-            dogrula(y, Math.abs(bunalmaAclik - e.bunalmaAclik() * 5) < 1e-4, "bunalma açlığı: " + bunalmaAclik);
+            dogrula(y, Math.abs(bunalmaAclik - e.bunalmaAclik()) < 1e-4, "bunalma açlığı: " + bunalmaAclik);
             dogrula(y, yanmaAclik > bunalmaAclik, "yanma daha çok açlık: " + yanmaAclik + " / " + bunalmaAclik);
             y.succeed();
         } finally {
@@ -761,7 +782,7 @@ public final class SicaklikOyunTestleri {
             level.setWeatherParameters(6000, 0, false, false);
             level.setRainLevel(0f);
             d.donmaIlerlemesiAyarla(0f);
-            VucutSicakligi.yaz(usuyen, VucutOlcegi.birim(35.4));
+            VucutSicakligi.yaz(usuyen, VucutOlcegi.birim(35.1));
             VucutSicakligi.yaz(bunalan, VucutOlcegi.birim(38.8));
             VucutSicakligi.yaz(izleyen, 0);
             for (ServerPlayer o : hepsi) {

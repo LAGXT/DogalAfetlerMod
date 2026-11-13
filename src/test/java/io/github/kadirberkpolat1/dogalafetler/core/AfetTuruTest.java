@@ -15,7 +15,7 @@ class AfetTuruTest {
     void kimliklerN18IleAyni() {
         List<String> kimlikler = Arrays.stream(AfetTuru.values()).map(AfetTuru::kimlik).toList();
         assertEquals(List.of("kasirga", "tsunami", "deprem", "gunes_patlamasi", "asit_yagmuru", "sinkhole",
-                "orman_yangini", "ay_carpmasi"), kimlikler);
+                "orman_yangini", "ay_carpmasi", "sel"), kimlikler);
     }
 
     @Test

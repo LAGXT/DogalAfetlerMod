@@ -20,11 +20,11 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.common.MinecraftForge;
 
 /**
- * Çarpma anı: sarsıntı/görsel paketi, krater sıcaklığı ve krater işi. Patlama sesini paketi alan istemci menzil ve mesafe
- * kazancıyla çalar ({@code client.meteor.MeteorSesi}). Krater blokları, yangın ve ödüller {@link KraterIsi}'nde tick'lere
- * yayılır. Suya düşen meteor sıçrama ve buhar çıkarır; krater, ateş ve ödül yoktur. Büyüklüğe bağlı her değer sürekli
- * ölçekten ({@link MeteorOlcegi#ara}); ödül sınıfı ölçeğin bantıdır. Yağmur meteorunun ({@code odulOyuncu} dolu) ödülü yalnız büyük
- * bantta ve afet başına, oyuncu başına tavanlıdır ({@code mantik.OdulTavani}).
+ * Çarpma anı: sarsıntı/görsel paketi, varlık hasarı ({@link MeteorPatlamasi}), krater sıcaklığı ve krater işi. Patlama sesini
+ * paketi alan istemci menzil ve mesafe kazancıyla çalar ({@code client.meteor.MeteorSesi}). Krater blokları, kırılma, yangın ve
+ * ödüller {@link KraterIsi}'nde tick'lere yayılır. Suya düşen meteor sıçrama ve buhar çıkarır; krater, ateş ve ödül yoktur.
+ * Büyüklüğe bağlı her değer sürekli ölçekten ({@link MeteorOlcegi#ara}); ödül sınıfı ölçeğin bantıdır. Yağmur meteorunun ({@code
+ * odulOyuncu} dolu) ödülü yalnız büyük bantta ve afet başına, oyuncu başına tavanlıdır ({@code mantik.OdulTavani}).
  */
 final class MeteorCarpmasi {
     /** Çarpılan yüzeyin üstünde boşaltılan blok (bitki, kar, asılı blok). */
@@ -60,12 +60,19 @@ final class MeteorCarpmasi {
                     Math.min(64, Math.max(6, yaricap * 4)), sicaklikSaniye * 20);
         }
         boolean blokHasari = Kurallar.blokHasariAcik(level.getGameRules());
+        int etkilenen = MeteorPatlamasi.uygula(level, nokta, olcek);
         long tohum = level.random.nextLong();
         OdulZari.Sonuc odul = OdulZari.at(boyut.buyuk(), sanslar, new Random(tohum ^ 0x5DEECE66DL));
         if (odulOyuncu != null) {
             odul = MeteorYoneticisi.odulSinirla(level, kaynak, odulOyuncu, odul, boyut.buyuk());
         }
-        KraterIsi is = new KraterIsi(zemin, yaricap, derinlik, tohum, olcek, gorunum, kaynak, odul, blokHasari);
+        double kirilma = blokHasari ? MeteorAyarlari.kirilmaYaricapi(olcek) : 0;
+        double cokme = blokHasari ? MeteorAyarlari.cokme(olcek) : 0;
+        DogalAfetler.LOGGER.info("meteor çarptı: {} ({}, ölçek {}): patlama r={} {} canlı, krater r={} d={}, kırılma r={}, çöküntü {}",
+                zemin.toShortString(), boyut, (float) olcek, (float) MeteorAyarlari.patlamaYaricapi(olcek), etkilenen,
+                (float) yaricap, (float) derinlik, (float) kirilma, (float) cokme);
+        KraterIsi is = new KraterIsi(zemin, yaricap, derinlik, kirilma, cokme, tohum, olcek, gorunum, kaynak, odul,
+                blokHasari);
         MeteorYoneticisi.kraterEkle(level, is);
         return is;
     }

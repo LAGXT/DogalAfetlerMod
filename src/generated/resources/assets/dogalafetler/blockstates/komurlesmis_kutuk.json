@@ -1,15 +1,87 @@
 {
   "variants": {
-    "axis=x": {
+    "axis=x,isi=0": {
+      "model": "dogalafetler:block/komurlesmis_kutuk_sonuk_horizontal",
+      "x": 90,
+      "y": 90
+    },
+    "axis=x,isi=1": {
       "model": "dogalafetler:block/komurlesmis_kutuk_horizontal",
       "x": 90,
       "y": 90
     },
-    "axis=y": {
+    "axis=x,isi=2": {
+      "model": "dogalafetler:block/komurlesmis_kutuk_horizontal",
+      "x": 90,
+      "y": 90
+    },
+    "axis=x,isi=3": {
+      "model": "dogalafetler:block/komurlesmis_kutuk_sicak_horizontal",
+      "x": 90,
+      "y": 90
+    },
+    "axis=x,isi=4": {
+      "model": "dogalafetler:block/komurlesmis_kutuk_sicak_horizontal",
+      "x": 90,
+      "y": 90
+    },
+    "axis=x,isi=5": {
+      "model": "dogalafetler:block/komurlesmis_kutuk_cok_sicak_horizontal",
+      "x": 90,
+      "y": 90
+    },
+    "axis=x,isi=6": {
+      "model": "dogalafetler:block/komurlesmis_kutuk_cok_sicak_horizontal",
+      "x": 90,
+      "y": 90
+    },
+    "axis=y,isi=0": {
+      "model": "dogalafetler:block/komurlesmis_kutuk_sonuk"
+    },
+    "axis=y,isi=1": {
       "model": "dogalafetler:block/komurlesmis_kutuk"
     },
-    "axis=z": {
+    "axis=y,isi=2": {
+      "model": "dogalafetler:block/komurlesmis_kutuk"
+    },
+    "axis=y,isi=3": {
+      "model": "dogalafetler:block/komurlesmis_kutuk_sicak"
+    },
+    "axis=y,isi=4": {
+      "model": "dogalafetler:block/komurlesmis_kutuk_sicak"
+    },
+    "axis=y,isi=5": {
+      "model": "dogalafetler:block/komurlesmis_kutuk_cok_sicak"
+    },
+    "axis=y,isi=6": {
+      "model": "dogalafetler:block/komurlesmis_kutuk_cok_sicak"
+    },
+    "axis=z,isi=0": {
+      "model": "dogalafetler:block/komurlesmis_kutuk_sonuk_horizontal",
+      "x": 90
+    },
+    "axis=z,isi=1": {
       "model": "dogalafetler:block/komurlesmis_kutuk_horizontal",
+      "x": 90
+    },
+    "axis=z,isi=2": {
+      "model": "dogalafetler:block/komurlesmis_kutuk_horizontal",
+      "x": 90
+    },
+    "axis=z,isi=3": {
+      "model": "dogalafetler:block/komurlesmis_kutuk_sicak_horizontal",
+      "x": 90
+    },
+    "axis=z,isi=4": {
+      "model": "dogalafetler:block/komurlesmis_kutuk_sicak_horizontal",
+      "x": 90
+    },
+    "axis=z,isi=5": {
+      "model": "dogalafetler:block/komurlesmis_kutuk_cok_sicak_horizontal",
+      "x": 90
+    },
+    "axis=z,isi=6": {
+      "model": "dogalafetler:block/komurlesmis_kutuk_cok_sicak_horizontal",
       "x": 90
     }
   }

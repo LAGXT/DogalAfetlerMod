@@ -15,16 +15,17 @@ import java.util.random.RandomGenerator;
  * engeller; geçici çarpan yalnız oranı çarpar. {@code afetSikligi} bütün takvimi ölçekler (11.4 "200 = iki katı"): oranı
  * çarpar, beklemeleri böler ({@link #beklemeOlcekle}). Oyun gününün takvim çarpanı ({@link ZamanlayiciAyarlari#gunCarpani},
  * K-E67) bölgesel afetlerin oranını aynı biçimde çarpar (beklemeler {@link BeklemeDurumu#afetBitti}'te). Dönem olayları
- * (güneş patlaması, ay çarpması) yalnız yuva boşken seçilebildiği için bölgesel afetler sıklaştıkça seçilme fırsatları azalır;
- * oranları gün çarpanının yalnız {@value #DONEM_GUN_USSU} kuvvetiyle artar (ilk güneş patlaması ortancası 60–120 gün kalır,
- * kuyruğu 400 günü aşmaz).
+ * (güneş patlaması, ay çarpması) yalnız hiçbir afet sürmezken seçilebildiği için (bölgesel afetler sıklaştıkça ve eşzamanlı
+ * sınır arttıkça boş an kalmaz) seçilme fırsatları azalır; bunu dengelemek için oranları gün çarpanının {@value #DONEM_GUN_USSU}
+ * kuvvetiyle (karekök) artar (ayar sürümü 4: eski üs 0,25'ti, kullanıcı "neredeyse hiç çıkmıyor" dedi; ilk güneş patlaması
+ * ortancası kapıdan (40. gün) sonra ~5-8 gün, kuyruğu 400 günü aşmaz).
  */
 public final class AfetZamanlayicisi {
     /** Bir Minecraft günü (tick). */
     public static final long GUN_TICK = 24_000L;
 
-    /** Dönem olaylarının oranına uygulanan gün çarpanı üssü (K-E67). */
-    public static final double DONEM_GUN_USSU = 0.25;
+    /** Dönem olaylarının oranına uygulanan gün çarpanı üssü (ayar sürümü 4: 0,25 → 0,5). */
+    public static final double DONEM_GUN_USSU = 0.5;
 
     private static final AfetTuru[] TURLER = AfetTuru.values();
 
@@ -97,7 +98,7 @@ public final class AfetZamanlayicisi {
 
     /**
      * Gün çarpanının türün oranına etkisi: bölgesel afette kendisi, dönem olayında (sunucu geneli) {@value #DONEM_GUN_USSU}
-     * kuvveti (K-E67).
+     * kuvveti (karekök).
      */
     public static double turGunCarpani(AfetTuru tur, double gunCarpani) {
         if (!(gunCarpani > 0) || Double.isInfinite(gunCarpani)) {

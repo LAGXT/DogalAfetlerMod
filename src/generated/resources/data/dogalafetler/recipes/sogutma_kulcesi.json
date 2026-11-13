@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {
+      "item": "dogalafetler:sogutma_parcasi"
+    },
+    {
+      "item": "dogalafetler:sogutma_parcasi"
+    },
+    {
+      "item": "dogalafetler:sogutma_parcasi"
+    },
+    {
+      "tag": "forge:ingots/iron"
+    }
+  ],
+  "result": {
+    "item": "dogalafetler:sogutma_kulcesi"
+  }
+}

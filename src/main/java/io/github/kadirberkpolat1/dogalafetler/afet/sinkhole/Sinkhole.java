@@ -15,6 +15,7 @@ import io.github.kadirberkpolat1.dogalafetler.basarim.BasarimIpucuEvent;
 import io.github.kadirberkpolat1.dogalafetler.basarim.mantik.Ipucu;
 import io.github.kadirberkpolat1.dogalafetler.core.Afet;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetAsamasi;
+import io.github.kadirberkpolat1.dogalafetler.core.AfetMerkezi;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.EtkiAlani;
 import io.github.kadirberkpolat1.dogalafetler.core.TpsOlcer;
@@ -108,22 +109,25 @@ public final class Sinkhole extends Afet {
     }
 
     /**
-     * Hedef oyuncudan 12–40 blok uzakta, çap boyunca yüksekliği ±4 blok düz, merkezi sıvı olmayan yer (8 deneme); hiçbiri
+     * Doğal başlatmada halka noktasının ≤16 blok çevresinde, komutta hedef oyuncudan 12–40 blok uzakta; çap boyunca
+     * yüksekliği ±4 blok düz, merkezi sıvı olmayan yer (8 deneme); hiçbiri
      * uymazsa en düz aday. Düzlük yalnız tercihtir: elle verilen konumda da çukur açılır ({@link #yerUygunMu}).
      */
     @Override
-    public BlockPos merkezSec(ServerLevel level, ServerPlayer hedef, int seviye, RandomSource r) {
+    public BlockPos merkezSec(ServerLevel level, ServerPlayer hedef, int seviye, BlockPos merkezNoktasi,
+            RandomSource r) {
         if (sabitMerkez != null) {
             return sabitMerkez;
         }
+        boolean komut = AfetMerkezi.komutNoktasi(hedef, merkezNoktasi);
         double yaricap = SinkholeAyarlari.seviye(seviye).yaricap();
-        BlockPos enIyi = hedef.blockPosition();
+        BlockPos enIyi = merkezNoktasi;
         int enIyiFark = Integer.MAX_VALUE;
         for (int i = 0; i < 8; i++) {
             double a = r.nextDouble() * Math.PI * 2;
-            double d = 12 + r.nextDouble() * 28;
-            int x = (int) Math.floor(hedef.getX() + Math.cos(a) * d);
-            int z = (int) Math.floor(hedef.getZ() + Math.sin(a) * d);
+            double d = komut ? 12 + r.nextDouble() * 28 : (i == 0 ? 0 : r.nextDouble() * 16);
+            int x = (int) Math.floor(merkezNoktasi.getX() + Math.cos(a) * d);
+            int z = (int) Math.floor(merkezNoktasi.getZ() + Math.sin(a) * d);
             int fark = duzlukFarki(level, x, z, yaricap);
             if (fark >= YUKLU_DEGIL) {
                 continue;

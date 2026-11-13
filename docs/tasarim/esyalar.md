@@ -281,6 +281,29 @@ dilinde görür. `basarim.unvanGoster=false` öneki kapatır; `/dogalafet unvan 
 (ünvan duyurudan önce verilir). Üçü aynı tick'te aynı tetikleyiciden gelir; oyunda sıraları garanti değildir. Görsel kanıt
 koşusu sırayı sabitler: tür ve seviye 3 ayrı tick'lerde verilir, doğal bitiş Felaket Ustası'nı açar.
 
+## Afet Defteri (K-E74; paket `journal`, istemci `client/journal`)
+
+Oyuncunun yaptıklarını ve önemli bilgileri tek yerde toplayan defter. **Erişim:** Kitap + Tüy + Mürekkep Kesesi + Pusula şekilsiz tarifi
+(tarif kitabına Hava Radarı gibi oyunun başında girer; oyuna ilk girişte verilmez) ve `/dogalafet defter`. Komut, kökün OP kuralının
+tek istisnasıdır: kök oyunculara görünür, `KomutKaydi.ekle` ile gelen her alt komuta OP yetkisi eklenir, yalnız `KomutKaydi.ekleAcik`
+ile kaydedilen alt komut (defter) yalnız `requires` koşulunu (oyuncu) taşır.
+
+**Veri** oyuncunun `getPersistentData()` etiketindedir (`dogalafetler_defter`; `BasarimVerisi` deseni), `PlayerEvent.Clone` ile ölümde ve
+boyut dönüşünde taşınır, yani defter eşyası kaybolsa da istatistik kalır. Toplayıcılar yeni kanca eklemez: `AfetBittiEvent`
+(`basarimSayilir()` olanlar: etkilenen çevrim içi oyuncuya karşılaşma, sağ çıkana atlatma; tür, seviye, en yüksek seviye, son 5 afet, ilk
+karşılaşma günü ve tarihi, tsunami dalgası: S3+ iki, altı bir), `ItemFishedEvent` (tutulan eşya listesi), `BalikTutulduEvent` (buz deliği
+çekişi ve buz balığı), `LivingDeathEvent` (yaşamın bitişi, en uzun yaşam, süren afetin etki alanında ölüm), `PlayerEvent.ItemPickupEvent`
+(yerden alınan, oyuncunun atmadığı Meteorit Parçası ve Kozmik Çekirdek), saniyede bir vücut sıcaklığı örneği (en soğuk/en sıcak) ve
+`BuzDeligiAcma`'daki tek satırlık kanca (`Defter.buzDeligiAcildi`). Mesafe, ölüm sayısı ve olta tutuşları vanilla istatistiklerinden
+açılışta okunur. "Hayatta kalınan gün" modun oyun günüdür: yaşamın başlangıç günü kaydedilir, ilk bakışta vanilla "son ölümden beri"
+sayacından kestirilir.
+
+**Ağ:** tek paket `defter/veri` (S2C). Eşya sağ tıkı ya da komut sunucuda paketi kurup yollar, ekranı istemci paket gelince açar; periyodik
+yayın ve istemciden istek yoktur. En çok 128 eşya satırı, ~5 KB altı; oyuncu başına en çok 10 tick'te bir.
+
+**Ekran:** dört sekmeli (Genel, Afetler, Balık/Eşya, Rehber), iki sayfalık düz renkli kitap; satırlar açılışta bir kez kurulur ve saf Java
+`SayfaDuzeni` ile sayfalara bölünür. Rehber: afet seviyeleri, her afet için ne yapmalı, sıcaklık rehberi (eşikler sunucunun config'inden).
+
 ## Görsel cila (2026-11-07)
 
 Beş buz balığı ve pişmişleri vanilla balık ikonu kalitesinde yeniden çizildi (`tools/assets/balikcilik_dokular.py`, rastgelelik

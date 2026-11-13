@@ -21,7 +21,8 @@ import net.minecraft.server.level.ServerPlayer;
  * (&lt; 200 bayt) ve oyuncu dosyasıyla kaydedilir; ölüm/boyut dönüşünde {@link #kopyala} ile taşınır (A-03). Alanlar:
  * {@code atlatilan} (sağ çıkılan afet türleri), {@code balik} (buz deliğinden toplam balık), {@code unvan},
  * {@code kutup}/{@code kutupSon}/{@code kutupDongu} (Kutup Sığınağı sayacı ve ait olduğu sıfırlama döngüsü),
- * {@code denizOlum} (yükselişte ölüm döngüsü), {@code afet} (süren afetteki iz: olay ve yedek tahmin
+ * {@code denizOlum} (yükselişte ölüm döngüsü), {@code seri}/{@code hayatTick} (ölmeden art arda sağ çıkılan afet ve
+ * çevrim içi geçen tick; ölümde silinir, K-E74), {@code afet} (süren afetteki iz: olay ve yedek tahmin
  * ipuçları ayrı, A-31). Dünya verisinde ({@code DunyaDonemi.ekVeri("basarim")}) yalnız sıfırlama işareti. Yalnız
  * sunucu ana thread'inde.
  */
@@ -69,6 +70,35 @@ public final class BasarimVerisi {
         int toplam = (int) Math.min(Integer.MAX_VALUE, (long) etiket.getInt("balik") + Math.max(0, adet));
         etiket.putInt("balik", toplam);
         return toplam;
+    }
+
+    /** Ölmeden art arda sağ çıkılan afet sayısı (ölüm sıfırlar; K-E74 "Üç Üst Üste"). */
+    public static int seri(ServerPlayer oyuncu) {
+        return kok(oyuncu).getInt("seri");
+    }
+
+    /** Seriyi bir arttırır, yeni değeri döner. */
+    public static int seriArtir(ServerPlayer oyuncu) {
+        CompoundTag etiket = kok(oyuncu);
+        int seri = (int) Math.min(Integer.MAX_VALUE, (long) etiket.getInt("seri") + 1);
+        etiket.putInt("seri", seri);
+        return seri;
+    }
+
+    /** Ölümde seri ve hayatta kalma süresi sıfırlanır (K-E74). */
+    public static void hayatSayaclariniSifirla(ServerPlayer oyuncu) {
+        CompoundTag etiket = kok(oyuncu);
+        etiket.remove("seri");
+        etiket.remove("hayatTick");
+    }
+
+    /** Son ölümden beri çevrim içinde geçen tick (K-E74 "On Gün On Gece"). */
+    public static long hayatTick(ServerPlayer oyuncu) {
+        return kok(oyuncu).getLong("hayatTick");
+    }
+
+    public static void hayatTickYaz(ServerPlayer oyuncu, long tick) {
+        kok(oyuncu).putLong("hayatTick", tick);
     }
 
     public static Optional<Unvan> unvan(ServerPlayer oyuncu) {

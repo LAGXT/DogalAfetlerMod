@@ -2,17 +2,14 @@ package io.github.kadirberkpolat1.dogalafetler.client.sicaklik;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.SicaklikDurumu;
-import java.awt.image.BufferedImage;
-import java.io.IOException;
-import java.io.InputStream;
 import java.util.List;
-import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
 
-/** S3-07 (§A8): sıcaklık bantının oyuncunun gördüğü yerleşim, dolum, çentik, şevron, metin ve animasyon davranışı. */
+/** K-E74: kafa ikonlu sıcaklık göstergesinin yerleşim, şerit, iğne, kafa tonu, efekt ve animasyon davranışı. */
 class HudCizimiTest {
     /** Varsayılan eşikler (S3-04, vücut birimi). */
     private static final float SOGUK = -20;
@@ -22,103 +19,184 @@ class HudCizimiTest {
     private static final float COK_SICAK = 50;
     private static final float YANMA = 70;
 
-    private static boolean dolu(float vucut, int x) {
-        int[] a = HudCizimi.dolguAraligi(vucut);
-        return a[0] <= x && x < a[1];
+    @Test
+    void gostergeVanillaCanIleAclikArasindakiBoslugaSigar() {
+        assertEquals(20, HudCizimi.GENISLIK, "can (merkez-10'da biter) ile açlık (merkez+10'da başlar) arası");
+        assertTrue(HudCizimi.YUKSEKLIK >= 20 && HudCizimi.YUKSEKLIK <= 24, "20–24 px");
+        assertEquals(HudCizimi.GENISLIK, HudCizimi.KAFA + 2 * HudCizimi.KAFA_X);
+        assertTrue(HudCizimi.DAMLA_Y + HudCizimi.DAMLA_YUKSEKLIK <= HudCizimi.YUKSEKLIK);
     }
 
     @Test
-    void hapVucuduSantigratYazar() {
+    void vucutSayisiSantigratYazar() {
         assertEquals("36.4°", HudCizimi.sayiMetni(-12));
         assertEquals("37.0°", HudCizimi.sayiMetni(0));
         assertEquals("32.0°", HudCizimi.sayiMetni(-100));
         assertEquals("42.0°", HudCizimi.sayiMetni(100));
-        assertEquals("-6°", HudCizimi.hissedilenMetni(-6.3f));
-        assertEquals("28°", HudCizimi.hissedilenMetni(27.6f));
     }
 
     @Test
-    void soguktaSolYariSicaktaSagYariMerkezdenDisaDolar() {
-        int[] soguk = HudCizimi.dolguAraligi(-50);
-        assertEquals(HudCizimi.HAP_X - 1, soguk[1], "soğuk dolum hapın kenarından başlar");
-        assertEquals(36, soguk[1] - soguk[0]);
-        assertTrue(soguk[0] > 0, "tüp çerçevesine taşmaz");
-
-        int[] sicak = HudCizimi.dolguAraligi(50);
-        assertEquals(HudCizimi.SICAK_X + 1, sicak[0], "sıcak dolum hapın kenarından başlar");
-        assertEquals(36, sicak[1] - sicak[0]);
-
-        int[] notr = HudCizimi.dolguAraligi(0);
-        assertEquals(notr[0], notr[1], "nötrde iki yarı da boş");
-        int[] uc = HudCizimi.dolguAraligi(-130);
-        assertEquals(1, uc[0], "ölçek ucunda tüp tam dolar, çerçeveye taşmaz");
-        assertEquals(HudCizimi.GENISLIK - 1, HudCizimi.dolguAraligi(130)[1]);
+    void seritSoguktaSolYariSicaktaSagYariMerkezdenDisaDolar() {
+        assertEquals(4.5f, HudCizimi.yariDolum(50), 1e-6f);
+        assertEquals(4.5f, HudCizimi.yariDolum(-50), 1e-6f);
+        assertEquals(0f, HudCizimi.yariDolum(0), 1e-6f, "nötrde iki yarı da boş");
+        assertEquals(HudCizimi.YARIM_IC, HudCizimi.yariDolum(-130), 1e-6f, "ölçek ucunda yarım tam dolar, taşmaz");
+        assertEquals(10, HudCizimi.piksel(true, 0), "sıcak merkezin sağından");
+        assertEquals(9, HudCizimi.piksel(false, 0), "soğuk merkezin solundan");
+        assertEquals(18, HudCizimi.piksel(true, HudCizimi.YARIM_IC - 1));
+        assertEquals(1, HudCizimi.piksel(false, HudCizimi.YARIM_IC - 1), "çerçeve pikseline taşmaz");
+        for (int i = 0; i < HudCizimi.YARIM_IC; i++) {
+            assertEquals(HudCizimi.GENISLIK - 1, HudCizimi.piksel(true, i) + HudCizimi.piksel(false, i), "merkeze ayna");
+        }
+        assertNotEquals(HudCizimi.seritRengi(false, 0), HudCizimi.seritRengi(false, 8), "soğuk dışa doğru koyulaşır");
+        assertNotEquals(HudCizimi.seritRengi(true, 0), HudCizimi.seritRengi(true, 8), "sıcak dışa doğru koyulaşır");
     }
 
     @Test
     void centiklerEsiklereDenkVeSimetrik() {
-        // Dolum çentiğe kademe değiştiğinde varır: bir pikselden (1,39 birim) fazla öncesinde boş, eşikte ve ötesinde dolu.
+        // Yarım 9 piksel: eşik büyüklüğünün 9/100'ü kadar piksel; eşiğin düştüğü piksel çentik olur.
+        assertEquals(8, HudCizimi.centik(SOGUK));
+        assertEquals(6, HudCizimi.centik(COK_SOGUK));
+        assertEquals(3, HudCizimi.centik(DONMA));
+        assertEquals(11, HudCizimi.centik(SICAK));
+        assertEquals(14, HudCizimi.centik(COK_SICAK));
+        assertEquals(16, HudCizimi.centik(YANMA));
         for (float e : new float[] {SOGUK, COK_SOGUK, DONMA, SICAK, COK_SICAK, YANMA}) {
-            int x = HudCizimi.centik(e);
-            float yon = Math.signum(e);
-            assertTrue(!dolu(e - yon * 1.5f, x), "eşik " + e + " öncesinde çentik boş");
-            assertTrue(dolu(e, x), "eşikte " + e + " çentik dolu");
-            assertTrue(dolu(e + yon * 1.5f, x), "eşik " + e + " aşılınca çentik dolu");
-            assertEquals(HudCizimi.GENISLIK - 1 - x, HudCizimi.centik(-e), "merkeze göre ayna");
+            assertEquals(HudCizimi.GENISLIK - 1, HudCizimi.centik(e) + HudCizimi.centik(-e), "merkeze göre ayna");
+            assertTrue(HudCizimi.centik(e) >= 1 && HudCizimi.centik(e) <= HudCizimi.GENISLIK - 2);
         }
-        assertTrue(HudCizimi.centik(SOGUK) > HudCizimi.centik(COK_SOGUK)
-                && HudCizimi.centik(COK_SOGUK) > HudCizimi.centik(DONMA), "soğuk çentikler merkezden dışa");
-        assertTrue(HudCizimi.centik(DONMA) > 0 && HudCizimi.centik(SOGUK) < HudCizimi.HAP_X, "soğuk tüpün içinde");
-        assertTrue(HudCizimi.centik(SICAK) > HudCizimi.SICAK_X && HudCizimi.centik(YANMA) < HudCizimi.GENISLIK - 1);
+        assertTrue(HudCizimi.centik(SOGUK) > HudCizimi.centik(COK_SOGUK) && HudCizimi.centik(COK_SOGUK) > HudCizimi.centik(DONMA),
+                "soğuk çentikler merkezden dışa");
+        assertEquals(1, HudCizimi.centik(-250), "ölçek dışı eşik şeridin ucunda kalır");
+        assertEquals(18, HudCizimi.centik(250));
     }
 
     @Test
-    void hissedilenUcgeniSoguktaSoldaNotrdeOrtada() {
-        assertEquals(HudCizimi.GENISLIK / 2, HudCizimi.ucgen(0.3f));
-        assertTrue(HudCizimi.ucgen(-60) < HudCizimi.HAP_X);
-        assertTrue(HudCizimi.ucgen(60) > HudCizimi.SICAK_X);
-        assertEquals(HudCizimi.ucgen(-100), HudCizimi.ucgen(-250), "ölçek dışı hissedilen tüp ucunda kalır");
+    void hissedilenIgnesiSoguktaSoldaNotrdeOrtada() {
+        assertEquals(HudCizimi.MERKEZ, HudCizimi.igneX(0f));
+        assertEquals(5, HudCizimi.igneX(-50));
+        assertEquals(14, HudCizimi.igneX(50));
+        assertEquals(1, HudCizimi.igneX(-100));
+        assertEquals(HudCizimi.GENISLIK - 2, HudCizimi.igneX(100));
+        assertEquals(HudCizimi.igneX(-100), HudCizimi.igneX(-250), "ölçek dışı hissedilen şeridin ucunda kalır");
     }
 
     @Test
-    void sevronSayisiEgilimHizinaGore() {
-        assertEquals(0, HudCizimi.sevron(0.03f));
-        assertEquals(1, HudCizimi.sevron(0.1f));
-        assertEquals(-2, HudCizimi.sevron(-0.3f));
-        assertEquals(3, HudCizimi.sevron(0.7f));
-        assertEquals(-3, HudCizimi.sevron(-2f));
-        for (int i = 0; i < 3; i++) {
-            int k = HudCizimi.sevronKaymasi(i, 17f);
-            assertTrue(k >= 0 && k <= 2);
+    void islaklikDamlasiYalnizIslakkenCizilir() {
+        assertTrue(HudCizimi.damla(0f, 10f).isEmpty(), "kuruyken damla yok");
+        assertTrue(HudCizimi.damla(0.04f, 10f).isEmpty(), "görünür eşiğin altında damla yok");
+        assertTrue(!HudCizimi.damla(0.05f, 10f).isEmpty(), "eşikte damla var");
+        assertTrue(!HudCizimi.damla(1f, 10f).isEmpty());
+    }
+
+    @Test
+    void islaklikDamlasiKafaninSagindaKalirVeAlttanDolar() {
+        for (float w : new float[] {0.05f, 0.3f, 0.7f, 1f}) {
+            for (float zaman : new float[] {0f, 20f, 35f, 50f, 69f}) {
+                for (HudCizimi.Parcacik p : HudCizimi.damla(w, zaman)) {
+                    assertTrue(p.x() >= HudCizimi.KAFA_X + HudCizimi.KAFA + 1, "kafanın sağında: " + p);
+                    assertTrue(p.x() + p.w() <= HudCizimi.DAMLA_X + HudCizimi.DAMLA_GENISLIK, "damla genişliği: " + p);
+                    assertTrue(p.y() >= 0 && p.y() + p.h() <= HudCizimi.YUKSEKLIK, "göstergenin yüksekliğinde: " + p);
+                }
+            }
         }
-        assertTrue(HudCizimi.sevronKaymasi(0, 0f) != HudCizimi.sevronKaymasi(0, 4f), "şevron zamanla kayar");
+        long azDolu = HudCizimi.damla(0.1f, 0f).stream().filter(p -> p.argb() == 0xFF5FB4FF).count();
+        long cokDolu = HudCizimi.damla(1f, 0f).stream().filter(p -> p.argb() == 0xFF5FB4FF).count();
+        assertTrue(azDolu >= 1 && cokDolu > azDolu, "dolu iç satırlar ıslaklıkla artar: " + azDolu + " < " + cokDolu);
     }
 
     @Test
-    void yalnizEtkinDurumIkonlariSoldanSaga() {
-        assertEquals(List.of(), HudCizimi.ikonlar(SicaklikDurumu.NORMAL, 0.02f));
-        assertEquals(List.of(HudCizimi.Ikon.ISLAK, HudCizimi.Ikon.USUME), HudCizimi.ikonlar(SicaklikDurumu.USUME, 0.6f));
-        assertEquals(List.of(HudCizimi.Ikon.YANMA), HudCizimi.ikonlar(SicaklikDurumu.YANMA, 0f));
-        assertEquals(List.of(HudCizimi.Ikon.ISLAK), HudCizimi.ikonlar(SicaklikDurumu.NORMAL, 0.05f));
-        assertEquals(1, HudCizimi.damlaDolulugu(0.05f), "görünür ıslaklıkta damla boş görünmez");
-        assertEquals(HudCizimi.IKON, HudCizimi.damlaDolulugu(1f));
-        assertTrue(HudCizimi.damlaDolulugu(0.3f) < HudCizimi.damlaDolulugu(0.7f));
+    void islaklikDamlasiYalnizYogunIslaklikdaDamlar() {
+        int damlaAlti = HudCizimi.DAMLA_Y + HudCizimi.DAMLA_YUKSEKLIK;
+        boolean damlayan = false;
+        for (float zaman = 0; zaman < 70; zaman += 1) {
+            damlayan |= HudCizimi.damla(1f, zaman).stream().anyMatch(p -> p.y() > damlaAlti);
+            assertTrue(HudCizimi.damla(0.2f, zaman).stream().noneMatch(p -> p.y() > damlaAlti),
+                    "hafif ıslaklıkta damlacık düşmez");
+        }
+        assertTrue(damlayan, "yoğun ıslaklıkta damlacık düşer");
     }
 
     @Test
-    void animasyonlarDurumaGore() {
-        assertArrayEquals(new int[] {0, 0}, HudCizimi.titreme(SicaklikDurumu.NORMAL, 6));
-        boolean donmaTitrer = false;
-        for (long t = 0; t < 12; t++) {
-            int[] d = HudCizimi.titreme(SicaklikDurumu.DONMA, t);
+    void kafaTonuDurumaGore() {
+        assertArrayEquals(new float[] {1f, 1f, 1f}, HudCizimi.kafaTonu(SicaklikDurumu.NORMAL, 0f));
+        float[] usume = HudCizimi.kafaTonu(SicaklikDurumu.USUME, 0f);
+        float[] donma = HudCizimi.kafaTonu(SicaklikDurumu.DONMA, 0f);
+        assertTrue(usume[2] > usume[0] && donma[2] > donma[0], "soğukta mavi ağır basar");
+        assertTrue(donma[0] < usume[0], "donma üşümeden daha mavi");
+        float[] yanma = HudCizimi.kafaTonu(SicaklikDurumu.YANMA, 0f);
+        float[] bunalma = HudCizimi.kafaTonu(SicaklikDurumu.BUNALMA, 0f);
+        assertTrue(yanma[0] > yanma[1] && yanma[0] > yanma[2], "yanmada kızıl");
+        assertTrue(yanma[1] < bunalma[1], "yanma bunalmadan kızıl");
+        assertTrue(HudCizimi.kafaTonu(SicaklikDurumu.YANMA, 0.6f)[1] < yanma[1], "nabız kızıllığı derinleştirir");
+    }
+
+    @Test
+    void herDurumunKendiKafaEfektiVarNormaldeYok() {
+        assertEquals(List.of(), HudCizimi.efekt(SicaklikDurumu.NORMAL, 10f));
+        assertEquals("", HudCizimi.efektAdi(SicaklikDurumu.NORMAL));
+        for (SicaklikDurumu durum : SicaklikDurumu.values()) {
+            if (durum == SicaklikDurumu.NORMAL) {
+                continue;
+            }
+            assertTrue(!HudCizimi.efekt(durum, 10f).isEmpty(), durum + " efekti boş olmamalı");
+            assertTrue(!HudCizimi.efektAdi(durum).isEmpty());
+        }
+        assertEquals("TER", HudCizimi.efektAdi(SicaklikDurumu.BUNALMA));
+        assertEquals("ALEV", HudCizimi.efektAdi(SicaklikDurumu.YANMA));
+        assertEquals("BUHAR", HudCizimi.efektAdi(SicaklikDurumu.USUME));
+        assertEquals("BUZ", HudCizimi.efektAdi(SicaklikDurumu.DONMA));
+    }
+
+    @Test
+    void efektlerGostergeninIcindeKalirYalnizDumanUstteTasar() {
+        for (SicaklikDurumu durum : SicaklikDurumu.values()) {
+            for (float zaman = 0; zaman < 300; zaman += 0.5f) {
+                for (HudCizimi.Parcacik p : HudCizimi.efekt(durum, zaman)) {
+                    String yer = durum + " zaman " + zaman + " " + p;
+                    assertTrue(p.x() >= 0 && p.x() + p.w() <= HudCizimi.GENISLIK, "yatayda taşmaz: " + yer);
+                    assertTrue(p.y() >= -6 && p.y() + p.h() <= HudCizimi.SERIT_Y, "dikeyde şeride binmez: " + yer);
+                    assertTrue(p.w() > 0 && p.h() > 0, "boş dikdörtgen yok: " + yer);
+                }
+            }
+        }
+    }
+
+    @Test
+    void efektlerZamanlaHareketEder() {
+        assertNotEquals(HudCizimi.efekt(SicaklikDurumu.BUNALMA, 0f), HudCizimi.efekt(SicaklikDurumu.BUNALMA, 8f), "ter akar");
+        assertNotEquals(HudCizimi.efekt(SicaklikDurumu.USUME, 0f), HudCizimi.efekt(SicaklikDurumu.USUME, 9f), "buhar yükselir");
+        assertNotEquals(HudCizimi.efekt(SicaklikDurumu.YANMA, 0f), HudCizimi.efekt(SicaklikDurumu.YANMA, 3f), "alev dalgalanır");
+    }
+
+    @Test
+    void titremeDurumaGore() {
+        assertArrayEquals(new int[] {0, 0}, HudCizimi.titreme(SicaklikDurumu.NORMAL, 6, -1));
+        assertArrayEquals(new int[] {1, 0}, HudCizimi.titreme(SicaklikDurumu.USUME, 0, -1), "ürperme");
+        assertArrayEquals(new int[] {-1, 0}, HudCizimi.titreme(SicaklikDurumu.USUME, 15, -1));
+        assertArrayEquals(new int[] {0, 0}, HudCizimi.titreme(SicaklikDurumu.USUME, 6, -1), "ürperme aralıklarla");
+    }
+
+    @Test
+    void donmaOnceSarsilirSonraDonupKalir() {
+        boolean sarsildi = false;
+        for (long t = 100; t < 100 + HudCizimi.DONMA_SARSINTI_TICK; t++) {
+            int[] d = HudCizimi.titreme(SicaklikDurumu.DONMA, t, 100);
             assertTrue(Math.abs(d[0]) <= 1 && Math.abs(d[1]) <= 1, "donma titremesi ±1 px");
-            donmaTitrer |= d[0] != 0 || d[1] != 0;
+            sarsildi |= d[0] != 0 || d[1] != 0;
         }
-        assertTrue(donmaTitrer);
+        assertTrue(sarsildi, "donma başlarken kafa sarsılır");
+        assertArrayEquals(new int[] {0, 0}, HudCizimi.titreme(SicaklikDurumu.DONMA, 150, 100), "sonra donup kalır");
+        assertArrayEquals(new int[] {0, 0}, HudCizimi.titreme(SicaklikDurumu.DONMA, 100, -1),
+                "durum hiç değişmediyse sarsıntı bitmiştir");
+        assertArrayEquals(new int[] {1, 1}, HudCizimi.titreme(SicaklikDurumu.DONMA, 160, 100), "80 tick'te bir ince titreme");
+    }
 
+    @Test
+    void nabizVeParlamaDurumaGore() {
         assertEquals(0f, HudCizimi.nabiz(SicaklikDurumu.USUME, -30, SICAK, YANMA, 10f));
         assertTrue(HudCizimi.nabiz(SicaklikDurumu.YANMA, 60, SICAK, YANMA, 0f) > HudCizimi.nabiz(SicaklikDurumu.BUNALMA,
-                30, SICAK, YANMA, 0f), "yanma nabzı bunalmadan güçlü");
+                30, SICAK, YANMA, 0f), "yanma nabızı bunalmadan güçlü");
         assertTrue(HudCizimi.nabizPeriyodu(68, SICAK, YANMA) < HudCizimi.nabizPeriyodu(22, SICAK, YANMA),
                 "hasara yaklaştıkça nabız hızlanır");
 
@@ -126,62 +204,5 @@ class HudCizimiTest {
         assertTrue(HudCizimi.parlama(103, 100, 0f) > 0f && HudCizimi.parlama(103, 100, 0f) < 1f);
         assertEquals(0f, HudCizimi.parlama(100 + HudCizimi.PARLAMA_TICK, 100, 0f), "parlama 6 tick'te biter");
         assertEquals(0f, HudCizimi.parlama(50, -1, 0f), "durum hiç değişmediyse parlama yok");
-    }
-
-    /**
-     * S3-10: hapın vücut sayısı her durumda okunur. Sayı rengi ile hap içinin (atlasın gerçek pikseli; nabızın en parlak
-     * anı, siyah ve beyaz dünya zemini üstünde) karşıtlığı WCAG AA ölçüsüyle en az 4,5:1; parlama anında sayıyı ayıran
-     * koyu kontur ile en az 7:1.
-     */
-    @Test
-    void hapSayisiHerDurumdaZemindenAyrilir() throws IOException {
-        BufferedImage atlas;
-        try (InputStream girdi = HudCizimiTest.class.getResourceAsStream(
-                "/assets/dogalafetler/textures/gui/sicaklik/hud.png")) {
-            atlas = ImageIO.read(girdi);
-        }
-        // Atlas: haplar v=16, u = 36 · sıra; beyaz nabız/parlama hapı u=180. (17, 5) sayının ortasındaki iç piksel.
-        int beyazIc = atlas.getRGB(180 + 17, 16 + 5);
-        for (SicaklikDurumu durum : SicaklikDurumu.values()) {
-            int ic = atlas.getRGB(HudCizimi.hapSirasi(durum) * 36 + 17, 16 + 5);
-            float nabiz = HudCizimi.nabiz(durum, YANMA, SICAK, YANMA, 0f);
-            int nabizKatmani = (Math.round((beyazIc >>> 24) * nabiz) << 24) | (HudCizimi.renk(durum) & 0xFFFFFF);
-            for (int zemin : new int[] {0x000000, 0xFFFFFF}) {
-                int arka = ust(nabizKatmani, ust(ic, zemin));
-                double k = kontrast(HudCizimi.sayiRengi(durum), arka);
-                assertTrue(k >= 4.5, durum + " zemin " + Integer.toHexString(zemin) + ": sayı "
-                        + Integer.toHexString(HudCizimi.sayiRengi(durum)) + " hap içi " + Integer.toHexString(arka)
-                        + " karşıtlık " + k);
-            }
-            double kontur = kontrast(HudCizimi.sayiRengi(durum), HudCizimi.KONTUR);
-            assertTrue(kontur >= 7, durum + ": sayı ile kontur karşıtlığı " + kontur);
-        }
-    }
-
-    /** ARGB ön renk, RGB zeminin üstünde (normal karışım); sonuç RGB. */
-    private static int ust(int on, int zemin) {
-        double a = (on >>> 24) / 255.0;
-        int s = 0;
-        for (int kaydir = 0; kaydir <= 16; kaydir += 8) {
-            double c = (on >> kaydir & 0xFF) * a + (zemin >> kaydir & 0xFF) * (1 - a);
-            s |= (int) Math.round(c) << kaydir;
-        }
-        return s;
-    }
-
-    private static double kontrast(int a, int b) {
-        double la = parlaklik(a);
-        double lb = parlaklik(b);
-        return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
-    }
-
-    /** WCAG göreli parlaklık. */
-    private static double parlaklik(int rgb) {
-        return 0.2126 * kanal(rgb >> 16 & 0xFF) + 0.7152 * kanal(rgb >> 8 & 0xFF) + 0.0722 * kanal(rgb & 0xFF);
-    }
-
-    private static double kanal(int c) {
-        double s = c / 255.0;
-        return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
     }
 }

@@ -7,6 +7,7 @@ import io.github.kadirberkpolat1.dogalafetler.afet.asit_yagmuru.mantik.AsitKural
 import io.github.kadirberkpolat1.dogalafetler.afet.ay_carpmasi.mantik.AyEgrileri;
 import io.github.kadirberkpolat1.dogalafetler.afet.deprem.mantik.SarsintiZarfi;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.KasirgaEvresi;
+import io.github.kadirberkpolat1.dogalafetler.afet.sel.mantik.SelKurallari;
 import io.github.kadirberkpolat1.dogalafetler.afet.sinkhole.mantik.SinkholeSeviyesi;
 import io.github.kadirberkpolat1.dogalafetler.afet.tsunami.TsunamiAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.afet.tsunami.TsunamiSeviyesi;
@@ -61,7 +62,18 @@ class GorunmeSuresiTest {
             case ORMAN_YANGINI -> 0;
             // AKTIF başı = çarpma: parlama ve patlama o anda.
             case AY_CARPMASI -> 0;
+            // Sel suyu AKTIF'in ilk saniyesinde kalkmaya başlar (sinüs eğrisi: su çizgisi hemen belirginleşir).
+            case SEL -> selGorunmeTick();
         };
+    }
+
+    /** En geç görünen seviyenin su çizgisi {@code GORUNUR_ARTIS} bloğa kalkma süresi (yukarı yuvarlanır). */
+    private static long selGorunmeTick() {
+        long en = 0;
+        for (int s = 1; s <= 5; s++) {
+            en = Math.max(en, (long) Math.ceil(SelKurallari.Tablo.VARSAYILAN.seviye(s).suyu(0).gorunmeGecikmesi()));
+        }
+        return en;
     }
 
     private static long asitGorunmeTick() {
@@ -91,7 +103,7 @@ class GorunmeSuresiTest {
             tablo.put(tur, sure(tur));
         }
         assertEquals(AfetTuru.values().length, tablo.size(), "her tür kapsanmalı");
-        assertEquals(8, tablo.size(), "8 afet türü");
+        assertEquals(9, tablo.size(), "9 afet türü");
         System.out.println("K-E67 seçimden görünmeye (sn): tür | ortalama | en çok | ön-uyarı ort/en çok | siren | görünme");
         for (Map.Entry<AfetTuru, Sure> e : tablo.entrySet()) {
             Sure s = e.getValue();

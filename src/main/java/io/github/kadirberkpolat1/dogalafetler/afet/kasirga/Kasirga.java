@@ -8,6 +8,7 @@ import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.KasirgaSeviyes
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.KasirgaYikimi;
 import io.github.kadirberkpolat1.dogalafetler.afet.kasirga.mantik.Yonelim;
 import io.github.kadirberkpolat1.dogalafetler.core.Afet;
+import io.github.kadirberkpolat1.dogalafetler.core.AfetMerkezi;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetAsamasi;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.EtkiAlani;
@@ -75,6 +76,18 @@ public final class Kasirga extends Afet {
     private static final int GOVDE_TARAMA = 32;
     /** Devrik kütüğün konduğu zemin, gövde dibinden en çok bu kadar blok yüksek ya da alçakta olabilir. */
     private static final int YATIS_YUKSEKLIK_FARKI = 2;
+    /** Zemin yüzeyi yok (boşluk, ör. Uç): {@link #zeminYuzeyi}. */
+    static final int ZEMIN_YOK = Integer.MIN_VALUE;
+    /** Zemin taramasında yüksek blok üstünden (ağaç, bina) aşağı en çok bu kadar kat atlanır. */
+    private static final int ZEMIN_TARAMA = 64;
+    /** Zeminsiz (boşluk üstü) kalan kasırga bu kadar tick sonra sona erer. */
+    private static final int ZEMINSIZ_SINIR = 100;
+    /** Önündeki engelin denetim ve temizleme aralığı (tick). */
+    private static final int ENGEL_ARALIGI = 4;
+    /** Temizlenemeyen engelde yan yön sapması (radyan), süresi (tick) ve bu sırada tick başına en çok dönüş. */
+    private static final double KACIS_ACISI = 1.0;
+    private static final int KACIS_TICK = 80;
+    private static final double KACIS_DONUS = Math.toRadians(5);
     private static final SoundEvent[] ENKAZ_SESLERI = {SoundEvents.WOOD_BREAK, SoundEvents.GRAVEL_BREAK,
         SoundEvents.GLASS_BREAK, SoundEvents.GRASS_BREAK, SoundEvents.WOOD_BREAK};
     private static final double TAM_TUR = Math.PI * 2;
@@ -99,6 +112,12 @@ public final class Kasirga extends Afet {
     private long aktifGecen;
     private long toplamKaldirilan;
     private boolean hareketli = true;
+    /** Temizlenemeyen engelden kaçış: kalan tick ve hedef yön. */
+    private int kacisKalan;
+    private double kacisYonu;
+    /** Zemin yokken geçen tick; sınırı aşınca kasırga sona erer. */
+    private int zeminsizTick;
+    private boolean zeminsizBitis;
 
     private Carpanlar carpanlar;
     private KasirgaSeviyesi seviyeBilgisi;
@@ -208,7 +227,13 @@ public final class Kasirga extends Afet {
      * üretmesin (inceleme Kn3).
      */
     @Override
-    public BlockPos merkezSec(ServerLevel level, ServerPlayer hedef, int seviye, RandomSource r) {
+    public BlockPos merkezSec(ServerLevel level, ServerPlayer hedef, int seviye, BlockPos merkezNoktasi,
+            RandomSource r) {
+        if (!AfetMerkezi.komutNoktasi(hedef, merkezNoktasi)) {
+            // Doğal başlatma: nokta oyuncunun 3–10 chunk uzağındaki halkada; ilk bacak hedeften uzaklaşır.
+            ilkYon = Math.atan2(merkezNoktasi.getZ() - hedef.getZ(), merkezNoktasi.getX() - hedef.getX());
+            return merkezNoktasi;
+        }
         KasirgaSeviyesi s = KasirgaSeviyesi.icin(seviye, KasirgaAyarlari.carpanlar());
         double aci = r.nextDouble() * TAM_TUR;
         double[] ofset = Yonelim.dogusOfseti(s.cekimYaricapi(), r.nextDouble(), aci);
@@ -220,9 +245,64 @@ public final class Kasirga extends Afet {
         return new BlockPos(x, yukseklik, z);
     }
 
+    /**
+     * Kasırga yalnız zemini olan boyutta ve gerçek zemin üstünde doğar: gökyüzü ışığı olmayan (Uç) ya da tavanlı (Nether)
+     * boyut ve boşluk üstündeki sütun reddedilir. Chunk yüklü değilse (yükseklik okuması chunk üretmesin) kabul edilir; zemin
+     * ilk hareket tick'lerinde yeniden denetlenir ({@link #zeminDenetimi}).
+     */
+    @Override
+    public boolean yerUygunMu(ServerLevel level, BlockPos merkez, int seviye) {
+        if (!zeminliBoyut(level)) {
+            return false;
+        }
+        return !level.hasChunk(merkez.getX() >> 4, merkez.getZ() >> 4)
+                || zeminYuzeyi(level, merkez.getX(), merkez.getZ()) != ZEMIN_YOK;
+    }
+
+    /** Gökyüzü ışıklı ve tavansız boyut (Overworld ve benzerleri); Uç ve Nether değil. */
+    static boolean zeminliBoyut(ServerLevel level) {
+        return level.dimensionType().hasSkyLight() && !level.dimensionType().hasCeiling();
+    }
+
+    /**
+     * {@code (x, z)} sütununun gerçek zemin yüzeyi (zemin bloğunun ya da su yüzeyinin üst Y'si; kasırga tabanı buraya oturur).
+     * Bina, ağaç gövdesi ve benzeri yapılar zemin sayılmaz: yapraksız en üst bloktan aşağı, toprak/kum/taş/kar/kil/buz gibi
+     * doğal zemin ya da sıvı bulunana dek inilir ({@link #zeminBlogu}); kasırga engelin üstüne çıkmaz. Chunk yüklü değilse ya da
+     * zemin yoksa (boşluk) {@link #ZEMIN_YOK}.
+     */
+    static int zeminYuzeyi(ServerLevel level, int x, int z) {
+        if (!level.hasChunk(x >> 4, z >> 4)) {
+            return ZEMIN_YOK;
+        }
+        int ust = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z);
+        int alt = Math.max(level.getMinBuildHeight(), ust - ZEMIN_TARAMA);
+        BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
+        for (int y = ust - 1; y >= alt; y--) {
+            if (zeminBlogu(level.getBlockState(p.set(x, y, z)))) {
+                return y + 1;
+            }
+        }
+        return ZEMIN_YOK;
+    }
+
+    /** Doğal zemin: toprak ailesi, kürek bloğu (kar, kil, çamur, kum, çakıl), ana kaya, kil, buz ya da sıvı. */
+    private static boolean zeminBlogu(BlockState blok) {
+        if (blok.isAir()) {
+            return false;
+        }
+        return !blok.getFluidState().isEmpty() || zeminMi(blok) || blok.is(BlockTags.MINEABLE_WITH_SHOVEL)
+                || blok.is(BlockTags.BASE_STONE_OVERWORLD) || blok.is(BlockTags.TERRACOTTA) || blok.is(BlockTags.ICE);
+    }
+
+    /** Başlangıç noktasının Y'si gerçek zemine oturtulur (doğuş noktası ağaç ya da çatı üstünde olabilir). */
+    private static Vec3 zemineOturtulmus(ServerLevel level, Vec3 k) {
+        int zemin = zeminYuzeyi(level, Mth.floor(k.x), Mth.floor(k.z));
+        return zemin == ZEMIN_YOK ? k : new Vec3(k.x, zemin, k.z);
+    }
+
     @Override
     protected void baslarken(ServerLevel level) {
-        konum = Vec3.atBottomCenterOf(baglam().merkez());
+        konum = zemineOturtulmus(level, Vec3.atBottomCenterOf(baglam().merkez()));
         // Konuma başlatılan kasırga (hedef oyuncu yok) ilk bacağı rastgele bir yöne yürür.
         yon = Double.isNaN(ilkYon) ? rastgele.nextDouble() * TAM_TUR : ilkYon;
         hedefYon = yon;
@@ -278,7 +358,7 @@ public final class Kasirga extends Afet {
 
     @Override
     protected boolean aktifBitti() {
-        return aktifGecen >= KasirgaEvresi.toplamAktif(seviyeBilgisi().aktifSureTick());
+        return zeminsizBitis || aktifGecen >= KasirgaEvresi.toplamAktif(seviyeBilgisi().aktifSureTick());
     }
 
     @Override
@@ -440,19 +520,34 @@ public final class Kasirga extends Afet {
      * dışındaysa (düşük simülasyon mesafesinde doğuş, kayıttan dönüş) K-01'deki gibi soyut ilerler; yükseklik yalnız yüklü
      * sütundan okunur. Rota başlangıcından {@link KasirgaRotasi#EN_COK_UZAKLIK} bloktan uzağa çıkan adım sınıra kırpılır ve
      * zorunlu yeni ara hedef istenir.
+     *
+     * <p>Zemin: huni tabanı her tick sütunun gerçek zeminine ({@link #zeminYuzeyi}) sıkıca oturur, kopmaz; bina, ağaç ve
+     * benzeri engellerin üstüne çıkmaz. Önündeki engel seviyenin gücüyle yok edilir ({@link #onuTemizle}); yok edilemiyorsa (sert
+     * ya da dayanıklı blok, aşırı dik yamaç, boşluk) kasırga yön değiştirir ({@link #kacisBaslat}).
      */
     private void hareketEt(ServerLevel level, int adim) {
         if (!hareketli || rota == null) {
             return;
         }
         Vec3 k = konum();
+        zeminDenetimi(level, k);
         if (rota.secimZamani(adim, k.x, k.z)) {
             araHedefSec(level, k);
         } else if (tick % Yonelim.SAPMA_ARALIGI_TICK == 0) {
             hedefYon = Yonelim.sapmaliYon(Yonelim.yon(k.x, k.z, rota.hedefX(), rota.hedefZ()), rastgele.nextDouble());
         }
-        yon = Yonelim.don(yon, hedefYon);
-        double hiz = seviyeBilgisi().hiz() / 20 * KasirgaEvresi.hizPayi(durum.evre());
+        double hizPayi = 1;
+        if (kacisKalan > 0) {
+            kacisKalan--;
+            hedefYon = kacisYonu;
+            yon += Math.max(-KACIS_DONUS, Math.min(KACIS_DONUS, Yonelim.aciFarki(hedefYon, yon)));
+            if (Math.abs(Yonelim.aciFarki(hedefYon, yon)) > 0.25) {
+                hizPayi = 0.15;
+            }
+        } else {
+            yon = Yonelim.don(yon, hedefYon);
+        }
+        double hiz = seviyeBilgisi().hiz() / 20 * KasirgaEvresi.hizPayi(durum.evre()) * hizPayi;
         double nx = k.x + Math.cos(yon) * hiz;
         double nz = k.z + Math.sin(yon) * hiz;
         double uzaklik = rota.baslangicaUzaklik(nx, nz);
@@ -468,14 +563,178 @@ public final class Kasirga extends Afet {
             zorunluSecim(level, k);
             return;
         }
-        if (level.isLoaded(sonraki)) {
-            int zemin = level.getHeight(Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, sonraki.getX(), sonraki.getZ());
-            y += (zemin - y) * 0.2;
+        int bx = Mth.floor(nx);
+        int bz = Mth.floor(nz);
+        if (level.hasChunk(bx >> 4, bz >> 4)) {
+            KasirgaSeviyesi s = seviyeBilgisi();
+            int zemin = zeminYuzeyi(level, bx, bz);
+            if (zemin == ZEMIN_YOK || zemin - y > engelYuksekligi(s)) {
+                kacisBaslat(level, k);
+                return;
+            }
+            if (tick % ENGEL_ARALIGI == 0 && Kurallar.blokHasariAcik(level.getGameRules())
+                    && level.isPositionEntityTicking(sonraki)) {
+                int engel = onuTemizle(level, k, y);
+                if (engel == ENGEL_KALDI) {
+                    kacisBaslat(level, k);
+                    return;
+                } else if (engel == ENGEL_BEKLE) {
+                    return;
+                }
+            }
+            y = zemineOturt(y, zemin);
         }
         konum = new Vec3(nx, y, nz);
         if (sinirda) {
             zorunluSecim(level, konum);
         }
+    }
+
+    private static final int ENGEL_YOK = 0;
+    /** Bu tick'in yıkım bütçesi bitti: engel yok edilebilir, kasırga bir sonraki denetime dek bekler. */
+    private static final int ENGEL_BEKLE = 1;
+    /** Yok edilemeyen engel (sert, dayanıklı, blok varlıklı): yön değişir. */
+    private static final int ENGEL_KALDI = 2;
+
+    /** Tabanın bir adımda çıkabileceği en yüksek zemin farkı (dik yamaç/kayalık engel sayılır): S1 4 → S5 8 blok. */
+    private static double engelYuksekligi(KasirgaSeviyesi s) {
+        return 3 + s.seviye();
+    }
+
+    /**
+     * Huni tabanını zemine yumuşak ama sıkı oturtur: fark yarıya iner, tick başına en çok 1,5 blok yükselir ve 3 blok alçalır
+     * (zemin çökerse taban havada asılı kalmaz); 0,05 blokta tam oturur.
+     */
+    private static double zemineOturt(double y, int zemin) {
+        double fark = zemin - y;
+        if (Math.abs(fark) < 0.05) {
+            return zemin;
+        }
+        return y + Math.max(-3.0, Math.min(1.5, fark * 0.6));
+    }
+
+    /**
+     * 10 tick'te bir bulunduğu sütunun zeminini denetler: {@link #ZEMINSIZ_SINIR} tick boyunca zemin yoksa (boşluk üstü, Uç)
+     * kasırga sona erer ({@link #aktifBitti}). Yüklü olmayan chunk'ta karar verilmez.
+     */
+    private void zeminDenetimi(ServerLevel level, Vec3 k) {
+        if (tick % 10 != 0) {
+            return;
+        }
+        int x = Mth.floor(k.x);
+        int z = Mth.floor(k.z);
+        if (!level.hasChunk(x >> 4, z >> 4)) {
+            return;
+        }
+        if (zeminYuzeyi(level, x, z) != ZEMIN_YOK) {
+            zeminsizTick = 0;
+            return;
+        }
+        zeminsizTick += 10;
+        if (zeminsizTick >= ZEMINSIZ_SINIR && !zeminsizBitis) {
+            zeminsizBitis = true;
+            DogalAfetler.LOGGER.info("[kasirga] zemin yok ({}, boyut {}): kasırga sona eriyor",
+                    BlockPos.containing(k).toShortString(), level.dimension().location());
+        }
+    }
+
+    /**
+     * Kasırganın önündeki (taban yarıçapı + 1,5 blok) üç sütunda, zeminden {@code 3 + 2·seviye} blok yukarıya kadar engel
+     * bloklarını yok eder: seviyenin sertlik sınırı ve yıkım bütçesi içinde uçurur ya da parçalar ({@link #kaldir}); hiç
+     * değişmeyen blok varsa ({@code #dogalafetler:kasirga_dayanikli}, blok varlıklı, sertlik sınırının üstü) {@link #ENGEL_KALDI}.
+     * Çarpışması olmayan (bitki) bloklar engel değildir; zemin bloğu da değildir (taban onun üstüne oturur).
+     */
+    private int onuTemizle(ServerLevel level, Vec3 k, double y) {
+        KasirgaSeviyesi s = seviyeBilgisi();
+        KasirgaYikimi.Butce butce = KasirgaYikimi.butce(s.seviye(), s.blokKaldirmaTick(), 1, TpsOlcer.kismaCarpani());
+        if (butce.deneme() <= 0) {
+            return ENGEL_YOK;
+        }
+        YikimTuru tur = new YikimTuru(butce, KasirgaAyarlari.ucanBlokTavani());
+        double mesafe = s.tabanYaricapi() + 1.5;
+        int yukseklik = 3 + 2 * s.seviye();
+        BlockPos.MutableBlockPos yer = new BlockPos.MutableBlockPos();
+        int islem = Math.max(8, butce.deneme());
+        int sonuc = ENGEL_YOK;
+        try {
+            for (int i = -1; i <= 1 && sonuc != ENGEL_KALDI; i++) {
+                double aci = yon + i * 0.45;
+                int x = Mth.floor(k.x + Math.cos(aci) * mesafe);
+                int z = Mth.floor(k.z + Math.sin(aci) * mesafe);
+                int zemin = zeminYuzeyi(level, x, z);
+                if (zemin == ZEMIN_YOK) {
+                    continue;
+                }
+                int ust = Mth.ceil(Math.max(y, zemin)) + yukseklik;
+                for (int yy = zemin; yy <= ust; yy++) {
+                    yer.set(x, yy, z);
+                    BlockState blok = level.getBlockState(yer);
+                    if (blok.isAir() || blok.getCollisionShape(level, yer).isEmpty()) {
+                        continue;
+                    }
+                    if (!kaldirilabilir(level, yer, blok, s)) {
+                        if (!ciftBlokKirilabilir(level, yer, blok, s)) {
+                            sonuc = ENGEL_KALDI;
+                            break;
+                        }
+                        if (islem <= 0 || !parcala(level, yer, blok, tur)) {
+                            sonuc = ENGEL_BEKLE;
+                            break;
+                        }
+                        tur.degisti(yer);
+                        toplamKaldirilan++;
+                        islem--;
+                        continue;
+                    }
+                    if (islem <= 0 || tur.tukendi(ucanlar.size()) || !kaldir(level, yer, blok, tur, true)) {
+                        sonuc = ENGEL_BEKLE;
+                        break;
+                    }
+                    islem--;
+                }
+            }
+        } finally {
+            tur.bildir(level);
+        }
+        return sonuc;
+    }
+
+    /** Çift blok (kapı, uzun ot) uçurulmaz ama kırılır: blok varlığı ve dayanıklı etiketi dışında, sertlik sınırı içinde. */
+    private static boolean ciftBlokKirilabilir(ServerLevel level, BlockPos yer, BlockState blok, KasirgaSeviyesi s) {
+        if (blok.hasBlockEntity() || blok.is(KasirgaKayitlari.DAYANIKLI) || !blok.getFluidState().isEmpty()
+                || !blok.hasProperty(BlockStateProperties.DOUBLE_BLOCK_HALF)) {
+            return false;
+        }
+        float sertlik = blok.getDestroySpeed(level, yer);
+        return sertlik >= 0 && sertlik <= s.sertlikSiniri();
+    }
+
+    /**
+     * Temizlenemeyen engel ya da boşluk önünde: solda ve sağda 57° açıdaki zemin farkına bakıp daha engelsiz yana döner;
+     * {@link #KACIS_TICK} boyunca rota hedefi yerine bu yön izlenir, dönerken kasırga neredeyse durur. Kaçış sürerken yeniden
+     * seçilmez.
+     */
+    private void kacisBaslat(ServerLevel level, Vec3 k) {
+        if (kacisKalan > 0) {
+            return;
+        }
+        double sol = engelSkoru(level, k, yon - KACIS_ACISI);
+        double sag = engelSkoru(level, k, yon + KACIS_ACISI);
+        int yan = sol < sag ? -1 : sol > sag ? 1 : rastgele.nextBoolean() ? 1 : -1;
+        kacisYonu = yon + yan * KACIS_ACISI;
+        kacisKalan = KACIS_TICK;
+    }
+
+    /** Yön için engel puanı: boşluk 1000, aksi halde taban üstündeki zemin farkı (küçük iyi). */
+    private double engelSkoru(ServerLevel level, Vec3 k, double aci) {
+        double mesafe = seviyeBilgisi().tabanYaricapi() + 4;
+        int x = Mth.floor(k.x + Math.cos(aci) * mesafe);
+        int z = Mth.floor(k.z + Math.sin(aci) * mesafe);
+        if (!level.hasChunk(x >> 4, z >> 4)) {
+            return 0;
+        }
+        int zemin = zeminYuzeyi(level, x, z);
+        return zemin == ZEMIN_YOK ? 1000 : Math.max(0, zemin - k.y);
     }
 
     /**
@@ -530,6 +789,11 @@ public final class Kasirga extends Afet {
         ucanlar.add(blok);
     }
 
+    /** Tepeden fırlatma rampası 0-1 (ömrün son %13'ü; öncesinde ve siren aşamasında 0). */
+    private double firlatmaRampi() {
+        return KasirgaEvresi.firlatma(aktifGecen, seviyeBilgisi().aktifSureTick());
+    }
+
     /** Görüntü varlığı: konum entity-ticking iken var, değilken yok (kasırga soyut ilerler). */
     private void varlikGuncelle(ServerLevel level) {
         if (varlik != null && varlik.isRemoved()) {
@@ -547,7 +811,7 @@ public final class Kasirga extends Afet {
             }
             yeni.moveTo(k.x, k.y, k.z, 0, 0);
             yeni.bagla(this, seviye(), (float) carpanlar().boyut(), (float) carpanlar().cekim(), (float) kaldirmaTavani());
-            yeni.guncelle(durum, (float) yon);
+            yeni.guncelle(durum, (float) yon, (float) firlatmaRampi());
             varlik = yeni;
             level.addFreshEntity(yeni);
         } else if (!isler) {
@@ -555,7 +819,7 @@ public final class Kasirga extends Afet {
             varlik = null;
         } else {
             varlik.setPos(k.x, k.y, k.z);
-            varlik.guncelle(durum, (float) yon);
+            varlik.guncelle(durum, (float) yon, (float) firlatmaRampi());
         }
     }
 
@@ -878,19 +1142,22 @@ public final class Kasirga extends Afet {
     }
 
     /**
-     * Çekim, kaldırma ve çekirdek hasarı ({@link KasirgaCekimi}): çekim yarıçapındaki mob, eşya ve sahipsiz araçların hızı burada
-     * değişir. Oyuncunun ve sürdüğü aracın hareketinin sahibi oyuncunun istemcisidir, çekim orada uygulanır (AF3-01): sunucu
+     * Çekim, yörünge, kaldırma, tepeden fırlatma ve çekirdek hasarı ({@link KasirgaCekimi}): çekim yarıçapındaki
+     * mob, eşya ve sahipsiz araçlar huninin çevresinde yükselerek döner, ömrün son %13'ünde huninin tepesinden dışa ve yukarı
+     * fırlatılır; hızları burada değişir. Oyuncunun ve sürdüğü aracın hareketinin sahibi oyuncunun istemcisidir, çekim orada uygulanır (AF3-01): sunucu
      * onların hızını ezmez (END tick'inde {@code getX() - xo} her zaman 0'dır, eski hız tahmini çekimi biriktirmiyordu). Kaldırma
      * etkiliyken sunucu yalnız düşme mesafesini (düşme hasarı sunucuda) ve oyuncunun uçma sayacını sıfırlar (AF3-08: huni oyuncuyu
      * tavanda asılı tutar; kaldırma bölgesinden çıkan oyuncuda vanilla denetimi aynen sürer). Hasar saniyede bir, huni tabanda.
      */
     private void varliklariCek(ServerLevel level) {
-        if (KasirgaEvresi.guc(durum) <= 0) {
+        double firlatma = firlatmaRampi();
+        double guc = Math.max(KasirgaEvresi.guc(durum), firlatma);
+        if (guc <= 0) {
             return;
         }
         KasirgaSeviyesi s = seviyeBilgisi();
-        KasirgaCekimi.Kaynak kaynak = new KasirgaCekimi.Kaynak(konum(), s, KasirgaEvresi.guc(durum) * carpanlar().cekim(),
-                kaldirmaTavani());
+        KasirgaCekimi.Kaynak kaynak = new KasirgaCekimi.Kaynak(konum(), s, guc * carpanlar().cekim(), kaldirmaTavani(),
+                firlatma * carpanlar().cekim());
         Vec3 k = kaynak.merkez();
         double r = s.cekimYaricapi();
         AABB kutu = new AABB(k.x - r, k.y - 6, k.z - r, k.x + r, k.y + s.yukseklik(), k.z + r);
@@ -905,7 +1172,7 @@ public final class Kasirga extends Afet {
                         ucmaDenetiminiSifirla(surucu);
                     }
                 }
-            } else if (KasirgaCekimi.uygula(e, ivme)) {
+            } else if (KasirgaCekimi.uygula(e, ivme, kaynak.firlatma())) {
                 e.hasImpulse = true;
             }
             double h = e.getY() - k.y;
@@ -918,6 +1185,7 @@ public final class Kasirga extends Afet {
 
     /** Kaldırma etkiliyken oyuncunun (ve sürdüğü aracın) uçma sayacı sıfırlanır; bağlantısı olmayan oyuncu (çıkış anı) atlanır. */
     private static void ucmaDenetiminiSifirla(ServerPlayer oyuncu) {
+        io.github.kadirberkpolat1.dogalafetler.basarim.BasarimOlaylari.kasirgaKaldirdi(oyuncu); // K-E74 "Bir Tur Attım"
         if (oyuncu.connection == null) {
             return;
         }

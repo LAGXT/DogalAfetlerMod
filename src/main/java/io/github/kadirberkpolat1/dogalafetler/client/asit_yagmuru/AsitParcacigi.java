@@ -1,7 +1,9 @@
 package io.github.kadirberkpolat1.dogalafetler.client.asit_yagmuru;
 
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import java.util.ArrayList;
 import java.util.List;
+import net.minecraft.client.Camera;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.Particle;
 import net.minecraft.client.particle.ParticleProvider;
@@ -9,6 +11,8 @@ import net.minecraft.client.particle.ParticleRenderType;
 import net.minecraft.client.particle.SpriteSet;
 import net.minecraft.client.particle.TextureSheetParticle;
 import net.minecraft.core.particles.SimpleParticleType;
+import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec3;
 
 /**
  * Asit yağmurunun parçacıkları (tasarım notu §2): bloklara çarpınca sıçrayan sarımsı yeşil damla, 0,6 sn'de yükselip dağılan
@@ -18,6 +22,12 @@ import net.minecraft.core.particles.SimpleParticleType;
 final class AsitParcacigi extends TextureSheetParticle {
     /** Canlı bulut tavanı parçacıkları; {@link IstemciAsitYagmuru} her tick ayıklar. */
     static final List<AsitParcacigi> BULUTLAR = new ArrayList<>();
+
+    /** Bulut tavanı parçacığının en yüksek opaklığı: gökyüzü kapatıp ekranı karartmasın. */
+    private static final float BULUT_ALFASI = 0.45F;
+    /** Bulut kameraya bu mesafeden (blok) yaklaşınca solmaya başlar; {@link #BULUT_TAM_SOLMA} içinde görünmez. */
+    private static final double BULUT_SOLMA_BASI = 40;
+    private static final double BULUT_TAM_SOLMA = 12;
 
     private final SpriteSet kareler;
     private final Tur tur;
@@ -68,17 +78,17 @@ final class AsitParcacigi extends TextureSheetParticle {
             }
             case BULUT -> {
                 lifetime = 300 + random.nextInt(140);
-                quadSize = 12F + random.nextFloat() * 10F;
+                quadSize = 8F + random.nextFloat() * 6F;
                 friction = 1.0F;
                 float gri = 0.85F + random.nextFloat() * 0.15F;
-                setColor(0.36F * gri, 0.38F * gri, 0.21F * gri);
+                setColor(0.5F * gri, 0.52F * gri, 0.3F * gri);
                 alpha = 0;
                 BULUTLAR.add(this);
             }
             default -> throw new IllegalStateException(tur.name());
         }
         ilkBoy = quadSize;
-        ilkAlfa = tur == Tur.BULUT ? 0.78F : alpha;
+        ilkAlfa = tur == Tur.BULUT ? BULUT_ALFASI : alpha;
         setSpriteFromAge(kareler);
     }
 
@@ -103,6 +113,27 @@ final class AsitParcacigi extends TextureSheetParticle {
             default -> {
             }
         }
+    }
+
+    /** Bulut kameranın içinden geçerken dev bir koyu dörtgen olup ekranı karartmasın: yaklaştıkça yumuşakça solar. */
+    @Override
+    public void render(VertexConsumer tampon, Camera kamera, float kismi) {
+        if (tur != Tur.BULUT) {
+            super.render(tampon, kamera, kismi);
+            return;
+        }
+        Vec3 k = kamera.getPosition();
+        double dx = Mth.lerp(kismi, xo, x) - k.x;
+        double dy = Mth.lerp(kismi, yo, y) - k.y;
+        double dz = Mth.lerp(kismi, zo, z) - k.z;
+        double uzaklik = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        float solma = (float) Mth.clamp((uzaklik - BULUT_TAM_SOLMA) / (BULUT_SOLMA_BASI - BULUT_TAM_SOLMA), 0.0, 1.0);
+        float asil = alpha;
+        alpha = asil * solma;
+        if (alpha > 0.003F) {
+            super.render(tampon, kamera, kismi);
+        }
+        alpha = asil;
     }
 
     @Override

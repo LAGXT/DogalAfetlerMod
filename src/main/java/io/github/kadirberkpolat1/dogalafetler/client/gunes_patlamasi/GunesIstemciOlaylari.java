@@ -3,6 +3,7 @@ package io.github.kadirberkpolat1.dogalafetler.client.gunes_patlamasi;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.afet.gunes_patlamasi.GunesPatlamasiSesleri;
 import io.github.kadirberkpolat1.dogalafetler.afet.gunes_patlamasi.mantik.GunesGorselEgrileri;
+import io.github.kadirberkpolat1.dogalafetler.client.core.EkranEfektKapisi;
 import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciDonem;
 import io.github.kadirberkpolat1.dogalafetler.config.EfektKalitesi;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
@@ -58,7 +59,12 @@ public final class GunesIstemciOlaylari {
                 }
             }
         } else if (olay.getStage() == RenderLevelStageEvent.Stage.AFTER_WEATHER) {
-            GunesGokCizici.ekran(olay.getProjectionMatrix(), ortuler(mc, level, d, pt), level.getGameTime() + pt, kalite());
+            GunesGokCizici.Ortuler ortu = ortuler(mc, level, d, pt);
+            if (!EkranEfektKapisi.isiIzinli()) {
+                // Isı dalgalanması yalnız oyuncunun vücudu ısınmışsa (bunalma/yanma) ve yaratıcı/izleyici değilse çizilir.
+                ortu = new GunesGokCizici.Ortuler(ortu.flas(), 0f, ortu.safak(), ortu.kizil());
+            }
+            GunesGokCizici.ekran(olay.getProjectionMatrix(), ortu, level.getGameTime() + pt, kalite());
         }
     }
 

@@ -67,11 +67,14 @@ public final class SicaklikYoneticisi {
         float sonOrtam;
         float sonMekan;
         float sonHissedilen;
+        float sonEgilim;
         float sonIslaklik;
         SolEl sonSolEl;
         Kademe sonKademe;
         long sonGonderim;
         int buharSayaci;
+        /** En son gösterilen (yumuşak geçişli) mekan sonucu; {@code null}: henüz ölçülmedi. */
+        OrtamSicakligi.Sonuc ortam;
     }
 
     /**
@@ -116,7 +119,20 @@ public final class SicaklikYoneticisi {
     public static Analiz analiz(ServerPlayer oyuncu) {
         SicaklikAyarlari.Ozet ozet = SicaklikAyarlari.al();
         OrtamSicakligi.Girdi og = OrtamOlcer.girdi(oyuncu, ozet);
-        return analiz(oyuncu, ozet, og, OrtamSicakligi.hesapla(og, ozet.ortam()), VucutSicakligi.islaklik(oyuncu));
+        return analiz(oyuncu, ozet, og, mekan(oyuncu, ozet, og, 0), VucutSicakligi.islaklik(oyuncu));
+    }
+
+    /**
+     * Mekan sonucu: model + ek kalemler ({@link OrtamOlcer#ekKatkilar}: yün, lav, yakın oyuncu, ekipman) ve son gösterilene
+     * göre yumuşak geçiş ({@link OrtamSicakligi#gecis}): biyom ya da konum değişince ortam anında zıplamaz.
+     * {@code saniye} 0 ise (salt okuma) son gösterilen aynen döner; ilk ölçümde hedef.
+     */
+    private static OrtamSicakligi.Sonuc mekan(ServerPlayer oyuncu, SicaklikAyarlari.Ozet ozet, OrtamSicakligi.Girdi og,
+            double saniye) {
+        OrtamSicakligi.Sonuc model = OrtamSicakligi.hesapla(og, ozet.ortam());
+        OrtamSicakligi.Sonuc hedef = model.ekle(OrtamOlcer.ekKatkilar(oyuncu, ozet.ekIsi(), model.toplam()));
+        Gecici g = GECICI.get(oyuncu.getUUID());
+        return OrtamSicakligi.gecis(g == null ? null : g.ortam, hedef, saniye, ozet.ortam().gecisSaniyesi());
     }
 
     private static Analiz analiz(ServerPlayer oyuncu, SicaklikAyarlari.Ozet ozet, OrtamSicakligi.Girdi og,
@@ -143,13 +159,14 @@ public final class SicaklikYoneticisi {
         SicaklikAyarlari.Ozet ozet = SicaklikAyarlari.al();
         double saniye = tick / 20.0;
         OrtamSicakligi.Girdi og = OrtamOlcer.girdi(oyuncu, ozet);
-        OrtamSicakligi.Sonuc mekan = OrtamSicakligi.hesapla(og, ozet.ortam());
+        OrtamSicakligi.Sonuc mekan = mekan(oyuncu, ozet, og, saniye);
         double islaklik = Islaklik.adim(VucutSicakligi.islaklik(oyuncu), OrtamOlcer.islaklikKaynagi(oyuncu, og),
                 oyuncu.isOnFire(), mekan.toplam(), mekan.katki(Katki.KAYNAKLAR), saniye, ozet.islaklik());
         VucutSicakligi.islaklikYaz(oyuncu, islaklik);
         Analiz a = analiz(oyuncu, ozet, og, mekan, VucutSicakligi.islaklik(oyuncu));
         Gecici g = gecici(oyuncu);
         g.sonKonum = oyuncu.position();
+        g.ortam = mekan;
         double yeni = IsiAlisverisi.adim(a.girdi(), saniye, ozet.isi(), ozet.yalitim())
                 + VucutSicakligi.etkileriIlerlet(oyuncu, tick);
         VucutSicakligi.yaz(oyuncu, yeni);
@@ -159,6 +176,14 @@ public final class SicaklikYoneticisi {
         buzKovasiniErit(oyuncu, a.mekan().toplam(), saniye, ozet.hissedilen());
         parcaciklariGonder(oyuncu, g, ozet.esikler().kademe(vucut).durum(), a.girdi().islaklik());
         gonderGerekirse(oyuncu, g, vucut, a, ozet.esikler(), false);
+    }
+
+    /** Yumuşak ortam geçişini unutur: sonraki ölçüm hedefi aynen alır (respawn, GameTest). */
+    public static void ortamGecisiniSifirla(ServerPlayer oyuncu) {
+        Gecici g = GECICI.get(oyuncu.getUUID());
+        if (g != null) {
+            g.ortam = null;
+        }
     }
 
     /** Sol eldeki sıcaklık eşyası (ana eldeki sayılmaz). */
@@ -320,6 +345,16 @@ public final class SicaklikYoneticisi {
         }
     }
 
+    /**
+     * HUD paketini tetikleyen en küçük değişimler (K-E74). Eski eşikler (vücut 0,25 / ortam 0,5 / hissedilen 0,5) yavaş sürüklenen
+     * değerleri 10 sn'ye dek (tazeleme aralığı) göstergeden saklayıp bir anda sıçrattığından gösterge geç güncelleniyordu. Hesap
+     * 1 Hz kaldığı için paket yine en çok saniyede bir gider; yarısını istemci eğilimle ileri tahmin eder.
+     */
+    private static final float VUCUT_ESIGI = 0.05f;
+    private static final float ORTAM_ESIGI = 0.1f;
+    private static final float HISSEDILEN_ESIGI = 0.1f;
+    private static final float EGILIM_ESIGI = 0.05f;
+
     private static void gonderGerekirse(ServerPlayer oyuncu, Gecici g, double vucut, Analiz a, Esikler e,
             boolean zorla) {
         long simdi = oyuncu.serverLevel().getGameTime();
@@ -328,22 +363,24 @@ public final class SicaklikYoneticisi {
         float mekan = (float) a.mekan().toplam();
         float his = (float) a.hissedilen().toplam();
         float w = (float) a.girdi().islaklik();
+        float egilim = (float) a.egilim();
         SolEl el = a.hissedilen().solEl();
         Kademe kademe = e.kademe(vucut);
         boolean gerekli = zorla || !g.hudAcik || kademe != g.sonKademe || el != g.sonSolEl || Float.isNaN(g.sonVucut)
-                || Math.abs(v - g.sonVucut) >= 0.25f || Math.abs(o - g.sonOrtam) >= 0.5f
-                || Math.abs(mekan - g.sonMekan) >= 0.5f || Math.abs(his - g.sonHissedilen) >= 0.5f
-                || Math.abs(w - g.sonIslaklik) >= 0.02f
+                || Math.abs(v - g.sonVucut) >= VUCUT_ESIGI || Math.abs(o - g.sonOrtam) >= ORTAM_ESIGI
+                || Math.abs(mekan - g.sonMekan) >= 0.5f || Math.abs(his - g.sonHissedilen) >= HISSEDILEN_ESIGI
+                || Math.abs(egilim - g.sonEgilim) >= EGILIM_ESIGI || Math.abs(w - g.sonIslaklik) >= 0.02f
                 || simdi - g.sonGonderim >= SicaklikAyarlari.paketTazelemeTick();
         if (!gerekli) {
             return;
         }
-        AgKanali.oyuncuyaGonder(oyuncu, SicaklikDurumPaketi.acik(v, o, mekan, his, (float) a.egilim(), w, el, e));
+        AgKanali.oyuncuyaGonder(oyuncu, SicaklikDurumPaketi.acik(v, o, mekan, his, egilim, w, el, e));
         g.hudAcik = true;
         g.sonVucut = v;
         g.sonOrtam = o;
         g.sonMekan = mekan;
         g.sonHissedilen = his;
+        g.sonEgilim = egilim;
         g.sonIslaklik = w;
         g.sonSolEl = el;
         g.sonKademe = kademe;
@@ -369,6 +406,7 @@ public final class SicaklikYoneticisi {
         g.sonVucut = Float.NaN;
         g.sonKademe = null;
         g.sonSolEl = null;
+        g.ortam = null;
         yavaslamaAyarla(oyuncu, 0);
         VucutSicakligi.hasarSayaciAyarla(oyuncu, 0);
         AgKanali.oyuncuyaGonder(oyuncu, SicaklikDurumPaketi.KAPALI);
@@ -411,6 +449,7 @@ public final class SicaklikYoneticisi {
         oyuncu.removeEffect(SicaklikKayitlari.ISLAK.get());
         Gecici g = gecici(oyuncu);
         g.sonKonum = oyuncu.position();
+        g.ortam = null;
         hemenGonder(oyuncu);
     }
 

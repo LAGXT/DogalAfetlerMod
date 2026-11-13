@@ -377,13 +377,14 @@ public final class SuRenderer {
             int dx = (int) Math.floor(cam.x) - uzakOx;
             int dz = (int) Math.floor(cam.z) - uzakOz;
             // Sakin denizde karolar değişmez: yenileme seyrek (güneş açısı için), kayma ve artış değişimi hemen.
-            boolean hareketli = d.dalgaDizisi().length > 0 || d.cekilmeDizisi().length > 0 || !d.magaralar().isEmpty();
+            boolean hareketli = d.dalgaDizisi().length > 0 || d.cekilmeDizisi().length > 0 || !d.magaralar().isEmpty()
+                    || d.selDizisi().length > 0;
             int periyot = hareketli ? UZAK_YENILEME : UZAK_SAKIN_YENILEME;
             if (!uzakYapiyor && (uzakKirli || tick - uzakTick >= periyot || tick < uzakTick || dx * dx + dz * dz > 64
-                    || d.denizArtisi() != uzakArtis)) {
+                    || d.etkinArtis(saat) != uzakArtis)) {
                 uzakTick = tick;
                 uzakKirli = false;
-                uzakArtis = d.denizArtisi();
+                uzakArtis = d.etkinArtis(saat);
                 uzakBaslat(mc, e.getCamera());
             }
         }
@@ -1217,15 +1218,31 @@ public final class SuRenderer {
                 }
             }
         }
+        // Dalga gövdesinde dalgacık ve kısa oktavlar söner (arka yüz pürüzsüz); ışık dalganın analitik eğimini alır.
+        float sak = dalga == null ? 1f : (float) Math.max(0, 1 - dalgaH / 2.5);
+        float dsx = 0;
+        float dsz = 0;
         if (dalga != null && dalgaH > 1) {
-            // Dalga gövdesi turkuaza kayar; tepede beyaz köpük bandı, arkasında yanal köpük çizgileri (tsunami.md).
+            // Gövde turkuaza kayar, kretinde açılır; beyaz köpük yalnız ön yüzde ve kretin hemen arkasında (eğim köpüğü yok),
+            // arkasında seyrek yanal çizgiler, geri kalanı köpüksüz (tsunami.md).
             renk = karistir(renk, 0x3E8F94, (float) Math.min(0.7, dalgaH / 8));
-            if (dalgaS < 5) {
-                kopuk = Math.max(kopuk, (float) Math.max(0, 0.95 * (1 - Math.abs(dalgaS - 2.5) / 2.5)));
-            } else if (dalgaS < 14) {
+            renk = karistir(renk, 0xB5E3E0, (float) (0.3 * Math.max(0, 1 - Math.abs(dalgaS - 2.5) / 3.5)));
+            double ex = dalga.yonX() * 0.5;
+            double ez = dalga.yonZ() * 0.5;
+            double hOn = dalga.yuzey(x + 0.5 + ex, z + 0.5 + ez, t);
+            double hArka = dalga.yuzey(x + 0.5 - ex, z + 0.5 - ez, t);
+            if (!Double.isNaN(hOn) && !Double.isNaN(hArka)) {
+                double e = Math.max(-1.2, Math.min(1.2, hOn - hArka));
+                dsx = (float) (e * dalga.yonX());
+                dsz = (float) (e * dalga.yonZ());
+            }
+            double on = dalgaS < 2.5 ? 0.75 + 0.25 * dalgaS / 2.5 : Math.max(0, 1 - (dalgaS - 2.5) / 3.5);
+            double dantel = 0.65 + 0.35 * Math.sin(x * 1.7 + z * 1.1 + t * 0.21) * Math.sin(x * 0.7 - z * 1.3 - t * 0.13);
+            kopuk = (float) Math.min(0.95, 0.95 * on * dantel);
+            if (dalgaS >= 6 && dalgaS < 14) {
                 double u = -(x + 0.5 - dalga.x0()) * dalga.yonZ() + (z + 0.5 - dalga.z0()) * dalga.yonX();
                 double serit = 0.5 + 0.5 * Math.sin(u * 0.9 + dalgaS * 0.35);
-                kopuk = Math.max(kopuk, (float) (0.45 * serit * (1 - (dalgaS - 5) / 9)));
+                kopuk = (float) (0.3 * serit * (1 - (dalgaS - 6) / 8));
             }
         }
         float a = Math.max(kopuk * 0.6f, derin < 1 ? 0.25f + 0.15f * derin : Math.min(0.85f, 0.4f + 0.06f * derin));
@@ -1244,14 +1261,14 @@ public final class SuRenderer {
             int v01 = v00 + 1;
             int v10 = v00 + N + 1;
             int v11 = v10 + 1;
-            float y00 = yu + VH[v00];
-            float y01 = yu + VH[v01];
-            float y11 = yu + VH[v11];
-            float y10 = yu + VH[v10];
-            kosegolge(0, tabanRenk, a, x, y00, z, v00, isik);
-            kosegolge(1, tabanRenk, a, x, y01, z + 1, v01, isik);
-            kosegolge(2, tabanRenk, a, x + 1, y11, z + 1, v11, isik);
-            kosegolge(3, tabanRenk, a, x + 1, y10, z, v10, isik);
+            float y00 = yu + sak * VH[v00];
+            float y01 = yu + sak * VH[v01];
+            float y11 = yu + sak * VH[v11];
+            float y10 = yu + sak * VH[v10];
+            kosegolge(0, tabanRenk, a, x, y00, z, v00, isik, sak, dsx, dsz);
+            kosegolge(1, tabanRenk, a, x, y01, z + 1, v01, isik, sak, dsx, dsz);
+            kosegolge(2, tabanRenk, a, x + 1, y11, z + 1, v11, isik, sak, dsx, dsz);
+            kosegolge(3, tabanRenk, a, x + 1, y10, z, v10, isik, sak, dsx, dsz);
             dortgenSerbest(rx, y00, rz, rx, y01, rz + 1, rx + 1, y11, rz + 1, rx + 1, y10, rz, false, x, z);
             if (kopuk > 0.08f) {
                 for (int q = 0; q < 4; q++) {
@@ -1437,8 +1454,13 @@ public final class SuRenderer {
         return 0;
     }
 
-    private static void kosegolge(int q, int taban, float alfa, double x, double y, double z, int v, int isik) {
-        golgele(taban, alfa, x, y, z, VSX[v], VSZ[v], isik);
+    /**
+     * Köşe gölgelemesi. {@code sak} dalgacığın ve kısa oktavların payı (dalga gövdesinde 0: yüzey pürüzsüz), {@code dsx}/{@code dsz}
+     * dalganın analitik eğimi ({@code sak} azaldıkça normale karışır: gövde kırışıksız, düzgün eğimli ışık alır).
+     */
+    private static void kosegolge(int q, int taban, float alfa, double x, double y, double z, int v, int isik, float sak, float dsx,
+            float dsz) {
+        golgele(taban, alfa, x, y, z, VSX[v] * sak + dsx * (1 - sak), VSZ[v] * sak + dsz * (1 - sak), isik);
         QC[q] = gRenk;
         QA[q] = gAlfa;
         QI[q] = gIsik;

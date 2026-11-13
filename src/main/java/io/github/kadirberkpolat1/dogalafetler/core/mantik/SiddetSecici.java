@@ -5,13 +5,20 @@ import java.util.Optional;
 import java.util.random.RandomGenerator;
 
 /**
- * Afet seviyesinin ağırlıklı rastgele seçimi (madde 10). Seviye 4 ve 5 art arda gelmez: önceki doğal seviyeli afet 4 ya da
- * 5 idiyse bu seçimde ikisi de dıştadır ("aynı seviye art arda en fazla bir kez" bunun özel hâlidir; komutla başlatılan
- * afet önceki seviye sayılmaz, K-E67). {@code afetMaksSiddet} gamerule'ü üstü keser. Afet yoğunluğu yüksekse
- * ({@link AfetYogunlugu}) ağırlık düşük seviyelere kayar. Diziler sıfır tabanlıdır: indeks 0 = Seviye 1.
+ * Afet seviyesinin ağırlıklı rastgele seçimi (madde 10). Seviye 4 ve 5 art arda gelmesi yasak değildir ama seyreltilir (ayar sürümü 4,
+ * kullanıcı isteği "5. seviyeler daha sık gelmeli": eski kesin yasak gerçekleşen S5 payını yarıya yakın düşürüyordu):
+ * önceki doğal seviyeli afet 4 ya da 5 idiyse bu seçimde 4 ve 5'in ağırlığı {@value #ART_ARDA_CARPANI} ile çarpılır
+ * (komutla başlatılan afet önceki seviye sayılmaz, K-E67). {@code afetMaksSiddet} gamerule'ü üstü keser. Afet yoğunluğu
+ * yüksekse ({@link AfetYogunlugu}) ağırlık düşük seviyelere kayar. Diziler sıfır tabanlıdır: indeks 0 = Seviye 1.
  */
 public final class SiddetSecici {
     private static final int SEVIYE_SAYISI = AfetTuru.EN_YUKSEK_SEVIYE;
+
+    /** Nadirlik katsayısı (k) her bu kadar günde bir basamak yükselir (K-E72). */
+    public static final double ADIM_GUNU = 5.0;
+
+    /** Önceki doğal afet seviye 4-5 idiyse seviye 4 ve 5'in ağırlığının çarpanı (0 = yasak; 1 = etkisiz). */
+    public static final double ART_ARDA_CARPANI = 0.5;
 
     /** Bir seviyenin olasılığının 0 olma nedeni ({@code /dogalafet gun} ve {@code durum} çıktısı). */
     public enum KapaliNeden {
@@ -20,9 +27,7 @@ public final class SiddetSecici {
         /** Oyun günü seviyenin açıldığı günün altında. */
         GUN,
         /** Oyun günü yetiyor ama gelişim kriteri açıkken etkin gün yetmiyor (madde 10). */
-        GELISIM,
-        /** Önceki doğal seviyeli afet 4 ya da 5 idi. */
-        ART_ARDA
+        GELISIM
     }
 
     private SiddetSecici() {
@@ -33,16 +38,17 @@ public final class SiddetSecici {
         return seviye >= 4;
     }
 
-    /** Ham ağırlıklar; açılmamış, kesilmiş ya da art arda yasaklı seviyenin ağırlığı 0. */
+    /** Ham ağırlıklar; açılmamış ya da kesilmiş seviyenin ağırlığı 0, art arda 4-5'te 4 ve 5 {@value #ART_ARDA_CARPANI} kattır. */
     public static double[] agirliklar(SiddetAyarlari ayarlar, double gun, int maksSiddet, boolean oncekiYuksek) {
         double[] agirlik = new double[SEVIYE_SAYISI];
         int maks = Math.max(AfetTuru.EN_DUSUK_SEVIYE, Math.min(SEVIYE_SAYISI, maksSiddet));
+        double basamakGunu = Math.floor(Math.max(0, gun) / ADIM_GUNU) * ADIM_GUNU;
         double ilerleme = ayarlar.nadirlikGecisGunu() <= 0 ? 1.0
-                : Math.max(0, Math.min(1, gun / ayarlar.nadirlikGecisGunu()));
+                : Math.max(0, Math.min(1, basamakGunu / ayarlar.nadirlikGecisGunu()));
         double k = ayarlar.nadirlikBaslangic() + (ayarlar.nadirlikSon() - ayarlar.nadirlikBaslangic()) * ilerleme;
         for (int seviye = 1; seviye <= maks; seviye++) {
             int esik = ayarlar.esik(seviye);
-            if (gun < esik || (oncekiYuksek && yuksek(seviye))) {
+            if (gun < esik) {
                 continue;
             }
             double rampa = 1.0;
@@ -50,7 +56,7 @@ public final class SiddetSecici {
                 double r0 = ayarlar.acilisBaslangicOrani();
                 rampa = Math.min(1.0, r0 + (1.0 - r0) * (gun - esik) / ayarlar.acilisRampaGunu());
             }
-            agirlik[seviye - 1] = Math.pow(k, seviye - 1) * rampa;
+            agirlik[seviye - 1] = Math.pow(k, seviye - 1) * rampa * (oncekiYuksek && yuksek(seviye) ? ART_ARDA_CARPANI : 1.0);
         }
         return agirlik;
     }
@@ -107,10 +113,10 @@ public final class SiddetSecici {
 
     /**
      * Seviyenin olasılığı neden 0; açıksa boş. {@code gercekGun} oyun günü, {@code etkinGun} gelişim kriterinden sonraki
-     * gün ({@link #etkinGun}). Sıra: gamerule üst sınırı, gün eşiği, gelişim kriteri, art arda 4-5 kuralı.
+     * gün ({@link #etkinGun}). Sıra: gamerule üst sınırı, gün eşiği, gelişim kriteri.
      */
     public static Optional<KapaliNeden> kapaliNedeni(SiddetAyarlari ayarlar, double gercekGun, double etkinGun,
-            int seviye, int maksSiddet, boolean oncekiYuksek) {
+            int seviye, int maksSiddet) {
         if (seviye > Math.max(AfetTuru.EN_DUSUK_SEVIYE, maksSiddet)) {
             return Optional.of(KapaliNeden.MAKS);
         }
@@ -120,9 +126,6 @@ public final class SiddetSecici {
         }
         if (etkinGun < esik) {
             return Optional.of(KapaliNeden.GELISIM);
-        }
-        if (oncekiYuksek && yuksek(seviye)) {
-            return Optional.of(KapaliNeden.ART_ARDA);
         }
         return Optional.empty();
     }

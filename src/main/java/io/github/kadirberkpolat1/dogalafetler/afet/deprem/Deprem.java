@@ -6,8 +6,10 @@ import io.github.kadirberkpolat1.dogalafetler.afet.deprem.mantik.ArtciSarsintisi
 import io.github.kadirberkpolat1.dogalafetler.afet.deprem.mantik.DepremSeviyesi;
 import io.github.kadirberkpolat1.dogalafetler.afet.deprem.mantik.FayHatti;
 import io.github.kadirberkpolat1.dogalafetler.afet.deprem.mantik.IcYikimSeviyesi;
+import io.github.kadirberkpolat1.dogalafetler.afet.tsunami.DepremTsunamisi;
 import io.github.kadirberkpolat1.dogalafetler.core.Afet;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetAsamasi;
+import io.github.kadirberkpolat1.dogalafetler.core.AfetMerkezi;
 import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.EtkiAlani;
 import io.github.kadirberkpolat1.dogalafetler.core.TpsOlcer;
@@ -156,9 +158,13 @@ public final class Deprem extends Afet {
     }
 
     @Override
-    public BlockPos merkezSec(ServerLevel level, ServerPlayer hedef, int seviye, RandomSource r) {
+    public BlockPos merkezSec(ServerLevel level, ServerPlayer hedef, int seviye, BlockPos merkezNoktasi,
+            RandomSource r) {
         if (sabitMerkez != null) {
             return sabitMerkez;
+        }
+        if (!AfetMerkezi.komutNoktasi(hedef, merkezNoktasi)) {
+            return merkezNoktasi;
         }
         double a = r.nextDouble() * Math.PI * 2;
         double d = 6 + 2 * seviye;
@@ -186,6 +192,7 @@ public final class Deprem extends Afet {
     protected void asamaDegisti(ServerLevel level, AfetAsamasi eski, AfetAsamasi yeni) {
         if (yeni == AfetAsamasi.AKTIF) {
             sesiBaslat(level);
+            DepremTsunamisi.tetikle(level, baglam().merkez(), seviye());
         } else if (yeni == AfetAsamasi.BITIS) {
             OrtamSesi.durdur(level.getServer(), SES_KATMANI, 60);
             if (isler != null) {

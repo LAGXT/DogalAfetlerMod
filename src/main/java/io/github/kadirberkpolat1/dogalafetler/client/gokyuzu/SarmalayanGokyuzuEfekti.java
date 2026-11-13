@@ -39,16 +39,18 @@ public final class SarmalayanGokyuzuEfekti extends DimensionSpecialEffects {
     }
 
     /**
-     * Normal güneş + ay yok iken tam gündüzde (yıldızlar görünmezken, ay ufkun en az ~22° altında) gök vanilla ile
+     * Normal güneş + ay var iken tam gündüzde (yıldızlar görünmezken, ay ufkun en az ~22° altında) gök vanilla ile
      * aynıdır; çizim iç nesneye bırakılır ki başka modun ya da şader paketinin gündüz göğü korunsun. Ay çarpmasının
-     * yaklaşması ve çarpma izleri (patlama, enkaz halkası) gündüz de bizim çizimimizdir.
+     * yaklaşması ve çarpma izleri (patlama, enkaz halkası) gündüz de bizim çizimimizdir. K-E84: ay yok olduktan sonra göğü hep
+     * biz çiziyoruz; vanilla (ya da şader paketinin vanilla yolu) ayın yok olduğunu bilmez ve ay dokusunu ufka yakın saatlerde
+     * yine çizerdi.
      */
     private static boolean bizCiziyoruz(@Nullable ClientLevel level, float zaman, IstemciGokyuzu.Gorunum d) {
         if (IstemciGokyuzu.kanca != IstemciGokyuzu.Kanca.SARMALAYICI || !overworldMu(level) || d.vanillaMi()) {
             return false;
         }
-        return IstemciAy.gokyuzuEtkin() || !(d.evre() == GunesEvresi.NORMAL && (d.onceki() == null || d.gecis() >= 1f)
-                && GokyuzuRenkleri.geceligi(zaman) <= 0f);
+        return IstemciAy.gokyuzuEtkin() || !d.ayVar() || !(d.evre() == GunesEvresi.NORMAL
+                && (d.onceki() == null || d.gecis() >= 1f) && GokyuzuRenkleri.geceligi(zaman) <= 0f);
     }
 
     @Override

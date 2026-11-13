@@ -10,6 +10,7 @@ import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.blaze3d.vertex.VertexSorting;
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
+import io.github.kadirberkpolat1.dogalafetler.client.core.EkranEfektKapisi;
 import io.github.kadirberkpolat1.dogalafetler.client.core.IstemciDonem;
 import io.github.kadirberkpolat1.dogalafetler.config.EfektKalitesi;
 import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
@@ -229,7 +230,7 @@ public final class PulsarIstemciEfektleri {
         IstemciGokyuzu.Gorunum g = IstemciGokyuzu.gorunum(pt);
         float kiragi = kiragi(IstemciDonem.durum(), g);
         float ortu = g.evre() == GunesEvresi.KARADELIK_YUTMA ? KaraDelikYutmaEgrileri.ekranOrtusu(g.saniye()) : 0f;
-        if (kiragi > 0.004f) {
+        if (kiragi > 0.004f && EkranEfektKapisi.donmaIzinli()) {
             tamEkran(KIRAGI, 1f, 1f, 1f, kiragi);
         }
         if (ortu > 0.004f) {

@@ -84,3 +84,31 @@ vinyeti, dikey dalga deseni).
 - **Sol el:** Buz Kovası −12 °C (mekan > 25 °C'de `(T − 25)/10`/sn erir, 300'de su kovası), lav kovası +12 °C; ana elde etki yok.
 - **Kaynaklar:** kömürleşmiş kütük 2:2, kömürleşmiş tahta 1,5:2 (kısık ama sürekli; `sicaklik.ayarSurumu` 1 liste göçü).
 - **Görsel kabul:** kullanıcının oyun içi doğrulaması (2026-11-08).
+
+## Güncelleme turu 4 (K-E74): kafa ikonlu gösterge ve gecikmesiz HUD
+
+- **Gösterge:** eski 182 px'lik bant kalktı (`hud.png` atlası ve üreten kod silindi). Yerine vanilla can (merkez−10'da biter) ile açlık
+  (merkez+10'da başlar) barları arasındaki 20 px'lik boşluğa sığan 20×24 px'lik rozet geldi (`SicaklikHud`, `HudCizimi`), XP seviye
+  sayısının hemen üstünde. Ortasında oyuncunun kendi kafası: skin yüzü (8,8) + şapka katmanı (40,8; model ayarı açıksa), 2×
+  ölçekli 16×16; çevresinde durum renginde 1 px halka. Atlas gerekmez, her şey doku + düz dikdörtgendir.
+- **Beş durum:** normal (düz kafa); bunalma = ter (3 damla alından kayıp düşer, hafif sıcak ton); yanma = kırmızıya çalan ton (nabızla
+  koyulaşır) + 5 alev sütunu ve yükselen duman; üşüme = hafif mavi ton + ağızdan genişleyip yanlara savrulan 3 buhar bulutu (15 tick'te
+  bir ürperme); donma = belirgin mavi ton, kırağı kenarı ve 5 parlayıp sönen buz kristali; başlarken 40 tick sarsılır, sonra donup
+  kalır (80 tick'te bir 4 tick ince titreme). Efektler `sicaklik.kafaEfektleri`, hareket `animasyonlar` ile kapanır.
+- **Şerit:** kafanın altında 20×2 px: ortadan dışa dolan renk (soğuk sol açık→koyu mavi, sıcak sağ turuncu→kırmızı; yarı 9 px, son
+  piksel kesir kadar saydam), durum eşikleri soluk, hasar eşikleri kırmızı çentik. Şeridi kesen 1 px beyaz iğne hissedilen sıcaklığı
+  (`hissedilenGoster`) gösterir. **Islaklık damlası (K-E80):** ıslaklık görünür eşiğini (0,05) geçince kafanın sağında (gösterge x 20..26,
+  y 2..11) 7×10 px su damlası çizilir (eski en alttaki 1 px mavi çizgi kalktı): içi ıslaklık oranında alttan dolar, yavaşça 1 px
+  süzülür, yoğun ıslaklıkta (≥ 0,5) altından ince bir damlacık düşer ve söner; kuruyunca kaybolur. İsteğe bağlı `sayiGoster` kafanın üstüne 0,75 ölçekli `36.4°`
+  yazar (varsayılan **kapalı**; eski configte açık yazılıysa kalır). Eski ikonlar, şevronlar ve sağdaki hissedilen °C kalktı,
+  `durumIkonlari` yerine `kafaEfektleri` geldi.
+- **Vanilla konumlar:** `leftHeight/rightHeight` artık hiç kaydırılmaz; can ve açlık vanilla yerinde. Rozet seçili eşya adının
+  (alttan 61–48 px) üstüne bindiği karelerde Forge'un `ITEM_NAME` katmanı `RenderGuiOverlayEvent` Pre/Post ile aynı kare içinde
+  yukarı ötelenir. Radar paneli sabit alt bölge kullandığı için değişmedi. Creative/spectator ve `hideGui`'de çizilmez.
+- **Gecikmenin kökü:** (1) sunucu vücut/ortam/hissedilen değeri en çok 1 Hz hesaplar ve yalnız vücut ≥ 0,25, ortam ≥ 0,5,
+  hissedilen ≥ 0,5 değişince (aksi halde 200 tick'te bir) gönderirdi: yavaş sürüklenen değer 10 sn'ye dek göstergeden saklanıp bir
+  anda sıçrardı; (2) istemci gösterilen değeri paketteki sabit hedefe yaklaştırırdı, yani ekran her zaman en az bir paket aralığı
+  geriydi. Çözüm: eşikler vücut 0,05 / ortam 0,1 / hissedilen 0,1 / eğilim 0,05'e indi (hesap 1 Hz kaldığı için paket yine en çok
+  saniyede bir, bant genişliği şişmedi, TPS yükü yok); istemci `AkanDeger` ile her paketin değerini ve hızını (vücut için sunucunun
+  eğilimi, ortam/hissedilen için ardışık iki paketin farkı) alır, paketten bu yana geçen süre kadar (en çok 25 tick, değer
+  birimine göre sınırlı) ileri tahmin eder ve gösterilen değer her tick hedefe %35 yaklaşır (eskiden %25).

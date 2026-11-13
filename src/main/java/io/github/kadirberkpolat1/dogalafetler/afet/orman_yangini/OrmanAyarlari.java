@@ -1,5 +1,6 @@
 package io.github.kadirberkpolat1.dogalafetler.afet.orman_yangini;
 
+import io.github.kadirberkpolat1.dogalafetler.afet.orman_yangini.mantik.OrmanAyarGocu;
 import io.github.kadirberkpolat1.dogalafetler.afet.orman_yangini.mantik.OrmanKurallari;
 import io.github.kadirberkpolat1.dogalafetler.config.AyarKaydi;
 import java.util.ArrayList;
@@ -19,6 +20,7 @@ public final class OrmanAyarlari {
 
     static void kaydet() {
         sunucu = AyarKaydi.sunucuBolumu("orman_yangini", "Orman yangını afeti (bölüm G, madde 10)", Sunucu::new);
+        AyarKaydi.sunucuGocu(OrmanAyarGocu.PLAN);
     }
 
     /** Seviye tablosu; beş öğeli olmayan liste varsayılana düşer. */
@@ -74,9 +76,12 @@ public final class OrmanAyarlari {
         private final ForgeConfigSpec.IntValue erkenBitisSaniye;
 
         private Sunucu(ForgeConfigSpec.Builder k) {
+            k.comment("Config göçünün sürümü (K-E61): dosya bundan eskiyse açılışta eski varsayılanında kalan orman yangını seviye "
+                    + "listeleri yeni varsayılana çekilir, elle değiştirilenlere dokunulmaz. Elle değiştirmeyin.")
+                    .defineInRange("ayarSurumu", OrmanAyarGocu.GUNCEL, 0, Integer.MAX_VALUE);
             OrmanKurallari.Tablo v = OrmanKurallari.Tablo.VARSAYILAN;
-            yaricap = liste(k, "baslangicYaricapi", "Başlangıç alanı yarıçapı (blok, ortak yangın en çok 24).", v.yaricap(),
-                    1, 24);
+            yaricap = liste(k, "baslangicYaricapi", "Başlangıç alanı yarıçapı (blok, ortak yangın en çok 48).", v.yaricap(),
+                    1, 48);
             yogunluk = liste(k, "yogunluk",
                     "Yangın yoğunluğu 0–1: yayılma çarpanı 0,5 + 1,3·y, kıvılcım sıçraması round(12·y) blok, alan tutuşma oranı.",
                     v.yogunluk(), 0, 1);

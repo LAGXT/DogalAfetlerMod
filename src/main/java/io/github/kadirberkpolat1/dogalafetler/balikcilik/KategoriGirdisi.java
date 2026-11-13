@@ -12,6 +12,7 @@ import java.util.function.Consumer;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.GsonHelper;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.entity.projectile.FishingHook;
 import net.minecraft.world.level.storage.loot.LootContext;
 import net.minecraft.world.level.storage.loot.LootDataId;
 import net.minecraft.world.level.storage.loot.LootDataType;
@@ -20,6 +21,7 @@ import net.minecraft.world.level.storage.loot.ValidationContext;
 import net.minecraft.world.level.storage.loot.entries.LootPoolEntryType;
 import net.minecraft.world.level.storage.loot.entries.LootPoolSingletonContainer;
 import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
+import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
 import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
 
 /**
@@ -51,7 +53,13 @@ public final class KategoriGirdisi extends LootPoolSingletonContainer {
 
     @Override
     public void createItemStack(Consumer<ItemStack> cikti, LootContext baglam) {
-        Kategori k = BalikcilikAyarlari.lootAgirliklari().sec(baglam.getRandom().nextDouble(), baglam.getLuck());
+        // Olta buz deliğinde bekleme başlarken kategoriyi çoktan seçtiyse (bekleme süresi nadirliğe göre) o kullanılır.
+        boolean ozelAcik = KutupOltasi.mi(baglam.getParamOrNull(LootContextParams.TOOL));
+        Kategori k = baglam.getParamOrNull(LootContextParams.THIS_ENTITY) instanceof FishingHook olta
+                ? BuzBalikciligi.secilenKategori(olta, ozelAcik) : null;
+        if (k == null) {
+            k = BalikcilikAyarlari.lootAgirliklari().sec(baglam.getRandom().nextDouble(), baglam.getLuck(), ozelAcik);
+        }
         ResourceLocation tablo = tablolar.get(k);
         if (tablo != null) {
             baglam.getResolver().getLootTable(tablo).getRandomItemsRaw(baglam, cikti);

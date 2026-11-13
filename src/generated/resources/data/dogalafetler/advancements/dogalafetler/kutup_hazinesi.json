@@ -1,0 +1,43 @@
+{
+  "parent": "dogalafetler:dogalafetler/buz_balikcisi",
+  "criteria": {
+    "topla": {
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "dogalafetler:kristal_levrek",
+              "dogalafetler:kutup_yilanbaligi",
+              "dogalafetler:aurora_baligi"
+            ]
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    }
+  },
+  "display": {
+    "announce_to_chat": false,
+    "description": {
+      "translate": "advancements.dogalafetler.kutup_hazinesi.description"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "dogalafetler:kristal_levrek"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.kutup_hazinesi.title"
+    }
+  },
+  "requirements": [
+    [
+      "topla"
+    ]
+  ],
+  "rewards": {
+    "experience": 15
+  },
+  "sends_telemetry_event": true
+}

@@ -180,6 +180,24 @@ public final class IstemciSarsinti {
         return new double[] {artciGenlik * carpan, 0};
     }
 
+    /**
+     * Uyum katmanı (Punchy, {@code client/uyum}): bu oyuncunun anlık sarsıntı genliği (derece, kullanıcı çarpanı dahil); sarsıntı
+     * yoksa 0. Kamera ve el sarsıntısıyla aynı kaynaktan okunur, böylece karakter gövdesi ve kamera uyumlu sallanır. Her
+     * oyuncu karesinde çağrılır: afet ve artçı yokken dizi/seçenek oluşturmadan döner.
+     */
+    public static double genlikDerece(Player oyuncu, float kismi) {
+        if (artci == null && IstemciAfetDurumu.aktif(AfetTuru.DEPREM).isEmpty()
+                && IstemciAfetDurumu.aktif(AfetTuru.SINKHOLE).isEmpty()) {
+            return 0;
+        }
+        return genlik(oyuncu, kismi)[0];
+    }
+
+    /** Uyum katmanı: sarsıntı dalgalarının saniye cinsinden saati (kamera sarsıntısıyla aynı faz). */
+    public static double sarsintiSaati(float kismi) {
+        return (saat + kismi) / 20.0;
+    }
+
     @SubscribeEvent
     public static void kamera(ViewportEvent.ComputeCameraAngles olay) {
         Player oyuncu = Minecraft.getInstance().player;

@@ -24,6 +24,7 @@ import io.github.kadirberkpolat1.dogalafetler.sicaklik.SicaklikKancalari;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.SicaklikYoneticisi;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.VucutSicakligi;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.ZirhEkleri;
+import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Katki;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Yalitim;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
 import io.github.kadirberkpolat1.dogalafetler.yangin.YanginKaynagi;
@@ -84,8 +85,9 @@ import net.minecraftforge.gametest.PrefixGameTestTemplate;
 public final class MeteorOyunTestleri {
     private static final String SAHNE = "meteor_sahne";
     private static final BlockPos MERKEZ = new BlockPos(7, 5, 7);
-    private static final OdulZari.Sanslar HIC = new OdulZari.Sanslar(0, 0, 0);
-    private static final OdulZari.Sanslar HEP = new OdulZari.Sanslar(1, 1, 1);
+    private static final OdulZari.Sanslar HIC = new OdulZari.Sanslar(0, 0, 0, 0);
+    /** Her zar tam bir parça (büyükte bir çekirdek); ek parça yok (eşya sayısı sabit kalsın). */
+    private static final OdulZari.Sanslar HEP = new OdulZari.Sanslar(1, 1, 1, 0);
 
     private MeteorOyunTestleri() {
     }
@@ -601,7 +603,7 @@ public final class MeteorOyunTestleri {
                 boolean b = o.boyut().buyuk();
                 buyuk += b ? 1 : 0;
                 once += b ? 2 : 1;
-                int adet = (o.odul().parca() ? 1 : 0) + (o.odul().cekirdek() ? 1 : 0);
+                int adet = o.odul().adet();
                 sonra += adet;
                 kucukOdul |= !b && adet > 0;
             }
@@ -1041,8 +1043,11 @@ public final class MeteorOyunTestleri {
             double ilimliE = SicaklikYoneticisi.analiz(duz).ortamBirim();
             double ilimliBeklenen = Yalitim.termostatCekimi(-60, ilimliE, 4, ayar);
             dogrula(y, ilimliFark > 0, "termostat −60'taki vücudu nötre çekmeli: " + ilimliFark);
-            dogrula(y, Math.abs(ilimliFark - ilimliBeklenen) < 0.02,
-                    "çekim fizikle aynı: " + ilimliFark + " / " + ilimliBeklenen + " (E=" + ilimliE + ")");
+            // Termostatlı parçalar soğuk mekanda ortama ayrıca ısı da ekler (Katki.TERMOSTAT); o durumda fark yalnız çekim olmaz.
+            if (termostatIsisi(termostatli) == 0) {
+                dogrula(y, Math.abs(ilimliFark - ilimliBeklenen) < 0.02,
+                        "çekim fizikle aynı: " + ilimliFark + " / " + ilimliBeklenen + " (E=" + ilimliE + ")");
+            }
 
             // Termostat + yün + tüy birlikte (madde 13c "hepsi birlikte dengeli", N4): sıcakta çok yalıtımlı ikisi de ısınır,
             // termostatlı fizikteki kadar az; yalıtım girdisi üç eki birlikte sayar, termostat tam koruma vermez.
@@ -1052,28 +1057,35 @@ public final class MeteorOyunTestleri {
             dogrula(y, girdi.termostatParcasi() == 4 && girdi.yunluParca() == 4 && girdi.toplamTuy() == 120,
                     "termostat, yün ve tüy birlikte sayılmalı: " + girdi);
             SicaklikKancalari.ortamKaynagiEkle(level, new Vec3(m.getX() + 0.6, m.getY() + 1, m.getZ() + 0.5), 45, 16, 40);
+            ortamGecisiniSifirla(termostatli, duz);
             double sicakE = SicaklikYoneticisi.analiz(duz).ortamBirim();
             double sicakFark = adim(termostatli, duz, 60);
             double sicakBeklenen = Yalitim.termostatCekimi(60, sicakE, 4, ayar);
             DogalAfetler.LOGGER.info("termostat GameTest (yün + 30 tüy): sıcak E={} fark={} vücut {} / {}", sicakE, sicakFark,
                     VucutSicakligi.al(termostatli), VucutSicakligi.al(duz));
             dogrula(y, sicakFark < 0, "termostat sıcakta nötre (aşağı) çekmeli: " + sicakFark);
-            dogrula(y, Math.abs(sicakFark - sicakBeklenen) < 0.02, "sıcak çekim fizikle aynı: " + sicakFark + " / "
-                    + sicakBeklenen + " (E=" + sicakE + ")");
+            if (termostatIsisi(termostatli) == 0) {
+                dogrula(y, Math.abs(sicakFark - sicakBeklenen) < 0.02, "sıcak çekim fizikle aynı: " + sicakFark + " / "
+                        + sicakBeklenen + " (E=" + sicakE + ")");
+            }
             dogrula(y, VucutSicakligi.al(termostatli) > 60, "çok yalıtımlı termostatlı da sıcakta ısınır (tam koruma yok)");
             giydir(termostatli, true, false);
             giydir(duz, false, false);
 
             SicaklikKancalari.ortamKaynagiEkle(level, new Vec3(m.getX() + 0.6, m.getY() + 1, m.getZ() + 0.5), -200, 16, 60);
+            ortamGecisiniSifirla(termostatli, duz);
             double ucE = SicaklikYoneticisi.analiz(duz).ortamBirim();
             double ucFark = adim(termostatli, duz, -100);
             double ucBeklenen = Yalitim.termostatCekimi(-100, ucE, 4, ayar);
             DogalAfetler.LOGGER.info("termostat GameTest: ılımlı E={} fark={}; uç E={} fark={}", ilimliE, ilimliFark, ucE,
                     ucFark);
             dogrula(y, ucE < ilimliE - 20, "soğuk kaynak ortamı düşürmeli: " + ilimliE + " → " + ucE);
-            dogrula(y, ucFark > 0 && ucFark < ilimliFark, "uçta çekim azalır ama kalır: " + ucFark + " < " + ilimliFark);
-            dogrula(y, Math.abs(ucFark - ucBeklenen) < 0.02, "uç çekim fizikle aynı: " + ucFark + " / " + ucBeklenen);
-            dogrula(y, ucFark >= 4 * ayar.termostatCekimi() * ayar.termostatTaban() - 1e-6, "çekim tabanın altına inmez");
+            dogrula(y, ucFark > 0, "uçta çekim kalır: " + ucFark);
+            if (termostatIsisi(termostatli) == 0) {
+                dogrula(y, ucFark < ilimliFark, "uçta çekim azalır ama kalır: " + ucFark + " < " + ilimliFark);
+                dogrula(y, Math.abs(ucFark - ucBeklenen) < 0.02, "uç çekim fizikle aynı: " + ucFark + " / " + ucBeklenen);
+                dogrula(y, ucFark >= 4 * ayar.termostatCekimi() * ayar.termostatTaban() - 1e-6, "çekim tabanın altına inmez");
+            }
             y.succeed();
         } finally {
             level.getServer().getPlayerList().remove(termostatli);
@@ -1099,6 +1111,17 @@ public final class MeteorOyunTestleri {
             }
             o.setItemSlot(yuva, parca);
         }
+    }
+
+    /** Termostatın ortama katı ısı (°C; soğuk mekanda &gt; 0, sıcakta 0). */
+    private static double termostatIsisi(ServerPlayer o) {
+        return SicaklikYoneticisi.analiz(o).mekan().katki(Katki.TERMOSTAT);
+    }
+
+    /** Ortam geçiş durumunu unutturur: eklediğimiz kaynak hemen hedef ortam olarak ölçülür. */
+    private static void ortamGecisiniSifirla(ServerPlayer termostatli, ServerPlayer duz) {
+        SicaklikYoneticisi.ortamGecisiniSifirla(termostatli);
+        SicaklikYoneticisi.ortamGecisiniSifirla(duz);
     }
 
     /** İki oyuncuyu aynı vücut sıcaklığından 1 sn ilerletir; termostatlının fazladan nötre yaklaşması. */

@@ -19,6 +19,7 @@ class GunesPatlamasiAyarGocuTest {
     private static Map<String, Object> eskiDosya() {
         Map<String, Object> d = new LinkedHashMap<>();
         d.put("gunes_patlamasi.aktifSureGun", 5.0);
+        d.put("gunes_patlamasi.kavrulmaBaslangicGun", 3.0);
         d.put(ONCU, 90);
         d.put("gunes_patlamasi.meteorYagmuruOncuDakikaBasina", 6.0);
         return d;
@@ -26,7 +27,8 @@ class GunesPatlamasiAyarGocuTest {
 
     @Test
     void eskiOncuPenceresiYeniVarsayilanaCekilir() {
-        assertEquals(Map.of(ONCU, 5), GunesPatlamasiAyarGocu.plan(0, eskiDosya()::get));
+        assertEquals(Map.of(ONCU, 5, "gunes_patlamasi.aktifSureGun", 1.0, "gunes_patlamasi.kavrulmaBaslangicGun", 0.4),
+                GunesPatlamasiAyarGocu.plan(0, eskiDosya()::get));
         assertEquals(GunesPatlamasiAyarlari.VARSAYILAN_ONCU_SANIYE, GunesPatlamasiAyarGocu.ADIMLAR.get(0).yeni().intValue(),
                 "tablonun yeni değeri spec varsayılanı");
     }
@@ -35,6 +37,8 @@ class GunesPatlamasiAyarGocuTest {
     void elleDegistirilenDegerKorunur() {
         Map<String, Object> d = eskiDosya();
         d.put(ONCU, 45);
+        d.put("gunes_patlamasi.aktifSureGun", 3.0);
+        d.put("gunes_patlamasi.kavrulmaBaslangicGun", 1.5);
         assertTrue(GunesPatlamasiAyarGocu.plan(0, d::get).isEmpty());
         assertTrue(GunesPatlamasiAyarGocu.plan(0, Map.<String, Object>of(ONCU, 5)::get).isEmpty(), "yeni varsayılan kalır");
     }

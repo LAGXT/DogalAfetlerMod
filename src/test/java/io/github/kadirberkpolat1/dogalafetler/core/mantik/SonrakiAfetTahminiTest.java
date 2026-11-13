@@ -109,7 +109,7 @@ class SonrakiAfetTahminiTest {
                 "tahmin " + tahmin.ortalama() + ", sınanan " + ortalama);
     }
 
-    /** K-E67: gün çarpanı bölgesel oranları çarpar, dönem olaylarını (sunucu geneli) yalnız dördüncü köküyle. */
+    /** K-E67: gün çarpanı bölgesel oranları çarpar, dönem olaylarını (sunucu geneli) yalnız kareköküyle (ayar sürümü 4). */
     @Test
     void gunCarpaniBolgeselOranlariCarparDonemOlaylarinaAzEtkiler() {
         SonrakiAfetTahmini normal = SonrakiAfetTahmini.hesapla(BEKLEMESIZ, 0, new BeklemeDurumu(),

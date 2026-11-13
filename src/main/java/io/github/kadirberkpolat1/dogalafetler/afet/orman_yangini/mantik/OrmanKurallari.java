@@ -29,8 +29,8 @@ public final class OrmanKurallari {
 
     /** Seviye 1–5 tablosu (config listeleri). */
     public record Tablo(List<Integer> yaricap, List<Double> yogunluk, List<Integer> sureSaniye) {
-        public static final Tablo VARSAYILAN = new Tablo(List.of(3, 6, 10, 16, 24), List.of(0.0, 0.2, 0.4, 0.7, 1.0),
-                List.of(120, 180, 240, 360, 480));
+        public static final Tablo VARSAYILAN = new Tablo(List.of(3, 6, 10, 20, 40), List.of(0.0, 0.2, 0.4, 0.8, 1.0),
+                List.of(120, 180, 240, 420, 720));
 
         public Seviye seviye(int seviye) {
             int i = Math.max(1, Math.min(5, seviye)) - 1;

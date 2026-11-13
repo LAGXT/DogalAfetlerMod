@@ -4,8 +4,10 @@ import java.util.Locale;
 
 /**
  * Ortam sıcaklığının kalemleri ({@code /dogalafet sicaklik bilgi} dökümü aynı sırayla yazar). {@code BIYOM}…{@code KAYNAKLAR}
- * mekanın, son üçü ({@link #hissedilen()}) kişisel hissedilen düzeltmeleridir (S3-02). Yalnız sona eklenir: sıra döküm
- * paketinde dizin olarak gider.
+ * mekanın, {@code ISLAKLIK}…{@code SOL_EL} ({@link #hissedilen()}) kişisel hissedilen düzeltmeleridir (S3-02);
+ * {@code YUN_BLOKLARI}…{@code SOGUTUCU_ESYA} çevre ve ekipmandan gelen ek mekan kalemleridir ({@code EkIsi},
+ * {@code IsiKaynagi}; menüde mekan katkıları arasında görünür). Yalnız sona eklenir: sıra döküm paketinde dizin olarak
+ * gider.
  */
 public enum Katki {
     BIYOM,
@@ -24,7 +26,14 @@ public enum Katki {
     KAYNAKLAR,
     ISLAKLIK,
     RUZGAR,
-    SOL_EL;
+    SOL_EL,
+    YUN_BLOKLARI,
+    LAV_ICINDE,
+    YAKIN_OYUNCULAR,
+    YUN,
+    TERMOSTAT,
+    ISITICI_ESYA,
+    SOGUTUCU_ESYA;
 
     /** Hissedilen düzeltmesi mi (mekan kalemi değil). */
     public boolean hissedilen() {

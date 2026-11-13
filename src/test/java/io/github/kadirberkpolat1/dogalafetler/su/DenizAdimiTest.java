@@ -25,7 +25,8 @@ class DenizAdimiTest {
         assertEquals(6f, DenizAdimi.hedef(9f, 6), 0f);
         assertEquals(4f, DenizAdimi.hedef(4f, 6), 0f);
         assertEquals(0f, DenizAdimi.hedef(-1f, 6), 0f);
-        assertEquals(8f, DenizAdimi.hedef(9f, 99), 0f, "üst sınır en çok " + DenizAlani.EN_COK_ARTIS);
+        assertEquals((float) DenizAlani.EN_COK_ARTIS, DenizAdimi.hedef(DenizAlani.EN_COK_ARTIS + 1f, 99), 0f,
+                "üst sınır en çok " + DenizAlani.EN_COK_ARTIS);
     }
 
     @Test

@@ -7,7 +7,7 @@ import java.util.Optional;
 
 /**
  * Bir oyun günündeki seviye olasılıkları ve olasılığı 0 olan seviyelerin nedeni ({@code /dogalafet gun} ve {@code durum},
- * K-E67). Doğal seçimin kullandığı değerlerin aynısıdır: gelişim kriteri, {@code afetMaksSiddet}, art arda 4-5 kuralı ve
+ * K-E67). Doğal seçimin kullandığı değerlerin aynısıdır: gelişim kriteri, {@code afetMaksSiddet}, art arda 4-5 seyreltmesi ve
  * yoğunluk zayıflatması dahil. Diziler sıfır tabanlıdır: indeks 0 = Seviye 1.
  *
  * @param olasilik  S1–S5 olasılıkları (toplam 1)
@@ -27,7 +27,7 @@ public record SeviyeDurumu(double[] olasilik, List<Optional<SiddetSecici.KapaliN
         List<Optional<SiddetSecici.KapaliNeden>> nedenler = new ArrayList<>();
         for (int seviye = AfetTuru.EN_DUSUK_SEVIYE; seviye <= AfetTuru.EN_YUKSEK_SEVIYE; seviye++) {
             nedenler.add(olasilik[seviye - 1] > 0 ? Optional.empty()
-                    : SiddetSecici.kapaliNedeni(ayarlar, gercekGun, etkinGun, seviye, maks, oncekiYuksek));
+                    : SiddetSecici.kapaliNedeni(ayarlar, gercekGun, etkinGun, seviye, maks));
         }
         return new SeviyeDurumu(olasilik, nedenler, maks, yuk);
     }

@@ -21,8 +21,11 @@ final class OrmanYeri {
     }
 
     static BlockPos sec(ServerLevel level, BlockPos oyuncu, RandomSource r) {
-        int enAz = OrmanAyarlari.aramaEnAz();
-        int enCok = OrmanAyarlari.aramaEnCok();
+        return sec(level, oyuncu, r, OrmanAyarlari.aramaEnAz(), OrmanAyarlari.aramaEnCok());
+    }
+
+    /** {@code nokta} çevresinde {@code enAz}–{@code enCok} blok halkasında en yanıcı yüzey (doğal başlatmada nokta zaten halkadadır). */
+    static BlockPos sec(ServerLevel level, BlockPos oyuncu, RandomSource r, int enAz, int enCok) {
         BlockPos en = null;
         int enPuan = 0;
         for (int i = 0; i < DENEME; i++) {

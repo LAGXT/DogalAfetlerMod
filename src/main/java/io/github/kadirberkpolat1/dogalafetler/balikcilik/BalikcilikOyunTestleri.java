@@ -5,6 +5,7 @@ import io.github.kadirberkpolat1.dogalafetler.balikcilik.BalikcilikKayitlari.Bal
 import io.github.kadirberkpolat1.dogalafetler.balikcilik.mantik.DelikOmru;
 import io.github.kadirberkpolat1.dogalafetler.balikcilik.mantik.IsirmaSuresi;
 import io.github.kadirberkpolat1.dogalafetler.core.CekirdekOyunTestleri;
+import io.github.kadirberkpolat1.dogalafetler.esya.sogutma.SogutmaKayitlari;
 import io.github.kadirberkpolat1.dogalafetler.core.DunyaDonemi;
 import io.github.kadirberkpolat1.dogalafetler.donma.DonmaApi;
 import io.github.kadirberkpolat1.dogalafetler.donma.DonmaAyarlari;
@@ -598,6 +599,9 @@ public final class BalikcilikOyunTestleri {
         s.add(BalikcilikKayitlari.BUZ_PARCASI.get());
         s.add(Items.SNOWBALL);
         s.add(Items.ENCHANTED_BOOK);
+        s.add(BalikcilikKayitlari.BUZLU_INCI.get());
+        s.add(BalikcilikKayitlari.TUZ_KRISTALI.get());
+        s.add(SogutmaKayitlari.SOGUTMA_PARCASI.get());
         return s;
     }
 
@@ -650,7 +654,7 @@ public final class BalikcilikOyunTestleri {
         }
         lootuDenetle(y, hepsi, "1000 çekiliş");
         double oran = balik / (double) cekilis;
-        y.assertTrue(oran >= 0.87 && oran <= 0.97, "balık oranı config'e (%92) yakın olmalı: " + oran);
+        y.assertTrue(oran >= 0.70 && oran <= 0.90, "balık oranı config'e (%78) yakın olmalı: " + oran);
         y.assertTrue(turler.size() == Balik.values().length, "beş türün hepsi çıkmalı: " + turler);
         y.succeed();
     }
@@ -672,7 +676,7 @@ public final class BalikcilikOyunTestleri {
     }
 
     /**
-     * Olta deliğe düşünce bizim bekleme süremiz işler (30–60 sn); zorlanmış ısırmada çekilen loot bizim tablodan gelir ve
+     * Olta deliğe düşünce bizim bekleme süremiz işler (normal olta 10–60 sn, nadirliğe göre); zorlanmış ısırmada çekilen loot bizim tablodan gelir ve
      * {@link BalikTutulduEvent} yayınlanır.
      */
     @GameTest(template = "bos", batch = BATCH, timeoutTicks = 300)
@@ -706,7 +710,7 @@ public final class BalikcilikOyunTestleri {
                 long gecen = level.getGameTime() - atis;
                 DogalAfetler.LOGGER.info("[balikcilik] test: delikte kalan bekleme {} tick, atıştan {} tick ({}..{})", kalan,
                         gecen, enAz, enCok);
-                y.assertTrue(kalan <= enCok && kalan >= enAz - gecen - 1, "bekleme config aralığında (30–60 sn) olmalı: "
+                y.assertTrue(kalan <= enCok && kalan >= enAz - gecen - 1, "bekleme config aralığında (normal olta 10–60 sn) olmalı: "
                         + kalan + " (" + enAz + ".." + enCok + ", geçen " + gecen + ")");
                 // Isırmada vanilla şamandırayı aşağı çeker: olta deliğin altındaki suya inse de delikte sayılmalı.
                 olta.setPos(olta.getX(), delik.getY() - 0.35, olta.getZ());
@@ -821,8 +825,10 @@ public final class BalikcilikOyunTestleri {
             dinle(dinleyici);
             MinecraftForge.EVENT_BUS.addListener(EventPriority.NORMAL, false, ItemFishedEvent.class, tutulan);
             try {
-                y.assertTrue(!BuzBalikciligi.delikteMi(olta) && BuzBalikciligi.kalanBekleme(olta) == -1,
-                        "açık suda bizim bekleme işlememeli");
+                int acikEnCok = IsirmaSuresi.beklemeTick(IsirmaSuresi.toplamTick(1.0, 0, BalikcilikAyarlari.isirma()));
+                int acikKalan = BuzBalikciligi.kalanBekleme(olta);
+                y.assertTrue(!BuzBalikciligi.delikteMi(olta) && acikKalan <= acikEnCok,
+                        "açık suda olta delik sayılmamalı, bekleme normal olta aralığında (10–60 sn) olmalı: " + acikKalan);
                 // Bc1: GLM'nin tetiklenmediği doğrudan; 20 tohumun her birinde Forge yolu = ham vanilla yuvarlaması.
                 for (int i = 0; i < 20; i++) {
                     List<List<ItemStack>> k = glmKarsilastir(level, olta, glmTohumu(i));

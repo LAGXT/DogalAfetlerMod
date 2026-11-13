@@ -1,0 +1,10 @@
+{
+  "type": "minecraft:smelting",
+  "category": "food",
+  "cookingtime": 200,
+  "experience": 0.35,
+  "ingredient": {
+    "item": "dogalafetler:kristal_levrek"
+  },
+  "result": "dogalafetler:pismis_kristal_levrek"
+}

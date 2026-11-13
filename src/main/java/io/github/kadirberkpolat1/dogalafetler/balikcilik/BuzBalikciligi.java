@@ -15,6 +15,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
 import java.util.WeakHashMap;
+import io.github.kadirberkpolat1.dogalafetler.balikcilik.mantik.LootAgirliklari.Kategori;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -23,8 +24,10 @@ import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.entity.projectile.FishingHook;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.TickEvent;
@@ -34,11 +37,13 @@ import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.fml.util.ObfuscationReflectionHelper;
 
 /**
- * Buz deliğinde olta (madde 15). Vanilla {@link FishingHook} deliğin su sıvı durumunda yüzer ve balık tutar; bu sınıf
- * yalnız bekleme süresini değiştirir: olta delikteyken vanilla'nın {@code timeUntilLured} sayacı her tick bizim kalan
- * beklememize yazılır ({@link IsirmaSuresi}, Lure kısaltır), süre bitince yaklaşma evresi başlatılır; ısırma, çekme ve
- * loot vanilla yolundan gider (loot'u {@link BuzDeligiLootDegistirici} değiştirir). Normal buzda olta suya değmez, vanilla
- * zaten tutmaz. Alanları erişim dönüştürücüsü ya da mixin olmadan Forge'un SRG yansımasıyla yazılır (karar B-03).
+ * Buz deliğinde ve açık denizde olta (madde 15). Vanilla {@link FishingHook} deliğin su sıvı durumunda yüzer ve balık tutar; bu
+ * sınıf yalnız bekleme süresini değiştirir: olta suda beklerken vanilla'nın {@code timeUntilLured} sayacı her tick bizim kalan
+ * beklememize yazılır ({@link IsirmaSuresi}: normal olta 10–60 sn, Kutup Oltası 2 kat hızlı 5–30 sn, Lure kısaltır), süre
+ * bitince yaklaşma evresi başlatılır; ısırma, çekme ve loot vanilla yolundan gider (loot'u {@link BuzDeligiLootDegistirici}
+ * değiştirir). Buz deliğinde çıkacak şeyin katmanı bekleme başında seçilir ve süreyi belirler; Kutup Oltası ile nadir bir katman
+ * seçildiyse şamandıra sarı işaretlenir ({@link NadirSamandira}). Normal buzda olta suya değmez, vanilla zaten tutmaz. Alanları
+ * erişim dönüştürücüsü ya da mixin olmadan Forge'un SRG yansımasıyla yazılır (karar B-03).
  *
  * <p>Aynı zamanda madde 15 risk/denge: oltaşı delikteyken buz üstünde hareketsiz duran oyuncunun ortamına giderek
  * güçlenen bir soğuk kaynağı eklenir ({@link HareketsizlikSogumasi}, {@link SicaklikKancalari#ortamKaynagiEkle}).
@@ -57,6 +62,9 @@ public final class BuzBalikciligi {
         int bekleme;
         boolean basladi;
         boolean serbest;
+        /** Bekleme son başladığında olta buz deliğinde miydi (değil: açık deniz); mod değişince bekleme yeniden başlar. */
+        boolean delikte;
+        Kategori kategori;
     }
 
     /** Bir oyuncunun hareketsizlik sayacı (saniye). */
@@ -165,19 +173,50 @@ public final class BuzBalikciligi {
                 it.remove();
                 continue;
             }
-            if (!delikteMi(olta)) {
-                e.getValue().basladi = false;
+            Olta d = e.getValue();
+            boolean delikte = delikteMi(olta);
+            if (!delikte && !acikSuda(olta)) {
+                d.basladi = false;
+                NadirSamandira.isaretle(olta, false);
                 continue;
             }
-            bekle(olta, e.getValue());
-            if (saniye && olta.getPlayerOwner() instanceof ServerPlayer oyuncu) {
+            if (d.basladi && d.delikte != delikte) {
+                d.basladi = false;
+            }
+            bekle(olta, d, delikte);
+            if (delikte && saniye && olta.getPlayerOwner() instanceof ServerPlayer oyuncu) {
                 sogut(oyuncu, server.getTickCount());
             }
         }
     }
 
-    /** Bekleme durum makinesi; olta tick'inden sonra (sunucu tick'inin sonunda) çalışır. */
-    private static void bekle(FishingHook olta, Olta d) {
+    /**
+     * Olta buz deliğine düşerken seçilen nadirlik kategorisi ({@link KutupOltasi}'yla özel balık havuza dahil). Aynı kategori bekleme
+     * süresini belirler ve çekilen loot'ta ({@link KategoriGirdisi}) kullanılır: süre ile nadirlik tutarlıdır.
+     */
+    private static Kategori kategoriSec(FishingHook olta, ItemStack sap) {
+        Player sahip = olta.getPlayerOwner();
+        float sans = sahip == null ? 0.0f : EnchantmentHelper.getFishingLuckBonus(sap) + sahip.getLuck();
+        return BalikcilikAyarlari.lootAgirliklari().sec(olta.level().random.nextDouble(), sans, KutupOltasi.mi(sap));
+    }
+
+    /**
+     * Oltanın bu bekleme döngüsünde önceden seçilmiş kategorisi; bekleme hiç başlamadıysa ya da özel kategori artık açık değilse
+     * (çekerken Kutup Oltası elde değil) {@code null}: loot kendi zarını atar.
+     */
+    static Kategori secilenKategori(FishingHook olta, boolean ozelAcik) {
+        Olta d = OLTALAR.get(olta);
+        if (d == null || d.kategori == null || d.kategori == Kategori.OZEL && !ozelAcik) {
+            return null;
+        }
+        return d.kategori;
+    }
+
+    /**
+     * Bekleme durum makinesi; olta tick'inden sonra (sunucu tick'inin sonunda) çalışır. Buz deliğinde önce katman seçilir ve süre
+     * katmanın dilimine düşer; açık denizde katman yoktur, süre tüm aralıktan çekilir. Kutup Oltası tutuluyorsa süreler yarıya iner.
+     */
+    private static void bekle(FishingHook olta, Olta d, boolean delikte) {
         try {
             int isirma = ISIRMA.getInt(olta);
             int yaklasma = YAKLASMA.getInt(olta);
@@ -187,10 +226,26 @@ public final class BuzBalikciligi {
             }
             if (!d.basladi || d.serbest) {
                 int lure = LURE.getInt(olta);
-                d.bekleme = IsirmaSuresi.beklemeTick(IsirmaSuresi.toplamTick(olta.level().random.nextDouble(), lure,
-                        BalikcilikAyarlari.isirma()));
+                Player sahip = olta.getPlayerOwner();
+                ItemStack sap = sahip == null ? ItemStack.EMPTY : KutupOltasi.tutulanOlta(sahip);
+                boolean kutup = KutupOltasi.mi(sap);
+                IsirmaSuresi.Ayarlar ayar = BalikcilikAyarlari.isirma(kutup);
+                double zar = olta.level().random.nextDouble();
+                int toplam;
+                if (delikte) {
+                    // Önce çıkacak şeyin nadirliği seçilir; bekleme o katmanın dilimine düşer (yaygın hızlı, nadir uzun).
+                    d.kategori = kategoriSec(olta, sap);
+                    toplam = IsirmaSuresi.toplamTick(zar, lure, ayar, d.kategori);
+                } else {
+                    d.kategori = null;
+                    toplam = IsirmaSuresi.toplamTick(zar, lure, ayar);
+                }
+                // Kutup Oltası ile buz deliğinde çok nadir bir şey çıkacaksa şamandıra sarı (istemciye vanilla varlık senkronuyla).
+                NadirSamandira.isaretle(olta, kutup && delikte && NadirSamandira.nadirMi(d.kategori));
+                d.bekleme = IsirmaSuresi.beklemeTick(toplam);
                 d.basladi = true;
                 d.serbest = false;
+                d.delikte = delikte;
             }
             d.bekleme--;
             if (d.bekleme > 0) {
@@ -204,6 +259,13 @@ public final class BuzBalikciligi {
         } catch (IllegalAccessException hata) {
             throw new IllegalStateException("FishingHook alanlarına erişilemedi", hata);
         }
+    }
+
+    /**
+     * Olta buz deliği dışında bir su sıvısında yüzüyor ve bir varlığa takılı değil: vanilla'nın balık bekleme evresi (açık deniz).
+     */
+    static boolean acikSuda(FishingHook olta) {
+        return olta.getHookedIn() == null && olta.level().getFluidState(olta.blockPosition()).is(FluidTags.WATER);
     }
 
     /** Saniyede bir: oltaşı buz üstünde hareketsizse soğuk kaynağı (süre bir sonraki güncellemeye kadar). */
@@ -246,7 +308,10 @@ public final class BuzBalikciligi {
         return d == null || !d.basladi || d.serbest ? -1 : d.bekleme;
     }
 
-    /** Vanilla {@code ItemFishedEvent} geçti: olta delikteyse {@link BalikTutulduEvent} yayınlanır. */
+    /**
+     * Vanilla {@code ItemFishedEvent} geçti: olta delikteyse {@link BalikTutulduEvent} yayınlanır; ardından Yineleme büyüsü
+     * ({@link Yineleme}) tutulanı çoğaltabilir (kopyalar olaya yansımaz: başarım sayımları şişmez).
+     */
     static void balikTutuldu(ItemFishedEvent olay) {
         FishingHook olta = olay.getHookEntity();
         BlockPos delik = delikKonumu(olta);
@@ -256,6 +321,7 @@ public final class BuzBalikciligi {
             cekilenOyuncu = oyuncu;
             MinecraftForge.EVENT_BUS.post(new BalikTutulduEvent(oyuncu, olay.getDrops(), delik));
         }
+        Yineleme.kopyala(olay);
     }
 
     /**

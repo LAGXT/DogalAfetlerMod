@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "key": {
+    "B": {
+      "item": "dogalafetler:buzlu_inci"
+    },
+    "K": {
+      "item": "dogalafetler:sogutma_kulcesi"
+    },
+    "S": {
+      "item": "minecraft:string"
+    }
+  },
+  "pattern": [
+    "SKS",
+    "S S",
+    " B "
+  ],
+  "result": {
+    "item": "dogalafetler:serin_kolye"
+  },
+  "show_notification": true
+}

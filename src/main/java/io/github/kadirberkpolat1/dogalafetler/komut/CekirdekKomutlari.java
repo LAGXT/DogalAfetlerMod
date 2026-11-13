@@ -63,7 +63,6 @@ public final class CekirdekKomutlari {
     public static final String SEVIYE_NEDEN_MAKS = ON + "seviye_neden.maks";
     public static final String SEVIYE_NEDEN_GUN = ON + "seviye_neden.gun";
     public static final String SEVIYE_NEDEN_GELISIM = ON + "seviye_neden.gelisim";
-    public static final String SEVIYE_NEDEN_ART_ARDA = ON + "seviye_neden.art_arda";
     public static final String SEVIYE_YOGUNLUK = ON + "seviye_yogunluk";
     public static final String DURUM_KAYITLI = ON + "durum.kayitli";
     public static final String DURUM_GOKYUZU = ON + "durum.gokyuzu";
@@ -437,7 +436,6 @@ public final class CekirdekKomutlari {
             case MAKS -> Component.translatable(SEVIYE_NEDEN_MAKS, maks);
             case GUN -> Component.translatable(SEVIYE_NEDEN_GUN, CekirdekAyarlari.al().siddet().esik(seviye));
             case GELISIM -> Component.translatable(SEVIYE_NEDEN_GELISIM);
-            case ART_ARDA -> Component.translatable(SEVIYE_NEDEN_ART_ARDA);
         };
     }
 
@@ -511,7 +509,6 @@ public final class CekirdekKomutlari {
         y.ekle(SEVIYE_NEDEN_MAKS, "above afetMaksSiddet %s", "afetMaksSiddet %s üstünde");
         y.ekle(SEVIYE_NEDEN_GUN, "unlocks on day %s", "%s. günde açılır");
         y.ekle(SEVIYE_NEDEN_GELISIM, "player progress too low (gelisimDahil)", "oyuncu gelişimi yetersiz (gelisimDahil)");
-        y.ekle(SEVIYE_NEDEN_ART_ARDA, "previous natural disaster was level 4/5", "önceki doğal afet seviye 4/5 idi");
         y.ekle(SEVIYE_YOGUNLUK, "many recent disasters (load x%s): higher levels are rarer",
                 "son günde çok afet (yük x%s): yüksek seviyeler daha seyrek");
         y.ekle(DURUM_KAYITLI, "Registered disasters: %s", "Kayıtlı afetler: %s");

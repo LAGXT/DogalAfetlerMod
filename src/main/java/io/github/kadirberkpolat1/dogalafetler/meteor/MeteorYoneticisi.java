@@ -210,7 +210,7 @@ public final class MeteorYoneticisi {
         int verilen = sayilar.getOrDefault(oyuncu, 0);
         OdulZari.Sonuc sonuc = OdulTavani.uygula(zar, buyuk, verilen, MeteorAyarlari.odulTavaniAfetBasina());
         if (!sonuc.bos()) {
-            sayilar.put(oyuncu, verilen + OdulTavani.adet(sonuc));
+            sayilar.put(oyuncu, verilen + sonuc.adet());
         }
         return sonuc;
     }

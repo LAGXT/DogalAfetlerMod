@@ -83,7 +83,8 @@ public final class KasirgaAyarlari {
             hiz = k.comment("Seviye tablosu çarpanı: hareket hızı (S1 2,0 → S5 4,4 blok/sn).").defineInRange("hizCarpani", 1.0, 0.0, 4.0);
             sure = k.comment("Seviye tablosu çarpanı: olgun evre süresi (S1 60 → S5 180 sn).").defineInRange("sureCarpani", 1.0, 0.1, 10.0);
             cekim = k.comment("Seviye tablosu çarpanı: oyuncu, mob ve eşyalara uygulanan çekim/kaldırma kuvveti (0 kapalı). 1'de çekim",
-                    "yarıçapının kenarındaki içe sürüklenme S1 1,8 → S5 8,4 blok/sn (koşu 5,7), çekirdek sınırında S5 13,9 blok/sn.")
+                    "yarıçapının kenarındaki hedef içe hız S1 2,4 → S5 7,4 blok/sn (koşu 5,7), çekirdek sınırında S5 14,8 blok/sn; varlıklar",
+                    "huniyi sarmal yörüngede dönerek çıkar, ömrün son %13'ünde huninin tepesinden fırlatılır.")
                     .defineInRange("cekimCarpani", 1.0, 0.0, 4.0);
             blok = k.comment("Seviye tablosu çarpanı: tick başına blok kaldırma (S1 2 → S5 32; TPS kısmasıyla ayrıca çarpılır).")
                     .defineInRange("blokCarpani", 1.0, 0.0, 4.0);

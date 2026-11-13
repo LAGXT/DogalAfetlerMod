@@ -10,14 +10,14 @@ import java.util.Map;
  * sekiz türün hepsi seçilebilirken bekleme dışındaki beklenen afet sayısı günde {@code gunlukAfetOrani}'dır (oyun günü 0'da).
  * Oyun günü ilerledikçe bölgesel afetlerin takvimi sıklaşır: {@link #gunCarpani} {@code afetSikligi} gibi oranı çarpar ve
  * yeni başlayan beklemeleri böler; {@code siklikArtisGunu}'nde {@code siklikArtisCarpani}'na varır. Dönem olaylarının (güneş
- * patlaması, ay çarpması) oranına yalnız dördüncü kökü uygulanır ({@link AfetZamanlayicisi#turGunCarpani}). Doğal afetler {@link #eszamanliSinir}
+ * patlaması, ay çarpması) oranına yalnız karekökü uygulanır ({@link AfetZamanlayicisi#turGunCarpani}). Doğal afetler {@link #eszamanliSinir}
  * kadar aynı anda sürebilir. Süreler ölçekli afet saati tick'idir. Varsayılanlar config'in de varsayılanıdır (tek kaynak).
  */
 public record ZamanlayiciAyarlari(double gunlukAfetOrani, long genelBeklemeTick, double siddetBeklemeCarpani,
         long ertelemeTick, long baslangicBeklemeTick, long ilkAfetGarantiTick, double siklikArtisCarpani,
         double siklikArtisGunu, int eszamanliIkiGunu, int eszamanliUcGunu, Map<AfetTuru, Integer> agirliklar,
         Map<AfetTuru, Long> turBeklemeleri) {
-    public static final double VARSAYILAN_GUNLUK_ORAN = 5.0;
+    public static final double VARSAYILAN_GUNLUK_ORAN = 5.5;
     public static final long VARSAYILAN_GENEL_BEKLEME = 1_500L;
     public static final double VARSAYILAN_SIDDET_CARPANI = 0.15;
     public static final long VARSAYILAN_ERTELEME = 6_000L;
@@ -26,8 +26,19 @@ public record ZamanlayiciAyarlari(double gunlukAfetOrani, long genelBeklemeTick,
     /** AS-12, K-E67: dünyada henüz afet olmadıysa 8. dakikada doğal seçim garanti edilir (0: garanti yok). */
     public static final long VARSAYILAN_ILK_AFET_GARANTISI = 9_600L;
     /** K-E67: gün ilerledikçe takvimin sıklaşması; gün 0'da ×1, {@link #VARSAYILAN_SIKLIK_ARTIS_GUNU}'nde ×bu. */
-    public static final double VARSAYILAN_SIKLIK_ARTIS_CARPANI = 8.0;
-    public static final double VARSAYILAN_SIKLIK_ARTIS_GUNU = 45.0;
+    public static final double VARSAYILAN_SIKLIK_ARTIS_CARPANI = 10.0;
+    public static final double VARSAYILAN_SIKLIK_ARTIS_GUNU = 30.0;
+    /**
+     * Ayar sürümü 4: nadir dönem olaylarının ağırlığı (sürüm 3: ay 50, güneş 35; sürüm 2: 32 ve 20) ve günlük oran birlikte arttı
+     * (toplam ağırlık 685 → 750, günlük oran 5 → 5,5: altı bölgesel afetin oranı aynı kalır); yine de en nadir olanlardır.
+     */
+    public static final int VARSAYILAN_AY_AGIRLIGI = 90;
+    public static final int VARSAYILAN_GUNES_AGIRLIGI = 60;
+    /**
+     * K-E80: sel sık afetlerin yarısı ağırlıkla başlar; yağmur, fırtına, tsunami ve ay çarpması olasılığını artırır
+     * ({@code SelTetikleyicileri}); günlük oran aynı kaldığından diğer afetlerin payı az düşer.
+     */
+    public static final int VARSAYILAN_SEL_AGIRLIGI = 50;
     /** K-E67: bu günden itibaren iki, sonrakinden itibaren üç doğal afet aynı anda sürebilir. */
     public static final int VARSAYILAN_ESZAMANLI_IKI_GUNU = 15;
     public static final int VARSAYILAN_ESZAMANLI_UC_GUNU = 40;
@@ -71,8 +82,9 @@ public record ZamanlayiciAyarlari(double gunlukAfetOrani, long genelBeklemeTick,
     /** Madde 4 nadirlik sırası: altı sık afet eşit, ay çarpması nadir, güneş patlaması en nadir. */
     public static int varsayilanAgirlik(AfetTuru tur) {
         return switch (tur) {
-            case AY_CARPMASI -> 32;
-            case GUNES_PATLAMASI -> 20;
+            case AY_CARPMASI -> VARSAYILAN_AY_AGIRLIGI;
+            case GUNES_PATLAMASI -> VARSAYILAN_GUNES_AGIRLIGI;
+            case SEL -> VARSAYILAN_SEL_AGIRLIGI;
             default -> 100;
         };
     }

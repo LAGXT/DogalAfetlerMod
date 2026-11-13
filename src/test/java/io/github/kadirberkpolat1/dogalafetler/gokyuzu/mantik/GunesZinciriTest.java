@@ -10,12 +10,14 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 class GunesZinciriTest {
-    private static final GunesZinciri.Ayarlar AYAR = GunesZinciri.Ayarlar.VARSAYILAN;
+    /** Zincir mekaniği sabit ayarla (1,5 gün süpernova, 7 gün kapı) sınanır; varsayılanlar ayrı testte. */
+    private static final GunesZinciri.Ayarlar AYAR = new GunesZinciri.Ayarlar(1.5, 7.0, 6_000L, 30.0);
 
     @Test
     void varsayilanlarSartnameyeUyar() {
-        assertEquals(36_000, AYAR.supernovaTick(), "süpernova 1,5 gün");
-        assertEquals(168_000, AYAR.gecikmeTick(), "kızıl cüce 7 gün sonra");
+        GunesZinciri.Ayarlar v = GunesZinciri.Ayarlar.VARSAYILAN;
+        assertEquals(24_000, v.supernovaTick(), "süpernova 1 gün (K-E72)");
+        assertEquals(72_000, v.gecikmeTick(), "kızıl cüce 3 gün sonra (K-E72, Kutup Sığınağı alt sınırı)");
         assertThrows(IllegalArgumentException.class, () -> new GunesZinciri.Ayarlar(0.5, 7, 6000, 30));
         assertThrows(IllegalArgumentException.class, () -> new GunesZinciri.Ayarlar(2.5, 7, 6000, 30));
         assertThrows(IllegalArgumentException.class, () -> new GunesZinciri.Ayarlar(1.5, 2.9, 6000, 30),

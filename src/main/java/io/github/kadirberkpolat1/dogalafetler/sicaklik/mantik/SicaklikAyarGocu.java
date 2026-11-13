@@ -15,7 +15,7 @@ import java.util.function.Function;
  */
 public final class SicaklikAyarGocu {
     public static final String SURUM_YOLU = "sicaklik.ayarSurumu";
-    public static final int GUNCEL = 1;
+    public static final int GUNCEL = 2;
 
     /** Sürüm 0'ın (sıcaklık-2) varsayılan ısı/soğuk kaynakları. */
     public static final List<String> KAYNAKLAR_0 = List.of("minecraft:lava=40:6", "minecraft:fire=25:4",
@@ -29,7 +29,10 @@ public final class SicaklikAyarGocu {
     public static final List<String> KAYNAKLAR = ekle(KAYNAKLAR_0, "dogalafetler:komurlesmis_kutuk=2:2",
             "dogalafetler:komurlesmis_tahta=1.5:2");
 
-    /** Sürüme göre sıralı. 1: sıcaklık-3 (°C ölçeğine uyan eşikler). */
+    /**
+     * Sürüme göre sıralı. 1: sıcaklık-3 (°C ölçeğine uyan eşikler). 2: hızlı ısı alışverişi (eşlenme hızı), güçlü tüy,
+     * gerçekten hissedilen bunalma/yanma açlığı.
+     */
     public static final List<SurumluGocPlani.Adim> ADIMLAR = List.of(
             adim(1, "sicaklik.esikler.notrBant", 10.0, 15.0),
             adim(1, "sicaklik.esikler.soguk", -20.0, -30.0),
@@ -37,7 +40,11 @@ public final class SicaklikAyarGocu {
             adim(1, "sicaklik.esikler.donmaHasari", -70.0, -75.0),
             adim(1, "sicaklik.esikler.sicak", 20.0, 30.0),
             adim(1, "sicaklik.esikler.cokSicak", 50.0, 55.0),
-            adim(1, "sicaklik.esikler.yanmaHasari", 70.0, 75.0));
+            adim(1, "sicaklik.esikler.yanmaHasari", 70.0, 75.0),
+            adim(2, "sicaklik.isi.esitlenmeHizi", 0.02, 0.006),
+            adim(2, "sicaklik.yalitim.tuyBasina", 0.10, 0.04),
+            adim(2, "sicaklik.esikler.bunalmaAclik", 0.15, 0.04),
+            adim(2, "sicaklik.esikler.yanmaAclik", 0.30, 0.08));
 
     /** 1: kaynak listesine kömür satırları (eski varsayılan aynen duruyorsa). */
     public static final List<SurumluGocPlani.ListeAdimi> LISTE_ADIMLARI = List.of(

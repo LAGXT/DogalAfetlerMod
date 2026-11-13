@@ -18,7 +18,7 @@ import net.minecraftforge.registries.RegistryObject;
  * {@code SnowyDirtBlock}, yayılmaz ve toprağa dönmez. Varsayılan tablo artık çimeni ona çevirmez (çimen kar örtüsüyle
  * karlı olur); eski dünyalardaki kopyaları {@link DonmaIsleyici} çimene döndürür, veri paketi yüzey satırı için kayıtlı
  * kalır. {@code ince_buz}: su sütununun üst bloğunun ilk (donarken) ve son (çözülürken) evresi; koyu, yarı saydam,
- * üstünde yürünür, buz gibi kayar ve ışıkta erir.
+ * üstünde yürünür, buz gibi kayar, ışıkta erir ve üzerinde birkaç kez zıplanca ses çıkararak kırılır ({@link InceBuzKirilmasi}).
  */
 public final class DonmaBloklari {
     private static final DeferredRegister<Block> BLOKLAR = DeferredRegister.create(ForgeRegistries.BLOCKS,

@@ -1,6 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.client.asit_yagmuru;
 
 import com.mojang.blaze3d.systems.RenderSystem;
+import io.github.kadirberkpolat1.dogalafetler.client.core.EkranEfektKapisi;
 import java.util.Random;
 import net.minecraft.client.CameraType;
 import net.minecraft.client.Minecraft;
@@ -57,7 +58,7 @@ final class AsitEkranEfekti {
 
     static void ciz(ForgeGui gui, GuiGraphics g, float pt, int w, int h) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.level == null || mc.options.getCameraType() != CameraType.FIRST_PERSON) {
+        if (mc.level == null || mc.options.getCameraType() != CameraType.FIRST_PERSON || !EkranEfektKapisi.izinli()) {
             return;
         }
         float gecen = mc.level.getGameTime() - baslangic + pt;

@@ -23,7 +23,7 @@ class TsunamiSeviyesiTest {
         assertEquals(5, TsunamiSeviyesi.al(9).seviye());
     }
 
-    /** Tasarım notu §2 "Seviye 1 ile 5 farkı": S1 4 blok / 30 blok içeri, S5 20 blok / 220 blok, 40 blok çekilme, ikinci dalga. */
+    /** Tasarım notu §2 "Seviye 1 ile 5 farkı": S1 4 blok / 30 blok içeri, S5 26 blok / 220 blok, 40 blok çekilme, ikinci dalga. */
     @Test
     void s1VeS5TasarimNotuylaAyni() {
         TsunamiSeviyesi s1 = TsunamiSeviyesi.al(1);
@@ -31,11 +31,12 @@ class TsunamiSeviyesiTest {
         assertEquals(4, s1.yukseklik());
         assertEquals(30, s1.karaGiris());
         assertFalse(s1.ikinciDalga() || s1.tasYikar());
-        assertEquals(20, s5.yukseklik());
+        assertEquals(26, s5.yukseklik());
         assertEquals(220, s5.karaGiris());
         assertEquals(40, s5.cekilme());
         assertTrue(s5.ikinciDalga() && s5.tasYikar());
-        assertEquals(48, s5.yikimButcesi());
+        assertEquals(64, s5.yikimButcesi());
+        assertEquals(49f, s5.sertlik());
         assertEquals(0.4, s5.hizTick(), 1e-12);
     }
 

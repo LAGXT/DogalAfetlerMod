@@ -2,6 +2,7 @@ package io.github.kadirberkpolat1.dogalafetler.gokyuzu.blok;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.gokyuzu.PulsarKayitlari;
+import io.github.kadirberkpolat1.dogalafetler.gokyuzu.mantik.KutukIsisi;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -24,6 +25,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.RotatedPillarBlock;
 import net.minecraft.world.level.block.SnowLayerBlock;
+import net.minecraft.core.Direction.Axis;
 import net.minecraft.world.level.storage.loot.LootPool;
 import net.minecraft.world.level.storage.loot.LootTable;
 import net.minecraft.world.level.storage.loot.entries.LootItem;
@@ -42,7 +44,7 @@ import net.minecraftforge.data.event.GatherDataEvent;
  * Pulsar bloklarının datagen çıktıları: loot tabloları (kül katmanı 1–7 katta kat sayısı kadar kendini, 8 katta — Kül
  * Bloğu modeliyle çizilen tam blok — bir Kül Bloğu, ipek dokunuşta da aynısı; diğerleri kendini), blok durumları ve
  * modeller (kül katmanı vanilla kar katmanı gibi 2/4/…/14 piksel kutu, 8 kat kül bloğu modeli; kömürleşmiş kütük
- * eksenli sütun, tahta tek dokulu küp) ve şekilsiz tarifler (1 kömürleşmiş kütük → 4 kömürleşmiş tahta, grup
+ * eksenli sütun; ısı kademesine göre dört dokulu görünüm, soyulmuş kütük eksenli sütun; tahta tek dokulu küp) ve şekilsiz tarifler (1 kömürleşmiş ya da soyulmuş kütük → 4 kömürleşmiş tahta, grup
  * {@code planks}; 8 Kül Katmanı ↔ 1 Kül Bloğu, 8 katlı külü kıran oyuncu blokla birlikte katmanlarını kaybetmesin); her
  * tarifin kitap kilidi girdisi envantere girince açılır (K-E63). Doku dosyalarını {@code tools/assets/pulsar_dokular.py}
  * üretir.
@@ -93,6 +95,7 @@ public final class PulsarBlokVerileri {
             add(kul, LootTable.lootTable().withPool(applyExplosionCondition(kul, havuz)));
             dropSelf(PulsarKayitlari.KUL_BLOGU.get());
             dropSelf(PulsarKayitlari.KOMURLESMIS_KUTUK.get());
+            dropSelf(PulsarKayitlari.SOYULMUS_KOMURLESMIS_KUTUK.get());
             dropSelf(PulsarKayitlari.KOMURLESMIS_TAHTA.get());
         }
 
@@ -104,7 +107,8 @@ public final class PulsarBlokVerileri {
         @Override
         protected Iterable<Block> getKnownBlocks() {
             return List.of(PulsarKayitlari.KUL_KATMANI.get(), PulsarKayitlari.KUL_BLOGU.get(),
-                    PulsarKayitlari.KOMURLESMIS_KUTUK.get(), PulsarKayitlari.KOMURLESMIS_TAHTA.get());
+                    PulsarKayitlari.KOMURLESMIS_KUTUK.get(), PulsarKayitlari.SOYULMUS_KOMURLESMIS_KUTUK.get(),
+                    PulsarKayitlari.KOMURLESMIS_TAHTA.get());
         }
     }
 
@@ -119,6 +123,10 @@ public final class PulsarBlokVerileri {
             ShapelessRecipeBuilder.shapeless(RecipeCategory.BUILDING_BLOCKS, PulsarKayitlari.KOMURLESMIS_TAHTA_ESYASI.get(), 4)
                     .requires(kutuk).group("planks").unlockedBy("has_komurlesmis_kutuk", has(kutuk))
                     .save(c, DogalAfetler.konum("komurlesmis_tahta"));
+            Item soyulmus = PulsarKayitlari.SOYULMUS_KOMURLESMIS_KUTUK_ESYASI.get();
+            ShapelessRecipeBuilder.shapeless(RecipeCategory.BUILDING_BLOCKS, PulsarKayitlari.KOMURLESMIS_TAHTA_ESYASI.get(), 4)
+                    .requires(soyulmus).group("planks").unlockedBy("has_soyulmus_komurlesmis_kutuk", has(soyulmus))
+                    .save(c, DogalAfetler.konum("komurlesmis_tahta_soyulmustan"));
             Block katman = PulsarKayitlari.KUL_KATMANI.get();
             Block blok = PulsarKayitlari.KUL_BLOGU.get();
             ShapelessRecipeBuilder.shapeless(RecipeCategory.BUILDING_BLOCKS, blok)
@@ -155,12 +163,39 @@ public final class PulsarBlokVerileri {
                     .modelFile(katlar[durum.getValue(SnowLayerBlock.LAYERS) - 1]).build());
             simpleBlockItem(PulsarKayitlari.KUL_KATMANI.get(), katlar[0]);
 
+            // Kütük: dört görünüm kademesi (sönmüş, ılık, sıcak, çok sıcak; KutukIsisi) × üç eksen; ılık mevcut adları korur.
             RotatedPillarBlock kutuk = (RotatedPillarBlock) PulsarKayitlari.KOMURLESMIS_KUTUK.get();
-            ResourceLocation yan = DogalAfetler.konum("block/komurlesmis_kutuk");
-            ResourceLocation tepe = DogalAfetler.konum("block/komurlesmis_kutuk_top");
-            ModelFile dik = models().cubeColumn("komurlesmis_kutuk", yan, tepe);
-            axisBlock(kutuk, dik, models().cubeColumnHorizontal("komurlesmis_kutuk_horizontal", yan, tepe));
-            simpleBlockItem(kutuk, dik);
+            ModelFile[] dikler = new ModelFile[KutukIsisi.Gorunum.values().length];
+            ModelFile[] yataylar = new ModelFile[dikler.length];
+            for (KutukIsisi.Gorunum g : KutukIsisi.Gorunum.values()) {
+                String ad = "komurlesmis_kutuk" + g.ek();
+                ResourceLocation yan = DogalAfetler.konum("block/" + ad);
+                ResourceLocation tepe = DogalAfetler.konum("block/" + ad + "_top");
+                dikler[g.ordinal()] = models().cubeColumn(ad, yan, tepe);
+                yataylar[g.ordinal()] = models().cubeColumnHorizontal(ad + "_horizontal", yan, tepe);
+            }
+            getVariantBuilder(kutuk).forAllStatesExcept(durum -> {
+                int g = KutukIsisi.gorunum(durum.getValue(KomurlesmisKutukBlogu.ISI)).ordinal();
+                Axis eksen = durum.getValue(RotatedPillarBlock.AXIS);
+                ConfiguredModel.Builder<?> m = ConfiguredModel.builder()
+                        .modelFile(eksen == Axis.Y ? dikler[g] : yataylar[g]);
+                if (eksen != Axis.Y) {
+                    m.rotationX(90);
+                    if (eksen == Axis.X) {
+                        m.rotationY(90);
+                    }
+                }
+                return m.build();
+            }, KomurlesmisKutukBlogu.DONUSUYOR);
+            simpleBlockItem(kutuk, dikler[KutukIsisi.Gorunum.ILIK.ordinal()]);
+
+            RotatedPillarBlock soyulmus = (RotatedPillarBlock) PulsarKayitlari.SOYULMUS_KOMURLESMIS_KUTUK.get();
+            ResourceLocation soyulmusYan = DogalAfetler.konum("block/soyulmus_komurlesmis_kutuk");
+            ResourceLocation soyulmusTepe = DogalAfetler.konum("block/soyulmus_komurlesmis_kutuk_top");
+            ModelFile soyulmusDik = models().cubeColumn("soyulmus_komurlesmis_kutuk", soyulmusYan, soyulmusTepe);
+            axisBlock(soyulmus, soyulmusDik,
+                    models().cubeColumnHorizontal("soyulmus_komurlesmis_kutuk_horizontal", soyulmusYan, soyulmusTepe));
+            simpleBlockItem(soyulmus, soyulmusDik);
 
             ModelFile tahta = models().cubeAll("komurlesmis_tahta", DogalAfetler.konum("block/komurlesmis_tahta"));
             simpleBlock(PulsarKayitlari.KOMURLESMIS_TAHTA.get(), tahta);

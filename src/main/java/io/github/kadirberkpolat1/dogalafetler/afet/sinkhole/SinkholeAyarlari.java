@@ -1,6 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.afet.sinkhole;
 
 import io.github.kadirberkpolat1.dogalafetler.afet.deprem.DepremAyarlari;
+import io.github.kadirberkpolat1.dogalafetler.afet.sinkhole.mantik.SinkholeAyarGocu;
 import io.github.kadirberkpolat1.dogalafetler.afet.sinkhole.mantik.SinkholeSeviyesi;
 import io.github.kadirberkpolat1.dogalafetler.config.AyarKaydi;
 import java.util.List;
@@ -20,18 +21,21 @@ public final class SinkholeAyarlari {
     private final ForgeConfigSpec.IntValue dusenBlokTavani;
 
     private SinkholeAyarlari(ForgeConfigSpec.Builder k) {
+        k.comment("Config göçünün sürümü (K-E61): dosya bundan eskiyse açılışta eski varsayılanında kalan sinkhole seviye listeleri "
+                + "yeni varsayılana çekilir, elle değiştirilenlere dokunulmaz. Elle değiştirmeyin.")
+                .defineInRange("ayarSurumu", SinkholeAyarGocu.GUNCEL, 0, Integer.MAX_VALUE);
         cap = DepremAyarlari.tamsayilar(k, "cap",
-                "Çukur çapı (blok), S1…S5", 6, 10, 16, 24, 34);
+                "Çukur çapı (blok), S1…S5", 6, 10, 16, 28, 48);
         derinlik = DepremAyarlari.tamsayilar(k, "derinlik",
-                "Merkez derinliği (yüzeyden blok; en alt Y -50), S1…S5", 6, 10, 16, 24, 32);
+                "Merkez derinliği (yüzeyden blok; en alt Y -50), S1…S5", 6, 10, 16, 28, 46);
         catlamaSaniye = DepremAyarlari.tamsayilar(k,
-                "catlamaSuresi", "Çökmeden önceki titreme ve çatlama (saniye; kaçma fırsatı), S1…S5", 4, 4, 5, 6, 7);
+                "catlamaSuresi", "Çökmeden önceki titreme ve çatlama (saniye; kaçma fırsatı), S1…S5", 4, 4, 5, 6, 8);
         cokusSaniye = DepremAyarlari.tamsayilar(k, "cokusSuresi",
-                "Çekirdek çöküşü + basamaklı geri çekilme (saniye), S1…S5", 3, 4, 6, 8, 10);
+                "Çekirdek çöküşü + basamaklı geri çekilme (saniye), S1…S5", 3, 4, 6, 9, 13);
         basamak = DepremAyarlari.tamsayilar(k, "basamak",
-                "Basamak (halka) sayısı, S1…S5", 1, 1, 2, 2, 3);
+                "Basamak (halka) sayısı, S1…S5", 1, 1, 2, 3, 4);
         hasar = DepremAyarlari.ondaliklar(k, "dusenBlokHasari",
-                "Çöken halkadaki canlılara bir kez hasar (can puanı; düşme hasarı ayrıca), S1…S5", 0.0, 0.0, 4.0, 6.0, 8.0);
+                "Çöken halkadaki canlılara bir kez hasar (can puanı; düşme hasarı ayrıca), S1…S5", 0.0, 0.0, 4.0, 7.0, 12.0);
         blokButcesi = k.comment("Tick başına en çok blok kaldırma (TPS düşünce yarıya/çeyreğe iner)")
                 .defineInRange("blokButcesi", 400, 16, 4000);
         dusenBlokTavani = k.comment("Aynı anda havadaki düşen blok (FallingBlockEntity) tavanı; aşılınca blok kaldırılır")
@@ -40,6 +44,7 @@ public final class SinkholeAyarlari {
 
     public static void kaydet() {
         bolum = AyarKaydi.sunucuBolumu("sinkhole", "Sinkhole (bölüm F, madde 10)", SinkholeAyarlari::new);
+        AyarKaydi.sunucuGocu(SinkholeAyarGocu.PLAN);
     }
 
     public static SinkholeSeviyesi seviye(int seviye) {

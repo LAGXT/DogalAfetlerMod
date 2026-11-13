@@ -19,7 +19,7 @@ Kaynaklar:
 
 | An | Olay | Görünüm |
 |---|---|---|
-| 0–60 sn | Siren | Ay, gündüz ya da gece fark etmeksizin gökyüzünde sabit bir yaklaşma yönünde (çarpma noktasına dönük, ufkun 35° üstü) zorla çizilir ve 1×'ten 14×'e büyür (`s = 1 + 13·t³`) |
+| 0–60 sn | Siren | Ay, gündüz ya da gece fark etmeksizin gökte, **olay başladığı anda vanilla ayın bulunduğu yerden** (K-E83; gölgelendirici paketi açıksa paketin güneş yolu eğimiyle) zorla çizilir ve 1×'ten 14×'e büyür (`s = 1 + 13·t³`). Ay ufuktan 35° üstünde başlarsa özgün yol (35° → son saniyelerde 4°); daha yüksekten başlarsa en çok 31° iner, tepeden gelen ay (çok yüksek) tepeye yakın patlar. Ufkun altındaki ay (gündüz komutla) 6°'den doğar |
 | 20–60 sn | Parçalanma | Ay dokusunda parlayan turuncu-beyaz kırık ağı büyür (önceden çizilmiş 3 aşamalı çatlak katmanı), kenarlardan kopan 20–40 küçük parça ayın önünde ve arkasında yörünge yayı boyunca uzar, ay ince toz haresiyle çevrelenir |
 | 50–60 sn | Son yaklaşma | Ay ufka iner, alt kenarı atmosfere girince kızarır, gökyüzü ve sis alttan turuncuya boyanır |
 | 60 sn | **Çarpma** | Siren fade-out; havada, dünyada sabit bir noktada (kameradan yaklaşma yönünde ~900 blok, gerçek blok değişmez) 3 boyutlu patlama: ateş topu, şok kabuğu, enkaz ve duman, 7 sn'de kaybolur; ekran 0,5 sn %70 mavi-beyaz, gök ve arazi birkaç saniye parlar (gökyüzü-2 bölümü) |

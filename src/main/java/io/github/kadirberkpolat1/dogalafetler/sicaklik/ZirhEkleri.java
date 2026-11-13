@@ -119,7 +119,7 @@ public final class ZirhEkleri {
     }
 
     /** Faz 3 termostat eki kayıtlıysa ({@code termostatli}) onu döndürür. */
-    private static Ek termostatEki() {
+    static Ek termostatEki() {
         for (Ek ek : EKLER) {
             if (ek.anahtar().equals("termostatli")) {
                 return ek;

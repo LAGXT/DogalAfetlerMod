@@ -10,6 +10,11 @@ import io.github.kadirberkpolat1.dogalafetler.balikcilik.BuzDeligiBlogu;
 import io.github.kadirberkpolat1.dogalafetler.balikcilik.BuzDeligiLootDegistirici;
 import io.github.kadirberkpolat1.dogalafetler.balikcilik.KategoriGirdisi;
 import io.github.kadirberkpolat1.dogalafetler.balikcilik.mantik.DelikOmru;
+import io.github.kadirberkpolat1.dogalafetler.balikcilik.BalikcilikKayitlari.OzelBalik;
+import io.github.kadirberkpolat1.dogalafetler.balikcilik.DenizLootDegistirici;
+import io.github.kadirberkpolat1.dogalafetler.esya.sogutma.SogutmaKayitlari;
+import net.minecraft.advancements.critereon.ItemPredicate;
+import net.minecraftforge.client.model.generators.ItemModelBuilder;
 import io.github.kadirberkpolat1.dogalafetler.balikcilik.mantik.LootAgirliklari.Kategori;
 import java.util.EnumMap;
 import java.util.List;
@@ -40,15 +45,18 @@ import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.item.enchantment.Enchantments;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.storage.loot.entries.LootPoolEntryContainer;
 import net.minecraft.world.level.storage.loot.BuiltInLootTables;
 import net.minecraft.world.level.storage.loot.LootPool;
 import net.minecraft.world.level.storage.loot.LootTable;
 import net.minecraft.world.level.storage.loot.entries.LootItem;
 import net.minecraft.world.level.storage.loot.Deserializers;
 import net.minecraft.world.level.storage.loot.functions.LootItemFunction;
+import net.minecraft.world.level.storage.loot.functions.SetEnchantmentsFunction;
 import net.minecraft.world.level.storage.loot.functions.SetItemCountFunction;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets;
 import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
+import net.minecraft.world.level.storage.loot.predicates.MatchTool;
 import net.minecraft.world.level.storage.loot.providers.number.ConstantValue;
 import net.minecraft.world.level.storage.loot.providers.number.UniformGenerator;
 import net.minecraftforge.client.model.generators.BlockModelBuilder;
@@ -71,6 +79,15 @@ import net.minecraftforge.registries.ForgeRegistries;
  */
 public final class BalikcilikVeriSaglayicilari {
     private static final ResourceLocation ANA = BuzDeligiLootDegistirici.TABLO;
+    /** Açık denizde vanilla sonucun eşya havuzuyla değişme ihtimali (her olta). */
+    private static final float DENIZ_ESYA_OLASILIGI = 0.22f;
+    /** Açık denizde Kutup Oltası'yla vanilla sonucun özel balıkla değişme ihtimali. */
+    private static final float DENIZ_OZEL_OLASILIGI = 0.30f;
+    /**
+     * Açık denizde vanilla sonucun Yineleme büyülü kitabıyla değişme ihtimali (her olta; vanilla hazine havuzu %5'tir, kitap
+     * onun çok küçük bir parçası).
+     */
+    private static final float DENIZ_YINELEME_OLASILIGI = 0.005f;
 
     private BalikcilikVeriSaglayicilari() {
     }
@@ -129,7 +146,15 @@ public final class BalikcilikVeriSaglayicilari {
                             .apply(SetItemCountFunction.setCount(UniformGenerator.between(1, 4)))));
             LootItemFunction kitap = hazineBuyusu(Enchantments.FROST_WALKER, Enchantments.FISHING_SPEED,
                     Enchantments.FISHING_LUCK);
-            c.accept(kategoriTablosu(Kategori.HAZINE), tablo(LootItem.lootTableItem(Items.BOOK).apply(() -> kitap)));
+            // Buz deliği hazine havuzu: Yineleme kitapları toplam ağırlığın ≈ %28'i (18 + 4 + 2 + 1).
+            LootPoolEntryContainer.Builder<?>[] yineleme = yinelemeKitaplari();
+            c.accept(kategoriTablosu(Kategori.HAZINE), tablo(LootItem.lootTableItem(Items.BOOK).setWeight(18)
+                    .apply(() -> kitap), yineleme[0], yineleme[1], yineleme[2]));
+            c.accept(kategoriTablosu(Kategori.ESYA), tablo(esyaGirdileri()));
+            c.accept(kategoriTablosu(Kategori.OZEL), tablo(ozelGirdileri()));
+            c.accept(DenizLootDegistirici.ESYA_TABLOSU, tablo(esyaGirdileri()));
+            c.accept(DenizLootDegistirici.OZEL_TABLOSU, tablo(ozelGirdileri()));
+            c.accept(DenizLootDegistirici.YINELEME_TABLOSU, tablo(yinelemeKitaplari()));
         }
 
         /**
@@ -156,6 +181,36 @@ public final class BalikcilikVeriSaglayicilari {
         }
     }
 
+    /** Buz altı ve açık deniz eşya havuzu: Soğutma Parçası sık (3 parçayla Külçe), Tuz Kristali orta, Buzlu İnci nadir. */
+    private static LootPoolEntryContainer.Builder<?>[] esyaGirdileri() {
+        return new LootPoolEntryContainer.Builder<?>[] {
+            LootItem.lootTableItem(SogutmaKayitlari.SOGUTMA_PARCASI.get()).setWeight(7)
+                    .apply(SetItemCountFunction.setCount(UniformGenerator.between(1, 2))),
+            LootItem.lootTableItem(BalikcilikKayitlari.TUZ_KRISTALI.get()).setWeight(3)
+                    .apply(SetItemCountFunction.setCount(UniformGenerator.between(1, 3))),
+            LootItem.lootTableItem(BalikcilikKayitlari.BUZLU_INCI.get()).setWeight(1)};
+    }
+
+    /** Özel kutup balıkları (yalnız Kutup Oltası): Kristal Levrek yaygın, Kutup Yılanbalığı orta, Aurora Balığı nadir. */
+    private static LootPoolEntryContainer.Builder<?>[] ozelGirdileri() {
+        return new LootPoolEntryContainer.Builder<?>[] {
+            LootItem.lootTableItem(OzelBalik.KRISTAL_LEVREK.cig()).setWeight(6),
+            LootItem.lootTableItem(OzelBalik.KUTUP_YILANBALIGI.cig()).setWeight(3),
+            LootItem.lootTableItem(OzelBalik.AURORA_BALIGI.cig()).setWeight(1)};
+    }
+
+    /** Yineleme büyülü kitapları: I ağırlık 4, II 2, III 1 (yüksek seviye daha nadir). */
+    private static LootPoolEntryContainer.Builder<?>[] yinelemeKitaplari() {
+        return new LootPoolEntryContainer.Builder<?>[] {
+            yinelemeKitabi(1, 4), yinelemeKitabi(2, 2), yinelemeKitabi(3, 1)};
+    }
+
+    /** {@code set_enchantments}: yalnız {@code Items.BOOK} tabanlı olursa büyülü kitaba (StoredEnchantments) çevrilir. */
+    private static LootPoolEntryContainer.Builder<?> yinelemeKitabi(int seviye, int agirlik) {
+        return LootItem.lootTableItem(Items.BOOK).setWeight(agirlik).apply(new SetEnchantmentsFunction.Builder()
+                .withEnchantment(BalikcilikKayitlari.YINELEME.get(), ConstantValue.exactly(seviye)));
+    }
+
     private static final class Degistiriciler extends GlobalLootModifierProvider {
         Degistiriciler(PackOutput cikti) {
             super(cikti, DogalAfetler.MOD_ID);
@@ -165,6 +220,18 @@ public final class BalikcilikVeriSaglayicilari {
         protected void start() {
             add("buz_deligi_balikcilik", new BuzDeligiLootDegistirici(
                     new LootItemCondition[] {LootTableIdCondition.builder(BuiltInLootTables.FISHING).build()}, ANA));
+            // Açık deniz (buz deliği dışı): her olta ile eşya, yalnız Kutup Oltası'yla özel balık (madde 1, 3).
+            add("deniz_balikciligi_esya", new DenizLootDegistirici(
+                    new LootItemCondition[] {LootTableIdCondition.builder(BuiltInLootTables.FISHING).build()},
+                    DenizLootDegistirici.ESYA_TABLOSU, DENIZ_ESYA_OLASILIGI));
+            add("deniz_balikciligi_ozel", new DenizLootDegistirici(
+                    new LootItemCondition[] {LootTableIdCondition.builder(BuiltInLootTables.FISHING).build(),
+                        MatchTool.toolMatches(ItemPredicate.Builder.item().of(BalikcilikKayitlari.KUTUP_OLTASI.get())).build()},
+                    DenizLootDegistirici.OZEL_TABLOSU, DENIZ_OZEL_OLASILIGI));
+            // Yineleme büyülü kitabı: her olta ile açık denizde çok nadir hazine.
+            add("deniz_balikciligi_yineleme", new DenizLootDegistirici(
+                    new LootItemCondition[] {LootTableIdCondition.builder(BuiltInLootTables.FISHING).build()},
+                    DenizLootDegistirici.YINELEME_TABLOSU, DENIZ_YINELEME_OLASILIGI));
         }
 
         @Override
@@ -215,6 +282,18 @@ public final class BalikcilikVeriSaglayicilari {
             Item parca = BalikcilikKayitlari.BUZ_PARCASI.get();
             ShapelessRecipeBuilder.shapeless(RecipeCategory.BUILDING_BLOCKS, Items.ICE).requires(parca, 4)
                     .unlockedBy("has_buz_parcasi", has(parca)).save(c, DogalAfetler.konum("buz_parcasindan_buz"));
+            for (OzelBalik b : OzelBalik.values()) {
+                Item cig = b.cig();
+                Item pismis = b.pismis();
+                String ad = "pismis_" + b.ad();
+                String acilis = "has_" + b.ad();
+                SimpleCookingRecipeBuilder.smelting(Ingredient.of(cig), RecipeCategory.FOOD, pismis, 0.35f, 200)
+                        .unlockedBy(acilis, has(cig)).save(c, DogalAfetler.konum(ad));
+                SimpleCookingRecipeBuilder.smoking(Ingredient.of(cig), RecipeCategory.FOOD, pismis, 0.35f, 100)
+                        .unlockedBy(acilis, has(cig)).save(c, DogalAfetler.konum(ad + "_tutsuleme"));
+                SimpleCookingRecipeBuilder.campfireCooking(Ingredient.of(cig), RecipeCategory.FOOD, pismis, 0.35f, 600)
+                        .unlockedBy(acilis, has(cig)).save(c, DogalAfetler.konum(ad + "_kamp_atesi"));
+            }
         }
     }
 
@@ -242,6 +321,20 @@ public final class BalikcilikVeriSaglayicilari {
                 itemModels().basicItem(b.pismis());
             }
             itemModels().basicItem(BalikcilikKayitlari.BUZ_PARCASI.get());
+            for (OzelBalik b : OzelBalik.values()) {
+                itemModels().basicItem(b.cig());
+                itemModels().basicItem(b.pismis());
+            }
+            itemModels().basicItem(BalikcilikKayitlari.BUZLU_INCI.get());
+            itemModels().basicItem(BalikcilikKayitlari.TUZ_KRISTALI.get());
+            // Kutup Oltası: vanilla olta modeli (handheld_rod); atılmış hali vanilla atılmış olta modelinin (fishing_rod_cast) kopyası:
+            // aynı gösterim dönüşümleri, böylece misina (varlık çizicisi) oltanın ucuna vanilla'daki gibi oturur. "cast" özelliği
+            // istemci kaydıyla (KutupOltasiIstemci).
+            ItemModelBuilder atilmis = itemModels().withExistingParent("kutup_oltasi_cast", mcLoc("item/fishing_rod_cast"))
+                    .texture("layer0", modLoc("item/kutup_oltasi_cast"));
+            itemModels().withExistingParent("kutup_oltasi", mcLoc("item/handheld_rod"))
+                    .texture("layer0", modLoc("item/kutup_oltasi"))
+                    .override().predicate(mcLoc("cast"), 1).model(atilmis).end();
         }
 
         /**

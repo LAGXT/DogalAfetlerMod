@@ -1,0 +1,44 @@
+{
+  "parent": "dogalafetler:dogalafetler/kutup_hazinesi",
+  "criteria": {
+    "topla": {
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "dogalafetler:aurora_baligi"
+            ]
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    }
+  },
+  "display": {
+    "announce_to_chat": false,
+    "description": {
+      "translate": "advancements.dogalafetler.aurora_avcisi.description"
+    },
+    "frame": "goal",
+    "hidden": false,
+    "icon": {
+      "item": "dogalafetler:aurora_baligi"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.aurora_avcisi.title"
+    }
+  },
+  "requirements": [
+    [
+      "topla"
+    ]
+  ],
+  "rewards": {
+    "experience": 40,
+    "loot": [
+      "dogalafetler:rewards/hedef"
+    ]
+  },
+  "sends_telemetry_event": true
+}

@@ -1,5 +1,7 @@
 package io.github.kadirberkpolat1.dogalafetler.gokyuzu;
 
+import io.github.kadirberkpolat1.dogalafetler.network.AgKanali;
+import io.github.kadirberkpolat1.dogalafetler.network.BakmaPaketi;
 import io.github.kadirberkpolat1.dogalafetler.veri.DataGenerators;
 import net.minecraftforge.eventbus.api.IEventBus;
 
@@ -20,6 +22,9 @@ public final class GokyuzuSistemi {
         GokyuzuKomutlari.kaydet();
         PulsarSesleri.kaydet(modBus);
         PulsarKayitlari.kaydet(modBus);
+        BakmaIlerlemesi.kaydet();
+        AgKanali.kaydet(k -> k.istemcidenSunucuya(BakmaPaketi.AD, BakmaPaketi.class, BakmaPaketi::yaz, BakmaPaketi::oku,
+                BakmaPaketi::isle));
         DataGenerators.ceviriEkle(GokyuzuKomutlari::cevirileriYaz);
     }
 }

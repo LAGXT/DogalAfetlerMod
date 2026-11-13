@@ -14,13 +14,13 @@ package io.github.kadirberkpolat1.dogalafetler.afet.deprem.mantik;
  */
 public record DepremSeviyesi(int seviye, int uzunluk, int genislik, int derinlik, int sureTick, double kameraGenligi,
         int yikimYaricapi, float hasar) {
-    private static final int[] UZUNLUK = {24, 48, 96, 160, 256};
-    private static final int[] GENISLIK = {1, 2, 3, 4, 6};
-    private static final int[] DERINLIK = {4, 8, 14, 22, 32};
-    private static final int[] SURE_SANIYE = {8, 15, 25, 40, 60};
-    private static final double[] GENLIK = {0.3, 0.8, 1.5, 2.5, 4.0};
-    private static final int[] YARICAP = {16, 32, 48, 72, 100};
-    private static final float[] HASAR = {0, 0, 0, 1, 2};
+    private static final int[] UZUNLUK = {24, 48, 96, 200, 400};
+    private static final int[] GENISLIK = {1, 2, 3, 5, 9};
+    private static final int[] DERINLIK = {4, 8, 14, 26, 44};
+    private static final int[] SURE_SANIYE = {8, 15, 25, 45, 90};
+    private static final double[] GENLIK = {0.3, 0.8, 1.5, 2.8, 4.6};
+    private static final int[] YARICAP = {16, 32, 48, 84, 160};
+    private static final float[] HASAR = {0, 0, 0, 1.5f, 4};
 
     public static DepremSeviyesi varsayilan(int seviye) {
         int i = Math.max(1, Math.min(5, seviye)) - 1;
@@ -35,7 +35,7 @@ public record DepremSeviyesi(int seviye, int uzunluk, int genislik, int derinlik
 
     /** Sağlam olmayan blokların yıkım yoğunluğu çarpanı: S1 "birkaç yaprak", S5 "ahşap köy çökmüş". */
     public double yikimYogunlugu() {
-        return new double[] {0.15, 0.4, 0.7, 1.0, 1.4}[seviye - 1];
+        return new double[] {0.15, 0.4, 0.7, 1.15, 2.0}[seviye - 1];
     }
 
     /** Heyelan (eğimli toprak/çakıl/kum kayması) yalnız S4–5. */

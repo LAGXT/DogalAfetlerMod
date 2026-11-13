@@ -77,5 +77,12 @@ public final class SicaklikCevirileri {
         y.ekle("sicaklik.dogalafetler.katki.islaklik", "wetness", "ıslaklık");
         y.ekle("sicaklik.dogalafetler.katki.ruzgar", "wind", "rüzgâr");
         y.ekle("sicaklik.dogalafetler.katki.sol_el", "off hand", "sol el");
+        y.ekle("sicaklik.dogalafetler.katki.yun_bloklari", "wool blocks", "yün blokları");
+        y.ekle("sicaklik.dogalafetler.katki.lav_icinde", "inside lava", "lavın içi");
+        y.ekle("sicaklik.dogalafetler.katki.yakin_oyuncular", "nearby players", "yakındaki oyuncular");
+        y.ekle("sicaklik.dogalafetler.katki.yun", "wool gear", "yünlü eşyalar");
+        y.ekle("sicaklik.dogalafetler.katki.termostat", "thermostat", "termostat");
+        y.ekle("sicaklik.dogalafetler.katki.isitici_esya", "heating gear", "ısıtıcı eşyalar");
+        y.ekle("sicaklik.dogalafetler.katki.sogutucu_esya", "cooling gear", "soğutucu eşyalar");
     }
 }

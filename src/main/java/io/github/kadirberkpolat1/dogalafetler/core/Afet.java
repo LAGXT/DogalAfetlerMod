@@ -79,9 +79,17 @@ public abstract class Afet {
 
     protected abstract void ozelDurumOku(CompoundTag etiket);
 
-    /** Hedef oyuncunun çevresinde merkez seçer; varsayılan oyuncunun bulunduğu blok. */
-    public BlockPos merkezSec(ServerLevel level, ServerPlayer hedef, int seviye, RandomSource rastgele) {
-        return hedef.blockPosition();
+    /**
+     * Hedef oyuncu için merkez seçer. {@code merkezNoktasi} yöneticinin seçtiği başlangıç noktasıdır: doğal başlatmada seçim anındaki
+     * (taze) oyuncu konumundan {@link io.github.kadirberkpolat1.dogalafetler.core.mantik.MerkezHalkasi} içinde (varsayılan 3–10
+     * chunk) rastgele yönde, yüzeye oturtulmuş bir nokta; komutla başlatmada oyuncunun bulunduğu blok. Varsayılan: noktanın
+     * kendisi. Afet kendi arazi gereksinimi için noktayı {@code merkezNoktasi} çevresinde rafine edebilir ama doğal
+     * başlatmada halkanın dışına taşımaz ve oyuncunun konumunu merkez olarak kullanmaz; merkez başladıktan sonra
+     * oyuncuyu izlemez.
+     */
+    public BlockPos merkezSec(ServerLevel level, ServerPlayer hedef, int seviye, BlockPos merkezNoktasi,
+            RandomSource rastgele) {
+        return merkezNoktasi;
     }
 
     /** N14: afet bu merkezi reddedebilir (ör. tsunami için yakında geniş su yok); yönetici başka oyuncu dener ya da erteler. */

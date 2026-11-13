@@ -1,0 +1,35 @@
+{
+  "parent": "dogalafetler:dogalafetler/yildizli_gece",
+  "criteria": {
+    "ozel": {
+      "conditions": {
+        "anahtar": "astronom"
+      },
+      "trigger": "dogalafetler:ozel_basarim"
+    }
+  },
+  "display": {
+    "announce_to_chat": false,
+    "description": {
+      "translate": "advancements.dogalafetler.astronom.description"
+    },
+    "frame": "challenge",
+    "hidden": true,
+    "icon": {
+      "item": "minecraft:recovery_compass"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.astronom.title"
+    }
+  },
+  "requirements": [
+    [
+      "ozel"
+    ]
+  ],
+  "rewards": {
+    "experience": 100
+  },
+  "sends_telemetry_event": true
+}

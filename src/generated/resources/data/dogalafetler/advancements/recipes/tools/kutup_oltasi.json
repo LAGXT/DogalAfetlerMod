@@ -1,0 +1,35 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_sogutma_kulcesi": {
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "dogalafetler:sogutma_kulcesi"
+            ]
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    },
+    "has_the_recipe": {
+      "conditions": {
+        "recipe": "dogalafetler:kutup_oltasi"
+      },
+      "trigger": "minecraft:recipe_unlocked"
+    }
+  },
+  "requirements": [
+    [
+      "has_sogutma_kulcesi",
+      "has_the_recipe"
+    ]
+  ],
+  "rewards": {
+    "recipes": [
+      "dogalafetler:kutup_oltasi"
+    ]
+  },
+  "sends_telemetry_event": false
+}

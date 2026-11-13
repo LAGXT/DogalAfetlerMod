@@ -2,12 +2,14 @@
 modLoader="javafml"
 loaderVersion="${loader_version_range}"
 license="${mod_license}"
+issueTrackerURL="${mod_issue_url}"
 
 [[mods]]
 modId="${mod_id}"
 version="${mod_version}"
 displayName="${mod_name}"
 authors="${mod_authors}"
+displayURL="${mod_display_url}"
 # Mod hem sunucuda hem istemcide gerekir; sürümler eşleşmezse bağlantı ekranında kırmızı X görünür.
 displayTest="MATCH_VERSION"
 description='''${mod_description}'''
@@ -34,3 +36,34 @@ description='''${mod_description}'''
     versionRange="[2.4,)"
     ordering="NONE"
     side="BOTH"
+
+# Uyum modları (uyum paketi) isteğe bağlıdır: yüklü değilse ilgili uyum sınıfları hiç yüklenmez. JEI ve Jade yalnız istemci
+# eklentisi olarak (JEI bilgi sayfaları, Jade ipucu satırları); Curios Serin Kolye'yi kolye yuvasına koyar (sunucu da bilmeli);
+# Punchy'nin birinci kişi kolu deprem sarsıntısını alır. Sürüm aralığı kısıtsızdır: yalnız ad alanı ve ilgili API imzaları kullanılır.
+[[dependencies.${mod_id}]]
+    modId="jei"
+    mandatory=false
+    versionRange="[15,)"
+    ordering="NONE"
+    side="CLIENT"
+
+[[dependencies.${mod_id}]]
+    modId="jade"
+    mandatory=false
+    versionRange="[8,)"
+    ordering="NONE"
+    side="CLIENT"
+
+[[dependencies.${mod_id}]]
+    modId="curios"
+    mandatory=false
+    versionRange="[5,)"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="punchy"
+    mandatory=false
+    versionRange="[3,)"
+    ordering="NONE"
+    side="CLIENT"

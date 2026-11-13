@@ -1,0 +1,26 @@
+{
+  "type": "minecraft:fishing",
+  "pools": [
+    {
+      "bonus_rolls": 0.0,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "dogalafetler:kristal_levrek",
+          "weight": 6
+        },
+        {
+          "type": "minecraft:item",
+          "name": "dogalafetler:kutup_yilanbaligi",
+          "weight": 3
+        },
+        {
+          "type": "minecraft:item",
+          "name": "dogalafetler:aurora_baligi"
+        }
+      ],
+      "rolls": 1.0
+    }
+  ],
+  "random_sequence": "dogalafetler:gameplay/deniz/ozel"
+}

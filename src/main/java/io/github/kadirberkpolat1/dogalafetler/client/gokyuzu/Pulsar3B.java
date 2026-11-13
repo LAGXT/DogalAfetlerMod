@@ -355,7 +355,7 @@ public final class Pulsar3B {
         Minecraft mc = Minecraft.getInstance();
         ClientLevel level = mc.level;
         float zaman = level == null ? 0f : level.getTimeOfDay(mc.getPartialTick());
-        Quaternionf q = new Quaternionf(Axis.YP.rotationDegrees(-90f)).mul(Axis.XP.rotationDegrees(zaman * 360f));
+        Quaternionf q = GokyuzuCizici.gunDonusu(zaman);
         q.transform(A1.set(EKSEN));
         dik(A1, E1, E2);
     }

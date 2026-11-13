@@ -66,6 +66,29 @@ class AyEgrileriTest {
         assertEquals(1f, AyEgrileri.kizarma(yaklasma), EPS);
     }
 
+    /** K-E83: ay olay başladığı anda vanilla ayın bulunduğu yükseklikten iner; özgün 35° yolu aynen korunur. */
+    @Test
+    void ayBaslangicYuksekligindenInerOzgunYolKorunur() {
+        for (float s = 0f; s <= AyEgrileri.YAKLASMA_SN; s += 0.25f) {
+            assertEquals(AyEgrileri.egim(s), AyEgrileri.egim(s, AyEgrileri.YAKLASMA_EGIMI), EPS, "35° başlangıç özgün yol");
+        }
+        assertEquals(4f, AyEgrileri.sonEgim(35f), EPS);
+        assertEquals(4f, AyEgrileri.sonEgim(20f), EPS, "alçak ay 4°'nin altına inmez");
+        assertEquals(29f, AyEgrileri.sonEgim(60f), EPS, "yüksek ay en çok 31° iner");
+        assertEquals(9f, AyEgrileri.patlamaEgimi(35f), EPS, "özgün patlama yüksekliği");
+        assertEquals(63f, AyEgrileri.patlamaEgimi(89f), EPS, "tepeden gelen ay tepeye yakın patlar");
+        float tepe = AyEgrileri.EN_COK_BASLANGIC_EGIMI;
+        assertEquals(tepe, AyEgrileri.egim(0f, tepe), EPS);
+        assertEquals(tepe, AyEgrileri.egim(AyEgrileri.SON_YAKLASMA_SN, tepe), EPS, "son yaklaşmaya kadar yerinde");
+        assertEquals(AyEgrileri.sonEgim(tepe), AyEgrileri.egim(AyEgrileri.YAKLASMA_SN, tepe), EPS);
+        float onceki = 90f;
+        for (float s = 0f; s <= AyEgrileri.YAKLASMA_SN; s += 0.05f) {
+            float e = AyEgrileri.egim(s, tepe);
+            assertTrue(e <= onceki, "eğim artmamalı (tepe başlangıcı)");
+            onceki = e;
+        }
+    }
+
     @Test
     void parlamaYarimSaniyeYuzdeYetmisSonraSoner() {
         assertEquals(0f, AyEgrileri.parlama(-0.1f), EPS, "çarpmadan önce parlama yok");

@@ -24,7 +24,7 @@ class AsitKurallariTest {
             onceki = v;
         }
         assertEquals(new Seviye(32, 1200, 2.0, false), Tablo.VARSAYILAN.seviye(1));
-        assertEquals(new Seviye(128, 4800, 16.0, true), Tablo.VARSAYILAN.seviye(5));
+        assertEquals(new Seviye(192, 6000, 26.0, true), Tablo.VARSAYILAN.seviye(5));
         assertEquals(Tablo.VARSAYILAN.seviye(1), Tablo.VARSAYILAN.seviye(0), "alt sınır");
         assertEquals(Tablo.VARSAYILAN.seviye(5), Tablo.VARSAYILAN.seviye(9), "üst sınır");
     }

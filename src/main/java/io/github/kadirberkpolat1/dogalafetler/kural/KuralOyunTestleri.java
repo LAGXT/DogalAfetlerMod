@@ -18,8 +18,8 @@ public final class KuralOyunTestleri {
     @GameTest(template = "bos")
     public static void varsayilanlarSartnamedekiGibi(GameTestHelper yardimci) {
         GameRules kurallar = yardimci.getLevel().getGameRules();
-        yardimci.assertTrue(Kurallar.MANTIKSAL_KURALLAR.size() + Kurallar.TAMSAYI_KURALLAR.size() == 13,
-                "madde 11'de 13 gamerule var");
+        yardimci.assertTrue(Kurallar.MANTIKSAL_KURALLAR.size() + Kurallar.TAMSAYI_KURALLAR.size() == 14,
+                "madde 11'de 14 gamerule var (13 + sel)");
         for (GameRules.Key<GameRules.BooleanValue> anahtar : Kurallar.MANTIKSAL_KURALLAR) {
             yardimci.assertTrue(kurallar.getBoolean(anahtar), anahtar.getId() + " varsayılanı true olmalı");
         }

@@ -86,7 +86,7 @@ public final class SicaklikOtomasyonu {
     private static int adim = -1;
     private static int sayac;
     private static int sahne;
-    /** İlk karede çizilmiş bantın tick'i, ofseti ve nabzı (ikinci kare farklı bir fazdan alınır). */
+    /** İlk karede çizilmiş göstergenin tick'i, ofseti ve nabızı (ikinci kare farklı bir fazdan alınır). */
     private static long ilkTick;
     private static int ilkDx;
     private static int ilkDy;
@@ -288,12 +288,13 @@ public final class SicaklikOtomasyonu {
         Screenshot.grab(mc.gameDirectory, dosya, mc.getMainRenderTarget(), mesaj -> { });
         var d = IstemciSicaklik.durum();
         DogalAfetler.LOGGER.info(ON + "kare {} (vücut {} °C kademe {} durum {}, ıslaklık {}, hissedilen {} °C, mekan {} °C, "
-                + "eğilim {}; FPS {}; bant dx={} dy={} parlama={} nabız={} şevron={} metin='{}' ikonlar=[{}] üçgen x={} "
-                + "çizim tick'i {}; kamera {}, sahnede kendi parçacığı {}; hap x={} y={} ölçek={} sayı rengi={})", dosya,
+                + "eğilim {}; FPS {}; gösterge dx={} dy={} parlama={} nabız={} efekt=[{}] metin='{}' iğne x={} "
+                + "çizim tick'i {}; kamera {}, sahnede kendi parçacığı {}; hap x={} y={} (kafanın sol üstü) ölçek={} "
+                + "sayı rengi={})", dosya,
                 sayi(VucutOlcegi.santigrat(d.vucut())), d.kademe(), d.kademe().durum(), sayi(d.islaklik()),
                 sayi(d.hissedilen()), sayi(d.mekan()), sayi(d.egilim()), mc.getFps(), SicaklikHud.sonDx, SicaklikHud.sonDy,
-                sayi(SicaklikHud.sonParlama), sayi(SicaklikHud.sonNabiz), SicaklikHud.sonSevron, SicaklikHud.sonMetin,
-                SicaklikHud.sonIkonlar, SicaklikHud.sonUcgen, SicaklikHud.sonTick, mc.options.getCameraType(),
+                sayi(SicaklikHud.sonParlama), sayi(SicaklikHud.sonNabiz), SicaklikHud.sonEfekt, SicaklikHud.sonMetin,
+                SicaklikHud.sonIgne, SicaklikHud.sonTick, mc.options.getCameraType(),
                 IstemciSicaklik.kendiParcacikSayisi() - sahneParcacik, SicaklikHud.sonHapX, SicaklikHud.sonHapY,
                 mc.getWindow().getGuiScale(),
                 String.format(Locale.ROOT, "%06x", HudCizimi.sayiRengi(d.kademe().durum()) & 0xFFFFFF));

@@ -1,0 +1,35 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_kutup_yilanbaligi": {
+      "conditions": {
+        "items": [
+          {
+            "items": [
+              "dogalafetler:kutup_yilanbaligi"
+            ]
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    },
+    "has_the_recipe": {
+      "conditions": {
+        "recipe": "dogalafetler:pismis_kutup_yilanbaligi_tutsuleme"
+      },
+      "trigger": "minecraft:recipe_unlocked"
+    }
+  },
+  "requirements": [
+    [
+      "has_kutup_yilanbaligi",
+      "has_the_recipe"
+    ]
+  ],
+  "rewards": {
+    "recipes": [
+      "dogalafetler:pismis_kutup_yilanbaligi_tutsuleme"
+    ]
+  },
+  "sends_telemetry_event": false
+}

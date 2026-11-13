@@ -329,7 +329,8 @@ public final class TermometreEkrani extends Screen {
         kaydirma = Mth.clamp(kaydirma, 0, Math.max(0, kalemler.size() - satir));
         for (int i = 0; i < Math.min(satir, kalemler.size() - kaydirma); i++) {
             Katki k = kalemler.get(i + kaydirma);
-            String ad = basHarfBuyuk(Component.translatable("sicaklik.dogalafetler.katki." + k.anahtar()).getString());
+            String ad = basHarfBuyuk(Component.translatable("sicaklik.dogalafetler.katki." + k.anahtar()).getString())
+                    + (v.dokum.adet(k) > 1 ? " \u00d7" + v.dokum.adet(k) : "");
             satirYaz(g, Component.literal(ad), v.dokum.katki(k), SOL_X0, SOL_X1, ust + DOKUM_Y + i * SATIR);
         }
         if (kalemler.size() > satir) {

@@ -2,6 +2,7 @@ package io.github.kadirberkpolat1.dogalafetler.sicaklik;
 
 import io.github.kadirberkpolat1.dogalafetler.DogalAfetler;
 import io.github.kadirberkpolat1.dogalafetler.config.AyarKaydi;
+import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.EkIsi;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Esikler;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.Hissedilen;
 import io.github.kadirberkpolat1.dogalafetler.sicaklik.mantik.IsiAlisverisi;
@@ -30,7 +31,7 @@ public final class SicaklikAyarlari {
 
     /** Config'ten kurulmuş saf ayarlar. */
     public record Ozet(IsiAlisverisi.Ayarlar isi, Yalitim.Ayarlar yalitim, Esikler esikler, OrtamSicakligi.Ayarlar ortam,
-            Islaklik.Ayarlar islaklik, Hissedilen.Ayarlar hissedilen, List<KaynakTanimi> kaynaklar) {
+            Islaklik.Ayarlar islaklik, Hissedilen.Ayarlar hissedilen, EkIsi.Ayarlar ekIsi, List<KaynakTanimi> kaynaklar) {
     }
 
     private record Aralik(double min, double max, String aciklama) {
@@ -48,6 +49,7 @@ public final class SicaklikAyarlari {
     private final Map<String, ForgeConfigSpec.DoubleValue> ortam;
     private final Map<String, ForgeConfigSpec.DoubleValue> islaklik;
     private final Map<String, ForgeConfigSpec.DoubleValue> hissedilen;
+    private final Map<String, ForgeConfigSpec.DoubleValue> ekIsi;
 
     private SicaklikAyarlari(ForgeConfigSpec.Builder k) {
         k.comment("Config göçünün sürümü (S3-09): dosya bundan eskiyse açılışta eski varsayılanında kalan sıcaklık değerleri "
@@ -91,6 +93,11 @@ public final class SicaklikAyarlari {
                 + "ısı alışverişi yapar.").push("hissedilen");
         hissedilen = tanimla(k, Hissedilen.Ayarlar.VARSAYILAN, hissedilenAciklamalari());
         k.pop();
+        k.comment("Ek ısı kaynakları: yün blokları, yünlü ve termostatlı zırh, Termostat Plakası, yakın oyuncular, lavın içi, ısıtıcı/"
+                + "soğutucu eşyalar (Serin Kolye, Soğutmalı zırh) ve yakın kaynakların yığılması. Hepsi ortam sıcaklığına °C olarak "
+                + "eklenir ve termometre dökümünde ayrı satır (kaynak sayısıyla) gösterilir.").push("ekisi");
+        ekIsi = tanimla(k, EkIsi.Ayarlar.VARSAYILAN, ekIsiAciklamalari());
+        k.pop();
     }
 
     public static void kaydet() {
@@ -118,7 +125,8 @@ public final class SicaklikAyarlari {
                     kurYaDa(Esikler.class, a.esikler, Esikler.VARSAYILAN),
                     kurYaDa(OrtamSicakligi.Ayarlar.class, a.ortam, OrtamSicakligi.Ayarlar.VARSAYILAN),
                     kurYaDa(Islaklik.Ayarlar.class, a.islaklik, Islaklik.Ayarlar.VARSAYILAN),
-                    kurYaDa(Hissedilen.Ayarlar.class, a.hissedilen, Hissedilen.Ayarlar.VARSAYILAN), List.copyOf(liste));
+                    kurYaDa(Hissedilen.Ayarlar.class, a.hissedilen, Hissedilen.Ayarlar.VARSAYILAN),
+                    kurYaDa(EkIsi.Ayarlar.class, a.ekIsi, EkIsi.Ayarlar.VARSAYILAN), List.copyOf(liste));
             ozet = o;
         }
         return o;
@@ -208,7 +216,7 @@ public final class SicaklikAyarlari {
     private static Map<String, Aralik> isiAciklamalari() {
         Map<String, Aralik> m = new LinkedHashMap<>();
         m.put("esitlenmeHizi", new Aralik(0.0005, 0.1, "k (1/sn): çıplak, kuru oyuncunun vücut-ortam farkını kapatma oranı. "
-                + "0,006 ≈ 167 sn zaman sabiti; donmaya ~3 dk."));
+                + "0,02 ≈ 50 sn zaman sabiti; fark büyüdükçe 'hizlanmaOlcegi' ile daha da hızlanır (uç ortamda 30–60 sn)."));
         m.put("konforSicakligi", new Aralik(-20, 40, "Çıplak, yürüyen oyuncunun nötr kaldığı ortam (°C)."));
         m.put("birimPerDerece", new Aralik(0.1, 10, "1 °C ortam farkının vücut birimi karşılığı."));
         m.put("metabolikIsi", new Aralik(0, 200, "U: konfor ortamında metabolik ısının vücut birimi karşılığı "
@@ -220,6 +228,9 @@ public final class SicaklikAyarlari {
                 + "(1) doğrusal."));
         m.put("suIletkenlik", new Aralik(1, 20, "Suyun içindeyken ısı iletkenliği çarpanı (soğuk su hızlı soğutur)."));
         m.put("asiriSogukEsigi", new Aralik(-100, 0, "Bu °C ve altında yün ve tüy donmayı yalnız yavaşlatır (madde 7e)."));
+        m.put("hizlanmaOlcegi", new Aralik(1, 10000, "Vücut-ortam farkı (vücut birimi) bu değere ulaştığında ISI alışverişi hızı 2 katına "
+                + "çıkar: fark büyüdükçe hız doğrusal-üstü artar, fark kapanırken yavaşlar (denge noktası değişmez). "
+                + "Çok büyük değer = düz Newton soğuması."));
         return m;
     }
 
@@ -284,6 +295,33 @@ public final class SicaklikAyarlari {
         return m;
     }
 
+    private static Map<String, Aralik> ekIsiAciklamalari() {
+        Map<String, Aralik> m = new LinkedHashMap<>();
+        m.put("yunBlokGucu", new Aralik(0, 50, "Bir yün bloğunun kendi konumundaki ısısı (°C); mesafeyle (1 − d/r)² azalır."));
+        m.put("yunBlokYaricap", new Aralik(0.5, 8, "Yün bloğunun etki yarıçapı (blok)."));
+        m.put("yunBlokUstSiniri", new Aralik(0, 100, "Tüm yün bloklarının toplam üst sınırı (°C)."));
+        m.put("yunZirhBasina", new Aralik(0, 30, "Yünlü her zırh parçasının ortama katı ısısı (°C; yalıtıma ek)."));
+        m.put("yunEsyaBasina", new Aralik(0, 10, "Envanterdeki her yün eşya yığınının ısısı (°C; en çok 4 yığın sayılır)."));
+        m.put("termostatZirhBasina", new Aralik(0, 30, "Termostatlı her zırh parçasının soğukta ortama katı ısısı (°C)."));
+        m.put("termostatPlakasiBasina", new Aralik(0, 30, "Envanterdeki her Termostat Plakası yığınının soğukta ısısı (°C; en çok 4 yığın)."));
+        m.put("termostatBaslangicC", new Aralik(-30, 40, "Mekan bu sıcaklığın (°C) altındayken termostat ısıtmaya başlar (sıcakta ortamı ısıtmaz)."));
+        m.put("termostatTamC", new Aralik(-60, 40, "Mekan bu sıcaklıkta (°C) ve altında termostat tam güçtedir; başlangıçla arasında doğrusal."));
+        m.put("kisiselUstSiniri", new Aralik(0, 100, "Bir kişisel ısı kaleminin (yün, termostat, ısıtıcı eşyalar) üst sınırı (°C)."));
+        m.put("kisiselAltSiniri", new Aralik(-100, 0, "Soğutucu eşyaların toplam alt sınırı (°C)."));
+        m.put("yakinOyuncuYaricap", new Aralik(0.5, 8, "Oyuncuların birbirini ısıttığı uzaklık (blok; canlı, hayatta kalma/macera modunda olanlar)."));
+        m.put("yakinOyuncuBasina", new Aralik(0, 20, "Yakındaki her diğer oyuncunun ortama katı ısısı (°C)."));
+        m.put("yakinOyuncuUstSiniri", new Aralik(0, 60, "Yakın oyuncu ısısının tavanı (°C)."));
+        m.put("lavIcinde", new Aralik(0, 150, "Lavın içindeyken yakın lav kaynağı katkısının üzerine eklenen ısı (°C); lavın yanında durmaktan belirgin sıcaktır."));
+        m.put("yigilmaArtisi", new Aralik(0, 2, "Yakın blok kaynaklarında ve taşınan ısıtıcı/soğutucu eşyalarda, aynı yönde ikinci kaynaktan "
+                + "itibaren her ek kaynağın toplamı artırdığı oran (0,25: 3 kaynak %50 daha sıcak/soğuk; 0 = yığılma yok)."));
+        m.put("yigilmaEnCok", new Aralik(1, 5, "Yığılmanın en çok çarpanı: bir yöndeki kaynak toplamı en fazla bu katına çıkar "
+                + "(2: iki kat). Toplam ayrıca kaynakUstSiniri/kaynakAltSiniri ve kişisel sınırlarla sınırlıdır."));
+        m.put("yigilmaKarsiligi", new Aralik(0, 1, "Zıt yöndeki bir kaynağın (soğuk kaynağı ısının, ısı soğuğun) yığılma "
+                + "sayısından götürdüğü pay: 0 = birbirinin yığılmasını etkilemez, 1 = bir kaynak bir karşıt kaynağı tam götür "
+                + "(katkılar zaten işaretli toplanır)."));
+        return m;
+    }
+
     private static Map<String, Aralik> ortamAciklamalari() {
         Map<String, Aralik> m = new LinkedHashMap<>();
         m.put("biyomCarpani", new Aralik(0, 100, "Biyom sıcaklığı (vanilla ölçek) × bu = °C katkısı (ova 0,8 → 16)."));
@@ -315,6 +353,8 @@ public final class SicaklikAyarlari {
         m.put("kizilCuceOfseti", new Aralik(-60, 0, "Kızıl cüce döneminin ek ofseti (°C; bölüm D: belirgin şekilde serin)."));
         m.put("kizilCuceGunesCarpani", new Aralik(0, 1, "Kızıl cücede güneş ve gün-gece ısısının çarpanı (zayıf güneş)."));
         m.put("kisBolgesiDususu", new Aralik(0, 100, "Kızıl cücede kalıcı kış bölgesinin ek düşüşü (°C)."));
+        m.put("gecisSaniyesi", new Aralik(0, 300, "Ortam sıcaklığının yeni hedefine üstel geçiş zaman sabiti (sn): biyom, boyut ya da "
+                + "konum değişinca ortam anında zıplamaz, bu sürede ~%63'üne ulaşır. 0 = anında geçiş."));
         return m;
     }
 }

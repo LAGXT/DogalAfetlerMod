@@ -82,6 +82,9 @@ public final class SanalSuSunucu {
         for (int id : d.bitenDalgalar(saat)) {
             degisti |= d.dalgaKaldir(id);
         }
+        for (int id : d.bitenSeller(saat)) {
+            degisti |= d.selKaldir(id);
+        }
         for (int id : d.bitenMagaralar(saat)) {
             long[] k = b.magaraKutusu.remove(id);
             if (k != null) {

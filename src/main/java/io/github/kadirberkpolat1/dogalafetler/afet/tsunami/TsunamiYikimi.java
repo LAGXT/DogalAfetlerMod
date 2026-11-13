@@ -3,6 +3,7 @@ package io.github.kadirberkpolat1.dogalafetler.afet.tsunami;
 import io.github.kadirberkpolat1.dogalafetler.afet.ortak.AfetBloklari;
 import io.github.kadirberkpolat1.dogalafetler.afet.ortak.mantik.BlokRolu;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
+import io.github.kadirberkpolat1.dogalafetler.su.Seritler;
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongIterator;
@@ -172,10 +173,21 @@ final class TsunamiYikimi {
         return kolonlar.size() + isSayisi;
     }
 
-    /** {@code boyuna} uzaklığındaki cephe şeridi satırının sütunları (her sütun bir kez). */
+    /** {@code boyuna} uzaklığındaki cephe şeridi satırının sütunları (her sütun bir kez); şeritsiz dalga. */
     void satirEkle(TsunamiGeometrisi g, double boyuna, double genislik, int ust) {
+        satirEkle(g, boyuna, genislik, ust, Seritler.YOK, 0, 0);
+    }
+
+    /**
+     * Aynı satır; dalga şeridi bu sütuna ulaşamadıysa (engelde durdu: {@code aciklik + boyuna} şeridin erişim sınırını geçti)
+     * sütun yıkım kuyruğuna girmez: dalga gitmediği yerdeki blokları kırmaz.
+     */
+    void satirEkle(TsunamiGeometrisi g, double boyuna, double genislik, int ust, Seritler seritler, double aciklik, double menzil) {
         double yarim = genislik / 2;
         for (double yan = -yarim; yan <= yarim; yan += ADIM) {
+            if (!seritler.yok() && aciklik + boyuna > seritler.erisim((yan + yarim) / genislik, menzil) + 1.0) {
+                continue;
+            }
             int x = (int) Math.floor(g.x(boyuna, yan));
             int z = (int) Math.floor(g.z(boyuna, yan));
             if (gorulen.add(ChunkPos.asLong(x, z))) {

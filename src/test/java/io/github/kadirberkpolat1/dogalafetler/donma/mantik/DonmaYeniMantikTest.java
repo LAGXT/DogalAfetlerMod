@@ -67,7 +67,10 @@ class DonmaYeniMantikTest {
     void buharlasmaSanalPayiOnceTuketirSigGolTamamenKurur() {
         assertEquals(0, BuharlasmaHedefi.etkinDerinlik(2.5f, 3.0), "sanal deniz yükselmesi önce iner (N10)");
         assertEquals(3, BuharlasmaHedefi.etkinDerinlik(6f, 3.0));
-        assertEquals(6, BuharlasmaHedefi.etkinDerinlik(6.9f, 0.0));
+        assertEquals(6, BuharlasmaHedefi.etkinDerinlik(6f, 0.0));
+        assertEquals(1, BuharlasmaHedefi.etkinDerinlik(0.02f, 0.0), "buhar çıkar çıkmaz ilk blok kurur");
+        assertEquals(0, BuharlasmaHedefi.etkinDerinlik(0.005f, 0.0), "eşik altında su dokunulmaz");
+        assertEquals(1, BuharlasmaHedefi.etkinDerinlik(3.5f, 3.0), "pay tüketildiği an ilk blok kurur");
         assertEquals(2, BuharlasmaHedefi.kaldirilacak(6, 2), "2 derin göl tamamen kurur");
         assertEquals(6, BuharlasmaHedefi.kaldirilacak(6, 40), "okyanus yalnız derinlik kadar alçalır");
         assertEquals(0, BuharlasmaHedefi.kaldirilacak(0, 40));

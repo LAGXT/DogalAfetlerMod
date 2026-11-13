@@ -1,0 +1,35 @@
+{
+  "parent": "dogalafetler:dogalafetler/sallanan_zemin",
+  "criteria": {
+    "ozel": {
+      "conditions": {
+        "anahtar": "sallanan_kule"
+      },
+      "trigger": "dogalafetler:ozel_basarim"
+    }
+  },
+  "display": {
+    "announce_to_chat": false,
+    "description": {
+      "translate": "advancements.dogalafetler.sallanan_kule.description"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:scaffolding"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.sallanan_kule.title"
+    }
+  },
+  "requirements": [
+    [
+      "ozel"
+    ]
+  ],
+  "rewards": {
+    "experience": 15
+  },
+  "sends_telemetry_event": true
+}

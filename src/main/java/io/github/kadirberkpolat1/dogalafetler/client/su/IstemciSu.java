@@ -8,6 +8,7 @@ import io.github.kadirberkpolat1.dogalafetler.config.IstemciAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.su.Cekilme;
 import io.github.kadirberkpolat1.dogalafetler.su.Dalga;
 import io.github.kadirberkpolat1.dogalafetler.su.DenizAlani;
+import io.github.kadirberkpolat1.dogalafetler.su.IsiBolgesi;
 import io.github.kadirberkpolat1.dogalafetler.su.MagaraZamani;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSuDunyasi;
@@ -110,8 +111,12 @@ public final class IstemciSu {
         for (int id : dunya.bitenDalgalar(t)) {
             dunya.dalgaKaldir(id);
         }
+        for (int id : dunya.bitenSeller(t)) {
+            dunya.selKaldir(id);
+        }
         buhar(l, t);
         serpinti(mc, l, t);
+        selBuhari(mc, l, t);
     }
 
     /**
@@ -131,14 +136,13 @@ public final class IstemciSu {
             if (w.bitti(t) || w.yukseklik() < 2) {
                 continue;
             }
-            double c = w.cephe(t) - 2.5;
-            double mx = w.x0() + w.yonX() * c;
-            double mz = w.z0() + w.yonZ() * c;
             int adet = (int) Math.ceil(14 * carpan);
             for (int i = 0; i < adet; i++) {
                 double u = (r.nextDouble() - 0.5) * w.genislik() * 0.9;
-                double px = mx - w.yonZ() * u;
-                double pz = mz + w.yonX() * u;
+                // Cephe şeridin kendi cephesidir: engelde duran şeritte sıçrantı durduğu yerde kalır (K-E76).
+                double c = w.cephe(t, u) - 2.5;
+                double px = w.x0() + w.yonX() * c - w.yonZ() * u;
+                double pz = w.z0() + w.yonZ() * c + w.yonX() * u;
                 if (mc.player.distanceToSqr(px, mc.player.getY(), pz) > 96 * 96) {
                     continue;
                 }
@@ -183,6 +187,35 @@ public final class IstemciSu {
             case ULTRA -> 1.5;
         };
         return k * SuAyarlari.istemci().parcacikYogunlugu.get();
+    }
+
+    /**
+     * Sel suyunu buharlaştıran ısı kaynaklarının çevresinde (kuru çekirdek ile sel arasındaki kenarda) sel yüzeyinden yükselen beyaz
+     * buhar; yalnız sel yükselmişken ve oyuncuya 48 blok yakınken, kalite çarpanıyla.
+     */
+    private static void selBuhari(Minecraft mc, ClientLevel l, double t) {
+        IsiBolgesi[] bolgeler = dunya.isiDizisi();
+        if (bolgeler.length == 0 || dunya.selArtisi(t) < 0.3) {
+            return;
+        }
+        double carpan = parcacikCarpani();
+        if (carpan <= 0) {
+            return;
+        }
+        RandomSource r = l.random;
+        for (IsiBolgesi b : bolgeler) {
+            if (mc.player.distanceToSqr(b.x() + 0.5, mc.player.getY(), b.z() + 0.5) > 48 * 48 || r.nextDouble() > 0.4 * carpan) {
+                continue;
+            }
+            double aci = r.nextDouble() * Math.PI * 2;
+            double mesafe = b.yaricap() * (IsiBolgesi.CEKIRDEK + (1 - IsiBolgesi.CEKIRDEK) * r.nextDouble());
+            double px = b.x() + 0.5 + Math.cos(aci) * mesafe;
+            double pz = b.z() + 0.5 + Math.sin(aci) * mesafe;
+            double yuzey = dunya.enUstYuzey((int) Math.floor(px), (int) Math.floor(pz), t);
+            if (!Double.isNaN(yuzey)) {
+                l.addParticle(ParticleTypes.CLOUD, px, yuzey + 0.1, pz, 0, 0.03 + r.nextDouble() * 0.04, 0);
+            }
+        }
     }
 
     /** Kuruyan mağaranın yüzeyinden beyaz buhar (yüzey alanıyla orantılı). */

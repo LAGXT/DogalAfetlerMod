@@ -127,7 +127,9 @@ public final class SicaklikKomutlari {
                 sonuc.append(", ");
             }
             ilk = false;
+            int adet = hissedilen ? 0 : a.mekan().adet(k);
             sonuc.append(Component.translatable("sicaklik.dogalafetler.katki." + k.anahtar()))
+                    .append(adet > 1 ? " \u00d7" + adet : "")
                     .append(String.format(Locale.ROOT, " %+.1f", d));
         }
         if (ilk) {

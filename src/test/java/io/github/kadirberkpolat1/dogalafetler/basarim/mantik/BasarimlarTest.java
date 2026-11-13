@@ -11,7 +11,10 @@ import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
-/** Madde 12 listesi birebir: kök + 26 başarım + N29 "Yeni Şafak" (27), türler ve gizliler şartnamedeki gibi. */
+/**
+ * Madde 12 listesi birebir: kök + 26 başarım + N29 "Yeni Şafak" (27), türler ve gizliler şartnamedeki gibi; K-E74'ün 18 yeni
+ * başarımı (28–45) sona eklenir.
+ */
 class BasarimlarTest {
     private static final Map<Integer, BasarimTuru> TURLER = Map.ofEntries(
             Map.entry(0, BasarimTuru.GOREV), Map.entry(1, BasarimTuru.GOREV), Map.entry(2, BasarimTuru.GOREV),
@@ -23,11 +26,17 @@ class BasarimlarTest {
             Map.entry(18, BasarimTuru.HEDEF), Map.entry(19, BasarimTuru.GOREV), Map.entry(20, BasarimTuru.GOREV),
             Map.entry(21, BasarimTuru.HEDEF), Map.entry(22, BasarimTuru.MEYDAN_OKUMA), Map.entry(23, BasarimTuru.HEDEF),
             Map.entry(24, BasarimTuru.MEYDAN_OKUMA), Map.entry(25, BasarimTuru.MEYDAN_OKUMA),
-            Map.entry(26, BasarimTuru.HEDEF), Map.entry(27, BasarimTuru.GOREV));
+            Map.entry(26, BasarimTuru.HEDEF), Map.entry(27, BasarimTuru.GOREV), Map.entry(28, BasarimTuru.GOREV),
+            Map.entry(29, BasarimTuru.MEYDAN_OKUMA), Map.entry(30, BasarimTuru.HEDEF), Map.entry(31, BasarimTuru.GOREV),
+            Map.entry(32, BasarimTuru.HEDEF), Map.entry(33, BasarimTuru.HEDEF), Map.entry(34, BasarimTuru.HEDEF),
+            Map.entry(35, BasarimTuru.GOREV), Map.entry(36, BasarimTuru.GOREV), Map.entry(37, BasarimTuru.GOREV),
+            Map.entry(38, BasarimTuru.GOREV), Map.entry(39, BasarimTuru.GOREV), Map.entry(40, BasarimTuru.HEDEF),
+            Map.entry(41, BasarimTuru.GOREV), Map.entry(42, BasarimTuru.GOREV), Map.entry(43, BasarimTuru.GOREV),
+            Map.entry(44, BasarimTuru.GOREV), Map.entry(45, BasarimTuru.GOREV));
 
     @Test
-    void kokVeYirmiYediBasarim() {
-        assertEquals(28, Basarimlar.values().length);
+    void kokVeKirkBesBasarim() {
+        assertEquals(46, Basarimlar.values().length);
         Set<Integer> numaralar = new HashSet<>();
         Set<String> yollar = new HashSet<>();
         for (Basarimlar b : Basarimlar.values()) {
@@ -36,7 +45,7 @@ class BasarimlarTest {
             assertTrue(b.yol().matches("[a-z_]+"), b.yol());
             assertEquals(TURLER.get(b.no()), b.tur(), b.yol());
         }
-        assertEquals(28, numaralar.size());
+        assertEquals(46, numaralar.size());
         assertEquals(Basarimlar.KOK, Basarimlar.numarayla(0).orElseThrow());
         assertEquals("root", Basarimlar.KOK.yol());
         assertEquals("Felaket Başlıyor", Basarimlar.KOK.turkceAd());
@@ -57,9 +66,31 @@ class BasarimlarTest {
     }
 
     @Test
-    void yalnizYirmiBesVeYirmiAltiGizli() {
+    void yalnizYirmiBesYirmiAltiVeAstronomGizli() {
         for (Basarimlar b : Basarimlar.values()) {
-            assertEquals(b.no() == 25 || b.no() == 26, b.gizli(), b.yol());
+            assertEquals(b.no() == 25 || b.no() == 26 || b.no() == 29, b.gizli(), b.yol());
+        }
+        assertTrue(Basarimlar.ASTRONOM.gizli());
+        assertEquals(Unvan.ASTRONOM, Basarimlar.ASTRONOM.unvan());
+    }
+
+    @Test
+    void ozelAnahtarlarBasarimYoluylaCozulur() {
+        int ozel = 0;
+        for (Basarimlar b : Basarimlar.values()) {
+            if (b.ozelMi()) {
+                ozel++;
+                assertEquals(b, Basarimlar.ozelAnahtardan(b.yol()).orElseThrow(), b.yol());
+            } else {
+                assertTrue(Basarimlar.ozelAnahtardan(b.yol()).isEmpty(), b.yol());
+            }
+        }
+        assertEquals(13, ozel);
+        assertTrue(Basarimlar.ozelAnahtardan("yok_boyle_bir_anahtar").isEmpty());
+        assertTrue(Basarimlar.ozelAnahtardan(null).isEmpty());
+        for (String anahtar : new String[] {"devasa", "astronom", "cayir_cayir", "sifon", "ince_buz_kirici",
+                "yineleme_ikiz", "defter_ilk_acilis", "kolye_serin"}) {
+            assertTrue(Basarimlar.ozelAnahtardan(anahtar).isPresent(), anahtar);
         }
     }
 

@@ -27,6 +27,8 @@ public final class SanalSuDunyasi {
     private static final Dalga[] DALGA_YOK = new Dalga[0];
     private static final Magara[] MAGARA_YOK = new Magara[0];
     private static final Cekilme[] CEKILME_YOK = new Cekilme[0];
+    private static final SelSuyu[] SEL_YOK = new SelSuyu[0];
+    private static final IsiBolgesi[] ISI_YOK = new IsiBolgesi[0];
 
     private final DenizAlani alan;
     private double denizArtisi;
@@ -36,7 +38,12 @@ public final class SanalSuDunyasi {
     private Dalga[] dalgaDizi = DALGA_YOK;
     private Magara[] magaraDizi = MAGARA_YOK;
     private volatile Cekilme[] cekilmeDizi = CEKILME_YOK;
+    private final Map<Integer, SelSuyu> seller = new LinkedHashMap<>();
+    private volatile SelSuyu[] selDizi = SEL_YOK;
+    private volatile IsiBolgesi[] isiDizi = ISI_YOK;
     private final SuAraliklari gecici = new SuAraliklari();
+    private final SuAraliklari selSuyu = new SuAraliklari();
+    private final SuAraliklari kaliciSu = new SuAraliklari();
     private ZeminOkuyucu canliZemin;
     private long canliZeminSayisi;
 
@@ -151,23 +158,135 @@ public final class SanalSuDunyasi {
         return cekilmeDizi;
     }
 
-    /** Dalga, mağara ve çekilmeleri siler (deniz artışı dönemin alanıdır, ayrı ayarlanır). */
+    /** Sel suyunu (taşkın) ekler ya da değiştirir; deniz artışına {@link SelSuyu#artis} kadar eklenir. */
+    public void selEkle(int id, SelSuyu s) {
+        seller.put(id, s);
+        selDizi = seller.values().toArray(SEL_YOK);
+    }
+
+    public boolean selKaldir(int id) {
+        boolean vardi = seller.remove(id) != null;
+        selDizi = seller.values().toArray(SEL_YOK);
+        return vardi;
+    }
+
+    public Map<Integer, SelSuyu> seller() {
+        return Collections.unmodifiableMap(seller);
+    }
+
+    /** Selleri değişmez dizi olarak verir (render, tahsissiz). */
+    public SelSuyu[] selDizisi() {
+        return selDizi;
+    }
+
+    /** Sel suyunu buharlaştıran ısı kaynağı bölgelerini topluca değiştirir (sunucu tarar, istemci paketten alır). */
+    public void isiBolgeleriAyarla(java.util.List<IsiBolgesi> yeni) {
+        isiDizi = yeni.isEmpty() ? ISI_YOK : yeni.toArray(ISI_YOK);
+    }
+
+    public IsiBolgesi[] isiDizisi() {
+        return isiDizi;
+    }
+
+    /** {@code t} anında bütün sellerin toplam yükselmesi (blok); ısı kaynakları hesaba katılmaz. */
+    public double selArtisi(double t) {
+        double toplam = 0;
+        for (SelSuyu s : selDizi) {
+            toplam += s.artis(t);
+        }
+        return toplam;
+    }
+
+    /**
+     * {@code t} anındaki genel deniz yükselmesi: kalıcı artış ve sel toplamı, sistemin desteklediği en büyük artışla sınırlı.
+     * Isı bölgeleri sütuna özgüdür ({@link #sutunArtisi}); render bu değeri "artış değişti mi" ölçütü olarak kullanır.
+     */
+    public double etkinArtis(double t) {
+        return Math.min(DenizAlani.EN_COK_ARTIS, denizArtisi + selArtisi(t));
+    }
+
+    /** Sütunda ısı kaynaklarının sel suyunu söndürme oranı (0..1, en güçlü bölge). */
+    public double isiOrani(double px, double pz) {
+        double en = 0;
+        for (IsiBolgesi b : isiDizi) {
+            en = Math.max(en, b.oran(px, pz));
+            if (en >= 1) {
+                break;
+            }
+        }
+        return en;
+    }
+
+    /** Sütunun {@code t} anındaki yükselmesi: kalıcı artış + sel × (1 − ısı kaynaklarının kuruluğu). */
+    public double sutunArtisi(int x, int z, double t) {
+        double sel = selArtisi(t);
+        if (sel > 0 && isiDizi.length > 0) {
+            sel *= 1 - isiOrani(x + 0.5, z + 0.5);
+        }
+        return Math.min(DenizAlani.EN_COK_ARTIS, denizArtisi + sel);
+    }
+
+    /**
+     * {@code (x, y, z)} noktası sel suyunun içinde mi: sütunun sel yükselmesiyle ({@link #sutunArtisi}) kaplanan aralığında ve
+     * kalıcı deniz artışının kaplamadığı yerde. Gerçek su, dalga ve mağara suyu sel sayılmaz; sel yoksa {@code false}.
+     */
+    public boolean selSuyundaMi(double x, double y, double z, double t) {
+        if (selDizi.length == 0) {
+            return false;
+        }
+        int bx = (int) Math.floor(x);
+        int bz = (int) Math.floor(z);
+        double artis = sutunArtisi(bx, bz, t);
+        if (!(artis > denizArtisi)) {
+            return false;
+        }
+        selSuyu.temizle();
+        alan.aralikEkle(bx, bz, artis, selSuyu);
+        selSuyu.birlestir();
+        if (Double.isNaN(selSuyu.ustuBul(y))) {
+            return false;
+        }
+        if (!(denizArtisi > 0)) {
+            return true;
+        }
+        kaliciSu.temizle();
+        alan.aralikEkle(bx, bz, denizArtisi, kaliciSu);
+        kaliciSu.birlestir();
+        return Double.isNaN(kaliciSu.ustuBul(y));
+    }
+
+    /** {@code t} anında bitmiş sellerin kimlikleri (silmez). */
+    public List<Integer> bitenSeller(double t) {
+        List<Integer> sonuc = new ArrayList<>();
+        seller.forEach((id, s) -> {
+            if (s.bitti(t)) {
+                sonuc.add(id);
+            }
+        });
+        return sonuc;
+    }
+
+    /** Dalga, mağara, çekilme, sel ve ısı bölgelerini siler (deniz artışı dönemin alanıdır, ayrı ayarlanır). */
     public void temizle() {
         dalgalar.clear();
         magaralar.clear();
         cekilmeler.clear();
+        seller.clear();
         dalgaDizi = DALGA_YOK;
         magaraDizi = MAGARA_YOK;
         cekilmeDizi = CEKILME_YOK;
+        selDizi = SEL_YOK;
+        isiDizi = ISI_YOK;
     }
 
     public boolean aktif() {
-        return denizArtisi > 0 || dalgaDizi.length > 0 || magaraDizi.length > 0 || cekilmeDizi.length > 0;
+        return denizArtisi > 0 || dalgaDizi.length > 0 || magaraDizi.length > 0 || cekilmeDizi.length > 0
+                || selDizi.length > 0;
     }
 
-    /** Alan (sütun önbelleği) gerekiyor mu: deniz, dalga tabanı ve çekilme gerçek sütun bilgisini okur. */
+    /** Alan (sütun önbelleği) gerekiyor mu: deniz, sel, dalga tabanı ve çekilme gerçek sütun bilgisini okur. */
     public boolean alanGerekli() {
-        return denizArtisi > 0 || dalgaDizi.length > 0 || cekilmeDizi.length > 0;
+        return denizArtisi > 0 || dalgaDizi.length > 0 || cekilmeDizi.length > 0 || selDizi.length > 0;
     }
 
     /** {@code t} anında bitmiş dalgaların kimlikleri (silmez). */
@@ -195,8 +314,9 @@ public final class SanalSuDunyasi {
     /** Sütunun ({@code x, z} blok) bütün su aralıkları; {@code a} temizlenip birleştirilmiş hâlde doldurulur. */
     public void araliklar(int x, int z, double t, SuAraliklari a) {
         a.temizle();
-        if (denizArtisi > 0) {
-            alan.aralikEkle(x, z, denizArtisi, a);
+        double artis = selDizi.length == 0 ? denizArtisi : sutunArtisi(x, z, t);
+        if (artis > 0) {
+            alan.aralikEkle(x, z, artis, a);
         }
         Dalga[] dd = dalgaDizi;
         for (Dalga d : dd) {

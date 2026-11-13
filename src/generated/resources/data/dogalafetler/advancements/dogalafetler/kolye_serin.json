@@ -1,0 +1,35 @@
+{
+  "parent": "dogalafetler:dogalafetler/yunlu_kahraman",
+  "criteria": {
+    "ozel": {
+      "conditions": {
+        "anahtar": "kolye_serin"
+      },
+      "trigger": "dogalafetler:ozel_basarim"
+    }
+  },
+  "display": {
+    "announce_to_chat": false,
+    "description": {
+      "translate": "advancements.dogalafetler.kolye_serin.description"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "dogalafetler:serin_kolye"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.kolye_serin.title"
+    }
+  },
+  "requirements": [
+    [
+      "ozel"
+    ]
+  ],
+  "rewards": {
+    "experience": 15
+  },
+  "sends_telemetry_event": true
+}

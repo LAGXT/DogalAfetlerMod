@@ -120,7 +120,7 @@ class AfetZamanlayicisiTest {
     }
 
     @Test
-    void ilkGunesPatlamasiOrtancasiAltmisIleYuzYirmiArasiVeAydanSonra() {
+    void ilkGunesPatlamasiOrtancasiKapidanSonraBirkacGunVeAydanSonra() {
         int dunya = 400;
         long sinir = 400L * AfetZamanlayicisi.GUN_TICK;
         List<Double> gunes = new ArrayList<>();
@@ -145,9 +145,11 @@ class AfetZamanlayicisiTest {
         double oran = gunesli / (double) dunya;
         System.out.printf(Locale.ROOT, "ilk güneş patlaması ortanca gün %.1f, 400 günde görülme %.4f; ilk ay çarpması ortanca gün %.1f%n",
                 gunesOrtanca, oran, ayOrtanca);
-        assertTrue(gunesOrtanca >= 60 && gunesOrtanca <= 120, "ilk güneş patlaması ortancası: " + gunesOrtanca);
+        // Ayar sürümü 4 (kullanıcı: "ay çarpması ve güneş patlaması neredeyse hiç çıkmıyor"): kapılar 40. (güneş) ve 25. (ay) gün;
+        // tek yuva + 8000 tick'lik afetlerde hesap: güneş ortancası ~48 (eski 60+), ay ~30 (eski ~40); tolerans cömert.
+        assertTrue(gunesOrtanca >= 40 && gunesOrtanca <= 75, "ilk güneş patlaması ortancası: " + gunesOrtanca);
         assertTrue(oran >= 0.99, "400 günde en az bir güneş patlaması oranı: " + oran);
-        assertTrue(ayOrtanca < gunesOrtanca, "ay çarpması ortancası " + ayOrtanca + " güneşten önce olmalı");
+        assertTrue(ayOrtanca < gunesOrtanca && ayOrtanca <= 45, "ay çarpması ortancası " + ayOrtanca + " güneşten önce ve ≤ 45 olmalı");
     }
 
     @Test

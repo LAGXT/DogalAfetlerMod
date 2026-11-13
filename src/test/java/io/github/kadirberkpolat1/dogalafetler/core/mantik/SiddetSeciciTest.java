@@ -35,13 +35,13 @@ class SiddetSeciciTest {
         assertEquals(2000, say(0, 5, 2000, 1)[1], "gün 0'da yalnız S1 çıkmalı");
     }
 
-    /** K-E67 hedef eğrisi: S2 gün 1, S3 gün 4, S4 gün 9 (8–10), S5 gün 16 (15–18). */
+    /** K-E72 hedef eğrisi: S2 gün 1, S3 gün 2, S4 gün 4, S5 gün 7 (oyun günü 20 dk). */
     @Test
     void gunEsikleriSeviyeleriErkenAcar() {
         assertEquals(1, A.seviye2Gunu());
-        assertEquals(4, A.seviye3Gunu());
-        assertTrue(A.seviye4Gunu() >= 8 && A.seviye4Gunu() <= 10, "S4 gün 8–10");
-        assertTrue(A.seviye5Gunu() >= 15 && A.seviye5Gunu() <= 18, "S5 gün 15–18");
+        assertEquals(2, A.seviye3Gunu());
+        assertEquals(4, A.seviye4Gunu());
+        assertEquals(7, A.seviye5Gunu());
         for (int seviye = 2; seviye <= 5; seviye++) {
             int esik = A.esik(seviye);
             assertEquals(0.0, SiddetSecici.agirliklar(A, esik - 0.01, 5, false)[seviye - 1], "S" + seviye + " eşikten önce");
@@ -60,7 +60,7 @@ class SiddetSeciciTest {
         assertEquals(tam, sonra, 1e-4, "rampa bitince tam ağırlık");
     }
 
-    /** K-E67 olasılık tablosu kilidi (art arda kuralı ve yoğunluk yokken). */
+    /** Olasılık tablosu kilidi, ayar sürümü 4 (art arda seyreltmesi ve yoğunluk yokken; k 100 günde 0,9 → 1,8). */
     @Test
     void hedefOlasilikTablosu() {
         System.out.println("| Gün | S1 | S2 | S3 | S4 | S5 |");
@@ -70,26 +70,31 @@ class SiddetSeciciTest {
             System.out.printf(Locale.ROOT, "| %d | %.1f | %.1f | %.1f | %.1f | %.1f |%n", gun, o[0] * 100, o[1] * 100,
                     o[2] * 100, o[3] * 100, o[4] * 100);
         }
-        double[] gun2 = p(2);
+        double[] gun2 = p(1.5);
         assertEquals(1.0, gun2[0] + gun2[1], 1e-12, "ilk günler yalnız S1–S2");
         assertTrue(gun2[1] > 0.15, "S2 ilk günlerde anlamlı pay alır: " + gun2[1]);
-        assertTrue(p(20)[3] >= 0.08 && p(20)[4] > 0, "gün 20: S4 ≥ %8 ve S5 > 0");
-        assertTrue(p(40)[4] >= 0.08, "gün 40: S5 ≥ %8");
+        assertTrue(p(20)[3] >= 0.15 && p(20)[4] >= 0.15, "gün 20: S4 ve S5 ≥ %15 (hesap %21 / %23)");
+        assertTrue(p(40)[4] >= 0.25, "gün 40: S5 ≥ %25 (hesap %30)");
         for (int gun : new int[] {100, 200, 1000}) {
-            assertTrue(p(gun)[3] + p(gun)[4] >= 0.25, "gün " + gun + ": S4+S5 ≥ %25");
+            assertTrue(p(gun)[3] + p(gun)[4] >= 0.6, "gün " + gun + ": S4+S5 ≥ %60");
         }
+        assertTrue(p(10)[4] >= 0.15, "gün 10: S5 ≥ %15 (hesap %19,6): " + p(10)[4]);
+        assertTrue(p(100)[4] > p(60)[4] && p(60)[4] > p(30)[4], "S5 payı 60. günden sonra da 5 günlük basamaklarla artar");
+        assertTrue(p(100)[4] >= 0.4, "gün 100: S5 ≥ %40 (hesap %47): " + p(100)[4]);
+        assertEquals(p(60)[4], p(64.9)[4], 1e-12, "basamak 5 gün boyunca sabit");
     }
 
     @Test
-    void yuksekSeviyeHerZamanDahaNadir() {
-        for (double gun : new double[] {1, 4, 9, 16, 20, 40, 100, 1000}) {
+    void yuksekSeviyeErkenGunlerdeDahaNadir() {
+        // k < 1 olduğu sürece (gün 15'e dek) yüksek seviye düşük seviyeden nadirdir; sonra k > 1 yüksek seviyeleri baskın yapar.
+        for (double gun : new double[] {1, 4, 9}) {
             double[] agirlik = SiddetSecici.agirliklar(A, gun, 5, false);
             for (int i = 1; i < 5; i++) {
                 assertTrue(agirlik[i] < agirlik[i - 1] || agirlik[i] == 0,
                         "gün " + gun + ": S" + (i + 1) + " S" + i + "'den nadir olmalı");
             }
         }
-        int[] sayilar = say(30, 5, 200_000, 7);
+        int[] sayilar = say(9, 5, 200_000, 7);
         assertTrue(sayilar[5] > 0 && sayilar[5] < sayilar[4], "S5 çıkar ama S4'ten nadirdir");
     }
 
@@ -118,36 +123,57 @@ class SiddetSeciciTest {
         assertEquals(1, SiddetSecici.sec(A, 500, 1, false, new SplittableRandom(1)));
     }
 
+    /**
+     * Ayar sürümü 4: art arda 4-5 yasak değil, ağırlığı yarıya iner; gerçekleşen S5 payı (Markov ortalaması) gün 30'da en az %20,
+     * gün 60'ta en az %29'dur (kullanıcı isteği; eski kesin yasakla %11 ve %15).
+     */
     @Test
-    void artArdaDortVeyaBesOlmaz() {
+    void artArdaDortVeBesSeyreltilirYasaklanmaz() {
         SplittableRandom rastgele = new SplittableRandom(13);
         boolean oncekiYuksek = false;
         int yuksekSayisi = 0;
+        int artArda = 0;
         for (int i = 0; i < 200_000; i++) {
             int seviye = SiddetSecici.sec(A, 300, 5, oncekiYuksek, rastgele);
             boolean yuksek = SiddetSecici.yuksek(seviye);
-            assertFalse(oncekiYuksek && yuksek, "art arda iki yüksek seviye (4-5) çıktı");
             if (yuksek) {
                 yuksekSayisi++;
+                if (oncekiYuksek) {
+                    artArda++;
+                }
             }
             oncekiYuksek = yuksek;
         }
-        assertTrue(yuksekSayisi > 0, "yüksek seviye hiç çıkmadı");
-        double[] agirlik = SiddetSecici.agirliklar(A, 300, 5, true);
-        assertEquals(0.0, agirlik[3]);
-        assertEquals(0.0, agirlik[4]);
-        assertTrue(agirlik[2] > 0);
+        assertTrue(artArda > 0, "art arda yüksek seviye yasak olmamalı");
+        assertTrue(yuksekSayisi > artArda, "yüksek seviye önceki yüksekten bağımsız da çıkmalı");
+        double[] serbest = SiddetSecici.agirliklar(A, 300, 5, false);
+        double[] seyrek = SiddetSecici.agirliklar(A, 300, 5, true);
+        for (int i = 0; i < 5; i++) {
+            double beklenen = SiddetSecici.yuksek(i + 1) ? serbest[i] * SiddetSecici.ART_ARDA_CARPANI : serbest[i];
+            assertEquals(beklenen, seyrek[i], 1e-12, "S" + (i + 1) + " ağırlığı");
+        }
+        assertTrue(gerceklesenS5(30) >= 0.20, "gün 30 gerçekleşen S5: " + gerceklesenS5(30));
+        assertTrue(gerceklesenS5(60) >= 0.29, "gün 60 gerçekleşen S5: " + gerceklesenS5(60));
     }
 
-    /** K-E67: olasılığı 0 olan seviyenin nedeni (gamerule önce, sonra gün, gelişim, art arda). */
+    /** Önceki seviyenin yüksek olup olmamasına göre iki durumlu zincirin durgun dağılımındaki S5 payı. */
+    private static double gerceklesenS5(double gun) {
+        double[] serbest = SiddetSecici.olasiliklar(A, gun, 5, false);
+        double[] seyrek = SiddetSecici.olasiliklar(A, gun, 5, true);
+        double yuksekSonrasiSerbest = serbest[3] + serbest[4];
+        double yuksekSonrasiSeyrek = seyrek[3] + seyrek[4];
+        double yuksekDurumu = yuksekSonrasiSerbest / (1 - yuksekSonrasiSeyrek + yuksekSonrasiSerbest);
+        return (1 - yuksekDurumu) * serbest[4] + yuksekDurumu * seyrek[4];
+    }
+
+    /** K-E67: olasılığı 0 olan seviyenin nedeni (gamerule önce, sonra gün, gelişim). */
     @Test
     void kapaliNedeniSiraylaBelirlenir() {
-        assertEquals(Optional.of(SiddetSecici.KapaliNeden.MAKS), SiddetSecici.kapaliNedeni(A, 100, 100, 5, 4, true));
-        assertEquals(Optional.of(SiddetSecici.KapaliNeden.GUN), SiddetSecici.kapaliNedeni(A, 5, 5, 4, 5, true));
-        assertEquals(Optional.of(SiddetSecici.KapaliNeden.GELISIM), SiddetSecici.kapaliNedeni(A, 100, 5, 4, 5, false));
-        assertEquals(Optional.of(SiddetSecici.KapaliNeden.ART_ARDA), SiddetSecici.kapaliNedeni(A, 100, 100, 5, 5, true));
-        assertEquals(Optional.empty(), SiddetSecici.kapaliNedeni(A, 100, 100, 5, 5, false));
-        assertEquals(Optional.empty(), SiddetSecici.kapaliNedeni(A, 100, 100, 3, 5, true), "S3 art arda kuralına girmez");
+        assertEquals(Optional.of(SiddetSecici.KapaliNeden.MAKS), SiddetSecici.kapaliNedeni(A, 100, 100, 5, 4));
+        assertEquals(Optional.of(SiddetSecici.KapaliNeden.GUN), SiddetSecici.kapaliNedeni(A, 3, 3, 4, 5));
+        assertEquals(Optional.of(SiddetSecici.KapaliNeden.GELISIM), SiddetSecici.kapaliNedeni(A, 100, 3, 4, 5));
+        assertEquals(Optional.empty(), SiddetSecici.kapaliNedeni(A, 100, 100, 5, 5));
+        assertEquals(Optional.empty(), SiddetSecici.kapaliNedeni(A, 100, 100, 3, 5));
     }
 
     /** Yoğunluk zayıflatması yüksek seviyeleri azaltır, hiçbirini sıfırlamaz; yük eşiğin altındaysa etkisiz. */

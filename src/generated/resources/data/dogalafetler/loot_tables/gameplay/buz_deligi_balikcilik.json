@@ -8,9 +8,11 @@
           "type": "dogalafetler:balikcilik_kategorisi",
           "tablolar": {
             "cop": "dogalafetler:gameplay/buz_deligi/cop",
+            "esya": "dogalafetler:gameplay/buz_deligi/esya",
             "hazine": "dogalafetler:gameplay/buz_deligi/hazine",
             "nadir": "dogalafetler:gameplay/buz_deligi/nadir",
             "orta": "dogalafetler:gameplay/buz_deligi/orta",
+            "ozel": "dogalafetler:gameplay/buz_deligi/ozel",
             "yaygin": "dogalafetler:gameplay/buz_deligi/yaygin"
           }
         }

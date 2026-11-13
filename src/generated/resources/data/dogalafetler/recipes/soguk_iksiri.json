@@ -1,0 +1,21 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {
+      "item": "minecraft:glass_bottle"
+    },
+    {
+      "item": "dogalafetler:sogutma_parcasi"
+    },
+    {
+      "item": "dogalafetler:tuz_kristali"
+    },
+    {
+      "item": "minecraft:snowball"
+    }
+  ],
+  "result": {
+    "item": "dogalafetler:soguk_iksiri"
+  }
+}

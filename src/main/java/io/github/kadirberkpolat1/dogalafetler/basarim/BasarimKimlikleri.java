@@ -26,6 +26,11 @@ public final class BasarimKimlikleri {
     public static final ResourceLocation HAVA_RADARI = DogalAfetler.konum("hava_radari");
     /** Madde 13b (radar-sismograf işçisi): #15 "Yer Dinleyici". */
     public static final ResourceLocation SISMOGRAF = DogalAfetler.konum("sismograf");
+    /** K-E74 "Nadir Av": Kutup Oltası'yla tutulan üç özel kutup balığının çiğ halleri ({@code BalikcilikKayitlari.OzelBalik}). */
+    public static final ResourceLocation KRISTAL_LEVREK = DogalAfetler.konum("kristal_levrek");
+    public static final ResourceLocation KUTUP_YILANBALIGI = DogalAfetler.konum("kutup_yilanbaligi");
+    /** K-E74 "Aurora Avcısı": en nadir özel balık. */
+    public static final ResourceLocation AURORA_BALIGI = DogalAfetler.konum("aurora_baligi");
     /** Madde 14 (yiyecek işçisi): "hedef" ödülünün sıcak yiyeceği. */
     public static final ResourceLocation SICAK_SALEP = DogalAfetler.konum("sicak_salep");
     /**

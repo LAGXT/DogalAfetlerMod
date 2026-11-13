@@ -1,0 +1,19 @@
+{
+  "type": "dogalafetler:deniz_balikciligi",
+  "conditions": [
+    {
+      "condition": "forge:loot_table_id",
+      "loot_table_id": "minecraft:gameplay/fishing"
+    },
+    {
+      "condition": "minecraft:match_tool",
+      "predicate": {
+        "items": [
+          "dogalafetler:kutup_oltasi"
+        ]
+      }
+    }
+  ],
+  "olasilik": 0.3,
+  "tablo": "dogalafetler:gameplay/deniz/ozel"
+}

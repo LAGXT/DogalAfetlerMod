@@ -48,6 +48,27 @@ public final class SuKalicilik {
             l.add(net.minecraft.nbt.DoubleTag.valueOf(x));
         }
         t.put("p", l);
+        seritlerYaz(t, d.seritler());
+    }
+
+    /** Şeritleri etikete yazar ({@code sk} kara başı, {@code se} erişim, {@code so} ölçek); şeritsizse hiçbir şey yazmaz. */
+    public static void seritlerYaz(CompoundTag t, Seritler s) {
+        if (s.yok()) {
+            return;
+        }
+        t.putDouble("sk", s.karaBasi());
+        t.putByteArray("se", s.erisimBayt());
+        t.putByteArray("so", s.olcekBayt());
+    }
+
+    public static Seritler seritlerOku(CompoundTag t) {
+        if (!t.contains("se") || !t.contains("so") || !t.contains("sk")) {
+            return Seritler.YOK;
+        }
+        byte[] erisim = t.getByteArray("se");
+        byte[] olcek = t.getByteArray("so");
+        // K-E76 kayıtları şerit başına tek bayt erişim yazmıştı (K-E77: iki bayt): uyuşmayan kayıt şeritsiz sayılır.
+        return erisim.length == 2 * olcek.length ? new Seritler(t.getDouble("sk"), erisim, olcek) : Seritler.YOK;
     }
 
     public static Dalga dalgaOku(CompoundTag t) {
@@ -56,7 +77,7 @@ public final class SuKalicilik {
         for (int i = 0; i < v.length; i++) {
             v[i] = l.getDouble(i);
         }
-        return new Dalga(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], v[11], v[12]);
+        return new Dalga(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], v[11], v[12], seritlerOku(t));
     }
 
     public static void cekilmeYaz(CompoundTag t, Cekilme c) {

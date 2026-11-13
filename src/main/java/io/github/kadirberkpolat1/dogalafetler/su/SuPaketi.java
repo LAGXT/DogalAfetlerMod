@@ -20,9 +20,10 @@ import net.minecraftforge.network.NetworkEvent;
  * dönem paketinde gelir. Değişimde boyuttaki oyunculara, girişte/boyut değişiminde/yeniden doğuşta o oyuncuya.
  */
 public record SuPaketi(ResourceKey<Level> boyut, Map<Integer, Dalga> dalgalar, Map<Integer, SanalSuDunyasi.Magara> magaralar,
-        Map<Integer, Cekilme> cekilmeler) {
+        Map<Integer, Cekilme> cekilmeler, Map<Integer, SelSuyu> seller, List<IsiBolgesi> isiBolgeleri) {
     public static SuPaketi durumdan(ResourceKey<Level> boyut, SanalSuDunyasi d) {
-        return new SuPaketi(boyut, new HashMap<>(d.dalgalar()), new HashMap<>(d.magaralar()), new HashMap<>(d.cekilmeler()));
+        return new SuPaketi(boyut, new HashMap<>(d.dalgalar()), new HashMap<>(d.magaralar()), new HashMap<>(d.cekilmeler()),
+                new HashMap<>(d.seller()), List.of(d.isiDizisi()));
     }
 
     public static void yaz(SuPaketi m, FriendlyByteBuf b) {
@@ -34,6 +35,10 @@ public record SuPaketi(ResourceKey<Level> boyut, Map<Integer, Dalga> dalgalar, M
                     w.genislik(), w.uzunluk(), w.taban(), w.menzil(), w.ivme(), w.hasar()}) {
                 b.writeDouble(v);
             }
+            Seritler s = w.seritler();
+            b.writeDouble(s.karaBasi());
+            b.writeByteArray(s.erisimBayt());
+            b.writeByteArray(s.olcekBayt());
         });
         b.writeVarInt(m.magaralar.size());
         m.magaralar.forEach((id, g) -> {
@@ -79,6 +84,50 @@ public record SuPaketi(ResourceKey<Level> boyut, Map<Integer, Dalga> dalgalar, M
             b.writeLong(c.baslangic());
             b.writeLong(c.sure());
         });
+        selYaz(b, m.seller);
+        isiYaz(b, m.isiBolgeleri);
+    }
+
+    /** Sel suyu parametreleri: kimlik ve beş sayı (başlangıç, yükselme, zirve, inme, hedef). */
+    static void selYaz(FriendlyByteBuf b, Map<Integer, SelSuyu> seller) {
+        b.writeVarInt(seller.size());
+        seller.forEach((id, s) -> {
+            b.writeVarInt(id);
+            b.writeDouble(s.baslangic());
+            b.writeDouble(s.yukselme());
+            b.writeDouble(s.zirve());
+            b.writeDouble(s.inme());
+            b.writeDouble(s.hedef());
+        });
+    }
+
+    static Map<Integer, SelSuyu> selOku(FriendlyByteBuf b) {
+        Map<Integer, SelSuyu> seller = new HashMap<>();
+        for (int n = b.readVarInt(); n > 0; n--) {
+            seller.put(b.readVarInt(), new SelSuyu(b.readDouble(), b.readDouble(), b.readDouble(), b.readDouble(),
+                    b.readDouble()));
+        }
+        return seller;
+    }
+
+    /** Sel suyunu buharlaştıran ısı kaynakları: blok konumu (x, y, z) ve yarıçap. */
+    static void isiYaz(FriendlyByteBuf b, List<IsiBolgesi> bolgeler) {
+        b.writeVarInt(bolgeler.size());
+        for (IsiBolgesi i : bolgeler) {
+            b.writeInt(i.x());
+            b.writeShort(i.y());
+            b.writeInt(i.z());
+            b.writeFloat(i.yaricap());
+        }
+    }
+
+    static List<IsiBolgesi> isiOku(FriendlyByteBuf b) {
+        int sayi = b.readVarInt();
+        List<IsiBolgesi> bolgeler = new ArrayList<>(sayi);
+        for (int n = sayi; n > 0; n--) {
+            bolgeler.add(new IsiBolgesi(b.readInt(), b.readShort(), b.readInt(), b.readFloat()));
+        }
+        return bolgeler;
     }
 
     private static int zigzag(int v) {
@@ -98,7 +147,8 @@ public record SuPaketi(ResourceKey<Level> boyut, Map<Integer, Dalga> dalgalar, M
             for (int i = 0; i < v.length; i++) {
                 v[i] = b.readDouble();
             }
-            dalgalar.put(id, new Dalga(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], v[11], v[12]));
+            Seritler seritler = new Seritler(b.readDouble(), b.readByteArray(), b.readByteArray());
+            dalgalar.put(id, new Dalga(v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9], v[10], v[11], v[12], seritler));
         }
         Map<Integer, SanalSuDunyasi.Magara> magaralar = new HashMap<>();
         for (int n = b.readVarInt(); n > 0; n--) {
@@ -133,7 +183,9 @@ public record SuPaketi(ResourceKey<Level> boyut, Map<Integer, Dalga> dalgalar, M
             cekilmeler.put(b.readVarInt(), new Cekilme(b.readDouble(), b.readDouble(), b.readDouble(), b.readDouble(),
                     b.readLong(), b.readLong()));
         }
-        return new SuPaketi(boyut, dalgalar, magaralar, cekilmeler);
+        Map<Integer, SelSuyu> seller = selOku(b);
+        List<IsiBolgesi> isiBolgeleri = isiOku(b);
+        return new SuPaketi(boyut, dalgalar, magaralar, cekilmeler, seller, isiBolgeleri);
     }
 
     /** İstemci ana thread'inde: {@code client.su.IstemciSu}'ya N15 yoluyla iletilir. */
@@ -151,6 +203,8 @@ public record SuPaketi(ResourceKey<Level> boyut, Map<Integer, Dalga> dalgalar, M
         dalgalar.forEach(d::dalgaEkle);
         magaralar.forEach(d::magaraKoy);
         cekilmeler.forEach(d::cekilmeAyarla);
+        seller.forEach(d::selEkle);
+        d.isiBolgeleriAyarla(isiBolgeleri);
     }
 
     /** Log için kodlanmış boyut (bayt). */

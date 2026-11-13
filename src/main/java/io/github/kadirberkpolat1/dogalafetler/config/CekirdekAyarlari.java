@@ -4,6 +4,7 @@ import io.github.kadirberkpolat1.dogalafetler.core.AfetTuru;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.CekirdekAyarGocu;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.GelisimKriteri;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.GelisimOlcutu;
+import io.github.kadirberkpolat1.dogalafetler.core.mantik.MerkezHalkasi;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.OnUyariPenceresi;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SiddetAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.core.mantik.SonumTipi;
@@ -72,6 +73,8 @@ public final class CekirdekAyarlari {
     private final ForgeConfigSpec.ConfigValue<List<? extends String>> boyutlar;
     private final ForgeConfigSpec.IntValue sirenEkYaricap;
     private final ForgeConfigSpec.IntValue ardisikAfetMesafesi;
+    private final ForgeConfigSpec.IntValue merkezEnAzChunk;
+    private final ForgeConfigSpec.IntValue merkezEnCokChunk;
 
     private final ForgeConfigSpec.DoubleValue tpsEsigi;
     private final ForgeConfigSpec.DoubleValue tpsKritikEsigi;
@@ -115,7 +118,7 @@ public final class CekirdekAyarlari {
                 .defineInRange("ilkAfetGarantiTick", z.ilkAfetGarantiTick(), 0L, 100_000_000L);
         siklikArtisCarpani = k.comment("Oyun günü ilerledikçe bölgesel afetler sıklaşır: gün çarpanı gün 0'da 1, siklikArtisGunu'nde",
                 "bu değer (arası doğrusal, sonra sabit). afetSikligi gibi oranı çarpar ve yeni başlayan beklemeleri böler; güneş",
-                "patlaması ve ay çarpmasının oranına yalnız dördüncü kökü uygulanır. 1 = günden bağımsız.")
+                "patlaması ve ay çarpmasının oranına yalnız karekökü uygulanır. 1 = günden bağımsız.")
                 .defineInRange("siklikArtisCarpani", z.siklikArtisCarpani(), 1.0, 100.0);
         siklikArtisGunu = k.comment("Gün çarpanının siklikArtisCarpani'na vardığı oyun günü.")
                 .defineInRange("siklikArtisGunu", z.siklikArtisGunu(), 0.0, 1_000_000.0);
@@ -156,11 +159,11 @@ public final class CekirdekAyarlari {
         seviye4Gunu = k.comment("Seviye 4'ün açıldığı oyun günü.").defineInRange("seviye4Gunu", s.seviye4Gunu(), 0, 1_000_000);
         seviye5Gunu = k.comment("Seviye 5'in açıldığı oyun günü.").defineInRange("seviye5Gunu", s.seviye5Gunu(), 0, 1_000_000);
         nadirlikBaslangic = k.comment("Yüksek seviye nadirlik katsayısı k (oyun başında): seviye L'nin taban ağırlığı k^(L-1).",
-                "k < 1 olduğu sürece yüksek seviye her zaman daha nadirdir.")
-                .defineInRange("nadirlikBaslangic", s.nadirlikBaslangic(), 0.01, 1.0);
+                "k < 1 olduğu sürece yüksek seviye daha nadirdir; k > 1'de yüksek seviye başkundur.")
+                .defineInRange("nadirlikBaslangic", s.nadirlikBaslangic(), 0.01, 2.0);
         nadirlikSon = k.comment("Nadirlik katsayısının ulaştığı son değer (ağırlık yüksek seviyelere kayar).")
-                .defineInRange("nadirlikSon", s.nadirlikSon(), 0.01, 1.0);
-        nadirlikGecisGunu = k.comment("Katsayının başlangıçtan son değere vardığı oyun günü.")
+                .defineInRange("nadirlikSon", s.nadirlikSon(), 0.01, 2.0);
+        nadirlikGecisGunu = k.comment("Katsayının başlangıçtan son değere vardığı oyun günü (5 günlük basamaklarla yükselir).")
                 .defineInRange("nadirlikGecisGunu", s.nadirlikGecisGunu(), 0.0, 1_000_000.0);
         acilisRampaGunu = k.comment("Yeni açılan seviyenin tam ağırlığa ulaştığı gün sayısı (hemen baskın olmaz).")
                 .defineInRange("acilisRampaGunu", s.acilisRampaGunu(), 0.0, 1_000_000.0);
@@ -203,6 +206,12 @@ public final class CekirdekAyarlari {
                 .defineInRange("sirenEkYaricap", 64, 0, 4096);
         ardisikAfetMesafesi = k.comment("Son afetin merkezine bu kadar yakın oyuncular hedef seçiminde sona bırakılır.")
                 .defineInRange("ardisikAfetMesafesi", 128, 0, 100_000);
+        merkezEnAzChunk = k.comment("Doğal afet merkezi, afetin seçildiği andaki oyuncu konumundan en az bu kadar chunk (16 blok)",
+                "uzakta seçilir; afet oyuncunun üstünde ya da onu izleyerek kurulmaz.")
+                .defineInRange("merkezEnAzChunk", MerkezHalkasi.VARSAYILAN_EN_AZ, 0, 64);
+        merkezEnCokChunk = k.comment("Doğal afet merkezi oyuncudan en çok bu kadar chunk uzakta seçilir (merkezEnAzChunk'tan küçükse",
+                "en az değere eşitlenir).")
+                .defineInRange("merkezEnCokChunk", MerkezHalkasi.VARSAYILAN_EN_COK, 0, 64);
         k.pop();
 
         k.comment("TPS kısması (madde 3): tüm sistemler tek ölçerden okur.").push("tps");
@@ -338,6 +347,11 @@ public final class CekirdekAyarlari {
 
     public double ardisikAfetMesafesi() {
         return ardisikAfetMesafesi.get();
+    }
+
+    /** Doğal afet merkezinin hedef oyuncuya göre halkası (chunk); en çok değer en azdan küçük olamaz. */
+    public MerkezHalkasi merkezHalkasi() {
+        return new MerkezHalkasi(merkezEnAzChunk.get(), merkezEnCokChunk.get());
     }
 
     public TpsKismasi.Esikler tpsEsikleri() {

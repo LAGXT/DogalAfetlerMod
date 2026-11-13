@@ -1,0 +1,35 @@
+{
+  "parent": "dogalafetler:dogalafetler/ilk_ruzgar",
+  "criteria": {
+    "ozel": {
+      "conditions": {
+        "anahtar": "gozun_icinde"
+      },
+      "trigger": "dogalafetler:ozel_basarim"
+    }
+  },
+  "display": {
+    "announce_to_chat": false,
+    "description": {
+      "translate": "advancements.dogalafetler.gozun_icinde.description"
+    },
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "item": "minecraft:phantom_membrane"
+    },
+    "show_toast": true,
+    "title": {
+      "translate": "advancements.dogalafetler.gozun_icinde.title"
+    }
+  },
+  "requirements": [
+    [
+      "ozel"
+    ]
+  ],
+  "rewards": {
+    "experience": 15
+  },
+  "sends_telemetry_event": true
+}
