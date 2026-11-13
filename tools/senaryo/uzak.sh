@@ -125,7 +125,7 @@ for y in "${geri[@]}"; do
 done
 "${ssh_ac[@]}" bash -s <<<"mkdir -p$(printf ' %q' "${klasorler[@]}")" || { echo "UZAK: $makine'de klasör açılamadı" >&2; exit 4; }
 /usr/bin/rsync -a --delete -e "ssh -o BatchMode=yes" \
-    --exclude=/build/ --exclude=/.gradle/ --exclude='/run*/' --exclude=/logs/ --exclude=/.vibe/ --exclude=/.venv/ \
+    --exclude=/build/ --exclude=/cekirdek/build/ --exclude=/.gradle/ --exclude='/run*/' --exclude=/logs/ --exclude=/.vibe/ --exclude=/.venv/ \
     --exclude=/.worktrees/ --exclude=/.git --exclude=/cikti/ --exclude='/_eski-surum-*/' --exclude=__pycache__/ \
     "$kok/" "$makine:$kok/" || { echo "UZAK: rsync başarısız, iş başlatılmadı" >&2; exit 4; }
 

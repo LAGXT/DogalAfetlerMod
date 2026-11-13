@@ -1,0 +1,34 @@
+// Ortak çekirdek (K-E89): Minecraft, Forge, Fabric ve Mojang sınıfına dokunmayan saf Java mantığı.
+// Bu proje sınıf yolunda yalnız JDK ve JUnit taşır: saf olmayan bir import bu derlemeyi kırar, yani sınır derleyiciyle korunur.
+// Kök proje (Forge) ve ileride Fabric portu bu klasörün kaynaklarını kendi ana kaynak kümesine ekler (srcDir); ayrı jar, JarJar ya da
+// bölünmüş paket yoktur, paket adları aynı kalır.
+plugins {
+    id 'java-library'
+}
+
+group = mod_group_id
+version = mod_version
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+// JUnit'i kök projedeki depo listesinden al: kökte bu depoları ForgeGradle ekler ve çevrimdışı Gradle önbelleği (ana makine, pc2)
+// depo kimliğine göre tutulur; aynı depolar kullanılınca ek indirme gerekmez.
+repositories.addAll(rootProject.repositories)
+
+dependencies {
+    testImplementation platform("org.junit:junit-bom:${junit_surum}")
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test', Test).configure {
+    useJUnitPlatform()
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+        exceptionFormat 'full'
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}

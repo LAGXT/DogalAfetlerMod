@@ -22,13 +22,16 @@ from pathlib import Path
 
 W = Path(__file__).resolve().parents[2]
 MOD = "src/main/java/io/github/kadirberkpolat1/dogalafetler/"
-FILTRESIZ_DOSYA = {"build.gradle", "settings.gradle", "gradle.properties"}
+FILTRESIZ_DOSYA = {"build.gradle", "settings.gradle", "gradle.properties", "cekirdek/build.gradle"}
+CEKIRDEK_ANA = "cekirdek/src/main/java/"
 YOK_KOK = {"LICENSE", ".gitignore", "gradlew", "gradlew.bat"}
-YOK_ON_EK = ("tools/", "docs/", ".vibe/", "src/test/", "src/main/resources/assets/", "src/generated/resources/assets/")
+YOK_ON_EK = ("tools/", "docs/", ".vibe/", "src/test/", "cekirdek/src/test/", "src/main/resources/assets/", "src/generated/resources/assets/")
 
 
 def sinifla(yol):
     """("filtresiz" | "yok" | "filtre", sınıf listesi, gerekçe)."""
+    if yol.startswith(CEKIRDEK_ANA):  # ortak çekirdek (K-E89): taşınmadan önceki yoluyla sınıflanır
+        yol = "src/main/java/" + yol[len(CEKIRDEK_ANA):]
     if "/mixin/" in yol or yol.endswith(".mixins.json"):
         return "filtresiz", [], "mixin"
     if yol in FILTRESIZ_DOSYA or yol.startswith("gradle/"):

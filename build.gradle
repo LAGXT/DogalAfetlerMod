@@ -115,6 +115,10 @@ mixin {
 // runData çıktıları derlemeye dahil edilir.
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
+// Ortak çekirdek (K-E89): cekirdek/ Minecraft'sız saf mantığı taşır ve ayrı bir alt proje olarak da derlenir (saflık sınırı
+// derleyiciyle korunur). Jar'a ayrı yapıt olarak girmez: kaynakları ana kaynak kümesine eklenir, paket adları değişmez.
+sourceSets.main.java { srcDir 'cekirdek/src/main/java' }
+
 // Uyum API taslakları (JEI, Jade): bu modların API jar'ı çevrimdışı Gradle önbelleğinde yok, bu yüzden derleme zamanında yalnız
 // kullanılan imzaları taşıyan taslaklar (src/uyumApi/java) ana kaynak kümesinin derleme sınıf yoluna eklenir. Taslaklar jar'a girmez ve
 // çalışma sınıf yoluna da konmaz: gerçek sınıflar çalışma anında JEI/Jade jar'ından gelir (mod yoksa eklenti sınıfları hiç yüklenmez).

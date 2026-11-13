@@ -36,8 +36,8 @@ W = Path(__file__).resolve().parents[2]
 KOK = W.parents[1] if W.parent.name == ".worktrees" else W
 DEFTER = KOK / ".vibe" / "test-defteri.tsv"
 BASLIK = "test_kimligi	girdi_hash	sonuc	makine	HEAD	tarih	log\n"
-MOD = ["src/main", "src/generated"]
-DERLEME = MOD + ["src/test", "build.gradle", "settings.gradle", "gradle.properties", "gradle"]
+MOD = ["src/main", "src/generated", "cekirdek/src/main"]
+DERLEME = MOD + ["src/test", "cekirdek/src/test", "cekirdek/build.gradle", "build.gradle", "settings.gradle", "gradle.properties", "gradle"]
 YAZILMAYAN_KODLAR = {2, 3, 4, 130, 143}
 
 # gradle_kapisi.sh görevleri: defterli olanlar ve onların yanında yutulanlar (başka görev varsa koşu defterlenmez).

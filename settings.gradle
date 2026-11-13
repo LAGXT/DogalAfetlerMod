@@ -18,3 +18,6 @@ plugins {
 }
 
 rootProject.name = 'dogalafetler'
+
+// Minecraft'sız ortak mantık (K-E89); kök proje kaynaklarını ana kaynak kümesine ekler (build.gradle).
+include 'cekirdek'
