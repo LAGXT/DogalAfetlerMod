@@ -167,10 +167,11 @@ public final class UyariOyunTestleri {
 
     /**
      * Sunucu geneli sirenler (V7): güneş patlaması kendi sireni, ay çarpması standart siren; ikisi de
-     * {@link SirenTuru#UZUN_SURE_TICK} tick (25 sn, K0-19 rev. K-E67), AKTIF'te türün fade-out'uyla durdurma (güneş 80,
+     * {@link SirenTuru#sureTick} tick (güneş 25 sn, ay 2 dk), AKTIF'te türün fade-out'uyla durdurma (güneş 80,
      * standart 40).
      */
     private static void uzunSiren(GameTestHelper yardimci, AfetTuru afetTuru, SirenTuru beklenen) {
+        int sure = SirenTuru.sureTick(afetTuru);
         Sahne sahne = Sahne.kur(yardimci, afetTuru);
         sahne.koru(() -> {
             ServerPlayer oyuncu = sahne.oyuncu(0, 0);
@@ -182,7 +183,7 @@ public final class UyariOyunTestleri {
             yardimci.assertTrue(siren.size() == 1, "SIREN başlarken tek siren paketi beklendi: " + siren.size());
             SirenPaketi paket = siren.get(0);
             yardimci.assertTrue(paket.tur() == beklenen && paket.afet() == afetTuru && paket.afetNo() == afetNo
-                    && paket.toplamTick() == SirenTuru.UZUN_SURE_TICK && paket.kalanTick() == SirenTuru.UZUN_SURE_TICK,
+                    && paket.toplamTick() == sure && paket.kalanTick() == sure,
                     "uzun siren paketi içeriği: " + paket);
             yardimci.assertTrue(sahne.yonetici().asamaIleri() && afet.asama() == AfetAsamasi.AKTIF, "AKTIF'e geçmedi");
             List<SirenDurdurPaketi> durdur = durdurmalar(gelenler(oyuncu));
@@ -201,7 +202,7 @@ public final class UyariOyunTestleri {
     }
 
     @GameTest(template = "bos", batch = "uyari_ay", timeoutTicks = 100)
-    public static void ayCarpmasiStandartSireniYirmiBesSaniyeCalarIkiSaniyedeSoner(GameTestHelper yardimci) {
+    public static void ayCarpmasiStandartSireniIkiDakikaCalarIkiSaniyedeSoner(GameTestHelper yardimci) {
         uzunSiren(yardimci, AfetTuru.AY_CARPMASI, SirenTuru.STANDART);
     }
 

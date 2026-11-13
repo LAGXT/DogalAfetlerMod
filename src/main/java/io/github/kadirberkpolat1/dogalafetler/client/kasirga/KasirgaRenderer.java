@@ -95,6 +95,8 @@ final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
     private Matrix3f nor;
     private int isik;
     private VertexConsumer vc;
+    /** Ağ köşelerinin normalinin y bileşeni: huni ve etek yan duvarı için 0, tavan kapağı için 1. */
+    private float agNormalY;
 
     KasirgaRenderer(EntityRendererProvider.Context baglam) {
         super(baglam);
@@ -228,6 +230,8 @@ final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
                         uKaymasi(t, icOmega, uTekrar) + 0.5, uTekrar, KasirgaDokusu.HUNI_B_V0, KasirgaDokusu.HUNI_B_V1,
                         hr * 0.78f, hg * 0.78f, hb * 0.80f, (float) (icAlfa * alfa * huniAlfa), kahve);
             }
+            // Tavan: huni tepesi açık bir borudur; yandan ya da alttan bakınca içi boş görünür. Duvar bulutunun koyu tonuyla kapatılır.
+            kapak(t, butce.huniDilim(), h, rUst, a, (float) (alfa * huniAlfa), uKaymasi(t, disOmega, uTekrar) * 0.5);
         }
         int girdap = evre == KasirgaEvresi.OLGUN ? butce.altGirdapSayisi(s.seviye(), mesafe, lod) : 0;
         sonGirdap = girdap;
@@ -273,6 +277,53 @@ final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
     /** Yüzey dönüşü: U zamanla artar, doku -θ yönünde (siklonik) kayar. */
     private static double uKaymasi(double t, double omega, int uTekrar) {
         return t * omega / TAM_TUR * uTekrar;
+    }
+
+    /**
+     * Huni tepesini kapatan hafif kubbeli disk: kenarı huninin tepe halkasıyla çakışır ({@code rUst}), ortası {@code 0,18·rUst}
+     * (en çok 6 blok) yukarı kabarır. Renk duvar bulutuyla aynı koyu ton (seviyeyle koyulaşır), doku iç katmandaki çizgili bulut
+     * gürültüsüdür ve huniyle aynı yönde yavaş döner. Alt ya da üstten bakınca (görüş doğrultusu diske dike yakınken) opak,
+     * yandan bakınca yarı saydam; kenara doğru huniye karışmak için %65'e söner.
+     */
+    private void kapak(double t, int dilim, double yukseklik, double rUst, float seviyeOrani, float alfa, double uKay) {
+        final int halka = 5;
+        diziHazirla((dilim + 1) * (halka + 1), halka + 1);
+        float r = Mth.lerp(seviyeOrani, 0.55f, 0.26f);
+        float g = Mth.lerp(seviyeOrani, 0.57f, 0.28f);
+        float b = Mth.lerp(seviyeOrani, 0.60f, 0.33f);
+        double kubbe = Math.min(6.0, 0.18 * rUst);
+        double taban = (0.62 + 0.25 * seviyeOrani) * alfa;
+        for (int j = 0; j <= halka; j++) {
+            double k = 1 - (double) j / halka;
+            double yaricap = rUst * k;
+            double y = yukseklik + kubbe * (1 - k * k);
+            double kenar = 0.65 + 0.35 * (1 - k);
+            halkaR[j] = r;
+            halkaG[j] = g;
+            halkaB[j] = b;
+            halkaV[j] = (float) (KasirgaDokusu.HUNI_B_V0 + (1 - k) * (KasirgaDokusu.HUNI_B_V1 - KasirgaDokusu.HUNI_B_V0));
+            for (int i = 0; i <= dilim; i++) {
+                double teta = TAM_TUR * i / dilim;
+                int n = j * (dilim + 1) + i;
+                float x = (float) (Math.cos(teta) * yaricap);
+                float z = (float) (Math.sin(teta) * yaricap);
+                noktaX[n] = x;
+                noktaY[n] = (float) y;
+                noktaZ[n] = z;
+                float dx = x - kamX;
+                float dy = (float) y - kamY;
+                float dz = z - kamZ;
+                float uzunluk = (float) Math.sqrt(dx * dx + dy * dy + dz * dz) + 1e-4f;
+                float dik = Math.abs(dy) / uzunluk;
+                noktaA[n] = (float) (taban * kenar * (0.55 + 0.45 * Math.sqrt(dik))) * UzaklikSolmasi.carpan(uzunluk, sisBitisi);
+                noktaU[n] = (float) ((double) i / dilim * 2 + uKay);
+                noktaNx[n] = 0;
+                noktaNz[n] = 0;
+            }
+        }
+        agNormalY = 1;
+        agiYaz(dilim, halka);
+        agNormalY = 0;
     }
 
     /**
@@ -338,7 +389,7 @@ final class KasirgaRenderer extends EntityRenderer<KasirgaVarligi> {
     private void agKosesi(int n, int halka) {
         vc.vertex(mat, noktaX[n], noktaY[n], noktaZ[n]).color(halkaR[halka], halkaG[halka], halkaB[halka], noktaA[n])
                 .uv(noktaU[n], halkaV[halka]).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(isik)
-                .normal(nor, noktaNx[n], 0, noktaNz[n]).endVertex();
+                .normal(nor, noktaNx[n], agNormalY, noktaNz[n]).endVertex();
     }
 
     /**

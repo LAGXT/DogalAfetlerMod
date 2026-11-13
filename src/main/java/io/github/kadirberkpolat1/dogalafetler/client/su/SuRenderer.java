@@ -243,6 +243,18 @@ public final class SuRenderer {
     private static final long DILIM_NS = 250_000;
     private static final int BIRIM = 4;
     private static final int BIRIM_UZAK = 8;
+    /**
+     * Tsunami dalgası ya da sel varken tick başına en az kurulum bütçesi: 2 ms'de dalgalı yakın halkanın yapımı (17–30 ms) 7–21
+     * tick'e yayılıyor, dalga cephesi ve yükselen sel yarım saniyede bir sıçrayıp duruyordu.
+     */
+    private static final long DALGA_BUTCE_NS = 12_000_000;
+    /** Dalga varken uzak LOD yenileme aralığı (tick). */
+    private static final int UZAK_DALGA_YENILEME = 4;
+    /** Son bütçe açılan tick: kare hızı tick hızının altındayken karesiz geçen tick'lerin bütçesi de kullanılır (en çok 4). */
+    private static long butceTick = Long.MIN_VALUE;
+    /** Önceki tick'te çizilen kare sayısı ve bu tick'in sayacı: tick bütçesi karelere yayılır. */
+    private static int kareTick = 1;
+    private static int kareBuTick;
     private static final ThreadMXBean IPLIK = ManagementFactory.getThreadMXBean();
     // Ölçüm: tick başına en çok kurulum ve yayılma (otomasyon özeti ve 10 sn'lik log).
     private static long olcEnCokTickNs;
@@ -370,6 +382,8 @@ public final class SuRenderer {
         aktifDunya = d;
         if (tick != kurulanTick) {
             kurulanTick = tick;
+            kareTick = Math.max(1, kareBuTick);
+            kareBuTick = 0;
             spriteGuncelle(mc);
             if (tick % 200 == 0) {
                 kurulumLogu();
@@ -379,7 +393,7 @@ public final class SuRenderer {
             // Sakin denizde karolar değişmez: yenileme seyrek (güneş açısı için), kayma ve artış değişimi hemen.
             boolean hareketli = d.dalgaDizisi().length > 0 || d.cekilmeDizisi().length > 0 || !d.magaralar().isEmpty()
                     || d.selDizisi().length > 0;
-            int periyot = hareketli ? UZAK_YENILEME : UZAK_SAKIN_YENILEME;
+            int periyot = d.dalgaDizisi().length > 0 ? UZAK_DALGA_YENILEME : hareketli ? UZAK_YENILEME : UZAK_SAKIN_YENILEME;
             if (!uzakYapiyor && (uzakKirli || tick - uzakTick >= periyot || tick < uzakTick || dx * dx + dz * dz > 64
                     || d.etkinArtis(saat) != uzakArtis)) {
                 uzakTick = tick;
@@ -388,6 +402,7 @@ public final class SuRenderer {
                 uzakBaslat(mc, e.getCamera());
             }
         }
+        kareBuTick++;
         if (yapAsama == 0 && tick != yapTick) {
             yapBaslat(e.getCamera(), tick);
         }
@@ -657,7 +672,7 @@ public final class SuRenderer {
         yapOx = (int) Math.floor(cam.x);
         yapOy = (int) Math.floor(cam.y);
         yapOz = (int) Math.floor(cam.z);
-        yapT = saat;
+        yapT = saat + onGorus(aktifDunya, cizAralik);
         yapTick = tick;
         yapSonTick = Long.MIN_VALUE;
         yapSatir = 0;
@@ -670,6 +685,22 @@ public final class SuRenderer {
         yansimaGuclu = 0;
         yansimaToplam = 0;
         yapAsama = 1;
+    }
+
+    /** Su hareketli mi: tsunami dalgası ya da yükselen/çekilen sel (yapım daha sık, zamanı ileri alınır). */
+    private static boolean akisVar(SanalSuDunyasi d) {
+        return d != null && (d.dalgaDizisi().length > 0 || d.selDizisi().length > 0);
+    }
+
+    /**
+     * Su hareketliyken yapımın zamanı ileri alınır: ağ yapım bitince çizilir ve sonraki ağa dek ekranda kalır, cephe gösterim
+     * süresinin ortasında doğru yerde olsun diye yapımlar arası aralığın ({@code aralik}, tick) 1,5 katı kadar. Hareket yoksa 0.
+     */
+    private static double onGorus(SanalSuDunyasi d, long aralik) {
+        if (!akisVar(d)) {
+            return 0;
+        }
+        return IstemciDonem.durum().hiz() * Math.min(20, Math.max(1, aralik)) * 1.5;
     }
 
     private static void yapIptal() {
@@ -694,6 +725,13 @@ public final class SuRenderer {
      */
     private static void kurulumIlerlet(ClientLevel l, SanalSuDunyasi d, long tick) {
         long butceNs = (long) (SuAyarlari.istemci().yakinKurulumButcesiMs.get() * 1e6);
+        if (akisVar(d)) {
+            butceNs = Math.max(butceNs, DALGA_BUTCE_NS);
+        }
+        if (tick != butceTick) {
+            butceNs *= butceTick == Long.MIN_VALUE || tick < butceTick ? 1 : Math.min(4, tick - butceTick);
+            butceTick = tick;
+        }
         BUTCE.tickBasla(tick, butceNs);
         if (yapAsama == 0 && !uzakYapiyor || !BUTCE.calisabilir()) {
             return;
@@ -710,14 +748,16 @@ public final class SuRenderer {
             tickCpuNs = 0;
         }
         long t0 = System.nanoTime();
+        // Tick bütçesi tick'in karelerine yayılır: ilk kare bütün bütçeyi harcayınca kare süreleri düzensizleşiyordu.
+        long kareSon = t0 + butceNs / kareTick + DILIM_NS;
         long cpu0 = GorselOtomasyon.AKTIF ? IPLIK.getCurrentThreadCpuTime() : 0;
         long onceki = t0;
-        while (BUTCE.calisabilir()) {
+        while (BUTCE.calisabilir() && System.nanoTime() < kareSon) {
             int is = BUTCE.siradaki(yapAsama != 0, uzakYapiyor);
             if (is == KurulumButcesi.YOK) {
                 break;
             }
-            long son = onceki + Math.min(BUTCE.kalan(), DILIM_NS);
+            long son = Math.min(onceki + Math.min(BUTCE.kalan(), DILIM_NS), kareSon);
             if (is == KurulumButcesi.YAKIN) {
                 if (yapSonTick != tick) {
                     yapSonTick = tick;
@@ -922,7 +962,7 @@ public final class SuRenderer {
         uzakYapGx = Math.floorDiv(uzakYapCx - uzakYapR, LOD) * LOD;
         uzakYapGz0 = Math.floorDiv(uzakYapCz - uzakYapR, LOD) * LOD;
         uzakYapGz = uzakYapGz0;
-        uzakYapT = saat;
+        uzakYapT = saat + onGorus(aktifDunya, UZAK_DALGA_YENILEME);
         uzakYapDortgen = 0;
         uzakYapTickSayisi = 0;
         uzakSonTick = Long.MIN_VALUE;

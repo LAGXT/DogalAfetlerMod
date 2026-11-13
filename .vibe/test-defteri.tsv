@@ -270,3 +270,5 @@ test	2fb837c18639	gecti	LAGXT2	2564a54+	2026-11-11T22:03	.vibe/kanit/k-e86/junit
 ay_carpmasi_gorsel	2b8c41d071c3	gecti	PC	2564a54+	2026-11-12T15:57	.vibe/kanit/ay-carpmasi
 su_istemci:deniz-dalga	4afac36a4af8	kaldi	PC	2564a54+	2026-11-12T16:56	.vibe/kanit/shader-dogrulama/once
 build+test	a5580f01a42d	gecti	LAGXT2	2564a54+	2026-11-12T18:54	.vibe/kanit/k-e87/junit-build.log
+test	78e88fd54e47	kaldi	LAGXT2	7d5f28a+	2026-11-13T15:29	.vibe/kanit/k-e88/junit-tum.log
+test	c9ecc3ba39c3	gecti	LAGXT2	7d5f28a+	2026-11-13T15:30	.vibe/kanit/k-e88/junit-tum.log

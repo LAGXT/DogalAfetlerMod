@@ -7,15 +7,15 @@ package io.github.kadirberkpolat1.dogalafetler.afet.ay_carpmasi.mantik;
  * çarpma süresince monotondur (istemci saatinin sanilik geri düzeltmesi titreme yapmasın, K-C35).
  */
 public final class AyEgrileri {
-    /** Yaklaşma = siren süresi (K0-19 rev. K-E67: 25 sn, eski 60 sn; evreler oranla ölçeklendi). */
-    public static final float YAKLASMA_SN = 25f;
+    /** Yaklaşma = siren süresi ({@code SirenTuru.AY_SURE_TICK}: 2 dakika; kullanıcı isteğiyle 25 sn'den uzatıldı). */
+    public static final float YAKLASMA_SN = 120f;
     /** Parçalanma (çatlaklar, kopan parçalar) başlangıcı. */
-    public static final float PARCALANMA_SN = 8f;
+    public static final float PARCALANMA_SN = 38f;
     /** Üç çatlak aşamasının aralığı ve her birinin belirme süresi. */
-    public static final float CATLAK_ARALIGI_SN = 5.5f;
-    public static final float CATLAK_BELIRME_SN = 2.5f;
-    /** Son yaklaşma: ay ufka iner, alt kenarı atmosferde kızarır (son 4 sn). */
-    public static final float SON_YAKLASMA_SN = 21f;
+    public static final float CATLAK_ARALIGI_SN = 26f;
+    public static final float CATLAK_BELIRME_SN = 12f;
+    /** Son yaklaşma: ay ufka iner, alt kenarı atmosferde kızarır (son 10 sn). */
+    public static final float SON_YAKLASMA_SN = 110f;
     /**
      * Yedek yaklaşma yönü: +X'ten (doğu) +Z'ye (güney) doğru derece. Gerçek yön, olayın başladığı anda vanilla ayın bulunduğu
      * yerden alınır ({@link AyYonu}); bu değer yalnız o bilinmiyorsa (ve eski sabit yönlü {@link #egim(float)} için) kullanılır.
@@ -74,14 +74,14 @@ public final class AyEgrileri {
 
     /**
      * Ayın ufuktan yüksekliği (derece), gökte {@code baslangic} yüksekliğinden başlayan ay için: son yaklaşmaya kadar o
-     * yükseklikte durur, son 4 sn'de {@link #sonEgim} yüksekliğine iner (K-E83: ay, olayın başladığı anda vanilla ayın
+     * yükseklikte durur, son 10 sn'de {@link #sonEgim} yüksekliğine iner (K-E83: ay, olayın başladığı anda vanilla ayın
      * bulunduğu yerden gelir).
      */
     public static float egim(float sn, float baslangic) {
         return baslangic + (sonEgim(baslangic) - baslangic) * yumusak((sn - SON_YAKLASMA_SN) / (YAKLASMA_SN - SON_YAKLASMA_SN));
     }
 
-    /** Gökte {@link #YAKLASMA_EGIMI} yüksekliğinden başlayan (özgün, sabit yönlü) ay: 35°, son 4 sn'de 4°'ye iner. */
+    /** Gökte {@link #YAKLASMA_EGIMI} yüksekliğinden başlayan (özgün, sabit yönlü) ay: 35°, son 10 sn'de 4°'ye iner. */
     public static float egim(float sn) {
         return egim(sn, YAKLASMA_EGIMI);
     }
@@ -99,7 +99,7 @@ public final class AyEgrileri {
         return sonEgim(baslangic) + (PATLAMA_EGIMI - SON_EGIM);
     }
 
-    /** Üç aşamalı çatlak katmanının alfası ({@code asama} 1–3): 8; 13,5 ve 19. sn'de 2,5 sn'de belirir. */
+    /** Üç aşamalı çatlak katmanının alfası ({@code asama} 1–3): 38; 64 ve 90. sn'de 12 sn'de belirir. */
     public static float catlak(int asama, float sn) {
         float bas = PARCALANMA_SN + CATLAK_ARALIGI_SN * (Math.max(1, Math.min(3, asama)) - 1);
         return yumusak((sn - bas) / CATLAK_BELIRME_SN);

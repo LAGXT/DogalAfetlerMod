@@ -2,7 +2,8 @@ package io.github.kadirberkpolat1.dogalafetler.core;
 
 /**
  * Siren türü ve süresi (madde 5, K0-19 rev. K-E67). Sireni çalan {@code uyari} paketidir; çekirdek yalnız "hangi tür, kaç
- * tick" bildirir. Güneş patlamasının kendi ürkütücü sireni vardır; ay çarpması standart sireni 25 sn çalar. Saf Java'dır.
+ * tick" bildirir. Güneş patlamasının kendi ürkütücü sireni vardır ve 25 sn çalar; ay çarpması standart sireni 2 dakika çalar (ay
+ * bütün bu sürede gökten yaklaşır). Saf Java'dır.
  */
 public enum SirenTuru {
     STANDART("standart"),
@@ -15,6 +16,11 @@ public enum SirenTuru {
      * seçilmesinden görünmesine ~30 sn; eski 60 sn).
      */
     public static final int UZUN_SURE_TICK = 500;
+    /**
+     * Bölüm H: ay çarpmasında ay siren boyunca yaklaşır; kullanıcı isteğiyle 25 sn çok hızlı bulunduğundan 2 dakika
+     * (2400 tick). Güneş patlaması {@link #UZUN_SURE_TICK}'te kalır.
+     */
+    public static final int AY_SURE_TICK = 2400;
 
     private final String kimlik;
 
@@ -32,7 +38,7 @@ public enum SirenTuru {
 
     /**
      * AS-9: aynı anda birden çok afet siren aşamasındayken oyuncunun duyacağı sirenin önceliği (büyük olan çalar, ötekiler
-     * susar): ay çarpması (25 sn) &gt; güneş patlaması &gt; diğerleri (10 sn).
+     * susar): ay çarpması (2 dk) &gt; güneş patlaması &gt; diğerleri (10 sn).
      */
     public static int oncelik(AfetTuru tur) {
         return switch (tur) {
@@ -44,6 +50,9 @@ public enum SirenTuru {
 
     /** Sirenin ölçekli (afet saati) tick cinsinden süresi. */
     public static int sureTick(AfetTuru tur) {
+        if (tur == AfetTuru.AY_CARPMASI) {
+            return AY_SURE_TICK;
+        }
         return tur.sunucuGeneli() ? UZUN_SURE_TICK : STANDART_SURE_TICK;
     }
 }

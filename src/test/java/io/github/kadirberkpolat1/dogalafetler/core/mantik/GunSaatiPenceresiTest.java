@@ -68,12 +68,16 @@ class GunSaatiPenceresiTest {
         assertEquals(9_200 / 24_000.0, GECE.secimPayi(pay), 1e-12);
     }
 
-    /** Varsayılan ön-uyarı ve siren ile görünme payı 800 tick (ön-uyarı 100 + 60, siren 500, emniyet 140). */
+    /**
+     * Varsayılan ön-uyarı ve siren ile görünme payı: güneş 800 tick (ön-uyarı 100 + 60, siren 500, emniyet 140); ay 2660 tick
+     * (erken bildirim 100 + en az 20, siren 2400, emniyet 140).
+     */
     @Test
     void varsayilanGorunmePayi() {
         for (AfetTuru tur : new AfetTuru[] {AfetTuru.GUNES_PATLAMASI, AfetTuru.AY_CARPMASI}) {
-            assertEquals(800, GunSaatiPenceresi.gorunmePayi(tur, OnUyariPenceresi.VARSAYILAN_ERKEN_BILDIRIM,
-                    OnUyariPenceresi.VARSAYILAN_EN_AZ, OnUyariPenceresi.VARSAYILAN_EN_COK), tur.kimlik());
+            assertEquals(tur == AfetTuru.AY_CARPMASI ? 2660 : 800, GunSaatiPenceresi.gorunmePayi(tur,
+                    OnUyariPenceresi.VARSAYILAN_ERKEN_BILDIRIM, OnUyariPenceresi.VARSAYILAN_EN_AZ,
+                    OnUyariPenceresi.VARSAYILAN_EN_COK), tur.kimlik());
         }
     }
 

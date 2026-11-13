@@ -142,8 +142,8 @@ public final class CekirdekAyarlari {
         k.pop();
 
         k.comment("Gizli ön-uyarı penceresi (madde 4): afet seçildikten sonra siren çalmadan önceki süre. Varsayılanlarla",
-                "seçimden görünmeye (ön-uyarı + 10 sn siren) ortalama ~30 sn geçer. Sireni 25 sn olan güneş patlaması ve ay",
-                "çarpmasında pencere sirenin fazlası (15 sn) kadar kısalır.").push("onUyari");
+                "seçimden görünmeye (ön-uyarı + 10 sn siren) ortalama ~30 sn geçer. Sireni uzun olan güneş patlaması (25 sn) ve ay",
+                "çarpmasında (2 dk) pencere sirenin fazlası kadar kısalır (en az 1 sn).").push("onUyari");
         onUyariEnAzTick = k.comment("Pencerenin en kısa süresi (200 tick = 10 sn).")
                 .defineInRange("enAzTick", OnUyariPenceresi.VARSAYILAN_EN_AZ, 0, 72_000);
         onUyariEnCokTick = k.comment("Pencerenin en uzun süresi (360 tick = 18 sn).")

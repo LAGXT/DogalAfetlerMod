@@ -15,7 +15,7 @@ class AyEgrileriTest {
     @Test
     void yaklasmaSirenSuresiyleAyni() {
         assertEquals(SirenTuru.sureTick(AfetTuru.AY_CARPMASI), Math.round(AyEgrileri.YAKLASMA_SN * 20),
-                "istemci yaklaşmayı siren süresinden çizer (K0-19 rev. K-E67: 25 sn)");
+                "istemci yaklaşmayı siren süresinden çizer (2 dakika)");
     }
 
     /** K-E67: kısa yaklaşmada da evreler okunur kalır ve sırası korunur. */
@@ -59,7 +59,7 @@ class AyEgrileriTest {
                 catlak[i] = c;
             }
         }
-        assertEquals(0f, AyEgrileri.parcaYayilmasi(AyEgrileri.PARCALANMA_SN - 0.1f), EPS, "parçalanma 8. sn'de başlar");
+        assertEquals(0f, AyEgrileri.parcaYayilmasi(AyEgrileri.PARCALANMA_SN - 0.1f), EPS, "parçalanma PARCALANMA_SN'de başlar");
         assertEquals(0f, AyEgrileri.catlak(1, AyEgrileri.PARCALANMA_SN), EPS);
         assertEquals(1f, AyEgrileri.catlak(3, yaklasma), EPS, "son aşama çarpmadan önce tam");
         assertEquals(0f, AyEgrileri.kizarma(AyEgrileri.SON_YAKLASMA_SN), EPS);

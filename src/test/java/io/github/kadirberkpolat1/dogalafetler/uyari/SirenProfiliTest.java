@@ -20,14 +20,13 @@ class SirenProfiliTest {
     }
 
     /**
-     * Ay çarpması 25 sn = standart 10 sn dosyasının 2,5 turu, yukarı 3 (K0-19 rev. K-E67); güneş 25 sn = 20 sn dosyanın
-     * 1,25 turu, yukarı 2.
+     * Ay çarpması 2 dk = standart 10 sn dosyasının 12 turu; güneş 25 sn = 20 sn dosyanın 1,25 turu, yukarı 2 (K0-19 rev. K-E67).
      */
     @Test
     void donguSayisiSureyiDosyaBoyunaBoler() {
         SirenProfili ay = SirenProfili.icin(SirenTuru.afetIcin(AfetTuru.AY_CARPMASI));
         assertEquals(SirenProfili.STANDART, ay);
-        assertEquals(3, ay.donguSayisi(SirenTuru.sureTick(AfetTuru.AY_CARPMASI)));
+        assertEquals(12, ay.donguSayisi(SirenTuru.sureTick(AfetTuru.AY_CARPMASI)));
         assertEquals(1, SirenProfili.STANDART.donguSayisi(SirenTuru.sureTick(AfetTuru.DEPREM)));
         assertEquals(2, SirenProfili.GUNES.donguSayisi(SirenTuru.sureTick(AfetTuru.GUNES_PATLAMASI)));
         assertTrue(SirenProfili.GUNES.acilisTick() + SirenProfili.GUNES.sondurmeTick()

@@ -96,6 +96,12 @@ class GorunmeSuresiTest {
         return new Sure(onUyari + siren + gorunme, onUyariEnCok + siren + gorunme, onUyari, onUyariEnCok, siren, gorunme);
     }
 
+    /** Ay çarpması: ay 2 dakika boyunca gökten yaklaşır (kullanıcı isteği); 30 sn kuralı yerine yaklaşma + en az ön-uyarı. */
+    private static void ayYaklasmasi(Sure s) {
+        assertEquals(SirenTuru.AY_SURE_TICK, s.siren(), "ay sireni 2 dakika");
+        assertTrue(s.ortalamaSn() >= 120 && s.enCokSn() <= 130, "ay: seçimden çarpmaya " + s.ortalamaSn() + " / " + s.enCokSn());
+    }
+
     @Test
     void butunTurlerdeSecimdenGorunmeyeOtuzSaniye() {
         Map<AfetTuru, Sure> tablo = new EnumMap<>(AfetTuru.class);
@@ -114,6 +120,10 @@ class GorunmeSuresiTest {
         for (Map.Entry<AfetTuru, Sure> e : tablo.entrySet()) {
             Sure s = e.getValue();
             String ad = e.getKey().kimlik();
+            if (e.getKey() == AfetTuru.AY_CARPMASI) {
+                ayYaklasmasi(s);
+                continue;
+            }
             assertTrue(s.ortalamaSn() >= EN_AZ_ORTALAMA_SN && s.ortalamaSn() <= EN_COK_ORTALAMA_SN,
                     ad + " ortalama " + s.ortalamaSn() + " sn");
             assertTrue(s.enCokSn() <= EN_KOTU_SN, ad + " en kötü durum " + s.enCokSn() + " sn");
@@ -164,6 +174,10 @@ class GorunmeSuresiTest {
                 }
             }
             assertTrue(secilebilir > 0, tur.kimlik() + " hiç seçilemiyor");
+            if (tur == AfetTuru.AY_CARPMASI) {
+                ayYaklasmasi(s);
+                continue;
+            }
             assertTrue(s.ortalamaSn() >= EN_AZ_ORTALAMA_SN && s.ortalamaSn() <= EN_COK_ORTALAMA_SN && s.enCokSn() <= EN_KOTU_SN,
                     tur.kimlik() + " doğal: " + s.ortalamaSn() + " / " + s.enCokSn());
         }

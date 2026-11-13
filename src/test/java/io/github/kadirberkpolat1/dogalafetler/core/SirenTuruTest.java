@@ -5,12 +5,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.jupiter.api.Test;
 
 class SirenTuruTest {
-    /** K0-19 rev. K-E67: uzun siren 25 sn (eski 60 sn). */
+    /** K0-19 rev. K-E67: güneş patlaması sireni 25 sn; ay çarpması yaklaşması kullanıcı isteğiyle 2 dakika. */
     @Test
-    void standartSirenOnSaniyeUzunSirenYirmiBesSaniye() {
+    void standartSirenOnSaniyeGunesYirmiBesSaniyeAyIkiDakika() {
         for (AfetTuru tur : AfetTuru.values()) {
-            boolean uzun = tur == AfetTuru.GUNES_PATLAMASI || tur == AfetTuru.AY_CARPMASI;
-            assertEquals(uzun ? 500 : 200, SirenTuru.sureTick(tur), tur.kimlik());
+            int beklenen = tur == AfetTuru.AY_CARPMASI ? 2400 : tur == AfetTuru.GUNES_PATLAMASI ? 500 : 200;
+            assertEquals(beklenen, SirenTuru.sureTick(tur), tur.kimlik());
         }
     }
 
