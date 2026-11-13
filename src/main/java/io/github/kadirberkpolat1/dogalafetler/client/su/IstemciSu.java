@@ -14,7 +14,12 @@ import io.github.kadirberkpolat1.dogalafetler.su.SanalSu;
 import io.github.kadirberkpolat1.dogalafetler.su.SanalSuDunyasi;
 import io.github.kadirberkpolat1.dogalafetler.su.SuAyarlari;
 import io.github.kadirberkpolat1.dogalafetler.su.SuPaketi;
+import io.github.kadirberkpolat1.dogalafetler.su.SuAraliklari;
 import io.github.kadirberkpolat1.dogalafetler.su.TazelemePlani;
+import it.unimi.dsi.fastutil.longs.Long2IntMap;
+import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongIterator;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
@@ -23,6 +28,7 @@ import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.SectionPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.Level;
@@ -55,6 +61,13 @@ public final class IstemciSu {
     /** Son su altı sisi (kare tanısı): sıcak pay ve uzak düzlem; kamera suda değilse NaN. */
     private static float sonSicak = Float.NaN;
     private static float sonSisUzak = Float.NaN;
+    /** Örtü ({@link SuGizleme#ortu}) son kurulduğundaki durum: etkin miydi, alan hesabı, ısı bölgeleri ve tick. */
+    private static boolean ortuEtkin;
+    private static int ortuHesap = -1;
+    private static Object ortuIsi;
+    private static long ortuTick = Long.MIN_VALUE;
+    private static int ortuLogBoyut = -1;
+    private static final SuAraliklari ORTU_A = new SuAraliklari();
 
     private IstemciSu() {
     }
@@ -72,6 +85,9 @@ public final class IstemciSu {
             SanalSu.istemci = dunya;
             derlenen = new Cekilme[0];
             hedef = new Cekilme[0];
+            SuGizleme.ortuAyarla(SuGizleme.yeniOrtu());
+            ortuEtkin = false;
+            ortuHesap = -1;
         }
     }
 
@@ -81,6 +97,8 @@ public final class IstemciSu {
         dunya = null;
         bekleyen = null;
         SanalSu.istemci = null;
+        SuGizleme.ortuAyarla(SuGizleme.yeniOrtu());
+        ortuEtkin = false;
     }
 
     @SubscribeEvent
@@ -108,6 +126,7 @@ public final class IstemciSu {
             dunya.alan().isle(SanalSu.okuyucu(l), TazelemePlani.tickButcesi(SuAyarlari.istemci().okumaButcesi.get(), 1, 1.0));
         }
         cekilmeGuncelle(mc, l, t);
+        ortuGuncelle(mc, l, t);
         for (int id : dunya.bitenDalgalar(t)) {
             dunya.dalgaKaldir(id);
         }
@@ -330,6 +349,91 @@ public final class IstemciSu {
                 }
             }
         }
+    }
+
+    /**
+     * Sel ve deniz yükselmesi: sanal suyun örttüğü gerçek su sütunlarının en üst bloğu çizilmez ({@link SuGizleme#ortu}). Küme
+     * görüş mesafesindeki okunmuş sütunlardan kurulur: örtü başlayınca ya da bitince hemen, sürerken alan yeniden hesaplanınca ya da
+     * ısı bölgeleri değişince en çok 20 tick'te bir. Yalnız üyeliği değişen sütunların bölümleri yeniden derlenir.
+     */
+    private static void ortuGuncelle(Minecraft mc, ClientLevel l, double t) {
+        boolean etkin = dunya.etkinArtis(t) > 0;
+        if (!etkin && !ortuEtkin) {
+            return;
+        }
+        DenizAlani alan = dunya.alan();
+        IsiBolgesi[] isi = dunya.isiDizisi();
+        long tick = l.getGameTime();
+        if (etkin == ortuEtkin && (alan.hesapSayisi() == ortuHesap && isi == ortuIsi
+                || tick >= ortuTick && tick - ortuTick < 20)) {
+            return;
+        }
+        ortuEtkin = etkin;
+        ortuHesap = alan.hesapSayisi();
+        ortuIsi = isi;
+        ortuTick = tick;
+        Long2IntOpenHashMap yeni = SuGizleme.yeniOrtu();
+        int yukluParca = 0;
+        int suSutun = 0;
+        int aralikli = 0;
+        double artisEnCok = 0;
+        if (etkin) {
+            int r = mc.options.getEffectiveRenderDistance() + 1;
+            int pcx = mc.player.getBlockX() >> 4;
+            int pcz = mc.player.getBlockZ() >> 4;
+            for (int cx = pcx - r; cx <= pcx + r; cx++) {
+                for (int cz = pcz - r; cz <= pcz + r; cz++) {
+                    int x0 = cx << 4;
+                    int z0 = cz << 4;
+                    if (!alan.yuklu(x0, z0)) {
+                        continue;
+                    }
+                    yukluParca++;
+                    for (int i = 0; i < 256; i++) {
+                        int x = x0 + (i & 15);
+                        int z = z0 + (i >> 4);
+                        if (!alan.su(x, z)) {
+                            continue;
+                        }
+                        suSutun++;
+                        ORTU_A.temizle();
+                        double artis = dunya.sutunArtisi(x, z, t);
+                        artisEnCok = Math.max(artisEnCok, artis);
+                        alan.aralikEkle(x, z, artis, ORTU_A);
+                        if (ORTU_A.adet() > 0) {
+                            aralikli++;
+                            yeni.put(DenizAlani.anahtar(x, z), alan.zemin(x, z) - 1);
+                        }
+                    }
+                }
+            }
+        }
+        Long2IntOpenHashMap eski = SuGizleme.ortu();
+        LongOpenHashSet bolumler = new LongOpenHashSet();
+        for (Long2IntMap.Entry e : eski.long2IntEntrySet()) {
+            if (yeni.get(e.getLongKey()) != e.getIntValue()) {
+                bolumEkle(bolumler, e.getLongKey(), e.getIntValue());
+            }
+        }
+        for (Long2IntMap.Entry e : yeni.long2IntEntrySet()) {
+            if (eski.get(e.getLongKey()) != e.getIntValue()) {
+                bolumEkle(bolumler, e.getLongKey(), e.getIntValue());
+            }
+        }
+        SuGizleme.ortuAyarla(yeni);
+        if (bolumler.size() > 0 && yeni.size() != ortuLogBoyut) {
+            ortuLogBoyut = yeni.size();
+            DogalAfetler.LOGGER.info("Sanal su: örtü sütun={} yeniden derlenen bölüm={}", yeni.size(), bolumler.size());
+        }
+        LongIterator it = bolumler.iterator();
+        while (it.hasNext()) {
+            long b = it.nextLong();
+            mc.levelRenderer.setSectionDirty(SectionPos.x(b), SectionPos.y(b), SectionPos.z(b));
+        }
+    }
+
+    private static void bolumEkle(LongOpenHashSet bolumler, long sutun, int y) {
+        bolumler.add(SectionPos.asLong((int) (sutun >> 32) >> 4, y >> 4, (int) sutun >> 4));
     }
 
     static boolean kameraSuda(Camera cam) {
