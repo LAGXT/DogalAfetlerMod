@@ -3,7 +3,7 @@
 # (pc2'nin `OLCUM` satırları `bilgi`, `olcum_tablosu.py`). Kullanım (proje ya da worktree kökünden):
 #   tools/senaryo/pc2_istemci.sh <kanıt/> <görsel betik> [betik argümanları...]
 #   tools/senaryo/pc2_istemci.sh .vibe/kanit/pc2-radar/ radar_gorsel.py .vibe/kanit/pc2-radar
-#   tools/senaryo/pc2_istemci.sh /home/lagxt/LagOS/DogalAfetlerMod/.vibe/kanit/yiyecek/ yiyecek_gorsel.py
+#   tools/senaryo/pc2_istemci.sh /home/lagxt/LagOS/Projeler/DogalAfetlerMod/.vibe/kanit/yiyecek/ yiyecek_gorsel.py
 # <kanıt/> betiğin yazdığı klasör olmalı (argümansız betikler KÖK/.vibe/kanit/<ad>/'a yazar). Bu kipi bütün görsel betikler
 # tanır (ortak ekran protokolü, `runclient_kilit.istemci_baslat` ve eşleri). İşi `uzak.sh` götürür (rsync, setsid, kesme,
 # <kanıt/> geri çekme onundur). Bu betik yalnız: (1) betik var mı diye bakar; (2) runClient ~5–6 GiB olduğundan pc2'nin

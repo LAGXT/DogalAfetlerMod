@@ -38,7 +38,7 @@ JAVA_HOME = "/home/lagxt/.jdks/jdk-17.0.21+9"
 ISARET = "AY_OTOMASYON"
 # AY_IRIS=1: Oculus + DogalAfetlerShader açıkken aynı senaryo (K-E83); çalışma klasörü aynı, log'larda -Puyum=iris görünür.
 IRIS = os.environ.get("AY_IRIS") == "1"
-SHADER_KAYNAK = Path("/home/lagxt/LagOS/DogalAfetlerShader/shaders")
+SHADER_KAYNAK = Path("/home/lagxt/LagOS/Projeler/DogalAfetlerShader/shaders")
 KANIT.mkdir(parents=True, exist_ok=True)
 KARELER.mkdir(exist_ok=True)
 GUNLUK = open(KANIT / "protokol.log", "a", encoding="utf-8")

@@ -22,7 +22,7 @@ import runclient_kilit  # noqa: E402
 WS = 97
 W = Path(__file__).resolve().parents[2]
 JAVA_HOME = "/home/lagxt/.jdks/jdk-17.0.21+9"
-SHADER = Path("/home/lagxt/LagOS/DogalAfetlerShader/shaders")
+SHADER = Path("/home/lagxt/LagOS/Projeler/DogalAfetlerShader/shaders")
 AYAR = Path(os.environ.get("ADIM_AYAR", "/home/lagxt/.sklauncher/instances/dglftlr/shaderpacks/DogalAfetlerShader.txt"))
 ISARET = "ADIM-OTOMASYON BITTI"
 
