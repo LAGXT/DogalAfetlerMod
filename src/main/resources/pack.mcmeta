@@ -3,6 +3,10 @@
     "description": {
       "text": "${mod_name} kaynakları"
     },
-    "pack_format": 15
+    "min_format": [
+      107,
+      1
+    ],
+    "max_format": 107
   }
 }

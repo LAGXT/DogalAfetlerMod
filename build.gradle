@@ -1,9 +1,9 @@
 plugins {
-    id 'eclipse'
+    id 'java'
     id 'idea'
+    id 'eclipse'
     id 'maven-publish'
-    id 'net.minecraftforge.gradle' version '[6.0,6.2)'
-    id 'org.spongepowered.mixin' version '0.7.+'
+    id 'net.minecraftforge.gradle' version '[7.0.23,8)'
 }
 
 version = mod_version
@@ -13,56 +13,34 @@ base {
     archivesName = mod_id
 }
 
-// Minecraft 1.20.1 Java 17 ister; JAVA_HOME'daki JDK 17 toolchain olarak bulunur.
-java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+// Minecraft 26.x Java 25 ister (Mojang son kullanıcıya Java 25 dağıtır); JAVA_HOME'daki JDK 25 toolchain olarak bulunur.
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
 
 println "Java: ${System.getProperty 'java.version'}, JVM: ${System.getProperty 'java.vm.version'} (${System.getProperty 'java.vendor'}), Arch: ${System.getProperty 'os.arch'}"
 
-// Uyumluluk modları: -Puyum=e4mc | coldsweat | ikisi | iris (varsayılan: yok).
-def uyum = (project.findProperty('uyum') ?: 'yok').toString()
-if (!(uyum in ['yok', 'e4mc', 'coldsweat', 'ikisi', 'iris'])) {
-    throw new GradleException("Geçersiz -Puyum=${uyum}; geçerli değerler: yok, e4mc, coldsweat, ikisi, iris")
-}
-
 minecraft {
-    mappings channel: mapping_channel, version: mapping_version
-
-    copyIdeResources = true
-
     runs {
         configureEach {
-            workingDirectory project.file('run')
-            property 'forge.logging.markers', 'REGISTRIES'
-            property 'forge.logging.console.level', 'info'
-            // Uyumluluk modlarının mixin refmap'i SRG adlıdır; geliştirme ortamında resmi adlara çevrilmezse hedefler
-            // kayar (Cold Sweat 2.4.5'in required_mods filtresi çalışmaz, dünya kayıt hatasıyla açılmaz). Uyum modu yokken
-            // refmap kapatılır: sanal su mixin'leri geliştirme ortamında resmi adlarla çalışır, refmap (SRG) yalnız üretim
-            // jar'ı içindir. İkisi birlikte kurulmaz: refmap kapalıyken uyum modunun refmap'i hiç okunmaz.
-            if (uyum != 'yok') {
-                property 'mixin.env.remapRefMap', 'true'
-                property 'mixin.env.refMapRemappingFile', "${projectDir}/build/createSrgToMcp/output.srg"
-            } else {
-                property 'mixin.env.disableRefMap', 'true'
-            }
-
-            mods {
-                "${mod_id}" {
-                    source sourceSets.main
-                }
-            }
+            workingDir.convention layout.projectDirectory.dir('run')
+            systemProperty 'forge.logging.markers', 'REGISTRIES'
+            systemProperty 'forge.logging.console.level', 'info'
+            systemProperty 'eventbus.api.strictRuntimeChecks', 'true'
+            // Mixin yapılandırmaları komut satırından verilir (jar'da ise MixinConfigs manifest girdisinden okunur).
+            args "--mixin.config=${mod_id}.su.mixins.json"
+            args "--mixin.config=${mod_id}.client.su.mixins.json"
+            args "--mixin.config=${mod_id}.uyum.mixins.json"
         }
 
-        client {
-            property 'forge.enabledGameTestNamespaces', mod_id
+        register('client') {
+            systemProperty 'forge.enabledGameTestNamespaces', mod_id
             // Entegre sunucuda yaşam döngüsü sınama afeti (core.OyunTestiAfeti), ör. -PoyunTestiAfeti=deprem.
             if (project.hasProperty('oyunTestiAfeti')) {
-                property 'dogalafetler.oyunTestiAfeti', project.property('oyunTestiAfeti').toString()
+                systemProperty 'dogalafetler.oyunTestiAfeti', project.property('oyunTestiAfeti').toString()
             }
             // Quick Play: -PquickPlay=<run/saves altındaki dünya klasörü>, ör. -PquickPlay=test
             if (project.hasProperty('quickPlay')) {
                 args '--quickPlaySingleplayer', project.property('quickPlay').toString()
             }
-            // Çok oyunculu/ekran otomasyonu: -PkullaniciAdi=A (oyuncu adı), -PquickPlaySunucu=localhost:25565 (doğrudan giriş).
             if (project.hasProperty('kullaniciAdi')) {
                 args '--username', project.property('kullaniciAdi').toString()
             }
@@ -71,54 +49,45 @@ minecraft {
             }
             // İstemci otomasyonu (K0-21 rev. 2): -Potomasyon=su senaryoyu koşar, ekran görüntüsü alır, oyunu kapatır.
             if (project.hasProperty('otomasyon')) {
-                property 'dogalafetler.otomasyon', project.property('otomasyon').toString()
-                property 'dogalafetler.otomasyon.bolum', (project.findProperty('otomasyonBolum') ?: 'hepsi').toString()
+                systemProperty 'dogalafetler.otomasyon', project.property('otomasyon').toString()
+                systemProperty 'dogalafetler.otomasyon.bolum', (project.findProperty('otomasyonBolum') ?: 'hepsi').toString()
                 args '--width', '1280', '--height', '720'
             }
         }
 
-        server {
-            workingDirectory project.file('run-server')
-            property 'forge.enabledGameTestNamespaces', mod_id
-            // Yaşam döngüsünü gerçek afet olmadan sınamak için: -PoyunTestiAfeti=deprem,sinkhole (core.OyunTestiAfeti).
+        register('server') {
+            workingDir = layout.projectDirectory.dir('run-server')
+            systemProperty 'forge.enabledGameTestNamespaces', mod_id
             if (project.hasProperty('oyunTestiAfeti')) {
-                property 'dogalafetler.oyunTestiAfeti', project.property('oyunTestiAfeti').toString()
+                systemProperty 'dogalafetler.oyunTestiAfeti', project.property('oyunTestiAfeti').toString()
             }
             args '--nogui'
         }
 
-        // Kayıtlı bütün GameTest'leri koşar ve çıkar; hiç GameTest yoksa çöker. -Ptest_filtre=<regex> yalnız sınıf, batch ya da
-        // test adı uyan testleri (ve yerleşim bekçisini) koşar (K-E20); kabul ve entegrasyon filtresiz koşar.
-        gameTestServer {
-            workingDirectory project.file('run-gametest')
-            property 'forge.enabledGameTestNamespaces', mod_id
+        // Kayıtlı bütün GameTest'leri koşar ve çıkar. -Ptest_filtre=<regex> yalnız uyan testleri koşar (K-E20).
+        register('gameTestServer') {
+            workingDir = layout.projectDirectory.dir('run-gametest')
+            systemProperty 'forge.enabledGameTestNamespaces', mod_id
             if (project.hasProperty('test_filtre')) {
-                property 'dogalafetler.gametest.filtre', project.property('test_filtre').toString()
+                systemProperty 'dogalafetler.gametest.filtre', project.property('test_filtre').toString()
             }
         }
 
-        data {
-            workingDirectory project.file('run-data')
-            args '--mod', mod_id, '--all', '--output', file('src/generated/resources/'), '--existing', file('src/main/resources/')
+        register('data') {
+            workingDir = layout.projectDirectory.dir('run-data')
+            args '--mod', mod_id, '--all',
+                    '--output', layout.projectDirectory.dir('src/generated/resources'),
+                    '--existing', layout.projectDirectory.dir('src/main/resources')
         }
     }
-}
-
-// Sanal su mixin yapılandırması (gerekçe docs/KARARLAR.md K0-25); üretim jar'ında refmap ve MixinConfigs manifest girdisi.
-mixin {
-    add sourceSets.main, "${mod_id}.refmap.json"
-    config "${mod_id}.su.mixins.json"
-    config "${mod_id}.client.su.mixins.json"
-    config "${mod_id}.uyum.mixins.json"
 }
 
 // runData çıktıları derlemeye dahil edilir.
 sourceSets.main.resources { srcDir 'src/generated/resources' }
 
-// Uyum API taslakları (JEI, Jade): bu modların API jar'ı çevrimdışı Gradle önbelleğinde yok, bu yüzden derleme zamanında yalnız
-// kullanılan imzaları taşıyan taslaklar (src/uyumApi/java) ana kaynak kümesinin derleme sınıf yoluna eklenir. Taslaklar jar'a girmez ve
-// çalışma sınıf yoluna da konmaz: gerçek sınıflar çalışma anında JEI/Jade jar'ından gelir (mod yoksa eklenti sınıfları hiç yüklenmez).
-// Taslak imzaları JEI 15.20 (1.20.1) ve Jade 11.13 (1.20.1) jar'larıyla doğrulanmıştır.
+// Uyum API taslakları (JEI, Jade): derleme zamanında yalnız kullanılan imzaları taşıyan taslaklar (src/uyumApi/java) ana kaynak
+// kümesinin derleme sınıf yoluna eklenir; jar'a ve çalışma sınıf yoluna girmez. Taslak imzaları 1.20.1 içindi, 26.x için yeniden
+// doğrulanmalı.
 sourceSets {
     uyumApi
 }
@@ -126,34 +95,17 @@ sourceSets.uyumApi.compileClasspath = sourceSets.main.compileClasspath
 sourceSets.main.compileClasspath += sourceSets.uyumApi.output
 
 repositories {
-    // Modrinth deposu yalnız maven.modrinth grubunu sunar. exclusiveContent kullanılmaz: fg.deobf aynı gruptaki
-    // *_mapped_official yapıtını ForgeGradle'ın kendi deobf deposundan verir ve exclusiveContent bunu engeller.
-    maven {
-        name = 'Modrinth'
-        url = 'https://api.modrinth.com/maven'
-        content {
-            includeGroup 'maven.modrinth'
-        }
-    }
+    minecraft.mavenizer(it)
+    maven fg.forgeMaven
+    maven fg.minecraftLibsMaven
+    mavenCentral()
 }
 
 dependencies {
-    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
-    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
-
-    if (uyum == 'e4mc' || uyum == 'ikisi') {
-        runtimeOnly fg.deobf("maven.modrinth:e4mc:${e4mc_surum}")
-    }
-    if (uyum == 'coldsweat' || uyum == 'ikisi') {
-        runtimeOnly fg.deobf("maven.modrinth:cold-sweat:${coldsweat_surum}")
-    }
-    // Gölgelendirici uyumu (K-E83): Embeddium + Oculus ile geçici geliştirme ortamı (-Puyum=iris), gölgelendirici paketi run/shaderpacks'ten.
-    if (uyum == 'iris') {
-        runtimeOnly fg.deobf("maven.modrinth:embeddium:${embeddium_surum}")
-        runtimeOnly fg.deobf("maven.modrinth:oculus:${oculus_surum}")
-    }
-    // Sıcaklık sisteminin Cold Sweat köprüsü (N8): API yalnız derlemede; mods.toml'da isteğe bağlı bağımlılık.
-    compileOnly fg.deobf("maven.modrinth:cold-sweat:${coldsweat_surum}")
+    implementation minecraft.dependency("net.minecraftforge:forge:${minecraft_version}-${forge_version}")
+    annotationProcessor 'net.minecraftforge:eventbus-validator:' + eventbus_validator_version
+    // Sanal su mixin'leri (gerekçe docs/KARARLAR.md K0-25): işlemci derlemede mixin doğrular.
+    annotationProcessor 'org.spongepowered:mixin:0.8.7:processor'
 
     testImplementation platform("org.junit:junit-bom:${junit_surum}")
     testImplementation 'org.junit.jupiter:junit-jupiter'
@@ -170,7 +122,6 @@ tasks.named('test', Test).configure {
 
 // Çalışma klasörleri git'te değil; yeni bir klon ya da worktree'de ilk açılışta gereken dosyalar burada yazılır.
 tasks.matching { it.name == 'runServer' }.configureEach {
-    // Sunucu konsolu: Gradle'ın stdin'i sunucuya iletilir, böylece `stop` ve diğer komutlar yazılabilir.
     standardInput = System.in
     doFirst {
         def klasor = project.file('run-server')
@@ -188,9 +139,7 @@ tasks.matching { it.name == 'runServer' }.configureEach {
 
 tasks.matching { it.name == 'runGameTestServer' }.configureEach {
     doFirst {
-        // Forge'un GameTest sunucusu dünyayı server.properties'ten kurar (yoksa log'a yanıltıcı bir ERROR düşer). Normal
-        // arazi testlerin sahnesini örter (K0-31): yapısız düz dünya, eski dünyaya dokunmamak için ayrı klasörde. Yönetilen
-        // anahtarlar her koşuda yeniden yazılır; dosyadaki diğer satırlar korunur. Oyun kuralları kural.OyunTestiDunyasi'nda.
+        // GameTest sunucusu dünyayı server.properties'ten kurar: yapısız düz dünya (K0-31), her koşuda boş (K-E16).
         def ozellikler = project.file('run-gametest/server.properties')
         ozellikler.parentFile.mkdirs()
         def yonetilen = [
@@ -205,11 +154,7 @@ tasks.matching { it.name == 'runGameTestServer' }.configureEach {
         def satirlar = eski.findAll { satir -> !yonetilen.keySet().any { satir.startsWith(it + '=') } }
         yonetilen.each { anahtar, deger -> satirlar << "${anahtar}=${deger}".toString() }
         ozellikler.text = satirlar.join('\n') + '\n'
-        yonetilen.each { anahtar, deger -> logger.lifecycle("run-gametest/server.properties: ${anahtar}=${deger}") }
-        // Her koşu boş dünyayla başlar (K-E16): sahnelerin yeri test sayısıyla değişir ve saklanan dünyada eski yerleşimin
-        // kutuları dışında kalan bloklar (ör. donma gölü) yeni sahnelere akıyordu.
         project.delete(project.file('run-gametest/oyuntesti-duz'))
-        logger.lifecycle('run-gametest/oyuntesti-duz silindi: GameTest boş dünyayla başlar')
     }
 }
 
@@ -253,10 +198,11 @@ tasks.named('jar', Jar).configure {
                 'Implementation-Title'    : project.name,
                 'Implementation-Version'  : project.jar.archiveVersion,
                 'Implementation-Vendor'   : mod_authors,
-                'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
+                'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
+                // Mixin üretim jar'ında yapılandırmaları buradan bulur.
+                'MixinConfigs'            : "${mod_id}.su.mixins.json,${mod_id}.client.su.mixins.json,${mod_id}.uyum.mixins.json",
         ])
     }
-    finalizedBy 'reobfJar'
 }
 
 publishing {
