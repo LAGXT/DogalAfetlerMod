@@ -323,7 +323,7 @@ class Kosucu:
                 if pc2_kopya:
                     self.pc2_metin = metin
                     self.pc2_olay.set()
-            time.sleep(0.5)
+            time.sleep(2.0)
         print(f"SIRA: {self.makine} koşucusu durdu; koşan {len(self.cocuklar)} iş sürüyor", flush=True)
 
 
